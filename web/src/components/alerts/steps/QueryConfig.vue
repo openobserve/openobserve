@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <template v-if="selectedFunction !== 'total_events'">
                               <span
                                 class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                                >{{ t("alerts.conditionOf") }}</span
+                                >{{ measureConnector }}</span
                               >
                               <OFormSelect
                                 :aria-label="t('alerts.form.names.field')"
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <template v-if="selectedFunction !== 'total_events'">
                               <span
                                 class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                                >{{ t("alerts.conditionOf") }}</span
+                                >{{ measureConnector }}</span
                               >
                               <div class="relative inline-flex min-w-28 shrink">
                                 <OFormSelect
@@ -1278,7 +1278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')
                         "
                         :label="t('alerts.promRuleMode')"
-                        :description="keptThresholdText || t('alerts.promRuleModeDescription')"
+                        :description="keptThresholdText || t('alerts.promRuleModeHelp')"
                         fill
                         data-test="add-alert-rule-mode-row"
                       >
@@ -1299,6 +1299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (localTab === 'sql' || promqlCondition || isPromRuleMode))
                       "
                       :label="sqlPlainLimit ? t('alerts.plain.queryReturns') : groupQuestionTitle"
+                      :description="groupQuestionHelp"
                       fill
                       data-test="add-alert-group-question-row"
                       wide
@@ -1577,7 +1578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="!isPromRuleMode"
                         :label="t('alerts.plain.valueIs')"
                         wide
-                        :info="t('alerts.queryConfig.alertIfValueIsTooltip')"
+                        :info="t('alerts.queryConfig.alertWhenTooltip')"
                         fill
                       >
                         <template #description>
@@ -2440,6 +2441,12 @@ export default defineComponent({
     }
 
     const countedNoun = computed(() => dataNoun(props.streamType, "custom", 2, t));
+    // COUNT(field) counts the events carrying the field, so "count of service_name" would misread.
+    const measureConnector = computed(() =>
+      selectedFunction.value === "count"
+        ? t("alerts.conditionCountWith", { noun: countedNoun.value })
+        : t("alerts.conditionOf"),
+    );
     // Log function options — count (default) and measure functions.
     // computed() (not a module/setup const) so the labels + tooltips re-resolve
     // if the locale changes; the `value`s are payload identifiers and stay literal.
@@ -3192,6 +3199,11 @@ export default defineComponent({
         ? t("alerts.form.group.grouped", { label: raw(q.labels[0]) })
         : t("alerts.form.group.groupedMany");
     });
+    const groupQuestionHelp = computed(() =>
+      localTab.value === "promql" && !isPromRuleMode.value && !sqlPlainLimit.value
+        ? t("alerts.form.group.eachSeriesHelp")
+        : undefined,
+    );
     const groupOneLabel = computed(() =>
       localTab.value === "promql" && isPromRuleMode.value
         ? t("alerts.multiAlert.simple")
@@ -4471,6 +4483,7 @@ export default defineComponent({
       switchedToCountNote,
       groupTotalBy,
       countedNoun,
+      measureConnector,
       isSpanDuration,
       durationUnit,
       durationUnitOptions,
@@ -4549,6 +4562,7 @@ export default defineComponent({
       warningOffered,
       groupEachLabel,
       groupOneLabel,
+      groupQuestionHelp,
       groupAnswer,
       countErrorTest,
       countTestIds,

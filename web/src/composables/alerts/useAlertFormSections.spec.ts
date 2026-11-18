@@ -621,6 +621,33 @@ describe("useAlertFormSections", () => {
       nav: ["more than 50 events · Group by service_name · matching 1 filter", "StandardAlert"],
     },
     {
+      scenario: "LOG: a count of the group field counts events, one alert per service",
+      aggregation: true,
+      form: {
+        stream_name: "otel_demo",
+        destinations: ["StandardAlert"],
+        logGroupBy: ["service_name"],
+        query_condition: {
+          type: "custom",
+          conditions: tree(cond("severity", "=", "ERROR")),
+          aggregation: {
+            function: "count",
+            group_by: ["service_name"],
+            multi_alert: true,
+            having: { column: "service_name", operator: ">", value: 50 },
+          },
+        },
+        trigger_condition: every(5),
+      },
+      card: [
+        "Watches Logs in otel_demo where severity is ERROR, on a schedule.",
+        "Fires for each service_name with more than 50 events in the last 5 minutes.",
+        "Tells StandardAlert (Webhook), notifying at most every 30 minutes.",
+        "Checks every 5 minutes, looking at the last 5 minutes.",
+      ],
+      nav: ["more than 50 events · One per service_name · matching 1 filter", "StandardAlert"],
+    },
+    {
       scenario: "OOM: real-time with an OR filter",
       form: {
         is_real_time: "true",

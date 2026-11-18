@@ -38,6 +38,7 @@ import {
   formatNumber,
   joinList,
   joinListMore,
+  measureWords as measurePhrase,
 } from "@/utils/alerts/alertCopy";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { compareFactor } from "@/utils/alerts/alertIntents";
@@ -344,7 +345,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   // "count" with no column is the builder's count of every matching event.
   const countsAllEvents = (fd: AlertSectionsFormData): boolean => {
     const agg = fd.query_condition?.aggregation;
-    return agg?.function === "count" && !hasValue(agg?.having?.column);
+    const column = agg?.having?.column;
+    // Every row of a group carries the group's own field, so counting it counts the group's events.
+    return agg?.function === "count" && (!hasValue(column) || groupLabels(fd).includes(column));
   };
   const ruleComparison = (fd: AlertSectionsFormData) => {
     const qc = fd.query_condition ?? {};
@@ -549,13 +552,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     return facts;
   };
 
-  const measureWords = (fd: AlertSectionsFormData): I18nText => {
-    const agg = fd.query_condition?.aggregation;
-    return t("alerts.verdict.measure", {
-      fn: agg?.function ?? "",
-      field: agg?.having?.column ?? "",
-    });
-  };
+  const measureWords = (fd: AlertSectionsFormData): I18nText =>
+    measurePhrase(fd.query_condition?.aggregation, groupLabels(fd), fd.stream_type, t);
 
   // Until the detection is fully described there is nothing for the step to be done with.
   const anomalyConditionMissing = (): boolean => {

@@ -15,7 +15,7 @@
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { hasDeliveryTarget } from "./deliveryTarget";
-import { dataNoun, formatNumber, joinList, valueWithUnit } from "./alertCopy";
+import { dataNoun, formatNumber, joinList, measureWords, valueWithUnit } from "./alertCopy";
 import { describeFilterNode, filterSentenceParts } from "./filterSentence";
 import {
   nameResolvedExpression,
@@ -273,6 +273,11 @@ export function eventCountText(
     : t("alerts.summary.plainEnglish.conditionOther", { threshold, operator, noun });
 }
 
+const groupsOf = (alert: ReadBackAlert): string[] => [
+  ...(alert.logGroupBy ?? []),
+  ...(alert.query_condition?.aggregation?.group_by ?? []),
+];
+
 function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: boolean): I18nText {
   const qc = alert.query_condition ?? {};
   const tc = alert.trigger_condition ?? {};
@@ -290,9 +295,8 @@ function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: bool
     qc.aggregation &&
     having?.column
   ) {
-    return t("alerts.readBack.measureIn", {
-      fn: qc.aggregation.function ?? "",
-      field: having.column,
+    return t("alerts.readBack.measureIs", {
+      measure: measureWords(qc.aggregation, groupsOf(alert), alert.stream_type, t),
       op: operatorSymbol(having.operator),
       value: measureValueText(alert, having.value ?? "", t),
       window,
@@ -419,10 +423,7 @@ export function previewVerdictSentence(
   const window = t("alerts.verdict.window", { n: num(tc.period) }, num(tc.period));
   const having = qc.aggregation?.having;
   if (verdict.value !== undefined && having?.column) {
-    const measure = t("alerts.verdict.measure", {
-      fn: qc.aggregation?.function ?? "",
-      field: having.column,
-    });
+    const measure = measureWords(qc.aggregation, groupsOf(alert), alert.stream_type, t);
     const value = measureValueText(alert, verdict.value, t);
     // With no threshold yet there is nothing to judge, but the value now helps pick one.
     if (isBlank(having.value)) return t("alerts.verdict.valueNow", { measure, value, window });

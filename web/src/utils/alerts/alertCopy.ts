@@ -70,6 +70,23 @@ export function dataNoun(
   return t(NOUN_BY_STREAM[streamType ?? ""] ?? "alerts.verdict.events", count);
 }
 
+/** A builder measure in words. A count counts events carrying its field, so counting a group's own
+ * field reads as the group's events, never as a count of field values. */
+export function measureWords(
+  aggregation: { function?: string; having?: { column?: string } } | undefined,
+  groups: readonly string[],
+  streamType: string | undefined,
+  t: TranslateFn,
+): I18nText {
+  const fn = aggregation?.function ?? "";
+  const field = aggregation?.having?.column ?? "";
+  if (fn !== "count") return t("alerts.verdict.measure", { fn, field });
+  const noun = dataNoun(streamType, "custom", 2, t);
+  return !field || groups.includes(field)
+    ? t("alerts.verdict.eventCount", { noun })
+    : t("alerts.verdict.eventCountWith", { noun, field });
+}
+
 /** The side of the threshold an operator alerts on; "=" and "!=" have none. */
 export const thresholdSide = (operator: string | undefined): "above" | "below" | null =>
   operator === ">=" || operator === ">"

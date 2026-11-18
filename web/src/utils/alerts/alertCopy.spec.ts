@@ -9,6 +9,7 @@ import {
   durationText,
   everyDuration,
   joinListMore,
+  measureWords,
   valueWithUnit,
 } from "./alertCopy";
 
@@ -71,5 +72,17 @@ describe("compactNumber", () => {
     [1_250_000, "1.3M"],
   ])("%i reads %s", (value, expected) => {
     expect(compactNumber(value)).toBe(expected);
+  });
+});
+
+describe("measureWords", () => {
+  it.each([
+    ["count", "service_name", ["service_name"], "number of events"],
+    ["count", "", [], "number of events"],
+    ["count", "user_id", ["service_name"], "number of events with user_id"],
+    ["avg", "duration", [], "avg of duration"],
+  ])("%s of %s grouped by %j reads %s", (fn, column, groups, expected) => {
+    const aggregation = { function: fn, having: { column } };
+    expect(measureWords(aggregation, groups, "logs", t)).toBe(expected);
   });
 });
