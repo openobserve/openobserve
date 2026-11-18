@@ -107,6 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open="firstDataNotice.open"
           @dismiss="firstDataNotice.dismiss"
         />
+        <StarterPackHomeCard
+          v-if="packsEnabled && activeHomeTab === 'overview'"
+          :key="store.state.selectedOrganization?.identifier"
+          :org="store.state.selectedOrganization?.identifier"
+        />
         <SampleDataHomeBanner v-if="activeHomeTab === 'overview'" class="mt-2.5 mb-1" />
         <FirstDataPanel
           v-if="flagOn && isDataTab && arrived"
@@ -294,6 +299,8 @@ import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import analytics from "@/services/product_analytics";
+import StarterPackHomeCard from "@/components/starterPacks/StarterPackHomeCard.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 
 export default defineComponent({
   name: "PageHome",
@@ -641,6 +648,7 @@ export default defineComponent({
       tabOrder,
       onTabReorder,
       isEnterpriseOrCloud,
+      packsEnabled: STARTER_PACKS_ENABLED,
       homeChat,
       aiChatPayload,
       onSendToAiChat,
@@ -660,6 +668,7 @@ export default defineComponent({
     };
   },
   components: {
+    StarterPackHomeCard,
     OverviewTab,
     UsageTab,
     O2AIChat,

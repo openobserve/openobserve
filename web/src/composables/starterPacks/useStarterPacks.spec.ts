@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 
 import { queryClient } from "@/composables/query/queryClient";
@@ -23,6 +23,7 @@ import store from "@/test/unit/helpers/store";
 import type { StarterPack } from "./types";
 import { StarterPackPermissionError } from "./types";
 
+const library = vi.hoisted(() => ({ down: false }));
 const fake = vi.hoisted(() => {
   type Row = Record<string, any>;
   type Fault = { method: string; url: RegExp; status?: number; afterCommit?: boolean };
@@ -35,6 +36,7 @@ const fake = vi.hoisted(() => {
     views: [] as Row[],
     faults: [] as Fault[],
     calls: [] as string[],
+    tagSearchLag: 0,
   };
   const reply = (data: unknown) => ({ status: 200, data });
   const httpError = (status: number) => Object.assign(new Error("http"), { response: { status } });
@@ -44,6 +46,9 @@ const fake = vi.hoisted(() => {
 
   const commit = (method: string, url: string, body: any, config?: Row) => {
     let match: RegExpMatchArray | null;
+    if (url.includes("/streams")) {
+      return reply({ list: [{ name: "kube_present" }], schema: [{ name: "value" }] });
+    }
     if ((match = url.match(/\/kv\/(.+)$/))) {
       const key = decodeURIComponent(match[1]);
       if (method === "post") state.kv.set(key, body);
@@ -69,8 +74,9 @@ const fake = vi.hoisted(() => {
     if ((match = url.match(/\/api\/v2\/org\/alerts(?:\/([^?]+))?/))) {
       const id = match[1];
       if (method === "post") {
-        state.alerts.push({ ...body, id: nextId("a"), folder_id: folderParam(url) });
-        return reply({});
+        const created = { ...body, id: nextId("a"), folder_id: folderParam(url) };
+        state.alerts.push(created);
+        return reply({ code: 200, message: "Alert saved", id: created.id, name: created.name });
       }
       if (id) {
         const alert = state.alerts.find((row) => row.id === id);
@@ -79,6 +85,10 @@ const fake = vi.hoisted(() => {
         return reply(method === "get" ? { ...alert, last_triggered_at: state.seq } : {});
       }
       const wanted = config?.params?.tags?.split(",") ?? [];
+      if (wanted.length && state.tagSearchLag > 0) {
+        state.tagSearchLag -= 1;
+        return reply({ list: [] });
+      }
       const folder = folderParam(url, config);
       const rows = state.alerts
         .filter((row) => wanted.every((tag: string) => row.tags.includes(tag)))
@@ -155,19 +165,26 @@ vi.mock("@/composables/alerts/useAlertLibrary", async () => {
     severity: "warning",
     stream_type: "metrics",
     query_type: "sql",
+    required_streams: id === "k8s/two" ? ["kube_absent"] : ["kube_present"],
     content_hash: `hash-${id}`,
   }));
   return {
     ...actual,
     useAlertLibrary: () => ({
-      loadManifest: async () => ({ alerts }),
-      loadAlertFile: async (entry: { id: string }) => ({
-        name: entry.id,
-        stream_name: "s",
-        destinations: ["someone"],
-        enabled: true,
-        trigger_condition: {},
-      }),
+      loadManifest: async () => {
+        if (library.down) throw new Error("library down");
+        return { alerts };
+      },
+      loadAlertFile: async (entry: { id: string }) => {
+        if (library.down) throw new Error("library down");
+        return {
+          name: entry.id,
+          stream_name: "s",
+          destinations: ["someone"],
+          enabled: true,
+          trigger_condition: {},
+        };
+      },
     }),
   };
 });
@@ -226,10 +243,19 @@ describe("useStarterPacks", () => {
       views: [],
       faults: [],
       calls: [],
+      tagSearchLag: 0,
     });
   });
 
   describe("installPack", () => {
+    it("records a saved alert by the id its create returned when the tag search lags", async () => {
+      fake.state.tagSearchLag = 100;
+      const record = await packs().installPack({ ...PACK, alerts: ["k8s/one"] });
+      const alert = record.items.find(({ kind }) => kind === "alert");
+      expect(alert).toMatchObject({ status: "created", id: fake.state.alerts[0].id });
+      expect(fake.state.alerts).toHaveLength(1);
+    });
+
     it("creates folders, dashboards, disabled alerts and views, and records each", async () => {
       const record = await packs().installPack(PACK);
 
@@ -347,6 +373,20 @@ describe("useStarterPacks", () => {
       expect(counts()).toEqual(FULL);
     });
 
+    it("a resumed install never attempts an item the plan now leaves out", async () => {
+      const api = packs();
+      fake.state.faults.push({ method: "post", url: /\/api\/v2\/org\/alerts/ });
+      expect((await api.installPack(PACK)).status).toBe("incomplete");
+      const before = fake.state.calls.length;
+
+      const record = await api.installPack(PACK, { exclude: ["k8s/one"] });
+
+      const posts = fake.state.calls.slice(before).filter((c) => c.includes("/api/v2/org/alerts"));
+      expect(posts.filter((c) => c.startsWith("post"))).toEqual([]);
+      expect(record.status).toBe("complete");
+      expect(record.items.some((item) => item.itemId === "k8s/one")).toBe(false);
+    });
+
     it("stops when a folder cannot be created and still resumes", async () => {
       const api = packs();
       fake.state.faults.push({ method: "post", url: /\/folders\/dashboards/ });
@@ -372,6 +412,124 @@ describe("useStarterPacks", () => {
 
       expect(left).toBe(right);
       expect(counts()).toEqual(FULL);
+    });
+  });
+
+  describe("previewPack", () => {
+    it("names items and gives a reason for each one left out, creating nothing", async () => {
+      fake.state.views.push({ view_id: "v9", view_name: "Events", data: {}, view_type: "logs" });
+      const preview = await packs().previewPack({
+        ...PACK,
+        alerts: ["k8s/one", "k8s/two", "k8s/lost"],
+      });
+      expect(preview.names["k8s/one"]).toBe("k8s/one");
+      expect(preview.notIncluded.map(({ itemId, reason }) => [itemId, reason])).toEqual([
+        ["k8s/two", "no_data"],
+        ["k8s/lost", "unavailable"],
+        ["events", "already_have"],
+      ]);
+      expect(counts()).toEqual({ ...EMPTY, views: 1 });
+    });
+
+    it("installs without excluded items, reporting progress and who installed", async () => {
+      const seen: number[] = [];
+      const record = await packs().installPack(PACK, {
+        exclude: ["k8s/two"],
+        onProgress: (next) =>
+          seen.push(next.items.filter(({ status }) => status === "created").length),
+      });
+      expect(record.items.some(({ itemId }) => itemId === "k8s/two")).toBe(false);
+      expect(fake.state.alerts).toHaveLength(1);
+      expect(seen.at(-1)).toBe(record.items.length);
+      expect(record.installedAt).toBeGreaterThan(0);
+      expect(record.installedBy).toBe(store.state.userInfo?.email ?? "");
+    });
+  });
+
+  describe("with the Library out of reach", () => {
+    const BUNDLED_PACK: StarterPack = {
+      ...PACK,
+      alerts: ["k8s/one"],
+      bundledAlerts: [
+        {
+          entry: {
+            id: "k8s/one",
+            title: "One",
+            stream_type: "metrics",
+            required_streams: ["kube_present"],
+          } as any,
+          file: { name: "k8s/one", stream_name: "s", trigger_condition: {} },
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      library.down = true;
+    });
+    afterEach(() => {
+      library.down = false;
+    });
+
+    it("previews and installs from the bundled copy", async () => {
+      const api = packs();
+      const preview = await api.previewPack(BUNDLED_PACK);
+      expect(preview.offline).toBe(true);
+      expect(preview.names["k8s/one"]).toBe("One");
+      const record = await api.installPack(BUNDLED_PACK);
+      expect(record.status).toBe("complete");
+      expect(fake.state.alerts).toHaveLength(1);
+      expect(fake.state.alerts[0].enabled).toBe(false);
+    });
+
+    it("creates the dashboard with only the panels that fit, and leaves out one with none", async () => {
+      const panel = (title: string, stream: string) => ({
+        title,
+        queryType: "sql",
+        layout: { x: 0, y: 0, w: 4, h: 4 },
+        queries: [{ query: `SELECT count(*) FROM "${stream}"` }],
+      });
+      const fitting: StarterPack = {
+        ...PACK,
+        alerts: [],
+        bundledAlerts: BUNDLED_PACK.bundledAlerts,
+        dashboards: [
+          {
+            id: "overview",
+            title: "Overview",
+            load: async () => ({
+              version: 8,
+              tabs: [{ tabId: "t", panels: [panel("Yes", "kube_present"), panel("No", "gone")] }],
+            }),
+          },
+        ],
+      };
+      const api = packs();
+      expect((await api.previewPack(fitting)).panels).toEqual({ kept: 1, dropped: 1 });
+      await api.installPack(fitting);
+      expect(fake.state.dashboards[0].body.tabs[0].panels.map((p: any) => p.title)).toEqual([
+        "Yes",
+      ]);
+
+      const none: StarterPack = {
+        ...fitting,
+        dashboards: [
+          {
+            id: "other",
+            title: "Other",
+            load: async () => ({
+              version: 8,
+              tabs: [{ tabId: "t", panels: [panel("No", "gone")] }],
+            }),
+          },
+        ],
+      };
+      expect((await api.previewPack(none)).notIncluded).toContainEqual(
+        expect.objectContaining({ itemId: "other", reason: "no_data" }),
+      );
+    });
+
+    it("still fails a pack with no bundled copy", async () => {
+      await expect(packs().previewPack(PACK)).rejects.toThrow("library down");
     });
   });
 
