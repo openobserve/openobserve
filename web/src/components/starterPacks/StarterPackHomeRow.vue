@@ -25,12 +25,12 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { packCardText, type PackCardKind } from "@/composables/starterPacks/packCardText";
-import type { HomePack } from "@/composables/starterPacks/useHomePacks";
+import type { HomePackRowItem } from "@/composables/starterPacks/useHomePacks";
 import type { PackItemKind } from "@/composables/starterPacks/types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 
-const props = defineProps<{ item: HomePack; first?: boolean }>();
+const props = defineProps<{ item: HomePackRowItem; first?: boolean }>();
 
 const { t, te } = useI18nTyped();
 const flow = props.item.flow;
@@ -61,7 +61,7 @@ const shownStreams = computed(() => streams.value.slice(0, SHOWN_STREAMS));
 const moreStreams = computed(() => streams.value.slice(SHOWN_STREAMS));
 const clusters = computed(() => props.item.matcher.clusters.value);
 const forbidden = computed(() => props.item.view.value === "forbidden");
-const busy = computed(() => flow.running.value);
+const busy = computed(() => flow.running.value || props.item.view.value === "loading");
 
 const plannedIds = (kind: PackItemKind) =>
   (flow.preview.value?.items ?? [])
@@ -137,6 +137,7 @@ const previewPending = computed(
   () => !cards.value.length && ["idle", "loading"].includes(flow.previewState.value),
 );
 const previewFailed = computed(() => !cards.value.length && flow.previewState.value === "error");
+const nothingFits = computed(() => !cards.value.length && flow.previewState.value === "ready");
 </script>
 
 <template>
@@ -145,7 +146,7 @@ const previewFailed = computed(() => !cards.value.length && flow.previewState.va
       class="bg-surface-base rounded-surface flex min-w-0 overflow-hidden border max-md:flex-col"
       :class="first ? 'border-accent' : 'border-border-default'"
       :data-test="id('home-pack-card')"
-      :data-status="busy ? 'running' : item.view.value"
+      :data-status="flow.running.value ? 'running' : item.view.value"
     >
       <div
         class="border-border-subtle flex w-85 shrink-0 flex-col gap-3 border-e p-4 max-md:w-full max-md:border-e-0 max-md:border-b"
@@ -270,6 +271,13 @@ const previewFailed = computed(() => !cards.value.length && flow.previewState.va
           wrap
           :data-test="id('home-pack-resource-error')"
           >{{ t("starterPacks.home.previewFailed") }}</OText
+        >
+        <OText
+          v-else-if="nothingFits"
+          variant="meta"
+          wrap
+          :data-test="id('home-pack-resource-empty')"
+          >{{ t("starterPacks.home.nothingFitsYet") }}</OText
         >
         <div v-else class="grid h-full items-stretch gap-3 max-sm:grid-cols-1" :class="gridCols">
           <div

@@ -15309,7 +15309,8 @@
           }
         }
       },
-      "previewFailed": "Couldn't load what this pack sets up. Review it to try again."
+      "previewFailed": "Couldn't load what this pack sets up. Review it to try again.",
+      "nothingFitsYet": "Nothing in this pack fits your data yet. Its items show here once their data arrives."
     },
     "whatGetsCreated": {
       "subtitle": "{title} starter pack",

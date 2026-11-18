@@ -32,7 +32,7 @@ import { useStarterPackMatcher } from "./useStarterPackMatcher";
 
 const FIT_KINDS = new Set<PackItemKind>(["dashboard", "alert", "savedView"]);
 
-type HomePackView =
+export type HomePackView =
   | "hidden"
   | "hiddenAdmin"
   | "loading"
@@ -144,6 +144,11 @@ function useHomePack(org: string, pack: StarterPack) {
 }
 
 export type HomePack = ReturnType<typeof useHomePack>;
+/** What a pack row reads, so a page with its own pack state can show the same row. */
+export type HomePackRowItem = Pick<
+  HomePack,
+  "pack" | "title" | "testId" | "flow" | "matcher" | "view" | "copyLink" | "startSetup"
+>;
 
 const matchItems = (item: HomePack): FindMoreItem[] => {
   const { flow, pack } = item;
