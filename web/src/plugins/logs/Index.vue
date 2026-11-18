@@ -628,6 +628,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="buildQueryPageRef"
               :searchQuery="searchObj.meta.sqlMode ? searchObj.data.query : ''"
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
+              :selectedStreamType="searchObj.data.stream.streamType || 'logs'"
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
               :isSqlMode="searchObj.meta.sqlMode"
@@ -3582,7 +3583,8 @@ export default defineComponent({
         dashboardPanelData.data.queries[currentQueryIndex].fields.stream = streamName;
         // stream_type should already be set, but ensure it's preserved
         if (!dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type) {
-          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type = "logs";
+          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type =
+            searchObj.data.stream.streamType || "logs";
         }
       }
 
