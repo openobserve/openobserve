@@ -88,6 +88,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #actions />
       </QueryErrorState>
+      <AlertTestRun
+        v-if="testOpen && testable"
+        ref="testRunPanel"
+        :body="testBody"
+        :folder="testFolder"
+        :unit="valueUnit"
+        :destinations="formData.destinations ?? []"
+        :template="formData.template || null"
+        @close="testOpen = false"
+      />
     </div>
     <div
       v-if="showChartKey"
@@ -111,13 +121,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         {{ limit.label }}
       </span>
-      <OTruncatedText
-        v-if="seriesCountText"
-        class="ms-auto min-w-0"
-        data-test="alert-preview-series-count"
-      >
-        {{ seriesCountText }}
-      </OTruncatedText>
+      <span class="ms-auto flex min-w-0 items-center gap-3">
+        <OTruncatedText
+          v-if="seriesCountText"
+          class="min-w-0"
+          data-test="alert-preview-series-count"
+        >
+          {{ seriesCountText }}
+        </OTruncatedText>
+        <OButton
+          v-if="testable"
+          variant="link"
+          size="xs"
+          class="shrink-0"
+          :loading="testRun.state.value === 'running'"
+          data-test="alert-preview-test-it"
+          @click="onTestIt"
+        >
+          {{ t("alerts.testRun.action") }}
+        </OButton>
+      </span>
     </div>
   </div>
 </template>
@@ -126,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   ref,
   watch,
+  inject,
   onMounted,
   computed,
   nextTick,
@@ -138,7 +162,15 @@ import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import { keyToMs } from "@/utils/alerts/alertBacktest";
 import { isCountLimit, previewCountText } from "@/utils/alerts/alertReadBack";
-import { durationText, formatNumber, valueWithUnit } from "@/utils/alerts/alertCopy";
+import { durationText, formatNumber } from "@/utils/alerts/alertCopy";
+import {
+  evaluateAlertBody,
+  measuresSpanDuration,
+  testRunKey,
+  testValueText,
+} from "@/utils/alerts/alertTestRun";
+import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
+import AlertTestRun from "./AlertTestRun.vue";
 import { promqlValueUnit, type MetricMeta } from "@/utils/alerts/alertValueUnit";
 import { noSeriesReason, noSeriesSentence, selectorsOf } from "@/utils/alerts/promqlNoSeries";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
@@ -160,7 +192,9 @@ import { queryClient } from "@/composables/query/queryClient";
 import { b64EncodeUnicode, generateTraceContext, smartDecodeVrlFunction } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
+import { routeLocationKey } from "vue-router";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
@@ -239,12 +273,11 @@ const currentLimits = (): [unknown, unknown] => {
     return [qc?.promql_condition?.value, qc?.promql_warning_value];
   }
   const aggregation = qc?.aggregation;
-  if (
-    props.selectedTab === "custom" &&
-    props.isAggregationEnabled &&
-    hasLimitValue(aggregation?.having?.value)
-  ) {
-    return [aggregation.having.value, aggregation.warning_value];
+  // A value alert compares the measure, never the count, so a blank value draws no line.
+  if (props.selectedTab === "custom" && props.isAggregationEnabled) {
+    return hasLimitValue(aggregation?.having?.value)
+      ? [aggregation.having.value, aggregation.warning_value]
+      : [undefined, undefined];
   }
   return [isPreviewCountLimit(tc?.threshold) ? tc.threshold : undefined, tc?.warning_threshold];
 };
@@ -330,6 +363,8 @@ const evaluationStatus = ref<{
   label?: string;
   grouped?: boolean;
   value?: number;
+  /** Unit of `value` and the limit when the measure has one ("microseconds" for span duration). */
+  unit?: string;
   windowMinutes?: number;
 } | null>(null);
 const { t } = useI18nTyped();
@@ -384,10 +419,61 @@ watch(
 // A forecast or a rule draws other numbers than the metric's values.
 const valueUnit = computed((): string | null => {
   const qc = props.formData.query_condition;
+  if (
+    props.selectedTab === "custom" &&
+    props.isAggregationEnabled &&
+    measuresSpanDuration(
+      props.formData.stream_type,
+      qc?.aggregation?.function,
+      qc?.aggregation?.having?.column,
+    )
+  )
+    return "microseconds";
   if (props.selectedTab !== "promql" || !metricMeta.value || qc?.promql_rule_mode) return null;
   if (props.formData._ui?.forecast) return null;
   return promqlValueUnit(props.query, metricMeta.value);
 });
+
+// Test it: the dry run of the alert as it stands; anomaly, composite and SLO alerts can't be run yet.
+const testRun = useAlertTestRun();
+const route = inject(routeLocationKey, null);
+const testFolder = computed(() => {
+  const folder = route?.query?.folder;
+  return typeof folder === "string" && folder ? folder : "default";
+});
+const testable = computed(
+  () =>
+    !!props.formData.stream_name &&
+    props.selectedTab !== "slo" &&
+    props.formData.is_real_time !== "composite" &&
+    !["anomaly_detection", "composite"].includes(props.formData.alert_type),
+);
+const testBody = computed(() => {
+  if (!testable.value) return null;
+  try {
+    return evaluateAlertBody(props.formData as any, {
+      store,
+      isAggregationEnabled: { value: props.isAggregationEnabled },
+      getSelectedTab: { value: props.selectedTab },
+    });
+  } catch {
+    // A form still loading has no body to test.
+    return null;
+  }
+});
+watch(
+  testBody,
+  (body) => {
+    testRun.currentKey.value = body ? testRunKey(body) : null;
+  },
+  { immediate: true },
+);
+const testOpen = ref(false);
+const testRunPanel = ref<{ run: () => void } | null>(null);
+const onTestIt = () => {
+  if (testOpen.value) testRunPanel.value?.run();
+  else testOpen.value = true;
+};
 
 type PreviewRange = "checks" | "12h" | "24h";
 const PREVIEW_RANGE_KEY = "o2_alert_preview_range";
@@ -520,7 +606,7 @@ const limitKeys = computed(() =>
         const shown = !Number.isFinite(Number(value))
           ? String(value)
           : valueUnit.value
-            ? valueWithUnit(Number(value), valueUnit.value, t)
+            ? testValueText(Number(value), valueUnit.value, t)
             : Number(value).toLocaleString();
         return {
           level,
@@ -988,9 +1074,12 @@ const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) =>
             props.formData.query_condition?.aggregation?.group_by || []
           ).filter((f: string) => f && f.trim() !== "");
           const numHaving = havingValue != null && havingValue !== "" ? Number(havingValue) : null;
+          if (numHaving === null) {
+            evaluationStatus.value = null;
+            return;
+          }
 
           const passesHaving = (val: number): boolean => {
-            if (numHaving === null) return true;
             switch (havingOperator) {
               case ">=":
                 return val >= numHaving;
@@ -1457,6 +1546,7 @@ const setEvaluationStatus = (verdict: {
     atLeast: verdict.atLeast,
     label: args.label,
     ...(verdict.value === undefined ? {} : { value: verdict.value }),
+    ...(verdict.value !== undefined && valueUnit.value ? { unit: valueUnit.value } : {}),
     grouped:
       props.selectedTab === "custom" &&
       props.isAggregationEnabled &&
@@ -2055,6 +2145,7 @@ const refreshFromProps = () => {
       props.formData.query_condition.aggregation.having.value !== "";
 
     if (!hasColumn || !hasValue) {
+      evaluationStatus.value = null;
       return;
     }
   }

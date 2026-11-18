@@ -3464,3 +3464,56 @@ describe("PreviewAlert - a PromQL chart says why it is empty and what unit it is
     w.unmount();
   });
 });
+
+describe("PreviewAlert - value alerts without a value, span durations and Test it", () => {
+  const valueAlert = (having: Record<string, unknown>, streamType = "logs") => {
+    const formData = baseFormData() as any;
+    formData.stream_type = streamType;
+    formData.query_condition.aggregation = {
+      function: "p95",
+      group_by: [],
+      having: { column: "duration", operator: ">=", ...having },
+    };
+    return formData;
+  };
+
+  it("draws no line and gives no verdict while the value threshold is blank", async () => {
+    const w = await mountComp({
+      query: "SELECT 1",
+      isAggregationEnabled: true,
+      formData: valueAlert({ value: "" }),
+    });
+    w.vm.refreshData();
+    await flushPromises();
+    await emitResultMetadata(w, [[{ hits: [{ zo_sql_num: 900 }], total: 1 }]]);
+    expect(w.vm.chartData.config.mark_line).toEqual([]);
+    expect(w.vm.evaluationStatus).toBeNull();
+    w.unmount();
+  });
+
+  it("reads a span duration threshold in ms and draws the axis from microseconds", async () => {
+    const w = await mountComp({
+      query: "SELECT 1",
+      isAggregationEnabled: true,
+      labelledLimit: true,
+      formData: valueAlert({ value: 500000 }, "traces"),
+    });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.vm.chartData.config.unit).toBe("microseconds");
+    expect(w.find('[data-test="alert-preview-limit-key"]').text()).toContain("500 ms");
+    w.unmount();
+  });
+
+  it.each([
+    ["custom", true],
+    ["sql", true],
+    ["slo", false],
+  ])("offers Test it on the %s tab: %s", async (selectedTab, offered) => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.find('[data-test="alert-preview-test-it"]').exists()).toBe(offered);
+    w.unmount();
+  });
+});

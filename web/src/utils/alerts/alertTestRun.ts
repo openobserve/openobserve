@@ -305,3 +305,24 @@ export function requestFailureReason(error: unknown, t: TranslateFn): I18nText {
   if (response?.status) return t("alerts.testRun.serverStatus", { status: response.status });
   return t("alerts.testRun.noAnswer");
 }
+
+// Span duration is microseconds by the traces contract; these functions keep the field's unit.
+const SPAN_DURATION_FIELD = "duration";
+const UNIT_KEEPING_FUNCTIONS = new Set([
+  "avg",
+  "min",
+  "max",
+  "sum",
+  "median",
+  "p50",
+  "p75",
+  "p90",
+  "p95",
+  "p99",
+]);
+
+/** True when a builder measure reads span duration, so its values are microseconds. */
+export const measuresSpanDuration = (streamType: unknown, fn: unknown, column: unknown): boolean =>
+  streamType === "traces" &&
+  column === SPAN_DURATION_FIELD &&
+  UNIT_KEEPING_FUNCTIONS.has(String(fn ?? ""));
