@@ -197,11 +197,11 @@ async fn changes(
     }
     let sql = audit_sql(&ask.org, &streams, has_target);
     let page = search
-        .sql_within(
+        .sql_streamed(
             META_ORG_ID,
             &sql,
             (ask.from, ask.to),
-            (0, ROWS),
+            ROWS,
             PROVIDER_TIMEOUT,
         )
         .await?;
