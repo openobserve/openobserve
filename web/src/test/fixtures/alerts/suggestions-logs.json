@@ -1,0 +1,317 @@
+{
+  "library": "ready",
+  "library_version": "e13f27fa44282df9fdc81c56a532d7fb",
+  "stream": {
+    "type": "logs",
+    "name": "app_logs",
+    "schema_read": true
+  },
+  "counts": {
+    "fits": 2,
+    "likely": 1,
+    "already_set_up": 1,
+    "starters": 2,
+    "total": 3
+  },
+  "suggestions": [
+    {
+      "kind": "library",
+      "severity": "critical",
+      "alert_type": "scheduled",
+      "fit": "fits",
+      "missing": [],
+      "stream_swap": {
+        "written_for": "k8s_events",
+        "will_use": "app_logs"
+      },
+      "already_set_up": [],
+      "enterprise": false,
+      "starter": null,
+      "id": "k8s/oom_killing_events",
+      "title": "OOM killing events",
+      "sentence": "Fires when Kubernetes reports a container killed for running out of memory.",
+      "query_type": "sql",
+      "matched_fields": ["reason", "k8s_namespace_name"],
+      "library": {
+        "pack": "k8s",
+        "path": "packs/k8s/alerts/oom_killing_events.json",
+        "content_hash": "3f2a9c1d",
+        "docs_url": null
+      },
+      "prefill": {
+        "stream_type": "logs",
+        "stream_name": "app_logs",
+        "is_real_time": false,
+        "query_condition": {
+          "type": "sql",
+          "sql": "SELECT k8s_namespace_name, count(*) AS events FROM \"app_logs\" WHERE reason = 'OOMKilling' GROUP BY k8s_namespace_name",
+          "promql": null,
+          "conditions": null,
+          "aggregation": null,
+          "vrl_function": null,
+          "multi_time_range": []
+        },
+        "trigger_condition": {
+          "period": 5,
+          "operator": ">=",
+          "threshold": 1,
+          "frequency": 5,
+          "frequency_type": "minutes",
+          "silence": 30
+        }
+      }
+    },
+    {
+      "kind": "library",
+      "severity": "warning",
+      "alert_type": "scheduled",
+      "fit": "likely",
+      "missing": [],
+      "stream_swap": {
+        "written_for": "default",
+        "will_use": "app_logs"
+      },
+      "already_set_up": [],
+      "enterprise": false,
+      "starter": null,
+      "id": "default/high_error_logs",
+      "title": "High error log volume",
+      "sentence": "Fires when error logs rise above a fixed count.",
+      "query_type": "sql",
+      "matched_fields": ["level"],
+      "library": {
+        "pack": "observability",
+        "path": "packs/observability/alerts/high_error_logs.json",
+        "content_hash": "91be04aa",
+        "docs_url": null
+      },
+      "prefill": {
+        "stream_type": "logs",
+        "stream_name": "app_logs",
+        "is_real_time": false,
+        "query_condition": {
+          "type": "sql",
+          "sql": "SELECT count(*) AS errors FROM \"app_logs\" WHERE level = 'error' HAVING count(*) > 100",
+          "promql": null,
+          "conditions": null,
+          "aggregation": null,
+          "vrl_function": null,
+          "multi_time_range": []
+        },
+        "trigger_condition": {
+          "period": 10,
+          "operator": ">=",
+          "threshold": 1,
+          "frequency": 10,
+          "frequency_type": "minutes",
+          "silence": 60
+        }
+      }
+    },
+    {
+      "kind": "library",
+      "severity": "critical",
+      "alert_type": "scheduled",
+      "fit": "fits",
+      "missing": [],
+      "stream_swap": null,
+      "already_set_up": [
+        {
+          "alert_id": "2xQk9fWm0Lr7aP3bN1cD5eZtYu8",
+          "name": "pod_crash_looping",
+          "matched_by": "query"
+        }
+      ],
+      "enterprise": false,
+      "starter": null,
+      "id": "k8s/pod_crash_looping",
+      "title": "Pod crash looping",
+      "sentence": "Fires when a pod restarts repeatedly.",
+      "query_type": "sql",
+      "matched_fields": ["reason", "k8s_pod_name"],
+      "library": {
+        "pack": "k8s",
+        "path": "packs/k8s/alerts/pod_crash_looping.json",
+        "content_hash": "c0ffee12",
+        "docs_url": null
+      },
+      "prefill": {
+        "stream_type": "logs",
+        "stream_name": "app_logs",
+        "is_real_time": false,
+        "query_condition": {
+          "type": "sql",
+          "sql": "SELECT k8s_pod_name, count(*) AS restarts FROM \"app_logs\" WHERE reason = 'BackOff' GROUP BY k8s_pod_name HAVING count(*) >= 3",
+          "promql": null,
+          "conditions": null,
+          "aggregation": null,
+          "vrl_function": null,
+          "multi_time_range": []
+        },
+        "trigger_condition": {
+          "period": 15,
+          "operator": ">=",
+          "threshold": 1,
+          "frequency": 5,
+          "frequency_type": "minutes",
+          "silence": 60
+        }
+      }
+    },
+    {
+      "kind": "starter",
+      "id": "starter:rare_value",
+      "title": null,
+      "sentence": null,
+      "severity": null,
+      "alert_type": "scheduled",
+      "query_type": "custom",
+      "fit": "fits",
+      "matched_fields": [],
+      "missing": [],
+      "stream_swap": null,
+      "already_set_up": [],
+      "enterprise": false,
+      "library": null,
+      "starter": {
+        "shape": "rare_value",
+        "slots": [
+          {
+            "name": "category",
+            "data_type": "string",
+            "candidates": ["level", "severity_text", "k8s_container_name"],
+            "pointer": "/query_condition/conditions/conditions/conditions/0/column"
+          },
+          {
+            "name": "value",
+            "data_type": "string",
+            "candidates": [],
+            "pointer": "/query_condition/conditions/conditions/conditions/0/value"
+          }
+        ]
+      },
+      "prefill": {
+        "stream_type": "logs",
+        "stream_name": "app_logs",
+        "is_real_time": false,
+        "query_condition": {
+          "type": "custom",
+          "conditions": {
+            "version": 2,
+            "conditions": {
+              "filterType": "group",
+              "logicalOperator": "AND",
+              "conditions": [
+                {
+                  "filterType": "condition",
+                  "column": "",
+                  "operator": "=",
+                  "value": "",
+                  "logicalOperator": "AND"
+                }
+              ]
+            }
+          },
+          "sql": null,
+          "promql": null,
+          "aggregation": null,
+          "vrl_function": null,
+          "multi_time_range": []
+        },
+        "trigger_condition": {
+          "period": 5,
+          "operator": ">=",
+          "threshold": 1,
+          "frequency": 5,
+          "frequency_type": "minutes",
+          "silence": 10
+        }
+      }
+    },
+    {
+      "kind": "starter",
+      "id": "starter:per_group",
+      "title": null,
+      "sentence": null,
+      "severity": null,
+      "alert_type": "scheduled",
+      "query_type": "custom",
+      "fit": "fits",
+      "matched_fields": [],
+      "missing": [],
+      "stream_swap": null,
+      "already_set_up": [],
+      "enterprise": false,
+      "library": null,
+      "starter": {
+        "shape": "per_group",
+        "slots": [
+          {
+            "name": "category",
+            "data_type": "string",
+            "candidates": ["level", "severity_text"],
+            "pointer": "/query_condition/conditions/conditions/conditions/0/column"
+          },
+          {
+            "name": "value",
+            "data_type": "string",
+            "candidates": [],
+            "pointer": "/query_condition/conditions/conditions/conditions/0/value"
+          },
+          {
+            "name": "group",
+            "data_type": "string",
+            "candidates": ["service_name", "k8s_namespace_name"],
+            "pointer": "/query_condition/aggregation/group_by/0"
+          }
+        ]
+      },
+      "prefill": {
+        "stream_type": "logs",
+        "stream_name": "app_logs",
+        "is_real_time": false,
+        "query_condition": {
+          "type": "custom",
+          "conditions": {
+            "version": 2,
+            "conditions": {
+              "filterType": "group",
+              "logicalOperator": "AND",
+              "conditions": [
+                {
+                  "filterType": "condition",
+                  "column": "",
+                  "operator": "=",
+                  "value": "",
+                  "logicalOperator": "AND"
+                }
+              ]
+            }
+          },
+          "sql": null,
+          "promql": null,
+          "aggregation": {
+            "group_by": [""],
+            "function": "count",
+            "having": {
+              "column": "",
+              "operator": ">=",
+              "value": 1
+            },
+            "multi_alert": true
+          },
+          "vrl_function": null,
+          "multi_time_range": []
+        },
+        "trigger_condition": {
+          "period": 5,
+          "operator": ">=",
+          "threshold": 1,
+          "frequency": 5,
+          "frequency_type": "minutes",
+          "silence": 10
+        }
+      }
+    }
+  ]
+}

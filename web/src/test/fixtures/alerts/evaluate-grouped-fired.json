@@ -1,0 +1,284 @@
+{
+  "query_type": "custom",
+  "is_real_time": false,
+  "start": 1763457000000000,
+  "end": 1763460000000000,
+  "truncated": false,
+  "checks": [
+    {
+      "time": 1763457000000000,
+      "window_start": 1763456400000000,
+      "window_end": 1763457000000000,
+      "state": "quiet",
+      "fired": false,
+      "notified": false,
+      "held_by": null,
+      "level": null,
+      "value": 12,
+      "value_is_lower_bound": false,
+      "operator": ">=",
+      "threshold": 50,
+      "warning_threshold": null,
+      "matched": 2,
+      "groups": [
+        {
+          "key": "service_name=checkout",
+          "labels": {
+            "service_name": "checkout"
+          },
+          "value": 12,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        },
+        {
+          "key": "service_name=cart",
+          "labels": {
+            "service_name": "cart"
+          },
+          "value": 4,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        }
+      ],
+      "groups_total": 2,
+      "reason": "below_threshold",
+      "error": null
+    },
+    {
+      "time": 1763457600000000,
+      "window_start": 1763457000000000,
+      "window_end": 1763457600000000,
+      "state": "firing",
+      "fired": true,
+      "notified": true,
+      "held_by": null,
+      "level": "critical",
+      "value": 61,
+      "value_is_lower_bound": false,
+      "operator": ">=",
+      "threshold": 50,
+      "warning_threshold": null,
+      "matched": 2,
+      "groups": [
+        {
+          "key": "service_name=checkout",
+          "labels": {
+            "service_name": "checkout"
+          },
+          "value": 61,
+          "threshold": 50,
+          "fired": true,
+          "level": "critical"
+        },
+        {
+          "key": "service_name=cart",
+          "labels": {
+            "service_name": "cart"
+          },
+          "value": 7,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        }
+      ],
+      "groups_total": 2,
+      "reason": null,
+      "error": null
+    },
+    {
+      "time": 1763458200000000,
+      "window_start": 1763457600000000,
+      "window_end": 1763458200000000,
+      "state": "firing",
+      "fired": true,
+      "notified": false,
+      "held_by": "notify_at_most_every",
+      "level": "critical",
+      "value": 58,
+      "value_is_lower_bound": false,
+      "operator": ">=",
+      "threshold": 50,
+      "warning_threshold": null,
+      "matched": 2,
+      "groups": [
+        {
+          "key": "service_name=checkout",
+          "labels": {
+            "service_name": "checkout"
+          },
+          "value": 58,
+          "threshold": 50,
+          "fired": true,
+          "level": "critical"
+        },
+        {
+          "key": "service_name=cart",
+          "labels": {
+            "service_name": "cart"
+          },
+          "value": 9,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        }
+      ],
+      "groups_total": 2,
+      "reason": null,
+      "error": null
+    },
+    {
+      "time": 1763458800000000,
+      "window_start": 1763458200000000,
+      "window_end": 1763458800000000,
+      "state": "quiet",
+      "fired": false,
+      "notified": false,
+      "held_by": null,
+      "level": null,
+      "value": 20,
+      "value_is_lower_bound": false,
+      "operator": ">=",
+      "threshold": 50,
+      "warning_threshold": null,
+      "matched": 2,
+      "groups": [
+        {
+          "key": "service_name=checkout",
+          "labels": {
+            "service_name": "checkout"
+          },
+          "value": 20,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        },
+        {
+          "key": "service_name=cart",
+          "labels": {
+            "service_name": "cart"
+          },
+          "value": 11,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        }
+      ],
+      "groups_total": 2,
+      "reason": "below_threshold",
+      "error": null
+    },
+    {
+      "time": 1763459400000000,
+      "window_start": 1763458800000000,
+      "window_end": 1763459400000000,
+      "state": "firing",
+      "fired": true,
+      "notified": true,
+      "held_by": null,
+      "level": "critical",
+      "value": 73,
+      "value_is_lower_bound": false,
+      "operator": ">=",
+      "threshold": 50,
+      "warning_threshold": null,
+      "matched": 2,
+      "groups": [
+        {
+          "key": "service_name=cart",
+          "labels": {
+            "service_name": "cart"
+          },
+          "value": 73,
+          "threshold": 50,
+          "fired": true,
+          "level": "critical"
+        },
+        {
+          "key": "service_name=checkout",
+          "labels": {
+            "service_name": "checkout"
+          },
+          "value": 15,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        }
+      ],
+      "groups_total": 2,
+      "reason": null,
+      "error": null
+    },
+    {
+      "time": 1763460000000000,
+      "window_start": 1763459400000000,
+      "window_end": 1763460000000000,
+      "state": "quiet",
+      "fired": false,
+      "notified": false,
+      "held_by": null,
+      "level": null,
+      "value": 18,
+      "value_is_lower_bound": false,
+      "operator": ">=",
+      "threshold": 50,
+      "warning_threshold": null,
+      "matched": 2,
+      "groups": [
+        {
+          "key": "service_name=checkout",
+          "labels": {
+            "service_name": "checkout"
+          },
+          "value": 18,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        },
+        {
+          "key": "service_name=cart",
+          "labels": {
+            "service_name": "cart"
+          },
+          "value": 6,
+          "threshold": 50,
+          "fired": false,
+          "level": null
+        }
+      ],
+      "groups_total": 2,
+      "reason": "below_threshold",
+      "error": null
+    }
+  ],
+  "summary": {
+    "checks": 6,
+    "fired": 3,
+    "pending": 0,
+    "notifications": 2,
+    "held": 1,
+    "errors": 0,
+    "notified_at": [1763457600000000, 1763459400000000],
+    "first_fired_at": 1763457600000000,
+    "last_fired_at": 1763459400000000,
+    "groups_fired": [
+      {
+        "key": "service_name=checkout",
+        "labels": {
+          "service_name": "checkout"
+        },
+        "checks": 2
+      },
+      {
+        "key": "service_name=cart",
+        "labels": {
+          "service_name": "cart"
+        },
+        "checks": 1
+      }
+    ],
+    "groups_fired_total": 2
+  },
+  "diagnostics": null
+}
