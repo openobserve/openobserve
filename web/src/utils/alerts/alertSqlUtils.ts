@@ -251,3 +251,58 @@ function fallbackHavingInsertion(
   // If no ORDER BY, LIMIT, or OFFSET found, append at the end
   return `${sqlQuery.trim()} ${havingClause}`;
 }
+
+const AGGREGATE_CALL =
+  /\b(?:count|sum|avg|min|max|median|mean|approx_\w+|stddev\w*|var(?:iance|_\w+)?|array_agg|string_agg|bool_and|bool_or|first_value|last_value|percentile_\w+)\s*\(/i;
+
+/** The query's outermost level: literals, comments and everything inside parentheses blanked to "()". */
+function outermostSql(sql: string): string {
+  const flat = sql
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/'(?:[^']|'')*'/g, "''")
+    .replace(/"(?:[^"]|"")*"/g, '""');
+  let depth = 0;
+  let out = "";
+  for (const ch of flat) {
+    if (ch === "(") {
+      if (depth === 0) out += "(";
+      depth++;
+    } else if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) out += ")";
+    } else if (depth === 0) out += ch;
+  }
+  return out;
+}
+
+/** True when the query aggregates without GROUP BY or HAVING, so every run returns exactly one row. */
+export function alwaysOneRow(sql: string): boolean {
+  const top = outermostSql(sql ?? "");
+  if ((top.match(/\bselect\b/gi) ?? []).length !== 1) return false;
+  if (/\b(?:union|intersect|except|group\s+by|having|over)\b/i.test(top)) return false;
+  const list = /\bselect\b([\s\S]*?)(?:\bfrom\b|$)/i.exec(top)?.[1] ?? "";
+  return AGGREGATE_CALL.test(list);
+}
+
+/** Whether a result of one row meets the "query returns [operator] [threshold] rows" limit. */
+export function oneRowMeetsLimit(operator: unknown, threshold: unknown): boolean {
+  const n = Number(threshold);
+  if (threshold === "" || threshold === null || !Number.isFinite(n)) return false;
+  switch (operator) {
+    case ">=":
+      return 1 >= n;
+    case ">":
+      return 1 > n;
+    case "<=":
+      return 1 <= n;
+    case "<":
+      return 1 < n;
+    case "=":
+      return n === 1;
+    case "!=":
+      return n !== 1;
+    default:
+      return false;
+  }
+}

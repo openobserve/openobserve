@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { addHavingClauseToQuery } from "./alertSqlUtils";
+import { addHavingClauseToQuery, alwaysOneRow, oneRowMeetsLimit } from "./alertSqlUtils";
 
 describe("alertSqlUtils", () => {
   let parser: any;
@@ -319,5 +319,31 @@ describe("alertSqlUtils", () => {
       expect(result.toLowerCase()).toMatch(/(cnt|"cnt")\s+>=\s+5/);
       expect(result.toLowerCase()).toContain("having");
     });
+  });
+
+  it.each([
+    ["SELECT count(*) AS errors FROM \"default\" WHERE body LIKE '% ERROR %'", true],
+    ["select avg(duration) from t", true],
+    ["SELECT approx_percentile_cont(duration, 0.95) FROM t", true],
+    ["SELECT count(*) FROM (SELECT a FROM t GROUP BY a)", true],
+    ["SELECT service, count(*) FROM t GROUP BY service", false],
+    ["SELECT count(*) AS c FROM t HAVING c > 5", false],
+    ["SELECT a FROM t WHERE x = 'count(*)'", false],
+    ["SELECT count(*) OVER (PARTITION BY a) FROM t", false],
+    ["SELECT count(*) FROM a UNION ALL SELECT count(*) FROM b", false],
+    ["", false],
+  ])("alwaysOneRow(%s) is %s", (sql, expected) => {
+    expect(alwaysOneRow(sql)).toBe(expected);
+  });
+
+  it.each([
+    [">=", 1, true],
+    [">", 0, true],
+    [">=", 2, false],
+    ["<=", 5, true],
+    ["=", 1, true],
+    [">=", "", false],
+  ])("one row meets %s %s: %s", (operator, threshold, expected) => {
+    expect(oneRowMeetsLimit(operator, threshold)).toBe(expected);
   });
 });
