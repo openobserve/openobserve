@@ -731,6 +731,15 @@ class AnomalyDetectionPage {
         }
     }
 
+    async saveAndCaptureCreate() {
+        const [request] = await Promise.all([
+            this.page.waitForRequest((r) => r.method() === 'POST' && /\/api\/v2\/[^/]+\/alerts(\?|$)/.test(r.url()), { timeout: 30000 }),
+            this.save(),
+        ]);
+        const response = await request.response();
+        return { body: request.postDataJSON(), status: response?.status(), text: await response?.text() };
+    }
+
     /**
      * Error toasts live 30s and stack over the wizard footer, where they
      * intercept the click meant for Cancel. Best-effort: the dismiss hook is

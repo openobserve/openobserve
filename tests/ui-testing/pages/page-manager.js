@@ -93,6 +93,7 @@ import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
 import { ServiceVersionsPage } from "./tracesPages/serviceVersionsPage.js";
 import { ProfilesPage } from "./profilesPages/profilesPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
+import { KubernetesPage } from "./infraPages/kubernetesPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
 import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
@@ -159,6 +160,8 @@ const FleetInstallPage = require("./fleetPages/fleetInstallPage.js");
 const FleetConfigPage = require("./fleetPages/fleetConfigPage.js");
 const FleetRolloutPage = require("./fleetPages/fleetRolloutPage.js");
 const FleetSeed = require("./fleetPages/fleetSeed.js");
+const SecurityPage = require("./securityPages/securityPage.js");
+const SecuritySeed = require("./securityPages/securitySeed.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -288,6 +291,10 @@ class PageManager {
     this.fleetRolloutPage = new FleetRolloutPage(page);
     this.fleetSeed = new FleetSeed(page);
 
+    // ===== SECURITY PAGE OBJECTS =====
+    this.securityPage = new SecurityPage(page);
+    this.securitySeed = new SecuritySeed(page);
+
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
     this.logsToolbarPinsPage = new LogsToolbarPinsPage(page);
@@ -316,6 +323,7 @@ class PageManager {
     this.serviceVersionsPage = new ServiceVersionsPage(page);
     this.profilesPage = new ProfilesPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
+    this.kubernetesPage = new KubernetesPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);
