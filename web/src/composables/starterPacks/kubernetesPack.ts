@@ -66,11 +66,7 @@ export const KUBERNETES_PACK: StarterPack = {
   clusterScoped: true,
   collectorRoute: "ingestFromKubernetes",
   logo: "images/common/kubernetes.svg",
-  tiles: {
-    dashboard: "starterPacks.kubernetes.tileDashboard",
-    alert: "starterPacks.kubernetes.tileAlerts",
-    savedView: "starterPacks.kubernetes.tileSavedView",
-  },
+  pausedImpactKey: "starterPacks.kubernetes.pausedImpact",
   aliases: [
     ["k8s_cluster", "k8s_cluster_name", "cluster", "cluster_name"],
     [

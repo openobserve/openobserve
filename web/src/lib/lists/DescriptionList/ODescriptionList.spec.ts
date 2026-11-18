@@ -23,6 +23,12 @@ describe("ODescriptionList", () => {
     expect(mount(ODescriptionList).classes()).toContain("gap-y-3");
     expect(mount(ODescriptionList, { props: { dense: true } }).classes()).toContain("gap-y-1.5");
   });
+
+  it("rules rows apart on divided instead of spacing them", () => {
+    const classes = mount(ODescriptionList, { props: { divided: true } }).classes();
+    expect(classes).toContain("divide-y");
+    expect(classes).not.toContain("gap-y-3");
+  });
 });
 
 describe("ODescriptionItem", () => {

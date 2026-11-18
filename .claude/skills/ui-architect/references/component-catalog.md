@@ -76,6 +76,7 @@ markup — don't guess a prop name.
 | Multi-step wizard                                    | `OStepper` (+ `OStep`)                                                                                               | overlay-navigation      |
 | Paginate a list                                      | `OPagination`                                                                                                        | overlay-navigation      |
 | Persistent inline message                            | `OBanner`                                                                                                            | feedback-data           |
+| Several notices folded into one bar (most severe leads) | `ONoticeBar`                                                                                                       | feedback-data           |
 | Transient notification (replaces `q-notify`)         | `useToast()` (+ `OToastProvider` at root)                                                                            | feedback-data           |
 | Loading state                                        | `OSkeleton` (placeholder) / `OSpinner` (bare) / `OInnerLoading` (over a container)                                   | feedback-data           |
 | Progress indicator                                   | `OProgressBar`                                                                                                       | feedback-data           |

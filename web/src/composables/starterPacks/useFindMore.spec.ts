@@ -23,6 +23,7 @@ import store from "@/test/unit/helpers/store";
 const fake = vi.hoisted(() => ({
   kv: new Map<string, string>(),
   readFails: false,
+  dismissalsStatus: 0,
   live: [] as Array<Record<string, unknown>>,
   installPack: vi.fn(async (): Promise<Record<string, unknown>> => ({
     installId: "new",
@@ -45,7 +46,11 @@ vi.mock("@/services/http", () => ({
   default: () => ({
     get: async (url: string) => {
       if (fake.readFails) throw Object.assign(new Error("x"), { response: { status: 500 } });
+      if (url.endsWith("/kv")) return { data: [] };
       const key = decodeURIComponent(url.split("/kv/")[1] ?? "");
+      if (key === "starter_pack_find.dismissed" && fake.dismissalsStatus) {
+        throw Object.assign(new Error("x"), { response: { status: fake.dismissalsStatus } });
+      }
       if (!fake.kv.has(key)) throw Object.assign(new Error("x"), { response: { status: 404 } });
       return { data: fake.kv.get(key) };
     },
@@ -74,6 +79,11 @@ vi.mock("./kubernetesPack", () => ({
     },
   ],
 }));
+vi.mock("./packMatchData", () => ({
+  readOrgStreams: async () => [],
+  matchPack: async () => ({ dashboards: new Map(), alerts: new Map() }),
+  matchAlerts: async () => new Map([["nginx/5xx", true]]),
+}));
 vi.mock("./useStarterPacks", () => ({
   useStarterPacks: () => ({
     listInstalls: async () => fake.live,
@@ -86,6 +96,7 @@ vi.mock("./useStarterPacks", () => ({
 }));
 
 import { DISMISSED_KEY, type FindMoreSource } from "./findMore";
+import { resetBrowserMatches, useBrowserMatches } from "./useBrowserMatches";
 import { useFindMore } from "./useFindMore";
 
 const PACK_SOURCE: FindMoreSource = {
@@ -126,6 +137,7 @@ describe("useFindMore", () => {
     queryClient.clear();
     fake.kv.clear();
     fake.live = [];
+    fake.dismissalsStatus = 0;
     vi.clearAllMocks();
   });
 
@@ -175,6 +187,17 @@ describe("useFindMore", () => {
     expect(api.added.value).toHaveLength(1);
     await api.undo(api.added.value[0]);
     expect(api.result.value?.sources).toEqual([PACK_SOURCE]);
+  });
+
+  it("drops an added source from this browser's header matches", async () => {
+    window.localStorage.clear();
+    resetBrowserMatches();
+    useBrowserMatches("org").saveFull(
+      { checkedAt: 1, sources: [NGINX, PACK_SOURCE], dismissed: 0 },
+      ["kubernetes"],
+    );
+    expect(await finder().add(NGINX)).toBe(true);
+    expect(useBrowserMatches("org").copy.value?.sources).toEqual([PACK_SOURCE]);
   });
 
   it("reports a failed append as not added", async () => {
@@ -234,5 +257,28 @@ describe("useFindMore", () => {
     expect(JSON.parse(fake.kv.get(DISMISSED_KEY)!).sources).toEqual(["library-nginx"]);
     expect(api.result.value?.sources).toEqual([]);
     expect(api.result.value?.dismissed).toBe(2);
+  });
+
+  it("checks with no org dismissals when reading them is refused", async () => {
+    fake.dismissalsStatus = 403;
+    const api = finder();
+    await api.check();
+    expect(api.state.value).toBe("ready");
+    expect(api.result.value?.sources.map(({ id }) => id)).toEqual(["library-nginx"]);
+  });
+
+  it("never writes dismissals back after a refused read", async () => {
+    fake.dismissalsStatus = 401;
+    const api = finder();
+    await api.check();
+    await expect(api.dismissSource("library-nginx")).rejects.toThrow();
+    expect(fake.kv.has(DISMISSED_KEY)).toBe(false);
+  });
+
+  it("still fails the check when the dismissals read fails another way", async () => {
+    fake.dismissalsStatus = 500;
+    const api = finder();
+    await api.check();
+    expect(api.state.value).toBe("error");
   });
 });

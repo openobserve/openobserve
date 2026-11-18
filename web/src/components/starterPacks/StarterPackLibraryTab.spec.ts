@@ -168,7 +168,18 @@ describe("StarterPackLibraryTab", () => {
     );
     expect(text(wrapper, "library-tab-meta-kubernetes")).toBe("2 of 3 items fit your data");
     expect(text(wrapper, "library-tab-install-kubernetes")).toBe("Set up Kubernetes monitoring");
-    expect(has(wrapper, "library-tab-see-kubernetes")).toBe(true);
+    expect(has(wrapper, "library-tab-see-kubernetes")).toBe(false);
+    expect(wrapper.text()).not.toContain("What gets created");
+  });
+
+  it("opens the setup popup from Set up without installing", async () => {
+    const wrapper = await render();
+    expect(wrapper.findComponent({ name: "StarterPackDrawer" }).exists()).toBe(false);
+    await wrapper.get('[data-test="library-tab-install-kubernetes"]').trigger("click");
+    const drawer = wrapper.findComponent({ name: "StarterPackDrawer" });
+    expect(drawer.exists()).toBe(true);
+    expect(drawer.vm.$attrs.flow).toBe(flow);
+    expect(flow.install).not.toHaveBeenCalled();
   });
 
   it("loads the install preview so its count matches Home and the drawer", async () => {
@@ -332,13 +343,13 @@ describe("StarterPackLibraryTab", () => {
     expect(flow.undo).not.toHaveBeenCalled();
   });
 
-  it("offers Open pack and What gets created, not Set up, when the pack's view needs a license", async () => {
+  it("offers only Open pack, not Set up, when the pack's view needs a license", async () => {
     fake.pack.nativeView = { feature: "kubernetes_monitoring", route: "infraKubernetes" };
     flow.licensed.value = false;
     const wrapper = await render();
     expect(has(wrapper, "library-tab-install-kubernetes")).toBe(false);
     expect(has(wrapper, "library-tab-open-kubernetes")).toBe(true);
-    expect(has(wrapper, "library-tab-see-kubernetes")).toBe(true);
+    expect(has(wrapper, "library-tab-see-kubernetes")).toBe(false);
   });
 
   it("refreshes in place, keeping the cards and the chosen filter", async () => {

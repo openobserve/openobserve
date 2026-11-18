@@ -17,15 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import { useStore } from "vuex";
 import { canManageInstall } from "@/composables/starterPacks/useStarterPackFlow";
 import { useRepairLater, type RepairScope } from "@/composables/starterPacks/useRepairLater";
 import { raw, useI18nTyped } from "@/types/i18n";
+import StarterPackRepairPanel from "./StarterPackRepairPanel.vue";
 
 const props = defineProps<{ org: string; scope: RepairScope }>();
 const emit = defineEmits<{ repaired: []; opened: [] }>();
@@ -48,12 +45,11 @@ const undoRecord = computed(() => {
 const chipText = computed(() => {
   const found = issue.value;
   if (!found) return "";
-  const since = raw(last.value);
+  const since = raw(timeOf(found.lastUs));
   return found.panels
     ? t("starterPacks.repairLater.chip", { count: found.panels, since }, found.panels)
     : t("starterPacks.repairLater.chipAlerts", { count: found.alerts, since }, found.alerts);
 });
-const last = computed(() => (issue.value ? timeOf(issue.value.lastUs) : ""));
 
 onMounted(() => repair.check(props.scope));
 
@@ -62,12 +58,6 @@ const openDrawer = () => {
   emit("opened");
 };
 
-const apply = async () => {
-  if (await repair.apply(props.scope)) {
-    open.value = false;
-    emit("repaired");
-  }
-};
 const undo = async () => {
   if (await repair.undo(props.scope)) emit("repaired");
 };
@@ -101,64 +91,12 @@ const undo = async () => {
         })
       }}
     </OButton>
-    <ODrawer
+    <StarterPackRepairPanel
       v-model:open="open"
-      size="sm"
-      :title="t('starterPacks.repairLater.title')"
-      data-test="starter-pack-repair-panel"
-    >
-      <div v-if="issue" class="flex flex-col gap-3 p-3 text-sm">
-        <p>{{ chipText }}</p>
-        <div class="border-border-default rounded-default flex flex-col gap-1 border p-3">
-          <OText variant="meta">{{ t("starterPacks.repairLater.stopped") }}</OText>
-          <strong class="text-text-heading font-medium" data-test="starter-pack-repair-from">{{
-            issue.from
-          }}</strong>
-          <OText variant="meta">{{
-            t("starterPacks.repairLater.lastData", { time: raw(last) })
-          }}</OText>
-        </div>
-        <OIcon name="arrow-downward" size="sm" class="text-text-secondary self-center" />
-        <div class="border-border-default rounded-default flex flex-col gap-1 border p-3">
-          <OText variant="meta">
-            {{ t("starterPacks.repairLater.started", { time: raw(timeOf(issue.startedUs)) }) }}
-          </OText>
-          <strong class="text-text-heading font-medium" data-test="starter-pack-repair-to">{{
-            issue.to
-          }}</strong>
-        </div>
-        <OBanner
-          v-if="repair.failed.value"
-          variant="error-soft"
-          dense
-          :content="t('starterPacks.repairLater.failed')"
-        />
-        <OText variant="meta">{{ t("starterPacks.repairLater.note") }}</OText>
-      </div>
-      <template #footer>
-        <div class="flex w-full flex-col gap-2">
-          <OButton variant="outline" size="sm-action" class="w-full" @click="open = false">
-            {{ t("common.cancel") }}
-          </OButton>
-          <OButton
-            v-if="issue"
-            variant="primary"
-            size="sm-action"
-            class="w-full"
-            :loading="repair.busy.value"
-            data-test="starter-pack-repair-apply-btn"
-            @click="apply"
-          >
-            {{
-              t("starterPacks.repairLater.apply", {
-                panels: t("starterPacks.repairLater.panels", { count: issue.panels }, issue.panels),
-                alerts: t("starterPacks.countAlerts", { count: issue.alerts }, issue.alerts),
-                to: raw(issue.to),
-              })
-            }}
-          </OButton>
-        </div>
-      </template>
-    </ODrawer>
+      :repair="repair"
+      :issue="issue"
+      :scope="scope"
+      @repaired="emit('repaired')"
+    />
   </template>
 </template>

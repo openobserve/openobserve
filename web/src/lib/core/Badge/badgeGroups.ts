@@ -2192,6 +2192,56 @@ export const BADGE_GROUPS = {
     },
     fallback: { variant: "default-soft" },
   },
+
+  // One state for a whole Starter Pack; the page picks the first that applies, so Ready never hides a fault.
+  starterPackStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      notsetup: { variant: "default-soft", labelKey: "starterPacks.page.status.notSetUp" },
+      viewonly: { variant: "default-soft", labelKey: "starterPacks.page.status.viewOnly" },
+      firing: { variant: "error-soft", labelKey: "starterPacks.page.status.firing" },
+      needsattention: { variant: "error-soft", labelKey: "starterPacks.page.status.attention" },
+      ready: { variant: "success-soft", labelKey: "starterPacks.page.status.ready" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // One item a Starter Pack made, failed to make, left out, or would make.
+  starterPackItemState: {
+    mode: "icon",
+    shape: "pill",
+    values: {
+      firing: { variant: "error-soft", dot: true, labelKey: "starterPacks.page.itemState.firing" },
+      muted: {
+        variant: "warning-soft",
+        icon: "notifications-off",
+        labelKey: "starterPacks.page.itemState.muted",
+      },
+      paused: {
+        variant: "default-soft",
+        icon: "pause",
+        labelKey: "starterPacks.page.itemState.paused",
+      },
+      active: {
+        variant: "success-soft",
+        dot: true,
+        labelKey: "starterPacks.page.itemState.active",
+      },
+      created: { variant: "default-soft", labelKey: "starterPacks.page.itemState.created" },
+      notcreated: {
+        variant: "error-soft",
+        icon: "cancel",
+        labelKey: "starterPacks.page.itemState.notCreated",
+      },
+      skipped: { variant: "default-outline", labelKey: "starterPacks.page.itemState.skipped" },
+      willbecreated: {
+        variant: "default-outline",
+        labelKey: "starterPacks.page.itemState.willBeCreated",
+      },
+    },
+    fallback: { variant: "default-soft" },
+  },
 } satisfies Record<string, BadgeGroupConfig>;
 
 export type BadgeGroupName = keyof typeof BADGE_GROUPS;

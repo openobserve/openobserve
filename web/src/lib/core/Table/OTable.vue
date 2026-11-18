@@ -91,6 +91,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   selection: "none",
   showSelectAll: true,
   expansion: "none",
+  expandButton: true,
   virtualScroll: false,
   virtualScrollItemSize: 48,
   enableColumnResize: false,
@@ -784,6 +785,7 @@ const expansion = useTableExpansion<TData>(
   },
   emit,
 );
+const expandGutter = computed(() => expansion.isEnabled.value && props.expandButton);
 
 // ── Highlighting ────────────────────────────────────────────────
 const highlighting = useTableHighlight({
@@ -1240,7 +1242,7 @@ function nonFlexFixedSum(): number {
     sum += measuredVar ? parseFloat(measuredVar) : col.getSize();
   }
   if (selection.isMultiple.value) sum += TABLE_CHECKBOX_COL_SIZE;
-  if (expansion.isEnabled.value) sum += EXPANSION_COL_WIDTH;
+  if (expandGutter.value) sum += EXPANSION_COL_WIDTH;
   return sum;
 }
 
@@ -1763,7 +1765,7 @@ defineExpose({
             :show-select-all="showSelectAll"
             :is-all-selected="selection.isAllSelected()"
             :is-indeterminate="selection.isIndeterminate()"
-            :expansion-enabled="expansion.isEnabled.value"
+            :expansion-enabled="expandGutter"
             :enable-row-reorder="props.enableRowReorder"
             :enable-column-reorder="props.enableColumnReorder"
             :wrap="props.wrap"
@@ -1808,7 +1810,7 @@ defineExpose({
             :rows="skeletonRowCount"
             :table-columns="table.getVisibleLeafColumns()"
             :selection-enabled="selection.isEnabled.value"
-            :expansion-enabled="expansion.isEnabled.value"
+            :expansion-enabled="expandGutter"
             :enable-row-reorder="props.enableRowReorder"
             :bordered="props.bordered"
           />
@@ -1826,7 +1828,7 @@ defineExpose({
             :selection-multiple="selection.isMultiple.value"
             :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
             :is-row-selectable="props.isRowSelectable"
-            :expansion-enabled="expansion.isEnabled.value"
+            :expansion-enabled="expandGutter"
             :is-expanded-fn="(row: TData) => expansion.isExpanded(row)"
             :get-row-expansion-enabled="props.getRowExpansionEnabled"
             :highlight-text="props.highlightText"
@@ -1981,7 +1983,7 @@ defineExpose({
               class="bg-table-header-bg"
             >
               <!-- Expand placeholder -->
-              <th v-if="expansion.isEnabled.value" class="w-0 px-0" />
+              <th v-if="expandGutter" class="w-0 px-0" />
               <!-- Selection placeholder -->
               <th v-if="selection.isMultiple.value" class="w-0" />
               <!-- Drag handle placeholder -->

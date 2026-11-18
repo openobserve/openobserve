@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
             <img
               data-test="header-openobserve-logo"
-              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80 max-md:h-6"
               :src="
                 getImageURL(
                   isDark
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80 max-md:h-6"
             :src="
               getImageURL(
                 isDark
@@ -156,10 +156,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- RIGHT SIDE: Controls -->
     <div
-      class="flex shrink-0 items-center justify-end gap-1 pe-3 md:max-xl:min-w-0 md:max-xl:shrink"
+      class="flex shrink-0 items-center justify-end gap-1 pe-3 max-md:gap-0.5 max-md:pe-1.5 md:max-xl:min-w-0 md:max-xl:shrink"
     >
+      <!-- keyed by org: the chip reads one org's browser copy -->
+      <StarterPackHeaderChip
+        v-if="packsEnabled && store.state.selectedOrganization?.identifier"
+        :key="store.state.selectedOrganization.identifier"
+        class="me-1 max-md:me-0"
+      />
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
-      <SampleDataHeaderChip class="me-2" />
+      <SampleDataHeaderChip class="me-2 max-md:me-0" />
 
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
@@ -182,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- HEADER MENU: Contains all header navigation and user controls -->
-      <div class="header-menu flex items-center gap-x-2 md:max-xl:min-w-0">
+      <div class="header-menu flex items-center gap-x-2 max-md:gap-x-0.5 md:max-xl:min-w-0">
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"
@@ -239,7 +245,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="handleOrgSelection"
         />
 
-        <div class="header-utility-icons flex items-center gap-x-2 md:max-xl:shrink-0">
+        <div
+          class="header-utility-icons flex items-center gap-x-2 max-md:gap-x-0.5 md:max-xl:shrink-0"
+        >
           <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
            Leads the utility-icon cluster, set off by a separator from the
            org selector so it reads as the primary action in this group.
@@ -520,6 +528,8 @@ import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import SampleDataHeaderChip from "@/components/sampleData/SampleDataHeaderChip.vue";
+import StarterPackHeaderChip from "@/components/starterPacks/StarterPackHeaderChip.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -538,6 +548,7 @@ export default defineComponent({
     OrganizationSelector,
     SolutionSwitcher,
     SampleDataHeaderChip,
+    StarterPackHeaderChip,
     LinkedAccountsDialog,
     OButton,
     OIcon,
@@ -876,6 +887,7 @@ export default defineComponent({
     };
 
     return {
+      packsEnabled: STARTER_PACKS_ENABLED,
       securityAccess,
       isDark,
       t,

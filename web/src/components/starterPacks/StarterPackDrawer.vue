@@ -36,6 +36,7 @@ import { getImageURL } from "@/utils/zincutils";
 import { packScope, packScopeValue } from "@/composables/starterPacks/packCopy";
 import type { PackNotIncludedReason, PackRecordItem } from "@/composables/starterPacks/types";
 import { useAdaptedData } from "@/composables/starterPacks/useAdaptedData";
+import { useBrowserMatches } from "@/composables/starterPacks/useBrowserMatches";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import StarterPackInstallDialog from "./StarterPackInstallDialog.vue";
 import StarterPackAdaptedRows from "./StarterPackAdaptedRows.vue";
@@ -44,6 +45,7 @@ import StarterPackInlineConfirm from "./StarterPackInlineConfirm.vue";
 const props = defineProps<{
   flow: StarterPackFlow;
   clusters: string[];
+  folderName?: string;
 }>();
 const open = defineModel<boolean>("open", { default: false });
 const emit = defineEmits<{ "copy-link": []; done: [] }>();
@@ -495,7 +497,9 @@ const manage = () => {
   void router.push(flow.packRoute.value).catch(() => {});
 };
 const startSetup = async () => {
-  if (await flow.install(undefined, choice())) await finishLanding();
+  if (!(await flow.install(props.folderName, choice()))) return;
+  useBrowserMatches(flow.org).markInstalled(pack.id, pack.id);
+  await finishLanding();
 };
 const confirmDone = () => {
   inlineConfirm.value = null;
@@ -512,7 +516,7 @@ watch(open, (isOpen) => {
     v-model:open="modalOpen"
     size="md"
     :persistent="flow.busy.value"
-    :aria-title="t('starterPacks.drawer.title')"
+    :aria-title="t('starterPacks.drawer.setUpTitle', { title })"
     data-test="starter-pack-drawer"
   >
     <template #header>
@@ -530,7 +534,7 @@ watch(open, (isOpen) => {
         </span>
         <div class="flex min-w-0 flex-col">
           <span class="text-text-heading text-base font-semibold">{{
-            t("starterPacks.drawer.title")
+            t("starterPacks.drawer.setUpTitle", { title })
           }}</span>
           <span
             class="text-text-secondary flex min-w-0 items-center gap-1.5 text-xs"

@@ -20,7 +20,10 @@ import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackF
 
 export const PACK = {
   id: "kubernetes",
+  version: "1.0.0",
   titleKey: "starterPacks.kubernetes.title",
+  descriptionKey: "starterPacks.kubernetes.description",
+  pausedImpactKey: "starterPacks.kubernetes.pausedImpact",
   dashboards: [{ id: "overview", title: "Overview" }],
   alerts: ["a1", "a2"],
   savedViews: [{ id: "v1", name: "Events" }],
@@ -66,6 +69,7 @@ export const fakeFlow = (over: Record<string, unknown> = {}) =>
     loaded: ref(true),
     made: ref([]),
     nameOf: (id: string) => `name-${id}`,
+    org: "org",
     alertTitle: (_id: string, fallback: string) => fallback,
     pack: PACK,
     preview: shallowRef(null),

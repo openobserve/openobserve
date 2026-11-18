@@ -61,7 +61,7 @@ const drawerPackId = ref<string | null>(null);
 const drawerFlow = computed(() => (drawerPackId.value ? flows.get(drawerPackId.value) : undefined));
 
 const signalsOf = (pack: StarterPack) =>
-  pack.id === KUBERNETES_PACK.id ? DETECTION_STREAMS : (pack.signals ?? []);
+  pack.id === KUBERNETES_PACK.id ? DETECTION_STREAMS : (pack.signals ?? []).flat();
 
 // Without a signal stream the pack cannot fit, so the full match is not paid for on this hot page.
 const matches = async (
