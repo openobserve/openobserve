@@ -70,7 +70,7 @@ class SecurityPage {
   async selectEventsStream(stream) {
     // The page ignores a pick made before its mount-time load ends, which it marks by writing sql_mode into the URL.
     await expect(this.page).toHaveURL((url) => url.searchParams.has('sql_mode'), { timeout: PAGE_TIMEOUT_MS });
-    await selectOSelectOption(this.page, this.eventsStream, stream);
+    await selectOSelectOption(this.page, this.eventsStream, stream, { search: true });
   }
 
   async expectEventRow(marker, cells) {
@@ -106,7 +106,7 @@ class SecurityPage {
   }
 
   async pickDetectionStream(stream) {
-    await selectOSelectOption(this.page, this.newDetectionStream, stream);
+    await selectOSelectOption(this.page, this.newDetectionStream, stream, { search: true });
   }
 
   async expectCompilesAgainst(stream) {
