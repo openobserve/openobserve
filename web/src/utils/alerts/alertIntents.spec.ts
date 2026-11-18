@@ -23,7 +23,7 @@ import {
   fieldsBySamplePresence,
   intentsFor,
   labelProfile,
-  matchingLabel,
+  familyMember,
   metricFamilySiblings,
   rankCategory,
   rankGroup,
@@ -323,11 +323,26 @@ describe("alertIntents", () => {
       },
     ];
     expect(metricFamilySiblings(streams[1], streams)).toEqual(["http_server_duration_count"]);
-    expect(matchingLabel("http_response_status_code", ["http_status_code", "service_name"])).toBe(
-      "http_status_code",
+    const series = (status: string, values: string[], service = "svc") =>
+      values.map((code) => ({ __name__: "m", service_name: service, [status]: code }));
+    const own = familyMember(
+      "http_response_status_code",
+      series("http_response_status_code", ["200", "500"]),
     );
-    expect(matchingLabel("service_name", ["service_name"])).toBe("service_name");
-    expect(matchingLabel("cpu", ["mode"])).toBeUndefined();
+    // One generation's series spell the label two ways, never both on one series.
+    const mixed = [
+      ...series("http_response_status_code", ["200"], "shipping"),
+      ...series("http_status_code", ["200", "503"], "dashboard"),
+    ];
+    expect(own).toEqual({ labels: ["http_response_status_code"], whole: true });
+    expect(familyMember("http_response_status_code", mixed)).toEqual({
+      labels: ["http_response_status_code", "http_status_code"],
+      whole: true,
+    });
+    expect(familyMember("cpu", series("mode", ["idle"]))).toBeUndefined();
+    expect(
+      familyMember("code", [{ code: "500" }, { code: "200", status_code: "200" }, { pod: "a" }]),
+    ).toEqual({ labels: ["code"], whole: false });
 
     const fill = buildMetricFill(
       "ratio",
@@ -337,14 +352,19 @@ describe("alertIntents", () => {
         group: "service_name",
         counter: true,
         family: [
-          { metric: "http_server_request_duration_count", label: "http_response_status_code" },
-          { metric: "http_server_duration_count", label: "http_status_code" },
+          { metric: "http_server_request_duration_count", ...own! },
+          {
+            metric: "http_server_duration_count",
+            labels: ["http_response_status_code", "http_status_code"],
+            whole: true,
+          },
+          { metric: "partial_count", labels: ["code"], whole: false },
         ],
       },
       { periodMinutes: 5 },
     );
     expect(fill.values["query_condition.promql"]).toBe(
-      'sum by (service_name) (rate(http_server_request_duration_count{http_response_status_code=~"5.."}[5m]) or rate(http_server_duration_count{http_status_code=~"5.."}[5m])) / sum by (service_name) (rate(http_server_request_duration_count[5m]) or rate(http_server_duration_count[5m])) * 100',
+      'sum by (service_name) (rate(http_server_request_duration_count{http_response_status_code=~"5.."}[5m]) or rate(http_server_duration_count{http_response_status_code=~"5.."}[5m]) or rate(http_server_duration_count{http_status_code=~"5.."}[5m]) or rate(partial_count{code=~"5.."}[5m])) / sum by (service_name) (rate(http_server_request_duration_count[5m]) or rate(http_server_duration_count[5m]) or rate(partial_count{code=~".+"}[5m])) * 100',
     );
     expect(fill.values["query_condition.promql_condition"]).toMatchObject({
       operator: ">",

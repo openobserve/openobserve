@@ -70,10 +70,12 @@ export interface MetricStreamInfo {
   metrics_meta?: { metric_type?: string; metric_family_name?: string };
 }
 
-/** A metric that reads the same thing under other names, with its own spelling of the labels. */
+/** A metric that reads the same thing under other names, with its own spellings of the share's label;
+ * `whole` when every series carries one of them, so the denominator needs no presence filter. */
 export interface MetricFamilyMember {
   metric: string;
-  label: string;
+  labels: string[];
+  whole: boolean;
 }
 
 /** What applying an intent writes: form paths, plus the mode switches the form owns outside its values. */
@@ -582,7 +584,7 @@ export function buildMetricFill(
         "query_condition.promql": ratioPromql({
           members: slots.family?.length
             ? slots.family
-            : [{ metric: slots.metric, label: slots.label ?? "" }],
+            : [{ metric: slots.metric, labels: slots.label ? [slots.label] : [], whole: true }],
           values: slots.values ?? [],
           group: slots.group,
           counter: slots.counter ?? true,
@@ -647,11 +649,24 @@ export function metricFamilySiblings(
     .map((s) => s.name);
 }
 
-/** A metric's own spelling of a label: the same name, else the one whose words contain or are contained in it. */
-export function matchingLabel(label: string, labels: readonly string[]): string | undefined {
-  if (labels.includes(label)) return label;
-  const related = labels.filter((l) => relatedNames(label, l));
-  return related.sort((a, b) => a.length - b.length)[0];
+/** How a metric's series spell a label: the label itself, then related names that never sit on one
+ * series with a spelling already taken (a naming generation renames, it does not add). */
+export function familyMember(
+  label: string,
+  series: readonly SeriesLabels[],
+): Omit<MetricFamilyMember, "metric"> | undefined {
+  const carries = (one: SeriesLabels, name: string) => one[name] !== undefined;
+  const coverage = (name: string) => series.filter((one) => carries(one, name)).length;
+  const names = [...new Set(series.flatMap((one) => Object.keys(one)))];
+  const related = names
+    .filter((name) => name !== label && relatedNames(label, name))
+    .sort((a, b) => coverage(b) - coverage(a));
+  const labels: string[] = names.includes(label) ? [label] : [];
+  for (const name of related)
+    if (!series.some((one) => carries(one, name) && labels.some((l) => carries(one, l))))
+      labels.push(name);
+  if (!labels.length) return undefined;
+  return { labels, whole: series.every((one) => labels.some((l) => carries(one, l))) };
 }
 
 /** Label names of a metric's series, each with its distinct values and the share of series carrying it. */
@@ -734,12 +749,15 @@ export function ratioPromql(input: {
 }): string {
   const window = `${Math.max(1, Math.round(input.windowMinutes))}m`;
   const pattern = input.values.filter(Boolean).map(promLabelValue).join("|");
-  const read = (m: MetricFamilyMember, filtered: boolean) => {
-    const selector = filtered && m.label ? `${m.metric}{${m.label}=~"${pattern}"}` : m.metric;
-    return input.counter ? `rate(${selector}[${window}])` : selector;
+  const rate = (selector: string) => (input.counter ? `rate(${selector}[${window}])` : selector);
+  // A series carrying none of the spellings cannot be split, so it stays out of the denominator too.
+  const reads = (m: MetricFamilyMember, filtered: boolean) => {
+    if (!m.labels.length || (!filtered && m.whole)) return [rate(m.metric)];
+    const match = filtered ? pattern : ".+";
+    return m.labels.map((label) => rate(`${m.metric}{${label}=~"${match}"}`));
   };
   const sum = (filtered: boolean) => {
-    const inner = input.members.map((m) => read(m, filtered)).join(" or ");
+    const inner = input.members.flatMap((m) => reads(m, filtered)).join(" or ");
     return `sum${input.group ? ` by (${input.group})` : ""} (${inner})`;
   };
   return `${sum(true)} / ${sum(false)} * 100`;

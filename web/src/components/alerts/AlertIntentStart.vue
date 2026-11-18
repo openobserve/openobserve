@@ -164,11 +164,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
     <p
-      v-if="active === 'ratio' && familyNames.length"
+      v-if="active === 'ratio' && familyText.length"
       class="text-text-secondary m-0 text-xs"
       data-test="add-alert-intent-family"
     >
-      {{ t("alerts.intent.ratio.alsoCovers", { metrics: joinListMore(familyNames, t) }) }}
+      {{ t("alerts.intent.ratio.alsoCovers", { metrics: joinListMore(familyText, t) }) }}
     </p>
 
     <template v-if="showLibrary && area.state !== 'absent'">
@@ -293,7 +293,7 @@ import {
   intentsFor,
   isCounterLike,
   labelProfile,
-  matchingLabel,
+  familyMember,
   metricFamilySiblings,
   rankCategory,
   rankGroup,
@@ -503,18 +503,32 @@ const siblings = computed(() =>
     ? metricFamilySiblings(pickedMetric.value, props.metricStreams).slice(0, FAMILY_CAP)
     : [],
 );
+// A naming generation joins the share only where its series carry the label under some spelling.
 const family = computed<MetricFamilyMember[]>(() => {
-  const own = { metric: props.streamName, label: slots.label ?? "" };
-  if (!slots.label) return [own];
-  const others = siblings.value.flatMap((metric) => {
-    const labels = labelProfile(series.value[metric] ?? []).map((p) => p.label);
-    const label = matchingLabel(slots.label!, labels);
-    const groupOk = !slots.group || labels.includes(slots.group);
-    return label && groupOk ? [{ metric, label }] : [];
-  });
-  return [own, ...others];
+  const label = slots.label;
+  const memberOf = (metric: string): MetricFamilyMember[] => {
+    const rows = series.value[metric] ?? [];
+    const member = label ? familyMember(label, rows) : undefined;
+    const groupOk = !slots.group || rows.some((one) => one[slots.group!] !== undefined);
+    return member && groupOk ? [{ metric, ...member }] : [];
+  };
+  const own = memberOf(props.streamName)[0] ?? {
+    metric: props.streamName,
+    labels: label ? [label] : [],
+    whole: true,
+  };
+  return label ? [own, ...siblings.value.flatMap(memberOf)] : [own];
 });
-const familyNames = computed(() => family.value.slice(1).map((m) => m.metric));
+const familyText = computed(() =>
+  family.value.slice(1).map((m) =>
+    m.labels.length === 1 && m.labels[0] === slots.label
+      ? m.metric
+      : t("alerts.intent.ratio.memberReads", {
+          metric: raw(m.metric),
+          labels: joinListOrMore(m.labels, t),
+        }),
+  ),
+);
 const labelValues = computed(
   () => profile.value.find((p) => p.label === slots.label)?.values ?? [],
 );
