@@ -289,9 +289,10 @@
     "browser": "chrome",
     "run_files": [
       "k8s-16300-events-flatten-level.spec.js",
-      "k8s-16778-cluster-picker-and-presets.spec.js"
+      "k8s-16778-cluster-picker-and-presets.spec.js",
+      "dbm-16278-one-row-per-server.spec.js"
     ],
     "disabled": [],
-    "_comment": "Infrastructure bug-fix regressions (Kubernetes explorer). Each spec seeds k8s_events in its own org, because the stream name is fixed per org."
+    "_comment": "Infrastructure bug-fix regressions (Kubernetes explorer, Database Monitoring). The Kubernetes specs seed k8s_events in their own org, because the stream name is fixed per org; the Database Monitoring spec serves its db_totals rows through page.route, because real rows appear only after the 15-minute rollup."
   }
 ]
