@@ -2306,6 +2306,29 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
     });
   });
 
+  describe("a matching recent search in the typed-word menu", () => {
+    it(
+      "ranks after every other row, so Tab or Enter keeps the word",
+      { timeout: 30000 },
+      async () => {
+        const { editor, model, provide } = await mountWith("recent-rank", {
+          recentQueries: ["code = '500'"],
+        });
+        const text = "code";
+        placeCaret(editor, model, text);
+        model.getValue.mockReturnValue(text);
+        model.getLineMaxColumn = vi.fn(() => text.length + 1);
+        model.getWordUntilPosition.mockReturnValue({ word: text, startColumn: 1, endColumn: 5 });
+        const { suggestions } = await provide(model, { lineNumber: 1, column: 5 }, {}, {});
+        const recent = suggestions.find((s: any) => s.insertText === "code = '500'");
+        const others = suggestions.filter((s: any) => s !== recent);
+        expect(others.length).toBeGreaterThan(0);
+        expect(recent.range.startColumn).toBe(5);
+        for (const other of others) expect(recent.sortText > String(other.sortText)).toBe(true);
+      },
+    );
+  });
+
   describe("the typed prefix reaches the resolver", () => {
     it("passes what is typed inside an open quote", { timeout: 30000 }, async () => {
       const resolver = vi.fn(async (_field: string, _options?: any) => ["openobserve"]);
