@@ -1204,7 +1204,7 @@ mod tests {
 
     /// Compare-with-past + function: the scheduler decides on the rows the function returned.
     #[tokio::test]
-    async fn compare_alert_notifies_then_holds_for_notify_at_most_every() {
+    async fn compare_alert_waits_must_last_then_holds_for_notify_at_most_every() {
         let mut alert = Alert::default();
         alert.query_condition.query_type = QueryType::SQL;
         alert.query_condition.sql = Some("SELECT * FROM t".into());
@@ -1213,35 +1213,37 @@ mod tests {
             Some(vec![config::meta::alerts::CompareHistoricData {
                 offset: "7d".into(),
             }]);
+        alert.pending_period_sec = 600;
         alert.trigger_condition.period = 10;
         alert.trigger_condition.frequency = 600;
         alert.trigger_condition.threshold = 1;
         alert.trigger_condition.operator = Operator::GreaterThanEquals;
         alert.trigger_condition.silence = 20;
         let step = 10 * MIN;
-        let results = vec![
-            (T0, count(0, 1.0)),
-            (T0 + step, count(2, 1.0)),
-            (T0 + 2 * step, count(3, 1.0)),
-            (T0 + 3 * step, count(1, 1.0)),
-            (T0 + 4 * step, count(0, 1.0)),
-            (T0 + 5 * step, count(0, 1.0)),
-        ];
+        let counts = [0, 2, 3, 1, 1, 0, 0];
+        let results = counts
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (T0 + i as i64 * step, count(*n, 1.0)))
+            .collect();
         let resp = run(&alert, results).await;
         use CheckState::*;
+        let held = Some(HeldBy::NotifyAtMostEvery);
         assert_eq!(
             states(&resp),
             vec![
                 (Quiet, false, None),
+                (Pending, false, None),
                 (Firing, true, None),
-                (Firing, false, Some(HeldBy::NotifyAtMostEvery)),
+                (Firing, false, held),
                 (Firing, true, None),
-                (Firing, false, Some(HeldBy::NotifyAtMostEvery)),
+                (Firing, false, held),
                 (Quiet, false, None),
             ]
         );
         assert_eq!(resp.checks[0].reason, Some(NotFiredReason::BelowThreshold));
-        assert_eq!(resp.summary.notified_at, vec![T0 + step, T0 + 3 * step]);
+        assert_eq!(resp.checks[1].reason, Some(NotFiredReason::Pending));
+        assert_eq!(resp.summary.notified_at, vec![T0 + 2 * step, T0 + 4 * step]);
         assert_eq!((resp.summary.fired, resp.summary.held), (4, 2));
     }
 
