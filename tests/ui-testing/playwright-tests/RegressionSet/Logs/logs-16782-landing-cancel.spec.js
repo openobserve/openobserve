@@ -10,6 +10,7 @@ const STREAM = `e2e_16782_${Math.random().toString(36).slice(2, 7)}`;
 const runButton = '[data-test="logs-search-bar-refresh-btn"]';
 const runInFlight = '[data-test="logs-search-bar-refresh-btn"][class*="bg-cancel-query-bg"]';
 const rows = '[data-test="logs-search-result-logs-table"] tbody tr';
+const noQueryApplied = '[data-test="logs-search-apply-search-text"]';
 
 const logsUrl = () =>
   `/web/logs?org_identifier=${ORG}&stream=${STREAM}&stream_type=logs&period=15m` +
@@ -66,8 +67,11 @@ test.describe('Logs landing search after Cancel (#16782)', () => {
     await page.unroute(/\/api\/[^/]+\/streams\?/);
     await new PageManager(page).logsPage.waitForStreamFieldsLoaded('level');
 
-    // The broken build sent the landing search right after the stream fields loaded, so give that path time to fire.
-    await page.waitForTimeout(3000);
+    // A skipped landing run ends on the no-query-applied state; the broken build searched instead, with a 0 ms landing debounce.
+    await expect.poll(async () => {
+      if (searches.hits().length) return 'searched';
+      return (await page.locator(noQueryApplied).isVisible()) ? 'idle' : 'loading';
+    }, { timeout: 15000, message: 'after Cancel the landing run must end idle without a search' }).toBe('idle');
     expect(searches.hits(), 'no search may start after Cancel').toHaveLength(0);
     await expect(page.locator(runInFlight)).toHaveCount(0);
 

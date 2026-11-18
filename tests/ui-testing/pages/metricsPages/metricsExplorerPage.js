@@ -677,7 +677,8 @@ export class MetricsExplorerPage {
         let values = [];
         await expect
             .poll(async () => {
-                if (await bar.suggestions.getAttribute('aria-busy').catch(() => null) === 'true') return -1;
+                // Value rows are final only once the panel's loading OSpinner (role=status) is gone.
+                if (await bar.suggestions.getByRole('status').count() > 0) return -1;
                 values = (await rows.allInnerTexts()).map((text) => text.trim()).filter(Boolean);
                 return values.length;
             }, { timeout, message: `no value suggestions for ${label}` })
