@@ -307,6 +307,14 @@ pub(crate) struct RoutedIncident {
     pub error: Option<anyhow::Error>,
 }
 
+/// The kv marker of an incident the org's page budget held back, naming the page that used it.
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) struct BudgetedPage {
+    pub record_id: String,
+    pub pages_per_day: u32,
+}
+
 /// How a finding's incident reaches on-call, behind a seam so routing failures can be tested.
 #[cfg(feature = "enterprise")]
 #[async_trait::async_trait]
@@ -325,6 +333,16 @@ pub(crate) trait FindingPager: Send + Sync {
         streams: &[(String, String)],
     ) -> RoutedIncident;
     async fn attach(&self, org_id: &str, record_id: &str, incident_id: &str) -> anyhow::Result<()>;
+    /// The org's daily page budget; a failed read is an error, so the incident retries unheld.
+    async fn pages_per_day(&self, org_id: &str) -> anyhow::Result<u32>;
+    /// The newest `limit` of the org's AutoObserve incident pages opened after `since` that name a
+    /// team, one per incident, newest first.
+    async fn pages_since(
+        &self,
+        org_id: &str,
+        since: i64,
+        limit: u32,
+    ) -> anyhow::Result<Vec<infra::table::oncall_responses::TeamPage>>;
 }
 
 /// The production [FindingPager]: on-call routing on the streams' catalogued services, at P2.
@@ -376,6 +394,48 @@ impl FindingPager for OncallPager {
     async fn attach(&self, org_id: &str, record_id: &str, incident_id: &str) -> anyhow::Result<()> {
         infra::table::oncall_responses::attach_incident(org_id, record_id, incident_id).await?;
         Ok(())
+    }
+
+    async fn pages_since(
+        &self,
+        org_id: &str,
+        since: i64,
+        limit: u32,
+    ) -> anyhow::Result<Vec<infra::table::oncall_responses::TeamPage>> {
+        use config::meta::oncall::{SubjectRef, SubjectType};
+        use o2_enterprise::enterprise::autoobserve::plugins::stream::PAGE_COHORT_MAX_AGE_US;
+
+        // A member's settle can route its incident up to a cohort's age after the incident opened.
+        let incidents = infra::table::alert_incidents::created_with_alert_kind_since(
+            org_id,
+            AlertKind::AutoObserve.as_str(),
+            since - PAGE_COHORT_MAX_AGE_US,
+        )
+        .await?;
+        // `route` opens firing 1 only, so each incident has one exact subject id to look up.
+        let subjects: Vec<String> = incidents
+            .into_iter()
+            .map(|i| SubjectRef::new(SubjectType::Incident, i.id, 1).subject_id())
+            .collect();
+        // Page order, not incident order: an older incident can be routed after a newer one.
+        let pages = infra::table::oncall_responses::team_pages_of(
+            org_id,
+            SubjectType::Incident,
+            &subjects,
+            since,
+            limit.into(),
+        )
+        .await?;
+        Ok(pages)
+    }
+
+    async fn pages_per_day(&self, org_id: &str) -> anyhow::Result<u32> {
+        use o2_enterprise::enterprise::autoobserve::{
+            marks::TableKvReader, paging_settings::try_paging_settings,
+        };
+
+        let settings = try_paging_settings(&TableKvReader, org_id).await?;
+        Ok(settings.pages_per_day())
     }
 }
 
@@ -2129,6 +2189,36 @@ pub async fn open_finding_incident(
     f: &FindingIncident,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     open_finding_incident_with(f, &OncallPager, &ClusterTurns).await
+}
+
+/// Write-once: one writer runs under the org's cohort turn, and a rewrite stores the same page.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn note_budgeted(
+    org_id: &str,
+    incident_id: &str,
+    record_id: &str,
+    pages_per_day: u32,
+) -> anyhow::Result<()> {
+    let marker = BudgetedPage {
+        record_id: record_id.to_string(),
+        pages_per_day,
+    };
+    let value = serde_json::to_vec(&marker)?;
+    infra::table::kv_store::set(org_id, &budgeted_key(incident_id), &value).await?;
+    Ok(())
+}
+
+/// Read on the primary, so a retried act sees the marker it wrote and never routes the incident.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn budgeted_page(
+    org_id: &str,
+    incident_id: &str,
+) -> anyhow::Result<Option<BudgetedPage>> {
+    let Some(row) = infra::table::kv_store::get_primary(org_id, &budgeted_key(incident_id)).await?
+    else {
+        return Ok(None);
+    };
+    Ok(Some(serde_json::from_slice(&row.value)?))
 }
 
 /// Never empty: an open incident with no group values is joined by any later dimensional alert.
@@ -4105,6 +4195,7 @@ async fn finish_finding_incident(
             }
             Some(record)
         }
+        None if page_budget_holds(f, incident_id, pager, turn).await? => None,
         None => {
             turn.held("paging")?;
             let routed = pager
@@ -4125,6 +4216,59 @@ async fn finish_finding_incident(
             .await?;
     }
     Ok(())
+}
+
+/// Whether the org's page budget holds this incident's page back; a held incident never routes.
+#[cfg(feature = "enterprise")]
+async fn page_budget_holds(
+    f: &FindingIncident,
+    incident_id: &str,
+    pager: &dyn FindingPager,
+    turn: &FindingTurn,
+) -> Result<bool, anyhow::Error> {
+    use o2_enterprise::enterprise::autoobserve::paging_settings::PAGE_BUDGET_WINDOW_US;
+
+    if budgeted_page(&f.org_id, incident_id).await?.is_some() {
+        return Ok(true);
+    }
+    turn.held("checking the page budget")?;
+    let limit = pager.pages_per_day(&f.org_id).await?;
+    let now = config::utils::time::now_micros();
+    let pages = pager
+        .pages_since(&f.org_id, now - PAGE_BUDGET_WINDOW_US, limit)
+        .await?;
+    let Some(spent) = page_budget_spent(limit, &pages, now) else {
+        return Ok(false);
+    };
+    note_budgeted(&f.org_id, incident_id, &spent.id, limit).await?;
+    Ok(true)
+}
+
+/// The newest team page once `limit` of them opened inside the window; one exactly a window old
+/// is out, so no UTC day holds more than `limit`.
+#[cfg(feature = "enterprise")]
+fn page_budget_spent(
+    limit: u32,
+    pages: &[infra::table::oncall_responses::TeamPage],
+    now: i64,
+) -> Option<&infra::table::oncall_responses::TeamPage> {
+    use o2_enterprise::enterprise::autoobserve::paging_settings::PAGE_BUDGET_WINDOW_US;
+
+    let inside: Vec<_> = pages
+        .iter()
+        .filter(|p| p.team_id.is_some() && p.opened_at > now - PAGE_BUDGET_WINDOW_US)
+        .collect();
+    if inside.len() < limit as usize {
+        return None;
+    }
+    inside.into_iter().max_by_key(|p| p.opened_at)
+}
+
+#[cfg(feature = "enterprise")]
+fn budgeted_key(incident_id: &str) -> String {
+    use o2_enterprise::enterprise::autoobserve::names::kv::PAGE_BUDGETED_PREFIX;
+
+    format!("{PAGE_BUDGETED_PREFIX}{incident_id}")
 }
 
 /// The finding's next incident id: a digest of org, finding and the incidents it already has.
@@ -7454,6 +7598,12 @@ mod tests {
                 self.state.lock().unwrap().pages
             }
 
+            fn age_pages(&self, by: i64) {
+                for record in self.state.lock().unwrap().records.values_mut() {
+                    record.opened_at -= by;
+                }
+            }
+
             fn for_team(team_id: &str) -> Self {
                 let pager = Self::default();
                 pager.state.lock().unwrap().team_id = Some(team_id.to_string());
@@ -7468,6 +7618,12 @@ mod tests {
                     s.refuse_attach = attach;
                 }
                 pager
+            }
+
+            /// None makes the budget read fail; an org never set reads one page a day.
+            fn set_budget(&self, org_id: &str, pages: Option<u32>) {
+                let mut s = self.state.lock().unwrap();
+                s.budgets.insert(org_id.to_string(), pages);
             }
 
             fn heal(&self) {
@@ -7580,6 +7736,33 @@ mod tests {
                 }
                 Ok(())
             }
+
+            async fn pages_per_day(&self, org_id: &str) -> anyhow::Result<u32> {
+                let s = self.state.lock().unwrap();
+                match s.budgets.get(org_id) {
+                    Some(None) => anyhow::bail!("the budget read failed"),
+                    Some(Some(pages)) => Ok(*pages),
+                    None => Ok(1),
+                }
+            }
+
+            async fn pages_since(
+                &self,
+                org_id: &str,
+                since: i64,
+                limit: u32,
+            ) -> anyhow::Result<Vec<infra::table::oncall_responses::TeamPage>> {
+                let s = self.state.lock().unwrap();
+                let mut pages: Vec<_> = s
+                    .records
+                    .values()
+                    .filter(|r| r.org_id == org_id && r.team_id.is_some() && r.opened_at > since)
+                    .map(team_page)
+                    .collect();
+                pages.sort_by_key(|r| std::cmp::Reverse(r.opened_at));
+                pages.truncate(limit as usize);
+                Ok(pages)
+            }
         }
 
         #[derive(Default)]
@@ -7593,6 +7776,7 @@ mod tests {
             refuse_attach: bool,
             team_id: Option<String>,
             routed: Vec<(String, Vec<(String, String)>)>,
+            budgets: HashMap<String, Option<u32>>,
         }
 
         fn page_record(
@@ -7609,11 +7793,22 @@ mod tests {
                 "priority": 2,
                 "responder_role": "owner",
                 "state": "triggered",
-                "opened_at": 1,
+                "opened_at": config::utils::time::now_micros(),
                 "incident_id": null,
                 "updated_at": 1
             }))
             .unwrap()
+        }
+
+        fn team_page(
+            record: &config::meta::oncall::Response,
+        ) -> infra::table::oncall_responses::TeamPage {
+            infra::table::oncall_responses::TeamPage {
+                id: record.id.clone(),
+                team_id: record.team_id.clone(),
+                opened_at: record.opened_at,
+                subject_id: record.subject.subject_id(),
+            }
         }
 
         fn finding(org_id: &str, at: i64) -> FindingIncident {
@@ -7822,7 +8017,7 @@ mod tests {
                 .unwrap();
             age_teams(&org, 2 * PAGE_PENDING_US).await;
             let mut ids = Vec::new();
-            for i in 0..4 {
+            for i in 0..5 {
                 let mut own = stop(&org, i);
                 own.cohort = false;
                 ids.push(open(&own, &pager).await.unwrap());
@@ -7839,6 +8034,7 @@ mod tests {
             )
             .await
             .unwrap();
+            note_budgeted(&org, &ids[4], &record.id, 1).await.unwrap();
             let sample = Some((SubjectType::Incident, ids[1].as_str(), Some(TITLE), 2));
             let now = config::utils::time::now_micros();
             infra::table::oncall_ownership::record_unrouted(
@@ -7876,6 +8072,10 @@ mod tests {
                 serde_json::to_value(&pages[&ids[3]]).unwrap(),
                 serde_json::json!({"outcome": "failed", "team_id": null, "team_name": null})
             );
+            assert_eq!(
+                serde_json::to_value(&pages[&ids[4]]).unwrap(),
+                serde_json::json!({"outcome": "budgeted", "team_id": null, "team_name": null})
+            );
             let threads = issue_incidents_of(&org).await;
             let (thread, firings) = &threads[&ids[0]];
             let own = ("stream_silence-s0".to_string(), ONSET);
@@ -7895,6 +8095,109 @@ mod tests {
             let (failed, _) = &threads[&ids[3]];
             assert_eq!((failed.paged, failed.page_failed), (false, true));
             assert_eq!((&failed.response_id, &failed.page_url), (&None, &None));
+            let (held, _) = &threads[&ids[4]];
+            assert_eq!(
+                (held.paged, held.page_failed, &held.response_id),
+                (false, false, &None)
+            );
+            let spent = held
+                .budget_spent_by
+                .as_ref()
+                .expect("the page that used it");
+            assert_eq!(spent.team_name.as_deref(), Some("shop"));
+            assert_eq!(spent.page_url, thread.page_url);
+            assert_eq!(
+                (spent.paged_at, spent.pages_per_day, spent.streams),
+                (record.opened_at, 1, 1)
+            );
+            assert_eq!(spent.stream_name, "s0");
+        }
+
+        #[test]
+        fn the_page_budget_counts_team_pages_inside_the_rolling_day() {
+            use o2_enterprise::enterprise::autoobserve::paging_settings::PAGE_BUDGET_WINDOW_US;
+
+            let hour = 3_600_000_000;
+            let page =
+                |id: &str, team: Option<&str>, ago: i64| infra::table::oncall_responses::TeamPage {
+                    id: format!("page-{id}"),
+                    team_id: team.map(str::to_string),
+                    opened_at: ONSET - ago,
+                    subject_id: format!("{id}#1"),
+                };
+            let recent = page("a", Some("shop"), hour);
+            let older = page("b", Some("shop"), 2 * hour);
+            let day_old = page("c", Some("shop"), PAGE_BUDGET_WINDOW_US);
+            let teamless = page("d", None, hour);
+            let cases: [(u32, Vec<_>, Option<&str>); 6] = [
+                (1, vec![], None),
+                (1, vec![recent.clone()], Some("page-a")),
+                (1, vec![day_old], None),
+                (1, vec![teamless], None),
+                (2, vec![recent.clone()], None),
+                (2, vec![older, recent], Some("page-a")),
+            ];
+            for (n, (limit, pages, want)) in cases.into_iter().enumerate() {
+                let spent = page_budget_spent(limit, &pages, ONSET).map(|p| p.id.as_str());
+                assert_eq!(spent, want, "case {n}");
+            }
+        }
+
+        #[tokio::test]
+        async fn a_spent_page_budget_opens_and_analyses_the_incident_but_pages_nobody() {
+            use o2_enterprise::enterprise::autoobserve::{
+                INTERVAL_SECS, paging_settings::PAGE_BUDGET_WINDOW_US,
+            };
+
+            let _db = store().await;
+            let (a, b, pager) = (new_org(), new_org(), Pager::for_team("shop"));
+            let gap = 3 * INTERVAL_SECS * 1_000_000;
+            let first = open(&stop(&a, 0), &pager).await.unwrap();
+            assert_eq!(pager.pages(), 1, "the first stop pages");
+            age(&first, gap, 0).await;
+            let held = stop(&a, 1);
+            let second = open(&held, &pager).await.unwrap();
+            assert_ne!(second, first, "its own incident");
+            assert_eq!(pager.pages(), 1, "the budget is spent");
+            assert_eq!(
+                budgeted_page(&a, &second).await.unwrap(),
+                Some(BudgetedPage {
+                    record_id: format!("page-{first}"),
+                    pages_per_day: 1
+                })
+            );
+            let row = infra::table::alert_incidents::get_rw(&a, &second)
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(
+                row.rca_run_id.is_some() || row.rca_off_reason.is_some(),
+                "its analysis was still decided"
+            );
+            pager.set_budget(&b, Some(2));
+            let b_first = open(&stop(&b, 0), &pager).await.unwrap();
+            assert_eq!(pager.pages(), 2, "another org has its own budget");
+            age(&b_first, gap, 0).await;
+            pager.set_budget(&b, None);
+            let unread = stop(&b, 1);
+            assert!(
+                open(&unread, &pager).await.is_err(),
+                "an unread budget fails the act"
+            );
+            pager.set_budget(&b, Some(2));
+            let b_second = open(&unread, &pager).await.unwrap();
+            assert_eq!(budgeted_page(&b, &b_second).await.unwrap(), None);
+            assert_eq!(pager.pages(), 3, "its retry pages inside B's budget of two");
+            pager.age_pages(PAGE_BUDGET_WINDOW_US);
+            assert_eq!(open(&held, &pager).await.unwrap(), second);
+            assert_eq!(pager.pages(), 3, "a held incident never pages later");
+            age(&second, gap, 0).await;
+            assert_ne!(open(&stop(&a, 2), &pager).await.unwrap(), second);
+            assert_eq!(
+                pager.pages(),
+                4,
+                "a day after the page, the next stop pages"
+            );
         }
 
         #[tokio::test]
@@ -7945,6 +8248,11 @@ mod tests {
             assert!(routed.error.is_none(), "{:?}", routed.error);
             let record = routed.record.expect("on-call keeps a teamless record");
             assert_eq!(record.team_id, None, "no rule and no default team");
+            let spent = OncallPager.pages_since(&org, 0, 1).await.unwrap();
+            assert!(
+                spent.is_empty(),
+                "a page that woke no one leaves the budget"
+            );
             let pages = pages_of(&org, true).await;
             assert_eq!(pages[&id].outcome, PageOutcome::Unrouted);
             assert_eq!(pages[&id].team_id, None);
@@ -8028,22 +8336,67 @@ mod tests {
             let id = open(&stop(&org, 0), &Pager::for_team(&team.id))
                 .await
                 .unwrap();
-            let paged = SubjectRef::new(SubjectType::Incident, id.clone(), 1);
-            infra::table::oncall_responses::open(
-                &org,
-                &paged,
-                Some(&team.id),
-                2,
-                Some(TITLE),
-                ResponderRole::Owner,
-                None,
-            )
-            .await
-            .unwrap();
+            let mut own = stop(&org, 1);
+            own.cohort = false;
+            let newer = open(&own, &Pager::default()).await.unwrap();
+            let mut records = Vec::new();
+            for incident in [&newer, &id, &"not-autoobserve".to_string()] {
+                let paged = SubjectRef::new(SubjectType::Incident, incident.clone(), 1);
+                let opened = infra::table::oncall_responses::open(
+                    &org,
+                    &paged,
+                    Some(&team.id),
+                    2,
+                    Some(TITLE),
+                    ResponderRole::Owner,
+                    None,
+                )
+                .await
+                .unwrap();
+                records.push(opened);
+                tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+            }
+            let (first_page, record) = (&records[0], &records[1]);
+            assert!(
+                records[2].opened_at > record.opened_at,
+                "the newest page is not ours"
+            );
             let page = &pages_of(&org, true).await[&id];
             assert_eq!(page.outcome, PageOutcome::Paged);
             assert_eq!(page.team_id.as_deref(), Some(team.id.as_str()));
             assert_eq!(page.team_name.as_deref(), Some("shop"));
+            let ids = |pages: Vec<infra::table::oncall_responses::TeamPage>| -> Vec<String> {
+                pages.into_iter().map(|r| r.id).collect()
+            };
+            unreadable_state(&record.id).await;
+            let unread = OncallPager.record(&org, &id).await.unwrap();
+            assert_eq!(unread, None, "this build cannot decode the newest page");
+            let mut held = stop(&org, 2);
+            held.cohort = false;
+            let held = open(&held, &Pager::default()).await.unwrap();
+            note_budgeted(&org, &held, &record.id, 1).await.unwrap();
+            let threads = issue_incidents_of(&org).await;
+            let spent = threads[&held].0.budget_spent_by.clone();
+            let spent = spent.expect("an unreadable page is still named");
+            assert_eq!(
+                (spent.team_name.as_deref(), spent.paged_at, spent.streams),
+                (Some("shop"), record.opened_at, 1)
+            );
+            assert_eq!(spent.stream_name, "s0");
+            let url = format!("/web/oncall/responses/{}?org_identifier={org}", record.id);
+            assert!(spent.page_url.unwrap().ends_with(&url));
+            let newest = OncallPager.pages_since(&org, 0, 1).await.unwrap();
+            assert_eq!(
+                ids(newest),
+                [record.id.as_str()],
+                "the older incident paged last"
+            );
+            let inside = OncallPager.pages_since(&org, first_page.opened_at, 2);
+            assert_eq!(
+                ids(inside.await.unwrap()),
+                [record.id.as_str()],
+                "a page at the edge is out"
+            );
         }
 
         /// Each incident's thread view and the firings an issue finds it by.
@@ -8089,6 +8442,18 @@ mod tests {
                 .into_iter()
                 .map(|i| (i.incident.id, i.page.expect("every item says its page")))
                 .collect()
+        }
+
+        /// Gives the record a state a newer build might write, which this build cannot decode.
+        async fn unreadable_state(record_id: &str) {
+            use infra::table::entity::oncall_responses as responses;
+
+            responses::Entity::update_many()
+                .col_expr(responses::Column::State, Expr::value(99))
+                .filter(responses::Column::Id.eq(record_id))
+                .exec(infra::db::get_orm_client_rw().await)
+                .await
+                .unwrap();
         }
 
         /// Moves the org's teams back, so an incident aged into the past still opened after them.
@@ -8928,6 +9293,7 @@ mod tests {
                         schema.create_table_from_entity(oncall_routing_config::Entity),
                         schema.create_table_from_entity(oncall_ownership_rules::Entity),
                         schema.create_table_from_entity(oncall_response_events::Entity),
+                        schema.create_table_from_entity(infra::table::entity::kv_store::Entity),
                     ] {
                         conn.execute(backend.build(table.if_not_exists()))
                             .await

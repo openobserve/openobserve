@@ -1658,6 +1658,24 @@ pub async fn open_with_alert_kind_since(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// The org's `alert_kind` incidents of any status created since `since`, newest first, on the
+/// primary.
+pub async fn created_with_alert_kind_since(
+    org_id: &str,
+    alert_kind: &str,
+    since: i64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::CreatedAt.gte(since))
+        .filter(alert_incidents::Column::Id.in_subquery(with_alert_kind(alert_kind)))
+        .order_by_desc(alert_incidents::Column::CreatedAt)
+        .order_by_desc(alert_incidents::Column::Id)
+        .all(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// The org's newest incidents with an `alert_kind` trigger, any status, on the primary.
 pub async fn newest_with_alert_kind(
     org_id: &str,
