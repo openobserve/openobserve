@@ -61,7 +61,12 @@ function onTreeChange(next: FilterGroup) {
   emit("update:query", sql);
 }
 
-defineExpose<SqlFilterBuilderExpose>({ activate: () => barRef.value?.activate() });
+defineExpose<SqlFilterBuilderExpose>({
+  activate: () => barRef.value?.activate(),
+  undo: () => barRef.value?.undo() ?? false,
+  redo: () => barRef.value?.redo() ?? false,
+  clear: () => barRef.value?.clear() ?? false,
+});
 </script>
 
 <template>

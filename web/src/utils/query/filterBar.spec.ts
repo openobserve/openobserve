@@ -18,6 +18,7 @@ import {
   applyPromMatchers,
   filterTreeToPromMatchers,
   filterTreeToSql,
+  groupNodes,
   toFilterFieldType,
   type FilterCondition,
   type FilterField,
@@ -174,5 +175,48 @@ describe("splitPromRegexLiterals", () => {
     expect(splitPromRegexLiterals("api-.*")).toBeNull();
     expect(splitPromRegexLiterals("\\d+|x")).toBeNull();
     expect(splitPromRegexLiterals("api")).toBeNull();
+  });
+});
+
+describe("groupNodes", () => {
+  const cond = (id: string, field: string, connector: "AND" | "OR" = "AND"): FilterNode => ({
+    kind: "condition",
+    id,
+    connector,
+    field,
+    operator: "eq",
+    values: ["1"],
+  });
+  const fields: FilterField[] = ["a", "b", "c"].map((name) => ({ name, type: "number" }));
+  const root = (items: FilterNode[]): FilterGroup => ({
+    kind: "group",
+    id: "root",
+    connector: "AND",
+    items,
+  });
+
+  it("wraps a run of siblings in a group that takes the first one's connector", () => {
+    const tree = root([cond("1", "a"), cond("2", "b", "OR"), cond("3", "c", "OR")]);
+    const next = groupNodes(tree, "root", 1, 3, "g");
+    expect(filterTreeToSql(tree, fields)).toBe("a = 1 OR b = 1 OR c = 1");
+    expect(filterTreeToSql(next, fields)).toBe("a = 1 OR (b = 1 OR c = 1)");
+    expect(next.items[1]).toMatchObject({ kind: "group", id: "g", connector: "OR" });
+  });
+
+  it("groups inside a nested group and leaves the tree alone for an empty or out-of-range run", () => {
+    const inner: FilterGroup = {
+      kind: "group",
+      id: "in",
+      connector: "AND",
+      items: [cond("2", "b"), cond("3", "c", "OR")],
+    };
+    const tree = root([cond("1", "a"), inner]);
+    const next = groupNodes(tree, "in", 0, 2, "g");
+    const outer = next.items[1] as FilterGroup;
+    expect(outer.items.map((item) => item.id)).toEqual(["g"]);
+    expect((outer.items[0] as FilterGroup).items.map((item) => item.id)).toEqual(["2", "3"]);
+    expect(groupNodes(tree, "root", 1, 1)).toBe(tree);
+    expect(groupNodes(tree, "root", 0, 5)).toBe(tree);
+    expect(groupNodes(tree, "missing", 0, 1)).toBe(tree);
   });
 });

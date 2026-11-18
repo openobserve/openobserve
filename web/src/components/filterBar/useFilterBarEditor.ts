@@ -22,6 +22,7 @@ import {
   findNode,
   findParent,
   groupLevel,
+  groupNodes,
   insertNode,
   makeCondition,
   newFilterId,
@@ -92,6 +93,7 @@ const CUSTOM_FIELD_KEY = "\u0000custom-field";
 const GROUP_KEY = "\u0000group";
 const FUNCTION_KEY_PREFIX = "\u0000fn:";
 const FUNCTION_START_PREFIX = "\u0000fn-start:";
+const JOIN_KEY_PREFIX = "\u0000join:";
 const EXTRA_KEY_PREFIX = "extra-";
 // The search functions a typed word offers, and the chip operator each becomes.
 const SEARCH_FUNCTIONS: [string, FilterOperatorId][] = [
@@ -276,10 +278,25 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     }));
   }
 
+  // Typed `and` / `or` switch the next join once Space follows; this row says so, and picking it does the same.
+  function joinRow(needle: string): ChipInputSuggestion | null {
+    const word = needle.toLowerCase();
+    if ((word !== "and" && word !== "or") || !advanced.value || step.value !== "field") return null;
+    if (editingId.value || draft.value || !targetGroup.value.items.length) return null;
+    const connector = word.toUpperCase();
+    return {
+      key: `${JOIN_KEY_PREFIX}${connector}`,
+      label: t("filterBar.joinWith", { connector }),
+      detail: t("filterBar.joinKey"),
+    };
+  }
+
   const fieldSuggestions = computed<ChipInputSuggestion[]>(() => {
     const needle = text.value.trim();
     const rows: ChipInputSuggestion[] = [];
     if (!editingId.value && atConditionLimit.value) return rows;
+    const join = joinRow(needle);
+    if (join) rows.push(join);
     const editedField = editedNode.value?.field;
     const unique = config.value.limits.uniqueFields;
     // Every way to name a field honours one-condition-per-field, not just the picked list.
@@ -607,6 +624,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function selectField(key: string) {
     if (key === GROUP_KEY) return startGroup();
+    if (key.startsWith(JOIN_KEY_PREFIX))
+      return chooseConnector(key.slice(JOIN_KEY_PREFIX.length) as FilterConnector);
     if (key === SHORTHAND_KEY) return addShorthand();
     const named = key.startsWith(FUNCTION_START_PREFIX);
     if (named || key.startsWith(FUNCTION_KEY_PREFIX)) {
@@ -850,13 +869,15 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       return closeGroup();
     }
     const connector = /^(and|or)\s$/.exec(typed)?.[1];
-    if (connector && advanced.value && targetGroup.value.items.length) {
-      text.value = "";
-      const chosen = connector.toUpperCase() as FilterConnector;
-      if (groupConnector(targetGroup.value) && chosen !== nextConnector.value)
-        togglePendingConnector();
-      else pendingConnector.value = chosen;
-    }
+    if (connector && advanced.value && targetGroup.value.items.length)
+      chooseConnector(connector.toUpperCase() as FilterConnector);
+  }
+
+  function chooseConnector(chosen: FilterConnector) {
+    text.value = "";
+    if (groupConnector(targetGroup.value) && chosen !== nextConnector.value)
+      togglePendingConnector();
+    else pendingConnector.value = chosen;
   }
 
   function backspaceDraft(): boolean {
@@ -983,6 +1004,53 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return canUngroupNode(tree.value, id, perGroup.value);
   }
 
+  // The node joined by connector `id`'s AND/OR and the one before it; null when nothing precedes it.
+  function joinedPair(id: string) {
+    const parent = findParent(tree.value, id);
+    const index = parent?.items.findIndex((item) => item.id === id) ?? -1;
+    if (!parent || index < 1) return null;
+    return { parent, index, before: parent.items[index - 1], after: parent.items[index] };
+  }
+
+  /** What the ( ) on the AND/OR before node `id` does: join a group already there, or make a new one. */
+  function canGroupAround(id: string): "group" | "join" | null {
+    if (config.value.connectors === "any-of-groups") return null;
+    const pair = joinedPair(id);
+    if (!pair) return null;
+    if ((pair.before.kind === "group") !== (pair.after.kind === "group")) return "join";
+    return canGroupIn(pair.parent.id === tree.value.id ? null : pair.parent.id) ? "group" : null;
+  }
+
+  /** Brackets the two nodes either side of node `id`'s AND/OR; one already a group takes the other in. */
+  function groupAround(id: string) {
+    const pair = joinedPair(id);
+    const mode = canGroupAround(id);
+    if (!pair || !mode) return;
+    const { parent, index, before, after } = pair;
+    reset();
+    if (mode === "group")
+      return options.commit(groupNodes(tree.value, parent.id, index - 1, index + 1));
+    // The joining node keeps the AND/OR it had with its neighbour, now inside the group.
+    const group = (before.kind === "group" ? before : after) as FilterGroup;
+    const items =
+      before.kind === "group"
+        ? [...group.items, after]
+        : [
+            { ...before, connector: after.connector },
+            ...group.items.map((item, at) =>
+              at === 0 ? { ...item, connector: after.connector } : item,
+            ),
+          ];
+    const joined: FilterGroup = { ...group, connector: before.connector, items };
+    const siblings = [
+      ...parent.items.slice(0, index - 1),
+      joined,
+      ...parent.items.slice(index + 1),
+    ];
+    const next = { ...parent, items: siblings };
+    options.commit(parent.id === tree.value.id ? next : replaceNode(tree.value, parent.id, next));
+  }
+
   function ungroup(id: string) {
     if (!canUngroup(id)) return;
     const parent = findParent(tree.value, id);
@@ -1040,6 +1108,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     addAfter,
     moveCaret,
     moveCaretTo,
+    groupAround,
+    canGroupAround,
     ungroup,
     canUngroup,
     canGroupIn,

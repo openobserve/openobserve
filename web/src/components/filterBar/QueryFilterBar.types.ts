@@ -101,6 +101,10 @@ export interface QueryFilterBarExpose {
   focus: () => void;
   /** Focuses the caret and opens its list, as a click on the bar does. */
   activate: () => void;
+  /** Step back or forward through the filter's changes, or remove every condition; false when nothing changed. */
+  undo: () => boolean;
+  redo: () => boolean;
+  clear: () => boolean;
 }
 
 export interface FilterBarNodesProps {
@@ -125,16 +129,26 @@ export interface FilterBarNodesProps {
   disabled?: boolean;
   /** Whether group `id` can be ungrouped without changing what the filter matches. */
   canUngroup?: (_id: string) => boolean;
+  /** What the ( ) on the AND/OR before node `id` does, or null when it is not offered. */
+  canGroupAround?: (_id: string) => "group" | "join" | null;
   dataTest: string;
 }
 
 export interface FilterBarNodesEmits {
-  (_e: "edit", _id: string, _part: FilterTokenPart, _element: HTMLElement): void;
+  (
+    _e: "edit",
+    _id: string,
+    _part: FilterTokenPart,
+    _element: HTMLElement,
+    _event?: MouseEvent,
+  ): void;
   (_e: "remove", _id: string): void;
   (_e: "toggle-connector", _id: string): void;
   (_e: "toggle-negate", _id: string): void;
   /** Lift a group's items into its parent. */
   (_e: "ungroup", _id: string): void;
+  /** Bracket the node `id` and the one before it, joined by `id`'s AND/OR. */
+  (_e: "group-around", _id: string): void;
   (_e: "add-condition", _groupId: string): void;
 }
 

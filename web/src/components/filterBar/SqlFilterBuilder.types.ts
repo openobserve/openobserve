@@ -34,6 +34,10 @@ export interface SqlFilterBuilderProps {
 export interface SqlFilterBuilderExpose {
   /** Focuses the bar and opens its list, as a click on it does. */
   activate: () => void;
+  /** Undo, redo or clear the filter; false when there was nothing to do. */
+  undo: () => boolean;
+  redo: () => boolean;
+  clear: () => boolean;
 }
 
 export interface SqlFilterBuilderEmits {

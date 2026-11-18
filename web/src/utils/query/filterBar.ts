@@ -669,6 +669,30 @@ export const ungroupNode = (root: FilterGroup, id: string): FilterGroup => {
   return parent.id === root.id ? next : replaceNode(root, parent.id, next);
 };
 
+/** Wraps items `from` to `to` (exclusive) of group `groupId` in a new group; it takes the first item's connector. */
+export const groupNodes = (
+  root: FilterGroup,
+  groupId: string,
+  from: number,
+  to: number,
+  id: string = newFilterId(),
+): FilterGroup => {
+  const parent = groupId === root.id ? root : findNode(root, groupId);
+  if (parent?.kind !== "group" || from < 0 || to > parent.items.length || from >= to) return root;
+  const taken = parent.items.slice(from, to);
+  const group: FilterGroup = {
+    kind: "group",
+    id,
+    connector: taken[0].connector,
+    items: taken.map((item, index) => (index === 0 ? { ...item, connector: "AND" } : item)),
+  };
+  const next = {
+    ...parent,
+    items: [...parent.items.slice(0, from), group, ...parent.items.slice(to)],
+  };
+  return parent.id === root.id ? next : replaceNode(root, parent.id, next);
+};
+
 /** Whether lifting group `id` into its parent keeps the filter's meaning; `perGroup` allows one AND/OR per group. */
 export const canUngroupNode = (root: FilterGroup, id: string, perGroup = false): boolean => {
   const parent = findParent(root, id);
