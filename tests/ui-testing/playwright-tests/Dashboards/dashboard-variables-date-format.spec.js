@@ -1,14 +1,14 @@
 // A Date variable substitutes its date in the variable's own output format, and a per-use ${day:<format>} overrides it (#16191).
 
-const { test, expect } = require('../../utils/enhanced-baseFixtures.js');
-const testLogger = require('../../utils/test-logger.js');
-const PageManager = require('../../../pages/page-manager.js');
+const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const testLogger = require('../utils/test-logger.js');
+const PageManager = require('../../pages/page-manager.js');
 const {
   namespaceTablePanel,
   createDashboard,
   deleteCreatedDashboards,
   trackPanelRuns,
-} = require('../../utils/dashboard-auto-run-fixtures.js');
+} = require('../utils/dashboard-auto-run-fixtures.js');
 
 const DAY = '2026-11-05';
 
@@ -18,7 +18,7 @@ test.describe('Dashboard Date variable output formats (#16191)', () => {
   });
 
   test('a dmy Date variable reaches the panel SQL as DD/MM/YYYY, and ${day:mdy} as MM/DD/YYYY', {
-    tag: ['@bug-16191', '@P2', '@regression', '@dashboardRegression'],
+    tag: ['@dashboards', '@dashboardVariables', '@P2', '@all'],
   }, async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     const pm = new PageManager(page);
