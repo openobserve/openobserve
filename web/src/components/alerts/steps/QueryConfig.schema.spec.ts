@@ -332,6 +332,22 @@ describe("QueryConfig.schema — conditions tree", () => {
       expect(found(parse({ query_condition, _meta: { ...promql, tab: "sql" } }))).toBeUndefined();
     });
 
+    it.each([
+      ["minutes", 525_600, false],
+      ["minutes", 525_601, true],
+      ["hours", 8_760, false],
+      ["hours", 8_761, true],
+      ["minutes", "1" + "0".repeat(60), true],
+    ])("caps Check every at one year (%s, %s)", (frequencyMode, checkEvery, blocked) => {
+      const r = parse({ _ui: { checkEvery }, _meta: { frequencyMode } });
+      const issue = r.error?.issues.find((i: any) => i.path.join(".") === "_ui.checkEvery");
+      expect(issue?.message).toBe(
+        blocked
+          ? `Check every must be between 1 and ${frequencyMode === "hours" ? "8,760" : "525,600"}`
+          : undefined,
+      );
+    });
+
     // ── Org min-frequency floor (R5 RESTORE) ────────────────────────────────
     // Pre-migration AlertSettings.validateFrequency compared the STORED minutes
     // against ceil(min_auto_refresh_interval / 60) and blocked save.

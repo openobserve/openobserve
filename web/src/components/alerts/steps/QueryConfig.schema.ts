@@ -23,6 +23,9 @@ import {
   isForecastHorizonValid,
 } from "@/utils/alerts/forecastAlert";
 
+// Past a year a schedule is no longer useful, and a huge value cannot be stored as the backend's integer minutes.
+const MAX_FREQUENCY_MINUTES = 365 * 24 * 60;
+
 /** i18n translator injected by the component: `(key, namedParams?) => string`.
  *  Every user-facing validation message resolves through this against the
  *  `alerts.validation.*` locale keys. */
@@ -394,11 +397,25 @@ export const makeQueryConfigSchema = (t: Translator) =>
       const ui = (val._ui ?? {}) as Record<string, unknown>;
       const display = ui.checkEvery;
       if (meta.frequencyMode !== "cron") {
+        const displayMinutes =
+          meta.frequencyMode === "hours" ? Number(display) * 60 : Number(display);
         if (isBelowOne(display)) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["_ui", "checkEvery"],
             message: t("alerts.validation.frequencyPositive"),
+          });
+        } else if (displayMinutes > MAX_FREQUENCY_MINUTES) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["_ui", "checkEvery"],
+            message: t("dashboard.utils.configValueOutOfRange", {
+              setting: t("alerts.queryConfig.checkEvery"),
+              min: 1,
+              max: new Intl.NumberFormat(getIntlLocale()).format(
+                meta.frequencyMode === "hours" ? MAX_FREQUENCY_MINUTES / 60 : MAX_FREQUENCY_MINUTES,
+              ),
+            }),
           });
         } else {
           // ── Org min-frequency floor ─────────────────────────────────────────
@@ -407,10 +424,8 @@ export const makeQueryConfigSchema = (t: Translator) =>
           // Skipped entirely when the org sets no floor.
           const floorSecs = Number(meta.minAutoRefreshInterval) || 0;
           if (floorSecs > 0) {
-            const freqMins =
-              meta.frequencyMode === "hours" ? Number(display) * 60 : Number(display);
             const floorMins = Math.ceil(floorSecs / 60);
-            if (freqMins < floorMins) {
+            if (displayMinutes < floorMins) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["_ui", "checkEvery"],
