@@ -224,6 +224,11 @@ describe("backtestHintKey", () => {
       day: { events: 40 },
       key: "alerts.sections.backtest.never",
     },
+    {
+      name: "matches Must last held back",
+      day: { pending: 6 },
+      key: "alerts.sections.backtest.heldByMustLast",
+    },
   ])("$name advises $key", ({ day, alerts = 0, operator = ">=", key }) => {
     expect(backtestHintKey(alerts, 288, operator, day)).toBe(key);
   });

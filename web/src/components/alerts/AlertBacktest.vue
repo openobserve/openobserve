@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   computed,
   inject,
+  nextTick,
   onBeforeUnmount,
   ref,
   shallowRef,
@@ -307,9 +308,18 @@ const hint = computed(() => {
   const key = backtestHintKey(counts.value.alerts, counts.value.total, operator, {
     events: counts.value.events,
     filtered: filtered.value,
+    pending: serverDay.value?.pending,
   });
-  return key ? t(key) : null;
+  if (!key) return null;
+  const held = key === "alerts.sections.backtest.heldByMustLast";
+  return { text: t(key), action: held ? t("alerts.sections.backtest.changeMustLast") : null };
 });
+const openMustLast = async () => {
+  formContext?.goToSection("condition");
+  await nextTick();
+  const row = document.querySelector<HTMLElement>('[data-test="add-alert-hold-for-row"]');
+  if (row) formContext?.reveal(row);
+};
 </script>
 
 <template>
@@ -383,13 +393,14 @@ const hint = computed(() => {
         data-test="add-alert-backtest-volume"
         @action="openWait"
       />
-      <p
+      <AlertLinkNote
         v-if="hint"
-        class="text-text-secondary m-0 mt-2 text-xs"
+        class="mt-2"
+        :text="hint.text"
+        :action="hint.action"
         data-test="add-alert-backtest-hint"
-      >
-        {{ hint }}
-      </p>
+        @action="openMustLast"
+      />
     </template>
   </OSettingRow>
 </template>

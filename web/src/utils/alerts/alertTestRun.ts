@@ -62,6 +62,8 @@ export interface TestRunDay {
   hours: boolean[];
   /** 0 when no check found a matching event; unknown otherwise. */
   events?: number;
+  /** Checks that matched but were held back by Must last. */
+  pending?: number;
 }
 
 /** The alert as the save path sends it, minus the record stamps, for the dry run. */
@@ -306,6 +308,7 @@ export function testRunDay(r: EvaluateAlertResponse): TestRunDay {
     fired: r.summary.fired,
     alerts: r.summary.notifications,
     total: r.summary.checks,
+    pending: r.summary.pending ?? 0,
     hours,
     ...(events === undefined ? {} : { events }),
   };

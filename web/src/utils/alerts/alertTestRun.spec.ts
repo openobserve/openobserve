@@ -175,7 +175,7 @@ describe("testRunReport", () => {
 describe("testRunDay", () => {
   it("marks the hours with a firing check and keeps the scheduler's counts", () => {
     const day = testRunDay(grouped as EvaluateAlertResponse);
-    expect([day.total, day.fired, day.alerts]).toEqual([6, 3, 2]);
+    expect([day.total, day.fired, day.alerts, day.pending]).toEqual([6, 3, 2, 0]);
     expect(day.hours.map((h, i) => (h ? i : -1)).filter((i) => i >= 0)).toEqual([23]);
     expect(day.events).toBeUndefined();
   });

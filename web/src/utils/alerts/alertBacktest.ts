@@ -266,12 +266,14 @@ export function backtestHintKey(
   alerts: number,
   total: number,
   operator: string,
-  day: { events?: number; filtered?: boolean } = {},
+  day: { events?: number; filtered?: boolean; pending?: number } = {},
 ): I18nKey | null {
   if (total === 0) return null;
   // No event to count means the threshold is not what kept it quiet (or noisy).
   if (day.events === 0) return emptyDayHintKey(day.filtered !== false);
   const direction = thresholdSide(operator) ?? "none";
+  // Matches Must last held back say the threshold already caught them.
+  if (alerts === 0 && (day.pending ?? 0) > 0) return "alerts.sections.backtest.heldByMustLast";
   if (alerts === 0) return HINT_KEYS[direction].never;
   return alerts / total > NOISY_SHARE ? HINT_KEYS[direction].noisy : null;
 }
