@@ -22,7 +22,10 @@
 use config::{
     DEFAULT_ORG,
     meta::{
-        alerts::content_spec::{ChartSpec, ContentField, ContentLink, ContentSpec, RowsSpec},
+        alerts::{
+            content_spec::{ChartSpec, ContentField, ContentLink, ContentSpec, RowsSpec},
+            notification_kind::NotificationKind,
+        },
         destinations::{Template, TemplateKind, TemplateType},
     },
 };
@@ -31,16 +34,26 @@ use db::alerts::templates::TemplateError;
 /// Reserved name of the compiled default's seeded copy.
 pub const DEFAULT_CONTENT_TEMPLATE_NAME: &str = infra::table::templates::DEFAULT_TEMPLATE_NAME;
 
+/// A result column of the same name fills a field first, so these show for an anomaly only.
+const ANOMALY_FIELDS: [(&str, &str); 3] = [
+    ("Expected", "{expected_lower}-{expected_upper}"),
+    ("Change", "{value_change_percent}%"),
+    ("Started", "{anomaly_started}"),
+];
+/// An anomaly speaks in its metric's units, so this field shows for every other kind only.
+const SCORE_FIELD: (&str, &str) = ("Score", "{anomaly_score}");
+
 /// The field superset in the amendment's order; Slack shows at most ten, and no kind fills more.
-const FIELDS: [(&str, &str); 19] = [
+const FIELDS: [(&str, &str); 20] = [
     ("Level", "{alert_level_label}"),
     ("Event", "{notification_event_label}"),
     ("Stream", "{stream_name}"),
     ("Threshold", "{alert_operator} {alert_threshold}"),
     ("Value", "{alert_agg_value}"),
-    ("Expected", "{expected_lower}-{expected_upper}"),
-    ("Change", "{value_change_percent}%"),
-    ("Started", "{anomaly_started}"),
+    SCORE_FIELD,
+    ANOMALY_FIELDS[0],
+    ANOMALY_FIELDS[1],
+    ANOMALY_FIELDS[2],
     ("Check", "{check_name} ({check_type})"),
     ("Target", "{check_target}"),
     ("Status", "{check_status_label}"),
@@ -53,6 +66,16 @@ const FIELDS: [(&str, &str); 19] = [
     ("Reason", "{oncall_reason}"),
     ("Time", "{alert_trigger_time_utc}"),
 ];
+
+/// Whether `field` of the default (or a copy of it) applies to a send of `kind`.
+pub fn default_field_applies(field: &ContentField, kind: NotificationKind) -> bool {
+    let is = |(label, value): &(&str, &str)| field.label == *label && field.value == *value;
+    if kind == NotificationKind::Anomaly {
+        !is(&SCORE_FIELD)
+    } else {
+        !ANOMALY_FIELDS.iter().any(is)
+    }
+}
 
 /// Terminal fallback, infallible by construction (asserted by test).
 pub fn compiled_default_content() -> ContentSpec {

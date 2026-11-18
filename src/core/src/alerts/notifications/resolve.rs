@@ -144,6 +144,9 @@ pub fn resolve_content(
         {
             continue;
         }
+        if !super::default_template::default_field_applies(field, ctx.kind) {
+            continue;
+        }
         let (label, mut unk) = substitute_raw(&field.label, ctx);
         unknown_variables.append(&mut unk);
         let (value, mut unk) = substitute_raw(&field.value, ctx);
