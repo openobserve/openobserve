@@ -49,6 +49,8 @@ pub struct AnomalyThreadChange {
     pub row: AnomalyRowChange,
     /// False while nodes of mixed builds run: advance an existing watermark only.
     pub create_watermark: bool,
+    /// A recovery: closes every open root, also one stored after this holder lost its lock.
+    pub closes_episode: bool,
     pub now: i64,
 }
 
@@ -793,6 +795,16 @@ async fn thread_change_in<C: ConnectionTrait>(
         return Ok(false);
     }
     apply_row_change(txn, change).await?;
+    if change.closes_episode {
+        close_open_roots(
+            txn,
+            &change.destination_id,
+            &change.anomaly_id,
+            None,
+            change.now,
+        )
+        .await?;
+    }
     if let Some(mark) = mark {
         let key = mark.key();
         let content = SlackMessageContent {
@@ -823,7 +835,14 @@ async fn apply_row_change<C: ConnectionTrait>(
     match &change.row {
         AnomalyRowChange::None => {}
         AnomalyRowChange::InsertRoot(root) => {
-            close_other_roots(txn, root, change.now).await?;
+            close_open_roots(
+                txn,
+                &root.destination_id,
+                &root.alert_id,
+                Some(root.firing_started_at),
+                change.now,
+            )
+            .await?;
             insert_firing_with(txn, root).await?;
         }
         AnomalyRowChange::Reply { key, content } => {
@@ -848,24 +867,27 @@ async fn apply_row_change<C: ConnectionTrait>(
 }
 
 /// A holder that lost the lock may insert beside another root; one detector keeps one open root.
-async fn close_other_roots<C: ConnectionTrait>(
+async fn close_open_roots<C: ConnectionTrait>(
     txn: &C,
-    root: &SlackAlertMessage,
+    destination_id: &str,
+    anomaly_id: &str,
+    keep: Option<i64>,
     now: i64,
 ) -> Result<u64, Error> {
-    let result = Entity::update_many()
+    let mut update = Entity::update_many()
         .col_expr(
             Column::State,
             Expr::value(enum_text(&MessageState::Cleared)?),
         )
         .col_expr(Column::UpdatedAt, Expr::value(now))
-        .filter(Column::DestinationId.eq(&root.destination_id))
-        .filter(Column::AlertId.eq(&root.alert_id))
+        .filter(Column::DestinationId.eq(destination_id))
+        .filter(Column::AlertId.eq(anomaly_id))
         .filter(Column::GroupKey.eq(ANOMALY_GROUP_KEY))
-        .filter(Column::State.is_in(state_texts(&MessageState::OPEN)?))
-        .filter(Column::FiringStartedAt.ne(root.firing_started_at))
-        .exec(txn)
-        .await?;
+        .filter(Column::State.is_in(state_texts(&MessageState::OPEN)?));
+    if let Some(keep) = keep {
+        update = update.filter(Column::FiringStartedAt.ne(keep));
+    }
+    let result = update.exec(txn).await?;
     Ok(result.rows_affected)
 }
 
@@ -1574,6 +1596,7 @@ mod tests {
             data_us,
             row,
             create_watermark: true,
+            closes_episode: false,
             now: data_us + 1,
         }
     }
@@ -1676,6 +1699,53 @@ mod tests {
             open_roots(&db).await,
             [10],
             "a watermark move leaves the root"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_recovery_closes_a_root_stored_after_it_lost_the_lock() {
+        let db = db().await;
+        insert_firing_with(&db, &anomaly_root("d1", 10, "1.1"))
+            .await
+            .unwrap();
+        // A fire after the gap stored root 20 while the recovery of data 30 was paused.
+        let late = AnomalyRowChange::InsertRoot(Box::new(anomaly_root("d1", 20, "1.2")));
+        assert!(
+            apply_thread_change_with(&db, &change(20, late))
+                .await
+                .unwrap()
+        );
+        let failed = AnomalyRowChange::Close {
+            key: anomaly_root("d1", 10, "x").key(),
+            state: MessageState::Failed,
+            content: None,
+        };
+        assert!(
+            apply_thread_change_with(&db, &change(25, failed))
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            open_roots(&db).await,
+            [20],
+            "a failed close keeps to its key"
+        );
+        let recovery = AnomalyThreadChange {
+            closes_episode: true,
+            ..change(
+                30,
+                AnomalyRowChange::Close {
+                    key: anomaly_root("d1", 10, "x").key(),
+                    state: MessageState::Cleared,
+                    content: None,
+                },
+            )
+        };
+        assert!(apply_thread_change_with(&db, &recovery).await.unwrap());
+        assert!(open_roots(&db).await.is_empty());
+        assert_eq!(
+            mark(&db).await.unwrap().content.unwrap().last_data_us,
+            Some(30)
         );
     }
 
