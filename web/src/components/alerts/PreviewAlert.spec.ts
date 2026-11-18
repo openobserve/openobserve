@@ -52,6 +52,15 @@ vi.mock("@/services/search", async (importOriginal) => {
   });
 });
 
+const streaming = vi.hoisted(() => ({ calls: [] as any[], cancel: vi.fn() }));
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: (data: any, handlers: any) =>
+      streaming.calls.push({ data, handlers }),
+    cancelStreamQueryBasedOnRequestId: streaming.cancel,
+  }),
+}));
+
 // Imported after the mock above so it resolves to the mocked module.
 import searchService from "@/services/search";
 
@@ -2986,14 +2995,13 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
     w.unmount();
   });
 
-  it("judges the verdict on the alert's own window, however wide the chart is", async () => {
+  it("judges the verdict on the alert's own window, however many checks the chart shows", async () => {
     const w = await mountComp({
       query: "SELECT * FROM logs",
       selectedTab: "custom",
       isAggregationEnabled: false,
       formData: baseFormData(),
     });
-    w.vm.previewRange = "24h";
     w.vm.refreshData();
     await flushPromises();
     const at = (minutesAgo: number) => (Date.now() - minutesAgo * 60_000) * 1000;
@@ -3035,5 +3043,83 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
     expect(again.vm.previewRange).toBe("24h");
     expect(formData).toEqual(baseFormData());
     again.unmount();
+  });
+});
+
+describe("PreviewAlert - a wide range asks the latest window alone for the verdict", () => {
+  beforeEach(() => {
+    streaming.calls.length = 0;
+    streaming.cancel.mockClear();
+  });
+  afterEach(() => sessionStorage.clear());
+
+  const mountRange = async (tab: string, range: string) => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: tab });
+    w.vm.previewRange = range;
+    w.vm.refreshData();
+    await flushPromises();
+    return w;
+  };
+  const answer = (call: any, frames: { total?: number; hits?: any[] }[]) => {
+    for (const { total, hits } of frames) {
+      call.handlers.data(call.data, {
+        type: "search_response_metadata",
+        content: { results: { total }, streaming_aggs: false },
+      });
+      if (hits)
+        call.handlers.data(call.data, {
+          type: "search_response_hits",
+          content: { results: { hits } },
+        });
+    }
+    call.handlers.complete(call.data, {});
+  };
+
+  it.each([
+    ["builder", "custom", "checks", 0],
+    ["SQL", "sql", "checks", 0],
+    ["builder", "custom", "24h", 1],
+    ["SQL", "sql", "12h", 1],
+  ])("a %s alert (%s tab) over %s runs %s extra search", async (_, tab, range, extra) => {
+    const w = await mountRange(tab, range);
+    expect(streaming.calls).toHaveLength(extra);
+    w.unmount();
+  });
+
+  it.each([
+    ["builder", "custom", [{ hits: [{ zo_sql_num: 4 }, { zo_sql_num: 3 }] }], 7, true],
+    ["SQL", "sql", [{ total: 2 }], 2, false],
+  ])(
+    "judges a %s alert (%s tab) from that window, not the chart",
+    async (_, tab, frames, count, fires) => {
+      const w = await mountRange(tab, "24h");
+      const [call] = streaming.calls;
+      const { start_time, end_time } = call.data.queryReq.query;
+      expect(end_time - start_time).toBe(10 * 60_000_000);
+      await emitResultMetadata(w, [[{ total: 99, hits: [{ zo_sql_num: 99 }] }]]);
+      expect(w.vm.evaluationStatus).toBeNull();
+
+      answer(call, frames);
+      expect(w.vm.evaluationStatus).toMatchObject({ count, wouldTrigger: fires });
+      w.unmount();
+    },
+  );
+
+  it("drops a superseded answer, and the verdict when the search fails", async () => {
+    const w = await mountRange("sql", "24h");
+    const [stale] = streaming.calls;
+    await w.setProps({ query: "SELECT nosuchcol FROM logs" });
+    expect(streaming.cancel).toHaveBeenCalled();
+    answer(stale, [{ total: 50 }]);
+    expect(w.vm.evaluationStatus).toBeNull();
+
+    w.vm.refreshData();
+    await flushPromises();
+    const call = streaming.calls[1];
+    call.handlers.error(call.data, { content: { message: "no field nosuchcol", code: 400 } });
+    await nextTick();
+    expect(w.vm.evaluationStatus).toBeNull();
+    expect((w.vm.$.exposed as any).queryFailed.value).toBe(true);
+    w.unmount();
   });
 });

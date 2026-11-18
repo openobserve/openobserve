@@ -83,7 +83,8 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import searchService from "@/services/search";
 import { promRulePreviewQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { b64EncodeUnicode, smartDecodeVrlFunction } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext, smartDecodeVrlFunction } from "@/utils/zincutils";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
@@ -239,8 +240,10 @@ const { t } = useI18nTyped();
 // The renderer's last run outcome; an empty message means it answered. Results it emits after
 // an error are not this query's, so the handlers skip them.
 const previewError = ref<{ message?: string; code?: string | number } | null>(null);
-watch(previewError, (error) => {
-  if (error?.message) evaluationStatus.value = null;
+// The wide-range verdict search fails on its own; its error withdraws the verdict the same way.
+const verdictSearchError = ref<{ message?: string; code?: string | number } | null>(null);
+watch([previewError, verdictSearchError], (errors) => {
+  if (errors.some((error) => error?.message)) evaluationStatus.value = null;
 });
 
 const store = useStore();
@@ -278,6 +281,15 @@ const previewMinutes = (): number => {
   if (previewRange.value !== "checks") return PREVIEW_RANGE_MINUTES[previewRange.value];
   if (orgPreviewMinutes() > 0) return orgPreviewMinutes();
   return Math.max(previewChecks.value * alertWindowMinutes(), 5);
+};
+// A wider range cannot give the latest window's count (SQL counts rows, wide buckets straddle it),
+// so the verdict then comes from one extra search over that window alone.
+const verdictNeedsOwnSearch = (): boolean => {
+  if (props.formData.is_real_time === "true" || props.selectedTab === "promql") return false;
+  if (alertWindowMinutes() <= 0) return false;
+  return props.selectedTab === "sql"
+    ? previewMinutes() > alertWindowMinutes()
+    : previewRange.value !== "checks";
 };
 const previewRangeOptions = computed(() => [
   {
@@ -671,15 +683,16 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   // refresh. Keyed on the tab, not on query_condition.type: the form keeps a
   // stale promql_condition around after the user switches modes.
   // (This makes the `selectedTab === "promql"` arm of the chain below dead code.)
-  if (props.selectedTab === "promql") return;
-  if (
-    (props.selectedTab === "sql" && previewMinutes() > alertWindowMinutes()) ||
-    bucketsCoarserThanWindow(resultMetaData)
-  ) {
+  if (props.selectedTab === "promql" || verdictNeedsOwnSearch()) return;
+  if (bucketsCoarserThanWindow(resultMetaData)) {
     evaluationStatus.value = null;
     return;
   }
+  evaluateResultMetadata(resultMetaData, inVerdictWindow);
+};
 
+/** Counts a run's frames into the verdict; `inWindow` keeps the hits of the latest window. */
+const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boolean) => {
   // resultMetaData structure from usePanelDataLoader:
   // resultMetaData[queryIndex] is an array of metadata objects from streaming partitions
   // Each metadata object has structure: {...content, ...content.results}
@@ -736,7 +749,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           const allHits: any[] = [];
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
-              allHits.push(...partition.hits.filter(inVerdictWindow));
+              allHits.push(...partition.hits.filter(inWindow));
             }
           }
 
@@ -887,7 +900,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
               for (const hit of partition.hits) {
-                if (hit.zo_sql_num !== undefined && inVerdictWindow(hit)) {
+                if (hit.zo_sql_num !== undefined && inWindow(hit)) {
                   resultCount += hit.zo_sql_num;
                 }
               }
@@ -1434,11 +1447,13 @@ const refreshData = () => {
     props.formData.trigger_condition?.operator,
     props.formData._ui?.forecast,
     new_relative_time,
+    verdictNeedsOwnSearch() && alertWindowMinutes(),
   ]);
   if (runKey === lastRunKey) return;
   lastRunKey = runKey;
 
   const endTime = new Date().getTime() * 1000;
+  runVerdictSearch(endTime);
   if (props.selectedTab === "promql" && props.formData.query_condition?.promql_rule_mode)
     void refreshRulePreview(endTime / 1_000_000);
   else rulePreviewGeneration++;
@@ -1601,6 +1616,78 @@ const refreshData = () => {
   // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
 };
 
+const streaming = useHttpStreaming();
+let verdictTraceId = "";
+const cancelVerdictSearch = () => {
+  if (!verdictTraceId) return;
+  streaming.cancelStreamQueryBasedOnRequestId({
+    trace_id: verdictTraceId,
+    org_id: store.state.selectedOrganization?.identifier,
+  });
+  verdictTraceId = "";
+};
+
+/** The alert's own query over its latest window alone, for a range the chart cannot judge. */
+const runVerdictSearch = (endMicros: number) => {
+  cancelVerdictSearch();
+  verdictSearchError.value = null;
+  const { stream_name, stream_type } = props.formData;
+  if (!verdictNeedsOwnSearch() || !stream_name || !stream_type) return;
+  const aggregate = props.selectedTab === "custom" && props.isAggregationEnabled;
+  const vrl = props.selectedTab === "sql" ? getDecodedVrlFunction() : null;
+  const traceId = generateTraceContext().traceId;
+  verdictTraceId = traceId;
+  const frames: any[] = [];
+  streaming.fetchQueryDataWithHttpStream(
+    {
+      queryReq: {
+        query: {
+          sql: b64EncodeUnicode(aggregate ? cleanAggregationQuery(props.query) : props.query),
+          ...(vrl ? { query_fn: b64EncodeUnicode(vrl) } : {}),
+          start_time: endMicros - alertWindowMinutes() * 60_000_000,
+          end_time: endMicros,
+          size: -1,
+        },
+        encoding: "base64",
+      },
+      type: "search",
+      traceId,
+      org_id: store.state.selectedOrganization?.identifier,
+      pageType: stream_type,
+      searchType: searchTypeForPanel.value,
+      meta: shouldUseHistogram.value
+        ? { is_ui_histogram: true, fallback_order_by_col: "zo_sql_key" }
+        : {},
+    },
+    {
+      data: (_request: unknown, response: any) => {
+        if (traceId !== verdictTraceId) return;
+        const content = response?.content ?? {};
+        if (response?.type === "search_response_metadata") {
+          frames.push({ ...content, ...content.results });
+        } else if (response?.type === "search_response_hits") {
+          if (!frames.length) frames.push({});
+          frames[frames.length - 1].hits = content.results?.hits ?? [];
+        }
+      },
+      error: (_request: unknown, response: any) => {
+        if (traceId !== verdictTraceId) return;
+        verdictTraceId = "";
+        const content = response?.content ?? {};
+        verdictSearchError.value = {
+          message: content.message || content.error_detail || t("search.unknownError"),
+          code: content.code ?? content.status ?? "",
+        };
+      },
+      complete: () => {
+        if (traceId !== verdictTraceId) return;
+        verdictTraceId = "";
+        if (!previewError.value?.message) evaluateResultMetadata([frames], () => true);
+      },
+    },
+  );
+};
+
 let lastRefreshTime = 0;
 
 const refreshDataOnce = () => {
@@ -1666,7 +1753,12 @@ watch(
   ],
   (next, prev) => {
     // A query that fails to run emits no new result, so the old verdict would linger.
-    if (next[0] !== prev?.[0]) evaluationStatus.value = null;
+    if (next[0] !== prev?.[0]) {
+      evaluationStatus.value = null;
+      cancelVerdictSearch();
+      // The verdict is gone, so even a query typed back to the last run's must run again.
+      lastRunKey = "";
+    }
     if (next.some((value, index) => TYPED_INPUTS.has(index) && value !== prev?.[index])) {
       debouncedRefreshFromProps();
       return;
@@ -1677,7 +1769,10 @@ watch(
   },
 );
 
-onBeforeUnmount(() => debouncedRefreshFromProps.cancel());
+onBeforeUnmount(() => {
+  debouncedRefreshFromProps.cancel();
+  cancelVerdictSearch();
+});
 
 watch(previewRange, () => refreshFromProps());
 
@@ -1736,8 +1831,9 @@ const shownEvaluationStatus = computed(() => {
 const queryFailed = computed(
   () =>
     !!props.query &&
-    !!previewError.value?.message &&
-    String(previewError.value.code ?? "").startsWith("4"),
+    [previewError.value, verdictSearchError.value].some(
+      (error) => !!error?.message && String(error.code ?? "").startsWith("4"),
+    ),
 );
 
 defineExpose({
