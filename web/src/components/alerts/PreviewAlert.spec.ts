@@ -33,7 +33,7 @@ vi.mock("../dashboards/PanelSchemaRenderer.vue", () => ({
       "searchType",
       "is_ui_histogram",
     ],
-    emits: ["result-metadata-update", "series-data-update", "error"],
+    emits: ["result-metadata-update", "series-data-update", "error", "loading-state-change"],
   },
 }));
 
@@ -711,10 +711,15 @@ describe("PreviewAlert - watcher behavior", () => {
     expect(exposed.evaluationStatus.value).toBeNull();
     expect(exposed.queryFailed.value).toBe(true);
 
+    // The next run clears the error as it starts; the summary keeps it until that run answers.
+    renderer.vm.$emit("loading-state-change", true);
     renderer.vm.$emit("error", { message: "", code: "" });
     await nextTick();
     expect(exposed.evaluationStatus.value).toBeNull();
+    expect(exposed.queryFailed.value).toBe(true);
     await emitResultMetadata(w, [[{ total: 2 }]]);
+    renderer.vm.$emit("loading-state-change", false);
+    await nextTick();
     expect(exposed.evaluationStatus.value?.wouldTrigger).toBe(false);
     expect(exposed.queryFailed.value).toBe(false);
     w.unmount();

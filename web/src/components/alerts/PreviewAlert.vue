@@ -51,7 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is_ui_histogram="shouldUseHistogram"
         @result-metadata-update="handleChartDataUpdate"
         @series-data-update="handleSeriesDataUpdate"
-        @error="previewError = $event"
+        @error="onPreviewError"
+        @loading-state-change="onPreviewLoading"
       />
     </div>
   </div>
@@ -245,6 +246,17 @@ const verdictSearchError = ref<{ message?: string; code?: string | number } | nu
 watch([previewError, verdictSearchError], (errors) => {
   if (errors.some((error) => error?.message)) evaluationStatus.value = null;
 });
+// A run clears the renderer's error as it starts; the summary keeps it until that run answers.
+const settledPreviewError = ref<{ message?: string; code?: string | number } | null>(null);
+let previewLoading = false;
+const onPreviewError = (error: { message?: string; code?: string | number } | null) => {
+  previewError.value = error;
+  if (error?.message || !previewLoading) settledPreviewError.value = error;
+};
+const onPreviewLoading = (loading: boolean) => {
+  previewLoading = loading;
+  if (!loading) settledPreviewError.value = previewError.value;
+};
 
 const store = useStore();
 
@@ -1630,9 +1642,11 @@ const cancelVerdictSearch = () => {
 /** The alert's own query over its latest window alone, for a range the chart cannot judge. */
 const runVerdictSearch = (endMicros: number) => {
   cancelVerdictSearch();
-  verdictSearchError.value = null;
   const { stream_name, stream_type } = props.formData;
-  if (!verdictNeedsOwnSearch() || !stream_name || !stream_type) return;
+  if (!verdictNeedsOwnSearch() || !stream_name || !stream_type) {
+    verdictSearchError.value = null;
+    return;
+  }
   const aggregate = props.selectedTab === "custom" && props.isAggregationEnabled;
   const vrl = props.selectedTab === "sql" ? getDecodedVrlFunction() : null;
   const traceId = generateTraceContext().traceId;
@@ -1682,6 +1696,7 @@ const runVerdictSearch = (endMicros: number) => {
       complete: () => {
         if (traceId !== verdictTraceId) return;
         verdictTraceId = "";
+        verdictSearchError.value = null;
         if (!previewError.value?.message) evaluateResultMetadata([frames], () => true);
       },
     },
@@ -1831,7 +1846,7 @@ const shownEvaluationStatus = computed(() => {
 const queryFailed = computed(
   () =>
     !!props.query &&
-    [previewError.value, verdictSearchError.value].some(
+    [settledPreviewError.value, verdictSearchError.value].some(
       (error) => !!error?.message && String(error.code ?? "").startsWith("4"),
     ),
 );
