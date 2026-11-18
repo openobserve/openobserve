@@ -41,6 +41,20 @@ export class QuickFilterCardsPage {
     await expect(this.page.locator(LISTS.publicLinks.table)).toBeVisible({ timeout: 30000 });
   }
 
+  /** Open one alert folder with no `state` in the URL, so the list picks its own default tile. */
+  async gotoAlertsFolderUnfiltered(folderId) {
+    await this.page.goto(`/web/alerts?org_identifier=${ORG()}&folder=${folderId}`);
+    await expect(this.card('alerts', 'firing')).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectAlertsNoFiringEmptyState() {
+    await expect(this.page.locator('[data-test="alert-list-empty-no-firing"]')).toBeVisible({ timeout: 30000 });
+  }
+
+  async showAllAlertsFromEmptyState() {
+    await this.page.locator('[data-test="alert-list-empty-no-firing"] [data-test="alert-list-empty-show-all"]').click();
+  }
+
   card(list, key) {
     return this.page.locator(LISTS[list].card(key));
   }

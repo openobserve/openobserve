@@ -331,6 +331,7 @@ export const useSearchQuery = (t: TranslateFn) => {
     isDistinctQuery,
     isWithQuery,
     isLimitQuery,
+    getOuterLimit,
     addTransformToQuery,
     fnUnparsedSQL,
     checkTimestampAlias,
@@ -492,12 +493,13 @@ export const useSearchQuery = (t: TranslateFn) => {
       }
 
       // Don't apply LIMIT from SQL when patterns mode is enabled - we need the configured scan size for pattern extraction
+      const limit: any = getOuterLimit(parsedSQL);
       if (isLimitQuery(parsedSQL) && searchObj.meta.logsVisualizeToggle !== "patterns") {
-        queryReq.query.size = parsedSQL.limit.value[0].value;
+        queryReq.query.size = limit.value[0].value;
         searchObj.meta.resultGrid.showPagination = false;
 
-        if (parsedSQL.limit.separator == "offset") {
-          queryReq.query.from = parsedSQL.limit.value[1].value || 0;
+        if (limit.separator == "offset") {
+          queryReq.query.from = limit.value[1].value || 0;
         }
         delete queryReq.query.track_total_hits;
       }
@@ -758,11 +760,12 @@ export const useSearchQuery = (t: TranslateFn) => {
         return null;
       }
 
-      if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
-        req.query.size = parsedSQL.limit.value[0].value;
+      const limit: any = getOuterLimit(parsedSQL);
+      if (isLimitQuery(parsedSQL)) {
+        req.query.size = limit.value[0].value;
 
-        if (parsedSQL.limit.separator == "offset") {
-          req.query.from = parsedSQL.limit.value[1].value || 0;
+        if (limit.separator == "offset") {
+          req.query.from = limit.value[1].value || 0;
         }
 
         query = fnUnparsedSQL(parsedSQL);

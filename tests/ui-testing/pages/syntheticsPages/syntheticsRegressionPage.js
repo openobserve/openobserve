@@ -32,6 +32,7 @@ export class SyntheticsRegressionPage {
     this.createdLocationIds = [];
     this.createdDestinationNames = [];
     this.createdTemplateNames = [];
+    this.createdDowntimeIds = [];
   }
 
   _initializeLocators() {
@@ -70,6 +71,13 @@ export class SyntheticsRegressionPage {
       sortTrigger: '[data-test="o2-table-th-sort-trigger"]',
       sortIcon: '[data-test^="o2-table-sort-icon-"]',
       durationCell: '[data-test="o2-table-cell-duration"]',
+      checkAlertsCard: '[data-test="synthetics-check-configure-alerts"]',
+      destinationsTrigger: '[data-test="alert-destinations-select-trigger"]',
+      destinationsPopover: '[data-test="alert-destinations-select-popover"]',
+      destinationsOption: '[data-test="alert-destinations-select-option"]',
+      templateOverrideRow: '[data-test="synthetics-check-alerts-template"]',
+      templateOverrideTrigger: '[data-test="template-override-select-trigger"]',
+      saveCheckButton: '[data-test="synthetics-create-save-btn"]',
     };
   }
 
@@ -148,7 +156,7 @@ export class SyntheticsRegressionPage {
   }
 
   // Disabled so the scheduler never claims it; the seeded runs stand in for real probes.
-  async createCheck(name, type, locationId, { destinations = [], config, target } = {}) {
+  async createCheck(name, type, locationId, { destinations = [], config, target, template = null } = {}) {
     const configs = {
       http: { method: 'GET', timeout_ms: 10000, follow_redirects: true, headers: [], assertions: [{ field: 'status_code', operator: 'eq', value: 200 }] },
       tcp: { port: 443, timeout_ms: 10000 },
@@ -165,6 +173,7 @@ export class SyntheticsRegressionPage {
       frequency: { type: 'minutes', interval: 5, cron: '' },
       config: config ?? configs[type],
       destinations,
+      template,
     });
     if (body?.id) this.createdCheckIds.push(body.id);
     expect([200, 201], `check ${name} must be created: ${JSON.stringify(body)}`).toContain(status);
@@ -187,6 +196,12 @@ export class SyntheticsRegressionPage {
 
   titleAssertStep(id, name) {
     return { id, action: 'assert', name, assertion: { kind: 'page_title', expected: 'Page two' } };
+  }
+
+  async fetchCheck(checkId) {
+    const { status, body } = await this.apiRequest('get', `/api/${this.org()}/synthetics/${checkId}?folder=default`);
+    expect(status, `check ${checkId} must load: ${JSON.stringify(body)}`).toBe(200);
+    return body;
   }
 
   async fetchCheckSteps(checkId) {
@@ -224,12 +239,64 @@ export class SyntheticsRegressionPage {
     return destinationName;
   }
 
+  /** A template a check can name as its own override; returns its name. */
+  async createOverrideTemplate(tag) {
+    const name = `synreg_${tag}_override`;
+    const tpl = await this.apiRequest('post', `/api/${this.org()}/alerts/templates`, {
+      name, body: '{"text":"synthetics override"}', type: 'http', title: '', applies_to: ['synthetics'],
+    });
+    expect(tpl.status, `override template must be created: ${JSON.stringify(tpl.body)}`).toBe(200);
+    this.createdTemplateNames.push(name);
+    return name;
+  }
+
   forgetDestination(name) {
     this.createdDestinationNames = this.createdDestinationNames.filter((created) => created !== name);
   }
 
+  /** One active downtime over the given checks, so ending it would free more than one row. */
+  async createDowntimeOverChecks(name, checkIds) {
+    const startsAt = (Date.now() - 60000) * 1000;
+    const { status, body } = await this.apiRequest('post', `/api/v2/${this.org()}/downtimes?folder=default`, {
+      folder_id: 'default',
+      name,
+      targets: [{ module: 'synthetics', folders: { kind: 'all' }, ids: checkIds }],
+      schedule: { repeat: 'none', starts_at: startsAt, ends_at: startsAt + 3660 * 1e6, timezone: 'UTC', duration_secs: 3660, weekdays: [] },
+      show_banner: false,
+    });
+    expect([200, 201], `downtime ${name} must be created: ${JSON.stringify(body)}`).toContain(status);
+    this.createdDowntimeIds.push(body.id);
+    return body.id;
+  }
+
+  // A fresh org lists no downtime folder until its first downtime creates "default", and a quick mute needs one listed.
+  async ensureDowntimeFolder() {
+    const listed = await this.apiRequest('get', `/api/v2/${this.org()}/folders/downtimes`);
+    if ((listed.body?.list ?? []).some((f) => f.folderId === 'default')) return;
+    const startsAt = (Date.now() + 7200000) * 1000;
+    const { status, body } = await this.apiRequest('post', `/api/v2/${this.org()}/downtimes?folder=default`, {
+      folder_id: 'default',
+      name: `synreg_folder_seed_${this.newRunTag()}`,
+      targets: [{ module: 'synthetics', folders: { kind: 'all' } }],
+      schedule: { repeat: 'none', starts_at: startsAt, ends_at: startsAt + 3600 * 1e6, timezone: 'UTC', duration_secs: 3600, weekdays: [] },
+      show_banner: false,
+    });
+    expect([200, 201], `the folder seed downtime must be created: ${JSON.stringify(body)}`).toContain(status);
+    await this.apiRequest('delete', `/api/v2/${this.org()}/downtimes/${body.id}?folder=default`);
+  }
+
+  async downtimeStatus(id) {
+    const { status, body } = await this.apiRequest('get', `/api/v2/${this.org()}/downtimes/${id}?folder=default`);
+    expect(status, `downtime ${id} must load: ${JSON.stringify(body)}`).toBe(200);
+    return body.status;
+  }
+
   // Checks go first: a location or destination still referenced by a check refuses deletion.
   async deleteCreated() {
+    for (const id of this.createdDowntimeIds.splice(0)) {
+      await this.apiRequest('post', `/api/v2/${this.org()}/downtimes/${id}/cancel?folder=default`);
+      await this.apiRequest('delete', `/api/v2/${this.org()}/downtimes/${id}?folder=default`);
+    }
     for (const id of this.createdCheckIds.splice(0)) await this.deleteCheck(id);
     for (const id of this.createdLocationIds.splice(0)) await this.deleteLocation(id);
     for (const name of this.createdDestinationNames.splice(0)) {
@@ -448,6 +515,49 @@ export class SyntheticsRegressionPage {
     await expect(this.table(MONITORS_TABLE).locator(this.locators.nameCell).filter({ hasText: name })).toBeVisible({ timeout: 30000 });
   }
 
+  monitorRow(name) {
+    return this.table(MONITORS_TABLE).locator(this.locators.tableRow)
+      .filter({ has: this.page.locator(this.locators.nameCell).filter({ hasText: name }) });
+  }
+
+  async openMonitorRowMenu(name) {
+    await this.monitorRow(name).locator(`[data-test="${MONITORS_TABLE}-more-btn"]`).click();
+  }
+
+  async quickMuteMonitorRow(name, preset = '1h') {
+    await this.openMonitorRowMenu(name);
+    const [response] = await Promise.all([
+      this.page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/downtimes')),
+      this.page.locator(`[data-test="${MONITORS_TABLE}-mute-${preset}"]`).click(),
+    ]);
+    expect([200, 201], 'the quick mute must be created').toContain(response.status());
+    return (await response.json()).id;
+  }
+
+  async expectMonitorRowMuted(check, muted) {
+    await expect(this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-muted"]`)).toHaveCount(muted ? 1 : 0, { timeout: 30000 });
+  }
+
+  async endMuteFromMonitorRow(check) {
+    await this.openMonitorRowMenu(check.name);
+    const endMute = this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-end-mute"]`);
+    await expect(endMute).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-muted-by"]`)).toHaveCount(0);
+    const [response] = await Promise.all([
+      this.page.waitForResponse((r) => r.request().method() === 'POST' && /\/downtimes\/[^/]+\/cancel$/.test(new URL(r.url()).pathname)),
+      endMute.click(),
+    ]);
+    expect(response.status(), 'the cancel must succeed').toBe(200);
+    return new URL(response.url()).pathname.split('/').slice(-2)[0];
+  }
+
+  async expectOnlyMutedByLink(check, downtimeName) {
+    await this.openMonitorRowMenu(check.name);
+    await expect(this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-muted-by"]`)).toContainText(downtimeName, { timeout: 10000 });
+    await expect(this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-end-mute"]`)).toHaveCount(0);
+    await this.page.keyboard.press('Escape');
+  }
+
   async expectMonitorRowAbsent(name) {
     await expect(this.table(MONITORS_TABLE).locator(this.locators.nameCell).filter({ hasText: name })).toHaveCount(0);
   }
@@ -515,6 +625,40 @@ export class SyntheticsRegressionPage {
   async openEditCheck(checkId) {
     await this.page.locator(this.locators.resultsEditButton).click();
     await expect(this.page).toHaveURL(new RegExp(`/synthetics/edit/${checkId}`), { timeout: 30000 });
+  }
+
+  async gotoEditCheck(check) {
+    await this.page.goto(`/web/synthetics/edit/${check.id}?org_identifier=${this.org()}&folder=default`);
+    await expect(this.page.locator(this.locators.checkAlertsCard)).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectTemplateOverride(name) {
+    await expect(this.page.locator(this.locators.templateOverrideTrigger)).toHaveAttribute('data-test-selected-value', name, { timeout: 30000 });
+  }
+
+  async expectTemplateOverrideHidden() {
+    await expect(this.page.locator(this.locators.templateOverrideRow)).toHaveCount(0);
+  }
+
+  async untickAlertDestination(name) {
+    const card = this.page.locator(this.locators.checkAlertsCard);
+    const popover = this.page.locator(this.locators.destinationsPopover);
+    await card.locator(this.locators.destinationsTrigger).click();
+    await popover.waitFor({ state: 'visible', timeout: 10000 });
+    await popover.locator(`${this.locators.destinationsOption}[data-test-value="dest:${name}"]`).click();
+    await this.page.keyboard.press('Escape');
+    await popover.waitFor({ state: 'hidden', timeout: 10000 });
+    await expect(card.locator(this.locators.destinationsTrigger)).toHaveAttribute('data-test-selected-value', '');
+  }
+
+  async saveEditedCheck(checkId) {
+    const [request] = await Promise.all([
+      this.page.waitForRequest((r) => r.method() === 'PUT' && new URL(r.url()).pathname.endsWith(`/synthetics/${checkId}`)),
+      this.page.locator(this.locators.saveCheckButton).click(),
+    ]);
+    const response = await request.response();
+    expect(response?.status(), 'the check update must succeed').toBe(200);
+    return request.postDataJSON();
   }
 
   async runDurationsMs() {
