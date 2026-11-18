@@ -2883,17 +2883,23 @@ async fn checked_update_group_by(
     let Some((sql, histogram)) = custom_sql_to_validate(req, existing) else {
         return Ok(());
     };
-    let Some(fields) = stream_field_names(
-        org_id,
-        &existing.anomaly_id,
-        &existing.stream_name,
-        &existing.stream_type,
-    )
-    .await
+    let stream = group_by_stream(sql, existing);
+    let Some(fields) =
+        stream_field_names(org_id, &existing.anomaly_id, &stream, &existing.stream_type).await
     else {
         return Ok(());
     };
     validate_custom_sql_grid(sql, &histogram, Some(&fields)).map_err(validation_error)
+}
+
+/// The stream the edited SQL reads; a SQL with no single stream keeps the stored one.
+#[cfg(feature = "enterprise")]
+fn group_by_stream(
+    sql: &str,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> String {
+    stream_name_from_sql(sql, &existing.stream_type)
+        .unwrap_or_else(|_| existing.stream_name.clone())
 }
 
 /// §4.1.1: an AST walk, because substring checks lose to nesting, comments and IANA names.
@@ -10871,6 +10877,31 @@ mod tests {
                 .unwrap_err()
                 .to_string();
             assert!(err.contains("Remove 'service'"), "{err}");
+        }
+
+        #[test]
+        fn an_update_probes_the_stream_its_new_sql_reads() {
+            let mut stored =
+                custom_sql_grid_rules_stored(&format!("{SELECT} GROUP BY time_bucket"));
+            stored.stream_name = "a".to_string();
+            let sql = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM b \
+                       GROUP BY time_bucket";
+            assert_eq!(group_by_stream(sql, &stored), "b");
+            assert!(
+                validate_custom_sql_grid(sql, "5m", Some(&fields(&["service"]))).is_ok(),
+                "b has no physical time_bucket, so the alias is the bucket"
+            );
+            assert!(
+                validate_custom_sql_grid(sql, "5m", Some(&fields(&["time_bucket"]))).is_err(),
+                "a's physical time_bucket would reject it"
+            );
+            let joined = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
+                          b JOIN c ON b.x = c.x GROUP BY time_bucket";
+            assert_eq!(
+                group_by_stream(joined, &stored),
+                "a",
+                "no single stream keeps the stored one"
+            );
         }
 
         fn custom_sql_grid_rules_stored(
