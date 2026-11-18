@@ -965,3 +965,15 @@ describe("suggestionArea", () => {
     expect(area.cards.map((c) => c.kind)).toEqual(Array(cards).fill("library"));
   });
 });
+
+describe("cardFit", () => {
+  it.each([
+    ["every field on the stream", ["reason", "ns", "msg"], "fits", []],
+    ["a field the stream lacks", ["ns"], "likely", ["reason"]],
+    ["a schema not read yet", [], "fits", []],
+  ])("%s", async (_name, columns, fit, absent) => {
+    const { cardFit } = await import("./useAlertLibrary");
+    const card = { fit: "fits" as const, matched_fields: ["reason", "ns"] };
+    expect(cardFit(card, new Set(columns))).toEqual({ fit, absent });
+  });
+});

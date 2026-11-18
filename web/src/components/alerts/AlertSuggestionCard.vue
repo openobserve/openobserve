@@ -47,12 +47,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-text-secondary m-0 text-xs"
       >{{ raw(suggestion.sentence) }}</OTruncatedText
     >
-    <p class="text-text-secondary m-0 flex min-w-0 items-center gap-1 text-xs">
+    <p
+      class="m-0 flex min-w-0 items-center gap-1 text-xs"
+      :class="lacks ? 'text-status-warning-text' : 'text-text-secondary'"
+    >
       <OIcon
-        :name="suggestion.fit === 'fits' ? 'check-circle' : 'help-outline'"
+        :name="lacks ? 'warning' : fit.fit === 'fits' ? 'check-circle' : 'help-outline'"
         size="xs"
         class="shrink-0"
-        :class="suggestion.fit === 'fits' ? 'text-status-positive' : 'text-text-secondary'"
+        :class="fit.fit === 'fits' ? 'text-status-positive' : ''"
       />
       <OTruncatedText class="min-w-0" data-test="add-alert-suggestion-card-why">{{
         whyLine
@@ -103,9 +106,14 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { severityBadgeValue, severityLabel } from "@/components/alertLibrary/libraryFacets";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { joinListMore } from "@/utils/alerts/alertCopy";
+import { cardFit } from "@/composables/alerts/useAlertLibrary";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 
-const props = defineProps<{ suggestion: LibrarySuggestion }>();
+const props = defineProps<{
+  suggestion: LibrarySuggestion;
+  /** Fields and metrics of the picked stream; empty while its schema is unread. */
+  onStream: ReadonlySet<string>;
+}>();
 const emit = defineEmits<{
   (e: "open"): void;
   (e: "open-existing", alert: AlreadySetUp): void;
@@ -123,15 +131,22 @@ const setUpText = computed<I18nText>(() =>
   ),
 );
 
-// "Likely fits" names what is missing; "Fits your data" names what it uses.
+const fit = computed(() => cardFit(props.suggestion, props.onStream));
+const lacks = computed(() => fit.value.absent.length > 0 || props.suggestion.missing.length > 0);
+
+// "Fits your data" names what it uses; anything the stream lacks is named instead, in amber.
 const whyLine = computed<I18nText>(() => {
   const s = props.suggestion;
-  const fit = t(s.fit === "fits" ? "alerts.librarySuggest.fits" : "alerts.librarySuggest.likely");
-  const detail = s.missing.length
-    ? t("alerts.librarySuggest.missingLabel", { label: joinListMore(s.missing, t) })
-    : s.matched_fields.length
-      ? t("alerts.librarySuggest.uses", { fields: joinListMore(s.matched_fields, t) })
-      : null;
-  return detail ? t("alerts.intent.cardWhy", { fit, detail }) : fit;
+  const label = t(
+    fit.value.fit === "fits" ? "alerts.librarySuggest.fits" : "alerts.librarySuggest.likely",
+  );
+  const detail = fit.value.absent.length
+    ? t("alerts.librarySuggest.missingFields", { fields: joinListMore(fit.value.absent, t) })
+    : s.missing.length
+      ? t("alerts.librarySuggest.missingLabel", { label: joinListMore(s.missing, t) })
+      : s.matched_fields.length
+        ? t("alerts.librarySuggest.uses", { fields: joinListMore(s.matched_fields, t) })
+        : null;
+  return detail ? t("alerts.intent.cardWhy", { fit: label, detail }) : label;
 });
 </script>

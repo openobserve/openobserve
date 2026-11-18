@@ -204,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="card in area.cards"
           :key="card.id"
           :suggestion="card"
+          :on-stream="onStream"
           @open="openCard(card)"
           @open-existing="emit('open-alert', $event)"
         />
@@ -701,6 +702,14 @@ const headerText = computed<I18nText>(() => {
       );
   }
 });
+
+const onStream = computed<ReadonlySet<string>>(
+  () =>
+    new Set([
+      ...props.columns.map((c) => c.value),
+      ...(isMetrics.value ? props.metricStreams.map((s) => s.name) : []),
+    ]),
+);
 
 const drawerCard = ref<LibrarySuggestion | null>(null);
 const drawerEntry = computed(() =>

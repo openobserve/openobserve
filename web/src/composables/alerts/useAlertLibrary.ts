@@ -33,6 +33,7 @@ import type {
 import type {
   LibrarySuggestion,
   LibrarySuggestResponse,
+  SuggestionFit,
 } from "@/utils/alerts/librarySuggest.types";
 
 // Reads the curated alert library from S3: one GET for the manifest (which
@@ -352,6 +353,16 @@ export function suggestionArea(
   const cards = shown.slice(0, SUGGESTION_CARDS);
   const total = Math.max(input.data.counts.total, shown.length);
   return { state: cards.length ? "ready" : "none", cards, total };
+}
+
+/** What a card may claim on the picked stream: it fits only when every field it uses is there. An
+ * unread schema (empty set) leaves the server's word standing. */
+export function cardFit(
+  suggestion: Pick<LibrarySuggestion, "fit" | "matched_fields">,
+  onStream: ReadonlySet<string>,
+): { fit: SuggestionFit; absent: string[] } {
+  const absent = onStream.size ? suggestion.matched_fields.filter((f) => !onStream.has(f)) : [];
+  return { fit: absent.length ? "likely" : suggestion.fit, absent };
 }
 
 /** The UI is the only guard: an OSS backend stores an anomaly body as a broken scheduled alert. */
