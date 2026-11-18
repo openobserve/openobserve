@@ -20,6 +20,12 @@ export const FROM_ANOMALY_PARAM = "from_anomaly";
 
 const ANOMALY_PARAM_PREFIX = "anomaly_";
 
+/** A Logs link's other query: the raw rows next to the aggregate, swapped in by the banner. */
+const ALT_QUERY_PARAM = "anomaly_alt_query";
+
+/** "raw" while the swapped-in raw rows show; absent on the aggregate the link opened. */
+const VIEW_PARAM = "anomaly_view";
+
 const SUMMARY_KINDS: ReadonlySet<string> = new Set(["value", "absence", "partial_drop"]);
 
 /** The snapshot an anomaly link carries; values are the alert's, never re-read. */
@@ -35,6 +41,9 @@ export interface AnomalyLinkInfo {
   upper: number | null;
   /** Baseline of a partial drop, which has no range. */
   expected: number | null;
+  /** The link carries a second query, so the banner can switch between the two. */
+  canSwitchView: boolean;
+  rawView: boolean;
 }
 
 type QueryLike = Record<string, unknown>;
@@ -94,5 +103,18 @@ export function parseAnomalyLink(query: QueryLike | null | undefined): AnomalyLi
     lower: numberParam(query.anomaly_lower),
     upper: numberParam(query.anomaly_upper),
     expected: numberParam(query.anomaly_expected),
+    canSwitchView: first(query[ALT_QUERY_PARAM]) !== null && first(query.query) !== null,
+    rawView: first(query[VIEW_PARAM]) === "raw",
   };
+}
+
+/** Swaps `query` with the other query of the link and flips the view; null when there is none. */
+export function switchAnomalyView<T extends QueryLike>(query: T): T | null {
+  const alt = first(query[ALT_QUERY_PARAM]);
+  const current = first(query.query);
+  if (alt === null || current === null) return null;
+  const next: QueryLike = { ...query, query: alt, [ALT_QUERY_PARAM]: current };
+  if (first(query[VIEW_PARAM]) === "raw") delete next[VIEW_PARAM];
+  else next[VIEW_PARAM] = "raw";
+  return next as T;
 }

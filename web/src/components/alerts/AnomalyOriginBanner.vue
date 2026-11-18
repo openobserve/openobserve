@@ -34,6 +34,19 @@
     <template #actions>
       <div v-if="link" class="flex shrink-0 items-center gap-1">
         <OButton
+          v-if="canSwitchView"
+          variant="ghost-primary"
+          size="sm"
+          :data-test="`${dataTest}-switch-view`"
+          @click="switchView"
+        >
+          {{
+            link.rawView
+              ? t("alerts.anomaly.originShowAggregate")
+              : t("alerts.anomaly.originShowRaw")
+          }}
+        </OButton>
+        <OButton
           variant="ghost-primary"
           size="sm"
           icon-left="arrow-back"
@@ -64,7 +77,12 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { anomalyExploreQuery } from "@/services/anomaly_detection.queries";
-import { parseAnomalyLink, withoutAnomalyLinkParams } from "@/utils/alerts/anomalyLinkParams";
+import {
+  parseAnomalyLink,
+  switchAnomalyView,
+  withoutAnomalyLinkParams,
+} from "@/utils/alerts/anomalyLinkParams";
+import { requestLogsReapply } from "@/utils/queryHistory/logs";
 import { formatAnomalyNumber, formatUtcHm } from "@/utils/alerts/anomalyExploreView";
 
 withDefaults(defineProps<{ dataTest?: string }>(), {
@@ -142,6 +160,17 @@ const backToAnomaly = () => {
     params: { alert_id: link.value.anomalyId },
     query: { org_identifier: org.value },
   });
+};
+
+// Only Logs runs a query through the reapply path; Traces and Metrics links carry no second query.
+const canSwitchView = computed(() => route.name === "logs" && !!link.value?.canSwitchView);
+
+/** A route change alone runs nothing on Logs, so the swapped query goes through the reapply path. */
+const switchView = async () => {
+  const next = switchAnomalyView({ ...route.query });
+  if (!next) return;
+  await router.replace({ query: next });
+  requestLogsReapply(true);
 };
 
 /** Dropping the parameters is what hides it: a refresh keeps it closed, the next link shows it. */

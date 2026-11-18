@@ -13811,6 +13811,8 @@
       "originTitle": "Opened from anomaly {name}",
       "originTitleUnnamed": "Opened from an anomaly",
       "originBack": "Back to anomaly",
+      "originShowRaw": "Show raw rows",
+      "originShowAggregate": "Show aggregate",
       "originFilterNotApplied": "Detector filter not applied: showing the whole stream around the anomaly",
       "originMeasureFallback": "Detector value",
       "originWindow": "{start}-{end} UTC",

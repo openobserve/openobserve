@@ -20,6 +20,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import anomalyDetection from "@/services/anomaly_detection";
 import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
+import { logsReapplyRequest } from "@/utils/queryHistory/logs";
 
 vi.mock("@/services/anomaly_detection", () => ({
   default: { explore: vi.fn() },
@@ -34,6 +35,7 @@ const makeRouter = () =>
     history: createMemoryHistory(),
     routes: [
       { path: "/logs", name: "logs", component: Blank },
+      { path: "/traces", name: "traces", component: Blank },
       { path: "/alerts/detail/:alert_id", name: "alertDetail", component: Blank },
     ],
   });
@@ -185,5 +187,50 @@ describe("AnomalyOriginBanner", () => {
     });
     await flushPromises();
     expect(find("values").exists()).toBe(true);
+  });
+
+  describe("raw rows switch", () => {
+    const AGGREGATE = { ...VALUE_LINK, query: "YWdn", anomaly_alt_query: "cmF3" };
+
+    it("swaps the queries, flips the label and runs through the reapply path", async () => {
+      const { router } = await mountBanner(AGGREGATE);
+      const seq = logsReapplyRequest.value.seq;
+      expect(find("switch-view").text()).toBe("Show raw rows");
+      await find("switch-view").trigger("click");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({
+        query: "cmF3",
+        anomaly_alt_query: "YWdn",
+        anomaly_view: "raw",
+        from_anomaly: "a1",
+        anomaly_start: VALUE_LINK.anomaly_start,
+      });
+      expect(logsReapplyRequest.value).toEqual({ seq: seq + 1, run: true });
+      expect(find("values").exists()).toBe(true);
+      expect(find("switch-view").text()).toBe("Show aggregate");
+      await find("switch-view").trigger("click");
+      await flushPromises();
+      expect(router.currentRoute.value.query).toMatchObject({ query: "YWdn" });
+      expect(router.currentRoute.value.query).not.toHaveProperty("anomaly_view");
+      expect(logsReapplyRequest.value.seq).toBe(seq + 2);
+      expect(find("switch-view").text()).toBe("Show raw rows");
+    });
+
+    it("reads the raw view of a refreshed URL", async () => {
+      await mountBanner({ ...AGGREGATE, anomaly_view: "raw" });
+      expect(find("switch-view").text()).toBe("Show aggregate");
+    });
+
+    it("has no switch without the second query, or off the Logs page", async () => {
+      await mountBanner({ ...VALUE_LINK, query: "YWdn" });
+      expect(find("switch-view").exists()).toBe(false);
+      wrapper?.unmount();
+      const router = makeRouter();
+      await router.push({ name: "traces", query: AGGREGATE });
+      wrapper = mount(AnomalyOriginBanner, { global: { plugins: [store, router] } });
+      await flushPromises();
+      expect(find("").exists()).toBe(true);
+      expect(find("switch-view").exists()).toBe(false);
+    });
   });
 });

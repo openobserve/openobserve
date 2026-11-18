@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   copyAnomalyLinkParams,
   parseAnomalyLink,
+  switchAnomalyView,
   withoutAnomalyLinkParams,
 } from "@/utils/alerts/anomalyLinkParams";
 
@@ -80,7 +81,17 @@ describe("parseAnomalyLink", () => {
       lower: 120.4,
       upper: 157.2,
       expected: null,
+      canSwitchView: false,
+      rawView: false,
     });
+  });
+
+  it("offers the view switch only when the link carries both queries", () => {
+    const both = { ...LINK, query: "YWdn", anomaly_alt_query: "cmF3" };
+    expect(parseAnomalyLink(both)?.canSwitchView).toBe(true);
+    expect(parseAnomalyLink({ ...both, query: "" })?.canSwitchView).toBe(false);
+    expect(parseAnomalyLink({ ...LINK, query: "YWdn" })?.canSwitchView).toBe(false);
+    expect(parseAnomalyLink({ ...both, anomaly_view: "raw" })?.rawView).toBe(true);
   });
 
   it("is null without from_anomaly", () => {
@@ -107,5 +118,29 @@ describe("parseAnomalyLink", () => {
 
   it("takes the first value of a repeated parameter", () => {
     expect(parseAnomalyLink({ from_anomaly: ["a", "b"] })?.anomalyId).toBe("a");
+  });
+});
+
+describe("switchAnomalyView", () => {
+  const AGGREGATE = { ...LINK, query: "YWdn", anomaly_alt_query: "cmF3" };
+
+  it("swaps the two queries and flips the view, keeping the rest", () => {
+    const raw = switchAnomalyView(AGGREGATE);
+    expect(raw).toEqual({ ...LINK, query: "cmF3", anomaly_alt_query: "YWdn", anomaly_view: "raw" });
+    expect(switchAnomalyView(raw!)).toEqual(AGGREGATE);
+  });
+
+  it("survives a page rewrite of the URL, which keeps both parameters", () => {
+    const rebuilt = copyAnomalyLinkParams(switchAnomalyView(AGGREGATE), {
+      stream: "k8s_logs",
+      query: "cmF3",
+    });
+    expect(switchAnomalyView(rebuilt)).toMatchObject({ query: "YWdn", anomaly_alt_query: "cmF3" });
+    expect(switchAnomalyView(rebuilt)).not.toHaveProperty("anomaly_view");
+  });
+
+  it("is null when the link has no second query", () => {
+    expect(switchAnomalyView(LINK)).toBeNull();
+    expect(switchAnomalyView({ ...LINK, anomaly_alt_query: "cmF3" })).toBeNull();
   });
 });
