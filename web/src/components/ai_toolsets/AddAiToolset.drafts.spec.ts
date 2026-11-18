@@ -370,7 +370,7 @@ describe("AddAiToolset drafts", () => {
   it("a not-kept header does not block Save once the toolset is switched to another kind", async () => {
     await mountPage();
     await edit({
-      name: "switch_kind",
+      name: "switch-kind",
       "mcp.url": "https://mcp.example.com/",
       "mcp.headers": [{ key: "Authorization", value: "Bearer s3cr3t", visible: false }],
     });
@@ -460,7 +460,7 @@ describe("AddAiToolset drafts", () => {
 
   it("Save in the leave dialog saves and goes where the user was headed", async () => {
     await mountPage();
-    await edit({ name: "saved_tool", "mcp.url": "https://mcp.example.com/" });
+    await edit({ name: "saved-tool", "mcp.url": "https://mcp.example.com/" });
 
     const navigation = router.push("/logs");
     await flushPromises();
@@ -475,7 +475,7 @@ describe("AddAiToolset drafts", () => {
 
   it("a normal save drops the draft and returns to the list without asking", async () => {
     await mountPage();
-    await edit({ name: "saved_tool", "mcp.url": "https://mcp.example.com/" });
+    await edit({ name: "saved-tool", "mcp.url": "https://mcp.example.com/" });
     window.dispatchEvent(new Event("pagehide"));
     expect(readEditorDraft(newScope)).not.toBeNull();
 

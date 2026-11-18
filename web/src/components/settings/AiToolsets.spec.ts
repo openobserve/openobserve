@@ -16,6 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import AiToolsets from "./AiToolsets.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import aiToolsetsService from "@/services/ai_toolsets";
 import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
@@ -131,6 +132,54 @@ describe("AiToolsets delete confirm", () => {
     expect(dialog.props("messageKeypath")).toBe("aiToolset.deleteMessage");
     expect(dialog.props("messageName")).toBe("github-tools");
     expect(dialog.props("okVariant")).toBe("destructive");
+    w.unmount();
+  });
+});
+
+describe("AiToolsets rename needed badge", () => {
+  afterEach(() => {
+    store.state.zoConfig.features = {};
+  });
+
+  it("marks only the rows whose normalized name collides", async () => {
+    resetListViewState();
+    queryClient.clear();
+    store.state.zoConfig.features = { ai_toolsets: "enabled" };
+    vi.mocked(aiToolsetsService.list).mockResolvedValueOnce({
+      data: {
+        toolsets: [
+          { id: "a", name: "Datadog Prod", kind: "mcp", rename_needed: true },
+          { id: "b", name: "datadog-prod", kind: "mcp", rename_needed: true },
+          { id: "c", name: "github", kind: "mcp", rename_needed: false },
+        ],
+      },
+    } as any);
+    const w = mount(AiToolsets, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: {
+          AddAiToolset: true,
+          ConfirmDialog: true,
+          OTable: {
+            props: ["data"],
+            template:
+              "<div><div v-for='row in data' :key='row.id'><slot name='cell-name' :row='row' /></div></div>",
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const badges = w.findAll("[data-test$='-rename-needed']");
+    expect(badges.map((b) => b.attributes("data-test"))).toEqual([
+      "ai-toolsets-Datadog Prod-rename-needed",
+      "ai-toolsets-datadog-prod-rename-needed",
+    ]);
+    expect(badges[0].text()).toBe("Rename needed");
+    const hint =
+      "Another toolset has the same name once normalized; delete and re-create one of them";
+    const hints = w.findAllComponents(OTooltip).filter((c) => c.props("content") === hint);
+    expect(hints).toHaveLength(2);
     w.unmount();
   });
 });

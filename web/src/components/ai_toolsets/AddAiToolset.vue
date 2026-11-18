@@ -246,10 +246,10 @@ export default defineComponent({
     const { t } = useI18nTyped();
 
     // Co-located Zod schema (factory keeps the messages i18n-driven).
-    const addAiToolsetSchema = makeAddAiToolsetSchema(t);
-
     const editingId = ref<string | null>(null);
     const isEditing = ref(false);
+
+    const addAiToolsetSchema = makeAddAiToolsetSchema(t, () => isEditing.value);
 
     const kindOptions = [
       { label: t("aiToolset.kindMcp"), value: "mcp" },
