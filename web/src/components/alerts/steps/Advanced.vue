@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormTextarea
                       :aria-label="t('alerts.row')"
                       data-test="add-alert-row-input-textarea"
+                      @focusin="revealFocused"
                       name="row_template"
                       :placeholder="rowTemplatePlaceholder"
                       autogrow
@@ -136,8 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ></OSettingRow>
 
               <OSettingRow v-if="tierShows('variables')" :label="t('alerts.plain.variables')" fill
-                ><div class="flex items-start gap-2">
-                  <div class="flex flex-col items-start gap-1">
+                ><div class="flex items-start gap-2 max-md:w-full">
+                  <div class="flex flex-col items-start gap-1 max-md:w-full max-md:items-stretch">
                     <template v-if="!variableRows.length">
                       <OButton
                         data-test="alert-variables-add-btn"
@@ -158,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div
                         v-for="(variable, index) in variableRows"
                         :key="index"
-                        class="mb-2 flex items-center gap-2"
+                        class="mb-2 flex min-w-0 items-center gap-2"
                         :data-test="`alert-variables-${index + 1}`"
                       >
                         <OFormInput
@@ -166,14 +167,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="alert-variables-key-input"
                           :name="`context_attributes[${index}].key`"
                           :placeholder="t('common.name')"
-                          class="min-w-35"
+                          class="min-w-35 max-md:min-w-0 max-md:flex-1"
                         />
                         <OFormInput
                           :aria-label="t('common.value')"
                           data-test="alert-variables-value-input"
                           :name="`context_attributes[${index}].value`"
                           :placeholder="t('common.value')"
-                          class="min-w-50"
+                          class="min-w-50 max-md:min-w-0 max-md:flex-1"
                         />
                         <OButton
                           data-test="alert-variables-delete-variable-btn"
@@ -587,10 +588,14 @@ export default defineComponent({
     const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
     const descriptionFocused = ref(false);
     // The box grows on focus, after the browser scrolled it into view.
-    const onDescriptionFocus = async (event: FocusEvent) => {
-      descriptionFocused.value = true;
+    // A field that grows on focus can end below the scroller, so bring it back once it has grown.
+    const revealFocused = async (event: FocusEvent) => {
       await nextTick();
       (event.target as HTMLElement | null)?.scrollIntoView?.({ block: "nearest" });
+    };
+    const onDescriptionFocus = async (event: FocusEvent) => {
+      descriptionFocused.value = true;
+      await revealFocused(event);
     };
     const removeDescription = () => {
       form.setFieldValue("description", "");
@@ -601,6 +606,7 @@ export default defineComponent({
       tierShows,
       descriptionFocused,
       onDescriptionFocus,
+      revealFocused,
       removeDescription,
       raw,
       priorityOptions,

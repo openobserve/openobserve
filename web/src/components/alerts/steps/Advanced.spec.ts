@@ -140,6 +140,19 @@ describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
     expect(parentForm.state.values.row_template).toBe("row tmpl");
   });
 
+  it.each(["add-alert-description-textarea", "add-alert-row-input-textarea"])(
+    "a focused %s scrolls itself back into view after it grows",
+    async (dataTest) => {
+      const host = mountDescendant();
+      const reveal = vi.fn();
+      const field = host.find(`[data-test="${dataTest}"] textarea`);
+      (field.element as HTMLElement).scrollIntoView = reveal;
+      await field.trigger("focusin");
+      await flushPromises();
+      expect(reveal).toHaveBeenCalledWith({ block: "nearest" });
+    },
+  );
+
   it("template select + row-template-type toggle write into the PARENT form", async () => {
     const host = mountDescendant();
     const parentForm = hostForm(host);
