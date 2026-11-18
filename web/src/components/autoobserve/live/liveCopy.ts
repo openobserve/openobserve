@@ -310,13 +310,20 @@ export const countText = (locale: string, n: number): I18nText =>
   raw(new Intl.NumberFormat(locale).format(n));
 
 /** A share floored, so it never reads 100% with a gap left; under 1% reads "<1%", never 0% with some there. */
-export const percentText = (locale: string, part: number, whole: number): I18nText => {
+export const percentText = (
+  t: TranslateFn,
+  locale: string,
+  part: number,
+  whole: number,
+): I18nText => {
   const format = (share: number) =>
     new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(share);
   if (part <= 0 || whole <= 0) return raw(format(0));
   if (part >= whole) return raw(format(1));
   const pct = Math.floor((100 * part) / whole);
-  return raw(pct < 1 ? `<${format(0.01)}` : format(pct / 100));
+  return pct < 1
+    ? t("autoobserveLive.lessThan", { value: raw(format(0.01)) })
+    : raw(format(pct / 100));
 };
 
 export const formatDay = (us: number, locale: string, timeZone: string): I18nText =>
@@ -708,6 +715,9 @@ export const refreshFailedText = (
     dataAt: formatWhen(stale.dataAt, locale, timeZone, now),
     what: t(WHAT_KEY[surface]),
   });
+
+// The approved copy names up to three, then counts the rest.
+export const NAMES_SHOWN = 3;
 
 export const moreCount = (total: number, shown: number) => Math.max(0, total - shown);
 

@@ -569,6 +569,8 @@ import LiveNoticeState from "./live/LiveNoticeState.vue";
 import LiveRefreshFailed from "./live/LiveRefreshFailed.vue";
 import {
   chooseCoverageGrouping,
+  coverageName,
+  coveragePlace,
   SERVICE_RANK,
   SORT_KEYS,
   chooseMapGrouping,
@@ -604,11 +606,11 @@ const MAP_SKELETON_HEXES = 18;
 // Past this many hexes the map stops being readable, so it draws groups and counts the rest.
 const MAP_HEX_CAP = 200;
 type GroupPick = "auto" | CoverageGroupBy;
-const GROUP_PICKS: GroupPick[] = ["auto", "service", "namespace", "none"];
+const GROUP_PICKS: GroupPick[] = ["auto", "service", "place", "none"];
 const GROUP_PICK_LABEL: Record<GroupPick, I18nKey> = {
   auto: "autoobserve.coverage.groupPick.auto",
   service: "autoobserve.coverage.groupPick.service",
-  namespace: "autoobserve.coverage.groupPick.namespace",
+  place: "autoobserve.coverage.groupPick.place",
   none: "autoobserve.coverage.groupPick.none",
 };
 // Learning shows only while some service learns.
@@ -732,7 +734,7 @@ const summaryText = computed(() => {
   const params = {
     watched: num(totals.value.fullyWatched),
     total: num(totals.value.total),
-    pct: percentText(locale.value, totals.value.fullyWatched, totals.value.total),
+    pct: percentText(t, locale.value, totals.value.fullyWatched, totals.value.total),
   };
   return t("autoobserveLive.coverage.summaryWatchedShare", params);
 });
@@ -864,24 +866,16 @@ const searched = computed(() =>
 const searchPlaceholder = computed(() => t("autoobserveLive.coverage.searchPlaceholder"));
 const rows = computed(() => searched.value.filter((r) => inFilter(r, filter.value)));
 
-// A service is one name in many places; a place is a cluster and namespace, as the Where column names it.
-const nameOf = (row: CoverageRow) => row.identity?.serviceName ?? row.service;
-const placeOf = (row: CoverageRow) =>
-  String(row.where ?? "") === "—" ? String(t("autoobserve.coverage.noPlace")) : String(row.where);
-// Where reads a lone cluster and a lone namespace alike, so places fold on the pair itself.
-const placeKeyOf = (row: CoverageRow) =>
-  row.identity
-    ? JSON.stringify([row.identity.cluster, row.identity.namespace])
-    : String(row.where ?? "");
+// A row with no place never folds by place, so no catch-all group hides the services outside one.
 const GROUPERS: Record<CoverageGroupBy, CoverageGrouper | null> = {
   none: null,
-  service: { keyOf: nameOf, titleOf: nameOf },
-  namespace: { keyOf: placeKeyOf, titleOf: placeOf },
+  service: { keyOf: coverageName, titleOf: coverageName },
+  place: { keyOf: coveragePlace, titleOf: (row) => coveragePlace(row) ?? row.service },
 };
 // The rows on screen pick their own grouping, so a search that leaves a few shows them flat.
 const group = computed(() =>
   groupPick.value === "auto"
-    ? chooseCoverageGrouping(rows.value, nameOf, placeKeyOf)
+    ? chooseCoverageGrouping(rows.value, coverageName, coveragePlace)
     : groupPick.value,
 );
 watch(group, () => (expanded.value = []));
@@ -900,9 +894,15 @@ const tableRows = computed(() => {
 const trafficOf = (row: CoverageTableRow) => row.traffic ?? null;
 const unknownShown = computed(() => rows.value.some((r) => r.traffic == null));
 
+// Rows left apart for having no place are not places, so a place count skips them.
+const groupLines = (lines: CoverageTableRow[], by: CoverageGroupBy) =>
+  by === "place"
+    ? lines.filter((r) => isGroup(r) || coveragePlace(r) !== null).length
+    : lines.length;
+
 const groupLine = computed((): I18nText => {
   if (group.value === "none") return t("autoobserve.coverage.groupedBy.none");
-  const lines = tableRows.value.length;
+  const lines = groupLines(tableRows.value, group.value);
   return t(`autoobserve.coverage.groupedBy.${group.value}`, { count: num(lines) }, lines);
 });
 const trafficText = (value: number | null) =>
@@ -910,14 +910,10 @@ const trafficText = (value: number | null) =>
 
 const groupWhere = (row: CoverageGroup): I18nText => {
   const count = row.children.length;
-  if (group.value !== "service")
+  const places = new Set(row.children.map(coveragePlace).filter((p) => p !== null)).size;
+  if (group.value !== "service" || places !== count)
     return t("autoobserve.coverage.groupServices", { count: num(count) }, count);
-  const clusters = new Set(row.children.map((c) => c.identity?.cluster ?? "")).size;
-  return t(
-    "autoobserve.coverage.groupPlaces",
-    { places: num(count), clusters: num(clusters) },
-    clusters,
-  );
+  return t("autoobserve.coverage.groupPlaces", { count: num(places) }, places);
 };
 
 const groupGaps = (row: CoverageGroup, check: LiveCheck) =>
@@ -1030,8 +1026,8 @@ const mapGroup = computed(() =>
     allRows.value,
     MAP_HEX_CAP,
     groupPick.value === "auto" ? null : groupPick.value,
-    nameOf,
-    placeKeyOf,
+    coverageName,
+    coveragePlace,
   ),
 );
 const searchedSet = computed(() => (term.value ? new Set(searched.value) : null));
@@ -1107,7 +1103,6 @@ const selectHex = async (key: string) => {
   const opened = tableRows.value.find((r) => isGroup(r) && r.id === hex.id);
   expanded.value = opened ? [opened.service] : [];
   await nextTick();
-  // Two places can share a title, so the row is found by its key.
   [...document.querySelectorAll<HTMLElement>("[data-group-key]")]
     .find((el) => el.dataset.groupKey === opened?.service)
     ?.scrollIntoView?.({ block: "nearest" });
@@ -1148,8 +1143,8 @@ const mapLabel = computed(() => {
     services: t("autoobserve.coverage.groupServices", { count: num(services) }, services),
     groups: t(
       `autoobserve.coverage.mapGroupCount.${by}`,
-      { count: num(hexes.length) },
-      hexes.length,
+      { count: num(groupLines(hexes, by)) },
+      groupLines(hexes, by),
     ),
     fill: fillText,
   });

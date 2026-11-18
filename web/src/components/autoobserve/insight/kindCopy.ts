@@ -23,7 +23,7 @@ import type {
   AutoObserveIncidentMember,
   AutoObserveSuggestion,
 } from "@/services/autoobserve";
-import { formatWhen, placeLabels, placeOf } from "../live/liveCopy";
+import { NAMES_SHOWN, formatWhen, placeLabels, placeOf } from "../live/liveCopy";
 import {
   heartbeatAlert,
   noDataAlert,
@@ -90,8 +90,6 @@ const GAP_CLASSES: GapClass[] = ["errors", "latency", "absence"];
 
 /** Six or more coverage gaps fold into one card, so a long rail never repeats one sentence per service. */
 export const GAP_GROUP_AT = 6;
-
-const GROUP_NAMES = 3;
 
 const NO_DATA_MINUTES = 15;
 // Names the coverage Add alert batch, so only its own reviews move it on.
@@ -817,7 +815,7 @@ const groupNames = (
     const namespace = s.subject.key_dims.k8s_namespace_name;
     return namespace ? `${serviceOf(s)} (${namespace})` : serviceOf(s);
   });
-  const shown = names.slice(0, GROUP_NAMES);
+  const shown = names.slice(0, NAMES_SHOWN);
   const rest = count - shown.length;
   const more =
     rest > 0 ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))] : [];
@@ -1022,7 +1020,7 @@ export const pagedFindingCopy = (
   const members = item.members ?? [];
   const many = members.length > 1;
   const names = (list: AutoObserveIncidentMember[]) => {
-    const shown = list.flatMap((m) => m.stream_name ?? []).slice(0, GROUP_NAMES);
+    const shown = list.flatMap((m) => m.stream_name ?? []).slice(0, NAMES_SHOWN);
     const rest = list.length - shown.length;
     return listOf(
       zone.locale,

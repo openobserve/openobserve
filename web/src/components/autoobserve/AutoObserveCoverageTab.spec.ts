@@ -497,7 +497,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
       const wrapper = mountTab(live(FLEET));
       expect(shown(wrapper)).toHaveLength(40);
       expect(wrapper.find('[data-test="autoobserve-coverage-group-svc39"]').text()).toBe(
-        "2 places · 2 clusters",
+        "2 places",
       );
       expect(wrapper.find('[data-test="autoobserve-coverage-grouped"]').text()).toBe(
         "Grouped by service · 40 names",
@@ -547,22 +547,16 @@ describe("AutoObserveCoverageTab in live mode", () => {
       );
     });
 
-    it("scrolls to the clicked group when two places share a title", async () => {
-      Object.assign(routeQuery, { cov: "map", group: "namespace" });
-      // A lone namespace and a lone cluster both read "prod" in Where.
-      const at = (name: string, cluster: string | null, namespace: string | null) => ({
-        ...busy(name, "none", 1, cluster ?? ""),
-        service_id: `${cluster}/${namespace}/${name}`,
-        cluster,
+    it("scrolls to the clicked group", async () => {
+      Object.assign(routeQuery, { cov: "map", group: "place" });
+      const at = (name: string, namespace: string) => ({
+        ...busy(name, "none", 1),
+        service_id: `${namespace}/${name}`,
+        cluster: null,
         namespace,
       });
       const source = live(
-        coverage([
-          at("a", null, "prod"),
-          at("b", null, "prod"),
-          at("c", "prod", null),
-          at("d", "prod", null),
-        ]),
+        coverage([at("a", "prod"), at("b", "prod"), at("c", "stage"), at("d", "stage")]),
       );
       const scrolled: Element[] = [];
       const scroll = Element.prototype.scrollIntoView;
@@ -577,14 +571,14 @@ describe("AutoObserveCoverageTab in live mode", () => {
       const clicked = (table.props("data") as { service: string }[]).findIndex(
         (r) => r.service === table.props("expandedIds")[0],
       );
-      const labels = wrapper.findAll('[data-test="autoobserve-coverage-group-prod"]');
+      const labels = wrapper.findAll("[data-group-key]");
       expect(labels).toHaveLength(2);
       expect(scrolled.map((el) => labels.findIndex((l) => l.element === el))).toEqual([clicked]);
       wrapper.unmount();
       Element.prototype.scrollIntoView = scroll;
     });
 
-    it.each(["none", "service", "namespace"] as const)(
+    it.each(["none", "service", "place"] as const)(
       "names the services a %s-grouped map stands for",
       (group) => {
         const at = (namespace: string, checks: object) => ({ ...checks, namespace });
@@ -691,7 +685,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
     it("rails a group by its worst service whatever the sort", () => {
       Object.assign(routeQuery, {
         filter: "all",
-        group: "namespace",
+        group: "place",
         sort: "service",
         order: "asc",
       });
@@ -749,8 +743,8 @@ describe("AutoObserveCoverageTab in live mode", () => {
       wrapper.unmount();
     });
 
-    it("groups by namespace on the place itself, and a search never opens the other place", async () => {
-      Object.assign(routeQuery, { filter: "all", group: "namespace" });
+    it("groups by place and leaves services with no place as rows of their own", () => {
+      Object.assign(routeQuery, { filter: "all", group: "place" });
       const at = (name: string, cluster: string | null, namespace: string | null) => ({
         ...busy(name, "none", 1),
         service_id: name,
@@ -760,24 +754,21 @@ describe("AutoObserveCoverageTab in live mode", () => {
       const wrapper = mountTab(
         live(
           coverage([
-            at("kube-a", null, "prod"),
-            at("kube-b", null, "prod"),
-            at("host-a", "prod", null),
-            at("host-b", "prod", null),
+            at("kube-a", "prod", "billing"),
+            at("kube-b", "prod", "billing"),
+            at("host-a", null, null),
+            at("host-b", null, null),
           ]),
         ),
       );
-      const table = () => wrapper.findComponent(OTable);
-      const groups = table().props("data") as {
+      const data = wrapper.findComponent(OTable).props("data") as {
         service: string;
-        children: { service: string }[];
+        children?: unknown[];
       }[];
-      const host = groups.find((g) => g.children[0].service.startsWith("host"))!;
-      expect(groups).toHaveLength(2);
-      table().vm.$emit("update:expandedIds", [host.service]);
-      await wrapper.find('[data-test="autoobserve-coverage-search"] input').setValue("kube");
-      const [kube] = table().props("data") as { service: string }[];
-      expect(table().props("expandedIds")).not.toContain(kube.service);
+      expect(data.map((r) => r.children?.length ?? r.service)).toEqual([2, "host-a", "host-b"]);
+      expect(wrapper.find('[data-test="autoobserve-coverage-grouped"]').text()).toBe(
+        "Grouped by place · 1 place",
+      );
     });
 
     it("follows every setting a link or Back changes while it stays mounted", async () => {

@@ -17,6 +17,8 @@ import { describe, expect, it } from "vitest";
 import type { CoverageRow } from "./aoTypes";
 import {
   chooseCoverageGrouping,
+  coverageName,
+  coveragePlace,
   groupCoverage,
   isGroup,
   chooseMapGrouping,
@@ -134,25 +136,47 @@ describe("groupCoverage (0, 1, many)", () => {
 });
 
 describe("chooseMapGrouping and mapCoverage", () => {
-  const place = (r: CoverageRow) => r.service.split("·")[0];
+  // `count` services over `places` places (none when 0), named by `names` names (each its own when 0).
+  const fleet = (count: number, places: number, names: number) =>
+    Array.from(
+      { length: count },
+      (_, i) =>
+        ({
+          ...svc(`s${i}`, "gap", i, names ? `n${i % names}` : `s${i}`),
+          where: places ? `p${i % places}` : "—",
+        }) as CoverageRow,
+    );
+  const fold = (keyOf: (r: CoverageRow) => string | null) => ({
+    keyOf,
+    titleOf: (r: CoverageRow) => keyOf(r) ?? r.service,
+  });
   it.each([
-    ["at the cap, one hex per service", 3, false, 3, 0],
-    ["past the cap, one hex per place", 6, false, 3, 0],
-    ["past the cap in places too, the first places and a count", 10, false, 3, 2],
-    ["grouped, one hex per group under the cap", 2, true, 1, 0],
-  ])("%s", (_case, count, grouped, hexes, more) => {
-    const rows = Array.from({ length: count }, (_, i) =>
-      svc(`${count > 6 ? `p${i % 5}` : `p${i % 3}`}·${i}`, "gap", i),
-    );
-    const by = chooseMapGrouping(rows, 3, grouped ? "service" : null, () => "one", place);
-    const fold = (keyOf: (r: CoverageRow) => string) => ({ keyOf, titleOf: keyOf });
-    const map = mapCoverage(
-      rows,
+    ["at the cap, one hex per service", 3, 3, 0, null, 3, 0],
+    ["past the cap, one hex per place", 6, 3, 0, null, 3, 0],
+    ["past the cap in places too, the first places and a count", 10, 5, 0, null, 3, 2],
+    ["grouped, one hex per group under the cap", 2, 2, 1, "service", 1, 0],
+    ["past the cap with no place, one hex per name", 6, 0, 2, null, 2, 0],
+    [
+      "past the cap with no place or shared name, the first services and a count",
+      6,
+      0,
+      0,
+      null,
       3,
-      by === "service" ? fold(() => "one") : by === "none" ? null : fold(place),
-    );
+      3,
+    ],
+  ] as const)("%s", (_case, count, places, names, picked, hexes, more) => {
+    const rows = fleet(count, places, names);
+    const by = chooseMapGrouping(rows, 3, picked, coverageName, coveragePlace);
+    const groupOf = by === "none" ? null : fold(by === "service" ? coverageName : coveragePlace);
+    const map = mapCoverage(rows, 3, groupOf);
     expect(map.items).toHaveLength(hexes);
     expect(map.more).toBe(more);
+  });
+
+  it("never overrides a manual Not grouped, however many services the map caps", () => {
+    const rows = fleet(201, 2, 0);
+    expect(chooseMapGrouping(rows, 200, "none", coverageName, coveragePlace)).toBe("none");
   });
 });
 
@@ -164,14 +188,14 @@ describe("chooseCoverageGrouping", () => {
       const r = svc(`${name}·p${Math.floor(i / n)}`, "gap", 1, name);
       return { ...r, where: `p${Math.floor(i / n)}` } as CoverageRow;
     });
-  const place = (r: CoverageRow) => String(r.where);
+  const place = coveragePlace;
   it.each([
     ["no rows", 0, 1, "none"],
     ["a few rows stay flat", 10, 3, "none"],
     ["names repeat across places", 20, 3, "service"],
     ["every name in one place stays flat", 40, 1, "none"],
-    ["many names but few places", 60, 2, "namespace"],
-    ["many unique names in few places", 40, 2, "namespace", true],
+    ["many names but few places", 60, 2, "place"],
+    ["many unique names in few places", 40, 2, "place", true],
     ["many unique names, each in its own place", 1, 60, "none", true],
   ])("%s", (_case, n, places, expected, unique = false) => {
     expect(chooseCoverageGrouping(fleet(n, places, unique), byName, place)).toBe(expected);
@@ -185,5 +209,47 @@ describe("chooseCoverageGrouping", () => {
     });
     expect(new Set(rows.map(place)).size).toBe(114);
     expect(chooseCoverageGrouping(rows, byName, place)).toBe("service");
+  });
+
+  // Rows the engine placed outside Kubernetes carry a Where of their own, or none at all.
+  const outside = (i: number, name: string, where: string) =>
+    ({
+      ...svc(`${name}·${i}`, "gap", 1, name),
+      where,
+      identity: { serviceName: name, cluster: null, namespace: null },
+    }) as CoverageRow;
+  const titles = (rows: CoverageTableRow[]) =>
+    rows.map((r) => (isGroup(r) ? `${r.title}×${r.children.length}` : "row"));
+  it.each([
+    [
+      "unique names over a few hosts fold by host",
+      Array.from({ length: 60 }, (_, i) => outside(i, `n${i}`, `host-${i % 2}`)),
+      "place",
+      ["host-0×30", "host-1×30"],
+    ],
+    [
+      "unique names with no place stay flat",
+      Array.from({ length: 60 }, (_, i) => outside(i, `n${i}`, "—")),
+      "none",
+      [],
+    ],
+    [
+      "repeated names with no place fold by name",
+      Array.from({ length: 120 }, (_, i) => outside(i, `n${i % 60}`, "—")),
+      "service",
+      [],
+    ],
+    [
+      "a mixed fleet folds its places and leaves the unplaced rows apart",
+      Array.from({ length: 120 }, (_, i) =>
+        outside(i, `n${i}`, i < 60 ? `prod / ns-${i % 2}` : "—"),
+      ),
+      "place",
+      ["prod / ns-0×30", "prod / ns-1×30", ...Array(60).fill("row")],
+    ],
+  ])("%s", (_case, rows, expected, folded) => {
+    const by = chooseCoverageGrouping(rows, byName, place);
+    expect(by).toBe(expected);
+    if (by === "place") expect(titles(groupCoverage(rows, place))).toEqual(folded);
   });
 });

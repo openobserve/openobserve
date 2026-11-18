@@ -29521,11 +29521,11 @@
       "mapLabel": "Coverage map, 1 service filled by {fill} | Coverage map, {count} services filled by {fill}",
       "mapLabelGrouped": {
         "service": "Coverage map, {services} under {groups}, filled by {fill}",
-        "namespace": "Coverage map, {services} in {groups}, filled by {fill}"
+        "place": "Coverage map, {services} in {groups}, filled by {fill}"
       },
       "mapGroupCount": {
         "service": "1 name | {count} names",
-        "namespace": "1 namespace | {count} namespaces"
+        "place": "1 place | {count} places"
       },
       "bucketNone": "None",
       "bucketFresh": "Under 5 min",
@@ -29621,7 +29621,7 @@
       "needsNone": "No service needs action",
       "needsNoneSearch": "{count} service matches “{query}”, and it needs no action | {count} services match “{query}”, and none needs action",
       "groupServices": "1 service | {count} services",
-      "groupPlaces": "{places} places · 1 cluster | {places} places · {clusters} clusters",
+      "groupPlaces": "1 place | {count} places",
       "groupOf": "{count} of {total}",
       "groupCount": {
         "gap": "1 gap | {count} gaps",
@@ -29629,7 +29629,6 @@
         "learning": "{count} learning",
         "watched": "{count} watched"
       },
-      "noPlace": "No cluster or namespace",
       "traffic": "Traffic",
       "hexGroup": "{name} ×{count}",
       "hexGroupName": "{name}, {state}",
@@ -29638,13 +29637,13 @@
       "trafficUnknown": "— traffic unknown: the service's streams are shared, so it sorts last",
       "groupedBy": {
         "service": "Grouped by service · 1 name | Grouped by service · {count} names",
-        "namespace": "Grouped by namespace · 1 namespace | Grouped by namespace · {count} namespaces",
+        "place": "Grouped by place · 1 place | Grouped by place · {count} places",
         "none": "Not grouped"
       },
       "groupPick": {
         "auto": "Automatic (recommended)",
         "service": "By service",
-        "namespace": "By namespace",
+        "place": "By place",
         "none": "Not grouped"
       }
     },
@@ -29816,6 +29815,7 @@
   },
   "autoobserveLive": {
     "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
     "topbar": {
       "checked": "Checked {ago}",
       "firstCheck": "First check in progress"

@@ -16,7 +16,7 @@
 import { LIVE_CHECKS, type CoverageRow, type LiveCheck } from "./aoTypes";
 
 export type ServiceState = "watched" | "partial" | "learning" | "gap";
-export type CoverageGroupBy = "none" | "service" | "namespace";
+export type CoverageGroupBy = "none" | "service" | "place";
 export type CoverageSortKey =
   "traffic" | "service" | "where" | `check-${LiveCheck}` | "state" | "lastScanned";
 
@@ -25,7 +25,7 @@ export interface CoverageGroup {
   kind: "group";
   // The table and the map key every row by `service`; the prefix keeps a group apart from a service.
   service: string;
-  // What the rows share; two groups may read the same title yet be different places.
+  // What the rows share, which the group keeps as its row key changes with the rows shown.
   id: string;
   title: string;
   children: CoverageRow[];
@@ -35,9 +35,9 @@ export interface CoverageGroup {
 
 export type CoverageTableRow = CoverageRow | CoverageGroup;
 
-/** How rows fold: the key they share and the title a group reads. */
+/** How rows fold: the key they share, or null to stay a plain row, and the title a group reads. */
 export interface CoverageGrouper {
-  keyOf: (row: CoverageRow) => string;
+  keyOf: (row: CoverageRow) => string | null;
   titleOf: (row: CoverageRow) => string;
 }
 
@@ -75,6 +75,15 @@ export const CHECK_RANK: Record<string, number> = {
 
 export const isGroup = (row: CoverageTableRow): row is CoverageGroup =>
   (row as CoverageGroup).kind === "group";
+
+/** A service is one name in many places. */
+export const coverageName = (row: CoverageRow): string => row.identity?.serviceName ?? row.service;
+
+/** The place is the Where the adapter wrote; its dash means it knows none, and such rows share nothing. */
+export const coveragePlace = (row: CoverageRow): string | null => {
+  const where = String(row.where ?? "");
+  return where && where !== "—" ? where : null;
+};
 
 // The adapter states every live row; a row without one has no covered check.
 export const serviceState = (row: CoverageRow): ServiceState => row.status?.state ?? "gap";
@@ -136,22 +145,32 @@ export const groupPrefix = (rows: CoverageRow[]): string => {
   return `group${n || ""}:`;
 };
 
-/** Folds rows sharing a key under one group row titled by `titleOf`; a key held once stays a plain row.
+/** Folds rows sharing a key under one group row titled by `titleOf`; a key held once, or none, stays a plain row.
  * A group's row key is `prefix` plus its key: pass the prefix of every row so keys hold as rows narrow. */
 export const groupCoverage = (
   rows: CoverageRow[],
-  keyOf: (row: CoverageRow) => string,
-  titleOf: (row: CoverageRow) => string = keyOf,
+  keyOf: (row: CoverageRow) => string | null,
+  titleOf: (row: CoverageRow) => string = (row) => keyOf(row) ?? row.service,
   prefix: string = groupPrefix(rows),
 ): CoverageTableRow[] => {
   const groups = new Map<string, CoverageRow[]>();
+  const lines: (string | CoverageRow)[] = [];
   for (const row of rows) {
     const key = keyOf(row);
+    if (key === null) {
+      lines.push(row);
+      continue;
+    }
     const members = groups.get(key);
     if (members) members.push(row);
-    else groups.set(key, [row]);
+    else {
+      groups.set(key, [row]);
+      lines.push(key);
+    }
   }
-  return [...groups].map(([id, children]): CoverageTableRow => {
+  return lines.map((id): CoverageTableRow => {
+    if (typeof id !== "string") return id;
+    const children = groups.get(id) ?? [];
     if (children.length === 1) return children[0];
     const title = titleOf(children[0]);
     const counts: Record<ServiceState, number> = { gap: 0, partial: 0, learning: 0, watched: 0 };
@@ -174,18 +193,21 @@ export const groupWorst = (group: CoverageGroup): ServiceState =>
   (["gap", "partial", "learning", "watched"] as const).find((state) => group.counts[state]) ??
   "watched";
 
-const linesOf = (rows: CoverageRow[], keyOf: (row: CoverageRow) => string) =>
-  new Set(rows.map(keyOf)).size;
+// A row with no key stays a line of its own.
+const linesOf = (rows: CoverageRow[], keyOf: (row: CoverageRow) => string | null) => {
+  const keys = rows.map(keyOf);
+  return new Set(keys.filter((k) => k !== null)).size + keys.filter((k) => k === null).length;
+};
 
 /** The grouping the coverage table shows for these rows; the reader never has to pick one. */
 export const chooseCoverageGrouping = (
   rows: CoverageRow[],
   nameOf: (row: CoverageRow) => string,
-  placeOf: (row: CoverageRow) => string,
+  placeOf: (row: CoverageRow) => string | null,
 ): CoverageGroupBy => {
   if (rows.length <= FLAT_MAX) return "none";
   const names = linesOf(rows, nameOf);
-  if (names > NAME_LINES_MAX && linesOf(rows, placeOf) <= names * PLACE_SHARE) return "namespace";
+  if (names > NAME_LINES_MAX && linesOf(rows, placeOf) <= names * PLACE_SHARE) return "place";
   return names < rows.length ? "service" : "none";
 };
 
@@ -201,16 +223,19 @@ export const sortCoverage = (
     .sort(by);
 };
 
-/** The map's grouping: the reader's pick, else its own choice over every row; past `cap` services, never flat. */
+/** The map's grouping: the reader's pick as is, else its own choice, which past `cap` services folds what it can. */
 export const chooseMapGrouping = (
   rows: CoverageRow[],
   cap: number,
   picked: CoverageGroupBy | null,
   nameOf: (row: CoverageRow) => string,
-  placeOf: (row: CoverageRow) => string,
+  placeOf: (row: CoverageRow) => string | null,
 ): CoverageGroupBy => {
-  const by = picked ?? chooseCoverageGrouping(rows, nameOf, placeOf);
-  return by === "none" && rows.length > cap ? "namespace" : by;
+  if (picked) return picked;
+  const by = chooseCoverageGrouping(rows, nameOf, placeOf);
+  if (by !== "none" || rows.length <= cap) return by;
+  if (linesOf(rows, placeOf) < rows.length) return "place";
+  return linesOf(rows, nameOf) < rows.length ? "service" : "none";
 };
 
 /** One hex per group, or per service when `groupOf` is null; past `cap` hexes, the first `cap` and a count. */

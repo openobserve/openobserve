@@ -16,11 +16,10 @@
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { CoverageRow } from "../aoTypes";
 import type { CoverageTotals } from "./liveAdapter";
-import { countText, coverageSentence, percentText } from "./liveCopy";
+import { NAMES_SHOWN, countText, coverageSentence, percentText } from "./liveCopy";
 
 // The verdict names the busiest gaps in batches this size, each one review list.
 export const GAP_BATCH = 10;
-const NAMED_GAPS = 3;
 
 /** Busiest first; a service whose traffic is unknown sorts after every measured one. */
 export const byTraffic = (a: CoverageRow, b: CoverageRow): number =>
@@ -118,7 +117,7 @@ export const coverageVerdict = (
   }
   const total = gaps.reduce((sum, r) => sum + (r.traffic ?? 0), 0);
   if (n <= GAP_BATCH || total <= 0) {
-    const shown = gaps.slice(0, NAMED_GAPS).map((r) => r.service);
+    const shown = gaps.slice(0, NAMES_SHOWN).map((r) => r.service);
     const rest = n - shown.length;
     const more = rest
       ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))]
@@ -133,7 +132,7 @@ export const coverageVerdict = (
     };
   }
   const carried = gaps.slice(0, GAP_BATCH).reduce((sum, r) => sum + (r.traffic ?? 0), 0);
-  const share = percentText(locale, carried, total);
+  const share = percentText(t, locale, carried, total);
   return {
     text: t("autoobserve.coverageLive.verdict.share", {
       count: countText(locale, n),

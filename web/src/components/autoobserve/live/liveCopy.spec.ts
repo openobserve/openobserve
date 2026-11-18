@@ -110,7 +110,7 @@ describe("percentText", () => {
     [0, 1205, "0%"],
     [0, 0, "0%"],
   ])("%i of %i reads %s", (part, whole, expected) => {
-    expect(String(percentText("en-US", part, whole))).toBe(expected);
+    expect(String(percentText(gt, "en-US", part, whole))).toBe(expected);
   });
 });
 
