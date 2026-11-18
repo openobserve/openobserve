@@ -15424,6 +15424,9 @@
         "cron": "Use a cron schedule",
         "description": "Description",
         "filters": "Add filter"
+      },
+      "notes": {
+        "anomalyRecordOnly": "Record only (off)"
       }
     },
     "verdict": {
@@ -15804,9 +15807,10 @@
         "trainingFloor": "Needs {days}+ days of data",
         "retrainHelp": "Choose Never to keep the first model.",
         "directionHelp": "Which side of normal alerts",
-        "windowFire": "fire at {fire} of the last {buckets} bucket | fire at {fire} of the last {buckets} buckets",
-        "windowRecover": "recover below {recover}%",
-        "templateNote": "To use a prebuilt template, copy it in Templates first."
+        "templateNote": "To use a prebuilt template, copy it in Templates first.",
+        "trainingHave": "Needs {days}+ days of data; this stream has less than a day | Needs {days}+ days of data; this stream has {count} day | Needs {days}+ days of data; this stream has {count} days",
+        "windowFireWords": "Alert when {fire} of the last {buckets} measure is unusual | Alert when {fire} of the last {buckets} measures are unusual",
+        "windowRecoverWords": "Stop alerting when under {recover}% are unusual"
       },
       "holdFor": {
         "label": "Must last",
@@ -15843,7 +15847,8 @@
         "comparison": "Comparison",
         "field": "Field",
         "lookBack": "Look back",
-        "savedAs": "Saved as {name}"
+        "savesAs": "Saves as {name}: names can't have spaces or symbols",
+        "rewritten": "Spaces and symbols became underscores"
       },
       "link": {
         "unlink": "Unlink",
@@ -15936,7 +15941,9 @@
       "insertHint": "Adds it to the query",
       "fieldEmpty": "No values in the last 24 hours",
       "sampleExpand": "Show all fields",
-      "sampleCollapse": "Hide fields"
+      "sampleCollapse": "Hide fields",
+      "active": "Active in the last hour · {rate}/h",
+      "activeNoRate": "Active in the last hour"
     },
     "intent": {
       "question": "What do you want to know about {stream}?",
@@ -16153,7 +16160,6 @@
       "customizeTooltip": "Opens the alert editor prefilled"
     },
     "drawer": {
-      "dataAvailable": "Data available",
       "streamNotFound": "Stream not found",
       "detects": "What it detects",
       "noDescription": "No description in the library.",
@@ -16164,8 +16170,6 @@
       "metricCondition": "Metric condition",
       "matchCount": "Matching rows required",
       "previewBlocked": "{stream} is not a stream in this organization, so there is nothing to evaluate.",
-      "wouldTrigger": "Would fire",
-      "wouldNotTrigger": "Would not fire",
       "loading": "Loading this alert from the library",
       "loadFailed": "This alert could not be loaded from the library.",
       "customize": "Customize in editor",

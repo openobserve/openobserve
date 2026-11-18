@@ -409,13 +409,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :org-alert-count="orgAlertCount"
                 :show-library="showsLibraryLink"
                 :active="appliedIntent?.fill?.intent ?? pendingIntent"
+                :how-it-checks="String(formData.is_real_time)"
                 data-snap-stop
                 @apply="applyIntent"
                 @pending="onIntentPending"
                 @use-suggestion="applySuggestion"
                 @scratch="startFromScratch"
                 @open-alert="openExistingAlert"
-                @browse-library="goToAlertLibrary"
                 @update:period="setLookBack"
               />
             </AlertFormSection>
@@ -787,7 +787,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="nameSavedAs"
                       class="text-text-secondary text-xs"
                       data-test="add-alert-details-name-saved-as"
-                      >{{ t("alerts.form.names.savedAs", { name: nameSavedAs }) }}</span
+                      >{{ t("alerts.form.names.savesAs", { name: nameSavedAs }) }}</span
+                    >
+                    <span
+                      v-else-if="nameRewrittenFrom"
+                      class="text-text-secondary text-xs"
+                      data-test="add-alert-details-name-rewritten"
+                      >{{ t("alerts.form.names.rewritten") }}</span
                     >
                     <span
                       v-else-if="alertAutoName.isAuto.value && formData.name"
@@ -1166,7 +1172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
           :disabled="silentAutoObserveDraft"
           class="min-w-28"
-          @click="handleSave"
+          @click="saveAlert"
           >{{ saveLabel }}</OButton
         >
       </div>
@@ -1291,7 +1297,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { useAutoName } from "@/composables/useAutoName";
 import { buildAlertAutoName } from "@/utils/autoName";
-import { savedAlertName, unusedAlertName } from "@/utils/alerts/alertName";
+import { savedAlertName, suggestedAlertName, unusedAlertName } from "@/utils/alerts/alertName";
 import { useQuery as useServerQuery } from "@tanstack/vue-query";
 import { alertsListQuery } from "@/services/alerts.queries";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1317,6 +1323,7 @@ import { withPackTag } from "@/components/alertLibrary/libraryInstall";
 import AlertMetricLabels from "./AlertMetricLabels.vue";
 import {
   insertLabelIntoPromql,
+  recentActivity,
   recentStreams,
   streamOptions,
 } from "@/composables/alerts/useStreamDiscovery";
@@ -1906,6 +1913,7 @@ export default defineComponent({
       clearTimeout(jumpSettle);
     });
     watch(activeSection, (now, left) => {
+      if (now === "details") nameDue.value = true;
       visitedSections.value = new Set([...visitedSections.value, left]);
       if (now === "watch") foldDue.value = false;
       else if (left === "watch" && alertForm.formData.value.stream_name) foldDue.value = true;
@@ -2417,9 +2425,15 @@ export default defineComponent({
           (folderAlerts.data.value ?? []).map((a: { name?: string }) => a.name ?? ""),
         ),
     );
+    // Offered only once the user reaches the name (or saves), so the name never renames itself mid-form.
+    const nameDue = ref(false);
+    const libraryName = ref("");
     const alertNameSuggestion = computed(() =>
       unusedAlertName(
-        buildAlertAutoName(alertForm.formData.value, alertForm.t),
+        suggestedAlertName(buildAlertAutoName(alertForm.formData.value, alertForm.t), {
+          due: nameDue.value,
+          fromLibrary: libraryName.value,
+        }),
         takenAlertNames.value,
       ),
     );
@@ -2436,9 +2450,20 @@ export default defineComponent({
       const saved = savedAlertName(typed);
       return !nameFieldError.value && saved && saved !== typed ? saved : "";
     });
+    // The typed name a blur rewrote, so the line under the field can say why it changed.
+    const nameRewrittenFrom = ref("");
     // Runs in the capture phase, ahead of the field's own blur check, so that check sees the saved name.
     const applySavedName = () => {
-      if (nameSavedAs.value) alertForm.setF("name", nameSavedAs.value);
+      if (!nameSavedAs.value) return;
+      nameRewrittenFrom.value = String(alertForm.formData.value?.name ?? "");
+      alertForm.setF("name", nameSavedAs.value);
+    };
+    // Saving a nameless alert names it from what it watches instead of stopping on the name.
+    const saveAlert = async () => {
+      nameDue.value = true;
+      await nextTick();
+      if (!String(alertForm.form.state.values.name ?? "").trim()) alertAutoName.resetToAuto();
+      await alertForm.handleSave();
     };
     // A generated name is a placeholder the user usually replaces, so focusing it selects it whole.
     const onNameFocus = (event: FocusEvent) => {
@@ -2465,7 +2490,10 @@ export default defineComponent({
           : alertForm.t("alerts.saveFailed"),
       });
     };
-    const onNameInput = () => alertAutoName.markManual();
+    const onNameInput = () => {
+      nameRewrittenFrom.value = "";
+      alertAutoName.markManual();
+    };
 
     // Its SQL is compiled from its Sigma rule, so the server refuses query edits from here.
     const siemDetectionId = computed(() => {
@@ -2495,6 +2523,14 @@ export default defineComponent({
           store.state.selectedOrganization?.identifier ?? "",
           alertForm.formData.value.stream_type,
         ),
+        activeNow: (name: string) =>
+          recentActivity(
+            {
+              org: store.state.selectedOrganization?.identifier ?? "",
+              streamType: alertForm.formData.value.stream_type,
+            },
+            name,
+          ),
       }),
     );
     const onMetricLabelInsert = ({ label, value }: { label: string; value?: string }) => {
@@ -2551,6 +2587,7 @@ export default defineComponent({
       }
       intentPaths.clear();
       appliedIntent.value = null;
+      libraryName.value = "";
       // The ready-made query's check result belongs to it, not to the restored builder.
       alertForm.sqlQueryErrorMsg.value = "";
       void nextTick(() => alertForm.previewAlertRef.value?.refreshData?.());
@@ -2622,6 +2659,7 @@ export default defineComponent({
       ];
       if (suggestion.library?.pack) data.tags = withPackTag(data.tags, suggestion.library.pack);
       alertForm.resetForm(data);
+      libraryName.value = String(data.name ?? "");
       if (seeded.aggregation) alertForm.isAggregationEnabled.value = true;
       if (seeded.vrl) alertForm.showVrlFunction.value = true;
       appliedIntent.value = { fill: null, label: raw(prefill.sourceLabel) };
@@ -2750,6 +2788,8 @@ export default defineComponent({
       alertNameSuggestion,
       nameSavedAs,
       applySavedName,
+      saveAlert,
+      nameRewrittenFrom,
       onNameInput,
       onNameFocus,
       onNameEnter,

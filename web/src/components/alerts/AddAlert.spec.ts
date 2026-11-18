@@ -305,18 +305,18 @@ describe("AddAlert (OForm owner)", () => {
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
     });
 
-    it("auto-names a cleared alert rather than blocking, once a stream is chosen", async () => {
-      // A create-mode alert can no longer reach save nameless: clearing the
-      // field re-arms the generator, which fills it from the stream. The schema
-      // rule above is the backstop for the case where it has nothing to offer.
+    it("auto-names a nameless alert on Save rather than blocking, once a stream is chosen", async () => {
+      // The schema rule above is the backstop for the case where the generator has nothing to offer.
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("name", "");
+      await wrapper.vm.saveAlert();
       await flushPromises();
-
-      expect(form.state.values.name).toBe("_rundata_alert");
+      expect(JSON.stringify(vi.mocked(alertsService.create_by_alert_id).mock.calls)).toContain(
+        '"name":"_rundata_alert"',
+      );
     });
 
     it("blocks save when the name contains unsupported characters (§4 restore)", async () => {
@@ -1977,6 +1977,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-details-rename-btn"]').exists()).toBe(false);
 
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      wrapper.vm.activeSection = "details";
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-details-name-auto"]').exists()).toBe(true);
 
@@ -1986,12 +1987,15 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       expect(wrapper.vm.formData.name).toBe("checkout errors > 5%");
       expect(savedAs().text()).toBe(
-        i18n.global.t("alerts.form.names.savedAs", { name: "checkout_errors_>_5" }),
+        i18n.global.t("alerts.form.names.savesAs", { name: "checkout_errors_>_5" }),
       );
       await input.trigger("blur");
       await flushPromises();
       expect(wrapper.vm.formData.name).toBe("checkout_errors_>_5");
       expect(savedAs().exists()).toBe(false);
+      expect(wrapper.find('[data-test="add-alert-details-name-rewritten"]').exists()).toBe(true);
+      await input.trigger("input");
+      await flushPromises();
       const suggest = wrapper.get('[data-test="add-alert-details-name-suggest"]');
       await suggest.trigger("click");
       await flushPromises();
@@ -2016,6 +2020,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert();
       await flushPromises();
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      wrapper.vm.activeSection = "details";
       await flushPromises();
       expect(wrapper.vm.alertNameSuggestion).toBe("k8s_logs_alert_2");
     });
