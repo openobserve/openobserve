@@ -266,6 +266,14 @@ pub fn upgrade_legacy_body(name: &str, body: &mut String) -> bool {
     true
 }
 
+/// True when `body` is exactly the shipped body of the system template `name`, so the system,
+/// not a user, wrote every placeholder in it.
+pub fn is_shipped_prebuilt_body(name: &str, body: &str) -> bool {
+    name.strip_prefix(PREBUILT_TEMPLATE_PREFIX)
+        .and_then(get_prebuilt_template)
+        .is_some_and(|shipped| shipped.body == body)
+}
+
 /// Built-in config: the embedded copy of the shipped JSON.
 fn load_builtin_config() -> PrebuiltDestinationsConfig {
     serde_json::from_str(EMBEDDED_CONFIG)
@@ -723,6 +731,17 @@ mod tests {
 
         let mut shipped = get_prebuilt_template("slack").unwrap().body;
         assert!(!upgrade_legacy_body("prebuilt_slack", &mut shipped));
+    }
+
+    #[test]
+    fn only_an_unchanged_shipped_body_counts_as_shipped() {
+        let body = get_prebuilt_template("slack").unwrap().body;
+        assert!(is_shipped_prebuilt_body("prebuilt_slack", &body));
+        assert!(!is_shipped_prebuilt_body(
+            "prebuilt_slack",
+            r#"{"text": "x"}"#
+        ));
+        assert!(!is_shipped_prebuilt_body("my_slack", &body));
     }
 
     #[test]

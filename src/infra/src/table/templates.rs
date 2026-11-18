@@ -990,6 +990,32 @@ mod tests {
     }
 
     #[test]
+    fn a_row_with_the_old_one_line_body_reads_as_the_shipped_body() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id, None, "http");
+        model.name = "prebuilt_slack".to_string();
+        model.body = r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string();
+        let tmpl = Template::try_from(model.clone()).unwrap();
+        assert_eq!(
+            tmpl.body,
+            config::prebuilt_loader::get_prebuilt_template("slack")
+                .unwrap()
+                .body
+        );
+        assert_eq!(tmpl.name, "prebuilt_slack");
+        assert_eq!(tmpl.id.unwrap().to_string(), id);
+
+        model.body = r#"{"text": "edited {alert_name}"}"#.to_string();
+        let edited = Template::try_from(model.clone()).unwrap();
+        assert_eq!(edited.body, r#"{"text": "edited {alert_name}"}"#);
+
+        model.name = "my_slack".to_string();
+        model.body = r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string();
+        let other = Template::try_from(model).unwrap();
+        assert_eq!(other.body, r#"{"text": "[{alert_status}] {alert_name}"}"#);
+    }
+
+    #[test]
     fn test_try_from_model_sns_template() {
         let id = svix_ksuid::Ksuid::new(None, None).to_string();
         let model = make_model(&id, None, "slack");

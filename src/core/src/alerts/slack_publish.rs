@@ -37,7 +37,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::alerts::notifications::{
-    apply_custom_template, apply_template_body,
+    apply_template_body,
     context::NotificationContext,
     render::{
         DEFAULT_LINK_LABEL,
@@ -954,7 +954,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::alerts::notifications::resolve::Link;
+    use crate::alerts::notifications::{apply_custom_template, resolve::Link};
 
     const PREBUILT_SLACK: &str = r#"{
   "text": "[{alert_status}] {alert_name}",
