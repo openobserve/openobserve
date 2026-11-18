@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { useAnnotations } from "./useAnnotations";
 import { annotationService } from "../../services/dashboard_annotations";
 import { queryClient } from "@/composables/query/queryClient";
+import { createAnnotationMutation } from "@/services/dashboard_annotations.queries";
 
 // Mock the annotation service
 vi.mock("../../services/dashboard_annotations", async (importOriginal) => {
@@ -369,5 +370,37 @@ describe("useAnnotations: one request per dashboard", () => {
 
     expect(result).toBeNull();
     expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a 503 answer so that a panel that loads later sends no request", async () => {
+    mockAnnotationService.get_timed_annotations.mockRejectedValue({
+      response: { status: 503 },
+    });
+
+    await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+    const later = await useAnnotations("org", "dash", "p2").refreshAnnotations(1, 2);
+
+    expect(later).toBeNull();
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let the reload after a write join a read that started before it", async () => {
+    let finishOldRead: (value: unknown) => void = () => {};
+    mockAnnotationService.get_timed_annotations
+      .mockImplementationOnce(() => new Promise((resolve) => (finishOldRead = resolve)) as any)
+      .mockResolvedValueOnce({ data: [{ annotation_id: "new", panels: ["p1"] }] } as any);
+    vi.spyOn(annotationService, "create_timed_annotations").mockResolvedValue({ data: {} } as any);
+
+    const oldRead = useAnnotations("org", "dash", "p2").refreshAnnotations(1, 2);
+    const write = queryClient
+      .getMutationCache()
+      .build(queryClient, createAnnotationMutation("org", "dash"));
+    await write.execute([{ title: "new" }]);
+    const reload = await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+    finishOldRead({ data: [] });
+    await oldRead;
+
+    expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(2);
+    expect(reload.map((a: any) => a.annotation_id)).toEqual(["new"]);
   });
 });

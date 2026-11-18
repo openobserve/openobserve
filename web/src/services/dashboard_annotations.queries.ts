@@ -16,20 +16,40 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { annotationService } from "./dashboard_annotations";
 import { annotationKeys } from "./dashboard_annotations.querykeys";
-import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
-import { defaultQueryRetry } from "@/composables/query/queryClient";
+import { EMPTY_LIST_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
-export const dashboardAnnotationsQuery = (org: string, dashboardId: string, params: unknown) =>
+// One counter per dashboard, moved after each annotation write. Every panel of
+// a dashboard shares one read, so the reload after a write needs a new key: on
+// the old key it would join a read that another panel started before the write.
+const revisions = new Map<string, number>();
+const revisionKey = (org: string, dashboardId: string) => `${org}/${dashboardId}`;
+const revisionOf = (org: string, dashboardId: string) =>
+  revisions.get(revisionKey(org, dashboardId)) ?? 0;
+const bumpRevision = (org: string, dashboardId: string) =>
+  revisions.set(revisionKey(org, dashboardId), revisionOf(org, dashboardId) + 1);
+
+export const dashboardAnnotationsQuery = (org: string, dashboardId: string, params: object) =>
   queryOptions({
-    queryKey: annotationKeys.list(org, dashboardId, params),
-    queryFn: async () =>
-      (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ?? null,
-    staleTime: NORMAL_STALE_TIME,
-    // A 503 means the permission service is overloaded. Annotations are an
-    // optional overlay, so a retry would only add load and the panel draws
-    // without them.
-    retry: (failureCount: number, err: any) =>
-      err?.response?.status !== 503 && defaultQueryRetry(failureCount, err),
+    queryKey: annotationKeys.list(org, dashboardId, {
+      ...params,
+      revision: revisionOf(org, dashboardId),
+    }),
+    queryFn: async () => {
+      try {
+        return (
+          (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ??
+          null
+        );
+      } catch (err: any) {
+        // A 503 means the permission service is overloaded. Annotations are an
+        // optional overlay, so the panels draw without them: no retry, and the
+        // empty answer is kept for a short time so that the other panels do not
+        // send the same request again.
+        if (err?.response?.status === 503) return null;
+        throw err;
+      }
+    },
+    staleTime: (query) => (query.state.data === null ? EMPTY_LIST_STALE_TIME : NORMAL_STALE_TIME),
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────
@@ -38,6 +58,9 @@ export const createAnnotationMutation = (org: string, dashboardId: string) =>
   mutationOptions({
     mutationFn: (annotations: Record<string, unknown>[]) =>
       annotationService.create_timed_annotations(org, dashboardId, annotations),
+    onSuccess: () => {
+      bumpRevision(org, dashboardId);
+    },
     meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });
 
@@ -50,6 +73,9 @@ export const updateAnnotationMutation = (org: string, dashboardId: string) =>
         vars.annotationId,
         vars.annotation,
       ),
+    onSuccess: () => {
+      bumpRevision(org, dashboardId);
+    },
     meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });
 
@@ -57,5 +83,8 @@ export const deleteAnnotationMutation = (org: string, dashboardId: string) =>
   mutationOptions({
     mutationFn: (annotationIds: string[]) =>
       annotationService.delete_timed_annotations(org, dashboardId, annotationIds),
+    onSuccess: () => {
+      bumpRevision(org, dashboardId);
+    },
     meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });
