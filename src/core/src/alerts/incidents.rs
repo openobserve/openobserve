@@ -8152,10 +8152,19 @@ mod tests {
             let _db = store().await;
             let (a, b, pager) = (new_org(), new_org(), Pager::for_team("shop"));
             let gap = 3 * INTERVAL_SECS * 1_000_000;
+            // Onsets an hour apart, past the cohort gap, so each stop opens its own incident.
+            let later = |org: &str, i: usize| {
+                member(
+                    org,
+                    "stream_silence",
+                    i,
+                    ONSET + 4 * QUARTER_HOUR * i as i64,
+                )
+            };
             let first = open(&stop(&a, 0), &pager).await.unwrap();
             assert_eq!(pager.pages(), 1, "the first stop pages");
             age(&first, gap, 0).await;
-            let held = stop(&a, 1);
+            let held = later(&a, 1);
             let second = open(&held, &pager).await.unwrap();
             assert_ne!(second, first, "its own incident");
             assert_eq!(pager.pages(), 1, "the budget is spent");
@@ -8179,7 +8188,7 @@ mod tests {
             assert_eq!(pager.pages(), 2, "another org has its own budget");
             age(&b_first, gap, 0).await;
             pager.set_budget(&b, None);
-            let unread = stop(&b, 1);
+            let unread = later(&b, 1);
             assert!(
                 open(&unread, &pager).await.is_err(),
                 "an unread budget fails the act"
@@ -8192,7 +8201,7 @@ mod tests {
             assert_eq!(open(&held, &pager).await.unwrap(), second);
             assert_eq!(pager.pages(), 3, "a held incident never pages later");
             age(&second, gap, 0).await;
-            assert_ne!(open(&stop(&a, 2), &pager).await.unwrap(), second);
+            assert_ne!(open(&later(&a, 2), &pager).await.unwrap(), second);
             assert_eq!(
                 pager.pages(),
                 4,
