@@ -27,7 +27,7 @@ export const LIBRARY_SOURCE_PREFIX = "library-";
 export const NO_DISMISSALS: FindMoreDismissals = { sources: [], items: [] };
 
 export interface FindMoreItem {
-  kind: "dashboard" | "alert";
+  kind: "dashboard" | "alert" | "savedView";
   id: string;
   name: string;
   /** Background queries a day once this alert is on. */
@@ -60,7 +60,13 @@ export interface FindMoreDismissals {
 }
 
 export interface FindMoreInputs {
-  packs: Array<{ pack: StarterPack; match: PackMatch; records: PackInstallRecord[] }>;
+  /** `fits` names the pack's detection streams, the same ones Home's offer names. */
+  packs: Array<{
+    pack: StarterPack;
+    match: PackMatch;
+    fits: string[];
+    records: PackInstallRecord[];
+  }>;
   /** Every known Library entry, for titles and streams. */
   catalog: Map<string, AlertLibraryEntry>;
   /** Library alerts outside every pack, with their verdicts. */
@@ -139,13 +145,15 @@ const splitDismissed = (
 };
 
 const packSource = (
-  { pack, match, records }: FindMoreInputs["packs"][number],
+  { pack, match, fits, records }: FindMoreInputs["packs"][number],
   entries: Map<string, AlertLibraryEntry>,
   inputs: FindMoreInputs,
 ) => {
   const owned = installedIds(records);
+  // Home's matcher offers a pack only on this rule, so the header never lists one Home does not.
+  const offered = match.ready && (pack.detector === "kubernetes" || fits.length > 0);
   const fresh = (id: string, ready: boolean) =>
-    ready && !owned.has(id) && !inputs.installedLibraryIds.has(id);
+    offered && ready && !owned.has(id) && !inputs.installedLibraryIds.has(id);
   const items: FindMoreItem[] = [
     ...pack.dashboards
       .filter(({ id }) => fresh(id, match.dashboards.get(id) ?? false))
@@ -158,14 +166,16 @@ const packSource = (
         name: entries.get(id)?.title ?? id,
         queries: inputs.queriesOf(id),
       })),
+    ...pack.savedViews
+      .filter(({ id }) => fresh(id, match.views.get(id) ?? false))
+      .map(({ id, name }) => ({ kind: "savedView" as const, id, name, queries: 0 })),
   ];
   const { kept, dismissed } = splitDismissed(pack.id, items, inputs.dismissals);
-  const streams = kept.flatMap((item) => entries.get(item.id)?.required_streams ?? []);
   const source: FindMoreSource = {
     id: pack.id,
     packId: pack.id,
     label: pack.id,
-    streams: [...new Set(streams)],
+    streams: fits,
     items: kept,
     queriesPerDay: sumQueries(kept),
   };

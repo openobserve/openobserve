@@ -2,31 +2,40 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 
-import { HOSTS_PACK } from "./hostsPack";
+import { EVENTS_STREAM } from "@/views/Infrastructure/kubernetes2/kubernetesQueries";
+
 import type { StarterPack } from "./types";
+import { packById } from "./usePackCatalog";
 import {
   MATCH_PARTIAL_AFTER_MS,
   MATCH_POLL_MS,
+  fitStreams,
   useStarterPackMatcher,
 } from "./useStarterPackMatcher";
 
 const fake = vi.hoisted(() => ({
   metrics: [] as string[],
   logs: [] as string[],
+  traces: [] as string[],
   columns: {} as Record<string, string[]>,
   fail: false,
   clusters: ["staging-eu-1"],
   sql: [] as string[],
+  forced: [] as string[],
   cancel: vi.fn(),
 }));
 
 vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: false }));
 vi.mock("@/composables/query/readQuery", () => ({
-  readQuery: async (options: { queryKey: unknown[] }) => {
+  readQuery: async (options: { queryKey: unknown[] }, force?: boolean) => {
     if (fake.fail) throw new Error("down");
+    if (force && options.queryKey.length === 3) fake.forced.push(String(options.queryKey[2]));
     const key = JSON.stringify(options.queryKey);
     if ((options.queryKey as string[]).length === 2 && key.includes("metrics")) {
       return fake.metrics.map((name) => ({ name }));
+    }
+    if ((options.queryKey as string[]).length === 2 && key.includes("traces")) {
+      return fake.traces.map((name) => ({ name }));
     }
     if ((options.queryKey as string[]).length === 2) return fake.logs.map((name) => ({ name }));
     const stream = Object.keys(fake.columns).find((name) => key.includes(name));
@@ -69,7 +78,15 @@ const setup = (poll = false, pack?: StarterPack) => {
 describe("useStarterPackMatcher", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    Object.assign(fake, { metrics: [], logs: [], columns: {}, fail: false, sql: [] });
+    Object.assign(fake, {
+      metrics: [],
+      logs: [],
+      traces: [],
+      columns: {},
+      fail: false,
+      sql: [],
+      forced: [],
+    });
   });
   afterEach(() => vi.useRealTimers());
 
@@ -140,6 +157,8 @@ describe("useStarterPackMatcher", () => {
   });
 
   describe("hosts pack", () => {
+    const HOSTS_PACK = packById("hosts")!;
+
     it.each([
       ["OpenTelemetry hostmetrics", "system_cpu_time"],
       ["node-exporter", "node_cpu_seconds_total"],
@@ -163,6 +182,85 @@ describe("useStarterPackMatcher", () => {
       const second = setup(false, HOSTS_PACK);
       await second.api.check();
       expect(second.api.state.value).toBe("none");
+    });
+  });
+
+  describe("packs found by stream", () => {
+    it("finds Traces in an org with only a traces stream", async () => {
+      fake.traces = ["default"];
+      fake.columns = { default: ["trace_id", "duration"] };
+      const { api } = setup(false, packById("traces")!);
+      await api.check();
+      expect(api.state.value).toBe("matched");
+      expect(api.streams.value).toEqual(["default"]);
+      expect(fake.sql).toEqual([]);
+    });
+
+    it("ignores sample and internal traces streams", async () => {
+      fake.traces = ["o2_demo_traces", "traces_service_graph_edges"];
+      fake.columns = { o2_demo_traces: ["trace_id"], traces_service_graph_edges: ["trace_id"] };
+      const { api } = setup(false, packById("traces")!);
+      await api.check();
+      expect(api.state.value).toBe("none");
+    });
+
+    it("finds AWS CloudWatch by its cloudwatch_metrics logs stream", async () => {
+      fake.logs = ["cloudwatch_metrics"];
+      fake.columns = { cloudwatch_metrics: ["metric_name", "value"] };
+      const { api } = setup(false, packById("aws-cloudwatch")!);
+      await api.check();
+      expect(api.state.value).toBe("matched");
+      expect(api.streams.value).toEqual(["cloudwatch_metrics"]);
+    });
+
+    it("guesses a renamed CloudWatch stream without forcing a schema read", async () => {
+      const role = packById("aws-cloudwatch")!.roles![0];
+      fake.logs = ["web", "empty_logs", "aws_metrics"];
+      fake.columns = { aws_metrics: role.fields, web: ["message"] };
+      const { api } = setup(false, packById("aws-cloudwatch")!);
+      await api.check();
+      expect(api.state.value).toBe("matched");
+      expect(api.streams.value).toEqual(["aws_metrics"]);
+      // Only the confirm read of the found stream is forced, never the guess's reads.
+      expect(fake.forced).toEqual(["aws_metrics"]);
+    });
+
+    it("reports none for AWS CloudWatch without its logs stream", async () => {
+      fake.logs = ["web"];
+      fake.columns = { web: ["message"] };
+      const { api } = setup(false, packById("aws-cloudwatch")!);
+      await api.check();
+      expect(api.state.value).toBe("none");
+    });
+  });
+
+  describe("fitStreams", () => {
+    const byType = (logs: string[], metrics: string[] = []) => ({
+      logs: new Map(logs.map((name) => [name, 0])),
+      metrics: new Map(metrics.map((name) => [name, 0])),
+    });
+
+    it("names the Kubernetes streams the matcher found, events included", async () => {
+      fake.metrics = ["kube_pod_status_phase", "kube_pod_info"];
+      fake.logs = [EVENTS_STREAM];
+      fake.columns = { kube_pod_status_phase: ["k8s_cluster"] };
+      const { api } = setup();
+      await api.check();
+      const kubernetes = packById("kubernetes")!;
+      expect(await fitStreams("org", kubernetes, byType(fake.logs, fake.metrics))).toEqual(
+        api.streams.value,
+      );
+      expect(api.streams.value).toEqual(["kube_pod_status_phase", EVENTS_STREAM]);
+    });
+
+    it("names the streams a signal pack's matcher found", async () => {
+      const role = packById("aws-cloudwatch")!.roles![0];
+      fake.logs = ["web", "aws_metrics"];
+      fake.columns = { aws_metrics: role.fields, web: ["message"] };
+      const { api } = setup(false, packById("aws-cloudwatch")!);
+      await api.check();
+      const pack = packById("aws-cloudwatch")!;
+      expect(await fitStreams("org", pack, byType(fake.logs), true)).toEqual(api.streams.value);
     });
   });
 });

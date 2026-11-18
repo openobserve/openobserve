@@ -22,7 +22,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { KUBERNETES_PACK, STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { packById } from "@/composables/starterPacks/usePackCatalog";
 import { packScope } from "@/composables/starterPacks/packCopy";
 import { usePackDismissal } from "@/composables/starterPacks/packDismissal";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
@@ -34,7 +34,7 @@ const props = defineProps<{ org: string; packId?: string }>();
 
 const { t } = useI18nTyped();
 const router = useRouter();
-const pack = STARTER_PACKS.find(({ id }) => id === props.packId) ?? KUBERNETES_PACK;
+const pack = packById(props.packId ?? "") ?? packById("kubernetes")!;
 const title = t(pack.titleKey);
 const flow = useStarterPackFlow(props.org, pack);
 const matcher = useStarterPackMatcher(props.org, { pack });

@@ -25,7 +25,6 @@ import type {
 
 export const MAX_STREAM_COPIES = 5;
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 // Below this a stream is no candidate at all; every match here still has to be confirmed.
 const MIN_FIELD_SHARE = 0.7;
 const CLOSE_SHARE = 0.1;
@@ -49,8 +48,11 @@ export type IdentityValues = Record<string, string[]>;
 
 export type IdentityVerdict = "agrees" | "mixed" | "none";
 
-export const isFresh = (lastIngested: number, nowMs: number) =>
-  lastIngested > 0 && nowMs - lastIngested / 1000 <= DAY_MS;
+// Newest first, so a stream still receiving data wins a tie over one that went quiet.
+const withData = (streams: StreamFacts[]) =>
+  streams
+    .filter(({ lastIngested }) => lastIngested > 0)
+    .sort((left, right) => right.lastIngested - left.lastIngested);
 
 export const fieldMatches = (
   fields: string[],
@@ -83,17 +85,27 @@ const closeToBest = (candidates: PackCandidate[]) => {
     .sort((left, right) => share(right) - share(left));
 };
 
+/** The stream that fits a role best on fields alone; identity is left to the setup popup. */
+export const bestRoleStream = (
+  role: PackStreamRole,
+  streams: StreamFacts[],
+  sources: BindingSources,
+): string | undefined => {
+  // Detection may list streams without ingest times, and then none is dropped for it.
+  const timed = streams.some(({ lastIngested }) => lastIngested > 0);
+  const present = timed ? withData(streams) : streams;
+  return closeToBest(present.map((stream) => toCandidate(stream, role.fields, sources)))[0]?.stream;
+};
+
 /** Names a metric question may offer; only a strict rename can skip the question. */
 export const metricCandidates = (
   want: MetricWant,
   streams: StreamFacts[],
   sources: BindingSources,
-  nowMs: number,
 ): PackCandidate[] => {
   const entity = metricEntity(want.name);
-  const allowed = streams.filter(
-    ({ name, lastIngested }) =>
-      isFresh(lastIngested, nowMs) && !want.used.has(name) && name.toLowerCase().startsWith(entity),
+  const allowed = withData(streams).filter(
+    ({ name }) => !want.used.has(name) && name.toLowerCase().startsWith(entity),
   );
   return closeToBest(allowed.map((stream) => toCandidate(stream, want.fields, sources)));
 };
@@ -103,12 +115,11 @@ export const repairMetric = (
   want: MetricWant,
   streams: StreamFacts[],
   sources: BindingSources,
-  nowMs: number,
 ): { repair?: PackRepair; question?: PackQuestion } => {
-  const fresh = streams.filter(({ lastIngested }) => isFresh(lastIngested, nowMs));
-  const [repair] = strictRenames([want.name], new Set(fresh.map(({ name }) => name)), want.used);
-  const similar = metricCandidates(want, streams, sources, nowMs);
-  const renamed = fresh.find(({ name }) => name === repair?.to);
+  const present = withData(streams);
+  const [repair] = strictRenames([want.name], new Set(present.map(({ name }) => name)), want.used);
+  const similar = metricCandidates(want, streams, sources);
+  const renamed = present.find(({ name }) => name === repair?.to);
   // A strict rename can leave the entity prefix, so it is offered even if no prefix match is.
   const candidates =
     renamed && !similar.some(({ stream }) => stream === renamed.name)
@@ -157,15 +168,14 @@ export const repairRole = (
   streams: StreamFacts[],
   values: Record<string, IdentityValues>,
   sources: BindingSources,
-  nowMs: number,
 ): PackQuestion => {
   const base = { want: role.stream, streamType: "logs", titleKey: role.titleKey };
-  const fresh = streams.filter(({ lastIngested }) => isFresh(lastIngested, nowMs));
+  const present = withData(streams);
   const sampled = (stream: StreamFacts) =>
     toCandidate(stream, role.fields, sources, Object.values(values[stream.name] ?? {}).flat());
-  const close = closeToBest(fresh.map(sampled));
+  const close = closeToBest(present.map(sampled));
   if (!close.length) {
-    return { ...base, kind: "none", candidates: fresh.map(sampled) };
+    return { ...base, kind: "none", candidates: present.map(sampled) };
   }
   const verdicts = new Map(
     close.map(({ stream }) => [stream, identityVerdict(role, values[stream] ?? {})]),

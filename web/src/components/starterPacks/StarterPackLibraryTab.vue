@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -31,7 +31,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import StarterPackParseDialog from "@/components/starterPacks/StarterPackParseDialog.vue";
 import StarterPackUndoDialog from "@/components/starterPacks/StarterPackUndoDialog.vue";
 import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
-import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { packs } from "@/composables/starterPacks/usePackCatalog";
 import { matchPack, readOrgStreams } from "@/composables/starterPacks/packMatchData";
 import { findRawNginxLogs, type RawLogNotice } from "@/composables/starterPacks/rawLogs";
 import type {
@@ -74,9 +74,9 @@ const { readValues } = useStreamValues(props.org);
 const rows = ref<LibraryRow[]>([]);
 const state = ref<"loading" | "ready" | "error">("loading");
 const facet = ref<Facet>("all");
-const flows = new Map(STARTER_PACKS.map((pack) => [pack.id, useStarterPackFlow(props.org, pack)]));
+const flows = new Map(packs().map((pack) => [pack.id, useStarterPackFlow(props.org, pack)]));
 const updates = new Map(
-  STARTER_PACKS.map((pack) => [pack.id, usePackUpdates(props.org, flows.get(pack.id)!)]),
+  packs().map((pack) => [pack.id, usePackUpdates(props.org, flows.get(pack.id)!)]),
 );
 const drawerPackId = ref<string | null>(null);
 const drawerFlow = computed(() => (drawerPackId.value ? flows.get(drawerPackId.value) : undefined));
@@ -207,7 +207,7 @@ const madeOfKind = (record: PackInstallRecord, kind: PackItemKind) =>
 const countsLine = (row: LibraryRow): I18nText => {
   const flow = flowOf(row);
   const made = row.record && !isSettingUp(row) ? row.record : null;
-  const parts: Array<[string, number]> = made
+  const parts: Array<[string, number | null]> = made
     ? [
         ["starterPacks.findMore.countDashboards", madeOfKind(made, "dashboard")],
         ["starterPacks.countAlerts", madeOfKind(made, "alert")],
@@ -220,7 +220,7 @@ const countsLine = (row: LibraryRow): I18nText => {
       ];
   return join(
     parts
-      .filter(([, value]) => value > 0)
+      .filter((part): part is [string, number] => (part[1] ?? 0) > 0)
       .map(([key, value]) => t(key as "starterPacks.countAlerts", { count: value }, value)),
   );
 };
@@ -285,10 +285,7 @@ const setUp = (row: LibraryRow) => {
   drawerPackId.value = row.pack.id;
 };
 
-const retry = async (row: LibraryRow) => {
-  await flowOf(row).install();
-  await load();
-};
+const retry = (row: LibraryRow) => flowOf(row).retry();
 
 const askUndoSetup = (row: LibraryRow) => {
   undoPackId.value = row.pack.id;
@@ -370,7 +367,7 @@ const load = async ({ quiet = false }: { quiet?: boolean } = {}) => {
     const streams = await readOrgStreams(props.org);
     void loadRawLogs(streams.logs ?? new Map());
     const built = await Promise.all(
-      STARTER_PACKS.map(async (pack) => {
+      packs().map(async (pack) => {
         const [match, installs] = await Promise.all([
           matchPack(props.org, pack, streams, { loadManifest, loadAlertFile }),
           records.list(pack.id),
@@ -379,7 +376,11 @@ const load = async ({ quiet = false }: { quiet?: boolean } = {}) => {
         // Without a preview the flow counts every manifest item, not what install would create.
         if (match.ready && !live.length) void flows.get(pack.id)?.loadPreview();
         if (live.length) void loadInstallState(pack).catch(() => {});
-        const verdicts = [...match.alerts.values(), ...match.dashboards.values()];
+        const verdicts = [
+          ...match.alerts.values(),
+          ...match.dashboards.values(),
+          ...match.views.values(),
+        ];
         return packRows(
           pack,
           {
@@ -399,6 +400,12 @@ const load = async ({ quiet = false }: { quiet?: boolean } = {}) => {
 };
 
 onMounted(() => void load());
+// The popup unmounts on close, so a setup that ends after that is only seen through its flow.
+for (const flow of flows.values()) {
+  watch(flow.running, (now, before) => {
+    if (before && !now) void load({ quiet: true });
+  });
+}
 defineExpose({ refresh: () => load({ quiet: true }) });
 </script>
 

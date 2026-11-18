@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ref } from "vue";
 
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -22,6 +23,8 @@ const fake = vi.hoisted(() => ({
   ready: {} as Record<string, boolean>,
   failing: "",
   metrics: ["kube_pod_status_phase", "system_cpu_time"],
+  logs: [] as string[],
+  traces: [] as string[],
   matchPack: vi.fn(),
   installs: {} as Record<string, Array<{ status: string }>>,
   alerts: {} as Record<string, Array<Record<string, unknown>>>,
@@ -33,7 +36,12 @@ vi.mock("@/composables/alerts/useAlertLibrary", () => ({
   useAlertLibrary: () => ({ loadManifest: vi.fn(), loadAlertFile: vi.fn() }),
 }));
 vi.mock("@/composables/starterPacks/packMatchData", () => ({
-  readOrgStreams: async () => ({ metrics: new Map(fake.metrics.map((name) => [name, 1])) }),
+  readOrgStreams: async () => ({
+    metrics: new Map(fake.metrics.map((name) => [name, 1])),
+    logs: new Map(fake.logs.map((name) => [name, 1])),
+    traces: new Map(fake.traces.map((name) => [name, 1])),
+  }),
+  readSchemaColumns: async () => ["trace_id"],
   matchPack: (...args: unknown[]) => fake.matchPack(...args),
 }));
 vi.mock("@/composables/starterPacks/useInstallRecords", () => ({
@@ -56,7 +64,10 @@ vi.mock("@/composables/query/readQuery", () => ({
   },
 }));
 
+import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import StarterPackCoverageLine from "./StarterPackCoverageLine.vue";
+
+const flow = useStarterPackFlow("org", {} as never);
 
 const mountLine = async (refreshKey = "a") => {
   const wrapper = mount(StarterPackCoverageLine, {
@@ -74,6 +85,8 @@ describe("StarterPackCoverageLine", () => {
     fake.alerts = {};
     fake.failing = "";
     fake.metrics = ["kube_pod_status_phase", "system_cpu_time"];
+    fake.logs = [];
+    fake.traces = [];
     fake.matchPack.mockReset();
     fake.matchPack.mockImplementation(async (_org: string, pack: { id: string }) => ({
       ready: !!fake.ready[pack.id],
@@ -84,6 +97,8 @@ describe("StarterPackCoverageLine", () => {
       ]),
     }));
     fake.push.mockClear();
+    flow.running.value = false;
+    Object.assign(flow, { alertCount: ref(2) });
   });
 
   it("stays hidden when no pack matches", async () => {
@@ -101,6 +116,15 @@ describe("StarterPackCoverageLine", () => {
       "Install 2 alerts",
     );
     expect(wrapper.find('[data-test="starter-pack-coverage-see-kubernetes"]').exists()).toBe(true);
+  });
+
+  it("offers Set up without a count until the pack's preview has loaded", async () => {
+    fake.ready = { kubernetes: true };
+    Object.assign(flow, { alertCount: ref(null) });
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-install-kubernetes"]').text()).toBe(
+      "Set up",
+    );
   });
 
   it("links an installed pack with every alert off to its page", async () => {
@@ -150,12 +174,44 @@ describe("StarterPackCoverageLine", () => {
     expect(fake.matchPack).not.toHaveBeenCalled();
   });
 
+  it("offers Traces to an org with only a traces stream", async () => {
+    fake.metrics = [];
+    fake.traces = ["default"];
+    fake.ready = { traces: true };
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-row-traces"]').exists()).toBe(true);
+    const matched = fake.matchPack.mock.calls.map(([, pack]) => pack.id);
+    expect(matched).toEqual(["traces"]);
+  });
+
+  it("offers AWS CloudWatch to an org with a cloudwatch_metrics logs stream", async () => {
+    fake.metrics = [];
+    fake.logs = ["cloudwatch_metrics"];
+    fake.ready = { "aws-cloudwatch": true };
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-row-aws-cloudwatch"]').exists()).toBe(
+      true,
+    );
+  });
+
   it("still reports the other packs when one pack's read fails", async () => {
     fake.ready = { kubernetes: true, hosts: true };
     fake.failing = "kubernetes";
     const wrapper = await mountLine();
     expect(wrapper.find('[data-test="starter-pack-coverage-row-kubernetes"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="starter-pack-coverage-row-hosts"]').exists()).toBe(true);
+  });
+
+  it("recounts when a setup finishes after its popup was closed", async () => {
+    fake.ready = { kubernetes: true };
+    flow.running.value = true;
+    const wrapper = await mountLine();
+    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').exists()).toBe(true);
+    fake.installs = { kubernetes: [{ status: "complete" }] };
+    fake.alerts = { kubernetes: [{ enabled: true }] };
+    flow.running.value = false;
+    await flushPromises();
+    expect(wrapper.find('[data-test="starter-pack-coverage-line"]').exists()).toBe(false);
   });
 
   it("recounts when the list reports a toggle, without matching again", async () => {

@@ -18,7 +18,7 @@ import { computed, onScopeDispose, ref } from "vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
-import { STARTER_PACKS } from "./kubernetesPack";
+import { packs } from "./usePackCatalog";
 import type { PackInstallRecord } from "./types";
 import { useBrowserMatches, type BrowserInterrupted } from "./useBrowserMatches";
 import { useFindMore } from "./useFindMore";
@@ -59,7 +59,7 @@ export function useRefreshMatches(org: string) {
 
   const installState = async () => {
     const live = await Promise.all(
-      STARTER_PACKS.map(async (pack) => ({
+      packs().map(async (pack) => ({
         pack,
         rows: (await records.list(pack.id)).filter(({ status }) => status !== "removed"),
       })),

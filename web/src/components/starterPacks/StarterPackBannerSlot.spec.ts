@@ -47,56 +47,107 @@ describe("StarterPackBannerSlot", () => {
   });
   afterEach(() => target.remove());
 
-  it("holds the button at final width and disabled while checking", async () => {
+  it("shows the Home pack row, disabled with skeleton counts, while checking", async () => {
     fake.matcher.state.value = "checking";
     const wrapper = await render();
-    const button = wrapper.get('[data-test="first-event-status-pack-checking"]')
+    const card = wrapper.get('[data-test="first-event-status-pack-card"]');
+    expect(card.attributes("data-status")).toBe("loading");
+    const button = wrapper.get('[data-test="first-event-status-pack-card-setup-btn"]')
       .element as HTMLButtonElement;
     expect(button.disabled).toBe(true);
-    expect(button.className).toContain("w-68");
     expect(wrapper.emitted("offered")?.at(-1)).toEqual([true]);
   });
 
-  it("keeps checking while logs arrive, then offers the partial setup after the wait", async () => {
+  it("keeps checking while logs arrive, then offers the setup and loads its counts", async () => {
     fake.matcher.state.value = "waiting";
     const wrapper = await render();
-    expect(has(wrapper, "first-event-status-pack-checking")).toBe(true);
+    const card = () => wrapper.get('[data-test="first-event-status-pack-card"]');
+    expect(card().attributes("data-status")).toBe("loading");
+    expect(fake.flow.loadPreview).not.toHaveBeenCalled();
     fake.matcher.waitedLong.value = true;
     await nextTick();
-    expect(wrapper.get('[data-test="first-event-status-pack-partial-btn"]').text()).toBe(
-      "Set up for logs now, add metrics later",
+    expect(card().attributes("data-status")).toBe("offer");
+    expect(fake.flow.loadPreview).toHaveBeenCalled();
+  });
+
+  it("says nothing fits yet when the long wait's preview has no items", async () => {
+    fake.flow = fakeFlow({ alertCount: ref(0), dashboardCount: ref(0), viewCount: ref(0) });
+    fake.matcher.state.value = "waiting";
+    fake.matcher.waitedLong.value = true;
+    const wrapper = await render();
+    expect(wrapper.get('[data-test="first-event-status-pack-resource-empty"]').text()).toBe(
+      "Nothing in this pack fits your data yet. Its items show here once their data arrives.",
     );
   });
 
-  it("offers the same install card as Home with counts and matched streams", async () => {
+  it("reloads the counts when the data arrives after a long wait", async () => {
+    fake.matcher.state.value = "waiting";
+    await render();
+    fake.matcher.waitedLong.value = true;
+    await nextTick();
+    expect(fake.flow.loadPreview).toHaveBeenCalledTimes(1);
+    fake.matcher.waitedLong.value = false;
+    fake.matcher.state.value = "matched";
+    await nextTick();
+    expect(fake.flow.loadPreview).toHaveBeenCalledTimes(2);
+  });
+
+  it("offers the same pack row as Home with matched streams and resource cards", async () => {
     const wrapper = await render("typed");
-    expect(wrapper.get('[data-test="first-event-status-pack-setup-btn"]').text()).toBe(
-      "Install 4 items",
+    expect(has(wrapper, "first-event-status-pack-row-highlight")).toBe(true);
+    expect(wrapper.get('[data-test="first-event-status-pack-card-setup-btn"]').text()).toBe(
+      "Review and set up",
     );
-    expect(wrapper.get('[data-test="first-event-status-pack-card-counts"]').text()).toContain(
+    expect(wrapper.get('[data-test="first-event-status-pack-row-streams"]').text()).toContain(
+      "k8s_events, k8s_node_cpu",
+    );
+    expect(wrapper.get('[data-test="first-event-status-pack-card-row-dashboard"]').text()).toBe(
       "1 dashboard",
     );
-    expect(wrapper.get('[data-test="first-event-status-pack-card-sub"]').text()).toContain(
-      "Matched to 2 streams you are already sending.",
-    );
   });
 
-  it("opens the setup popup from Set up without installing", async () => {
+  it("shows skeleton counts until the preview has loaded", async () => {
+    fake.flow = fakeFlow({
+      alertCount: ref(null),
+      dashboardCount: ref(null),
+      viewCount: ref(null),
+      previewState: ref("loading"),
+    });
+    const wrapper = await render("typed");
+    expect(has(wrapper, "first-event-status-pack-resource-skeleton")).toBe(true);
+  });
+
+  it("opens the setup popup from Review and set up without installing", async () => {
     const wrapper = await render("typed");
     const drawer = wrapper.findComponent({ name: "StarterPackDrawer" });
     expect(drawer.props("open")).toBe(false);
-    await wrapper.get('[data-test="first-event-status-pack-setup-btn"]').trigger("click");
+    await wrapper.get('[data-test="first-event-status-pack-card-setup-btn"]').trigger("click");
     await flushPromises();
     expect(drawer.props("open")).toBe(true);
     expect(drawer.props("flow")).toBe(fake.flow);
+    expect(drawer.props("clusters")).toEqual(["typed", "seen-1"]);
     expect(fake.flow.install).not.toHaveBeenCalled();
     expect(fake.flow.land).not.toHaveBeenCalled();
   });
 
-  it("offers no separate What gets created button", async () => {
+  it("holds the row busy while the setup runs", async () => {
+    fake.flow.running.value = true;
     const wrapper = await render();
-    expect(has(wrapper, "first-event-status-pack-card-details-btn")).toBe(false);
-    expect(wrapper.text()).not.toContain("What gets created");
+    expect(
+      wrapper.get('[data-test="first-event-status-pack-card"]').attributes("data-status"),
+    ).toBe("running");
+    const button = wrapper.get('[data-test="first-event-status-pack-card-setup-btn"]')
+      .element as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
+
+  it("says a stopped setup in the Home banner and finishes it in the popup", async () => {
+    fake.flow.interrupted.value = true;
+    const wrapper = await render();
+    expect(has(wrapper, "first-event-status-pack-card")).toBe(false);
+    await wrapper.get('[data-test="first-event-status-pack-interrupted-btn"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.findComponent({ name: "StarterPackDrawer" }).props("open")).toBe(true);
   });
 
   it("offers nothing when no pack matches", async () => {
@@ -109,23 +160,26 @@ describe("StarterPackBannerSlot", () => {
 
   it("offers a check retry on error", async () => {
     fake.matcher.state.value = "error";
-    await render();
+    const wrapper = await render();
+    expect(has(wrapper, "first-event-status-pack-card")).toBe(false);
     (action("first-event-status-pack-retry-btn") as HTMLElement).click();
     expect(fake.matcher.retry).toHaveBeenCalled();
   });
 
-  it("shows the admin link in the card instead of the counts when setup was refused", async () => {
+  it("asks an admin with a copy link, and no badge, when setup was refused", async () => {
     fake.flow.forbidden.value = true;
     const wrapper = await render();
-    expect(has(wrapper, "first-event-status-pack-copy-link-btn")).toBe(true);
-    expect(has(wrapper, "first-event-status-pack-card-counts")).toBe(false);
+    expect(has(wrapper, "first-event-status-pack-card-ask-admin-btn")).toBe(true);
+    expect(has(wrapper, "first-event-status-pack-card-copy-link-btn")).toBe(true);
+    expect(has(wrapper, "first-event-status-pack-card-setup-btn")).toBe(false);
+    expect(has(wrapper, "first-event-status-pack-best-start")).toBe(false);
     expect(target.children.length).toBe(0);
   });
 
   it("offers nothing once the pack is installed", async () => {
     fake.flow.installed.value = true;
     const wrapper = await render();
-    expect(has(wrapper, "first-event-status-pack-setup-btn")).toBe(false);
+    expect(has(wrapper, "first-event-status-pack-card")).toBe(false);
     expect(wrapper.emitted("offered")?.at(-1)).toEqual([false]);
   });
 });

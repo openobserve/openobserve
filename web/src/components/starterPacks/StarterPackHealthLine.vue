@@ -20,14 +20,14 @@ import { useRouter } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { readQuery } from "@/composables/query/readQuery";
-import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import { packById } from "@/composables/starterPacks/usePackCatalog";
 import type { StarterPack } from "@/composables/starterPacks/types";
 import { usePackHealth } from "@/composables/starterPacks/usePackHealth";
 import { alertsByTagsQuery } from "@/services/alerts.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = withDefaults(defineProps<{ org: string; pack?: StarterPack }>(), {
-  pack: () => KUBERNETES_PACK,
+  pack: () => packById("kubernetes")!,
 });
 
 const { t } = useI18nTyped();

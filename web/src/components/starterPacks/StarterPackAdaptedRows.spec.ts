@@ -22,8 +22,8 @@ import StarterPackAdaptedRows from "./StarterPackAdaptedRows.vue";
 
 const flowWith = (preview: Record<string, unknown>) => ({
   pack: {
-    aliasTitles: { k8s_cluster: "starterPacks.kubernetes.fieldCluster" },
-    flavours: [{ id: "otel", titleKey: "starterPacks.kubernetes.flavourOtel" }],
+    aliasTitles: { k8s_cluster: "starterPacks.packs.kubernetes.fields.k8s_cluster" },
+    flavours: [{ id: "otel", titleKey: "starterPacks.packs.kubernetes.flavours.opentelemetry" }],
   },
   preview: shallowRef({
     bindings: [],
@@ -47,7 +47,7 @@ const render = (flow: ReturnType<typeof flowWith>, readonly = false) =>
   });
 type Wrapper = ReturnType<typeof render>;
 const has = (wrapper: Wrapper, id: string) => wrapper.find(`[data-test="${id}"]`).exists();
-const events = "starterPacks.kubernetes.roleEvents";
+const events = "starterPacks.packs.kubernetes.roles.events";
 const answeredWith = (answer: Record<string, unknown>, titleKey?: string) => ({
   want: "kube_pod_info",
   kind: "confirm",

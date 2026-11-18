@@ -75,6 +75,8 @@ const limitTo = ref<string[]>([]);
 const lastChoice = ref({ critical: "", warning: "" });
 const knownDestinations = ref<Set<string> | null>(null);
 const added = ref<{ name: string; field: DestinationField } | null>(null);
+// Fields already preselected or picked in this open, so a cleared picker stays cleared.
+let settledFields = new Set<DestinationField>();
 
 const destinations = shallowRef<Array<{ name: string }>>([]);
 const destinationOptions = computed(() =>
@@ -115,20 +117,21 @@ const form = useOForm({
   onSubmit: (values) => submit(values),
 });
 const criticalChoice = form.useStore((state) => state.values.critical);
+const warningChoice = form.useStore((state) => state.values.warning);
 
-const offRows = computed(() => turn.rows.value.filter(({ enabled }) => !enabled));
+const listedRows = turn.listedRows;
 const longest = computed(() =>
-  Math.max(0, ...offRows.value.map((row) => row.result?.checkedSeconds ?? 0)),
+  Math.max(0, ...listedRows.value.map((row) => row.result?.checkedSeconds ?? 0)),
 );
 const checkedCount = computed(
-  () => offRows.value.filter(({ state }) => state !== "loading").length,
+  () => listedRows.value.filter(({ state }) => state !== "loading").length,
 );
-const stillChecking = computed(() => checkedCount.value < offRows.value.length);
+const stillChecking = computed(() => checkedCount.value < listedRows.value.length);
 const allNoData = computed(
   () =>
     !stillChecking.value &&
-    offRows.value.length > 0 &&
-    offRows.value.every(({ result }) => result?.noData),
+    listedRows.value.length > 0 &&
+    listedRows.value.every(({ result }) => result?.noData),
 );
 const duration = (seconds: number) => {
   const minutes = Math.round(seconds / 60);
@@ -148,7 +151,7 @@ const headline = computed(() => {
 });
 const leftOff = computed(() => turn.summary.value.leftOffIncidents);
 const leftOffNames = computed(() =>
-  offRows.value
+  listedRows.value
     .filter(({ chosen }) => !chosen)
     .map(({ name }) => name)
     .join(raw(", ")),
@@ -161,7 +164,7 @@ const scope = computed(() =>
 const cost = computed(() =>
   t("starterPacks.turnOn.cost", {
     queries: queriesPerDay(turn.chosenRows.value.map(({ alert }) => alert)).toLocaleString(),
-    checks: offRows.value.length,
+    checks: listedRows.value.length,
   }),
 );
 const history = (row: TurnOnRow) =>
@@ -220,10 +223,19 @@ const setLimit = (cluster: string, on: boolean) => {
     ? [...limitTo.value, cluster]
     : limitTo.value.filter((name) => name !== cluster);
 };
+const sharedDestination = (severity: AlertSeverity) => {
+  const names = new Set(
+    turn.chosenRows.value
+      .filter((row) => row.severity === severity)
+      .map(({ alert }) => (alert.destinations?.length === 1 ? alert.destinations[0] : "")),
+  );
+  const [name] = names;
+  return names.size === 1 && destinations.value.some((option) => option.name === name) ? name : "";
+};
 const applyPreselect = () => {
   const ids = props.preselectIds;
   if (!ids?.length) return;
-  for (const row of offRows.value) turn.choose(row.id, ids.includes(row.id));
+  for (const row of listedRows.value) turn.choose(row.id, ids.includes(row.id));
 };
 
 async function submit(values: { critical: string; warning: string }, onlyIds?: string[]) {
@@ -268,6 +280,22 @@ watch(criticalChoice, (next, previous) => {
   if (form.getFieldValue("warning") === (previous ?? "")) form.setFieldValue("warning", next);
 });
 watch(
+  () => ({
+    picked: [criticalChoice.value, warningChoice.value],
+    shared: (["critical", "warning"] as const).map(
+      (field) => [field, sharedDestination(field)] as const,
+    ),
+  }),
+  ({ shared }) => {
+    for (const [field, name] of shared) {
+      if (form.getFieldValue(field)) settledFields.add(field);
+      if (!name || settledFields.has(field)) continue;
+      form.setFieldValue(field, name);
+      settledFields.add(field);
+    }
+  },
+);
+watch(
   () => turn.loadState.value,
   (state) => state === "ready" && applyPreselect(),
 );
@@ -278,6 +306,7 @@ watch(
     editing.value = null;
     thresholdError.value = null;
     if (!isOpen) return;
+    settledFields = new Set();
     added.value = null;
     void turn.load();
     void readDestinations();
@@ -308,7 +337,7 @@ onBeforeUnmount(() => {
           <strong class="text-text-heading" data-test="turn-on-alerts-checking">{{
             t("starterPacks.turnOn.checking", {
               done: checkedCount,
-              total: offRows.length,
+              total: listedRows.length,
             })
           }}</strong>
           <OSkeleton class="h-4 w-full" />
@@ -371,7 +400,7 @@ onBeforeUnmount(() => {
           <span>{{ t("starterPacks.turnOn.colChecked") }}</span>
         </div>
         <div
-          v-for="row in offRows"
+          v-for="row in listedRows"
           :key="row.id"
           class="border-border-default border-t"
           :data-test="`turn-on-alerts-row-${row.id}`"

@@ -13,6 +13,7 @@ const fake = vi.hoisted(() => ({
   previewPack: vi.fn(),
   undoPack: vi.fn(),
   removePack: vi.fn(),
+  refreshResources: vi.fn(),
   push: vi.fn(async () => undefined),
   alerts: [] as Array<{ enabled: boolean }>,
 }));
@@ -28,6 +29,7 @@ vi.mock("./useStarterPacks", () => ({
 }));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: fake.push }) }));
 vi.mock("@/composables/query/readQuery", () => ({ readQuery: async () => fake.alerts }));
+vi.mock("@/composables/useOrgResources", () => ({ refreshOrgResources: fake.refreshResources }));
 
 const PACK = {
   id: "kubernetes",
@@ -125,6 +127,29 @@ describe("useStarterPackFlow", () => {
     fake.previewPack.mockResolvedValue({ items: [], names: {}, notIncluded: [] });
   });
 
+  it("has no counts before the preview, then counts what the popup would create", async () => {
+    const flow = setup();
+    expect([flow.dashboardCount.value, flow.alertCount.value, flow.viewCount.value]).toEqual([
+      null,
+      null,
+      null,
+    ]);
+    fake.previewPack.mockResolvedValue({
+      items: [
+        { kind: "folder", itemId: "alerts", status: "pending" },
+        { kind: "dashboard", itemId: "overview", status: "pending" },
+        { kind: "alert", itemId: "a1", status: "pending" },
+        { kind: "alert", itemId: "a2", status: "existing" },
+      ],
+      names: {},
+      notIncluded: [{ kind: "savedView", itemId: "events", name: "Events", reason: "no_data" }],
+    });
+    await flow.loadPreview();
+    expect([flow.dashboardCount.value, flow.alertCount.value, flow.viewCount.value]).toEqual([
+      1, 1, 0,
+    ]);
+  });
+
   it("titles an installed alert from the preview, falling back to its saved name", async () => {
     fake.installs = [record()];
     const flow = setup();
@@ -175,14 +200,80 @@ describe("useStarterPackFlow", () => {
     expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(false);
   });
 
-  it("asks for started alerts and counts them on without a re-read", async () => {
+  it("asks for started alerts and counts them on", async () => {
     fake.installPack.mockResolvedValue(record());
+    fake.alerts = [{ alert_id: "al1", enabled: true }] as any;
     const flow = setup();
     await flow.install(undefined, { enableAlerts: true });
     expect(fake.installPack.mock.calls[0][1].enableAlerts).toBe(true);
     expect(flow.alertsOn.value).toBe(1);
     expect(flow.enabledAlertIds.value.has("al1")).toBe(true);
     expect(flow.remindAlerts.value).toBe(false);
+  });
+
+  it("re-reads which pack alerts are on once the install finishes", async () => {
+    const items = [
+      ...record().items,
+      { kind: "alert" as const, itemId: "a2", status: "existing" as const, id: "al2" },
+      { kind: "alert" as const, itemId: "a3", status: "existing" as const, id: "al3" },
+    ];
+    fake.installPack.mockResolvedValue(record({ items }));
+    fake.alerts = [
+      { alert_id: "al1", enabled: true },
+      { alert_id: "al2", enabled: true },
+      { alert_id: "al3", enabled: false },
+    ] as any;
+    const flow = setup();
+    await flow.install(undefined, { enableAlerts: true });
+    expect([...flow.enabledAlertIds.value].sort()).toEqual(["al1", "al2"]);
+  });
+
+  it("keeps alerts it just created on when the tag search has not caught up", async () => {
+    fake.installPack.mockResolvedValue(record());
+    fake.alerts = [] as any;
+    const flow = setup();
+    await flow.install(undefined, { enableAlerts: true });
+    expect(flow.enabledAlertIds.value.has("al1")).toBe(true);
+  });
+
+  it("passes the chosen destination to the install", async () => {
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.install(undefined, { enableAlerts: true, destination: "oncall" });
+    expect(fake.installPack.mock.calls[0][1].destination).toBe("oncall");
+  });
+
+  it("never carries an earlier choice into an ordinary install", async () => {
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.install(undefined, { exclude: ["v1"], enableAlerts: true, destination: "oncall" });
+    await flow.install();
+    const second = fake.installPack.mock.calls[1][1];
+    expect(second.enableAlerts).toBe(false);
+    expect(second.destination).toBeUndefined();
+    expect(second.exclude).not.toContain("v1");
+  });
+
+  it("retries an interrupted install with the choice stored on its record", async () => {
+    fake.installs = [record({ status: "incomplete", enableAlerts: true, destination: "oncall" })];
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.load();
+    expect(await flow.retry()).toBe(true);
+    const retry = fake.installPack.mock.calls[0][1];
+    expect(retry.enableAlerts).toBe(true);
+    expect(retry.destination).toBe("oncall");
+  });
+
+  it("retries a record without a stored choice with alerts off", async () => {
+    fake.installs = [record({ status: "incomplete" })];
+    fake.installPack.mockResolvedValue(record());
+    const flow = setup();
+    await flow.load();
+    await flow.retry();
+    const retry = fake.installPack.mock.calls[0][1];
+    expect(retry.enableAlerts).toBe(false);
+    expect(retry.destination).toBeUndefined();
   });
 
   it("keeps alerts silent by default", async () => {
@@ -302,6 +393,23 @@ describe("useStarterPackFlow", () => {
     fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
     expect(await flow.undo()).toBe(true);
     expect(flow.record.value).toBeNull();
+  });
+
+  it("refreshes the org's resources check after every install, undo and remove", async () => {
+    const flow = setup();
+    fake.installPack.mockResolvedValueOnce(record());
+    await flow.install();
+    expect(fake.refreshResources).toHaveBeenLastCalledWith("org");
+    fake.installPack.mockRejectedValueOnce(new Error("down"));
+    await flow.install();
+    expect(fake.refreshResources).toHaveBeenCalledTimes(2);
+    fake.undoPack.mockResolvedValueOnce({ removed: [{}], kept: [] });
+    await flow.undo();
+    expect(fake.refreshResources).toHaveBeenCalledTimes(3);
+    fake.removePack.mockResolvedValueOnce({ removed: [{}], kept: [] });
+    await flow.remove();
+    expect(fake.refreshResources).toHaveBeenCalledTimes(4);
+    expect(fake.refreshResources.mock.calls.every(([org]) => org === "org")).toBe(true);
   });
 
   it("lands an unlicensed org on the dashboard it already has when nothing is left to create", async () => {

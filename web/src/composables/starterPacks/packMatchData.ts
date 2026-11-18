@@ -38,8 +38,9 @@ import {
   type MatchItem,
 } from "./packMatch";
 import type { BindingSources } from "./packBinding";
+import { roleRepairs } from "./packDetect";
 import { strictRenames } from "./strictRenames";
-import type { PackDashboard, PackRepair, StarterPack } from "./types";
+import type { PackDashboard, PackRepair, PackSavedView, StarterPack } from "./types";
 
 const FILE_READS_AT_ONCE = 8;
 const FORCED_READ_GAP_MS = 30_000;
@@ -65,6 +66,7 @@ export interface PackLibrary {
 export interface PackMatch {
   alerts: Map<string, boolean>;
   dashboards: Map<string, boolean>;
+  views: Map<string, boolean>;
   ready: boolean;
 }
 
@@ -87,6 +89,9 @@ const loadDoc = (dashboard: PackDashboard) => {
   dashboardDocs.set(dashboard, loaded);
   return loaded;
 };
+
+const columnsOf = (schema: any): string[] =>
+  ((schema?.schema ?? []) as Array<{ name: string }>).map((column) => column.name);
 
 export const inBatches = async <T, R>(
   values: T[],
@@ -121,12 +126,14 @@ export const readSchemaColumns = async (
   name: string,
   force = false,
 ): Promise<string[]> => {
-  const columnsOf = (schema: any) =>
-    ((schema?.schema ?? []) as Array<{ name: string }>).map((column) => column.name);
   const first = columnsOf(await readQuery(streamSchemaQuery(org, name, type), force));
   if (first.length || force) return first;
   return columnsOf(await readQuery(streamSchemaQuery(org, name, type), true));
 };
+
+/** Never forced, so a scan over many streams does not re-read a cached empty schema. */
+export const readCachedColumns = async (org: string, type: string, name: string) =>
+  columnsOf(await readQuery(streamSchemaQuery(org, name, type)));
 
 const readFields = async (
   org: string,
@@ -196,6 +203,10 @@ export const ingestTimes = (list: StreamRow[] | null | undefined): StreamsByType
     })),
   );
 
+/** A stream the user's own data lives in, so neither sample data nor O2's own streams match a pack. */
+export const isPackStream = (row: StreamRow, type: string) =>
+  isOwnedStream(row, type) && !isSampleStreamName(row.name ?? "");
+
 /** Every stream in the org with its last ingest time. */
 export const readOrgStreams = async (org: string): Promise<StreamsByType> => {
   const lists = await Promise.all(
@@ -204,9 +215,7 @@ export const readOrgStreams = async (org: string): Promise<StreamsByType> => {
   return ingestTimes(
     lists.flatMap((rows, index) =>
       rows
-        .filter(
-          (row) => isOwnedStream(row, STREAM_TYPES[index]) && !isSampleStreamName(row.name ?? ""),
-        )
+        .filter((row) => isPackStream(row, STREAM_TYPES[index]))
         .map((row) => ({ ...row, stream_type: STREAM_TYPES[index] })),
     ),
   );
@@ -275,6 +284,16 @@ const strictPackRepairs = (entries: AlertLibraryEntry[], streams: StreamsByType)
   return [...new Map(found.map((repair) => [repair.from, repair])).values()];
 };
 
+// Same rule as the setup popup, so both count the same items.
+const viewFits = ({ search }: PackSavedView, streams: StreamsByType, repairs: PackRepair[]) => {
+  const stream = search?.data?.stream;
+  const type = String(stream?.streamType ?? "logs");
+  const wanted: string[] = stream?.selectedStream ?? [];
+  return wanted.every(
+    (name) => (locateStream(name, type, { streams, repairs })?.lastIngested ?? 0) > 0,
+  );
+};
+
 /** A pack is ready when any item is; items without data are simply left out of it. */
 export const matchPack = async (
   org: string,
@@ -287,10 +306,13 @@ export const matchPack = async (
     // A dashboard that cannot load is not ready; the alert verdicts still stand.
     Promise.all(pack.dashboards.map((dashboard) => loadDoc(dashboard).catch(() => ({})))),
   ]);
+  const guessed = await roleRepairs(pack, streams, (type, name) =>
+    readCachedColumns(org, type, name),
+  );
   const sources = {
     loadFile: library.loadAlertFile,
     packs: [pack],
-    repairs: strictPackRepairs(entries, streams),
+    repairs: [...strictPackRepairs(entries, streams), ...guessed],
   };
   const prepared = await prepareAlerts(entries, streams, sources);
   const panels = docs.map(dashboardItems);
@@ -304,6 +326,10 @@ export const matchPack = async (
       panels[index].some((item) => matchItem(item, facts)),
     ]),
   );
+  const views = new Map(
+    pack.savedViews.map((view) => [view.id, viewFits(view, streams, sources.repairs)]),
+  );
+  // A saved view alone is not worth setting a pack up for.
   const ready = [...alerts.values(), ...dashboards.values()].some(Boolean);
-  return { alerts, dashboards, ready };
+  return { alerts, dashboards, views, ready };
 };

@@ -78,6 +78,7 @@ export const packStreams = (pack: StarterPack, sources: PackStreamSources = {}):
     ...(pack.signals ?? []).flatMap((spellings) =>
       spellings.map((name) => ({ name, type: "metrics", signal: spellings[0] })),
     ),
+    ...(pack.detectStreams ?? []).flatMap(({ type, name }) => (name ? [{ name, type }] : [])),
     ...(sources.dashboardStreams ?? []).map((name) => ({ name, type: "" })),
   ].flatMap((stream) => repaired(stream, sources.repairs ?? []));
   const byName = new Map<string, PackStream>();

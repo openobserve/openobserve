@@ -20,16 +20,19 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
+import { useOrgHasNoResources } from "@/composables/useOrgResources";
 
 import type { FindMoreItem, FindMoreSource } from "./findMore";
-import { STARTER_PACKS } from "./kubernetesPack";
+import { packs as allPacks } from "./usePackCatalog";
 import { usePackDismissal, usePackHiddenForOrg } from "./packDismissal";
-import type { StarterPack } from "./types";
+import type { PackItemKind, StarterPack } from "./types";
 import { useBrowserMatches, type BrowserInterrupted } from "./useBrowserMatches";
 import { useStarterPackFlow } from "./useStarterPackFlow";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
 
-type HomePackView =
+const FIT_KINDS = new Set<PackItemKind>(["dashboard", "alert", "savedView"]);
+
+export type HomePackView =
   | "hidden"
   | "hiddenAdmin"
   | "loading"
@@ -141,15 +144,18 @@ function useHomePack(org: string, pack: StarterPack) {
 }
 
 export type HomePack = ReturnType<typeof useHomePack>;
+/** What a pack row reads, so a page with its own pack state can show the same row. */
+export type HomePackRowItem = Pick<
+  HomePack,
+  "pack" | "title" | "testId" | "flow" | "matcher" | "view" | "copyLink" | "startSetup"
+>;
 
 const matchItems = (item: HomePack): FindMoreItem[] => {
   const { flow, pack } = item;
   const preview = flow.preview.value;
   if (preview) {
     return preview.items
-      .filter(
-        ({ kind, status }) => (kind === "dashboard" || kind === "alert") && status !== "existing",
-      )
+      .filter(({ kind, status }) => FIT_KINDS.has(kind) && status !== "existing")
       .map(({ kind, itemId }) => ({
         kind: kind as FindMoreItem["kind"],
         id: itemId,
@@ -165,6 +171,12 @@ const matchItems = (item: HomePack): FindMoreItem[] => {
       queries: 0,
     })),
     ...pack.alerts.map((id) => ({ kind: "alert" as const, id, name: id, queries: 0 })),
+    ...pack.savedViews.map(({ id, name }) => ({
+      kind: "savedView" as const,
+      id,
+      name,
+      queries: 0,
+    })),
   ];
 };
 
@@ -185,32 +197,50 @@ const interruptedOf = (item: HomePack): BrowserInterrupted => ({
   total: item.flow.toCreate.value.length,
 });
 
+const NOTICE_VIEWS: HomePackView[] = ["hiddenAdmin", "dismissed", "error"];
+
 /** Every pack Home offers, plus whether Home shows the setup section. */
-export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) {
+export function useHomePacks(org: string, packs: StarterPack[] = allPacks()) {
   const router = useRouter();
   const items = packs.map((pack) => useHomePack(org, pack));
   const { hasUserData } = useOrgHasUserData(org);
+  const { noResources } = useOrgHasNoResources(org, () => hasUserData.value === true);
   const browser = useBrowserMatches(org);
 
+  // An unknown answer counts as not empty, so a slow or failed check never shows the offer.
+  const orgEmpty = computed(() => hasUserData.value === true && noResources.value);
   const anySetUp = computed(() => items.some((item) => item.view.value === "installed"));
   const offered = computed(() =>
     items.filter((item) => item.view.value === "offer" || item.view.value === "forbidden"),
   );
   const setUp = computed(() => items.filter((item) => item.view.value === "installed"));
   const anyLoading = computed(() => items.some((item) => item.view.value === "loading"));
+  const canCreate = computed(
+    () => !offered.value.length || offered.value.some((item) => item.view.value === "offer"),
+  );
+  // A dismissed pack is known at once, so its record read never holds a skeleton over Overview.
+  const offerLoading = computed(() =>
+    items.some((item) => item.view.value === "loading" && !item.dismissal.dismissed.value),
+  );
+  const offerable = computed(() => orgEmpty.value && !anySetUp.value);
+  // Covers whatever `answered` waits for once a pack is offered, so the strip replaces it with no gap.
+  const loading = computed(
+    () => offerable.value && anyLoading.value && (offerLoading.value || offered.value.length > 0),
+  );
   // Waits for every pack, so no card moves once the strip shows.
-  const showSection = computed(
-    () => !anySetUp.value && !anyLoading.value && offered.value.length > 0,
+  const answered = computed(() => offerable.value && !anyLoading.value && offered.value.length > 0);
+  const showSection = computed(() => answered.value && canCreate.value);
+  const askAdmin = computed(() => answered.value && !canCreate.value);
+  const offerShown = computed(() => loading.value || showSection.value);
+  // A stopped setup is said in any org; the rest only belongs next to an offer.
+  const notices = computed(() =>
+    items.filter(
+      (item) =>
+        item.view.value === "interrupted" ||
+        (orgEmpty.value && NOTICE_VIEWS.includes(item.view.value)),
+    ),
   );
-  const loading = computed(() => !anySetUp.value && anyLoading.value);
-  const hasData = computed(() => hasUserData.value === true);
-  // Said once for all packs, only when none has anything else to show, and never before the org has data.
-  const empty = computed(
-    () =>
-      hasData.value &&
-      items.every((item) => item.view.value === "empty" || item.view.value === "hidden") &&
-      items.some((item) => item.view.value === "empty"),
-  );
+  const labelShown = computed(() => offerShown.value || askAdmin.value || notices.value.length > 0);
   const silent = computed(() => setUp.value.filter((item) => item.flow.remindAlerts.value));
   const library = () =>
     router.push({ name: "starterPacks", query: { org_identifier: org } }).catch(() => {});
@@ -246,9 +276,11 @@ export function useHomePacks(org: string, packs: StarterPack[] = STARTER_PACKS) 
     offered,
     setUp,
     showSection,
+    askAdmin,
+    offerShown,
+    notices,
+    labelShown,
     loading,
-    empty,
-    hasData,
     silent,
     library,
   };

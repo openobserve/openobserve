@@ -35,7 +35,10 @@ const PACK = {
   id: "kubernetes",
   dashboards: [{ id: "overview", title: "Overview", load: async () => ({}) }],
   alerts: ["k8s/one", "k8s/two"],
-  savedViews: [],
+  savedViews: [
+    { id: "events", name: "Events", search: {} },
+    { id: "audit", name: "Audit", search: {} },
+  ],
 } as unknown as StarterPack;
 
 const NGINX = [entry("nginx/5xx", "nginx", "edge"), entry("nginx/slow", "nginx", "edge")];
@@ -57,8 +60,13 @@ const inputs = (overrides: Partial<FindMoreInputs> = {}): FindMoreInputs => {
             ["k8s/two", false],
           ]),
           dashboards: new Map([["overview", true]]),
+          views: new Map([
+            ["events", true],
+            ["audit", false],
+          ]),
           ready: true,
         },
+        fits: ["kube_pod_status_phase"],
         records: [],
       },
     ],
@@ -91,10 +99,30 @@ describe("groupFindMore", () => {
     expect(pack.items).toEqual([
       { kind: "dashboard", id: "overview", name: "Overview", queries: 0 },
       { kind: "alert", id: "k8s/one", name: "Title k8s/one", queries: 288 },
+      { kind: "savedView", id: "events", name: "Events", queries: 0 },
     ]);
     expect(nginx.items.map(({ id }) => id)).toEqual(["nginx/5xx", "nginx/slow"]);
     expect(nginx.streams).toEqual(["edge"]);
     expect(nginx.queriesPerDay).toBe(576);
+  });
+
+  it("names a pack's detection streams, not its alerts' streams", () => {
+    const [pack] = groupFindMore(inputs()).sources;
+    expect(pack.streams).toEqual(["kube_pod_status_phase"]);
+  });
+
+  it("leaves out a pack Home would not offer: a saved view alone, or no detected stream", () => {
+    const [row] = inputs().packs;
+    const viewOnly = { ...row.match, ready: false };
+    const unseen = { ...row, pack: { ...PACK, detector: undefined }, fits: [] };
+    const ids = (packs: FindMoreInputs["packs"]) =>
+      groupFindMore(inputs({ packs })).sources.map(({ id }) => id);
+    expect(ids([{ ...row, match: viewOnly }])).toEqual(["library-nginx"]);
+    expect(ids([unseen])).toEqual(["library-nginx"]);
+    expect(ids([{ ...unseen, pack: { ...PACK, detector: "kubernetes" } as StarterPack }])).toEqual([
+      "kubernetes",
+      "library-nginx",
+    ]);
   });
 
   it("leaves out items an install record or a Library install already holds", () => {
@@ -106,7 +134,7 @@ describe("groupFindMore", () => {
             records: [record([{ kind: "dashboard", itemId: "overview", status: "created" }])],
           },
         ],
-        installedLibraryIds: new Set(["k8s/one", "nginx/5xx"]),
+        installedLibraryIds: new Set(["k8s/one", "nginx/5xx", "events"]),
       }),
     );
     expect(result.sources.map(({ id }) => id)).toEqual(["library-nginx"]);
@@ -129,7 +157,7 @@ describe("groupFindMore", () => {
       }),
     );
     expect(result.sources.map(({ id }) => id)).toEqual(["kubernetes"]);
-    expect(result.sources[0].items.map(({ id }) => id)).toEqual(["k8s/one"]);
+    expect(result.sources[0].items.map(({ id }) => id)).toEqual(["k8s/one", "events"]);
     expect(result.dismissed).toBe(3);
   });
 
@@ -138,7 +166,12 @@ describe("groupFindMore", () => {
     const result = groupFindMore(
       inputs({
         packs: [
-          { pack: PACK, match: { alerts: none, dashboards: none, ready: false }, records: [] },
+          {
+            pack: PACK,
+            match: { alerts: none, dashboards: none, views: none, ready: false },
+            fits: [],
+            records: [],
+          },
         ],
         library: { entries: [], verdicts: none },
       }),

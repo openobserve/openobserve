@@ -65,18 +65,26 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/alerts/useAlertLibrary")>()),
   useAlertLibrary: () => library,
 }));
-vi.mock("./kubernetesPack", () => ({
-  KUBERNETES_PACK: {
+vi.mock("./usePackCatalog", () => {
+  const kubernetes = {
     id: "kubernetes",
+    detector: "kubernetes",
     alerts: ["k8s/one"],
     dashboards: [] as unknown[],
+    savedViews: [] as unknown[],
     aliases: [["k8s_cluster", "k8s_cluster_name"]],
-  },
-}));
+  };
+  return {
+    packs: () => [kubernetes],
+    packById: (id: string) => (id === "kubernetes" ? kubernetes : undefined),
+  };
+});
 
-import { KUBERNETES_PACK } from "./kubernetesPack";
 import { matchAlerts, matchPack, readOrgStreams } from "./packMatchData";
+import { packById } from "./usePackCatalog";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
+
+const KUBERNETES_PACK = packById("kubernetes")!;
 
 const entry = {
   id: "k8s/one",
@@ -316,5 +324,127 @@ describe("one matcher", () => {
     };
     const match = await matchPack("org", pack, await readOrgStreams("org"), library as any);
     expect(match.ready).toBe(false);
+  });
+
+  describe("a pack whose named stream was renamed", () => {
+    const awsEntry = {
+      id: "aws/high_cpu",
+      stream_type: "logs",
+      required_streams: ["cloudwatch_metrics"],
+    } as AlertLibraryEntry;
+    const fields = ["namespace", "metric_name", "account_id", "region", "value_sum", "value_count"];
+    const cloudwatch = (dashboards: unknown[] = []) =>
+      ({
+        id: "aws_cloudwatch",
+        alerts: [awsEntry.id],
+        dashboards,
+        savedViews: [
+          {
+            id: "v",
+            name: "V",
+            search: { data: { stream: { selectedStream: ["cloudwatch_metrics"] } } },
+          },
+        ],
+        detectStreams: [{ type: "logs", name: "cloudwatch_metrics" }],
+        roles: [
+          { id: "metrics", titleKey: "x", stream: "cloudwatch_metrics", fields, identity: [] },
+        ],
+      }) as any;
+    const awsLibrary = {
+      loadManifest: async () => ({ alerts: [awsEntry] }),
+      loadAlertFile: async () =>
+        ({
+          query_condition: { type: "sql", sql: 'SELECT namespace FROM "cloudwatch_metrics"' },
+        }) as any,
+    };
+    const sqlPanel = {
+      queryType: "sql",
+      queries: [{ query: 'SELECT region FROM "cloudwatch_metrics"' }],
+    };
+
+    beforeEach(() => {
+      fake.streams = {
+        logs: [
+          { name: "aws_metrics", stats: { doc_time_max: recent() } },
+          { name: "web", stats: { doc_time_max: recent() } },
+        ],
+      };
+      fake.columns = { aws_metrics: [...fields, "_timestamp"], web: ["method"] };
+    });
+
+    it("counts the alert, panel and view through the stream that fits the role", async () => {
+      const dashboard = {
+        id: "overview",
+        title: "O",
+        load: async () => ({ tabs: [{ panels: [sqlPanel] }] }),
+      };
+      const result = await matchPack(
+        "org",
+        cloudwatch([dashboard]),
+        await readOrgStreams("org"),
+        awsLibrary,
+      );
+      expect(result.alerts.get(awsEntry.id)).toBe(true);
+      expect(result.dashboards.get("overview")).toBe(true);
+      expect(result.views.get("v")).toBe(true);
+      expect(result.ready).toBe(true);
+    });
+
+    it("is not ready when no stream fits the role", async () => {
+      fake.columns = { aws_metrics: ["namespace"], web: ["method"] };
+      const result = await matchPack("org", cloudwatch(), await readOrgStreams("org"), awsLibrary);
+      expect(result.ready).toBe(false);
+    });
+  });
+
+  describe("a pack with a saved view", () => {
+    const view = (selectedStream: string[], streamType?: string) => ({
+      id: "events-view",
+      name: "Events",
+      search: { data: { stream: { selectedStream, streamType } } },
+    });
+    const match = async (savedViews: unknown[]) =>
+      matchPack(
+        "org",
+        { ...KUBERNETES_PACK, savedViews } as any,
+        await readOrgStreams("org"),
+        library as any,
+      );
+
+    beforeEach(() => {
+      fake.columns = { kube_pod: ["phase"] };
+      fake.files = { "k8s/one": query("kube_pod") };
+    });
+
+    it("counts a view whose logs stream has data", async () => {
+      fake.streams = {
+        metrics: [metric(recent())],
+        logs: [{ name: "k8s_events", stats: { doc_time_max: recent() } }],
+      };
+      const result = await match([view(["k8s_events"])]);
+      expect(result.views.get("events-view")).toBe(true);
+      const verdicts = [...result.alerts.values(), ...result.views.values()];
+      expect(`${verdicts.filter(Boolean).length} of ${verdicts.length}`).toBe("2 of 2");
+    });
+
+    it("leaves out a view whose stream is missing", async () => {
+      fake.streams = { metrics: [metric(recent())] };
+      const result = await match([view(["k8s_events"])]);
+      expect(result.views.get("events-view")).toBe(false);
+      expect(result.ready).toBe(true);
+    });
+
+    it("looks the stream up under the view's own stream type", async () => {
+      fake.streams = { metrics: [metric(recent())] };
+      const result = await match([view(["kube_pod"], "metrics")]);
+      expect(result.views.get("events-view")).toBe(true);
+    });
+
+    it("is not ready when only the view fits", async () => {
+      fake.streams = { logs: [{ name: "k8s_events", stats: { doc_time_max: recent() } }] };
+      const result = await match([view(["k8s_events"])]);
+      expect(result.views.get("events-view")).toBe(true);
+      expect(result.ready).toBe(false);
+    });
   });
 });

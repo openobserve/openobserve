@@ -15108,25 +15108,74 @@
       "confirmNew": "Parse new Nginx lines",
       "notNow": "Not now"
     },
-    "hosts": {
-      "title": "Hosts",
-      "description": "The host metrics dashboard and alerts for servers and virtual machines.",
-      "pausedImpact": "a host runs out of CPU, memory or disk"
-    },
-    "kubernetes": {
-      "title": "Kubernetes",
-      "description": "Dashboards, alerts and saved views for Kubernetes clusters.",
-      "fieldCluster": "Cluster name",
-      "fieldNamespace": "Namespace",
-      "fieldPod": "Pod name",
-      "fieldNode": "Node name",
-      "fieldContainer": "Container name",
-      "fieldKind": "Event kind",
-      "fieldReason": "Event reason",
-      "fieldMessage": "Event message",
-      "roleEvents": "Kubernetes events",
-      "flavourOtel": "OpenTelemetry",
-      "pausedImpact": "your cluster runs out of CPU, memory or pods"
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "description": "Dashboards, alerts and saved views for Kubernetes clusters.",
+        "fields": {
+          "k8s_cluster": "Cluster name",
+          "k8s_namespace_name": "Namespace",
+          "k8s_pod_name": "Pod name",
+          "k8s_node_name": "Node name",
+          "k8s_container_name": "Container name",
+          "kind": "Event kind",
+          "reason": "Event reason",
+          "message": "Event message"
+        },
+        "roles": {
+          "events": "Kubernetes events"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        },
+        "pausedImpact": "pods crash or run out of memory, or a deployment loses replicas"
+      },
+      "hosts": {
+        "title": "Hosts",
+        "description": "The host metrics dashboard for servers and virtual machines.",
+        "pausedImpact": "a host runs out of CPU, memory or disk, or stops reporting"
+      },
+      "traces": {
+        "title": "Traces (APM)",
+        "description": "Request rate, errors and latency per service from OpenTelemetry traces.",
+        "pausedImpact": "a service's error rate or latency climbs, or a dependency starts failing"
+      },
+      "postgresql": {
+        "title": "PostgreSQL",
+        "description": "Connections, commits, database size and locks from the OpenTelemetry PostgreSQL receiver.",
+        "pausedImpact": "PostgreSQL goes down, runs out of connections or slows down"
+      },
+      "docker": {
+        "title": "Docker",
+        "description": "Container CPU, memory, network and disk from the OpenTelemetry Docker stats receiver.",
+        "pausedImpact": "a container runs out of memory or container metrics stop arriving"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "description": "EC2, RDS, load balancer, Lambda and SQS health from a CloudWatch metric stream.",
+        "pausedImpact": "an AWS resource fails, fills up or starts erroring",
+        "roles": {
+          "metrics": "CloudWatch metrics"
+        }
+      },
+      "genai": {
+        "title": "AI (LLM apps)",
+        "description": "Requests, tokens, cost and latency per model from OpenTelemetry GenAI traces.",
+        "pausedImpact": "LLM calls fail, slow down or cost more than expected"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "description": "Workflow runs, failures and duration from GitHub Actions events.",
+        "pausedImpact": "a GitHub Actions job logs errors or job logs stop arriving",
+        "roles": {
+          "job_logs": "GitHub Actions job logs"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD",
+        "description": "Application sync and health, Git fetches and controller load from Argo CD's own metrics.",
+        "pausedImpact": "an application fails to sync, turns unhealthy or can't fetch from Git"
+      }
     },
     "setUp": "Set up {title} monitoring",
     "checking": "Checking what fits…",
@@ -15174,35 +15223,25 @@
       "attention": "{title} · {count} needs your attention | {title} · {count} need your attention",
       "couldNot": "Could not create · {count}",
       "created": "Created · {count}",
-      "open": "Open {name}",
       "manage": "Manage pack",
       "failedReason": "Couldn't be created. Retry to try again.",
       "undoAll": "Undo — remove all {count}",
       "typeDashboard": "dashboard",
       "typeAlert": "alert",
       "typeSavedView": "saved search",
-      "doneTitle": "{title} monitoring is set up",
-      "subtitleRunning": "{made} of {total} created · you can leave this page",
-      "subtitleDone": "{made} of {total} created · alerts are silent until you turn them on",
-      "subtitleDoneStarted": "{made} of {total} created · alerts run but notify no one until a destination is added",
       "kindDashboards": "Dashboards",
       "kindAlerts": "Alerts",
       "kindSavedViews": "Saved views",
-      "rowCreated": "Created · {kind} {made} of {total}",
-      "rowCreating": "Creating · {kind} {made} of {total}",
-      "rowWaiting": "{kind} waiting",
-      "rowFailed": "Failed · {name}",
-      "settingUp": "Setting up…",
-      "undoSetup": "Undo setup"
+      "rowFailed": "Failed · {name}"
     },
     "home": {
+      "label": "Starter packs",
       "title": "Your {title} data is ready to monitor",
       "hidden": "{title} pack hidden for you",
       "hiddenForEveryone": "{title} pack hidden for everyone",
       "showForEveryone": "Show for everyone",
       "hideFailed": "Couldn't change that setting. Try again.",
       "showAgain": "Show again",
-      "empty": "No starter pack matches your data yet",
       "error": "Couldn't check your data for packs",
       "turnOn": "Turn on alerts",
       "viewPack": "View pack",
@@ -15211,23 +15250,67 @@
       "fromClusters": "from {clusters}",
       "moreStreams": "+{count} stream | +{count} streams",
       "moreStreamsLabel": "More matched streams",
-      "setUp": "Set up {title}",
       "setUpShort": "Set up",
       "findOther": "Find packs for other data",
       "interrupted": "{title} setup stopped partway · {made} of {total} done",
       "silentNoIncidents": "No incidents · {count} {title} alert is silent | No incidents · {count} {title} alerts are silent",
       "silentTitle": "{count} {title} alert is silent | {count} {title} alerts are silent",
       "silentSub": "They show what would fire but notify no one. Turn them on to get notified.",
-      "stripTitle": "Ready-made content for your data",
-      "stripMeta": "{count} starter pack fits streams you already send · undo any setup for 24 hours | {count} starter packs fit streams you already send · undo any setup for 24 hours",
-      "fits": "Fits {stream}",
       "askAdmin": "Ask an admin",
       "copyLink": "Copy link",
-      "findOtherSub": "Nginx, PostgreSQL, AWS and more in the Starter Packs library.",
-      "browse": "Browse starter packs",
+      "askAdminLine": "Starter packs fit your data. Ask an admin to add them.",
       "streamCount": "{count} stream | {count} streams",
       "ingestedToday": "{size} today",
-      "openStreams": "Open streams"
+      "openStreams": "Open streams",
+      "heroTitle": "Your data is arriving. Turn it into monitoring.",
+      "heroSub": "Pick a starter pack below. It creates dashboards, alerts and saved views that fit your streams.",
+      "reviewSetUp": "Review and set up",
+      "reviewSetUpLabel": "Review and set up {title}",
+      "bestStart": "Best place to start",
+      "cards": {
+        "andMore": "{list} and {count} more",
+        "panels": "{count} panel | {count} panels",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} for {clusters}. | {title}: {panels} for {clusters} clusters.",
+            "fallback": "{title}: every node, pod and workload."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire for every cluster ({clusters}). Off until you turn them on.",
+            "fallback": "{alert_names}. Fire for every cluster. Off until you turn them on.",
+            "plain": "Fire for every cluster. Off until you turn them on."
+          },
+          "savedViews": {
+            "template": "Kubernetes events: every event in {stream}, one click from Logs.",
+            "fallback": "Kubernetes events, one click from Logs."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Host Metrics: CPU, memory and disk for each host."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire for every host. Off until you turn them on.",
+            "fallback": "Fire for every host. Off until you turn them on."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} for your data.",
+            "fallback": "{title}, built for your streams."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire across all your matching data. Off until you turn them on.",
+            "fallback": "Fire across all your matching data. Off until you turn them on."
+          },
+          "savedViews": {
+            "template": "{stream} in Logs, one click away.",
+            "fallback": "One click from Logs."
+          }
+        }
+      },
+      "previewFailed": "Couldn't load what this pack sets up. Review it to try again.",
+      "nothingFitsYet": "Nothing in this pack fits your data yet. Its items show here once their data arrives."
     },
     "whatGetsCreated": {
       "subtitle": "{title} starter pack",
@@ -15235,20 +15318,15 @@
       "savedIn": "Saved in the folder {folder}",
       "skippedNote": "{count} item skipped · your existing one is kept | {count} items skipped · your existing ones are kept",
       "nameInUse": "{name} already exists · yours is kept",
-      "alertsSilent": "{count} · silent until you turn them on",
-      "alertsStart": "{count} · run on creation, notify no one until a destination is added",
-      "startAlerts": "Start alerts on creation",
       "skipped": "Skipped",
       "notSeenYet": "Not seen yet",
       "footprint": "Footprint",
       "reachStarted": "Background queries: each started alert runs on its own schedule",
       "reachStartedScoped": "Alert scope: {scope} · Background queries: each started alert runs on its own schedule",
-      "cta": "Set up {title} monitoring ({count})",
       "selectGroup": "Select all in {group}",
       "selectRow": "Select {name}"
     },
     "drawer": {
-      "setUpTitle": "Set up {title}",
       "packTitle": "{title} pack",
       "view": "Kubernetes view",
       "viewPath": "Infrastructure › Kubernetes",
@@ -15275,7 +15353,6 @@
       "reasonNeedsPlan": "{name}: needs the Enterprise plan",
       "source": "From the Library at {host}. The pack built into this version works offline.",
       "sourceOffline": "{host} can't be reached. Using the pack built into this version, which works offline.",
-      "summary": "{count} item. You can undo the setup for 24 hours. | {count} items. You can undo the setup for 24 hours.",
       "nothingToCreate": "You already have every item in this pack",
       "openKubernetes": "Open Kubernetes",
       "openDashboard": "Open dashboard",
@@ -15283,14 +15360,20 @@
       "reasonNoFlavour": "{name}: not available for your metric names yet",
       "close": "Close",
       "loadingFit": "Checking which items fit your data",
+      "noteForbidden": "{title} · you can see this pack but not set it up",
       "groupAlerts": "{count} alert | {count} alerts",
       "alertsSilentMeta": "Silent until you turn them on",
-      "groupSavedViews": "{count} saved view in Logs | {count} saved views in Logs"
+      "groupSavedViews": "{count} saved view in Logs | {count} saved views in Logs",
+      "setUp": "Set up",
+      "allExist": "You already have all {count} items in this pack. Existing alerts keep their settings.",
+      "continue": "Continue",
+      "alertsMeta": "{count} · {critical} critical · {warning} warning",
+      "setUpCount": "Set up {count} item | Set up {count} items",
+      "undoNote": "You can undo this for 24 hours"
     },
     "progress": {
       "title": "Setting up {title} monitoring",
       "summary": "{made} of {total} created",
-      "summaryRetry": "{made} of {total} created · {failed} to retry",
       "created": "Created",
       "creating": "Creating",
       "waiting": "Waiting",
@@ -15304,7 +15387,10 @@
       "retry": "Retry {count} item | Retry {count} items",
       "finish": "Finish",
       "interrupted": "Setup interrupted · {made} of {total} done",
-      "installError": "Setup didn't finish. Try again."
+      "installError": "Setup didn't finish. Try again.",
+      "comeBack": "{made} of {total} created · you can close this and keep working. Find it again under {path}.",
+      "alertsOnTo": "Creating · on, sending to {destination}",
+      "emailMe": "Email me ({email})"
     },
     "landing": {
       "set": "{title} monitoring is set up · {count} alert off | {title} monitoring is set up · {count} alerts off",
@@ -15804,6 +15890,50 @@
         "metrics": "Metrics",
         "traces": "Traces"
       }
+    },
+    "stepper": {
+      "content": "Choose content",
+      "setup": "Setting up",
+      "settingUp": "Setting up…",
+      "interrupted": "Interrupted",
+      "ready": "Ready",
+      "noteRunning": "Setting up · {made} of {total} created",
+      "noteAlertsOn": "{made} of {total} created · {count} alert on | {made} of {total} created · {count} alerts on",
+      "noteAlertsOff": "{made} of {total} created · alerts off",
+      "noteAlreadyHere": "{made} of {total} created · {count} already here"
+    },
+    "alertStep": {
+      "turnOn": "Turn on the {count} pack alert | Turn on the {count} pack alerts",
+      "sendTo": "Send to",
+      "sendToEmail": "Send to: {icon} Email me — {email}",
+      "firstOf": "First of {count} destination in this org | First of {count} destinations in this org",
+      "emailCreateNote": "No destination in this org yet. Set up adds an email destination for you (or reuses one that only sends to you).",
+      "historyOnly": "Alerts will fire into alert history only. No one is notified.",
+      "noDestination": "No destination yet. Add one under Alerts → Destinations, then route the alerts from the pack page."
+    },
+    "ready": {
+      "title": "{title} monitoring is ready",
+      "dashboards": "{count} dashboard | {count} dashboards",
+      "views": "{count} saved view in Logs | {count} saved views in Logs",
+      "alertsOn": "{count} alert on → {destination} | {count} alerts on → {destination}",
+      "alertsOnEmail": "{count} alert on → Email me ({email}) | {count} alerts on → Email me ({email})",
+      "alertsHistoryOnly": "{count} alert on — recorded in alert history; no one is notified | {count} alerts on — recorded in alert history; no one is notified",
+      "alertsOffWithDestination": "Alerts are off — they will send to {destination} when you turn them on",
+      "alertsOffPlain": "Alerts are off",
+      "addDestination": "Add a destination from the pack page",
+      "alertsOff": "Alerts are off — {reason}",
+      "offEmailFailed": "the email destination couldn't be saved; email is not set up on this server",
+      "offForbidden": "you can't create destinations; ask an admin",
+      "alreadyOff": "{count} pack alert was already here and is off. | {count} pack alerts were already here and are off.",
+      "turnOnRest": "Turn on the rest from the pack page",
+      "turnOnThem": "Turn them on from the pack page",
+      "receiving": "Receiving data from {cluster}",
+      "waiting": "Waiting for first data — dashboards fill in when it arrives",
+      "whereNext": "Where to next",
+      "openView": "Open {view}",
+      "openViewHint": "Clusters, nodes and workloads in one place",
+      "openDashboard": "Open the dashboard",
+      "recommended": "Recommended"
     }
   },
   "alert_library": {

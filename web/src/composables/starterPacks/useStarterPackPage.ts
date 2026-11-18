@@ -255,9 +255,9 @@ export function useStarterPackPage(org: string, pack: StarterPack) {
     }
   };
 
-  /** Resumes the install, which makes again only what failed. */
+  /** Resumes the install with its stored alert choice, which makes again only what failed. */
   const retry = async () => {
-    await flow.install(flow.record.value?.folderName);
+    await flow.retry();
     await refresh();
   };
 

@@ -89,8 +89,9 @@ import {
   readOrgStreams,
   readSchemaColumns,
 } from "./packMatchData";
-import { isFresh, MAX_STREAM_COPIES } from "./streamCandidates";
+import { MAX_STREAM_COPIES } from "./streamCandidates";
 import { contentHash, useInstallRecords } from "./useInstallRecords";
+import { catalogVersion } from "./usePackCatalog";
 import { mergeUpdate, pickFields, revertUpdate } from "./packUpdate";
 import { panelHash } from "./repairLater";
 import { StreamRewriteError } from "./streamRewriter";
@@ -234,7 +235,8 @@ export function useStarterPacks(org: string) {
     const wanted = dashboardStreams(doc);
     const schemas = new Map<string, Set<string>>();
     if (!wanted.length) return schemas;
-    const types = ["metrics", "logs"];
+    // The last type read wins a shared name, so logs keeps winning as it did before traces was read.
+    const types = ["traces", "metrics", "logs"];
     const lists = await Promise.all(
       types.map((type) => readQuery(streamNameListQuery(org, type), true)),
     );
@@ -252,11 +254,10 @@ export function useStarterPacks(org: string) {
     return schemas;
   };
 
-  const fitPackDashboard = async (
-    dashboard: PackDashboard,
+  const fitLoadedDashboard = async (
+    loaded: Record<string, any>,
     adaptation: PackAdaptation = NO_ADAPTATION,
   ): Promise<DashboardFit> => {
-    const loaded = await dashboard.load();
     if (!adaptation.repairs.length && !adaptation.bindings.length) {
       return fitDashboard(loaded, await readDashboardSchemas(loaded));
     }
@@ -267,6 +268,9 @@ export function useStarterPacks(org: string) {
     await planKeptPanels(fit.doc, rewriteChecks);
     return fit;
   };
+
+  const fitPackDashboard = async (dashboard: PackDashboard, adaptation?: PackAdaptation) =>
+    fitLoadedDashboard(await dashboard.load(), adaptation);
 
   const dashboardAdapter = (
     pack: StarterPack,
@@ -314,6 +318,7 @@ export function useStarterPacks(org: string) {
     adaptation: PackAdaptation,
     flavour?: PackFlavourAlert,
     enabled = false,
+    destination?: string,
   ) => {
     const flavoured = withFlavour(payload, flavour);
     const doc = await adaptAlert(flavoured, adaptation, rewriteChecks, stream);
@@ -323,7 +328,7 @@ export function useStarterPacks(org: string) {
       ...doc,
       name: stream ? `${doc.name}_${stream}` : doc.name,
       enabled,
-      destinations: [],
+      destinations: destination ? [destination] : [],
       tags: [...new Set(tags)],
     };
   };
@@ -336,6 +341,7 @@ export function useStarterPacks(org: string) {
     adaptation: PackAdaptation,
     flavour?: PackFlavourAlert,
     enabled = false,
+    destination?: string,
   ): PackItemAdapter => {
     let savedId: string | undefined;
     return {
@@ -364,7 +370,7 @@ export function useStarterPacks(org: string) {
           timezone: store.state.timezone,
           scheduledOnly: true,
           decoratePayload: (payload) =>
-            decorateAlert(pack, item, payload, adaptation, flavour, enabled),
+            decorateAlert(pack, item, payload, adaptation, flavour, enabled, destination),
           onSaved: (id) => {
             savedId = id;
           },
@@ -415,13 +421,23 @@ export function useStarterPacks(org: string) {
     adaptation: PackAdaptation = NO_ADAPTATION,
     flavours: Record<string, string> = {},
     enableAlerts = false,
+    destination?: string,
   ): PackItemAdapter => {
     if (item.kind === "folder") return folderAdapter(pack, item.itemId as PackFolderType);
     if (item.kind === "dashboard") return dashboardAdapter(pack, item.itemId, items, adaptation);
     if (item.kind === "alert") {
       const id = item.copyOf ?? item.itemId;
       const flavour = flavourAlert(pack, flavours[id], id);
-      return alertAdapter(pack, item, items, entries, adaptation, flavour, enableAlerts);
+      return alertAdapter(
+        pack,
+        item,
+        items,
+        entries,
+        adaptation,
+        flavour,
+        enableAlerts,
+        destination,
+      );
     }
     return savedViewAdapter(pack, item.itemId, adaptation);
   };
@@ -465,7 +481,7 @@ export function useStarterPacks(org: string) {
   ) => {
     const here = (name: string) => {
       const found = locateStream(name, "metrics", { streams, repairs: [] });
-      return !!found && isFresh(found.lastIngested, Date.now());
+      return !!found && found.lastIngested > 0;
     };
     const flavours: Record<string, string> = {};
     const unsupported = new Set<string>();
@@ -487,6 +503,7 @@ export function useStarterPacks(org: string) {
   const adaptationFor = async (
     pack: StarterPack,
     listed: AlertLibraryEntry[],
+    loaded: Map<string, Record<string, any> | null>,
     choices?: PackChoices,
   ) => {
     const streams = await readOrgStreams(org);
@@ -499,8 +516,9 @@ export function useStarterPacks(org: string) {
     );
     const { flavours, unsupported } = pickFlavours(pack, alerts, streams);
     // A shared dashboard is imported as its importer ships it, so the plan never rewrites it.
-    const adaptable = pack.dashboards.filter(({ shared }) => !shared);
-    const docs = await Promise.all(adaptable.map((dashboard) => dashboard.load()));
+    const docs = pack.dashboards.flatMap(({ id, shared }) =>
+      shared ? [] : (loaded.get(id) ?? []),
+    );
     const sources = await readBindingSources(org, [pack]);
     const plan = await planAdaptation({
       pack,
@@ -509,10 +527,9 @@ export function useStarterPacks(org: string) {
       panels: docs.flatMap(dashboardItems),
       sources,
       choices,
-      nowMs: Date.now(),
       readers: {
         columns: async (type, name) => new Set(await readSchemaColumns(org, type, name)),
-        values: (stream, fields) => readValues(stream, fields),
+        values: (stream, fields, lastIngested) => readValues(stream, fields, "logs", lastIngested),
       },
     });
     return { ...plan, alerts, flavours, unsupported, streams, titles: sources.titles };
@@ -535,7 +552,13 @@ export function useStarterPacks(org: string) {
   const previewPack = async (pack: StarterPack, choices?: PackChoices): Promise<PackPreview> => {
     const { entries, offline } = await loadEntries(pack);
     const listed = pack.alerts.flatMap((id) => entries.get(id) ?? []);
-    const plan = await adaptationFor(pack, listed, choices);
+    // A dashboard the gallery cannot serve is left out like a missing alert, not a failed preview.
+    const loaded = new Map(
+      await Promise.all(
+        pack.dashboards.map(async ({ id, load }) => [id, await load().catch(() => null)] as const),
+      ),
+    );
+    const plan = await adaptationFor(pack, listed, loaded, choices);
     const { repairs, bindings, flavours, alerts, unsupported, streams } = plan;
     const flavoured = listed.map((entry) => flavouredEntry(pack, entry, flavours[entry.id]));
     const verdicts = STARTER_PACKS_ENABLED
@@ -562,16 +585,21 @@ export function useStarterPacks(org: string) {
     }
 
     const panels = { kept: 0, dropped: 0 };
-    const noFit = new Set<string>();
+    const noFit = new Map<string, PackNotIncludedReason>();
     for (const dashboard of pack.dashboards) {
+      const doc = loaded.get(dashboard.id);
+      if (!doc) {
+        noFit.set(dashboard.id, "unavailable");
+        continue;
+      }
       const adaptation = dashboard.shared ? NO_ADAPTATION : { repairs, bindings };
-      const fit = await fitPackDashboard(dashboard, adaptation).catch((error) => {
+      const fit = await fitLoadedDashboard(doc, adaptation).catch((error) => {
         if (error instanceof StreamRewriteError) return { doc: {}, kept: 0, dropped: 1 };
         throw error;
       });
       panels.kept += fit.kept;
       panels.dropped += fit.dropped;
-      if (!fit.kept && fit.dropped) noFit.add(dashboard.id);
+      if (!fit.kept && fit.dropped) noFit.set(dashboard.id, "no_data");
     }
 
     const alertReason = (id: string): PackNotIncludedReason | null => {
@@ -586,13 +614,23 @@ export function useStarterPacks(org: string) {
       return unsupported.has(id) ? "no_flavour" : "no_data";
     };
 
+    // Install skips only what the preview leaves out, so an unanswered question must not keep it.
+    const viewMissing = (itemId: string) => {
+      const stream = pack.savedViews.find(({ id }) => id === itemId)?.search?.data?.stream;
+      const type = String(stream?.streamType ?? "logs");
+      const wanted: string[] = stream?.selectedStream ?? [];
+      return wanted.some((name) => !locateStream(name, type, { streams, repairs }));
+    };
+
     const notIncluded: PackNotIncludedItem[] = [];
     const items: PackRecordItem[] = [];
     const reported = new Set<string>();
     for (const item of await planItems(pack, copies)) {
       const name = names[item.itemId] ?? item.itemId;
-      if (item.kind === "dashboard" && item.status !== "existing" && noFit.has(item.itemId)) {
-        notIncluded.push({ kind: "dashboard", itemId: item.itemId, name, reason: "no_data" });
+      const unfit =
+        item.kind === "dashboard" && item.status !== "existing" && noFit.get(item.itemId);
+      if (unfit) {
+        notIncluded.push({ kind: "dashboard", itemId: item.itemId, name, reason: unfit });
         continue;
       }
       const id = item.copyOf ?? item.itemId;
@@ -603,6 +641,9 @@ export function useStarterPacks(org: string) {
         if (!reported.has(id))
           notIncluded.push({ kind: "alert", itemId: id, name: names[id] ?? id, reason: missing });
         reported.add(id);
+        continue;
+      } else if (item.kind === "savedView" && viewMissing(item.itemId)) {
+        notIncluded.push({ kind: "savedView", itemId: item.itemId, name, reason: "no_data" });
         continue;
       }
       items.push(item);
@@ -645,6 +686,7 @@ export function useStarterPacks(org: string) {
     entries: Map<string, AlertLibraryEntry>,
     record: PackInstallRecord,
     enableAlerts = false,
+    destination?: string,
   ): Promise<PackRecordItem> => {
     const adaptation = { repairs: record.repairs ?? [], bindings: record.bindings ?? [] };
     const adapter = adapterFor(
@@ -655,6 +697,7 @@ export function useStarterPacks(org: string) {
       adaptation,
       record.flavours,
       enableAlerts,
+      destination,
     );
     try {
       let found = await adapter.lookup();
@@ -698,6 +741,7 @@ export function useStarterPacks(org: string) {
       copies,
       folderName,
       enableAlerts = false,
+      destination,
     }: PackInstallOptions,
   ): Promise<PackInstallRecord> => {
     const { entries } = await loadEntries(sourcePack);
@@ -710,9 +754,16 @@ export function useStarterPacks(org: string) {
     const excluded = (item: PackRecordItem) =>
       exclude.includes(item.itemId) || exclude.includes(item.copyOf ?? item.itemId);
     const kept = (item: PackRecordItem) => item.status === "created" || !excluded(item);
+    const choice = {
+      ...(enableAlerts ? { enableAlerts } : {}),
+      ...(destination ? { destination } : {}),
+    };
     const record: PackInstallRecord = interrupted
       ? {
           ...interrupted,
+          enableAlerts: undefined,
+          destination: undefined,
+          ...choice,
           status: "installing",
           installedAt: Date.now() * 1000,
           items: interrupted.items.filter(kept),
@@ -724,15 +775,17 @@ export function useStarterPacks(org: string) {
           installedAt: Date.now() * 1000,
           installedBy: store.state.userInfo?.email ?? "",
           version: pack.version,
+          catalogVersion: catalogVersion(),
           ...(repairs.length ? { repairs } : {}),
           ...(bindings.length ? { bindings } : {}),
           ...(Object.keys(flavours).length ? { flavours } : {}),
           ...(folderName ? { folderName } : {}),
+          ...choice,
           items: (await planItems(pack, copies)).filter((item) => !excluded(item)),
         };
     await writeFirstRecord(record);
     onProgress?.(record);
-    return settleRecord(pack, record, entries, onProgress, enableAlerts);
+    return settleRecord(pack, record, entries, onProgress, enableAlerts, destination);
   };
 
   const settleRecord = async (
@@ -741,6 +794,7 @@ export function useStarterPacks(org: string) {
     entries: Map<string, AlertLibraryEntry>,
     onProgress?: PackInstallOptions["onProgress"],
     enableAlerts = false,
+    destination?: string,
   ): Promise<PackInstallRecord> => {
     for (let index = 0; index < record.items.length; index += 1) {
       const item = record.items[index];
@@ -752,6 +806,7 @@ export function useStarterPacks(org: string) {
         entries,
         record,
         enableAlerts,
+        destination,
       );
       await records.write(record);
       onProgress?.(record);

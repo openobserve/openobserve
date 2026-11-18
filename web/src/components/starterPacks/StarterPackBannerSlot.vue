@@ -17,19 +17,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
-import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import { packById } from "@/composables/starterPacks/usePackCatalog";
+import type { HomePackRowItem, HomePackView } from "@/composables/starterPacks/useHomePacks";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
-import StarterPackInstallCard, { type StarterPackCardStatus } from "./StarterPackInstallCard.vue";
+import StarterPackHomeRow from "./StarterPackHomeRow.vue";
 
 const props = defineProps<{ org: string; clusterName?: string }>();
 const emit = defineEmits<{ offered: [offered: boolean] }>();
 
 const { t } = useI18nTyped();
-const flow = useStarterPackFlow(props.org, KUBERNETES_PACK);
+const pack = packById("kubernetes")!;
+const flow = useStarterPackFlow(props.org, pack);
 const matcher = useStarterPackMatcher(props.org, { poll: true });
 const drawerOpen = ref(false);
 
@@ -39,6 +42,10 @@ onMounted(() => {
 });
 watch(matcher.state, (state) => {
   if (state === "matched") void flow.loadPreview();
+});
+// A long wait still offers the logs-only setup, so its card counts load too.
+watch(matcher.waitedLong, (long) => {
+  if (long) void flow.loadPreview();
 });
 
 const clusters = computed(() => {
@@ -63,31 +70,28 @@ watch(
   { immediate: true },
 );
 
-const showCard = computed(
+const showRow = computed(
   () =>
     matcher.state.value !== "error" &&
-    (flow.forbidden.value || pending.value || flow.interrupted.value || offering.value),
+    !flow.interrupted.value &&
+    (flow.forbidden.value || pending.value || offering.value),
 );
-const status = computed<StarterPackCardStatus>(() => {
+const view = computed<HomePackView>(() => {
   if (flow.forbidden.value) return "forbidden";
-  if (pending.value) return "checking";
-  if (flow.interrupted.value) return "interrupted";
-  if (flow.running.value) return "running";
-  if (flow.failed.value.length) return "failed";
-  if (matcher.waitedLong.value) return "waiting";
-  return "ready";
-});
-const primaryTestId = computed(() => {
-  if (status.value === "checking") return "first-event-status-pack-checking";
-  if (status.value === "waiting") return "first-event-status-pack-partial-btn";
-  return "first-event-status-pack-setup-btn";
-});
-const primaryLabel = computed(() => {
-  if (status.value === "interrupted") return t("starterPacks.progress.finish");
-  if (status.value === "waiting") return t("starterPacks.partial");
-  return undefined;
+  if (pending.value) return "loading";
+  return "offer";
 });
 const copyLink = () => copyToClipboard(flow.packLink(), t);
+const row: HomePackRowItem = {
+  pack,
+  title: t(pack.titleKey),
+  testId: (id: string) => id.replace("home-pack", "first-event-status-pack"),
+  flow,
+  matcher,
+  view,
+  copyLink,
+  startSetup: () => (drawerOpen.value = true),
+};
 </script>
 
 <template>
@@ -102,33 +106,37 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
       {{ t("starterPacks.retryCheck") }}
     </OButton>
   </Teleport>
-  <StarterPackInstallCard
-    v-if="showCard"
-    :title="t(KUBERNETES_PACK.titleKey)"
-    :flow="flow"
-    :status="status"
-    :stream-count="matcher.streams.value.length"
-    test-id="first-event-status-pack-card"
-    :primary-label="primaryLabel"
-    :primary-test-id="primaryTestId"
-    @install="drawerOpen = true"
+  <OBanner
+    v-if="flow.interrupted.value"
+    variant="warning"
+    dense
+    inline-actions
+    data-test="first-event-status-pack-interrupted"
   >
-    <template v-if="status === 'forbidden'" #actions>
+    {{
+      t("starterPacks.home.interrupted", {
+        title: row.title,
+        made: flow.made.value.length,
+        total: flow.toCreate.value.length,
+      })
+    }}
+    <template #actions>
       <OButton
-        variant="outline"
+        variant="primary"
         size="sm-action"
-        icon-left="content-copy"
-        data-test="first-event-status-pack-copy-link-btn"
-        @click="copyLink"
+        data-test="first-event-status-pack-interrupted-btn"
+        @click="drawerOpen = true"
       >
-        {{ t("starterPacks.copyLink") }}
+        {{ t("starterPacks.progress.finish") }}
       </OButton>
     </template>
-  </StarterPackInstallCard>
+  </OBanner>
+  <StarterPackHomeRow v-else-if="showRow" :item="row" :first="view !== 'forbidden'" />
   <StarterPackDrawer
     v-model:open="drawerOpen"
     :flow="flow"
     :clusters="clusters"
+    :match-state="matcher.state.value"
     @copy-link="copyLink"
   />
 </template>

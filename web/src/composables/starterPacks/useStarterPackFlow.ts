@@ -18,6 +18,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import { readQuery } from "@/composables/query/readQuery";
+import { refreshOrgResources } from "@/composables/useOrgResources";
 import { alertsByTagsQuery } from "@/services/alerts.queries";
 import { featureState } from "@/utils/featureGate";
 
@@ -45,6 +46,8 @@ export interface PackInstallChoice {
   /** Item ids the user unticked, on top of the ones the preview leaves out. */
   exclude?: string[];
   enableAlerts?: boolean;
+  /** Alert destination the created alerts route to, whether they start on or off. */
+  destination?: string;
 }
 
 const countsAsItem = (item: PackRecordItem) => item.kind !== "folder";
@@ -203,13 +206,10 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   const planned = (kind: PackRecordItem["kind"]) =>
     (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
-  const alertCount = computed(() => (preview.value ? planned("alert").length : pack.alerts.length));
-  const dashboardCount = computed(() =>
-    preview.value ? planned("dashboard").length : pack.dashboards.length,
-  );
-  const viewCount = computed(() =>
-    preview.value ? planned("savedView").length : pack.savedViews.length,
-  );
+  // Null until the preview loads, since the raw pack counts items the data may not support.
+  const alertCount = computed(() => (preview.value ? planned("alert").length : null));
+  const dashboardCount = computed(() => (preview.value ? planned("dashboard").length : null));
+  const viewCount = computed(() => (preview.value ? planned("savedView").length : null));
 
   const alertsRoute = computed(() => ({
     name: "alertList",
@@ -255,11 +255,9 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     alertsOn.value = enabledAlertIds.value.size;
   };
 
-  const install = async (
-    folderName?: string,
-    { exclude: unticked = [], enableAlerts = false }: PackInstallChoice = {},
-  ): Promise<boolean> => {
+  const install = async (folderName?: string, choice: PackInstallChoice = {}): Promise<boolean> => {
     if (running.value) return false;
+    const { exclude: unticked = [], enableAlerts = false, destination } = choice;
     running.value = true;
     installFailed.value = false;
     forbidden.value = false;
@@ -274,6 +272,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
         copies: plan.copies,
         folderName,
         enableAlerts,
+        destination,
         onProgress: (next) => {
           record.value = { ...next, items: [...next.items] };
           if (enableAlerts) trackEnabled(next);
@@ -281,6 +280,12 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       });
       record.value = { ...done, items: [...done.items] };
       if (enableAlerts) trackEnabled(done);
+      // Alerts the lookup found keep their own state, so only the server knows which are on.
+      const tracked = enabledAlertIds.value;
+      await readAlertsOn().catch(() => {});
+      // The tag search trails a create, so keep the alerts this run just made on.
+      enabledAlertIds.value = new Set([...enabledAlertIds.value, ...tracked]);
+      alertsOn.value = enabledAlertIds.value.size;
       return done.status === "complete";
     } catch (error) {
       if (error instanceof StarterPackPermissionError) forbidden.value = true;
@@ -288,7 +293,14 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       return false;
     } finally {
       running.value = false;
+      void refreshOrgResources(org);
     }
+  };
+
+  /** Finishes an interrupted install the way it was asked for, even after a reload. */
+  const retry = () => {
+    const { enableAlerts, destination } = record.value ?? {};
+    return install(undefined, { enableAlerts, destination });
   };
 
   const applyRemoval = async (work: () => Promise<PackRemovalResult>) => {
@@ -305,6 +317,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
       return false;
     } finally {
       busy.value = false;
+      void refreshOrgResources(org);
     }
   };
 
@@ -360,6 +373,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     remove,
     removal,
     removalFailed,
+    retry,
     running,
     skipped,
     toCreate,

@@ -22,8 +22,8 @@ import type { PackStream } from "./packStreams";
 
 export const STALE_AFTER_US = 30 * 60 * 1_000_000;
 
-// Where the type is unknown (a dashboard's streams) both lists are read.
-const UNTYPED_LOOKUP = ["metrics", "logs"];
+// Where the type is unknown (a dashboard's streams) every list is read.
+const UNTYPED_LOOKUP = ["metrics", "logs", "traces"];
 
 export type StreamHealthState = "receiving" | "stopped" | "never" | "unknown";
 

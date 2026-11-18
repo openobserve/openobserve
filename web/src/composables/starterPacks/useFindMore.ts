@@ -36,11 +36,11 @@ import {
   type FindMoreResult,
   type FindMoreSource,
 } from "./findMore";
-import { STARTER_PACKS } from "./kubernetesPack";
+import { packs as allPacks } from "./usePackCatalog";
 import { matchAlerts, matchPack, readOrgStreams } from "./packMatchData";
 import type { StarterPack } from "./types";
-import { useBrowserMatches } from "./useBrowserMatches";
 import { useInstallRecords } from "./useInstallRecords";
+import { fitStreams } from "./useStarterPackMatcher";
 import { useStarterPacks } from "./useStarterPacks";
 import { queriesPerDay } from "./wouldFire";
 
@@ -135,21 +135,22 @@ export function useFindMoreCheck(org: string) {
       readDismissalsForCheck(),
     ]);
     const library = { loadManifest, loadAlertFile };
-    const packAlerts = new Set(STARTER_PACKS.flatMap((pack) => pack.alerts));
+    const packAlerts = new Set(allPacks().flatMap((pack) => pack.alerts));
     const outside = manifest.alerts.filter((entry) => !packAlerts.has(entry.id));
     const packs = await Promise.all(
-      STARTER_PACKS.map(async (pack) => ({
+      allPacks().map(async (pack) => ({
         pack,
         match: await matchPack(org, pack, streams, library),
+        fits: await fitStreams(org, pack, streams),
         records: await records.list(pack.id),
       })),
     );
     const verdicts = await matchAlerts(org, outside, streams, {
       loadFile: loadAlertFile,
-      packs: STARTER_PACKS,
+      packs: allPacks(),
     });
     const catalog = new Map(manifest.alerts.map((entry) => [entry.id, entry]));
-    for (const pack of STARTER_PACKS) {
+    for (const pack of allPacks()) {
       for (const { entry } of pack.bundledAlerts ?? []) {
         if (!catalog.has(entry.id)) catalog.set(entry.id, entry);
       }
@@ -182,7 +183,6 @@ export function useFindMore(org: string) {
   const runner = useFindMoreCheck(org);
   const installer = useStarterPacks(org);
   const { loadManifest } = useAlertLibrary();
-  const browser = useBrowserMatches(org);
   const result = ref<FindMoreResult | null>(null);
   const state = ref<"idle" | "checking" | "ready" | "error">("idle");
   const added = ref<FindMoreAdded[]>([]);
@@ -201,8 +201,6 @@ export function useFindMore(org: string) {
   };
 
   const packFor = async (source: FindMoreSource): Promise<StarterPack> => {
-    const shipped = STARTER_PACKS.find(({ id }) => id === source.packId);
-    if (shipped) return shipped;
     const manifest = await loadManifest();
     const ids = new Set(source.items.map(({ id }) => id));
     return libraryPack(
@@ -226,12 +224,7 @@ export function useFindMore(org: string) {
   ): Promise<{ done: FindMoreAdded; complete: boolean }> => {
     const itemIds = source.items.map(({ id }) => id);
     const live = (await installer.listInstalls(pack.id)).find(({ status }) => status !== "removed");
-    const preview = source.packId ? await installer.previewPack(pack) : null;
-    const adaptation = {
-      repairs: preview?.repairs ?? [],
-      bindings: preview?.bindings ?? [],
-      flavours: preview?.flavours ?? {},
-    };
+    const adaptation = { repairs: [], bindings: [], flavours: {} };
     if (live) {
       const record = await installer.appendToInstall(pack, live.installId, itemIds, adaptation);
       const done = { source, installId: live.installId, itemIds, newRecord: false };
@@ -244,24 +237,22 @@ export function useFindMore(org: string) {
     ].filter((id) => !itemIds.includes(id));
     const record = await installer.installPack(pack, {
       ...adaptation,
-      copies: preview?.copies,
       exclude: [...others, ...unusedFolders(source)],
     });
     const done = { source, installId: record.installId, itemIds, newRecord: true };
     return { done, complete: record.status === "complete" };
   };
 
-  /** Installs one source's new matches with alerts off, like a first install. */
+  /** Installs one Library group's new matches with alerts off, like a first install. */
   const add = async (source: FindMoreSource): Promise<boolean> => {
+    // A starter pack is only ever set up through its setup popup.
+    if (source.packId) return false;
     busy.value = source.id;
     try {
       const { done, complete } = await install(await packFor(source), source);
       added.value = [...added.value, done];
       // An incomplete install keeps the source listed; Undo still covers what was made.
-      if (complete) {
-        dropSource(source.id);
-        browser.markInstalled(source.id, source.packId);
-      }
+      if (complete) dropSource(source.id);
       return complete;
     } catch {
       return false;

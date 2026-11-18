@@ -29,7 +29,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { FindMoreSource } from "@/composables/starterPacks/findMore";
-import { STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { packs } from "@/composables/starterPacks/usePackCatalog";
 import { useBrowserMatches } from "@/composables/starterPacks/useBrowserMatches";
 import { useRefreshMatches } from "@/composables/starterPacks/useRefreshMatches";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
@@ -62,7 +62,7 @@ const rows = computed(() => matches.visible.value.slice(0, ROWS_SHOWN));
 const moreCount = computed(() => Math.max(0, matches.count.value - ROWS_SHOWN));
 const interrupted = computed(() => matches.copy.value?.interrupted ?? null);
 
-const builtIns = STARTER_PACKS.map((pack) => {
+const builtIns = packs().map((pack) => {
   const flow = useStarterPackFlow(org, pack);
   const matcher = useStarterPackMatcher(org, { pack });
   return { pack, flow, matcher };
@@ -77,11 +77,14 @@ const nameOf = (source: FindMoreSource): I18nText => {
 
 const logoOf = (source: FindMoreSource) => builtInOf(source.packId)?.pack.logo;
 
+// Visible rows never hold an installed built-in, so its setup makes what the popup would.
+const sourceCounts = (source: FindMoreSource): [number, number, number] => {
+  const flow = builtInOf(source.packId)?.flow;
+  return [flow?.dashboardCount.value ?? 0, flow?.alertCount.value ?? 0, flow?.viewCount.value ?? 0];
+};
+
 const countsLine = (source: FindMoreSource): I18nText => {
-  const dashboards = source.items.filter(({ kind }) => kind === "dashboard").length;
-  const alerts = source.items.length - dashboards;
-  // Visible rows never hold an installed built-in, so its setup also makes its saved views.
-  const views = builtInOf(source.packId)?.pack.savedViews.length ?? 0;
+  const [dashboards, alerts, views] = sourceCounts(source);
   const parts = [
     ...(dashboards
       ? [t("starterPacks.headerChip.countDashboards", { count: dashboards }, dashboards)]
@@ -107,9 +110,7 @@ const openDrawer = (packId: string) => {
   activePack.value = packId;
 };
 
-// A Library group has no setup popup of its own yet, so it is set up from the Starter Packs page.
-const setUp = (source: FindMoreSource) =>
-  builtInOf(source.packId) ? openDrawer(source.packId!) : openLibrary();
+const setUp = (source: FindMoreSource) => openDrawer(source.packId!);
 
 const notNowAll = () => {
   const ids = matches.notNowAll();
@@ -266,7 +267,12 @@ const setDrawerOpen = (packId: string, isOpen: boolean) => {
               <template #count>{{ source.streams.length - 1 }}</template>
             </Translation>
           </OTruncatedText>
-          <OText variant="meta">{{ countsLine(source) }}</OText>
+          <OText
+            v-if="countsLine(source)"
+            variant="meta"
+            :data-test="`header-starter-packs-counts-${source.id}`"
+            >{{ countsLine(source) }}</OText
+          >
           <div class="mt-1.5 flex">
             <OButton
               variant="primary"

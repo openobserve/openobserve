@@ -18,8 +18,6 @@ import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types
 import { dashboardPanelNeeds, queryNeeds } from "./dashboardFit";
 import type { PackRepair } from "./types";
 
-const FRESH_MS = 24 * 60 * 60 * 1000;
-
 /** What one alert or dashboard panel reads. No `streamType` means any type. */
 export interface MatchItem {
   streamType?: string;
@@ -78,7 +76,6 @@ export const matchItem = (item: MatchItem | null, facts: MatchFacts): boolean =>
   for (const stream of item.streams) {
     const found = locateStream(stream, item.streamType, facts);
     if (!found || found.lastIngested <= 0) return false;
-    if (facts.nowMs - found.lastIngested / 1000 > FRESH_MS) return false;
     const columns = facts.fields.get(schemaKey(found.type, found.name));
     if (!columns) schemasKnown = false;
     else if (columns.size === 0) return false;

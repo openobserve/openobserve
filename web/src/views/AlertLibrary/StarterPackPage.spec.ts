@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { computed, ref, shallowRef } from "vue";
+import { computed, reactive, ref, shallowRef } from "vue";
 
 import { fakeFlow } from "@/components/starterPacks/starterPackTestFlow";
 import { staleSinceText } from "@/composables/starterPacks/usePackHealth";
@@ -78,7 +78,7 @@ vi.mock("@/composables/starterPacks/useRepairLater", async (importOriginal) => (
   useRepairLater: () => fake.repair,
 }));
 vi.mock("@/composables/starterPacks/useStarterPackMatcher", () => ({
-  useStarterPackMatcher: () => ({ clusters: ref([]), check: vi.fn() }),
+  useStarterPackMatcher: () => ({ clusters: ref([]), state: ref("matched"), check: vi.fn() }),
 }));
 vi.mock("@/composables/starterPacks/usePackHealth", async (importOriginal) => {
   const { shallowRef: vueShallowRef, ref: vueRef } = await import("vue");
@@ -201,6 +201,7 @@ const render = async () => {
   await flushPromises();
   return wrapper;
 };
+const turnOnDrawer = (wrapper: any) => wrapper.findComponent({ name: "TurnOnAlertsDrawer" });
 const has = (wrapper: any, id: string) => wrapper.find(`[data-test="${id}"]`).exists();
 const text = (wrapper: any, id: string) => wrapper.get(`[data-test="${id}"]`).text();
 
@@ -235,6 +236,11 @@ describe("StarterPackPage", () => {
       loadState: ref("ready"),
       load: vi.fn(),
       forbidden: ref(false),
+      listedRows: computed(() =>
+        fake.turn.rows.value.filter(
+          ({ enabled, alert }: any) => !enabled || !alert.destinations?.length,
+        ),
+      ),
     };
     fake.updates = {
       available: ref(false),
@@ -279,6 +285,13 @@ describe("StarterPackPage", () => {
     it("drops Turn on once every alert is active", async () => {
       fake.turn.rows.value = [row("a", true)];
       expect(has(await render(), "starter-pack-page-turn-on-btn")).toBe(false);
+    });
+
+    it("offers Turn on for alerts that are on with no destination", async () => {
+      fake.turn.rows.value = [row("a", true, { alert: { stream_name: "s", destinations: [] } })];
+      expect(text(await render(), "starter-pack-page-turn-on-btn")).toBe(
+        t("starterPacks.turnOn.submit", { count: 1 }, 1),
+      );
     });
 
     it("leaves a view-only user with Share alone", async () => {
@@ -357,11 +370,22 @@ describe("StarterPackPage", () => {
       );
     });
 
+    it("retries an interrupted install with the alert choice it stored", async () => {
+      fake.flow.record.value = installedRecord([
+        recordItem("alert", "k8s/c", { status: "failed", id: undefined }),
+      ]);
+      const wrapper = await render();
+      await wrapper.get('[data-test="starter-pack-page-notice-failed-action"]').trigger("click");
+      await flushPromises();
+      expect(fake.flow.retry).toHaveBeenCalledTimes(1);
+      expect(fake.flow.install).not.toHaveBeenCalled();
+    });
+
     it("explains paused alerts with no button of its own", async () => {
       const wrapper = await render();
       const notice = wrapper.get('[data-test="starter-pack-page-notice-paused"]');
       expect(notice.text()).toContain("1 alert is paused");
-      expect(notice.text()).toContain("CPU, memory or pods");
+      expect(notice.text()).toContain("pods crash or run out of memory");
       expect(has(wrapper, "starter-pack-page-notice-paused-action")).toBe(false);
     });
 
@@ -671,6 +695,56 @@ describe("StarterPackPage", () => {
     await flushPromises();
     expect(has(wrapper, "starter-pack-page-loading")).toBe(false);
     expect(has(wrapper, "starter-pack-page-status")).toBe(true);
+  });
+
+  describe("turn on link", () => {
+    it("opens the Turn on drawer to route alerts that are on with no destination", async () => {
+      fake.query = { org_identifier: "org", turnOn: "1" };
+      fake.turn.rows.value = [row("a", true, { alert: { stream_name: "s", destinations: [] } })];
+      const wrapper = await render();
+      expect(turnOnDrawer(wrapper).props("open")).toBe(true);
+      expect(fake.replace).toHaveBeenCalledWith({ query: { org_identifier: "org" } });
+    });
+
+    it("keeps the link when there is nothing to turn on", async () => {
+      fake.query = { org_identifier: "org", turnOn: "1" };
+      fake.turn.rows.value = [row("a", true)];
+      const wrapper = await render();
+      expect(turnOnDrawer(wrapper).props("open")).toBe(false);
+      expect(fake.replace).not.toHaveBeenCalled();
+    });
+
+    it("opens the Turn on drawer for a link that arrived while the rows reloaded", async () => {
+      fake.query = reactive({ org_identifier: "org" }) as Record<string, string>;
+      fake.turn.rows.value = [];
+      const wrapper = await render();
+      let finish!: () => void;
+      fake.turn.load = vi.fn(
+        () =>
+          new Promise<void>((done) => {
+            finish = () => {
+              fake.turn.rows.value = [row("a", false)];
+              done();
+            };
+          }),
+      );
+      wrapper.findComponent({ name: "StarterPackDrawer" }).vm.$emit("installed");
+      await flushPromises();
+      fake.query.turnOn = "1";
+      await flushPromises();
+      expect(turnOnDrawer(wrapper).props("open")).toBe(false);
+      finish();
+      await flushPromises();
+      expect(turnOnDrawer(wrapper).props("open")).toBe(true);
+    });
+  });
+
+  it("re-reads the page when the setup popup reports the pack installed", async () => {
+    const wrapper = await render();
+    vi.mocked(fake.flow.load).mockClear();
+    wrapper.findComponent({ name: "StarterPackDrawer" }).vm.$emit("installed");
+    await flushPromises();
+    expect(fake.flow.load).toHaveBeenCalledTimes(1);
   });
 
   it("names a mistyped pack instead of showing another one", async () => {
