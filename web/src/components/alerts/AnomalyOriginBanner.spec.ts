@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { queryClient } from "@/composables/query/queryClient";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import store from "@/test/unit/helpers/store";
@@ -133,6 +134,15 @@ describe("AnomalyOriginBanner", () => {
     expect(find("title").text()).toBe("Opened from an anomaly");
     expect(find("values").exists()).toBe(true);
     expect(explore.mock.calls[0][3]).toEqual({ silentForbidden: true });
+  });
+
+  it("drops a cached name when a later lookup fails", async () => {
+    await mountBanner(VALUE_LINK);
+    expect(find("title").text()).toBe("Opened from anomaly checkout-requests");
+    explore.mockRejectedValue({ response: { status: 500 } });
+    await queryClient.refetchQueries();
+    await flushPromises();
+    expect(find("title").text()).toBe("Opened from an anomaly");
   });
 
   it("shows the amber note when the detector filter was not applied", async () => {

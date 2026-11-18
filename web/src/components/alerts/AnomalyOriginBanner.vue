@@ -88,7 +88,8 @@ const explore = useQuery(() =>
 );
 
 const title = computed<I18nText>(() => {
-  const name = explore.data.value?.name;
+  // A failed refetch keeps the last data; the failure must still show the unnamed title.
+  const name = explore.isError.value ? undefined : explore.data.value?.name;
   return name
     ? t("alerts.anomaly.originTitle", { name: raw(name) })
     : t("alerts.anomaly.originTitleUnnamed");
