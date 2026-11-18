@@ -52,23 +52,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <div v-if="indexData.schema">
-      <div class="m-0 p-0">
-        <div @submit.prevent="onSubmit">
+    <!-- Fill the drawer body (h-full down the chain) rather than a viewport calc:
+         the drawer header and body padding vary, and a calc that ignores them
+         pushes the footer below the fold on short screens. -->
+    <div v-if="indexData.schema" class="h-full">
+      <div class="m-0 h-full p-0">
+        <div class="h-full" @submit.prevent="onSubmit">
           <!-- we will show loading state here -->
-          <div
-            v-if="loadingState"
-            class="flex h-full w-full items-center justify-center"
-            style="min-height: calc(100vh - 3.75rem)"
-          >
+          <div v-if="loadingState" class="flex h-full w-full items-center justify-center">
             <OSpinner size="md" />
           </div>
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
-          <div
-            v-else
-            class="indexDetailsContainer flex min-h-0 w-full flex-col"
-            style="height: calc(100vh - 3.75rem)"
-          >
+          <div v-else class="indexDetailsContainer flex h-full min-h-0 w-full flex-col">
             <!-- this the grid section the tiles section -->
             <div class="stats-grid mb-2 grid grid-cols-4 gap-2 max-md:grid-cols-2">
               <!-- Docs Count Tile -->
