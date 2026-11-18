@@ -1642,6 +1642,7 @@
     "enableSqlModeOrSelectSingleStream": "Please enable SQL mode to use timechart",
     "drillDown": "Drill down",
     "drillDownUnavailableInSqlMode": "Drill down is not available in SQL mode",
+    "patternsLogsOnly": "Patterns are available for logs streams only",
     "buildQuery": "Visualize",
     "nlpModeDisabledForVisualization": "Natural Language mode cannot be disabled while on timechart with multiple streams",
     "transformType": "Transform Type",

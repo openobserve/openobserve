@@ -127,6 +127,33 @@ describe("SearchBar — Drill down mode toggle", () => {
     expect(router.currentRoute.value.query.logs_visualize_toggle).toBe("drilldown");
   });
 
+  it.each(["traces", "metrics"])(
+    "disables Patterns on a %s stream, which it cannot mine",
+    async (streamType) => {
+      (config as any).isEnterprise = "true";
+      wrapper = mountSearchBar();
+      wrapper.vm.searchObj.data.stream.streamType = streamType;
+      await flushPromises();
+
+      const option = wrapper.vm.toggleViewOptions.find(
+        (o: { value: string }) => o.value === "patterns",
+      );
+      expect(option.disabled).toBe(true);
+    },
+  );
+
+  it("keeps Patterns enabled on a logs stream", async () => {
+    (config as any).isEnterprise = "true";
+    wrapper = mountSearchBar();
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    await flushPromises();
+
+    const option = wrapper.vm.toggleViewOptions.find(
+      (o: { value: string }) => o.value === "patterns",
+    );
+    expect(option.disabled).toBe(false);
+  });
+
   it("extracts patterns when switching from drill down to patterns", async () => {
     (config as any).isEnterprise = "true";
     wrapper = mountSearchBar();
