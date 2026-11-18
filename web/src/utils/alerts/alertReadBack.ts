@@ -438,6 +438,13 @@ export function previewVerdictSentence(
     countsEvents || qc.type === "sql" || qc.type === "promql"
       ? dataNoun(alert.stream_type, qc.type, verdict.count, t)
       : raw(verdict.label ?? "");
+  // A PromQL query sets its own range ([5m]); the look-back plays no part in what it returns now.
+  if (qc.type === "promql")
+    return t(verdict.wouldTrigger ? "alerts.verdict.promqlFires" : "alerts.verdict.promqlQuiet", {
+      count,
+      label,
+      limit,
+    });
   return t(verdict.wouldTrigger ? "alerts.verdict.fires" : "alerts.verdict.quiet", {
     count,
     label,

@@ -340,18 +340,18 @@ describe("previewVerdictSentence", () => {
       "Quiet now: 1 group is over the threshold (needs 3).",
     ],
     [
-      "PromQL series against the value threshold, not the series count",
+      "PromQL series against the value threshold, with no look-back the query does not use",
       { wouldTrigger: false, reason: "", count: 0 },
       promql({ operator: ">=", value: 80 }),
       {},
-      "Quiet now: 0 series in the last 5 minutes (threshold 80).",
+      "Quiet now: 0 series (threshold 80).",
     ],
     [
       "PromQL rule mode against the series count",
       { wouldTrigger: false, reason: "", count: 0 },
       promql(null),
       {},
-      "Quiet now: 0 series in the last 5 minutes (threshold 1).",
+      "Quiet now: 0 series (threshold 1).",
     ],
     [
       "nothing counted",
