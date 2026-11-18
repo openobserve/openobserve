@@ -752,7 +752,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
-import { logsReapplyRequest } from "@/utils/queryHistory/logs";
+import { logsReapplyRequest, requestLogsReapply } from "@/utils/queryHistory/logs";
+import { useLogsHistoryRestore } from "@/composables/useLogs/useLogsHistoryRestore";
 import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
@@ -1219,7 +1220,11 @@ export default defineComponent({
     };
 
     // Logs is not in MainLayout's keep-alive include list, so onActivated alone would never run.
-    onMounted(registerBeforeAppReload);
+    let stopHistoryRestore: (() => void) | undefined;
+    onMounted(() => {
+      registerBeforeAppReload();
+      stopHistoryRestore = useLogsHistoryRestore(router, () => requestLogsReapply(true));
+    });
 
     onActivated(() => {
       registerBeforeAppReload();
@@ -1227,7 +1232,10 @@ export default defineComponent({
     });
 
     onDeactivated(unregisterBeforeAppReload);
-    onBeforeUnmount(unregisterBeforeAppReload);
+    onBeforeUnmount(() => {
+      unregisterBeforeAppReload();
+      stopHistoryRestore?.();
+    });
 
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
