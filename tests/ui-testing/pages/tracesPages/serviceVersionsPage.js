@@ -257,7 +257,10 @@ export class ServiceVersionsPage {
 
   /** Change a catalog row's env through its env chip, with a new label typed into the popover. */
   async setEnvFromChip(service, env) {
-    await this.catalogCell(service, 'version_env').locator('button[data-test="svcver-env-chip"]').click();
+    const chip = this.catalogCell(service, 'version_env').locator('button[data-test="svcver-env-chip"]');
+    // The popover closes when the table scrolls, and a scroll made inside click() lands after it opens.
+    await chip.scrollIntoViewIfNeeded();
+    await chip.click();
     await expect(this.envPopover).toBeVisible();
     await this.envNewButton.click();
     await this.envNewInput.fill(env);

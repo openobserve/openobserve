@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :scope="versionScope"
         :instance-version="versionInstance"
         :time-range="timeRange"
+        :trace-stream="sortedTraceStreams[0]?.stream_name"
         @close="onClose"
       />
     </template>
