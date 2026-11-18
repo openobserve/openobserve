@@ -199,6 +199,9 @@ class FilterBuilderDriver {
     if (!groupPath && (await empty.isVisible().catch(() => false))) await empty.click();
     else if (await add.isVisible().catch(() => false)) await add.click();
     else await this.barInput.click();
+    // Search bars open on typing, so a click only places the caret there; ArrowDown opens the list.
+    const opened = await this.suggestions.waitFor({ state: "visible", timeout: 1500 }).then(() => true, () => false);
+    if (!opened) await this.barInput.press("ArrowDown");
     await this.waitForPicker();
   }
 

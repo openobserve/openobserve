@@ -276,6 +276,7 @@ function onFocus() {
       :placeholder="raw(filterHint)"
       size="sm"
       appearance="plain"
+      open-on-type
       data-test="metrics-explorer-label"
       @update:model-value="onChange"
       @focus="onFocus"

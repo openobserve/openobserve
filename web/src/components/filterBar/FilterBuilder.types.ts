@@ -40,6 +40,8 @@ export interface FilterBuilderProps {
   size?: "sm" | "md";
   /** `plain` blends the bar into the editor surface it sits in. */
   appearance?: "field" | "plain";
+  /** A click or focus only places the caret; the list opens once the user types or presses ArrowDown. */
+  openOnType?: boolean;
   /** Prefix for every test id: `-row-<path>`, `-chip-<field>`, `-connector-<path>`, `-add-condition`, `-add-group`, `-group-add-<path>`, `-ungroup-<path>`, `-issues`. */
   dataTest?: string;
 }
