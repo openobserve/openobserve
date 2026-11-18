@@ -188,224 +188,63 @@ fn convert_template_config(config: &TemplateConfig, dest_type: &str) -> Template
     }
 }
 
-/// Load built-in config (fallback when JSON file is not available)
+/// The shipped `config/prebuilt-destinations.json`, compiled into the binary.
+///
+/// Release images copy only the binary into a distroless runtime, so the
+/// relative path that `load_prebuilt_config` reads never exists there. Before
+/// this was embedded, every real deployment fell back to a hand-written copy
+/// whose bodies were one line (`[{alert_status}] {alert_name}`).
+const EMBEDDED_CONFIG: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../config/prebuilt-destinations.json"
+));
+
+/// Bodies the old hand-written fallback shipped as `(template name, body)`.
+/// Org copies saved from these bodies are system output, never user edits, so
+/// the startup reseed may replace them with the shipped body.
+pub const LEGACY_BUILTIN_BODIES: &[(&str, &str)] = &[
+    (
+        "prebuilt_slack",
+        r#"{"text": "[{alert_status}] {alert_name}"}"#,
+    ),
+    ("prebuilt_email", "<h2>[{alert_status}] {alert_name}</h2>"),
+    (
+        "prebuilt_msteams",
+        r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#,
+    ),
+    (
+        "prebuilt_pagerduty",
+        r#"{"payload": {"summary": "OpenObserve [{alert_status}]: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#,
+    ),
+    (
+        "prebuilt_discord",
+        r#"{"content": "[{alert_status}] {alert_name}"}"#,
+    ),
+    (
+        "prebuilt_webhook",
+        r#"{"alert": {"name": "{alert_name}", "status": "{alert_status}"}}"#,
+    ),
+    (
+        "prebuilt_opsgenie",
+        r#"{"message": "[{alert_status}] {alert_name}", "priority": "{credential_priority}"}"#,
+    ),
+    (
+        "prebuilt_servicenow",
+        r#"{"short_description": "[{alert_status}] {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#,
+    ),
+];
+
+/// True when `body` is what the old fallback shipped for template `name`.
+pub fn is_legacy_builtin_body(name: &str, body: &str) -> bool {
+    LEGACY_BUILTIN_BODIES
+        .iter()
+        .any(|(n, b)| *n == name && *b == body)
+}
+
+/// Built-in config: the embedded copy of the shipped JSON.
 fn load_builtin_config() -> PrebuiltDestinationsConfig {
-    // Return built-in configuration with templates embedded
-    // This ensures the system works even if the JSON file is missing
-    PrebuiltDestinationsConfig {
-        revision: 3,
-        destinations: vec![
-            PrebuiltDestinationConfig {
-                id: "slack".to_string(),
-                name: "Slack".to_string(),
-                description: "Send notifications to Slack channels".to_string(),
-                destination_type: "http".to_string(),
-                icon: "slack-icon".to_string(),
-                popular: true,
-                category: "messaging".to_string(),
-                endpoint: Some(EndpointConfig {
-                    url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK".to_string(),
-                    method: "POST".to_string(),
-                    skip_tls_verify: false,
-                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-                    output_format: "JSON".to_string(),
-                    destination_type: "slack".to_string(),
-                }),
-                template: TemplateConfig {
-                    name: "prebuilt_slack".to_string(),
-                    body: r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string(),
-                    title: None,
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-            PrebuiltDestinationConfig {
-                id: "email".to_string(),
-                name: "Email".to_string(),
-                description: "Send email notifications".to_string(),
-                destination_type: "email".to_string(),
-                icon: "email-icon".to_string(),
-                popular: true,
-                category: "email".to_string(),
-                endpoint: None,
-                template: TemplateConfig {
-                    name: "prebuilt_email".to_string(),
-                    body: "<h2>[{alert_status}] {alert_name}</h2>".to_string(),
-                    title: Some("OpenObserve Alert: {alert_name}".to_string()),
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-            PrebuiltDestinationConfig {
-                id: "msteams".to_string(),
-                name: "Microsoft Teams".to_string(),
-                description: "Send notifications to Teams".to_string(),
-                destination_type: "http".to_string(),
-                icon: "teams-icon".to_string(),
-                popular: true,
-                category: "messaging".to_string(),
-                endpoint: Some(EndpointConfig {
-                    url: "https://webhook.office.com/webhookb2/YOUR-TEAMS-WEBHOOK".to_string(),
-                    method: "POST".to_string(),
-                    skip_tls_verify: false,
-                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-                    output_format: "JSON".to_string(),
-                    destination_type: "teams".to_string(),
-                }),
-                template: TemplateConfig {
-                    name: "prebuilt_msteams".to_string(),
-                    body: r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#.to_string(),
-                    title: None,
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-            PrebuiltDestinationConfig {
-                id: "pagerduty".to_string(),
-                name: "PagerDuty".to_string(),
-                description: "Create incidents in PagerDuty".to_string(),
-                destination_type: "http".to_string(),
-                icon: "pagerduty-icon".to_string(),
-                popular: true,
-                category: "incident".to_string(),
-                endpoint: Some(EndpointConfig {
-                    url: "https://events.pagerduty.com/v2/enqueue".to_string(),
-                    method: "POST".to_string(),
-                    skip_tls_verify: false,
-                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-                    output_format: "JSON".to_string(),
-                    destination_type: "pagerduty".to_string(),
-                }),
-                template: TemplateConfig {
-                    name: "prebuilt_pagerduty".to_string(),
-                    body: r#"{"payload": {"summary": "OpenObserve [{alert_status}]: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#.to_string(),
-                    title: None,
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-            PrebuiltDestinationConfig {
-                id: "discord".to_string(),
-                name: "Discord".to_string(),
-                description: "Send notifications to Discord".to_string(),
-                destination_type: "http".to_string(),
-                icon: "discord-icon".to_string(),
-                popular: true,
-                category: "messaging".to_string(),
-                endpoint: Some(EndpointConfig {
-                    url: "https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK".to_string(),
-                    method: "POST".to_string(),
-                    skip_tls_verify: false,
-                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-                    output_format: "JSON".to_string(),
-                    destination_type: "discord".to_string(),
-                }),
-                template: TemplateConfig {
-                    name: "prebuilt_discord".to_string(),
-                    body: r#"{"content": "[{alert_status}] {alert_name}"}"#.to_string(),
-                    title: None,
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-            PrebuiltDestinationConfig {
-                id: "webhook".to_string(),
-                name: "Generic Webhook".to_string(),
-                description: "Generic webhook for any HTTP endpoint".to_string(),
-                destination_type: "http".to_string(),
-                icon: "webhook-icon".to_string(),
-                popular: false,
-                category: "generic".to_string(),
-                endpoint: Some(EndpointConfig {
-                    url: "https://your-service.com/webhook".to_string(),
-                    method: "POST".to_string(),
-                    skip_tls_verify: false,
-                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-                    output_format: "JSON".to_string(),
-                    destination_type: "webhook".to_string(),
-                }),
-                template: TemplateConfig {
-                    name: "prebuilt_webhook".to_string(),
-                    body: r#"{"alert": {"name": "{alert_name}", "status": "{alert_status}"}}"#.to_string(),
-                    title: None,
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-            PrebuiltDestinationConfig {
-                id: "opsgenie".to_string(),
-                name: "Opsgenie".to_string(),
-                description: "Create alerts in Opsgenie".to_string(),
-                destination_type: "http".to_string(),
-                icon: "opsgenie-icon".to_string(),
-                popular: true,
-                category: "incident".to_string(),
-                endpoint: Some(EndpointConfig {
-                    url: "https://api.opsgenie.com/v2/alerts".to_string(),
-                    method: "POST".to_string(),
-                    skip_tls_verify: false,
-                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-                    output_format: "JSON".to_string(),
-                    destination_type: "opsgenie".to_string(),
-                }),
-                template: TemplateConfig {
-                    name: "prebuilt_opsgenie".to_string(),
-                    body: r#"{"message": "[{alert_status}] {alert_name}", "priority": "{credential_priority}"}"#.to_string(),
-                    title: None,
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-            PrebuiltDestinationConfig {
-                id: "servicenow".to_string(),
-                name: "ServiceNow".to_string(),
-                description: "Create incidents in ServiceNow".to_string(),
-                destination_type: "http".to_string(),
-                icon: "servicenow-icon".to_string(),
-                popular: true,
-                category: "incident".to_string(),
-                endpoint: Some(EndpointConfig {
-                    url: "https://YOUR_INSTANCE.service-now.com/api/now/table/incident".to_string(),
-                    method: "POST".to_string(),
-                    skip_tls_verify: false,
-                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-                    output_format: "JSON".to_string(),
-                    destination_type: "servicenow".to_string(),
-                }),
-                template: TemplateConfig {
-                    name: "prebuilt_servicenow".to_string(),
-                    body: r#"{"short_description": "[{alert_status}] {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
-                    title: None,
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-            PrebuiltDestinationConfig {
-                id: "jira".to_string(),
-                name: "Jira".to_string(),
-                description: "Create Jira issues and comment on them".to_string(),
-                destination_type: "http".to_string(),
-                icon: "jira-icon".to_string(),
-                popular: true,
-                category: "incident".to_string(),
-                endpoint: Some(EndpointConfig {
-                    url: "https://YOUR_SITE.atlassian.net".to_string(),
-                    method: "POST".to_string(),
-                    skip_tls_verify: false,
-                    headers: HashMap::from([("Content-Type".to_string(), "application/json".to_string())]),
-                    output_format: "JSON".to_string(),
-                    destination_type: "jira".to_string(),
-                }),
-                template: TemplateConfig {
-                    name: "prebuilt_jira".to_string(),
-                    body: r#"{"note": "The Jira destination builds the issue text from the alert data and does not render this template.", "alert_name": "{alert_name}", "alert_status": "{alert_status}"}"#.to_string(),
-                    title: None,
-                },
-                credential_fields: vec![],
-                metadata: HashMap::new(),
-            },
-        ],
-    }
+    serde_json::from_str(EMBEDDED_CONFIG)
+        .expect("config/prebuilt-destinations.json is valid; a test parses it")
 }
 
 fn convert_to_destination(config: PrebuiltDestinationConfig) -> Result<Destination, String> {
@@ -523,246 +362,13 @@ fn convert_to_destination(config: PrebuiltDestinationConfig) -> Result<Destinati
     })
 }
 
-/// Built-in fallback destinations in case config file is not available
+/// Built-in destinations, from the embedded config.
 fn load_builtin_destinations() -> Vec<Destination> {
-    use hashbrown::HashMap;
-
-    use crate::meta::destinations::{
-        DestinationType, Email, Endpoint, HTTPOutputFormat, HTTPType, Module,
-    };
-
-    vec![
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "Slack Webhook".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_slack".to_string()),
-                destination_type: DestinationType::Http(Endpoint {
-                    url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK".to_string(),
-                    method: HTTPType::POST,
-                    skip_tls_verify: false,
-                    headers: Some(HashMap::from([(
-                        "Content-Type".to_string(),
-                        "application/json".to_string(),
-                    )])),
-                    output_format: Some(HTTPOutputFormat::JSON),
-                    destination_type: Some("slack".to_string()),
-                    metadata: HashMap::from([
-                        ("service".to_string(), "slack".to_string()),
-                        (
-                            "description".to_string(),
-                            "Slack webhook for team notifications".to_string(),
-                        ),
-                    ]),
-                }),
-            },
-        },
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "Microsoft Teams Webhook".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_msteams".to_string()),
-                destination_type: DestinationType::Http(Endpoint {
-                    url: "https://your-tenant.webhook.office.com/webhookb2/YOUR-TEAMS-WEBHOOK-URL"
-                        .to_string(),
-                    method: HTTPType::POST,
-                    skip_tls_verify: false,
-                    headers: Some(HashMap::from([(
-                        "Content-Type".to_string(),
-                        "application/json".to_string(),
-                    )])),
-                    output_format: Some(HTTPOutputFormat::JSON),
-                    destination_type: Some("teams".to_string()),
-                    metadata: HashMap::from([
-                        ("service".to_string(), "teams".to_string()),
-                        (
-                            "description".to_string(),
-                            "Microsoft Teams webhook for team notifications".to_string(),
-                        ),
-                    ]),
-                }),
-            },
-        },
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "PagerDuty Events API".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_pagerduty".to_string()),
-                destination_type: DestinationType::Http(Endpoint {
-                    url: "https://events.pagerduty.com/v2/enqueue".to_string(),
-                    method: HTTPType::POST,
-                    skip_tls_verify: false,
-                    headers: Some(HashMap::from([
-                        ("Content-Type".to_string(), "application/json".to_string()),
-                        (
-                            "Authorization".to_string(),
-                            "Token YOUR_INTEGRATION_KEY".to_string(),
-                        ),
-                    ])),
-                    output_format: Some(HTTPOutputFormat::JSON),
-                    destination_type: Some("pagerduty".to_string()),
-                    metadata: HashMap::from([
-                        ("service".to_string(), "pagerduty".to_string()),
-                        (
-                            "description".to_string(),
-                            "PagerDuty incident management".to_string(),
-                        ),
-                    ]),
-                }),
-            },
-        },
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "Discord Webhook".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_discord".to_string()),
-                destination_type: DestinationType::Http(Endpoint {
-                    url: "https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK".to_string(),
-                    method: HTTPType::POST,
-                    skip_tls_verify: false,
-                    headers: Some(HashMap::from([(
-                        "Content-Type".to_string(),
-                        "application/json".to_string(),
-                    )])),
-                    output_format: Some(HTTPOutputFormat::JSON),
-                    destination_type: Some("discord".to_string()),
-                    metadata: HashMap::from([
-                        ("service".to_string(), "discord".to_string()),
-                        (
-                            "description".to_string(),
-                            "Discord webhook for community notifications".to_string(),
-                        ),
-                    ]),
-                }),
-            },
-        },
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "Generic Webhook".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_webhook".to_string()),
-                destination_type: DestinationType::Http(Endpoint {
-                    url: "https://your-service.com/webhook".to_string(),
-                    method: HTTPType::POST,
-                    skip_tls_verify: false,
-                    headers: Some(HashMap::from([(
-                        "Content-Type".to_string(),
-                        "application/json".to_string(),
-                    )])),
-                    output_format: Some(HTTPOutputFormat::JSON),
-                    destination_type: Some("webhook".to_string()),
-                    metadata: HashMap::from([
-                        ("service".to_string(), "webhook".to_string()),
-                        (
-                            "description".to_string(),
-                            "Generic webhook destination".to_string(),
-                        ),
-                    ]),
-                }),
-            },
-        },
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "Opsgenie".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_opsgenie".to_string()),
-                destination_type: DestinationType::Http(Endpoint {
-                    url: "https://api.opsgenie.com/v2/alerts".to_string(),
-                    method: HTTPType::POST,
-                    skip_tls_verify: false,
-                    headers: Some(HashMap::from([
-                        ("Content-Type".to_string(), "application/json".to_string()),
-                        (
-                            "Authorization".to_string(),
-                            "GenieKey YOUR_API_KEY".to_string(),
-                        ),
-                    ])),
-                    output_format: Some(HTTPOutputFormat::JSON),
-                    destination_type: Some("opsgenie".to_string()),
-                    metadata: HashMap::from([
-                        ("service".to_string(), "opsgenie".to_string()),
-                        (
-                            "description".to_string(),
-                            "Opsgenie incident management and alerting".to_string(),
-                        ),
-                    ]),
-                }),
-            },
-        },
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "ServiceNow".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_servicenow".to_string()),
-                destination_type: DestinationType::Http(Endpoint {
-                    url: "https://YOUR_INSTANCE.service-now.com/api/now/table/incident".to_string(),
-                    method: HTTPType::POST,
-                    skip_tls_verify: false,
-                    headers: Some(HashMap::from([
-                        ("Content-Type".to_string(), "application/json".to_string()),
-                        (
-                            "Authorization".to_string(),
-                            "Basic YOUR_AUTH_TOKEN".to_string(),
-                        ),
-                    ])),
-                    output_format: Some(HTTPOutputFormat::JSON),
-                    destination_type: Some("servicenow".to_string()),
-                    metadata: HashMap::from([
-                        ("service".to_string(), "servicenow".to_string()),
-                        (
-                            "description".to_string(),
-                            "ServiceNow incident management".to_string(),
-                        ),
-                    ]),
-                }),
-            },
-        },
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "Jira".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_jira".to_string()),
-                destination_type: DestinationType::Http(Endpoint {
-                    url: "https://YOUR_SITE.atlassian.net".to_string(),
-                    method: HTTPType::POST,
-                    skip_tls_verify: false,
-                    headers: Some(HashMap::from([
-                        ("Content-Type".to_string(), "application/json".to_string()),
-                        ("Accept".to_string(), "application/json".to_string()),
-                        (
-                            "Authorization".to_string(),
-                            "Basic YOUR_AUTH_TOKEN".to_string(),
-                        ),
-                    ])),
-                    output_format: Some(HTTPOutputFormat::JSON),
-                    destination_type: Some("jira".to_string()),
-                    metadata: HashMap::from([
-                        ("service".to_string(), "jira".to_string()),
-                        ("description".to_string(), "Jira issue tracking".to_string()),
-                    ]),
-                }),
-            },
-        },
-        Destination {
-            id: None,
-            org_id: String::new(),
-            name: "Email Notification".to_string(),
-            module: Module::Alert {
-                template: Some("prebuilt_email".to_string()),
-                destination_type: DestinationType::Email(Email {
-                    recipients: vec!["admin@your-domain.com".to_string()],
-                }),
-            },
-        },
-    ]
+    load_builtin_config()
+        .destinations
+        .into_iter()
+        .filter_map(|dest| convert_to_destination(dest).ok())
+        .collect()
 }
 
 #[cfg(test)]
@@ -1046,6 +652,44 @@ mod tests {
         match result.template_type {
             TemplateType::Email { title } => assert_eq!(title, "OpenObserve Alert"),
             _ => panic!("Expected Email template type"),
+        }
+    }
+    /// Tests run from the crate dir, where `config/prebuilt-destinations.json` does not exist,
+    /// which is the same as a release image: the template must still be the shipped one.
+    #[test]
+    fn slack_template_without_a_config_dir_is_the_shipped_blocks_body() {
+        assert!(!std::path::Path::new("config/prebuilt-destinations.json").exists());
+        let body = get_prebuilt_template("slack").unwrap().body;
+        assert!(body.contains("\"blocks\""), "{body}");
+        assert!(body.contains("{alert_url}"), "{body}");
+        assert!(!is_legacy_builtin_body("prebuilt_slack", &body));
+    }
+
+    #[test]
+    fn builtin_config_is_the_shipped_json() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../config/prebuilt-destinations.json"
+        );
+        let file: PrebuiltDestinationsConfig =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let builtin = load_builtin_config();
+        assert_eq!(builtin.revision, file.revision);
+        assert!(builtin.revision >= 4, "the reseed needs a revision past 3");
+        assert_eq!(
+            serde_json::to_value(&builtin.destinations).unwrap(),
+            serde_json::to_value(&file.destinations).unwrap()
+        );
+    }
+
+    #[test]
+    fn no_shipped_body_is_a_legacy_one_liner() {
+        for d in load_builtin_config().destinations {
+            assert!(
+                !is_legacy_builtin_body(&d.template.name, &d.template.body),
+                "'{}' still ships the old one-line body, so the reseed would loop",
+                d.id
+            );
         }
     }
 }
