@@ -18,6 +18,7 @@ import { savedViewsQuery } from "@/services/saved_views.queries";
 import { viewTypeOf } from "@/services/saved_views";
 import { queryClient } from "@/composables/query/queryClient";
 import { queryFunctionsQuery } from "@/services/query_functions.queries";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
@@ -488,11 +489,15 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   // hasAggregation reads aggregate names from the function catalog, so SQL runs wait for it once.
+  // A failure is not cached, so its error state stops every later run from waiting on it again.
   const pendingQueryFunctions = (): Promise<unknown> | null => {
     if (!searchObj.meta.sqlMode) return null;
-    const org = store.state.selectedOrganization.identifier;
-    if (queryClient.getQueryData(queryFunctionsQuery(org).queryKey)) return null;
-    return queryClient.fetchQuery(queryFunctionsQuery(org)).catch(() => undefined);
+    const catalog = queryFunctionsQuery(store.state.selectedOrganization.identifier);
+    const state = queryClient.getQueryState(catalog.queryKey);
+    if (state?.data) return null;
+    if (state?.status === "error" && Date.now() - state.errorUpdatedAt < NORMAL_STALE_TIME)
+      return null;
+    return queryClient.fetchQuery({ ...catalog, retry: false }).catch(() => undefined);
   };
 
   const runQueryData = async (isPagination: boolean, options: QueryDataOptions) => {

@@ -21,6 +21,8 @@ import store from "@/test/unit/helpers/store";
 import useSearchBar, { streamSwitchPending } from "./useSearchBar";
 import { queryClient } from "@/composables/query/queryClient";
 import { queryFunctionsQuery } from "@/services/query_functions.queries";
+import queryFunctions from "@/services/query_functions";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import searchState from "./searchState";
 import { resetLogsAutoRunForTests, useLogsAutoRun } from "./logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "./logsRowNav";
@@ -435,6 +437,58 @@ describe("useSearchBar Composable", () => {
       void (wrapper.vm as any).getQueryData(false);
       expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getQueryData — function catalog that fails to load", () => {
+    let listSpy: ReturnType<typeof vi.spyOn>;
+    const catalogKey = () =>
+      queryFunctionsQuery(store.state.selectedOrganization.identifier).queryKey;
+
+    beforeEach(() => {
+      queryClient.removeQueries({ queryKey: catalogKey() });
+      listSpy = vi.spyOn(queryFunctions, "list").mockRejectedValue({ response: { status: 500 } });
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.meta.sqlMode = true;
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      queryClient.removeQueries({ queryKey: catalogKey() });
+      searchState().searchObj.meta.sqlMode = false;
+    });
+
+    // setupTests turns retry off globally, so assert the opt-out the app's retry policy needs.
+    it("asks once without retrying, then runs the search", async () => {
+      const fetchSpy = vi.spyOn(queryClient, "fetchQuery");
+      await (wrapper.vm as any).getQueryData(false);
+      expect(fetchSpy).toHaveBeenCalledWith(expect.objectContaining({ retry: false }));
+      expect(listSpy).toHaveBeenCalledTimes(1);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not wait again after a recent failure", async () => {
+      await (wrapper.vm as any).getQueryData(false);
+      mockGetDataThroughStream.mockClear();
+
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(listSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits again once the failure is older than the catalog's stale time", async () => {
+      await (wrapper.vm as any).getQueryData(false);
+      const later = Date.now() + NORMAL_STALE_TIME + 1;
+      vi.spyOn(Date, "now").mockReturnValue(later);
+      mockGetDataThroughStream.mockClear();
+
+      const run = (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+      await run;
+      expect(listSpy).toHaveBeenCalledTimes(2);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
     });
   });
 
