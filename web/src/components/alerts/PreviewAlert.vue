@@ -1010,6 +1010,11 @@ const resultLabelFor = (resultCount: number): I18nText => {
       : t("alerts.previewEvaluation.matchingSeries");
   }
 
+  // The SQL limit counts the rows the query returns, whatever chart draws them.
+  if (props.selectedTab === "sql") {
+    return plural ? t("alerts.previewEvaluation.rows") : t("alerts.previewEvaluation.row");
+  }
+
   const chartType = dashboardPanelData.data.type;
   const hasGroupBy =
     dashboardPanelData.data.queries[0]?.fields?.breakdown?.length > 0 ||

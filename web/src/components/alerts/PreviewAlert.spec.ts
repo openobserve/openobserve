@@ -1797,6 +1797,27 @@ describe("PreviewAlert - PromQL verdict", () => {
     w.unmount();
   });
 
+  it("counts a grouped SQL query in rows, as the SQL limit does", async () => {
+    vi.mocked(searchService.result_schema).mockResolvedValueOnce({
+      data: { group_by: ["service_name"], projections: [], timeseries_field: null },
+    } as any);
+    const w = await mountComp({
+      query: "SELECT service_name, count(*) AS errors FROM logs GROUP BY service_name",
+      selectedTab: "sql",
+      formData: {
+        ...baseFormData(),
+        is_real_time: false,
+        trigger_condition: { period: 10, threshold: 5, operator: ">=" },
+      },
+    });
+    await flushPromises();
+
+    await emitResultMetadata(w, [[{ total: 0 }]]);
+
+    expectVerdict(w, { matched: 0, gate: "0 >= 5", trigger: false, label: "rows" });
+    w.unmount();
+  });
+
   it("ignores series-data-update outside PromQL mode", async () => {
     // The mirror of the two-writers test. The only thing keeping a stray series
     // emit from stamping a bogus verdict over a SQL result is the mode check at the
