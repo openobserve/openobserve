@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex min-w-0 flex-col gap-1" :data-test="`template-override-${kind}`">
     <OButton
+      v-if="!helpOutside"
       variant="ghost-primary"
       size="xs"
       class="gap-1 self-start font-medium"
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :help-text="
         state === 'forbidden'
           ? t('alerts.templateOverride.forbidden')
-          : t('alerts.templateOverride.help', { kind: kindLabel })
+          : (helpText ?? t('alerts.templateOverride.help', { kind: kindLabel }))
       "
       :error="!!serverError"
       class="max-w-105"
@@ -168,7 +169,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import templateService from "@/services/alert_templates";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { destinationsQuery } from "@/services/alert_destination.queries";
@@ -202,8 +203,12 @@ const props = withDefaults(
     destinations?: (string | FormDestination)[];
     /** The server's 400 message for this field, shown under the select. */
     serverError?: string | null;
+    /** Replaces the help line under the select (opt-in). */
+    helpText?: I18nText;
+    /** The caller opens the help from its own button via the exposed `openHelp` (opt-in). */
+    helpOutside?: boolean;
   }>(),
-  { disabled: false, destinations: () => [], serverError: null },
+  { disabled: false, destinations: () => [], serverError: null, helpText: undefined },
 );
 
 const emit = defineEmits<{ (e: "update:modelValue", value: string | null): void }>();
@@ -406,5 +411,5 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", onReturn);
 });
 
-defineExpose({ load });
+defineExpose({ load, openHelp: () => (helpOpen.value = true) });
 </script>

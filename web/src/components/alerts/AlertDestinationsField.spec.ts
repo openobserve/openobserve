@@ -54,6 +54,7 @@ const TargetsStub = defineComponent({
     "placeholder",
     "lockedWorkflowNames",
     "noWorkflowButton",
+    "oneLine",
   ],
   emits: ["refresh"],
   template: "<div />",
@@ -117,6 +118,19 @@ describe("AlertDestinationsField workflows", () => {
     wrapper.findComponent(TargetsStub).vm.$emit("refresh");
     await flushPromises();
 
+    expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
+    expect(wrapper.emitted("refresh")).toHaveLength(1);
+  });
+
+  it("as a setting row, puts refresh in the actions column and keeps the picker on one line", async () => {
+    wrapper = mountField({ settingRow: true });
+    await flushPromises();
+    expect(wrapper.findComponent(TargetsStub).props("oneLine")).toBe(true);
+    const refresh = wrapper.find(
+      '[data-o-setting-row-actions] [data-test="alert-settings-refresh-destinations-btn"]',
+    );
+    await refresh.trigger("click");
+    await flushPromises();
     expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
     expect(wrapper.emitted("refresh")).toHaveLength(1);
   });

@@ -33,7 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    :class="['flex items-center max-md:flex-wrap max-md:gap-y-2', wrap ? 'flex-wrap gap-y-2' : '']"
+    :class="[
+      'flex items-center max-md:flex-wrap max-md:gap-y-2',
+      oneLine ? 'gap-2' : wrap ? 'flex-wrap gap-y-2' : '',
+    ]"
   >
     <div v-if="showsList" class="w-full" data-test="alert-destinations-list">
       <OCheckboxGroup
@@ -68,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :collapsible-groups="workflowsEnabled"
       pin-selected-in-groups
       class="max-w-[18.75rem] min-w-[11.25rem] max-md:max-w-none max-md:min-w-0 max-md:flex-1 max-md:basis-[calc(100%-2rem)]"
-      :class="wrap && 'flex-1'"
+      :class="[wrap && 'flex-1', oneLine && 'min-w-0! flex-1']"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >
@@ -80,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OSelect>
 
     <OButton
+      v-if="!oneLine"
       data-test="alert-settings-refresh-destinations-btn"
       class="ms-1"
       variant="ghost"
@@ -94,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="outline"
       size="sm"
       icon-left="add"
-      class="ms-2 max-md:ms-0"
+      :class="oneLine ? 'shrink-0' : 'ms-2 max-md:ms-0'"
       @click="emit('create-destination')"
     >
       {{ t("alerts.alertSettings.addNewDestination") }}
@@ -183,6 +187,8 @@ const props = defineProps<{
   list?: boolean;
   /** The parent offers New workflow itself, so the row draws no workflow button. */
   noWorkflowButton?: boolean;
+  /** Picker and New destination share one line and the caller draws refresh (opt-in). */
+  oneLine?: boolean;
 }>();
 
 const emit = defineEmits<{

@@ -159,6 +159,17 @@ describe("TemplateOverridePicker", () => {
     expect(w.find('[data-test="template-override-help-btn"]').exists()).toBe(true);
   });
 
+  it("helpOutside moves the help button to the caller, and helpText replaces the help line", async () => {
+    list.mockResolvedValue({ data: [{ name: "card", kind: "content", type: "http" }] } as any);
+    const w = await mountPicker({ helpOutside: true, helpText: "Copy prebuilt ones first" });
+
+    expect(w.find('[data-test="template-override-help-btn"]').exists()).toBe(false);
+    expect(String(select(w).props("helpText"))).toBe("Copy prebuilt ones first");
+    (w.vm as unknown as { openHelp: () => void }).openHelp();
+    await flushPromises();
+    expect(w.findComponent({ name: "AlertSettingsHelpDrawer" }).props("open")).toBe(true);
+  });
+
   it("asks for the kind's templates and lists Content then Custom without prebuilt rows", async () => {
     list.mockResolvedValue({
       data: [

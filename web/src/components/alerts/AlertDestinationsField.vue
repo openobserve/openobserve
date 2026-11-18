@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :wrap="wrap"
         :list="list"
         :no-workflow-button="workflowLink"
+        :one-line="settingRow"
         @update:destinations="emit('update:destinations', $event)"
         @update:workflows="emit('update:workflows', $event)"
         @refresh="refreshTargets"
@@ -111,6 +112,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
     </div>
+    <template v-if="settingRow" #actions>
+      <OButton
+        data-test="alert-settings-refresh-destinations-btn"
+        variant="ghost"
+        size="icon-circle-sm"
+        :title="t('alerts.alertSettings.refreshDestinations')"
+        :aria-label="t('alerts.alertSettings.refreshDestinations')"
+        @click="refreshTargets"
+      >
+        <OIcon name="refresh" size="sm" />
+      </OButton>
+    </template>
   </component>
 </template>
 
