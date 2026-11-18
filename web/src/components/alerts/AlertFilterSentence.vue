@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { FilterGroup } from "@/utils/query/filterBar";
 import { describeFilterNode, filterSentenceParts } from "@/utils/alerts/filterSentence";
@@ -39,6 +39,8 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const OPEN = raw("(");
 const CLOSE = raw(")");
+const SPACE = raw(" ");
+const brackets = (bracket: I18nText, count: number) => raw(bracket.repeat(count));
 
 const parts = computed(() =>
   filterSentenceParts(props.group, (n) => describeFilterNode(n, props.dialect, t)),
@@ -48,7 +50,7 @@ const connectorWord = (connector: "AND" | "OR") =>
   connector === "OR" ? t("alerts.form.filter.or") : t("alerts.form.filter.and");
 </script>
 
-<!-- The whole filter tree as one wrapping sentence; the builder itself opens only from Change or a phrase. -->
+<!-- The whole filter tree as one wrapping sentence; inline flow, so word spaces come from the text itself. -->
 <template>
   <div
     v-if="empty"
@@ -68,38 +70,50 @@ const connectorWord = (connector: "AND" | "OR") =>
       {{ t("alerts.tiers.add.filters") }}
     </OButton>
   </div>
-  <div
-    v-else
-    class="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm"
-    :data-test="props.dataTest"
-  >
-    <span class="text-text-secondary">{{ t("alerts.form.filter.where") }}</span>
-    <template v-for="(part, index) in parts" :key="index">
-      <OButton
-        v-if="part.kind === 'condition'"
-        variant="link"
-        size="sm"
-        class="h-auto! max-w-full text-start whitespace-normal!"
-        :data-test="`${props.dataTest}-condition-${part.id}`"
-        @click="emit('edit', part.id)"
+  <div v-else class="flex flex-wrap items-center gap-x-2 gap-y-1" :data-test="props.dataTest">
+    <p class="text-text-body m-0 min-w-0 text-sm leading-6">
+      <span class="text-text-secondary">{{ t("alerts.form.filter.where") }}</span>
+      <template v-for="part in parts" :key="`${part.kind}-${part.id}`"
+        >{{ SPACE
+        }}<span v-if="part.kind === 'condition'" class="whitespace-nowrap"
+          ><span v-if="part.opens" class="text-text-secondary">{{
+            brackets(OPEN, part.opens)
+          }}</span
+          ><OButton
+            variant="phrase"
+            size="sm"
+            :data-test="`${props.dataTest}-condition-${part.id}`"
+            @click="emit('edit', part.id)"
+            ><template v-if="part.phrase.field"
+              ><code class="bg-surface-subtle rounded-default px-1 wrap-anywhere">{{
+                raw(part.phrase.field)
+              }}</code
+              >{{ SPACE }}{{ raw(part.phrase.operator)
+              }}<template v-if="part.phrase.value"
+                >{{ SPACE
+                }}<strong class="text-text-heading font-semibold wrap-anywhere">{{
+                  raw(part.phrase.value)
+                }}</strong></template
+              ></template
+            ><template v-else>{{ raw(part.phrase.text) }}</template></OButton
+          ><span v-if="part.closes" class="text-text-secondary">{{
+            brackets(CLOSE, part.closes)
+          }}</span></span
+        ><OButton
+          v-else
+          variant="phrase"
+          size="sm"
+          class="text-text-secondary"
+          :aria-label="
+            t('alerts.form.filter.toggleConnector', { connector: connectorWord(part.connector) })
+          "
+          :data-test="`${props.dataTest}-connector-${part.id}`"
+          @click="emit('toggleConnector', part.id)"
+          >{{ connectorWord(part.connector) }}</OButton
+        ></template
       >
-        {{ raw(part.text) }}
-      </OButton>
-      <OButton
-        v-else-if="part.kind === 'connector'"
-        variant="ghost"
-        size="xs"
-        :aria-label="
-          t('alerts.form.filter.toggleConnector', { connector: connectorWord(part.connector) })
-        "
-        :data-test="`${props.dataTest}-connector-${part.id}`"
-        @click="emit('toggleConnector', part.id)"
-      >
-        {{ connectorWord(part.connector) }}
-      </OButton>
-      <span v-else class="text-text-secondary">{{ part.kind === "open" ? OPEN : CLOSE }}</span>
-    </template>
-    <span class="ms-1 flex items-center gap-1">
+    </p>
+    <span class="flex shrink-0 items-center gap-1">
       <OButton
         variant="ghost-primary"
         size="sm"

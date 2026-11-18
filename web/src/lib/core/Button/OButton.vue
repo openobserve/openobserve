@@ -303,6 +303,13 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
     "enabled:hover:opacity-80",
     "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
   ].join(" "),
+  // phrase: words in a sentence that open what they describe; the hover fill is the only affordance.
+  phrase: [
+    "bg-transparent border-0 text-inherit font-normal text-start rounded-default",
+    "inline! h-auto! px-0.5! py-0! -mx-0.5! align-baseline whitespace-normal!",
+    "enabled:hover:bg-button-ghost-hover-bg",
+    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
+  ].join(" "),
   // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
   // Use for edition/tier badges that must stand out without being a heavy CTA.
   "outline-primary": [
@@ -427,6 +434,7 @@ const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string
   "webinar-dismiss": "opacity-60",
   "banner-dismiss": "opacity-60",
   link: "opacity-60",
+  phrase: "opacity-60",
   "outline-primary": "opacity-50",
   dashed: "opacity-50",
   "pricing-chip": "opacity-60",
