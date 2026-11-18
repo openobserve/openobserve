@@ -493,11 +493,13 @@ pub fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
 }
 
 /// The anomaly send's render: it waits up to [`ANOMALY_RENDER_WAIT`] for a permit.
-pub async fn render_png_waiting(p: &ChartPayload) -> Option<Vec<u8>> {
+pub async fn render_png_waiting(p: &ChartPayload, anomaly_id: &str) -> Option<Vec<u8>> {
     let Ok(Ok(_permit)) =
         tokio::time::timeout(ANOMALY_RENDER_WAIT, render_semaphore().acquire()).await
     else {
-        return render_busy();
+        log::warn!("[ALERT_CHART] anomaly {anomaly_id} render busy, sending without chart");
+        chart_event("render_busy");
+        return None;
     };
     render_send_png(p)
 }
@@ -1191,7 +1193,7 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(50)).await;
             drop(held);
         });
-        let png = render_png_waiting(&p)
+        let png = render_png_waiting(&p, "a1")
             .await
             .expect("a PNG once a permit frees");
         assert!(png.starts_with(b"\x89PNG"));
@@ -1205,7 +1207,8 @@ mod tests {
         let p = anomaly_payload("t".into(), &points, T0, T0 + 9 * B).unwrap();
         let others = (max_concurrent_renders() - 1) as u32;
         let _held = render_semaphore().acquire_many(others).await.unwrap();
-        let send = |p: ChartPayload| tokio::spawn(async move { render_png_waiting(&p).await });
+        let send =
+            |p: ChartPayload| tokio::spawn(async move { render_png_waiting(&p, "a1").await });
         let (a, b) = tokio::join!(send(p.clone()), send(p));
         assert!(
             a.unwrap().is_some() && b.unwrap().is_some(),

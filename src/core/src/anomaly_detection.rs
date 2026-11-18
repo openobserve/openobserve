@@ -4588,7 +4588,7 @@ async fn attach_anomaly_chart(
 ) {
     use crate::alerts::notifications::chart;
     if !template_wants_anomaly_chart(&resolved.effective) {
-        log::debug!(
+        log::info!(
             "[ALERT_CHART] anomaly {} template has no chart",
             actx.anomaly_id
         );
@@ -4639,7 +4639,7 @@ async fn attach_anomaly_chart(
     set_anomaly_chart_url(ctx, wants_url.then_some(url));
     // Several detectors fire on one tick, so an anomaly send waits briefly for a render permit.
     ctx.chart_png = if wants_png {
-        chart::render_png_waiting(&payload)
+        chart::render_png_waiting(&payload, &actx.anomaly_id)
             .await
             .map(std::sync::Arc::new)
     } else {
