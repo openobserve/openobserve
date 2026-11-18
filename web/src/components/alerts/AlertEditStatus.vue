@@ -153,14 +153,7 @@ const openHistory = () =>
       data-test="add-alert-state-chip"
     />
     <OTag
-      v-else-if="header.state.value.kind === 'disabled'"
-      type="alertStatus"
-      value="disabled"
-      size="sm"
-      data-test="add-alert-state-chip"
-    />
-    <OTag
-      v-else
+      v-else-if="header.state.value.kind === 'notRun'"
       variant="default-soft"
       size="sm"
       :label="t('alerts.editMode.state.notRun')"
@@ -170,8 +163,8 @@ const openHistory = () =>
     <span class="inline-flex" @click.capture.stop="toggleEnabled">
       <OSwitch
         :model-value="header.enabled.value"
-        :label="t('alerts.editMode.enabled')"
-        label-position="left"
+        :aria-label="t('alerts.editMode.enabled')"
+        state-text
         off-tone="neutral"
         :disabled="header.pending.value"
         :aria-busy="header.pending.value"

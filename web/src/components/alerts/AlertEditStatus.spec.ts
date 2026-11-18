@@ -4,10 +4,12 @@ import { describe, it, expect, vi } from "vitest";
 import { computed, defineComponent, h, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { raw } from "@/types/i18n";
+import i18n from "@/locales";
 import AlertEditStatus from "./AlertEditStatus.vue";
 import AlertEditActions from "./AlertEditActions.vue";
 import type { AlertEditHeader, AlertEditState } from "@/composables/alerts/useAlertEditHeader";
 
+const t = (key: string) => i18n.global.t(key);
 const push = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
@@ -110,13 +112,22 @@ describe("AlertEditStatus", () => {
     expect(wrapper.find('[data-test="add-alert-muted"]').exists()).toBe(false);
   });
 
-  it("chips the last run outcome, a disabled alert, or no run yet", () => {
+  it("chips the last run outcome or no run yet", () => {
     const outcome = mountStatus(fakeHeader({ state: { kind: "outcome", value: "firing" } }));
     expect(outcome.find('[data-test="add-alert-state-chip"]').text()).toContain("Firing");
-    const disabled = mountStatus(fakeHeader({ state: { kind: "disabled" } }));
-    expect(disabled.find('[data-test="add-alert-state-chip"]').text()).toContain("Disabled");
     const fresh = mountStatus(fakeHeader({ state: { kind: "notRun" } }));
     expect(fresh.find('[data-test="add-alert-state-chip"]').text()).toContain("Not run yet");
+  });
+
+  it.each([
+    ["on", true, "common.switchOn"],
+    ["off", false, "common.switchOff"],
+  ])("says %s once, beside the switch", (_, on, key) => {
+    const wrapper = mountStatus(
+      fakeHeader({ enabled: { value: on }, state: on ? { kind: "notRun" } : { kind: "disabled" } }),
+    );
+    expect(wrapper.find('[data-test="add-alert-enabled-switch-state"]').text()).toBe(t(key));
+    expect(wrapper.find('[data-test="add-alert-state-chip"]').exists()).toBe(on);
   });
 
   it("links Alert History to the alert's detail page", async () => {
