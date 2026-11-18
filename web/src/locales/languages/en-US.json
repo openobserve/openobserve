@@ -15965,8 +15965,7 @@
       },
       "noGroup": "No grouping",
       "addGroup": "Add a group",
-      "cardWhy": "{fit} · {detail}",
-      "applied": "Filled from {intent}"
+      "cardWhy": "{fit} · {detail}"
     },
     "librarySuggest": {
       "suggestedStarter": "Suggested starter",
