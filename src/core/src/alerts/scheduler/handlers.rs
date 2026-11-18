@@ -1337,10 +1337,10 @@ async fn nudge_composite_parents(org: &str, child_id: &str, now: i64) {
     }
 }
 
-/// Ends the run of a composite that references another composite, which only legacy rows hold.
-fn refuse_nested(
+/// Pauses a composite that references another composite; only legacy rows do, and none can run.
+async fn pause_if_nested(
     composite: &infra::table::alert_composites::CompositeWithChildren,
-) -> Result<(), anyhow::Error> {
+) -> Result<bool, anyhow::Error> {
     use infra::table::alert_composites::ChildKind;
 
     let Some(child) = composite
@@ -1348,16 +1348,17 @@ fn refuse_nested(
         .iter()
         .find(|child| child.child_kind == ChildKind::Composite as i16)
     else {
-        return Ok(());
+        return Ok(false);
     };
     let definition = &composite.definition;
-    log::error!(
-        "[COMPOSITE_ALERT] not evaluating {}/{}: child {} is a composite; remove it to evaluate again",
+    log::warn!(
+        "[COMPOSITE_ALERT] pausing {}/{}: child {} is a composite, which composites no longer reference",
         definition.org,
         definition.id,
         child.child_alert_id
     );
-    anyhow::bail!("composite child {} is a composite", child.child_alert_id)
+    crate::alerts::composite::set_composite_enabled(&definition.org, &definition.id, false).await?;
+    Ok(true)
 }
 
 /// Composite jobs are routed explicitly by their append-only scheduler
@@ -1392,7 +1393,9 @@ async fn handle_composite_alert_trigger(
         .await?;
         return Ok(());
     }
-    refuse_nested(&definition)?;
+    if pause_if_nested(&definition).await? {
+        return Ok(());
+    }
     let mut scheduled_data: config::meta::triggers::ScheduledTriggerData =
         config::utils::json::from_str(&trigger.data).unwrap_or_default();
 
@@ -10863,7 +10866,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_composite_with_a_composite_child_is_refused_and_an_ordinary_one_evaluates() {
+    async fn a_composite_with_a_composite_child_is_paused_and_an_ordinary_one_evaluates() {
         use config::meta::alerts::state::ROLLUP_GROUP_KEY;
         use infra::table::alert_composites::ChildKind;
         use svix_ksuid::KsuidLike;
@@ -10894,10 +10897,21 @@ mod tests {
             &[(&plain, ChildKind::Composite), (&child, ChildKind::Alert)],
         )
         .await;
-        let refused = handle_composite_alert_trigger("t", job).await.unwrap_err();
-        assert!(refused.to_string().contains(&plain), "{refused}");
+        handle_composite_alert_trigger("t", job).await.unwrap();
+        let stored = infra::table::alert_composites::get_by_id(
+            infra::db::get_orm_client_rw().await,
+            org,
+            &legacy,
+        )
+        .await
+        .unwrap()
+        .expect("a paused composite is kept");
+        assert!(!stored.definition.enabled, "a nested composite is paused");
+        let module = db::scheduler::TriggerModule::CompositeAlert;
+        let job = infra::scheduler::get(org, module, &legacy).await;
+        assert!(job.is_err(), "a paused composite is never scheduled again");
         let rollup = infra::table::alert_states::get(&legacy, ROLLUP_GROUP_KEY).await;
-        assert!(rollup.unwrap().is_none(), "a refused run writes no state");
+        assert!(rollup.unwrap().is_none(), "a paused run writes no state");
     }
 
     /// 2026-11-16 at `h:m:s` UTC, in microseconds.
