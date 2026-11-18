@@ -392,6 +392,8 @@ pub struct AnomalyLinkSnapshot {
     pub actual: Option<f64>,
     pub lower: Option<f64>,
     pub upper: Option<f64>,
+    /// The baseline of a partial drop, which has no range.
+    pub expected: Option<f64>,
 }
 
 /// One explore link; `url` is empty when the detector has no stream to open.
@@ -3845,6 +3847,7 @@ pub fn anomaly_explore_link(
         actual: None,
         lower: None,
         upper: None,
+        expected: None,
         ..s.clone()
     });
     let mut last = AnomalyExploreLink::default();
@@ -4095,6 +4098,7 @@ fn snapshot_pairs(s: &AnomalyLinkSnapshot) -> Vec<(&'static str, String)> {
         ("anomaly_actual", s.actual),
         ("anomaly_lower", s.lower),
         ("anomaly_upper", s.upper),
+        ("anomaly_expected", s.expected),
     ] {
         if let Some(v) = value.filter(|v| v.is_finite()) {
             pairs.push((key, ((v * 10_000.0).round() / 10_000.0).to_string()));
@@ -4616,6 +4620,9 @@ fn alert_link_snapshot(
         actual: reading(actx.worst_actual_value),
         lower: reading(actx.worst_expected_lower),
         upper: reading(actx.worst_expected_upper),
+        expected: actx
+            .worst_expected
+            .filter(|_| matches!(actx.kind, AnomalyAlertKind::PartialDrop)),
     })
 }
 
@@ -8685,6 +8692,7 @@ mod tests {
                 actual: Some(208.0),
                 lower: Some(120.4),
                 upper: Some(157.25),
+                expected: None,
             }
         }
 
@@ -8794,9 +8802,30 @@ mod tests {
             let link = link_with(&explore_ctx("logs", None, false), Some(&absence));
             let (_, p) = pairs(&link.url);
             assert_eq!(get(&p, "anomaly_kind"), Some("absence"));
-            for key in ["anomaly_actual", "anomaly_lower", "anomaly_upper"] {
+            for key in [
+                "anomaly_actual",
+                "anomaly_lower",
+                "anomaly_upper",
+                "anomaly_expected",
+            ] {
                 assert_eq!(get(&p, key), None, "a value the alert lacks is left out");
             }
+            let drop = super::super::AnomalyLinkSnapshot {
+                kind: "partial_drop".to_string(),
+                actual: Some(12.0),
+                lower: None,
+                upper: None,
+                expected: Some(40.0),
+                ..snapshot()
+            };
+            let link = link_with(&explore_ctx("logs", None, false), Some(&drop));
+            let (_, p) = pairs(&link.url);
+            assert_eq!(get(&p, "anomaly_expected"), Some("40"));
+            assert_eq!(get(&p, "anomaly_lower"), None);
+            let long = "x".repeat(2500);
+            let link = link_with(&explore_ctx("logs", Some(&long), false), Some(&drop));
+            let (_, p) = pairs(&link.url);
+            assert_eq!(get(&p, "anomaly_expected"), None, "dropped with the values");
         }
 
         #[test]

@@ -33,6 +33,8 @@ export interface AnomalyLinkInfo {
   actual: number | null;
   lower: number | null;
   upper: number | null;
+  /** Baseline of a partial drop, which has no range. */
+  expected: number | null;
 }
 
 type QueryLike = Record<string, unknown>;
@@ -91,5 +93,6 @@ export function parseAnomalyLink(query: QueryLike | null | undefined): AnomalyLi
     actual: numberParam(query.anomaly_actual),
     lower: numberParam(query.anomaly_lower),
     upper: numberParam(query.anomaly_upper),
+    expected: numberParam(query.anomaly_expected),
   };
 }

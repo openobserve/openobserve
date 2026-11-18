@@ -129,6 +129,12 @@ const valuesLine = computed<I18nText | null>(() => {
       ? t("alerts.anomaly.originValues", { ...params, window: span })
       : t("alerts.anomaly.originValuesNoWindow", params);
   }
+  if (l.kind === "partial_drop" && l.expected !== null) {
+    const params = { measure, actual, expected: formatAnomalyNumber(l.expected) };
+    return span
+      ? t("alerts.anomaly.originValuesExpected", { ...params, window: span })
+      : t("alerts.anomaly.originValuesExpectedNoWindow", params);
+  }
   return span
     ? t("alerts.anomaly.originValuesActual", { measure, actual, window: span })
     : t("alerts.anomaly.originValuesActualNoWindow", { measure, actual });

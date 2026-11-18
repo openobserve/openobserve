@@ -13806,6 +13806,8 @@
       "originWindow": "{start}-{end} UTC",
       "originValues": "{measure}: actual {actual}, expected {lower}-{upper}, {window}",
       "originValuesNoWindow": "{measure}: actual {actual}, expected {lower}-{upper}",
+      "originValuesExpected": "{measure}: actual {actual}, expected {expected}, {window}",
+      "originValuesExpectedNoWindow": "{measure}: actual {actual}, expected {expected}",
       "originValuesActual": "{measure}: actual {actual}, {window}",
       "originValuesActualNoWindow": "{measure}: actual {actual}",
       "originValuesAbsence": "{measure}: returned no data, {window}",

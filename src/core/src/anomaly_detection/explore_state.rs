@@ -321,6 +321,7 @@ pub fn summary_snapshot(
         actual: summary.actual,
         lower: summary.expected_lower,
         upper: summary.expected_upper,
+        expected: summary.expected.filter(|_| summary.kind == "partial_drop"),
     }
 }
 
@@ -337,6 +338,7 @@ pub fn bucket_snapshot(
             kind: "value".to_string(),
             ..Default::default()
         });
+    let expected = summary.expected.filter(|_| summary.kind == "partial_drop");
     AnomalyLinkSnapshot {
         start_us,
         end_us,
@@ -345,6 +347,7 @@ pub fn bucket_snapshot(
         actual: summary.actual,
         lower: summary.expected_lower,
         upper: summary.expected_upper,
+        expected,
     }
 }
 

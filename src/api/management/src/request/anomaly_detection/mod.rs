@@ -356,7 +356,7 @@ async fn explore_response(
     );
     let measure = target
         .as_ref()
-        .map(|t| anomaly_service::anomaly_measure(t, bucket_us / 1_000_000))
+        .map(|t| anomaly_service::anomaly_measure(t))
         .unwrap_or_default();
     let snapshot = match (requested, &decision.window, &decision.summary) {
         (Some(_), ..) => Some(explore_state::bucket_snapshot(

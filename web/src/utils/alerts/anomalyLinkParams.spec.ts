@@ -79,6 +79,7 @@ describe("parseAnomalyLink", () => {
       actual: 208,
       lower: 120.4,
       upper: 157.2,
+      expected: null,
     });
   });
 

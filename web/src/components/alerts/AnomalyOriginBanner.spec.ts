@@ -103,6 +103,16 @@ describe("AnomalyOriginBanner", () => {
     wrapper?.unmount();
     await mountBanner({ ...VALUE_LINK, anomaly_kind: "partial_drop", anomaly_actual: "12" });
     expect(find("values").text()).toBe("count(*) per 15 min: actual 12.00, 18:00-19:00 UTC");
+    wrapper?.unmount();
+    await mountBanner({
+      ...VALUE_LINK,
+      anomaly_kind: "partial_drop",
+      anomaly_actual: "12",
+      anomaly_expected: "40",
+    });
+    expect(find("values").text()).toBe(
+      "count(*) per 15 min: actual 12.00, expected 40.00, 18:00-19:00 UTC",
+    );
   });
 
   it("shows the first line only for a link with no values", async () => {
