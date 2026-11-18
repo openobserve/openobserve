@@ -34,7 +34,7 @@ export interface AnomalyStripView {
   /** Ongoing only: from the start to the window end, so it moves only when the strip reloads. */
   ongoingMs: number | null;
   lastRunUs: number | null;
-  /** Set for the "No new data" state and for the gray second line under Ongoing. */
+  /** Set while the query has returned no new data for more than three buckets. */
   noNewDataSinceUs: number | null;
   incomplete: boolean;
   summary: AnomalyExploreSummary | null;
@@ -104,6 +104,10 @@ export function anomalyStripView(
   if (!config.enabled) return { ...base, state: "paused" };
   // Rule 10: while untrained the strip says Learning, whatever the run freshness.
   if (!config.isTrained) return { ...base, state: "learning" };
+  // A value or drop run whose query went quiet is not still going on; an absence is that silence.
+  if (res.state === "ongoing" && noNewData && summary?.kind !== "absence") {
+    return { ...base, state: "no_new_data" };
+  }
   if (res.state === "ongoing") {
     const ongoingMs =
       !clipped && win !== null && startedUs !== null ? (win.end_us - startedUs) / 1000 : null;

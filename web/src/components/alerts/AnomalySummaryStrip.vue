@@ -75,15 +75,8 @@
             {{ secondary.text }}<OTooltip v-if="secondary.utc" :content="secondary.utc" />
           </span>
         </div>
-        <span
-          v-if="noNewDataLine"
-          class="text-status-warning-text text-xs"
-          data-test="alerts-anomalysummarystrip-nonewdata"
-        >
-          {{ noNewDataLine.text }}<OTooltip v-if="noNewDataLine.utc" :content="noNewDataLine.utc" />
-        </span>
         <OTruncatedText
-          v-else-if="measureLine"
+          v-if="measureLine"
           class="text-text-secondary text-xs"
           data-test="alerts-anomalysummarystrip-measure"
           >{{ measureLine }}</OTruncatedText
@@ -289,16 +282,6 @@ const secondary = computed(() => facts.value.secondary);
 const isAbsence = computed(
   () => view.value?.state === "ongoing" && view.value.summary?.kind === "absence",
 );
-
-/** An absence already states its time, so only a value or a drop takes this line. */
-const noNewDataLine = computed<TimedText | null>(() => {
-  const v = view.value;
-  if (!v || v.state !== "ongoing" || v.noNewDataSinceUs === null || isAbsence.value) return null;
-  return {
-    text: t("alerts.anomaly.stripNoNewData", { time: time(v.noNewDataSinceUs) }),
-    utc: utc(v.noNewDataSinceUs),
-  };
-});
 
 const measureLine = computed<I18nText | null>(() => {
   const res = props.response;

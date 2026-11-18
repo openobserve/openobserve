@@ -13786,7 +13786,6 @@
       "stripTimeUtc": "{time} UTC",
       "stripPaused": "Detector is paused",
       "stripNoRecentRunsText": "The detector did not run in the last 3 schedule intervals.",
-      "stripNoNewData": "No new data since {time}",
       "stripNoNewDataText": "The detector runs, but its query has returned no new data.",
       "stripLearning": "Learning normal behaviour. Alerts start after training.",
       "stripNoAnomalies": "No anomalies in the last 7 days",

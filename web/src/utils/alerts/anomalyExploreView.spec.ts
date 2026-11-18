@@ -101,14 +101,47 @@ describe("anomalyStripView", () => {
     expect(view.ongoingMs).toBe((ongoing.window!.end_us - view.startedUs!) / 1000);
   });
 
-  it("puts Ongoing before No new data, and keeps No new data as the second line", () => {
+  it("puts No new data over Ongoing for a value run whose query went quiet", () => {
     const view = anomalyStripView(
       { ...ongoing, no_new_data_since_us: NOW - 70 * MIN },
       CONFIG,
       NOW,
     );
-    expect(view.state).toBe("ongoing");
+    expect(view.state).toBe("no_new_data");
     expect(view.noNewDataSinceUs).toBe(NOW - 70 * MIN);
+    expect(view.summary).toBeNull();
+  });
+
+  it("keeps Ongoing with a fresh cursor and says No new data for a quiet partial drop", () => {
+    const fresh = anomalyStripView(
+      { ...ongoing, no_new_data_since_us: NOW - 40 * MIN },
+      CONFIG,
+      NOW,
+    );
+    expect(fresh.state).toBe("ongoing");
+    const drop = anomalyStripView(
+      {
+        ...ongoing,
+        summary: { ...ongoing.summary!, kind: "partial_drop" },
+        no_new_data_since_us: NOW - 70 * MIN,
+      },
+      CONFIG,
+      NOW,
+    );
+    expect(drop.state).toBe("no_new_data");
+  });
+
+  it("keeps Ongoing for an absence, whose silence is the anomaly", () => {
+    const view = anomalyStripView(
+      {
+        ...ongoing,
+        summary: { ...ongoing.summary!, kind: "absence" },
+        no_new_data_since_us: NOW - 70 * MIN,
+      },
+      CONFIG,
+      NOW,
+    );
+    expect(view.state).toBe("ongoing");
   });
 
   it("shows No new data as the main state when no episode is open", () => {

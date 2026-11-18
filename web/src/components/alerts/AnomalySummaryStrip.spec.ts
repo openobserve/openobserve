@@ -164,12 +164,15 @@ describe("AnomalySummaryStrip", () => {
       expect(text(w, "fact").text()).toMatch(/^started before \D+ ?15,? 18:00$/);
     });
 
-    it("puts No new data in the warning colour on line 2 for a value anomaly (AC1.16)", () => {
+    it("shows No new data, not Ongoing, for a value run whose query went quiet", () => {
       const w = mountStrip({ response: ongoing({ no_new_data_since_us: at("18:05") }) });
-      const line = text(w, "nonewdata");
-      expect(line.text()).toBe("No new data since 18:05");
-      expect(line.classes()).toContain("text-status-warning-text");
-      expect(text(w, "measure").exists()).toBe(false);
+      expect(text(w, "state-no_new_data").exists()).toBe(true);
+      expect(text(w, "chip").text()).toBe("No new data");
+      expect(text(w, "fact").text()).toBe("since 18:05");
+      expect(text(w, "message").text()).toBe(
+        "The detector runs, but its query has returned no new data.",
+      );
+      expect(text(w, "readings").exists()).toBe(false);
     });
   });
 
@@ -215,7 +218,7 @@ describe("AnomalySummaryStrip", () => {
       });
       expect(text(w, "message").text()).toBe("No data for this detector's query since 18:15");
       expect(tip(w, "message")).toBe("2026-11-16 18:15 UTC");
-      expect(text(w, "nonewdata").exists()).toBe(false);
+      expect(text(w, "state-ongoing").exists()).toBe(true);
       expect(text(w, "readings").exists()).toBe(false);
       expect(text(w, "fact").text()).toBe("for 45 min");
       expect(text(w, "measure").text()).toBe("count(*) per 15 min · k8s_logs");
@@ -362,6 +365,7 @@ describe("AnomalySummaryStrip", () => {
       "The detector runs, but its query has returned no new data.",
       "since 18:05",
     ],
+
     [
       { is_trained: false },
       { state: "no_runs", last_detection_run: null, model_version: 0 },
