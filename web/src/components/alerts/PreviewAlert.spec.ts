@@ -61,8 +61,20 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
+const metricsApi = vi.hoisted(() => ({
+  parsePromqlQuery: vi.fn().mockResolvedValue({ data: { data: null } }),
+  get_promql_series: vi.fn().mockResolvedValue({ data: { data: [] } }),
+}));
+vi.mock("@/services/metrics", () => ({ default: metricsApi }));
+
+const streamMeta = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: async () => ({ metrics_meta: streamMeta.value }) }),
+}));
+
 // Imported after the mock above so it resolves to the mocked module.
 import searchService from "@/services/search";
+import { queryClient } from "@/composables/query/queryClient";
 
 const baseFormData = () => ({
   stream_name: "test-stream",
@@ -3357,6 +3369,95 @@ describe("PreviewAlert - a chart with many series", () => {
     await flushPromises();
     expect(w.vm.chartData.config.mark_line.map((l: any) => l.show_label)).toEqual([false]);
     expect(w.find('[data-test="alert-preview-limit-key"]').text()).toContain("5");
+    w.unmount();
+  });
+});
+
+describe("PreviewAlert - a PromQL chart says why it is empty and what unit it is in", () => {
+  const MEM = "container_memory_working_set_bytes";
+  const mountMetric = (query: string) =>
+    mountComp({
+      query,
+      selectedTab: "promql",
+      labelledLimit: true,
+      formData: {
+        stream_name: MEM,
+        stream_type: "metrics",
+        trigger_condition: { period: 10, threshold: 1, operator: ">=" },
+        query_condition: { promql_condition: { column: "value", operator: ">=", value: 80 } },
+      },
+    });
+  const emitSeries = async (w: VueWrapper<any>, series: any[]) => {
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series },
+    });
+    await flushPromises();
+  };
+
+  beforeEach(() => {
+    queryClient.clear();
+    streamMeta.value = { metric_type: "gauge", unit: "By" };
+  });
+
+  it("names the filter value no series carried in 24 hours", async () => {
+    metricsApi.parsePromqlQuery.mockResolvedValueOnce({
+      data: {
+        data: {
+          type: "aggregate",
+          expr: {
+            type: "selector",
+            name: MEM,
+            matchers: [{ label: "pod", op: "=", value: "oom" }],
+          },
+        },
+      },
+    });
+    metricsApi.get_promql_series.mockResolvedValueOnce({
+      data: {
+        data: [
+          { __name__: MEM, pod: "api" },
+          { __name__: MEM, pod: "web" },
+        ],
+      },
+    });
+    const w = await mountMetric(`max(${MEM}{pod="oom"})`);
+    w.vm.refreshData();
+    await emitSeries(w, []);
+    expect(w.find('[data-test="alert-preview-no-series"]').text()).toContain(
+      'pod="oom" hasn\'t appeared in the last 24 hours. Seen: api (1) and web (1).',
+    );
+
+    await emitSeries(w, [
+      {
+        name: "api",
+        data: [
+          [1, "10"],
+          [2, "20"],
+        ],
+      },
+    ]);
+    expect(w.find('[data-test="alert-preview-no-series"]').exists()).toBe(false);
+    expect(w.find('[data-test="alert-preview-series-count"]').text()).toBe(
+      i18n.global.t("alerts.form.preview.seriesNoneCross", { count: "1" }, 1),
+    );
+    w.unmount();
+  });
+
+  it("draws the axis and the limit in the metric's unit", async () => {
+    const w = await mountMetric(`avg(${MEM})`);
+    await flushPromises();
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.vm.chartData.config).toMatchObject({ unit: "bytes", decimals: undefined });
+    expect(w.find('[data-test="alert-preview-limit-key"]').text()).toContain("80 B");
+    w.unmount();
+  });
+
+  it("draws counted events on a whole-number axis", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs" });
+    w.vm.refreshData();
+    await flushPromises();
+    expect(w.vm.chartData.config).toMatchObject({ unit: "numbers", decimals: 0 });
     w.unmount();
   });
 });

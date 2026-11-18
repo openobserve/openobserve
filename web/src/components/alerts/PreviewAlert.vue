@@ -68,6 +68,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @error="onPreviewError"
         @loading-state-change="onPreviewLoading"
       />
+      <OEmptyState
+        v-if="selectedTab === 'promql' && !awaitsQuery && !shownChartError && noSeriesText"
+        class="bg-surface-base absolute! inset-0 h-full min-h-0! w-full"
+        size="inline"
+        icon="bar-chart"
+        :title="t('panel.noData')"
+        :description="noSeriesText"
+        :backdrop="false"
+        data-test="alert-preview-no-series"
+      />
       <QueryErrorState
         v-if="!awaitsQuery && shownChartError"
         class="bg-surface-base absolute inset-0 overflow-y-auto"
@@ -124,6 +134,13 @@ import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import { keyToMs } from "@/utils/alerts/alertBacktest";
 import { isCountLimit, previewCountText } from "@/utils/alerts/alertReadBack";
+import { formatNumber, valueWithUnit } from "@/utils/alerts/alertCopy";
+import { promqlValueUnit, type MetricMeta } from "@/utils/alerts/alertValueUnit";
+import { noSeriesReason, noSeriesSentence, selectorsOf } from "@/utils/alerts/promqlNoSeries";
+import { toO2Unit } from "@/utils/metrics/metricDefaults";
+import { promqlDaySeriesQuery, promqlParseTreeQuery } from "@/services/alert_preview.queries";
+import useStreams from "@/composables/useStreams";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import {
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
@@ -254,6 +271,12 @@ const applyThresholds = (): void => {
     warning: t("alerts.plain.warnLine"),
   }).map((line) => ({ ...line, show_label: false }));
   const bounds = thresholdAxisBounds(markLines);
+  const unit = toO2Unit(valueUnit.value ?? "none");
+  dashboardPanelData.data.config.unit = unit.unit;
+  dashboardPanelData.data.config.unit_custom = unit.unitCustom;
+  // Counted events are whole numbers; an axis of "180.00" reads as a measurement.
+  dashboardPanelData.data.config.decimals =
+    props.selectedTab === "custom" && !props.isAggregationEnabled ? 0 : undefined;
   dashboardPanelData.data.config.mark_line = markLines;
   dashboardPanelData.data.config.y_axis_min = bounds.y_axis_min;
   dashboardPanelData.data.config.y_axis_max = bounds.y_axis_max;
@@ -334,6 +357,32 @@ const shownChartError = computed(() => {
 });
 
 const store = useStore();
+
+const { getStream } = useStreams(t);
+const metricMeta = ref<MetricMeta | null>(null);
+watch(
+  () => [props.formData.stream_name, props.formData.stream_type] as const,
+  async ([name, type]) => {
+    metricMeta.value = null;
+    if (type !== "metrics" || !name) return;
+    try {
+      const stream = await getStream(name, "metrics", false);
+      if (props.formData.stream_name !== name) return;
+      const meta = stream?.metrics_meta ?? {};
+      metricMeta.value = { name, type: meta.metric_type, unit: meta.unit };
+    } catch {
+      // Without the stream's metadata the axis stays unitless.
+    }
+  },
+  { immediate: true },
+);
+// A forecast or a rule draws other numbers than the metric's values.
+const valueUnit = computed((): string | null => {
+  const qc = props.formData.query_condition;
+  if (props.selectedTab !== "promql" || !metricMeta.value || qc?.promql_rule_mode) return null;
+  if (props.formData._ui?.forecast) return null;
+  return promqlValueUnit(props.query, metricMeta.value);
+});
 
 type PreviewRange = "checks" | "12h" | "24h";
 const PREVIEW_RANGE_KEY = "o2_alert_preview_range";
@@ -436,6 +485,18 @@ const onRangePick = (value: unknown) => {
 const drawnSeries = ref<{ shown: number; total: number } | null>(null);
 const seriesCountText = computed((): I18nText | null => {
   const drawn = drawnSeries.value;
+  // Lines on the chart with no verdict count say the series are there and none crossed.
+  if (
+    props.selectedTab === "promql" &&
+    drawn &&
+    drawn.shown > 0 &&
+    evaluationStatus.value?.count === 0
+  )
+    return t(
+      "alerts.form.preview.seriesNoneCross",
+      { count: formatNumber(drawn.total) },
+      drawn.total,
+    );
   if (!drawn || drawn.total <= 1) return null;
   if (drawn.total > drawn.shown)
     return t("alerts.form.preview.seriesShown", {
@@ -451,9 +512,11 @@ const drawnLimits = ref<{ level: "critical" | "warning"; value: unknown }[]>([])
 const limitKeys = computed(() =>
   props.labelledLimit
     ? drawnLimits.value.map(({ level, value }) => {
-        const shown = Number.isFinite(Number(value))
-          ? Number(value).toLocaleString()
-          : String(value);
+        const shown = !Number.isFinite(Number(value))
+          ? String(value)
+          : valueUnit.value
+            ? valueWithUnit(Number(value), valueUnit.value, t)
+            : Number(value).toLocaleString();
         return {
           level,
           label:
@@ -1570,6 +1633,9 @@ const handleSeriesDataUpdate = (seriesData: any) => {
   const named = chartDataSeries(seriesData).length;
   const limit = seriesData?.extras?.seriesLimit;
   drawnSeries.value = { shown: named, total: Math.max(Number(limit?.total) || 0, named) };
+  if (props.selectedTab === "promql" && named === 0 && props.query)
+    void explainNoSeries(props.query);
+  else clearNoSeries();
   if (!props.formData.trigger_condition) return;
   if (props.selectedTab !== "promql") return;
 
@@ -1595,6 +1661,31 @@ const handleSeriesDataUpdate = (seriesData: any) => {
     evaluatePromqlSeries(chartDataSeries(seriesData));
   } catch (error) {
     console.error("[PreviewAlert] Error processing series data:", error);
+  }
+};
+
+// "No Data" alone can't tell a filter that matched nothing from a quiet metric, so the chart says which.
+const noSeriesText = ref<I18nText | null>(null);
+let noSeriesGeneration = 0;
+const clearNoSeries = () => {
+  noSeriesGeneration++;
+  noSeriesText.value = null;
+};
+const explainNoSeries = async (query: string) => {
+  const generation = ++noSeriesGeneration;
+  const org = store.state.selectedOrganization.identifier;
+  try {
+    const selectors = selectorsOf(await queryClient.fetchQuery(promqlParseTreeQuery(org, query)));
+    const names = [...new Set(selectors.map((selector) => selector.name))];
+    const endMicros = Date.now() * 1000;
+    const series = await Promise.all(
+      names.map((name) => queryClient.fetchQuery(promqlDaySeriesQuery(org, name, endMicros))),
+    );
+    if (generation !== noSeriesGeneration || query !== props.query) return;
+    const reason = noSeriesReason(selectors, (name) => series[names.indexOf(name)] ?? []);
+    noSeriesText.value = reason ? noSeriesSentence(reason, t) : null;
+  } catch {
+    if (generation === noSeriesGeneration) noSeriesText.value = null;
   }
 };
 
@@ -1984,6 +2075,7 @@ watch(
     // A query that fails to run emits no new result, so the old verdict would linger.
     if (next[0] !== prev?.[0]) {
       evaluationStatus.value = null;
+      clearNoSeries();
       cancelVerdictSearch();
       // The verdict is gone, so even a query typed back to the last run's must run again.
       lastRunKey = "";
@@ -2011,15 +2103,16 @@ watch(previewRange, () => {
 
 // The lines follow the limit at once; the re-query a limit change starts may be throttled or slow.
 watch(
-  () => JSON.stringify(currentLimits()),
+  () => JSON.stringify([currentLimits(), valueUnit.value]),
   () => {
     const config = (chartData.value as any)?.config;
     if (!dashboardPanelData || !config) return;
     applyThresholds();
-    const { mark_line, y_axis_min, y_axis_max } = dashboardPanelData.data.config;
+    const { mark_line, y_axis_min, y_axis_max, unit, unit_custom, decimals } =
+      dashboardPanelData.data.config;
     chartData.value = {
       ...chartData.value,
-      config: { ...config, mark_line, y_axis_min, y_axis_max },
+      config: { ...config, mark_line, y_axis_min, y_axis_max, unit, unit_custom, decimals },
     };
   },
 );
