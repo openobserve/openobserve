@@ -152,6 +152,15 @@ describe("value counts", () => {
     expect(stream).toHaveBeenCalledTimes(2);
   });
 
+  it("gives up on a lookup that never ends, so the list stops loading", async () => {
+    vi.useFakeTimers();
+    stream.mockImplementation(() => {});
+    const pending = loadValueCounts(ctx, "reason");
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect((await pending).state).toBe("failed");
+    vi.useRealTimers();
+  });
+
   it("serves a typed search from a complete answer without another request", async () => {
     answerWith({
       "": [

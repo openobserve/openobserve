@@ -38,6 +38,7 @@ export const HOUR_US = 60 * 60 * 1_000_000;
 /** Values asked for per field; a full page means more may exist. */
 export const VALUE_COUNT_SIZE = 20;
 const CACHE_TTL_MS = 5 * 60_000;
+const VALUE_COUNT_TIMEOUT_MS = 30_000;
 const RECENT_MAX = 3;
 const SEEN_MAX = 3;
 // A lookup by a value's first letters also finds its look-alikes (OOMKilled → OOMKilling).
@@ -261,7 +262,11 @@ export function loadValueCounts(
   const request = new Promise<ValueCountEntry>((done) => (resolve = done));
   // Registered before the call starts: a stream that settles at once must not leave its promise behind.
   inFlight.set(key, request);
+  // A stream that never ends must not leave the list loading; the next ask tries again.
+  const ceiling = setTimeout(() => settle("failed"), VALUE_COUNT_TIMEOUT_MS);
   const settle = (state: ValueCountState) => {
+    clearTimeout(ceiling);
+    if (inFlight.get(key) !== request) return;
     const live = entries.get(key);
     if (live) {
       live.state = state;
