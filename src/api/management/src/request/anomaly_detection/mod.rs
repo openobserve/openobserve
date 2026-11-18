@@ -374,9 +374,12 @@ async fn explore_response(
             end_us,
             &measure,
         )),
-        (None, Some(window), Some(summary)) => {
-            Some(explore_state::summary_snapshot(window, summary, &measure))
-        }
+        (None, Some(window), Some(summary)) => Some(explore_state::summary_snapshot(
+            window,
+            summary,
+            &measure,
+            decision.state == explore_state::ExploreState::Ongoing,
+        )),
         _ => None,
     };
     let link = target

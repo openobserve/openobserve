@@ -247,14 +247,19 @@ pub fn bucket_at(buckets: &[ExploreBucket], ts_us: i64, bucket_us: i64) -> Optio
         .find(|b| b.ts_us <= ts_us && ts_us < b.ts_us.saturating_add(bucket_us.max(1)))
 }
 
-/// The banner values of a link built from the strip's summary.
+/// The banner values of a link built from the strip's summary; an ongoing absence starts at
+/// its own first bucket, while the page range still covers the whole episode.
 pub fn summary_snapshot(
     window: &ExploreWindow,
     summary: &ExploreSummary,
     measure: &str,
+    ongoing: bool,
 ) -> AnomalyLinkSnapshot {
+    let absence_start = summary
+        .since_us
+        .filter(|_| ongoing && summary.kind == "absence");
     AnomalyLinkSnapshot {
-        start_us: window.start_us,
+        start_us: absence_start.unwrap_or(window.start_us),
         end_us: window.end_us,
         kind: summary.kind.clone(),
         measure: measure.to_string(),
@@ -635,6 +640,34 @@ mod tests {
         assert_eq!(only_absence.summary.unwrap().since_us, Some(2 * B));
         let value = decide(&[normal(1), high(2, 900.0)], B, 0, true, true);
         assert_eq!(value.summary.unwrap().since_us, None);
+    }
+
+    #[test]
+    fn test_an_ongoing_absence_link_starts_at_the_absence_and_others_at_the_window() {
+        let buckets = [normal(1), high(2, 900.0), high(3, 600.0), absent(4)];
+        let d = decide(&buckets, B, 0, true, true);
+        let (window, summary) = (d.window.unwrap(), d.summary.unwrap());
+        let snap = summary_snapshot(&window, &summary, "m", true);
+        assert_eq!(
+            (snap.kind.as_str(), snap.start_us, snap.end_us),
+            ("absence", 4 * B, 5 * B)
+        );
+        assert_eq!(
+            window.start_us,
+            2 * B,
+            "the page range keeps the whole episode"
+        );
+        let back = summary_snapshot(&window, &summary, "m", false);
+        assert_eq!(back.start_us, 2 * B);
+        let value = decide(
+            &[normal(1), high(2, 900.0), high(3, 600.0)],
+            B,
+            0,
+            true,
+            true,
+        );
+        let snap = summary_snapshot(&value.window.unwrap(), &value.summary.unwrap(), "m", true);
+        assert_eq!(snap.start_us, 2 * B);
     }
 
     #[test]
