@@ -82,6 +82,7 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
       query_condition: {
         ...validScheduled().query_condition,
         type: "promql",
+        promql: "up",
         promql_rule_mode: true,
         promql_multi_alert: true,
         promql_condition: null,

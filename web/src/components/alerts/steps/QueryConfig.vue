@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="thresholdError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-if-row-logs-error"
                                 role="alert"
                               >
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="warningThresholdError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-warning-threshold-error-136"
                                 role="alert"
                               >
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="havingValueError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-if-row-logs-value-error"
                                 role="alert"
                               >
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="aggregationWarningError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-aggregation-warning-value-error-182"
                                 role="alert"
                               >
@@ -562,7 +562,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="thresholdError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-if-row-metrics-error"
                                 role="alert"
                               >
@@ -598,7 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="warningThresholdError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-warning-threshold-error-381"
                                 role="alert"
                               >
@@ -658,7 +658,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="havingValueError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-if-row-metrics-value-error"
                                 role="alert"
                               >
@@ -694,7 +694,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="aggregationWarningError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-aggregation-warning-value-error-413"
                                 role="alert"
                               >
@@ -833,7 +833,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </OFormInput>
                                   <div
                                     v-if="thresholdError && groupAnswer === 'one'"
-                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    class="text-input-error-text w-0 min-w-full text-xs"
                                     :data-test="countErrorTest"
                                     role="alert"
                                   >
@@ -862,7 +862,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </OFormInput>
                                   <div
                                     v-if="thresholdError && groupAnswer === 'one'"
-                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    class="text-input-error-text w-0 min-w-full text-xs"
                                     :data-test="countErrorTest"
                                     role="alert"
                                   >
@@ -1169,7 +1169,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="inlineStatusBarClass"
             >
               <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
-                <template v-if="inlineStatusState === 'sql-status-bar--hint'">
+                <span
+                  v-if="queryRequiredError"
+                  role="alert"
+                  tabindex="-1"
+                  class="text-status-error-text flex min-w-0 items-center gap-1.25 outline-none"
+                  data-test="add-alert-query-required-error"
+                >
+                  <OIcon class="shrink-0" name="error-outline" size="xs" />
+                  <span>{{ queryRequiredError }}</span>
+                </span>
+                <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
                   <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
                   <span>{{ t("alerts.queryConfig.writeQueryHint") }}</span>
                 </template>
@@ -1198,6 +1208,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("alerts.form.sqlError.use", { match: raw(sqlColumnFix.match) }) }}
               </OButton>
+            </div>
+
+            <div
+              v-if="localTab === 'promql' && queryRequiredError"
+              role="alert"
+              tabindex="-1"
+              class="text-status-error-text flex items-center gap-2 text-xs outline-none"
+              data-test="add-alert-query-required-error"
+            >
+              <OIcon class="shrink-0" name="error-outline" size="xs" />
+              <span class="min-w-0 break-words">{{ queryRequiredError }}</span>
             </div>
 
             <OBanner
@@ -1271,7 +1292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OFormInput>
                           <div
                             v-if="thresholdError"
-                            class="text-input-error-text text-xs whitespace-nowrap"
+                            class="text-input-error-text w-0 min-w-full text-xs"
                             data-test="alert-trigger-threshold-error"
                             role="alert"
                           >
@@ -1326,7 +1347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </OFormInput>
                                   <div
                                     v-if="thresholdError && groupAnswer === 'one'"
-                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    class="text-input-error-text w-0 min-w-full text-xs"
                                     :data-test="countErrorTest"
                                     role="alert"
                                   >
@@ -1359,7 +1380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </OFormInput>
                                   <div
                                     v-if="thresholdError && groupAnswer === 'one'"
-                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    class="text-input-error-text w-0 min-w-full text-xs"
                                     :data-test="countErrorTest"
                                     role="alert"
                                   >
@@ -1416,7 +1437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </OFormInput>
                                   <div
                                     v-if="havingValueError && groupAnswer === 'each'"
-                                    class="text-input-error-text text-xs whitespace-nowrap"
+                                    class="text-input-error-text w-0 min-w-full text-xs"
                                     data-test="alert-sql-agg-value-error"
                                     role="alert"
                                   >
@@ -1452,7 +1473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="warningThresholdError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-warning-threshold-error-1020"
                                 role="alert"
                               >
@@ -1505,7 +1526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </OFormInput>
                               <div
                                 v-if="aggregationWarningError"
-                                class="text-input-error-text text-xs whitespace-nowrap"
+                                class="text-input-error-text w-0 min-w-full text-xs"
                                 data-test="alert-sql-agg-warning-value-error"
                                 role="alert"
                               >
@@ -1595,7 +1616,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OFormInput>
                             <div
                               v-if="promqlValueError"
-                              class="text-input-error-text text-xs whitespace-nowrap"
+                              class="text-input-error-text w-0 min-w-full text-xs"
                               data-test="alert-threshold-value-error"
                               role="alert"
                             >
@@ -1630,7 +1651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OFormInput>
                             <div
                               v-if="promqlWarningError"
-                              class="text-input-error-text text-xs whitespace-nowrap"
+                              class="text-input-error-text w-0 min-w-full text-xs"
                               data-test="alert-promql-warning-value-error"
                               role="alert"
                             >
@@ -1675,28 +1696,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!sectionTargets?.querySchedule"
         >
           <template v-if="frequencyMode !== 'cron'">
-            <div class="flex flex-col gap-1">
-              <OFormInput
-                :aria-label="t('alerts.queryConfig.checkEvery')"
-                name="_ui.checkEvery"
-                data-test="alert-check-every-input"
-                type="number"
-                class="w-16!"
-                min="1"
-                @update:model-value="onCheckEveryChange($event)"
-                @blur="restoreDefaultFrequency"
-              >
-                <template #error />
-              </OFormInput>
-              <div
-                v-if="checkEveryError"
-                class="text-input-error-text text-xs"
-                data-test="alert-check-every-error"
-                role="alert"
-              >
-                {{ checkEveryError }}
-              </div>
-            </div>
+            <OFormInput
+              :aria-label="t('alerts.queryConfig.checkEvery')"
+              name="_ui.checkEvery"
+              data-test="alert-check-every-input"
+              type="number"
+              class="w-16!"
+              min="1"
+              @update:model-value="onCheckEveryChange($event)"
+              @blur="restoreDefaultFrequency"
+            >
+              <template #error />
+            </OFormInput>
             <OSelect
               :aria-label="t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })"
               class="max-w-25 min-w-20"
@@ -1708,6 +1719,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :searchable="false"
               @update:model-value="onFrequencyUnitChange"
             />
+            <div
+              v-if="checkEveryError"
+              class="text-input-error-text order-last basis-full text-xs"
+              data-test="alert-check-every-error"
+              role="alert"
+            >
+              {{ checkEveryError }}
+            </div>
             <div class="order-last basis-full">
               <OButton
                 variant="ghost-primary"
@@ -1737,7 +1756,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
                   class="max-w-37.5 min-w-37.5"
                   @update:model-value="onCronExpressionChange"
-                />
+                >
+                  <template #error />
+                </OFormInput>
                 <span class="text-text-secondary text-sm">{{
                   t("alerts.form.schedule.cronIn")
                 }}</span>
@@ -1837,8 +1858,6 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
   convertMinutesToCron,
-  getCronIntervalDifferenceInSeconds,
-  isAboveMinRefreshInterval,
   describeCron,
   getImageURL,
   resolveBrowserTimezone,
@@ -1851,7 +1870,6 @@ import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { savedBrowserTimezone } from "@/utils/timezoneAliases";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
-import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
@@ -1893,7 +1911,8 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { revealFieldErrors } from "@/lib/forms/Form/useOForm";
+import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
 import {
   ALERT_SETTING_TIERS_KEY,
@@ -2393,6 +2412,10 @@ export default defineComponent({
 
     const onBlurInlineSqlEditor = async () => {
       inlineEditorFocused.value = false;
+      // The editor is not a form field, so leaving it reveals its "write a query" error by hand.
+      if (form && localTab.value !== "custom") {
+        revealFieldErrors(form, [`query_condition.${localTab.value}`]);
+      }
       queryEditorPlaceholderFlag.value =
         localTab.value === "sql" ? localSqlQuery.value === "" : editorPromqlQuery.value === "";
       if (localTab.value === "sql") {
@@ -2654,62 +2677,15 @@ export default defineComponent({
     // suppresses the built-in message and we render it in a full-width sibling
     // below the row. These read the same R3-timed field errors OFormInput would
     // have surfaced — single source of truth, just displayed at column width.
-    const savedThresholdError = form.useStore((s: any) =>
-      firstFieldError(s.fieldMeta?.["trigger_condition.threshold"]?.errors ?? []),
+    const thresholdError = shownFieldError(form, "trigger_condition.threshold");
+    // The schema owns the §4.5 warning matrix; each warning shows its error the way its field would.
+    const warningThresholdError = shownFieldError(form, "trigger_condition.warning_threshold");
+    const aggregationWarningError = shownFieldError(
+      form,
+      "query_condition.aggregation.warning_value",
     );
-    // The form validates on Save; a limit the user has left is checked here so its error shows at once.
-    const thresholdLeft = ref(false);
-    const thresholdError = computed(
-      () =>
-        savedThresholdError.value ||
-        (thresholdLeft.value && !isCountLimit(triggerThreshold.value)
-          ? t("alerts.validation.limitWholeNumber")
-          : undefined),
-    );
-    // Warning validation, §4.5 matrix. "Less severe" is OPERATOR-DEPENDENT —
-    // a plain `warning < critical` check is wrong for `<`/`<=`, and `=`/`!=`
-    // have no ordering so they reject a warning outright. Mirrors the backend
-    // `validate_thresholds` so the user is told before submit, not by a 400.
-    const matrixError = (w: any, c: any, op: any): string => {
-      if (w === null || w === undefined || w === "") return "";
-      const wn = Number(w);
-      const cn = Number(c);
-      if (Number.isNaN(wn) || Number.isNaN(cn)) return "";
-      if (op === "=" || op === "!=") {
-        return t("alerts.warnOperatorUnordered", { operator: op });
-      }
-      if ((op === ">" || op === ">=") && !(wn < cn)) {
-        return t("alerts.warnMustBeLower", { warning: wn, critical: cn, operator: op });
-      }
-      if ((op === "<" || op === "<=") && !(wn > cn)) {
-        return t("alerts.warnMustBeHigher", { warning: wn, critical: cn, operator: op });
-      }
-      return "";
-    };
-    // Count-based warning (trigger_condition), for modes where the threshold
-    // IS the row/series count.
-    const warningThresholdError = form.useStore((s: any) => {
-      const tc = s.values?.trigger_condition ?? {};
-      return matrixError(tc.warning_threshold, tc.threshold, tc.operator);
-    });
-    // Aggregate-VALUE warning (Aggregation.warning_value), read against
-    // `having.operator` — that is the comparison an aggregation alert makes.
-    const aggregationWarningError = form.useStore((s: any) => {
-      const agg = s.values?.query_condition?.aggregation ?? {};
-      return matrixError(agg.warning_value, agg.having?.value, agg.having?.operator);
-    });
-    // PromQL warning validated against `promql_condition.operator`.
-    const promqlWarningError = form.useStore((s: any) => {
-      const qc = s.values?.query_condition ?? {};
-      return matrixError(
-        qc.promql_warning_value,
-        qc.promql_condition?.value,
-        qc.promql_condition?.operator,
-      );
-    });
-    const promqlValueError = form.useStore((s: any) =>
-      firstFieldError(s.fieldMeta?.["query_condition.promql_condition.value"]?.errors ?? []),
-    );
+    const promqlWarningError = shownFieldError(form, "query_condition.promql_warning_value");
+    const promqlValueError = shownFieldError(form, "query_condition.promql_condition.value");
     // ── Severity rows ──────────────────────────────────────────────────────
     // Critical and Warning are stacked rows (mock: multi-alert-form.html), not
     // one long sentence. Warning shares Critical's operator, so its row only
@@ -2751,11 +2727,13 @@ export default defineComponent({
       setFV("query_condition.promql_warning_value", "");
       showPromqlWarningRow.value = false;
     };
-    const checkEveryError = form.useStore((s: any) =>
-      firstFieldError(s.fieldMeta?.["_ui.checkEvery"]?.errors ?? []),
-    );
-    const havingValueError = form.useStore((s: any) =>
-      firstFieldError(s.fieldMeta?.["query_condition.aggregation.having.value"]?.errors ?? []),
+    const checkEveryError = shownFieldError(form, "_ui.checkEvery");
+    const havingValueError = shownFieldError(form, "query_condition.aggregation.having.value");
+    const cronError = shownFieldError(form, "trigger_condition.cron");
+    const sqlRequiredError = shownFieldError(form, "query_condition.sql");
+    const promqlRequiredError = shownFieldError(form, "query_condition.promql");
+    const queryRequiredError = computed(() =>
+      localTab.value === "promql" ? promqlRequiredError.value : sqlRequiredError.value,
     );
 
     // Reactive views of the two group-by field arrays (form store) so the
@@ -3222,7 +3200,6 @@ export default defineComponent({
     };
 
     const restoreDefaultThreshold = () => {
-      thresholdLeft.value = true;
       if (
         triggerThreshold.value === null ||
         triggerThreshold.value === "" ||
@@ -3277,7 +3254,7 @@ export default defineComponent({
     // Rule ②: `cron` + `timezone` are SAVED alert fields, so the ONE form owns
     // them — no local-ref mirror. The visible controls bind by `name=`; these
     // computeds are the read/write seam for the NON-control consumers
-    // (cronDescription, validateCron, onFrequencyUnitChange, the tooltips).
+    // (cronDescription, onFrequencyUnitChange, the tooltips).
     // Writing through the setter goes straight to the form, so there is exactly
     // one source of truth.
     const cronExpression = computed<string>({
@@ -3288,7 +3265,6 @@ export default defineComponent({
       get: () => fv("trigger_condition.timezone") ?? "",
       set: (v) => setFV("trigger_condition.timezone", v ?? ""),
     });
-    const cronError = ref("");
     const cronDescription = computed(() =>
       describeCron(t, cronExpression.value, cronTimezone.value),
     );
@@ -3303,33 +3279,6 @@ export default defineComponent({
     const { zones: filteredTimezones, timezoneOptions: timezoneSelectOptions } = useTimezoneOptions(
       { browserEntry: true, current: cronTimezone },
     );
-
-    const validateCron = () => {
-      cronError.value = "";
-      if (frequencyMode.value !== "cron") return;
-      if (!cronExpression.value || !cronTimezone.value) {
-        cronError.value = t("alerts.queryConfig.cronExpressionTimezoneRequired");
-        return;
-      }
-      if (cronExpression.value.trim().split(/\s+/).length !== 6) {
-        cronError.value = t("common.invalidCronSixFields");
-        return;
-      }
-      try {
-        const intervalInSecs = getCronIntervalDifferenceInSeconds(cronExpression.value);
-        if (
-          typeof intervalInSecs === "number" &&
-          !isAboveMinRefreshInterval(intervalInSecs, store.state?.zoConfig)
-        ) {
-          const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
-          cronError.value = t("alerts.queryConfig.frequencyGreaterThanSeconds", {
-            seconds: minInterval - 1,
-          });
-        }
-      } catch {
-        cronError.value = t("alerts.queryConfig.invalidCronExpression");
-      }
-    };
 
     // computed() so the labels re-resolve on a locale change; the `value`s are
     // the frequency-mode identifiers and stay literal.
@@ -3364,7 +3313,6 @@ export default defineComponent({
             cronTimezone.value = savedBrowserTimezone();
           }
         }
-        validateCron();
       } else {
         setFV("trigger_condition.frequency_type", "minutes");
         // Convert between minutes and hours. checkEveryFrequency is the DISPLAY
@@ -3411,14 +3359,13 @@ export default defineComponent({
 
     // The `name=` binding owns the write, but this handler runs BEFORE the
     // wrapper's own field.handleChange (merged listeners fire in declaration
-    // order — see R6), so write through the computed FIRST: validateCron() and
-    // emitTriggerUpdate() both re-read the form and would otherwise see the
+    // order — see R6), so write through the computed FIRST: emitTriggerUpdate()
+    // re-reads the form and would otherwise see the
     // STALE cron. Writing the same value twice targets the ONE form, so this is
     // ordering insurance — not a second source of truth.
     const onCronExpressionChange = (value: any) => {
       isUserTriggerChange.value = true;
       cronExpression.value = value;
-      validateCron();
       emitTriggerUpdate();
     };
 
@@ -3428,7 +3375,6 @@ export default defineComponent({
       // IANA zone so trigger_condition.timezone stays a value the backend can
       // parse (storing the raw label produces a NaN tz_offset).
       cronTimezone.value = resolveBrowserTimezone(value);
-      validateCron();
       emitTriggerUpdate();
     };
 
@@ -4401,6 +4347,7 @@ export default defineComponent({
       cronExpression,
       cronTimezone,
       cronError,
+      queryRequiredError,
       cronDescription,
       thresholdError,
       warningThresholdError,

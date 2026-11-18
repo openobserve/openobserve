@@ -1028,13 +1028,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </p>
           <p
-            v-else-if="compositeNeedsChildren"
-            class="text-text-secondary min-w-0 text-xs"
-            data-test="add-alert-save-reason"
-          >
-            {{ t("alerts.form.save.compositeNeeds") }}
-          </p>
-          <p
             v-else-if="viaIncidentDraft"
             class="text-text-secondary min-w-0 text-xs"
             data-test="add-alert-via-incident"
@@ -1042,6 +1035,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ viaIncidentLine(t, 1) }}
           </p>
         </div>
+        <p
+          v-if="issueSections && !silentAutoObserveDraft"
+          class="text-status-error-text m-0 flex min-w-0 items-start gap-1.5 text-xs"
+          data-test="add-alert-save-reason"
+        >
+          <OIcon name="error" size="xs" class="mt-0.5 shrink-0" />
+          <i18n-t keypath="alerts.form.save.issuesIn" tag="span" scope="global">
+            <template #sections>
+              <OButton
+                variant="link"
+                size="xs"
+                data-test="add-alert-save-reason-link"
+                @click="goToSaveReason"
+                >{{ issueSections }}</OButton
+              >
+            </template>
+          </i18n-t>
+        </p>
+        <p
+          v-else-if="compositeNeedsChildren && !silentAutoObserveDraft"
+          class="text-text-secondary m-0 min-w-0 text-xs"
+          data-test="add-alert-save-reason"
+        >
+          <OButton
+            variant="link"
+            size="xs"
+            data-test="add-alert-save-reason-link"
+            @click="goToSaveReason"
+            >{{ t("alerts.form.save.compositeNeeds") }}</OButton
+          >
+        </p>
         <OButton
           data-test="add-alert-cancel-btn"
           variant="outline"
@@ -1055,7 +1079,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
-          :disabled="compositeSaveDisabled"
+          :disabled="silentAutoObserveDraft"
           class="min-w-28"
           @click="handleSave"
           >{{ saveLabel }}</OButton
@@ -1129,6 +1153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw } from "@/types/i18n";
+import { getIntlLocale } from "@/locales";
 import {
   defineComponent,
   computed,
@@ -1251,7 +1276,8 @@ import {
   type AlertSectionSlot,
   type AlertSectionTargets,
 } from "./alertFormSections";
-import { useAlertFormSections, type FieldMetaMap } from "@/composables/alerts/useAlertFormSections";
+import { useAlertFormSections } from "@/composables/alerts/useAlertFormSections";
+import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import useBreakpoint from "@/composables/useBreakpoint";
 import type { OSnapScrollExpose } from "@/lib/core/SnapScroll/OSnapScroll.types";
 import AlertEditStatus from "./AlertEditStatus.vue";
@@ -1399,6 +1425,7 @@ export default defineComponent({
     const alertForm = useAlertForm(props, formEmit, {
       showSection: goToSection,
       revealControl: (el) => snapScrollRef.value?.revealElement(el),
+      heldSaveSection: () => (compositeNeedsChildren.value ? "condition" : undefined),
     });
     const alertEditorDraft = useAlertEditorDraft({
       form: alertForm,
@@ -1502,16 +1529,10 @@ export default defineComponent({
       alertForm.setF("children", draft.children ?? []);
     };
 
-    // Composite drafts validate asynchronously against the server; until the
-    // form reports a valid expression the Save button stays disabled (the schema
-    // blocks a bad expression on submit too — this is the visible affordance).
+    // Composite drafts validate asynchronously against the server; until the form
+    // reports a valid expression, Save holds and names the reason beside it.
     const compositeValidation = ref<{ valid: boolean }>({ valid: false });
     const { silentAutoObserveDraft, destinationRequired, viaIncidentDraft, reachGap } = alertForm;
-    const compositeSaveDisabled = computed(
-      () =>
-        (isCompositeMode.value && compositeValidation.value.valid !== true) ||
-        silentAutoObserveDraft.value,
-    );
     const onCompositeValidation = (value: { valid: boolean }) => {
       compositeValidation.value = value;
     };
@@ -1894,7 +1915,7 @@ export default defineComponent({
     };
 
     const submitAttempted = alertForm.form.useStore((s) => s.submissionAttempts > 0);
-    // The cron and SQL checks run in Save, not in the form schema, so their failures are counted here.
+    // These mark a section for the list; the schema counts the field errors behind them.
     const cronSaveProblem = computed(() => {
       const tc = alertForm.formData.value?.trigger_condition;
       if (tc?.frequency_type !== "cron") return false;
@@ -1917,6 +1938,15 @@ export default defineComponent({
       if (qc.type === "promql") return !String(qc.promql ?? "").trim();
       return false;
     });
+    const sqlCheckFailed = computed(() => {
+      const fd = alertForm.formData.value;
+      return (
+        fd?.is_real_time === "false" &&
+        fd.query_condition?.type === "sql" &&
+        !!String(fd.query_condition.sql ?? "").trim() &&
+        !!alertForm.sqlQueryErrorMsg.value?.trim()
+      );
+    });
     // Same gate as the incident switch in AlertSettings: a prefilled flag elsewhere opens nothing.
     const incidentsEnabled = computed(
       () =>
@@ -1929,15 +1959,15 @@ export default defineComponent({
       errorCounts,
       review: reviewLines,
     } = useAlertFormSections({
+      // The server's SQL check is not a schema rule, so a failed one is counted here.
       extraErrors: computed(() => ({
-        condition: submitAttempted.value && querySaveProblem.value ? 1 : 0,
-        schedule: submitAttempted.value && cronSaveProblem.value ? 1 : 0,
+        condition: submitAttempted.value && sqlCheckFailed.value ? 1 : 0,
       })),
       invalid: computed(() => ({
         condition: !!querySaveProblem.value,
         schedule: !!cronSaveProblem.value,
       })),
-      fieldMeta: alertForm.form.useStore((s) => s.fieldMeta as FieldMetaMap),
+      fieldMeta: alertForm.visibleFieldMeta,
       formData: alertForm.formData,
       anomalyConfig: alertForm.anomalyConfig,
       isAnomalyMode: alertForm.isAnomalyMode,
@@ -1970,6 +2000,19 @@ export default defineComponent({
     const compositeNeedsChildren = computed(
       () => isCompositeMode.value && compositeValidation.value.valid !== true,
     );
+    // Names beside Save the sections it will not save yet; the link goes where the first fix is.
+    const issueSections = computed(() => {
+      const titles = sectionItems.value
+        .filter((item) => (errorCounts.value[item.id as AlertSectionId] ?? 0) > 0)
+        .map((item) => item.title);
+      return titles.length
+        ? raw(new Intl.ListFormat(getIntlLocale(), { type: "conjunction" }).format(titles))
+        : "";
+    });
+    const goToSaveReason = () => {
+      if (issueCount.value > 0) alertForm.focusOnFirstError();
+      else goToSection("condition");
+    };
 
     const alertSentence = computed(() => {
       if (alertForm.isAnomalyMode.value) return "";
@@ -2207,13 +2250,11 @@ export default defineComponent({
       apply: (name: string) => alertForm.setF("name", name),
       enabled: () => !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
     });
-    const nameFieldErrors = alertForm.form.useStore(
-      (state) => (state.fieldMeta as FieldMetaMap).name?.errors?.length ?? 0,
-    );
-    // The live hint covers typing; once a save has validated the field, its own error says it instead.
+    const nameFieldError = shownFieldError(alertForm.form, "name");
+    // The live hint covers typing; once the field shows its own error, that error says it instead.
     const nameHasUnsupportedChars = computed(
       () =>
-        nameFieldErrors.value === 0 &&
+        !nameFieldError.value &&
         ALERT_NAME_UNSUPPORTED_CHARS.test(String(alertForm.formData.value?.name ?? "")),
     );
     // A generated name is a placeholder the user usually replaces, so focusing it selects it whole.
@@ -2286,6 +2327,8 @@ export default defineComponent({
       issueCount,
       saveLabel,
       compositeNeedsChildren,
+      issueSections,
+      goToSaveReason,
       lgUp,
       snapScrollRef,
       activeSection,
@@ -2337,7 +2380,6 @@ export default defineComponent({
       isCompositeMode,
       availableCompositeChildren,
       updateCompositeDraft,
-      compositeSaveDisabled,
       silentAutoObserveDraft,
       destinationRequired,
       viaIncidentDraft,

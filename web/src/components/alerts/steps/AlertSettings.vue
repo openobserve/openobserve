@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="periodError"
-                class="text-input-error-text text-xs whitespace-nowrap"
+                class="text-input-error-text w-0 min-w-full text-xs"
                 data-test="alert-settings-period-error"
                 role="alert"
               >
@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="pendingPeriodError"
-                class="text-input-error-text text-xs whitespace-nowrap"
+                class="text-input-error-text w-0 min-w-full text-xs"
                 data-test="alert-settings-pending-period-error"
                 role="alert"
               >
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="!pendingPeriodError && pendingPeriodWarning"
-                class="text-status-warning-text text-xs whitespace-nowrap"
+                class="text-status-warning-text w-0 min-w-full text-xs"
                 data-test="alert-settings-pending-period-warning"
                 role="alert"
               >
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="silenceError"
-                class="text-input-error-text text-xs whitespace-nowrap"
+                class="text-input-error-text w-0 min-w-full text-xs"
                 data-test="alert-settings-silence-error"
                 role="alert"
               >
@@ -429,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="keepFiringError"
-                  class="text-input-error-text text-xs"
+                  class="text-input-error-text w-0 min-w-full text-xs"
                   data-test="alert-settings-keep-firing-error"
                   role="alert"
                 >
@@ -494,7 +494,8 @@ import { fromBase, pickUnit, toBase, type DurationUnit } from "@/utils/alerts/du
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { renderTemplate, segmentClass } from "@/composables/alerts/useTemplatePreview";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError, visibleFieldError } from "@/lib/forms/Form/fieldError";
+import { visibleFieldError } from "@/lib/forms/Form/fieldError";
+import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -604,10 +605,7 @@ export default defineComponent({
     // full-width sibling below the pair. Reads the same R3-timed field errors
     // OFormInput would have surfaced — single source of truth, wider display.
     const form: any = inject(FORM_CONTEXT_KEY, null);
-    const fieldError = (path: string) =>
-      form
-        ? form.useStore((s: any) => firstFieldError(s.fieldMeta?.[path]?.errors ?? []))
-        : computed(() => undefined);
+    const fieldError = (path: string) => shownFieldError(form, path);
     const periodError = fieldError("trigger_condition.period");
     const silenceError = fieldError("trigger_condition.silence");
     // AlertDestinationsField is not an OForm* wrapper, so it cannot render its own schema error.

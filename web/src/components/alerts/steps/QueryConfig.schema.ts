@@ -14,6 +14,8 @@ import { z } from "zod";
 
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
+import { modesWithContent } from "@/utils/alerts/alertCondition";
+import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
 import {
   FORECAST_MAX_DAYS,
   FORECAST_MIN_DAYS,
@@ -209,6 +211,26 @@ export interface QueryConfigMeta {
  *  so "" / null / undefined always count as "not provided". */
 const isBlank = (v: unknown): boolean => v === undefined || v === null || v === "";
 
+/** Why a cron schedule cannot run, or null; the server parses six fields and enforces the org floor. */
+const cronIssue = (
+  t: Translator,
+  tc: Record<string, unknown>,
+  minIntervalSecs: number,
+): string | null => {
+  const cron = String(tc.cron ?? "").trim();
+  if (!cron || isBlank(tc.timezone)) return t("alerts.queryConfig.cronExpressionTimezoneRequired");
+  if (cron.split(/\s+/).length !== 6) return t("common.invalidCronSixFields");
+  try {
+    const seconds = getCronIntervalDifferenceInSeconds(cron);
+    if (typeof seconds === "number" && seconds < minIntervalSecs) {
+      return t("alerts.queryConfig.frequencyGreaterThanSeconds", { seconds: minIntervalSecs - 1 });
+    }
+  } catch {
+    return t("alerts.queryConfig.invalidCronExpression");
+  }
+  return null;
+};
+
 /** A number field that must be present AND ≥ 1. Empty OR NaN OR < 1 → invalid.
  *  Operates on the raw (possibly string) value so 0 fails but "" is caught as
  *  "required" rather than silently coerced to 0. */
@@ -358,8 +380,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
       }
 
       // ── Frequency ≥ 1 ────────────────────────────────────────────────────────
-      // Only when NOT in cron mode (cron is validated separately — the component
-      // renders `cronError`, useAlertForm.runImperativeQueryChecks gates save).
+      // Only when NOT in cron mode (cron has its own rule below, on `trigger_condition.cron`).
       // Keyed on the DISPLAY value (`_ui.checkEvery`) because that is the path the
       // visible "Check every" input binds, so the message renders inline. Display
       // ≥ 1 ⇔ stored ≥ 1 in both modes (hours multiplies by 60).
@@ -393,6 +414,32 @@ export const makeQueryConfigSchema = (t: Translator) =>
             }
           }
         }
+      }
+
+      if (tc.frequency_type === "cron") {
+        const cronMessage = cronIssue(t, tc, Number(meta.minAutoRefreshInterval) || 1);
+        if (cronMessage) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["trigger_condition", "cron"],
+            message: cronMessage,
+          });
+        }
+      }
+
+      // An empty editor is fine while another mode holds the query: Save then asks which one runs.
+      const otherQuery = modesWithContent({
+        sql: qc.sql,
+        promql: qc.promql,
+        conditions: qc.conditions,
+        streamType: String((val as Record<string, unknown>).stream_type ?? ""),
+      });
+      if ((isSql || isPromql) && !String(qc[meta.tab] ?? "").trim() && !otherQuery.length) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["query_condition", meta.tab],
+          message: t(isSql ? "alerts.messages.sqlQueryEmpty" : "alerts.messages.promqlQueryEmpty"),
+        });
       }
 
       // ── Warning/critical matrix (alerts_2.md §4.5) ──────────────────────────

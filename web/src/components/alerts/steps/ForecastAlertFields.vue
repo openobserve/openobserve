@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               width="xs"
               :debounce="300"
               data-test="alert-forecast-horizon"
-              @blur="horizonBlurred = true"
             >
               <template #suffix>{{ t("alerts.forecast.days") }}</template>
               <template #error />
@@ -102,19 +101,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, useId, watch } from "vue";
+import { computed, inject, useId, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import {
-  FORECAST_MAX_DAYS,
-  FORECAST_MIN_DAYS,
   forecastModeFields,
   forecastRowTemplate,
-  isForecastHorizonValid,
   isForecastRowTemplate,
   type ForecastAlert,
 } from "@/utils/alerts/forecastAlert";
@@ -147,16 +143,7 @@ const horizonId = useId();
 const directionId = useId();
 const windowId = useId();
 
-// The form validates only after the first save, so a bad horizon would otherwise stay silent until then.
-const horizonBlurred = ref(false);
-const horizonSubmitError = form?.useStore?.((s: any) =>
-  firstFieldError(s.fieldMeta?.["_ui.forecast.H"]?.errors ?? []),
-);
-const horizonError = computed(() => {
-  if (horizonSubmitError?.value) return horizonSubmitError.value;
-  if (!horizonBlurred.value || isForecastHorizonValid(toNumber(forecast?.value?.H))) return null;
-  return t("alerts.forecast.horizonRange", { min: FORECAST_MIN_DAYS, max: FORECAST_MAX_DAYS });
-});
+const horizonError = shownFieldError(form, "_ui.forecast.H");
 
 watch(
   () => forecast?.value,

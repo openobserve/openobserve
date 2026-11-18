@@ -200,8 +200,11 @@ describe("QueryConfig.schema — conditions tree", () => {
         conditions: group([]),
         aggregation: null,
         promql_condition: null,
+        sql: "SELECT 1",
+        promql: "up",
         ...(overrides.query_condition || {}),
       },
+      stream_type: overrides.stream_type ?? "logs",
       logGroupBy: overrides.logGroupBy ?? [],
       // DISPLAY value: equals the stored minutes in minutes mode, stored/60 in
       // hours mode.
@@ -261,12 +264,60 @@ describe("QueryConfig.schema — conditions tree", () => {
       );
     });
 
-    it("does NOT require frequency in cron mode (cronError owns it)", () => {
+    it("does NOT require frequency in cron mode (the cron rule owns it)", () => {
       const r = parse({
         _ui: { checkEvery: "" },
         _meta: { frequencyMode: "cron" },
       });
       expect(paths(r)).not.toContain("_ui.checkEvery");
+    });
+
+    const cron = (expression: string, timezone = "UTC") => ({
+      trigger_condition: { frequency_type: "cron", cron: expression, timezone },
+      _meta: { frequencyMode: "cron", minAutoRefreshInterval: 300 },
+    });
+    it.each([
+      ["a blank expression", cron(""), t("alerts.queryConfig.cronExpressionTimezoneRequired")],
+      [
+        "no timezone",
+        cron("0 */10 * * * *", ""),
+        t("alerts.queryConfig.cronExpressionTimezoneRequired"),
+      ],
+      ["five fields", cron("0 9 * * 1-5"), t("common.invalidCronSixFields")],
+      ["an unparseable one", cron("a b c d e f"), t("alerts.queryConfig.invalidCronExpression")],
+      [
+        "one below the org floor",
+        cron("0 * * * * *"),
+        t("alerts.queryConfig.frequencyGreaterThanSeconds", { seconds: 299 }),
+      ],
+      ["a valid one", cron("0 */10 * * * *"), undefined],
+    ])("checks a cron schedule with %s", (_, overrides, message) => {
+      const r = parse(overrides);
+      const issue = r.success
+        ? undefined
+        : r.error.issues.find((i: any) => i.path.join(".") === "trigger_condition.cron");
+      expect(issue?.message).toBe(message);
+    });
+
+    it.each([
+      ["SQL with nothing written", { tab: "sql" }, { sql: "", promql: "" }, "query_condition.sql"],
+      [
+        "PromQL with nothing written",
+        { tab: "promql" },
+        { sql: "", promql: "" },
+        "query_condition.promql",
+      ],
+      [
+        "SQL while filters hold the query",
+        { tab: "sql" },
+        { sql: "", conditions: group([leaf()]) },
+        null,
+      ],
+      ["SQL with a query", { tab: "sql" }, {}, null],
+    ])("asks for a query: %s", (_, metaOver, qcOver, path) => {
+      const r = parse({ stream_type: "metrics", query_condition: qcOver, _meta: metaOver });
+      const queryPaths = paths(r).filter((p: string) => /^query_condition\.(sql|promql)$/.test(p));
+      expect(queryPaths).toEqual(path ? [path] : []);
     });
 
     // ── Org min-frequency floor (R5 RESTORE) ────────────────────────────────

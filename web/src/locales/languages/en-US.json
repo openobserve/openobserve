@@ -15664,7 +15664,8 @@
       },
       "save": {
         "fixIssues": "Fix {count} issue | Fix {count} issues",
-        "compositeNeeds": "Add 2 to 10 alerts and a Fire when expression to save."
+        "compositeNeeds": "Add 2 to 10 alerts and a Fire when expression to save.",
+        "issuesIn": "Issues in {sections}"
       },
       "anomaly": {
         "sensitivityAuto": "Auto",

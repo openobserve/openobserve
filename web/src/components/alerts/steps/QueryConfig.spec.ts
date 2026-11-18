@@ -251,8 +251,8 @@ describe("QueryConfig.vue", () => {
         groupId: "",
         conditions: [],
       },
-      sql: "",
-      promql: "",
+      sql: "SELECT * FROM logs",
+      promql: "up",
       type: "custom",
       aggregation: null,
       promql_condition: null,
@@ -288,7 +288,7 @@ describe("QueryConfig.vue", () => {
         onSubmit,
       }),
       template: `
-        <OForm :schema="schema" :default-values="defaultValues" @submit="onSubmit">
+        <OForm validate-on="leave" :schema="schema" :default-values="defaultValues" @submit="onSubmit">
           <QueryConfig v-bind="qcProps" />
         </OForm>
       `,
@@ -836,23 +836,6 @@ describe("QueryConfig.vue", () => {
 
     it("passes with a valid threshold/frequency in SQL mode", async () => {
       expect(await submit()).toBe(true);
-    });
-
-    it("shows a bad limit's error once the field is left, then on every change", async () => {
-      const input = () => wrapper.find('[data-test="alert-trigger-threshold-input"] input');
-      const error = () => wrapper.find('[data-test="alert-trigger-threshold-error"]');
-      await input().setValue("-5");
-      await flushPromises();
-      expect(error().exists()).toBe(false);
-      await input().trigger("blur");
-      await flushPromises();
-      expect(error().text()).toBe(t("alerts.validation.limitWholeNumber"));
-      await input().setValue("3");
-      await flushPromises();
-      expect(error().exists()).toBe(false);
-      await input().setValue("2.5");
-      await flushPromises();
-      expect(error().exists()).toBe(true);
     });
 
     it("blocks an empty threshold in SQL mode (REHOMED rule)", async () => {
@@ -2652,15 +2635,43 @@ describe("QueryConfig.vue", () => {
     });
 
     it.each([
-      ["0 9 * * 1-5", true],
-      ["0 0 9 * * 1-5", false],
-    ])("the cron %s shows the six-field error: %s", async (cron, error) => {
-      remount({ ...sectioned });
-      await host.find('[data-test="add-alert-add-cron"]').trigger("click");
-      await host.find('[data-test="alert-cron-input"] input').setValue(cron);
+      ["limit", "alert-trigger-threshold-input", "alert-if-row-logs-error", ["-5", "2.5", "3"]],
+      ["check every", "alert-check-every-input", "alert-check-every-error", ["0", "-1", "5"]],
+      ["cron", "alert-cron-input", "alert-cron-error", ["0 9 * * 1-5", "", "0 0 9 * * 1-5"]],
+    ])(
+      "the %s shows its error once left, then on every change until fixed",
+      async (name, inputId, errorId, [bad, worse, good]) => {
+        remount({ ...sectioned });
+        if (name === "cron") await host.find('[data-test="add-alert-add-cron"]').trigger("click");
+        const input = () => host.find(`[data-test="${inputId}"] input`);
+        const error = () => host.find(`[data-test="${errorId}"]`);
+        await input().setValue(bad);
+        await flushPromises();
+        expect(error().exists()).toBe(false);
+        await input().trigger("blur");
+        await vi.waitFor(() => expect(error().exists()).toBe(true));
+        await input().setValue(worse);
+        await vi.waitFor(() => expect(error().exists()).toBe(true));
+        await input().setValue(good);
+        await vi.waitFor(() => expect(error().exists()).toBe(false));
+      },
+    );
+
+    it.each([
+      ["sql", "alerts.messages.sqlQueryEmpty"],
+      ["promql", "alerts.messages.promqlQueryEmpty"],
+    ])("an empty %s editor asks for a query once left", async (tab, key) => {
+      remount(
+        { ...sectioned, tab, sqlQuery: "", promqlQuery: "", streamType: "metrics" },
+        { stream_type: "metrics", _meta: defaultAddAlertMeta({ tab: tab as any }) },
+      );
+      const error = () => host.find('[data-test="add-alert-query-required-error"]');
+      hostForm().setFieldValue("query_condition.sql", "");
+      hostForm().setFieldValue("query_condition.promql", "");
       await flushPromises();
-      expect(host.find('[data-test="alert-cron-error"]').exists()).toBe(error);
-      if (error) expect(wrapper.vm.cronError).toBe(t("common.invalidCronSixFields"));
+      expect(error().exists()).toBe(false);
+      await wrapper.vm.onBlurInlineSqlEditor();
+      await vi.waitFor(() => expect(error().text()).toBe(t(key)));
     });
 
     it("the unit select offers minutes and hours only", () => {

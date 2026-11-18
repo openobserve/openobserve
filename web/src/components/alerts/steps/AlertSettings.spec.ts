@@ -109,6 +109,7 @@ function makeDescendantHost(
   defaultOverrides: Record<string, any> = {},
   formDataOverrides: Record<string, any> = {},
   destinations: string[] = [],
+  validateOn: "submit" | "leave" = "submit",
 ) {
   return defineComponent({
     components: { OForm, AlertSettings },
@@ -121,10 +122,10 @@ function makeDescendantHost(
         ...defaultOverrides,
       };
       const formData = makeFormData(formDataOverrides);
-      return { schema, defaultValues, formData, isRealTime, destinations };
+      return { schema, defaultValues, formData, isRealTime, destinations, validateOn };
     },
     template: `
-      <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+      <OForm :validate-on="validateOn" :schema="schema" :default-values="defaultValues" @submit="() => {}">
         <AlertSettings
           :form-data="formData"
           :is-real-time="isRealTime"
@@ -224,6 +225,42 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(parentForm.state.isValid).toBe(true);
     expect(parentForm.state.values.trigger_condition.silence).toBe(5);
   });
+
+  it.each([
+    ["look-back", "alert-settings-period-input", "alert-settings-period-error", "0", "5"],
+    ["remind", "alert-settings-silence-duration-input", "alert-settings-silence-error", "-1", "5"],
+    [
+      "must last",
+      "alert-settings-pending-period-input",
+      "alert-settings-pending-period-error",
+      "-1",
+      "2",
+    ],
+    [
+      "keep firing",
+      "alert-settings-keep-firing-for-input",
+      "alert-settings-keep-firing-error",
+      "-1",
+      "5",
+    ],
+  ])(
+    "the %s field shows its error once left, then clears when fixed",
+    async (_, inputId, errorId, bad, good) => {
+      const host = mount(makeDescendantHost("false", {}, {}, [], "leave"), {
+        global: { plugins: [makeStore(), i18n] },
+      });
+      const input = () => host.find(`[data-test="${inputId}"] input`);
+      const error = () => host.find(`[data-test="${errorId}"]`);
+      await input().setValue(bad);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await flushPromises();
+      expect(error().exists()).toBe(false);
+      await input().trigger("blur");
+      await vi.waitFor(() => expect(error().exists()).toBe(true));
+      await input().setValue(good);
+      await vi.waitFor(() => expect(error().exists()).toBe(false), { timeout: 1500 });
+    },
+  );
 
   it("blocks submit when silence is negative (schema ≥ 0)", async () => {
     const host = mountDescendant("true", { destinations: ["dest-a"] });

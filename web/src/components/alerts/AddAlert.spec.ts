@@ -365,22 +365,16 @@ describe("AddAlert (OForm owner)", () => {
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");
+      form.setFieldValue("_meta.tab", "sql");
       form.setFieldValue("query_condition.sql", "");
-      const scrollToSection = vi.fn();
-      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
 
       await form.handleSubmit();
       await flushPromises();
 
-      expect(scrollToSection).toHaveBeenCalledWith("condition");
-
-      // The schema passes (query text is not a schema rule) …
-      expect(form.state.isValid).toBe(true);
-      // … but the imperative gate blocks the save with the same toast.
+      // With no other mode holding a query, an empty editor is a field error, not a toast.
+      expect(form.state.isValid).toBe(false);
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "SQL query cannot be empty." }),
-      );
+      expect(toast).not.toHaveBeenCalled();
       const condition = wrapper.vm.sectionItems.find(
         (item: { id: string }) => item.id === "condition",
       );
@@ -488,9 +482,6 @@ describe("AddAlert (OForm owner)", () => {
 
         await saveSettled();
 
-        expect(toast).toHaveBeenCalledWith(
-          expect.objectContaining({ message: "Invalid cron expression" }),
-        );
         expect(searchService.search).not.toHaveBeenCalled();
         expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
       });
@@ -808,69 +799,29 @@ describe("AddAlert (OForm owner)", () => {
       };
     };
 
-    it("blocks a cron save when the interval is below the org minimum", async () => {
-      const restore = withMinInterval(300); // 5 minutes
+    it.each([
+      ["below the org minimum", "0 * * * * *", "UTC"],
+      ["unparseable", "not-a-cron", "UTC"],
+      ["5 fields, not the 6 the server needs", "0 9 * * 1-5", "UTC"],
+      ["missing its timezone", "0 */10 * * * *", ""],
+    ])("blocks a cron save %s as an issue in How often to check", async (_, cron, timezone) => {
+      const restore = withMinInterval(300);
       try {
-        wrapper = mountAlert({}, { attachTo: document.body });
+        wrapper = mountAlert();
         await flushPromises();
-        const form = wrapper.vm.form;
-        // Every minute = 60s < 300s.
-        seedCron(form, "0 * * * * *");
+        seedCron(wrapper.vm.form, cron, timezone);
 
-        await form.handleSubmit();
+        await wrapper.vm.handleSave();
         await flushPromises();
 
         expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-        // Verbatim pre-migration message (minInterval - 1).
-        expect(toast).toHaveBeenCalledWith(
-          expect.objectContaining({
-            message: "Frequency should be greater than 299 seconds.",
-          }),
+        expect(toast).not.toHaveBeenCalled();
+        expect(wrapper.get('[data-test="o-section-nav-item-schedule"]').text()).toContain(
+          i18n.global.t("alerts.sections.needsFix", { count: 1 }, 1),
         );
-        expect(focusedTestId()).toBe("add-alert-section-schedule-title");
       } finally {
         restore();
       }
-    });
-
-    it.each([
-      ["unparseable", "not-a-cron"],
-      ["5 fields, not the 6 the server needs", "0 9 * * 1-5"],
-    ])("blocks a cron save when the expression is %s", async (_, cron) => {
-      wrapper = mountAlert({}, { attachTo: document.body });
-      await flushPromises();
-      const form = wrapper.vm.form;
-      seedCron(form, cron);
-
-      await form.handleSubmit();
-      await flushPromises();
-
-      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "Invalid cron expression" }),
-      );
-      expect(focusedTestId()).toBe("add-alert-section-schedule-title");
-      expect(wrapper.get('[data-test="o-section-nav-item-schedule"]').text()).toContain(
-        i18n.global.t("alerts.sections.needsFix", { count: 1 }, 1),
-      );
-    });
-
-    it("blocks a cron save when the timezone is missing (inline-only, NO toast)", async () => {
-      wrapper = mountAlert({}, { attachTo: document.body });
-      await flushPromises();
-      const form = wrapper.vm.form;
-      seedCron(form, "0 */10 * * * *", "");
-
-      await form.handleSubmit();
-      await flushPromises();
-
-      // Pre-migration returned {valid:false, message:null} here and the
-      // orchestrator only toasted `if (message)` — so this case blocks + moves
-      // to the schedule section WITHOUT a toast (QueryConfig renders the inline
-      // "Cron expression and timezone are required").
-      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(toast).not.toHaveBeenCalled();
-      expect(focusedTestId()).toBe("add-alert-section-schedule-title");
     });
 
     it("blocks a cron save when the expression is missing", async () => {
@@ -1916,10 +1867,7 @@ describe("AddAlert (OForm owner)", () => {
       await input.setValue("checkout/errors");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(true);
-      wrapper.vm.form.setFieldMeta("name", (meta: object) => ({
-        ...meta,
-        errorMap: { onSubmit: "invalid" },
-      }));
+      await input.trigger("blur");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(false);
       const suggest = wrapper.get('[data-test="add-alert-details-name-suggest"]');
@@ -2459,6 +2407,8 @@ describe("AddAlert (OForm owner)", () => {
     const failField = (name: string) =>
       wrapper.vm.form.setFieldMeta(name, (meta: object) => ({
         ...meta,
+        isDirty: true,
+        isBlurred: true,
         errorMap: { onSubmit: "invalid" },
       }));
 
@@ -2474,15 +2424,31 @@ describe("AddAlert (OForm owner)", () => {
       );
     });
 
-    it("a composite with no alerts shows why Save is disabled", async () => {
+    it("a composite not yet passed by the server says why beside Save, which saves nothing and goes there", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      wrapper.vm.form.setFieldValue("is_real_time", "composite");
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      const form = wrapper.vm.form;
+      form.setFieldValue("is_real_time", "composite");
+      form.setFieldValue("name", "combined");
+      form.setFieldValue("trigger_condition", { silence: 15 });
+      form.setFieldValue("composite_condition", { expression: "{id-a} && {id-b}" });
+      form.setFieldValue("children", [
+        { alert_id: "id-a", name: "errors_high", accessible: true },
+        { alert_id: "id-b", name: "latency_high", accessible: true },
+      ]);
+      await flushPromises();
+      wrapper.vm.onCompositeValidation({ valid: false });
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-save-reason"]').exists()).toBe(true);
-      expect(
-        wrapper.get('[data-test="add-alert-submit-btn"]').attributes("disabled"),
-      ).toBeDefined();
+      const save = wrapper.get('[data-test="add-alert-submit-btn"]');
+      expect(save.attributes("disabled")).toBeUndefined();
+      await save.trigger("click");
+      await flushPromises();
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      await vi.waitFor(() => expect(scrollToSection).toHaveBeenCalledWith("condition"));
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
     });
 
     it("an edit with an unknown column reads Fix 1 issue after Save and focuses the error", async () => {
@@ -2557,6 +2523,32 @@ describe("AddAlert (OForm owner)", () => {
       body.appendChild(field);
       return field.querySelector("input") as HTMLInputElement;
     };
+
+    it("a field left invalid counts at once, and the line beside Save names its section and goes to it", async () => {
+      // Typing keeps an editor draft, which would greet the next mount with a restore dialog.
+      onTestFinished(() => localStorage.clear());
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-save-reason"]').exists()).toBe(false);
+      const input = wrapper.get('[data-test="add-alert-details-name-input"] input');
+      await input.setValue("bad/name");
+      await flushPromises();
+      expect(wrapper.get('[data-test="add-alert-submit-btn"]').text()).toBe(
+        i18n.global.t("alerts.save"),
+      );
+      await input.trigger("blur");
+      await vi.waitFor(() =>
+        expect(wrapper.get('[data-test="add-alert-submit-btn"]').text()).toBe(
+          i18n.global.t("alerts.form.save.fixIssues", { count: 1 }, 1),
+        ),
+      );
+      const reason = wrapper.get('[data-test="add-alert-save-reason"]');
+      expect(reason.text()).toContain(i18n.global.t("alerts.sections.details.nav"));
+      (document.activeElement as HTMLElement | null)?.blur();
+      await reason.get('[data-test="add-alert-save-reason-link"]').trigger("click");
+      await flushPromises();
+      expect(document.activeElement).toBe(input.element);
+    });
 
     it("focuses an error in any section, since every section is always shown", async () => {
       // Attached: focusOnFirstError reaches for the live document (the real

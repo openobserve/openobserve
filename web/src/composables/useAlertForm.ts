@@ -127,6 +127,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { anomalyWhereClause, toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import { invalidateSiemDetections } from "@/composables/security/useSiemDetections";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { shownFieldMeta } from "@/composables/alerts/shownFieldError";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import type { AlertSectionId } from "@/components/alerts/alertFormSections";
 import {
@@ -545,6 +546,8 @@ export interface AlertFormHooks {
   showSection?: (id: AlertSectionId) => void;
   /** Scroll a focused error's control into view the host's way; without it the control is centred. */
   revealControl?: (el: HTMLElement) => void;
+  /** A section whose own check, outside the schema, still holds Save there; undefined lets it save. */
+  heldSaveSection?: () => AlertSectionId | undefined;
 }
 
 export function useAlertForm(
@@ -667,10 +670,19 @@ export function useAlertForm(
   const form = useOForm<AlertFormValues>({
     defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
+    validateOn: "leave",
+    // A warning is judged against its critical value, so editing either re-checks both.
+    coupled: [
+      ["trigger_condition.threshold", "trigger_condition.warning_threshold"],
+      ["query_condition.aggregation.having.value", "query_condition.aggregation.warning_value"],
+      ["query_condition.promql_condition.value", "query_condition.promql_warning_value"],
+    ],
     onSubmit: async () => {
       await performSave();
     },
   });
+  // Section counts and the Save label follow what the fields show, not errors still held back.
+  const visibleFieldMeta = shownFieldMeta(form);
 
   // READ-VIEW of the single form. Reactive; replaced immutably on every change.
   const formData: any = form.useStore((s: any) => s.values);
@@ -2751,6 +2763,11 @@ export function useAlertForm(
   // still reached in anomaly mode and delegates correctly.
   const performSave = async () => {
     if (blockSilentDraft(formData.value)) return;
+    const held = hooks.heldSaveSection?.();
+    if (held) {
+      hooks.showSection?.(held);
+      return;
+    }
     if (isAnomalyMode.value) {
       await saveAnomalyDetection();
       return;
@@ -3523,6 +3540,7 @@ export function useAlertForm(
 
     // Form (Rule ③ owner) + write helpers
     form,
+    visibleFieldMeta,
     setF,
     resetForm,
 
