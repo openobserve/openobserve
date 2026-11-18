@@ -2,6 +2,7 @@
 // Settings › Assistant with the flag on: toolsets, permissions, activity, role access and the OSS lock.
 import { test, expect } from "@playwright/test";
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 // Playwright compiles a static import to require(), which would load the .mjs harness as CommonJS; import() keeps it ESM.
 const loadHarness = () => import("./harness/setup.mjs");
@@ -263,9 +264,9 @@ test.describe("assistant settings tools", () => {
     await mockRoles(context, []);
     await page.goto(url("/iam/roles/edit/sre-oncall"), { waitUntil: "domcontentloaded" });
     const rail = page.locator('[data-test="edit-role-module-rail"]');
-    await expect(rail).toContainText("Assistant", { timeout: 30_000 });
+    await expect(rail).toContainText(BRAND.autobot, { timeout: 30_000 });
     await expect(rail).toContainText("LLM observability");
-    await expect(page.locator("#module-desc-ai")).toContainText("Chat with the assistant");
+    await expect(page.locator("#module-desc-ai")).toContainText(`Chat with ${BRAND.autobot}`);
   });
 
   test("ADMIN-15 Grant chat reaches the role's chat permission in three clicks", { tag: ["@mock", "@stack-ee"] }, async ({ context, page }) => {

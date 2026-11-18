@@ -24,7 +24,7 @@ export const ENTERPRISE_FEATURES = [
   // but that page issues a client-side redirect to /docs/enterprise-setup/sre-agent/ — assert
   // the final user-visible URL.
   { name: 'SRE Agent', slug: 'sre_agent', beta: true, ha: true, expectedPath: '/docs/enterprise-setup/sre-agent/' },
-  { name: BRAND.askAutobot, slug: 'ai_assistant', beta: true, ha: true, expectedPath: '/docs/' },
+  { name: BRAND.autobot, slug: 'ai_assistant', beta: true, ha: true, expectedPath: '/docs/' },
   { name: 'Anomaly Detection', slug: 'anomaly_detect', beta: true, ha: false, expectedPath: '/docs/user-guide/analytics/alerts/anomaly-detection/' },
   { name: 'Metrics Auto Downsampling', slug: 'metrics_downsample', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/metrics/downsampling-metrics/' },
   { name: 'Log Patterns', slug: 'log_patterns', beta: false, ha: false, expectedPath: '/blog/log-patterns-automatic-pattern-extraction-faster-analysis/' },

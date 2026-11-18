@@ -4,6 +4,7 @@
 import { test, expect } from "@playwright/test";
 
 import { AssistantPage } from "../../pages/assistantPage.js";
+import { BRAND } from "../../utils/brand.js";
 
 const loadHarness = () => import("./harness/setup.mjs");
 
@@ -63,7 +64,7 @@ test.describe("assistant approval cards", () => {
     await expect(card).toHaveAttribute("role", "group");
     await expect(card.locator('[data-test="assistant-approval-heading"]')).toHaveText("Delete 1 alert");
     const countdown = card.locator('[data-test="assistant-approval-countdown"]');
-    await expect(countdown).toHaveText(/^\d+:\d\d$/);
+    await expect(countdown).toHaveText(/^Expires in \d+:\d\d$/);
     await expect(countdown).toHaveAttribute("aria-label", /^Expires in \d+:\d\d$/);
     await expect(approve()).toHaveText("Delete 1 alert");
     await expect(card.locator('[data-test="assistant-approval-edit"]')).toHaveCount(0);
@@ -138,7 +139,7 @@ test.describe("assistant approval cards", () => {
     await ask(page, "permission_card", "list the pods");
     await expect(region()).toContainText("Waiting for your approval: Allow bash. Expires in 2");
     const countdown = assistant.approval().locator('[data-test="assistant-approval-countdown"]');
-    await expect(countdown).toHaveText(/^0:\d\d$/);
+    await expect(countdown).toHaveText(/^Expires soon · 0:\d\d$/);
     await expect(countdown).toHaveAttribute("aria-label", /^Expires soon · 0:\d\d$/);
     const record = assistant.approvalResult();
     await expect(record).toHaveAttribute("data-state", "expired", { timeout: 35_000 });
@@ -159,7 +160,7 @@ test.describe("assistant approval cards", () => {
   test("APPR-05 Reply declines with the text and sends it as the next turn naming the card", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "permission_card", "list the pods");
     await menuAction(page, "reply");
-    await expect(assistant.composer()).toHaveAttribute("placeholder", "Reply to the assistant");
+    await expect(assistant.composer()).toHaveAttribute("placeholder", `Reply to ${BRAND.autobot}`);
     await expect(assistant.composer()).toBeFocused();
     await assistant.composer().fill("use the staging namespace");
     await harness.nextScenario(page, "complete");
@@ -174,15 +175,25 @@ test.describe("assistant approval cards", () => {
     expect(reply.messages.at(-1).content).toBe("use the staging namespace");
   });
 
-  test("APPR-06 the decision posts on the session it was asked in, after the chat moved to the full view", { tag: ["@mock"] }, async ({ page }) => {
+  test("APPR-06 Full page carries the waiting card to the new tab; approving there settles the original tab too", { tag: ["@mock"] }, async ({ page }) => {
     await ask(page, "confirmation");
     const sid = (await requests(page))[0].headers["x-o2-assistant-session-id"];
-    await assistant.placeAs("full");
-    await expect(assistant.full).toBeVisible();
-    await expect(assistant.approval()).toBeVisible();
-    await approve().click();
-    await expect(assistant.approvalResult()).toContainText("Deleted 1 alert");
-    expect((await confirmations(page))[0].url).toContain(`/ai/confirm/${sid}`);
+    const tab = await assistant.placeFullInNewTab();
+    await expect(tab.page).toHaveURL(new RegExp(`[?&]thread=${sid}`));
+    await expect(tab.full).toBeVisible({ timeout: 30_000 });
+    await expect(tab.approval()).toBeVisible({ timeout: 15_000 });
+    await expect(tab.full).not.toContainText("Still answering in another tab");
+    await tab.approval().locator('[data-test="assistant-approval-approve"]').click();
+    await expect(tab.approvalResult()).toContainText("Deleted 1 alert");
+    expect((await confirmations(tab.page))[0].url).toContain(`/ai/confirm/${sid}`);
+    await page.bringToFront();
+    await expect(page.getByText("Delete stale alert opened in a new tab.")).toBeAttached();
+    await assistant.open("header");
+    // The original tab keeps no live card, so the same decision is never posted twice.
+    await expect(assistant.approval()).toHaveCount(0);
+    await expect(assistant.approvalResult()).toContainText("Approved in another tab");
+    await expect(assistant.answer()).toContainText("was deleted", { timeout: 15_000 });
+    expect(await confirmations(page)).toHaveLength(0);
   });
 
   test("APPR-07 a reload shows the decision as a record, never a live card", { tag: ["@mock", "@stack-ee"] }, async ({ page }) => {
@@ -217,7 +228,7 @@ test.describe("assistant approval cards", () => {
     await openOnLogs(page);
     await assistant.send("raise the threshold", "resource_changed_unreviewed");
     const notice = assistant.container().locator('[data-test="assistant-unreviewed-change"]');
-    await expect(notice).toContainText("The assistant changed 1 alert without a review step.");
+    await expect(notice).toContainText(`${BRAND.autobot} changed 1 alert without a review step.`);
     const open = assistant.container().locator('[data-test="assistant-unreviewed-change-open"]');
     await expect(open).toHaveText("See what changed");
     await expect(open).toHaveAttribute("target", "_blank");
@@ -240,15 +251,13 @@ test.describe("assistant approval cards", () => {
     const waiting = assistant
       .container()
       .locator('[data-test="assistant-approval-result"][data-state="waiting_elsewhere"]');
-    await expect(waiting).toContainText(
-      "Waiting for your approval in the tab where you asked. Approve or deny it there, or stop this answer.",
-    );
+    await expect(waiting).toContainText("Waiting for your approval in another tab");
     await assistant.composer().fill("and now?");
     await assistant.composer().press("Enter");
     expect(await requests(page)).toHaveLength(1);
     // The refused send is spoken by the composer's status region; no line is drawn under the field.
     await expect(assistant.container().locator('[data-test="assistant-composer-status"]')).toContainText(
-      "Another tab is waiting for your approval on this chat.",
+      "Waiting for your approval in another tab",
     );
     await post({ v: 1, type: "approval_resolved", sid, callId: "o2_delete", approved: false, at: Date.now() });
     await expect(waiting).toHaveCount(0);
@@ -380,7 +389,7 @@ test.describe("assistant approval cards", () => {
       );
       await revoke().click();
       await deleted;
-      await expect(always()).toHaveText("Approval revoked. The assistant will ask next time.");
+      await expect(always()).toHaveText(`Approval revoked. ${BRAND.autobot} will ask next time.`);
       expect(state.log).toContain("REVOKE grant gr_e2e_mute");
     });
 
@@ -388,7 +397,7 @@ test.describe("assistant approval cards", () => {
       state.grants = [];
       await approveAlways(page, { stored: false, scope: "always", reason: "read_only" });
       await expect(always()).toHaveAttribute("data-grant", "not_stored");
-      await expect(always()).toContainText("wasn't saved for later");
+      await expect(always()).toHaveText(`Approved once. ${BRAND.autobot} will ask next time.`);
       await expect(revoke()).toHaveCount(0);
       expect(state.log.some((line) => line.startsWith("REVOKE"))).toBe(false);
     });

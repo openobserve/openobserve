@@ -63,11 +63,8 @@ test.describe("assistant security", () => {
     await expect(answer.locator('a[href*="logout"], a[href*="shared"], a[href^="javascript"], a[href^="data"]')).toHaveCount(0);
   });
 
-  test("SEC-03 with Auto Navigation off, a navigation frame from the agent never navigates; it is offered as one link card", { tag: ["@mock"] }, async ({ page }) => {
+  test("SEC-03 a navigation frame from the agent never navigates; it is offered as one link card", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
-    const toggle = assistant.container().locator('[data-test="assistant-composer-auto-navigation-btn"]');
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-checked", "false");
     // The logs page writes its own time range into the URL once it loads; only a change after that is the agent's.
     await expect.poll(() => page.url(), { timeout: 15_000 }).not.toContain("from=NaN");
     const before = page.url();

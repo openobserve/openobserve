@@ -76,27 +76,28 @@ test.describe("assistant composer and context", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("CTX-01 the time chip sits in the composer row and the popover tells sent from not read", { tag: ["@mock"] }, async ({ page }) => {
+  test("CTX-01 the composer has no time chip and its ⓘ lists the Default context", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
-    const first = assistant.timeChip();
-    await expect(first).toHaveAttribute("aria-label", /^Time range, \d\d:\d\d–\d\d:\d\d, from this page$/);
+    // The agent picks the time range itself; the page's range travels only as default context.
+    await expect(assistant.container().locator('[data-test="assistant-context-chip-time"]')).toHaveCount(0);
     // The page's own stream is read from the page, so it is listed in the popover, not staged as a chip.
     await expect(assistant.chips()).toHaveCount(0);
+    await expect(assistant.sees()).toHaveAccessibleName("Default context");
     await assistant.openSees();
     const popover = page.locator('[data-test="assistant-context-sees-popover"]');
     await expect(popover).toBeVisible();
-    await expect(popover.locator('[data-test="assistant-context-sees-intro"]')).toHaveText("These go with your next message.");
+    await expect(popover.locator("h2")).toHaveText("Default context");
     const onPage = popover.locator('[data-test="assistant-context-sees-page"]');
-    // One card now lists Page, organization, Streams, Time range and the not-sent row together.
-    for (const label of ["Page", "organization", "Streams", "Time range", "Not Sent", "Quick mode"]) await expect(onPage).toContainText(label);
+    for (const label of ["Page", "Streams", "Time range"]) await expect(onPage).toContainText(label);
+    await expect(onPage.locator('[data-test="assistant-context-sees-org"]')).toHaveText(`${harness.ENV.org} organization`);
+    // Only what is sent is listed; not-read rows stay out of the popover.
+    for (const label of ["Not Sent", "Quick mode"]) await expect(onPage).not.toContainText(label);
     await page.keyboard.press("Escape");
     await expect(popover).toBeHidden();
     await expect(assistant.sees()).toBeFocused();
   });
 
-  test("CTX-01 Tab past a chip popover's last control moves on and stays there; the time range opens by keyboard", { tag: ["@mock"] }, async ({
-    page,
-  }) => {
+  test("CTX-01 Tab past a chip popover's last control moves on and stays there", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     await mentionStream(page);
     const stream = assistant.chips().first().locator('[data-test="assistant-context-chip-button"]');
@@ -109,16 +110,6 @@ test.describe("assistant composer and context", () => {
     await expect(popover).toHaveCount(0);
     await flushTasks(page);
     await expect(assistant.chips().first().locator('[data-test="assistant-context-chip-remove"]')).toBeFocused();
-    // The pointer still rests on the stream chip, whose hover tooltip would cover the time chip until it leaves.
-    await page.mouse.move(0, 0);
-
-    await assistant.timeChip().click();
-    // The popover opens on the window in use; Custom Range… is the last row and swaps the presets for the range picker.
-    await expect(page.locator('[data-test="assistant-context-time-page"]')).toBeFocused();
-    await page.keyboard.press("End");
-    await expect(page.locator('[data-test="assistant-context-time-custom"]')).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(page.locator('[data-test="assistant-context-time-range"] [data-test="datetimerange-inline"]')).toBeVisible();
   });
 
   test("CTX-02 a refused turn gives back the text, the chips and the images", { tag: ["@mock"] }, async ({ page }) => {

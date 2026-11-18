@@ -46,6 +46,13 @@ export class AssistantPage {
     await this.container().locator(`[data-test="assistant-shell-place-${id}"]`).filter({ visible: true }).first().click();
   }
 
+  /** Full page on a saved or empty chat opens Home's AI tab in a new browser tab; returns that tab's page object. */
+  async placeFullInNewTab() {
+    const [tab] = await Promise.all([this.page.context().waitForEvent("page"), this.placeAs("full")]);
+    await tab.waitForLoadState("domcontentloaded");
+    return new AssistantPage(tab);
+  }
+
   async close() {
     await this.container().locator('[data-test="assistant-shell-close"]').click();
   }
@@ -196,13 +203,9 @@ export class AssistantPage {
     return this.container().locator('[data-test="assistant-composer"]');
   }
 
-  /** The staged chips; the time chip sits in the composer's bottom row, not in the tray. */
+  /** The staged chips. */
   chips() {
     return this.tray().locator("[data-assistant-chip]");
-  }
-
-  timeChip() {
-    return this.container().locator('[data-test="assistant-context-chip-time"]');
   }
 
   /** The chips folded behind `+N` list in its menu, outside the tray; open it with `openMore()`. */

@@ -117,7 +117,14 @@ test.describe("assistant accessibility", () => {
               after.content !== "none" && after.position === "absolute"
                 ? { w: r.width - px(after.left) - px(after.right), h: r.height - px(after.top) - px(after.bottom) }
                 : { w: 0, h: 0 };
-            return { el, w: Math.round(Math.max(r.width, hit.w)), h: Math.round(Math.max(r.height, hit.h)) };
+            // The composer frame hands any tap on its box to the field, so the field's target is the box.
+            const frame = el.tagName === "TEXTAREA" ? el.closest('[data-test="assistant-composer-frame"]') : null;
+            const box = frame ? el.parentElement.getBoundingClientRect() : { width: 0, height: 0 };
+            return {
+              el,
+              w: Math.round(Math.max(r.width, hit.w, box.width)),
+              h: Math.round(Math.max(r.height, hit.h, box.height)),
+            };
           })
           .filter(({ w, h }) => w < min || h < min)
           .map(({ el, w, h }) => `${el.getAttribute("data-test") ?? el.tagName.toLowerCase()} ${w}x${h}`),
@@ -213,13 +220,13 @@ test.describe("assistant accessibility", () => {
       await openOnLogs(page);
       await assistant.send("why 5xx?", "complete");
       await expect(done()).toBeVisible({ timeout: 20_000 });
-      await assistant.placeAs("full");
-      await expect(assistant.full).toBeVisible({ timeout: 15_000 });
-      expect(await page.evaluate(() => document.documentElement.classList.contains("dark")), `the page is in ${theme}`).toBe(theme === "dark");
+      const tab = await assistant.placeFullInNewTab();
+      await expect(tab.full).toBeVisible({ timeout: 15_000 });
+      expect(await tab.page.evaluate(() => document.documentElement.classList.contains("dark")), `the page is in ${theme}`).toBe(theme === "dark");
       for (const width of Object.keys(VIEWPORTS)) {
-        await page.setViewportSize(VIEWPORTS[width]);
-        await expect(assistant.full).toBeVisible({ timeout: 15_000 });
-        await expectClean(page, `full-view-${width}-${theme}`);
+        await tab.page.setViewportSize(VIEWPORTS[width]);
+        await expect(tab.full).toBeVisible({ timeout: 15_000 });
+        await expectClean(tab.page, `full-view-${width}-${theme}`);
       }
     });
   }

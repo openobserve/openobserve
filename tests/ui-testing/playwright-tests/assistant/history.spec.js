@@ -204,7 +204,7 @@ test.describe("assistant history", () => {
     await assistant.openHistory();
     const line = assistant.history().locator('[data-test="assistant-local-only-line"]');
     await expect(line).toHaveText(
-      "95 of 100 · the oldest unpinned chat is removed when you reach 100",
+      "95 of 100 chats",
     );
     await expect(line).toHaveAttribute("data-near", "");
     await seedLocal(page, 5, 95);

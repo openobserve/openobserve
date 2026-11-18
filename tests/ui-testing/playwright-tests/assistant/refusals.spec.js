@@ -179,7 +179,7 @@ test.describe("assistant refusals and recovery", () => {
     await harness.nextScenario(page, "agent_503");
     await assistant.send("why?");
     await expect(assistant.outcome()).toHaveAttribute("data-code", "agent_unavailable");
-    await expect(assistant.outcome()).toContainText("The assistant didn't respond. Nothing was changed.");
+    await expect(assistant.outcome()).toContainText(`${BRAND.autobot} didn't respond. Nothing was changed.`);
     await expect(assistant.composer()).toBeEditable();
   });
 

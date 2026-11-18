@@ -42,7 +42,7 @@ test.describe("assistant settings", () => {
     await expect(item).toBeVisible({ timeout: 30_000 });
     await item.click();
     await expect(page).toHaveURL(/\/settings\/assistant\/status/);
-    await expect(page.locator('[data-test="settings-assistant-page-title"]')).toHaveText(BRAND.askAutobot);
+    await expect(page.locator('[data-test="settings-assistant-page-title"]')).toHaveText(BRAND.autobot);
     await expect(item).toHaveAttribute("aria-selected", "true");
     for (const tab of TABS) {
       await openTab(page, tab);
@@ -151,7 +151,7 @@ test.describe("assistant settings", () => {
     await expect(assistant.settingsSwitch("public-sharing-switch")).toHaveAttribute("aria-checked", "false");
     await assistant.settingsControl("tier-propose").click();
     await assistant.settingsControl("policy-save").click();
-    await expect(page.locator('[data-test="o-toast-message"]')).toHaveText("Assistant settings saved");
+    await expect(page.locator('[data-test="o-toast-message"]')).toHaveText(`${BRAND.autobot} settings saved`);
     expect(state.settingsPuts).toEqual([
       { enabled: true, permission_tier: "propose", org_sharing: true, public_sharing: true, data_sharing_level: "raw" },
     ]);

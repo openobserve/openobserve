@@ -161,10 +161,10 @@ test.describe("assistant shell", () => {
       );
       await expect(
         assistant.sidebar.locator('[data-test="assistant-thread-logo"]'),
-      ).toBeVisible();
+      ).toHaveCount(0);
       await expect(assistant.sidebar).toHaveAttribute(
         "aria-label",
-        BRAND.askAutobot,
+        BRAND.autobot,
       );
       await expect(
         assistant.sidebar.locator('[data-test="assistant-shell-close"]'),
@@ -177,34 +177,33 @@ test.describe("assistant shell", () => {
   );
 
   test(
-    "the full view takes over from the sidebar as Home's AI tab, which offers no move to another container",
+    "Full page opens Home's AI tab in a new tab, whose bar lists Full page, Side and Floating in that order",
     { tag: ["@mock"] },
     async ({ page }) => {
       await gotoLogs(page);
       await assistant.open("header");
-      await assistant.placeAs("full");
-      // The full view is Home's AI tab at Full density.
-      await expect(page).toHaveURL(/[?&]tab=ai&thread=/);
+      const tab = await assistant.placeFullInNewTab();
+      // This page stays where it was; the new tab is Home's AI tab at Full density.
+      await expect(page).toHaveURL(/\/logs\?/);
+      await expect(tab.page).toHaveURL(/[?&]tab=ai&thread=/);
+      await expect(tab.full).toBeVisible({ timeout: 30_000 });
       await expect(
-        page.locator('[data-test="assistant-container-status"]'),
-      ).not.toHaveText(/closed/);
-      await expect(assistant.full).toBeVisible();
-      await expect(
-        page.locator('[data-test="assistant-welcome"][data-variant="roomy"]'),
+        tab.page.locator('[data-test="assistant-welcome"][data-variant="roomy"]'),
       ).toBeVisible();
-      await expect(page).toHaveTitle("OpenObserve - Home");
-      const landmarks = page.locator(
-        `aside[aria-label="${BRAND.askAutobot}"], [role="region"][aria-label="${BRAND.askAutobot}"]`,
+      await expect(tab.page).toHaveTitle("OpenObserve - Home");
+      const landmarks = tab.page.locator(
+        `aside[aria-label="${BRAND.autobot}"], [role="region"][aria-label="${BRAND.autobot}"]`,
       );
       await expect(landmarks.filter({ visible: true })).toHaveCount(1);
-      await expect(assistant.headerButton).toHaveAttribute(
-        "data-state",
-        "open",
-      );
-      // Home's chat is the page itself, so its bar has no Side panel or Floating Window move.
-      await expect(
-        assistant.full.locator('[data-test^="assistant-shell-place-"]'),
-      ).toHaveCount(0);
+      await expect(tab.headerButton).toHaveAttribute("data-state", "open");
+      const places = await tab.full
+        .locator('[data-test^="assistant-shell-place-"]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute("data-test")));
+      expect(places).toEqual([
+        "assistant-shell-place-full",
+        "assistant-shell-place-sidebar",
+        "assistant-shell-place-window",
+      ]);
     },
   );
 
@@ -218,7 +217,7 @@ test.describe("assistant shell", () => {
       const sheet = assistant.sheet;
       await expect(sheet).toHaveAttribute("role", "dialog");
       await expect(sheet).toHaveAttribute("aria-modal", "false");
-      await expect(sheet).toHaveAttribute("aria-label", BRAND.askAutobot);
+      await expect(sheet).toHaveAttribute("aria-label", BRAND.autobot);
       // At 812 px a half sheet leaves the transcript under 240 px, so it opens full.
       await expect(sheet).toHaveAttribute("data-snap", "full");
       const focusedInside = () =>

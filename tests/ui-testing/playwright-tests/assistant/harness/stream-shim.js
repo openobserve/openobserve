@@ -17,12 +17,20 @@
   let confirmWaiters = [];
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Another tab of this browser started the turn, so a Full page tab answers that turn's card.
+  const sharedTurn = () => {
+    try {
+      return localStorage.getItem("o2mock.lastTurn");
+    } catch (_) {
+      return null;
+    }
+  };
 
   // o2-ai's /confirm answer for the last turn's card: a delete batch item by item, a permission or CLI echo (app.py confirm_action).
   const confirmAnswer = (body) => {
     const status = mock.knobs.confirmStatus || 200;
     if (status !== 200) return { status, body: { code: status, message: `Confirmation failed: upstream ${status}` } };
-    const scenario = SCENARIOS[mock.lastTurn?.name] || {};
+    const scenario = SCENARIOS[mock.lastTurn?.name ?? sharedTurn()] || {};
     const card = (scenario.frames || []).find((frame) => frame.type === "confirmation_required");
     const items = card?.tool === "o2_delete" ? card.args?.items || [] : null;
     if (!body.approved) return { status, body: items ? { approved: false, deleted: false, count: 0 } : { approved: false, kind: "opencode_permission" } };
@@ -96,6 +104,14 @@
   // One channel object per page: a page never hears its own post, so only other tabs' streams end.
   const cancelChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("o2mock-cancel") : null;
   if (cancelChannel) cancelChannel.onmessage = (event) => mock.cancelSid(event.data?.sid);
+  // The server has one agent per chat: a decision posted from any tab resumes the stream paused on the card.
+  const confirmChannel = typeof BroadcastChannel === "function" ? new BroadcastChannel("o2mock-confirm") : null;
+  const wakeConfirmWaiters = (body) => {
+    const waiters = confirmWaiters;
+    confirmWaiters = [];
+    waiters.forEach((r) => r(body));
+  };
+  if (confirmChannel) confirmChannel.onmessage = (event) => wakeConfirmWaiters(event.data);
 
   const sseStream = (scenario, signal, firstSeq = 1, hooks = {}) => {
     const enc = new TextEncoder();
@@ -179,6 +195,9 @@
       const scenario = SCENARIOS[name] || SCENARIOS.complete;
       const turnId = (init.headers || {})["x-o2-assistant-turn-id"];
       mock.lastTurn = { name, turnId, seq: 0 };
+      try {
+        localStorage.setItem("o2mock.lastTurn", name);
+      } catch (_) {}
       const sid = (init.headers || {})["x-o2-assistant-session-id"];
       const onEnd = () => sid && origFetch(new URL("/__o2mock/turn_end", url).href, { method: "POST", body: JSON.stringify({ session_id: sid }) }).catch(() => {});
       return new Response(sseStream({ ...scenario, frames: withLifecycle(scenario.frames, turnId) }, init.signal, 1, { sid, onEnd }), {
@@ -236,9 +255,8 @@
       const answer = confirmAnswer(body);
       // A refused decision never reached the agent, so the paused stream keeps waiting.
       if (answer.status === 200) {
-        const waiters = confirmWaiters;
-        confirmWaiters = [];
-        waiters.forEach((r) => r(body));
+        wakeConfirmWaiters(body);
+        confirmChannel?.postMessage(body);
       }
       return new Response(JSON.stringify(answer.body), { status: answer.status, headers: { "Content-Type": "application/json" } });
     }
