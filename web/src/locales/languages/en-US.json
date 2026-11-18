@@ -13792,6 +13792,7 @@
       "stripNoAnomalies": "No anomalies in the last 7 days",
       "stripAbsence": "No data for this detector's query",
       "stripAbsenceSince": "No data for this detector's query since {time}",
+      "stripAbsenceReturned": "Data for this detector's query returned at {time}",
       "stripActual": "Actual",
       "stripExpected": "Expected",
       "stripChange": "Change",

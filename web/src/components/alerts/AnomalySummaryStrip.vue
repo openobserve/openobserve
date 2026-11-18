@@ -321,6 +321,11 @@ const message = computed<TimedText | null>(() => {
         ? { text: t("alerts.anomaly.stripAbsence"), utc: null }
         : { text: t("alerts.anomaly.stripAbsenceSince", { time: time(at) }), utc: utc(at) };
     }
+    case "back_in_range": {
+      if (v.summary?.kind !== "absence" || v.sinceUs === null) return null;
+      const text = t("alerts.anomaly.stripAbsenceReturned", { time: time(v.sinceUs) });
+      return { text, utc: utc(v.sinceUs) };
+    }
     case "no_new_data":
       return { text: t("alerts.anomaly.stripNoNewDataText"), utc: null };
     case "no_recent_runs":

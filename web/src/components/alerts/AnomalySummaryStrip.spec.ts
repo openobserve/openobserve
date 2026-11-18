@@ -289,6 +289,54 @@ describe("AnomalySummaryStrip", () => {
       ).toBe(false);
     });
 
+    it("shows when the data returned for an absence, with no readings", () => {
+      const w = mountStrip({
+        response: response({
+          state: "back_in_range",
+          summary: summary({ kind: "absence", ...NO_VALUES, since_us: at("21:45") }),
+          window: { start_us: at("18:00"), end_us: at("21:45"), clipped: false },
+          last_detection_run: at("21:58"),
+        }),
+        nowUs: at("22:00"),
+      });
+      expect(text(w, "chip").text()).toBe("Back in range");
+      expect(text(w, "fact").text()).toBe("since 21:45");
+      expect(text(w, "secondary").text()).toBe("lasted 3 h 45 min");
+      expect(text(w, "measure").text()).toBe("count(*) per 15 min · k8s_logs");
+      expect(text(w, "message").text()).toBe("Data for this detector's query returned at 21:45");
+      expect(tip(w, "message")).toBe("2026-11-16 21:45 UTC");
+      expect(text(w, "readings").exists()).toBe(false);
+    });
+
+    it("keeps worst, one expected value and change in the heading colour for a partial drop", () => {
+      const w = mountStrip({
+        response: response({
+          state: "back_in_range",
+          summary: summary({
+            kind: "partial_drop",
+            actual: 40,
+            expected: 100,
+            expected_lower: null,
+            expected_upper: null,
+            change_percent: -60,
+            since_us: at("21:45"),
+          }),
+          window: { start_us: at("18:00"), end_us: at("21:45"), clipped: false },
+          last_detection_run: at("21:58"),
+        }),
+        nowUs: at("22:00"),
+      });
+      expect(text(w, "actual").text()).toContain("Worst value");
+      expect(text(w, "expected").text()).toContain("100.00");
+      expect(text(w, "change").text()).toContain("▼");
+      expect(text(w, "message").exists()).toBe(false);
+      expect(
+        w
+          .find('[data-test="alerts-anomalysummarystrip-readings"] .text-status-error-text')
+          .exists(),
+      ).toBe(false);
+    });
+
     it("shows since and no lasted when the window is clipped", () => {
       const w = back(true);
       expect(text(w, "fact").text()).toBe("since 21:45");
