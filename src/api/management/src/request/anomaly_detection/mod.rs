@@ -335,9 +335,9 @@ async fn explore_response(
     )
     .unwrap_or(0);
     let now_us = config::utils::time::now_micros();
-    let range = explore_state::read_range(now_us, bucket_us);
+    let range = explore_state::read_range(now_us);
     let buckets = if detector.is_trained {
-        explore_state::read_buckets(org_id, anomaly_id, model_version, range).await?
+        explore_state::read_buckets(org_id, anomaly_id, model_version, range, bucket_us).await?
     } else {
         vec![]
     };

@@ -28,6 +28,8 @@ pub const ANOMALY_STREAM: &str = "_anomalies";
 const LOOKBACK_US: i64 = 7 * 86_400 * 1_000_000;
 /// Caps the rows of one read: 7 days of 1-minute buckets.
 const MAX_BUCKETS: i64 = 10_080;
+/// Buckets read on each side of the newest anomaly when the newest rows do not reach it.
+const AROUND_BUCKETS: i64 = MAX_BUCKETS / 2;
 /// "No new data" shows once the cursor lags this many buckets.
 const STALE_CURSOR_BUCKETS: i64 = 3;
 const HOUR_US: i64 = 3_600 * 1_000_000;
@@ -226,10 +228,31 @@ pub fn is_stale_model(sent: Option<i64>, served: i64) -> bool {
     sent.is_some_and(|v| v != served)
 }
 
-/// The read range `(start, end)` in microseconds: 7 days, or fewer for very small buckets.
-pub fn read_range(now_us: i64, bucket_us: i64) -> (i64, i64) {
-    let span = LOOKBACK_US.min(bucket_us.max(1).saturating_mul(MAX_BUCKETS));
-    (now_us.saturating_sub(span), now_us.saturating_add(1))
+/// The read range `(start, end)` in microseconds: 7 days for every bucket size.
+pub fn read_range(now_us: i64) -> (i64, i64) {
+    (now_us.saturating_sub(LOOKBACK_US), now_us.saturating_add(1))
+}
+
+/// True when the newest rows filled a read and hold no anomaly, so an older one may exist.
+pub fn needs_anomaly_probe(newest: &[ExploreBucket]) -> bool {
+    newest.len() as i64 >= MAX_BUCKETS && !newest.iter().any(ExploreBucket::is_anomalous)
+}
+
+/// The read around the newest anomalous bucket `anomaly_us`, inside `range`.
+pub fn around_range(anomaly_us: i64, bucket_us: i64, range: (i64, i64)) -> (i64, i64) {
+    let side = bucket_us.max(1).saturating_mul(AROUND_BUCKETS);
+    (
+        anomaly_us.saturating_sub(side).max(range.0),
+        anomaly_us.saturating_add(side).min(range.1),
+    )
+}
+
+/// The rows around an older anomaly and the newest rows, one per bucket, oldest first.
+pub fn merge_reads(around: Vec<ExploreBucket>, newest: Vec<ExploreBucket>) -> Vec<ExploreBucket> {
+    let mut merged: Vec<ExploreBucket> = around.into_iter().chain(newest).collect();
+    merged.sort_by_key(|b| b.ts_us);
+    merged.dedup_by_key(|b| b.ts_us);
+    merged
 }
 
 /// The unpadded window the link opens: the request's, else the anomaly window, else the
@@ -427,6 +450,35 @@ pub fn buckets_sql(anomaly_id: &str, model_version: i64, fields: &HashSet<String
     )
 }
 
+/// The newest bucket whose latest judgment is anomalous, as one row of `buckets_sql`.
+pub fn newest_anomaly_sql(
+    anomaly_id: &str,
+    model_version: i64,
+    fields: &HashSet<String>,
+) -> String {
+    let flag = |name: &str| {
+        if fields.contains(name) {
+            format!("{name} IS TRUE")
+        } else {
+            "false".to_string()
+        }
+    };
+    let (absence, partial) = (flag("is_absence"), flag("is_partial_drop"));
+    let scored_rank = format!("CASE WHEN ({absence}) OR ({partial}) THEN 0 ELSE 1 END");
+    let judged = if fields.contains("judged_end_us") {
+        ", judged_end_us ASC NULLS FIRST"
+    } else {
+        ""
+    };
+    let order = format!("ORDER BY {scored_rank}{judged}, created_at ASC");
+    let having = format!(
+        " HAVING (max({scored_rank}) = 1 AND last_value(is_anomaly {order})) \
+         OR max(CASE WHEN {absence} THEN 1 ELSE 0 END) = 1 \
+         OR max(CASE WHEN {partial} THEN 1 ELSE 0 END) = 1 ORDER BY ts DESC"
+    );
+    buckets_sql(anomaly_id, model_version, fields).replacen(" ORDER BY ts DESC", &having, 1)
+}
+
 /// Buckets from the rows of `buckets_sql`, oldest first.
 pub fn parse_buckets(hits: &[serde_json::Value]) -> Vec<ExploreBucket> {
     let num = |hit: &serde_json::Value, key: &str| hit.get(key).and_then(|v| v.as_f64());
@@ -471,6 +523,7 @@ pub async fn read_buckets(
     anomaly_id: &str,
     model_version: i64,
     range: (i64, i64),
+    bucket_us: i64,
 ) -> anyhow::Result<Vec<ExploreBucket>> {
     let schema = infra::schema::get_cache(org_id, ANOMALY_STREAM, StreamType::Logs).await?;
     let fields: HashSet<String> = schema.fields_map().keys().cloned().collect();
@@ -487,11 +540,35 @@ pub async fn read_buckets(
     {
         return Ok(vec![]);
     }
+    let sql = buckets_sql(anomaly_id, model_version, &fields);
+    let newest = parse_buckets(&search_hits(org_id, &sql, range, MAX_BUCKETS).await?);
+    // Small buckets fill one read in hours, so an older anomaly is found and read on its own.
+    if !needs_anomaly_probe(&newest) {
+        return Ok(newest);
+    }
+    let probe = newest_anomaly_sql(anomaly_id, model_version, &fields);
+    let Some(anomaly_us) = parse_buckets(&search_hits(org_id, &probe, range, 1).await?)
+        .first()
+        .map(|b| b.ts_us)
+    else {
+        return Ok(newest);
+    };
+    let around = around_range(anomaly_us, bucket_us, range);
+    let around = parse_buckets(&search_hits(org_id, &sql, around, MAX_BUCKETS).await?);
+    Ok(merge_reads(around, newest))
+}
+
+async fn search_hits(
+    org_id: &str,
+    sql: &str,
+    range: (i64, i64),
+    size: i64,
+) -> anyhow::Result<Vec<serde_json::Value>> {
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: buckets_sql(anomaly_id, model_version, &fields),
+            sql: sql.to_string(),
             from: 0,
-            size: MAX_BUCKETS,
+            size,
             start_time: range.0,
             end_time: range.1,
             ..Default::default()
@@ -505,7 +582,7 @@ pub async fn read_buckets(
     let resp = search_service::search(&trace_id, org_id, StreamType::Logs, None, &req)
         .await
         .map_err(|e| anyhow::anyhow!("reading {ANOMALY_STREAM} failed: {e}"))?;
-    Ok(parse_buckets(&resp.hits))
+    Ok(resp.hits)
 }
 
 /// The readings of a run, by the kind of its newest bucket; an absence has no numbers.
@@ -724,6 +801,90 @@ mod tests {
         let mut back = decide(&[normal(1), absent(2), normal(3)], B, 0, true, true);
         extend_ongoing_absence(&mut back, Some(9 * B));
         assert_eq!(back.window.unwrap().end_us, 3 * B);
+    }
+
+    /// The newest `MAX_BUCKETS` rows of 1-second buckets, as the DESC read returns them.
+    fn newest_rows(rows: Vec<ExploreBucket>) -> Vec<ExploreBucket> {
+        let skip = rows.len().saturating_sub(MAX_BUCKETS as usize);
+        rows.into_iter().skip(skip).collect()
+    }
+
+    #[test]
+    fn test_one_second_buckets_keep_an_absence_onset_four_hours_back() {
+        let s = 1_000_000;
+        let now = 1_800_000_000 * s;
+        let range = read_range(now);
+        assert_eq!(range.0, now - LOOKBACK_US, "7 days for every bucket size");
+        let onset = now - 4 * 3_600 * s;
+        let at = |ts_us: i64, b: ExploreBucket| ExploreBucket { ts_us, ..b };
+        let mut rows: Vec<ExploreBucket> = (1..=3 * 3_600)
+            .map(|i| at(onset - i * s, normal(0)))
+            .rev()
+            .collect();
+        rows.push(at(onset, absent(0)));
+        let read = newest_rows(rows);
+        assert!(!needs_anomaly_probe(&read));
+        let d = decide(&read, s, range.0, true, true);
+        assert_eq!(d.state, ExploreState::Ongoing);
+        assert_eq!(d.summary.unwrap().since_us, Some(onset));
+    }
+
+    #[test]
+    fn test_one_second_buckets_find_an_anomaly_four_hours_back() {
+        let s = 1_000_000;
+        let now = 1_800_000_000 * s;
+        let range = read_range(now);
+        let spike = now - 4 * 3_600 * s;
+        let at = |ts_us: i64, b: ExploreBucket| ExploreBucket { ts_us, ..b };
+        let all: Vec<ExploreBucket> = (0..=4 * 3_600 + 600)
+            .map(|i| {
+                let ts = now - i * s;
+                if ts == spike {
+                    at(ts, high(0, 900.0))
+                } else {
+                    at(ts, normal(0))
+                }
+            })
+            .rev()
+            .collect();
+        let newest = newest_rows(all.clone());
+        assert!(
+            needs_anomaly_probe(&newest),
+            "the newest rows reach 2 h 48 min back only"
+        );
+        assert_eq!(
+            decide(&newest, s, range.0, true, true).state,
+            ExploreState::default(),
+            "one read alone says no anomaly"
+        );
+        let (lo, hi) = around_range(spike, s, range);
+        assert_eq!(
+            (lo, hi),
+            (spike - AROUND_BUCKETS * s, spike + AROUND_BUCKETS * s)
+        );
+        let around: Vec<ExploreBucket> = all
+            .iter()
+            .filter(|b| b.ts_us >= lo && b.ts_us < hi)
+            .cloned()
+            .collect();
+        let merged = merge_reads(around, newest);
+        let d = decide(&merged, s, range.0, true, true);
+        assert_eq!(d.state, ExploreState::BackInRange);
+        assert_eq!(d.window.unwrap().start_us, spike);
+        assert_eq!(d.summary.unwrap().since_us, Some(spike + s));
+        assert!(merged.windows(2).all(|w| w[0].ts_us < w[1].ts_us));
+    }
+
+    #[test]
+    fn test_the_probe_sql_keeps_only_anomalous_buckets() {
+        let fields: HashSet<String> = ["is_absence", "is_partial_drop", "judged_end_us"]
+            .iter()
+            .map(|f| f.to_string())
+            .collect();
+        let sql = newest_anomaly_sql("ad1", 3, &fields);
+        assert!(sql.contains("GROUP BY _timestamp HAVING "), "{sql}");
+        assert!(sql.ends_with("ORDER BY ts DESC"), "{sql}");
+        assert_eq!(sql.matches("ORDER BY ts DESC").count(), 1);
     }
 
     #[test]
