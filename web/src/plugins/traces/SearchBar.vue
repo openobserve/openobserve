@@ -1049,6 +1049,9 @@ export default defineComponent({
     // Filter mode is always the chip bar; SQL mode keeps the editor.
     const showFilterBuilder = computed(() => !searchObj.meta.sqlMode && !nlpMode.value);
     const focusQuery = () => (showFilterBuilder.value ? activateFilterBuilder() : focusEditor());
+    // Page shortcuts reach the chip bar's undo, redo and clear; SQL mode's editor keeps its own.
+    const filterHistory = (action: "undo" | "redo" | "clear") =>
+      showFilterBuilder.value ? (filterBuilderRef.value?.[action]() ?? false) : false;
     const { isDark } = useTheme();
     const aiIcon = computed(() =>
       getImageURL(
@@ -1764,6 +1767,7 @@ export default defineComponent({
       applyRecentExample,
       focusEditor,
       focusQuery,
+      filterHistory,
       emit,
       updateQueryValue,
       updateDateTime,

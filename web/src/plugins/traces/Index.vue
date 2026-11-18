@@ -2726,6 +2726,9 @@ const tracesShortcuts = [
     id: "tracesFocusQuery",
     handler: () => searchBarRef.value?.focusQuery?.(),
   },
+  { id: "tracesFilterUndo", handler: () => searchBarRef.value?.filterHistory?.("undo") },
+  { id: "tracesFilterRedo", handler: () => searchBarRef.value?.filterHistory?.("redo") },
+  { id: "tracesFilterClear", handler: () => searchBarRef.value?.filterHistory?.("clear") },
   {
     id: "tracesCopyUrl",
     handler: () => copyTracesUrl(t),

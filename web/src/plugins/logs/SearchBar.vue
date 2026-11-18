@@ -2394,6 +2394,9 @@ export default defineComponent({
 
     const focusEditor = () => queryEditorRef.value?.focus?.();
     const focusQuery = () => (showFilterBuilder.value ? activateFilterBuilder() : focusEditor());
+    // Page shortcuts reach the chip bar's undo, redo and clear; SQL mode's editor keeps its own.
+    const filterHistory = (action: "undo" | "redo" | "clear") =>
+      showFilterBuilder.value ? (filterBuilderRef.value?.[action]() ?? false) : false;
     const filterBuilderFreeText = computed(() => allowsMatchAll(searchObj, store.state.zoConfig));
 
     // Escape in the list hands focus back to the editor, and that focus must not reopen the list.
@@ -5291,6 +5294,7 @@ export default defineComponent({
       queryEditorRef,
       focusEditor,
       focusQuery,
+      filterHistory,
       filterBuilderFreeText,
       dismissRecentFocus,
       syntaxGuideRef,

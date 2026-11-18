@@ -279,6 +279,28 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         descriptionKey: "shortcuts.actions.logsSearchHistory",
       },
       { id: "logsFocusQuery", key: "/", descriptionKey: "shortcuts.actions.focusQuery" },
+      // The chip filter bar handles these itself while it has focus; here they reach it from the rest of the page.
+      {
+        id: "logsFilterUndo",
+        keyForWindows: "ctrl+z",
+        keyForMac: "meta+z",
+        descriptionKey: "shortcuts.actions.filterUndo",
+        skipInInput: true,
+      },
+      {
+        id: "logsFilterRedo",
+        keyForWindows: "ctrl+shift+z",
+        keyForMac: "shift+meta+z",
+        descriptionKey: "shortcuts.actions.filterRedo",
+        skipInInput: true,
+      },
+      {
+        id: "logsFilterClear",
+        keyForWindows: "ctrl+backspace",
+        keyForMac: "meta+backspace",
+        descriptionKey: "shortcuts.actions.filterClear",
+        skipInInput: true,
+      },
       { id: "logsSaveView", key: "s", descriptionKey: "shortcuts.actions.logsSaveView" },
       {
         id: "logsExport",
@@ -505,6 +527,28 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       },
       { id: "tracesRefresh", key: "r", descriptionKey: "shortcuts.actions.tracesRefresh" },
       { id: "tracesFocusQuery", key: "/", descriptionKey: "shortcuts.actions.focusQuery" },
+      // The chip filter bar handles these itself while it has focus; here they reach it from the rest of the page.
+      {
+        id: "tracesFilterUndo",
+        keyForWindows: "ctrl+z",
+        keyForMac: "meta+z",
+        descriptionKey: "shortcuts.actions.filterUndo",
+        skipInInput: true,
+      },
+      {
+        id: "tracesFilterRedo",
+        keyForWindows: "ctrl+shift+z",
+        keyForMac: "shift+meta+z",
+        descriptionKey: "shortcuts.actions.filterRedo",
+        skipInInput: true,
+      },
+      {
+        id: "tracesFilterClear",
+        keyForWindows: "ctrl+backspace",
+        keyForMac: "meta+backspace",
+        descriptionKey: "shortcuts.actions.filterClear",
+        skipInInput: true,
+      },
       {
         id: "tracesCopyUrl",
         keyForWindows: "ctrl+shift+c",

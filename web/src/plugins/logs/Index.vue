@@ -4152,6 +4152,9 @@ export default defineComponent({
         id: "logsFocusQuery",
         handler: () => searchBarRef.value?.focusQuery?.(),
       },
+      { id: "logsFilterUndo", handler: () => searchBarRef.value?.filterHistory?.("undo") },
+      { id: "logsFilterRedo", handler: () => searchBarRef.value?.filterHistory?.("redo") },
+      { id: "logsFilterClear", handler: () => searchBarRef.value?.filterHistory?.("clear") },
       {
         id: "logsRefresh",
         handler: () => {
