@@ -179,8 +179,10 @@ import useStreams from "@/composables/useStreams";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
+  buildCountChartQuery,
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
+  withHistogramMinutes,
 } from "@/utils/alerts/aggregationPreviewQuery";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { cloneDeep, debounce } from "lodash-es";
@@ -529,6 +531,19 @@ const verdictNeedsOwnSearch = (): boolean => {
     ? previewMinutes() > alertWindowMinutes()
     : shownRange.value !== "checks";
 };
+// An automatic bucket on a wide range spans several alert windows, so its points read above a threshold no check crossed.
+const chartBucketMinutes = (): number =>
+  props.selectedTab === "custom" && verdictNeedsOwnSearch() ? alertWindowMinutes() : 0;
+// A count chart the server would bucket itself is rewritten into one that names its bucket.
+const windowCountQuery = (): string | null => {
+  const minutes = chartBucketMinutes();
+  if (!minutes || props.isAggregationEnabled) return null;
+  const count = /\bhistogram\(/i.test(props.query)
+    ? props.query
+    : buildCountChartQuery(props.query);
+  return count ? withHistogramMinutes(count, minutes) : null;
+};
+const selfBucketed = ref(false);
 // Hours, never days, so the default reads on the same scale as 12h and 24h.
 const compactDuration = (minutes: number): I18nText => {
   if (minutes % 60 === 0) return t("alerts.form.preview.hrCompact", { count: minutes / 60 });
@@ -663,7 +678,7 @@ const shouldUseHistogram = computed(() => {
   }
 
   // For other modes (PromQL, custom without agg), use the prop value
-  return props.isUsingBackendSql;
+  return props.isUsingBackendSql && !selfBucketed.value;
 });
 
 // When aggregation is enabled use "dashboards" search type so the panel does not
@@ -818,7 +833,10 @@ const fetchQuerySchema = async () => {
     // We clean the query, rename zo_sql_val→zo_sql_num, and wire the fields
     // directly so we get a multi-series line chart with a threshold mark-line.
     if (props.selectedTab === "custom" && props.isAggregationEnabled) {
-      const queryForPreview = cleanAggregationQuery(props.query);
+      const cleaned = cleanAggregationQuery(props.query);
+      const queryForPreview = chartBucketMinutes()
+        ? withHistogramMinutes(cleaned, chartBucketMinutes())
+        : cleaned;
 
       // Build breakdown from aggregation group_by fields.
       // Backend uses the original field names (e.g. status, service) in the SELECT and GROUP BY.
@@ -1878,6 +1896,8 @@ const refreshData = () => {
   }
 
   const new_relative_time = previewMinutes();
+  const windowCount = windowCountQuery();
+  selfBucketed.value = !!windowCount;
   // Every input the preview request depends on; asking again with the same ones fetches nothing new.
   const runKey = JSON.stringify([
     props.query,
@@ -2013,7 +2033,7 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.z = [];
     dashboardPanelData.data.queries[0].fields.breakdown = [];
     dashboardPanelData.data.queries[0].customQuery = true;
-    dashboardPanelData.data.queries[0].query = props.query;
+    dashboardPanelData.data.queries[0].query = windowCount ?? props.query;
     dashboardPanelData.data.queries[0].vrlFunctionQuery = null; // VRL not supported in custom mode
     dashboardPanelData.data.config.table_dynamic_columns = false; // VRL not supported in custom mode
     dashboardPanelData.data.queries[0].fields.stream = props.formData.stream_name;

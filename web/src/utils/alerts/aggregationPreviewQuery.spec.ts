@@ -18,6 +18,7 @@ import {
   buildCountChartQuery,
   cleanAggregationQuery,
   withCompositeGroupLabel,
+  withHistogramMinutes,
 } from "./aggregationPreviewQuery";
 
 /** Quote count must stay even, or the SQL parser hits "Unterminated string literal". */
@@ -26,6 +27,28 @@ const quotesBalanced = (sql: string) => (sql.match(/'/g) || []).length % 2 === 0
 /** Paren count must net to zero, or the rewrite cut the statement mid-expression. */
 const parensBalanced = (sql: string) =>
   [...sql].reduce((d, c) => d + (c === "(" ? 1 : c === ")" ? -1 : 0), 0) === 0;
+
+describe("withHistogramMinutes", () => {
+  it.each([
+    [
+      "an automatic bucket",
+      "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"a\" GROUP BY 1",
+      "SELECT histogram(_timestamp, '5 minute') AS zo_sql_key, count(*) AS zo_sql_num FROM \"a\" GROUP BY 1",
+    ],
+    [
+      "a bucket the query already names",
+      "SELECT histogram(_timestamp, '1 hour') AS zo_sql_key FROM \"a\"",
+      "SELECT histogram(_timestamp, '1 hour') AS zo_sql_key FROM \"a\"",
+    ],
+    [
+      "a filter value spelling histogram(x)",
+      "SELECT histogram(_timestamp) AS zo_sql_key FROM \"a\" WHERE m = 'histogram(x)'",
+      "SELECT histogram(_timestamp, '5 minute') AS zo_sql_key FROM \"a\" WHERE m = 'histogram(x)'",
+    ],
+  ])("buckets %s by the given minutes", (_case, query, expected) => {
+    expect(withHistogramMinutes(query, 5)).toBe(expected);
+  });
+});
 
 describe("cleanAggregationQuery", () => {
   it("drops the HAVING clause on a plain query", () => {

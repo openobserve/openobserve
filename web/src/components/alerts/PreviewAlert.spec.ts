@@ -3287,6 +3287,26 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
     w.unmount();
   });
 
+  const AGG_SQL =
+    "SELECT histogram(_timestamp) AS zo_sql_key, avg(x) AS zo_sql_val FROM logs GROUP BY zo_sql_key";
+  it.each([
+    ["an aggregation", "checks", true, AGG_SQL, null],
+    ["an aggregation", "24h", true, AGG_SQL, "10 minute"],
+    ["a count", "24h", false, "SELECT * FROM logs WHERE level = 'error'", "10 minute"],
+  ])(
+    "a builder chart of %s over %s draws one point per alert window",
+    async (_, range, aggregated, query, bucket) => {
+      const w = await mountComp({ query, selectedTab: "custom", isAggregationEnabled: aggregated });
+      w.vm.previewRange = range;
+      w.vm.refreshData();
+      await flushPromises();
+      const panel = w.findComponent({ name: "PanelSchemaRenderer" });
+      expect(panel.props("panelSchema").queries[0].query.includes(`'${bucket}'`)).toBe(!!bucket);
+      if (bucket) expect(panel.props("is_ui_histogram")).toBe(false);
+      w.unmount();
+    },
+  );
+
   it("a click on 12h draws 12 hours and adds the one verdict search", async () => {
     const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "custom" });
     await flushPromises();

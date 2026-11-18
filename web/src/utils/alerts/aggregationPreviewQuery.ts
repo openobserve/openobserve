@@ -114,13 +114,19 @@ const maskForKeywordSearch = (sql: string): string => maskParens(maskStringLiter
  * at the matched positions. Masking preserves length, so positions line up
  * between the two.
  */
-const replaceOutsideLiterals = (sql: string, pattern: RegExp, replacement: string): string => {
+const replaceOutsideLiterals = (
+  sql: string,
+  pattern: RegExp,
+  replacement: string | ((group: string) => string),
+): string => {
   const masked = maskStringLiterals(sql);
   let out = "";
   let lastIndex = 0;
   for (const match of masked.matchAll(pattern)) {
     const index = match.index as number;
-    out += sql.slice(lastIndex, index) + replacement;
+    out +=
+      sql.slice(lastIndex, index) +
+      (typeof replacement === "string" ? replacement : replacement(match[1]));
     lastIndex = index + match[0].length;
   }
   return out + sql.slice(lastIndex);
@@ -225,6 +231,14 @@ export const cleanAggregationQuery = (query: string): string => {
   }
   return cleaned.trim();
 };
+
+/** Buckets the chart's automatic time histogram by `minutes`, so each point holds what one alert window holds. */
+export const withHistogramMinutes = (query: string, minutes: number): string =>
+  replaceOutsideLiterals(
+    query,
+    /\bhistogram\(\s*([A-Za-z_][\w]*)\s*\)/g,
+    (column) => `histogram(${column}, '${Math.max(1, Math.floor(minutes))} minute')`,
+  );
 
 export default cleanAggregationQuery;
 
