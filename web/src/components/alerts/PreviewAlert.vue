@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-for="limit in limitKeys"
         :key="limit.level"
-        class="inline-flex items-center gap-1.5"
+        class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap"
         :data-test="
           limit.level === 'critical' ? 'alert-preview-limit-key' : 'alert-preview-warning-key'
         "
@@ -111,9 +111,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         {{ limit.label }}
       </span>
-      <span v-if="seriesCountText" class="ms-auto" data-test="alert-preview-series-count">
+      <OTruncatedText
+        v-if="seriesCountText"
+        class="ms-auto min-w-0"
+        data-test="alert-preview-series-count"
+      >
         {{ seriesCountText }}
-      </span>
+      </OTruncatedText>
     </div>
   </div>
 </template>
@@ -141,6 +145,7 @@ import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { promqlDaySeriesQuery, promqlParseTreeQuery } from "@/services/alert_preview.queries";
 import useStreams from "@/composables/useStreams";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
