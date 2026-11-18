@@ -126,10 +126,8 @@ export function formatUtcHm(us: number): string {
 
 const localDay = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
-/**
- * Strip and popover time in the zone of the chart axis: the chart sets no zone, so ECharts
- * draws the axis in the browser zone. A time on another day than `refUs` also shows the date.
- */
+// ECharts draws the axis in the browser zone, so strip and popover times use it too.
+// A time on another day than `refUs` also shows the date.
 export function formatAnomalyTime(us: number, refUs: number): string {
   const d = new Date(us / 1000);
   const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
