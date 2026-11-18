@@ -364,6 +364,7 @@ describe("alerts service", () => {
       expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/v2/org%201/alerts/evaluate", body, {
         params: { folder: "f1" },
         signal,
+        silentForbidden: true,
       });
     });
   });

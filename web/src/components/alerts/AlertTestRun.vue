@@ -20,8 +20,8 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import destinationService from "@/services/alert_destination";
 import { starterContentSpec } from "@/components/alerts/template-content/contentSpec";
+import alertsService from "@/services/alerts";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatNumber, joinList, joinListMore } from "@/utils/alerts/alertCopy";
@@ -100,7 +100,7 @@ const send = async () => {
     : { definition: starterContentSpec(), kind: "alert" };
   const outcomes = await Promise.allSettled(
     names.map((destination_name) =>
-      destinationService.testSend({ org_identifier: org(), destination_name, data }),
+      alertsService.testSendDestination(org(), destination_name, data),
     ),
   );
   const sent: string[] = [];
@@ -139,7 +139,7 @@ defineExpose({ run });
 
 <template>
   <section
-    class="bg-surface-base absolute inset-0 flex flex-col gap-2 overflow-y-auto px-4 py-2"
+    class="bg-surface-base absolute inset-0 z-10 flex flex-col gap-2 overflow-y-auto px-4 pt-2"
     :aria-label="t('alerts.testRun.region')"
     :aria-busy="running"
     data-test="alert-test-run"
@@ -209,23 +209,19 @@ defineExpose({ run });
       </li>
     </ul>
     <div
-      class="border-border-default mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2"
+      class="border-border-default bg-surface-base sticky bottom-0 mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2"
     >
       <OButton
+        v-if="destinations.length"
         variant="outline"
         size="xs"
         :loading="sending"
-        :disabled="!destinations.length"
         data-test="alert-test-run-send"
         @click="confirmOpen = true"
       >
         {{ t("alerts.testRun.sendTest") }}
       </OButton>
-      <span
-        v-if="!destinations.length"
-        class="text-text-secondary text-xs"
-        data-test="alert-test-run-no-destination"
-      >
+      <span v-else class="text-text-secondary text-xs" data-test="alert-test-run-no-destination">
         {{ t("alerts.testRun.noDestination") }}
       </span>
       <span

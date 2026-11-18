@@ -374,11 +374,30 @@ const alerts = {
       });
   },
   // Dry run of an unsaved alert: the server searches as the caller, writes and sends nothing.
+  // The Test it panel says what a 403 refused, so the access boundary stays out of it.
   evaluate: (org: string, body: EvaluateAlertRequest, folder?: string, signal?: AbortSignal) =>
-    http().post<EvaluateAlertResponse>(`/api/v2/${encodeURIComponent(org)}/alerts/evaluate`, body, {
-      ...inFolder(folder),
-      signal,
-    }),
+    http()
+      .post<EvaluateAlertResponse>(`/api/v2/${encodeURIComponent(org)}/alerts/evaluate`, body, {
+        ...inFolder(folder),
+        signal,
+        silentForbidden: true,
+      })
+      .then((res) => {
+        analytics.track("alert_test_run_completed");
+        return res;
+      }),
+  // Posts a real message, marked [TEST], to the destination; needs write on it.
+  testSendDestination: (org: string, destination: string, data: Record<string, unknown>) =>
+    http()
+      .post(
+        `/api/${encodeURIComponent(org)}/alerts/destinations/${encodeURIComponent(destination)}/test_send`,
+        data,
+        { silentForbidden: true },
+      )
+      .then((res) => {
+        analytics.track("alert_test_message_sent");
+        return res;
+      }),
   generate_sql: (org_identifier: string, data: any) => {
     return http().post(`/api/v2/${org_identifier}/alerts/generate_sql`, data);
   },

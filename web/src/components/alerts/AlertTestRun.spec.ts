@@ -26,10 +26,10 @@ import AlertTestRun from "./AlertTestRun.vue";
 const evaluate = vi.fn();
 const testSend = vi.fn();
 vi.mock("@/services/alerts", () => ({
-  default: { evaluate: (...a: unknown[]) => evaluate(...a) },
-}));
-vi.mock("@/services/alert_destination", () => ({
-  default: { testSend: (...a: unknown[]) => testSend(...a) },
+  default: {
+    evaluate: (...a: unknown[]) => evaluate(...a),
+    testSendDestination: (...a: unknown[]) => testSend(...a),
+  },
 }));
 
 const BODY = {
@@ -118,14 +118,14 @@ describe("AlertTestRun", () => {
     evaluate.mockResolvedValue({ data: grouped });
     const { wrapper } = mountRun();
     await flushPromises();
-    expect(wrapper.find('[data-test="alert-test-run-send"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="alert-test-run-send"]').exists()).toBe(false);
     expect(text(wrapper, "no-destination")).toBe("Pick a destination to send a test message");
   });
 
   it("sends to every destination after the confirm and says what each answered, once per reason", async () => {
     evaluate.mockResolvedValue({ data: grouped });
-    testSend.mockImplementation(({ destination_name }: { destination_name: string }) =>
-      destination_name === "slack" ? Promise.resolve({ data: {} }) : Promise.reject(blocked),
+    testSend.mockImplementation((_org: string, destination: string) =>
+      destination === "slack" ? Promise.resolve({ data: {} }) : Promise.reject(blocked),
     );
     const { wrapper } = mountRun({ destinations: ["slack", "pager", "mail"] });
     await flushPromises();
@@ -136,7 +136,7 @@ describe("AlertTestRun", () => {
     await flushPromises();
 
     expect(testSend).toHaveBeenCalledTimes(3);
-    expect(testSend.mock.calls[0][0].data.definition).toBeTruthy();
+    expect(testSend.mock.calls[0][2].definition).toBeTruthy();
     const lines = wrapper.findAll('[data-test="alert-test-run-send-result"]').map((l) => l.text());
     expect(lines).toEqual([
       "Test message sent to slack",
