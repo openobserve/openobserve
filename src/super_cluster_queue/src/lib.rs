@@ -16,6 +16,7 @@
 #![cfg(feature = "enterprise")]
 
 mod alert_acks;
+mod alert_composites;
 mod alert_states;
 mod alerts;
 mod anomaly_detection;
@@ -155,6 +156,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_alert_state_msg: alert_states::process,
         on_downtime_msg: downtimes::process,
         on_alert_ack_msg: alert_acks::process,
+        on_alert_composite_msg: alert_composites::process,
     };
     // On-call rides the scheduler topic with the triggers it belongs to, so a
     // response record always lands before the escalation timer that names it.
