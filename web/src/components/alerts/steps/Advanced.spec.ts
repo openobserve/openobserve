@@ -125,6 +125,17 @@ describe("Advanced — descendant (binds into ancestor OForm) mode", () => {
     expect(host.findComponent(Advanced).emitted("update:contextAttributes")).toBeFalsy();
   });
 
+  it("keeps a ready-made alert's provenance out of the rows while the form still saves it", async () => {
+    const host = mountDescendant([
+      { id: "1", key: "library_id", value: "k8s/oom" },
+      { id: "2", key: "library_hash", value: "abc" },
+    ]);
+    await flushPromises();
+    expect(host.findAll('[data-test="alert-variables-key-input"]')).toHaveLength(0);
+    expect(host.find('[data-test="alert-variables-add-btn"]').exists()).toBe(true);
+    expect(hostForm(host).state.values.context_attributes).toHaveLength(2);
+  });
+
   it("typing description / row template writes into the PARENT form", async () => {
     const host = mountDescendant();
     const parentForm = hostForm(host);

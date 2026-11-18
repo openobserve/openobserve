@@ -15,6 +15,7 @@
 
 import type { I18nKey } from "@/types/i18n";
 import type { AlertSectionId } from "./alertFormSections";
+import { isLibraryAttribute } from "@/components/alertLibrary/libraryInstall";
 
 /** add = its own "+ name" link; more = named on the More options line; smart = more, and a suggestion may offer it. */
 export type AlertSettingTier = "add" | "more" | "smart";
@@ -359,7 +360,9 @@ export function tierIsSet(id: AlertSettingId, v: AlertTierValues): boolean {
     case "rowTemplate":
       return has(fd.row_template);
     case "variables":
-      return (fd.context_attributes ?? []).length > 0;
+      return (fd.context_attributes ?? []).some(
+        (a) => !isLibraryAttribute((a as { key?: unknown } | null)?.key),
+      );
     case "recovery":
       return fd.notify_on_recovery === true || (fd.recovery_destinations ?? []).length > 0;
     case "keepFiring":

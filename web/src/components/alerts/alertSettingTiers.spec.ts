@@ -290,6 +290,8 @@ describe("tierIsSet", () => {
   });
   it.each<[AlertSettingId, AlertTierValues, boolean]>([
     ["holdFor", v({ pending_period_sec: 600 }), true],
+    ["variables", v({ context_attributes: [{ key: "library_id", value: "k8s/oom" }] }), false],
+    ["variables", v({ context_attributes: [{ key: "team", value: "infra" }] }), true],
     ["holdFor", v({ pending_period_sec: 0 }), false],
     ["keepFiring", v({ keep_firing_for: 45 }), true],
     ["cron", v({ trigger_condition: { frequency_type: "cron" } }), true],
