@@ -14,76 +14,99 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!-- One row per past window, each with its own Remove; the add link sits under the last one. -->
 <template>
-  <div ref="multiWindowContainerRef" class="step-compare-with-past flex w-full flex-col">
+  <div
+    ref="multiWindowContainerRef"
+    class="step-compare-with-past flex w-full flex-col"
+    data-test="add-alert-compare"
+  >
     <OSettingRow
-      :label="t('alerts.plain.compareTitle')"
-      :description="
-        t('alerts.compareWithPast.runningFor', {
-          period: convertMinutesToDisplayValue(period),
-          frequency: convertMinutesToDisplayValue(frequency),
-        })
-      "
+      v-for="(picker, index) in localMultiTimeRange"
+      :key="picker.uuid"
+      :label="index === 0 ? t('alerts.plain.compareTitle') : noLabel"
       fill
-      data-test="add-alert-compare"
+      data-test="add-alert-compare-window"
     >
-      <div class="flex flex-col items-start gap-1">
-        <!-- `:key` is the row UUID: the picker is bound by object reference, not by an index `name=`. -->
-        <div
-          v-for="(picker, index) in localMultiTimeRange"
-          :key="picker.uuid"
-          class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
-          data-test="add-alert-compare-window"
-        >
-          <i18n-t
-            keypath="alerts.compareWithPast.comparingText"
-            tag="span"
-            scope="global"
-            class="text-text-body flex flex-wrap items-center gap-x-1"
-          >
-            <template #offset>
-              <span class="datetime-picker-wrapper rounded-default border-border-default border">
-                <CustomDateTimePicker
-                  v-model="picker.offSet"
-                  :picker="picker"
-                  :isFirstEntry="false"
-                  @update:model-value="updateDateTimePicker"
-                  :changeStyle="true"
-                />
-              </span>
-            </template>
-          </i18n-t>
-          <OButton
-            data-test="multi-time-range-alerts-delete-btn"
-            variant="ghost-primary"
-            size="sm"
-            @click="removeTimeShift(index)"
-          >
-            {{ t("common.remove") }}
-          </OButton>
-        </div>
+      <i18n-t
+        keypath="alerts.compareWithPast.comparingText"
+        tag="div"
+        scope="global"
+        class="text-text-body flex flex-wrap items-center gap-2 text-sm"
+      >
+        <template #offset>
+          <span class="flex items-center gap-2">
+            <OInput
+              type="number"
+              min="1"
+              fit-content
+              :model-value="parseOffset(picker.offSet).amount"
+              :aria-label="t('alerts.plain.compareTitle')"
+              data-test="multi-time-range-offset-input"
+              @update:model-value="setOffset(index, $event, parseOffset(picker.offSet).unit)"
+            />
+            <OSelect
+              class="w-30"
+              :model-value="parseOffset(picker.offSet).unit"
+              :options="unitOptions"
+              labelKey="label"
+              valueKey="value"
+              :searchable="false"
+              :aria-label="t('common.unitFor', { label: t('alerts.plain.compareTitle') })"
+              data-test="multi-time-range-offset-unit"
+              @update:model-value="
+                setOffset(index, parseOffset(picker.offSet).amount, String($event))
+              "
+            />
+          </span>
+        </template>
+      </i18n-t>
+      <OButton
+        v-if="index === localMultiTimeRange.length - 1"
+        class="-ms-3.5 mt-2 self-start max-[85.5rem]:-ms-3"
+        data-test="multi-time-range-alerts-add-btn"
+        variant="ghost-primary"
+        size="sm"
+        icon-left="add"
+        @click="addTimeShift"
+      >
+        {{ t("alerts.form.compare.addWindow") }}
+      </OButton>
+      <template #actions>
         <OButton
-          data-test="multi-time-range-alerts-add-btn"
+          data-test="multi-time-range-alerts-delete-btn"
           variant="ghost-primary"
           size="sm"
-          icon-left="add"
-          :disabled="isComparisonDisabled"
-          @click="addTimeShift"
+          @click="removeTimeShift(index)"
         >
-          {{
-            localMultiTimeRange.length
-              ? t("alerts.form.compare.addWindow")
-              : t("alerts.plain.compareAddWindow")
-          }}
-          <OTooltip
-            v-if="isComparisonDisabled"
-            :content="raw(comparisonDisabledTooltip)"
-            side="top"
-            align="center"
-            :sideOffset="8"
-          />
+          {{ t("common.remove") }}
         </OButton>
-      </div>
+      </template>
+    </OSettingRow>
+    <OSettingRow
+      v-if="!localMultiTimeRange.length"
+      :label="t('alerts.plain.compareTitle')"
+      fill
+      data-test="add-alert-compare-empty"
+    >
+      <OButton
+        class="-ms-3.5 self-start max-[85.5rem]:-ms-3"
+        data-test="multi-time-range-alerts-add-btn"
+        variant="ghost-primary"
+        size="sm"
+        icon-left="add"
+        :disabled="isComparisonDisabled"
+        @click="addTimeShift"
+      >
+        {{ t("alerts.plain.compareAddWindow") }}
+        <OTooltip
+          v-if="isComparisonDisabled"
+          :content="raw(comparisonDisabledTooltip)"
+          side="top"
+          align="center"
+          :sideOffset="8"
+        />
+      </OButton>
     </OSettingRow>
   </div>
 </template>
@@ -93,8 +116,9 @@ import { defineComponent, ref, watch, computed, inject, type PropType } from "vu
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
-import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -107,8 +131,9 @@ interface TimeShiftPicker {
 export default defineComponent({
   name: "Step4CompareWithPast",
   components: {
-    CustomDateTimePicker,
     OButton,
+    OInput,
+    OSelect,
     OSettingRow,
     OTooltip,
   },
@@ -195,7 +220,7 @@ export default defineComponent({
 
     const addTimeShift = () => {
       const newTimeShift: TimeShiftPicker = {
-        offSet: "15m",
+        offSet: "1d",
         uuid: getUUID(),
       };
       localMultiTimeRange.value.push(newTimeShift);
@@ -207,52 +232,28 @@ export default defineComponent({
       commit();
     };
 
-    const updateDateTimePicker = () => {
+    const UNIT_KEYS: Record<string, I18nKey> = {
+      s: "alerts.form.units.seconds",
+      m: "alerts.form.units.minutes",
+      h: "alerts.form.units.hours",
+      d: "alerts.form.units.days",
+      w: "alerts.form.units.weeks",
+      M: "alerts.form.units.months",
+    };
+    const unitOptions = computed(() =>
+      Object.entries(UNIT_KEYS).map(([value, key]) => ({ label: t(key), value })),
+    );
+    const noLabel = raw("");
+
+    // An offset is stored as a code such as "15m" or "1d".
+    const parseOffset = (code: string) => {
+      const match = String(code ?? "").match(/^(\d+)([smhdwM])$/);
+      return match ? { amount: Number(match[1]), unit: match[2] } : { amount: 1, unit: "d" };
+    };
+    const setOffset = (index: number, amount: unknown, unit: string) => {
+      const n = Math.max(1, Math.floor(Number(amount)) || 1);
+      localMultiTimeRange.value[index].offSet = `${n}${unit}`;
       commit();
-    };
-
-    // Offset code ("15m") → counted noun. Shares the *Count plural keys with
-    // convertMinutesToDisplayValue so "1m" reads "1 Minute", not "1 Minutes".
-    const UNIT_COUNT_KEYS: Record<string, I18nKey> = {
-      s: "alerts.compareWithPast.secondCount",
-      m: "alerts.compareWithPast.minuteCount",
-      h: "alerts.compareWithPast.hourCount",
-      d: "alerts.compareWithPast.dayCount",
-      w: "alerts.compareWithPast.weekCount",
-      M: "alerts.compareWithPast.monthCount",
-    };
-
-    const getDisplayValue = (value: string) => {
-      if (typeof value !== "string") return value;
-
-      const match = value.match(/^(\d+)([smhdwM])$/);
-      if (!match) return value;
-
-      const [, numberPart, unitPart] = match;
-      const countKey = UNIT_COUNT_KEYS[unitPart];
-
-      if (countKey) {
-        return t(countKey, Number(numberPart));
-      }
-
-      return value;
-    };
-
-    // Counted nouns → vue-i18n plural forms ("{n} Minute | {n} Minutes"),
-    // called as t(key, n). vue-i18n picks the singular form only for n === 1
-    // (n === 0 → "0 Minutes").
-    const convertMinutesToDisplayValue = (minutes: number) => {
-      if (minutes < 60) {
-        return t("alerts.compareWithPast.minuteCount", minutes);
-      } else if (minutes < 1440) {
-        return t("alerts.compareWithPast.hourCount", Math.floor(minutes / 60));
-      } else if (minutes < 10080) {
-        return t("alerts.compareWithPast.dayCount", Math.floor(minutes / 1440));
-      } else if (minutes < 43200) {
-        return t("alerts.compareWithPast.weekCount", Math.floor(minutes / 10080));
-      } else {
-        return t("alerts.compareWithPast.monthCount", Math.floor(minutes / 43200));
-      }
     };
 
     return {
@@ -263,9 +264,10 @@ export default defineComponent({
       localMultiTimeRange,
       addTimeShift,
       removeTimeShift,
-      updateDateTimePicker,
-      getDisplayValue,
-      convertMinutesToDisplayValue,
+      unitOptions,
+      noLabel,
+      parseOffset,
+      setOffset,
       isComparisonDisabled,
       comparisonDisabledTooltip,
     };
