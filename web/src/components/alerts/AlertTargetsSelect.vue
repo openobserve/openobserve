@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="option in listOptions"
             :key="option.value"
             :value="option.value"
-            :label="option.label"
+            :label="option.listLabel ?? option.label"
             class="border-border-default rounded-default border px-3 py-2"
             data-test="alert-destinations-list-option"
           />
@@ -155,12 +155,15 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import type { DestinationDescription } from "@/utils/alerts/destinationDescription";
 
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 interface Option {
   label: I18nText;
   value: string;
+  listLabel?: I18nText;
+  searchText?: string;
 }
 // Option lists may be plain strings (destinations = `getFormattedDestinations`
 // returns names) or `{label,value}` objects (workflows). Normalized below.
@@ -187,6 +190,8 @@ const props = defineProps<{
   noWorkflowButton?: boolean;
   /** The picker has the line to itself; the caller draws refresh and New destination (opt-in). */
   oneLine?: boolean;
+  /** Type and target per destination name, so each row says where it delivers (opt-in). */
+  describe?: Record<string, DestinationDescription>;
 }>();
 
 const emit = defineEmits<{
@@ -247,11 +252,28 @@ const norm = (o: RawOption): { name: string; label: I18nText } | null => {
   return { name: value, label: (o as Option).label ?? raw(value) };
 };
 
+// The chip keeps the bare name; the row and the search also carry type and target.
+const described = (name: string, label: I18nText): Partial<Option> => {
+  const detail = props.describe?.[name];
+  if (!detail) return {};
+  const params = { name: label, type: detail.type, target: detail.target };
+  return {
+    listLabel: detail.target
+      ? t("alerts.form.destination.row", params)
+      : t("alerts.form.destination.rowNoTarget", params),
+    searchText: [detail.type, detail.target].filter(Boolean).join(" "),
+  };
+};
+
 const toTagged = (list: RawOption[] | undefined, tag: string) =>
   (list || [])
     .map(norm)
     .filter(isFilled)
-    .map(({ name, label }) => ({ label, value: `${tag}${name}` }));
+    .map(({ name, label }) => ({
+      label,
+      value: `${tag}${name}`,
+      ...(tag === DEST ? described(name, label) : {}),
+    }));
 
 // A selected name absent from its options list — flagged, not dropped, so it stays until removed.
 const missingOptions = (

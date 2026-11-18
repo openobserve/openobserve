@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :list="list"
         :no-workflow-button="workflowLink"
         :one-line="settingRow"
+        :describe="destinationDetails"
         @update:destinations="emit('update:destinations', $event)"
         @update:workflows="emit('update:workflows', $event)"
         @refresh="refreshTargets"
@@ -157,6 +158,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import type { DestinationDescription } from "@/utils/alerts/destinationDescription";
 
 type RawOption = string | { label: I18nText; value: string };
 
@@ -193,6 +195,8 @@ const props = withDefaults(
     list?: boolean;
     /** Render as an OSettingRow, for forms built from setting rows (opt-in). */
     settingRow?: boolean;
+    /** Type and target per destination name, shown in the picker rows (opt-in). */
+    destinationDetails?: Record<string, DestinationDescription>;
   }>(),
   {
     supportsWorkflows: true,

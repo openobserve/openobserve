@@ -144,6 +144,25 @@ describe("AlertTargetsSelect", () => {
       ]);
     });
 
+    it("describe names each destination's type and target in its row and search, not its chip", () => {
+      const describe = {
+        pager: { type: "PagerDuty", target: "events.pagerduty.com" },
+        chat: { type: "Slack webhook", target: null },
+      };
+      const options = ["pager", "chat"];
+      const rows = select(createWrapper({ destinationOptions: options, describe })).props(
+        "options",
+      );
+      expect(rows.map((o: any) => [o.label, o.listLabel, o.searchText])).toEqual([
+        ["pager", "pager · PagerDuty · events.pagerduty.com", "PagerDuty events.pagerduty.com"],
+        ["chat", "chat · Slack webhook", "Slack webhook"],
+      ]);
+      const list = createWrapper({ destinationOptions: options, describe, list: true });
+      expect(list.find('[data-test="alert-destinations-list"]').text()).toContain(
+        "pager · PagerDuty · events.pagerduty.com",
+      );
+    });
+
     it("normalizes plain-string workflow options", () => {
       const wrapper = createWrapper({
         workflowOptions: ["wf-1"],
