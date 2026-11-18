@@ -205,7 +205,7 @@ fn closes_question(call: &ToolPart<'_>) -> bool {
         SUBMIT_REPORT,
         ASK_RESPONDERS,
     ]
-    .contains(&call.tool)
+    .contains(&call.control_tool())
 }
 
 /// Decode the committed events of an RCA session.
@@ -276,7 +276,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
                 }
                 ThreadPart::Step(None) | ThreadPart::FailedStep => {}
                 ThreadPart::Hidden if call.status == "completed" => {
-                    let tool = match call.tool {
+                    let tool = match call.control_tool() {
                         RECORD_HYPOTHESIS => Some(LedgerTool::Hypothesis),
                         RECORD_BLIND_SPOT => Some(LedgerTool::BlindSpot),
                         SUBMIT_REPORT => {
@@ -347,24 +347,24 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         _ => return None,
     };
     let args = call.args();
-    let key_arg = key_arg(call.tool, &args).unwrap_or_default();
+    let key_arg = key_arg(&call.tool, &args).unwrap_or_default();
     let input = Value::Object(args);
-    let target = evidence_target(call.tool, &input);
+    let target = evidence_target(&call.tool, &input);
     let empty = Map::new();
     let state = call.state.unwrap_or(&empty);
     let body = completed.then(|| tool_body(state));
     let failure = body
         .as_ref()
-        .and_then(|body| completed_call_failure(call.tool, state, body));
+        .and_then(|body| completed_call_failure(&call.tool, state, body));
     let success = completed && failure.is_none();
     let (result_summary, result_count, error_type, observed) = match (body, failure) {
         (Some(body), None) => {
-            let (summary, count) = summarize_result(call.tool, &body);
+            let (summary, count) = summarize_result(&call.tool, &body);
             (
                 summary,
                 count,
                 None,
-                observed_window(call.tool, &body, &target),
+                observed_window(&call.tool, &body, &target),
             )
         }
         (_, failure) => (
@@ -382,13 +382,13 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         call_id: call.call_id(),
         tool: call.tool.to_string(),
         key_arg,
-        stream_type: stream_type(call.tool, &input),
+        stream_type: stream_type(&call.tool, &input),
         success,
         result_count,
         started_at_us: started_at.unwrap_or_default(),
         duration_ms,
         error_type,
-        signal: signal_class(call.tool, &input),
+        signal: signal_class(&call.tool, &input),
         target,
         observed,
         result_summary,
@@ -826,6 +826,82 @@ pub(crate) mod tests {
             })
         );
         assert_eq!(run.tool_log[1].observed, None);
+    }
+
+    #[test]
+    fn gateway_toolset_calls_keep_the_server_tool_key_and_its_signal_class() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        let call = |toolset: &str, tool: &str, args: Value| json!({"toolset_name": toolset, "tool_name": tool, "args": args});
+        s.tool(
+            "msg_a1",
+            "prt_c1",
+            "toolset_tool_call",
+            "completed",
+            call(
+                "orca-demo-code",
+                "read_file",
+                json!({"path": "src/payment/charge.js"}),
+            ),
+            json!({"output": "module.exports.charge = ..."}),
+            1_100,
+            1_112,
+        );
+        s.tool(
+            "msg_a1",
+            "prt_c2",
+            "toolset_tool_call",
+            "completed",
+            call("orca-demo-code", "git_show", json!({"sha": "4f2c1e"})),
+            json!({"output": "diff --git a/src/payment/charge.js"}),
+            1_200,
+            1_220,
+        );
+        let run = decode_run(&s.events);
+
+        let (read, show) = (&run.tool_log[0], &run.tool_log[1]);
+        assert_eq!(read.tool, "orca-demo-code_read_file");
+        assert_eq!(read.key_arg, r#"{"path":"src/payment/charge.js"}"#);
+        assert_eq!(read.signal, SignalClass::Context);
+        assert_eq!(show.tool, "orca-demo-code_git_show");
+        assert_eq!(show.signal, SignalClass::Change);
+    }
+
+    #[test]
+    fn vendor_calls_named_like_control_tools_are_tool_log_rows_only() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        let vendor = |toolset: &str, tool: &str, args: Value| json!({"toolset_name": toolset, "tool_name": tool, "args": args});
+        let parts = [
+            vendor("record", "step", json!({"stage": "metrics", "title": "t"})),
+            vendor(
+                "record",
+                "hypothesis",
+                hypothesis("h1", H1, "testing", vec![]),
+            ),
+            vendor("submit", "report", json!({"markdown": "## Root cause"})),
+        ];
+        for (i, input) in parts.into_iter().enumerate() {
+            s.tool(
+                "msg_a1",
+                &format!("prt_v{i}"),
+                "toolset_tool_call",
+                "completed",
+                input,
+                json!({"output": "{}"}),
+                1_000 + i as i64 * 10,
+                1_005 + i as i64 * 10,
+            );
+        }
+        let run = decode_run(&s.events);
+
+        assert!(run.calls.is_empty(), "{:?}", run.calls);
+        assert!(run.stages_run.is_empty());
+        assert!(run.submit.is_none());
+        let tools: Vec<&str> = run.tool_log.iter().map(|r| r.tool.as_str()).collect();
+        assert_eq!(tools, ["record_step", "record_hypothesis", "submit_report"]);
     }
 
     /// An org AI Toolset call keeps opencode's `<server>_<tool>` name in the tool log.

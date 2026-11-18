@@ -188,6 +188,23 @@ function reduceConfirmationRequired(
   return effects;
 }
 
+const TOOLSET_LISTING_TOOLS = new Set(["toolset_list", "toolset_list_tools"]);
+
+/** A raw toolset gateway frame as the chat shows it: listings hidden, a call as `toolset · tool`. */
+export function resolveToolsetFrame(data: any, active: ActiveToolCall | null): any | null {
+  if (TOOLSET_LISTING_TOOLS.has(data.tool)) return null;
+  if (data.tool !== "toolset_tool_call") return data;
+  const input = data.call_args || data.context || {};
+  if (input.toolset_name && input.tool_name) {
+    return { ...data, tool: `${input.toolset_name} · ${input.tool_name}` };
+  }
+  // A result frame may come without its arguments; it is the active call's result then.
+  if (data.type === "tool_result" && active && data.call_id && active.call_id === data.call_id) {
+    return { ...data, tool: active.tool };
+  }
+  return data.type === "tool_call" ? null : data;
+}
+
 function reduceToolCall(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
   const effects: StreamEffect[] = [];
   if (state.activeToolCall) {
@@ -495,11 +512,15 @@ export function reduce(state: StreamState, data: any, ctx: ReducerCtx): StreamEf
   if (data && data.type === "confirmation_required" && ctx.phase === "stream") {
     return reduceConfirmationRequired(state, data, ctx);
   }
-  if (data && data.type === "tool_call") return reduceToolCall(state, data, ctx);
+  if (data && (data.type === "tool_call" || data.type === "tool_result")) {
+    const frame = resolveToolsetFrame(data, state.activeToolCall);
+    if (!frame) return [];
+    if (frame.type === "tool_call") return reduceToolCall(state, frame, ctx);
+    return reduceToolResult(state, frame, ctx);
+  }
   if (data && data.type === "error") return reduceError(state, data, ctx);
   if (data && data.type === "complete") return reduceComplete(state, data, ctx);
   if (data && data.type === "cancelled") return reduceCancelled(state, ctx);
-  if (data && data.type === "tool_result") return reduceToolResult(state, data, ctx);
   // ponytail: phase gate reproduces the tail-flush handler gap on purpose. Delete with the follow-up fix.
   if (data && data.type === "navigation_action" && ctx.phase === "stream") {
     return reduceNavigationAction(state, data, ctx);
