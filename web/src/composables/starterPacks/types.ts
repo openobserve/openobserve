@@ -18,7 +18,7 @@ import type { I18nKey } from "@/types/i18n";
 
 export type PackFolderType = "dashboards" | "alerts";
 
-export type PackItemKind = "folder" | "dashboard" | "alert" | "savedView";
+export type PackItemKind = "folder" | "dashboard" | "alert" | "savedView" | "function" | "pipeline";
 
 /** `existing` was there before this install, so undo never touches it. */
 export type PackItemStatus = "pending" | "created" | "existing" | "failed" | "skipped";

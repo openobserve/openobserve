@@ -1,0 +1,201 @@
+{
+  "combined": [
+    {
+      "line": "203.0.113.10 - - [09/Nov/2026:10:00:02 +0000] \"GET /cart/1 HTTP/1.1\" 200 512 \"-\" \"curl/8.0\"",
+      "fields": {
+        "agent": "curl/8.0",
+        "client": "203.0.113.10",
+        "referer": "-",
+        "request": "GET /cart/1 HTTP/1.1",
+        "size": 512,
+        "status": 200,
+        "timestamp": "2026-11-09T10:00:02Z"
+      }
+    },
+    {
+      "line": "198.51.100.7 - alice [09/Nov/2026:10:01:15 +0000] \"POST /api/orders HTTP/1.1\" 201 1043 \"https://shop.example.com/checkout\" \"Mozilla/5.0 (X11; Linux x86_64)\"",
+      "fields": {
+        "agent": "Mozilla/5.0 (X11; Linux x86_64)",
+        "client": "198.51.100.7",
+        "referer": "https://shop.example.com/checkout",
+        "request": "POST /api/orders HTTP/1.1",
+        "size": 1043,
+        "status": 201,
+        "timestamp": "2026-11-09T10:01:15Z",
+        "user": "alice"
+      }
+    },
+    {
+      "line": "203.0.113.22 - - [09/Nov/2026:10:02:40 +0000] \"GET /static/app.js HTTP/2.0\" 304 0 \"https://shop.example.com/\" \"Mozilla/5.0 (Macintosh)\"",
+      "fields": {
+        "agent": "Mozilla/5.0 (Macintosh)",
+        "client": "203.0.113.22",
+        "referer": "https://shop.example.com/",
+        "request": "GET /static/app.js HTTP/2.0",
+        "size": 0,
+        "status": 304,
+        "timestamp": "2026-11-09T10:02:40Z"
+      }
+    },
+    {
+      "line": "192.0.2.5 - - [09/Nov/2026:10:03:01 +0000] \"DELETE /api/cart/9 HTTP/1.1\" 404 153 \"-\" \"python-requests/2.31\"",
+      "fields": {
+        "agent": "python-requests/2.31",
+        "client": "192.0.2.5",
+        "referer": "-",
+        "request": "DELETE /api/cart/9 HTTP/1.1",
+        "size": 153,
+        "status": 404,
+        "timestamp": "2026-11-09T10:03:01Z"
+      }
+    },
+    {
+      "line": "203.0.113.99 - - [09/Nov/2026:10:04:59 +0000] \"GET /health HTTP/1.0\" 500 21 \"-\" \"kube-probe/1.29\"",
+      "fields": {
+        "agent": "kube-probe/1.29",
+        "client": "203.0.113.99",
+        "referer": "-",
+        "request": "GET /health HTTP/1.0",
+        "size": 21,
+        "status": 500,
+        "timestamp": "2026-11-09T10:04:59Z"
+      }
+    }
+  ],
+  "main": [
+    {
+      "line": "203.0.113.10 - - [09/Nov/2026:10:00:02 +0000] \"GET /cart/1 HTTP/1.1\" 200 512 \"-\" \"curl/8.0\" \"198.51.100.1\"",
+      "fields": {
+        "body_bytes_size": 512,
+        "http_user_agent": "curl/8.0",
+        "http_x_forwarded_for": "198.51.100.1",
+        "remote_addr": "203.0.113.10",
+        "request": "GET /cart/1 HTTP/1.1",
+        "status": 200,
+        "timestamp": "2026-11-09T10:00:02Z"
+      }
+    },
+    {
+      "line": "198.51.100.7 - alice [09/Nov/2026:10:01:15 +0000] \"POST /api/orders HTTP/1.1\" 201 1043 \"https://shop.example.com/checkout\" \"Mozilla/5.0 (X11; Linux x86_64)\" \"-\"",
+      "fields": {
+        "body_bytes_size": 1043,
+        "http_referer": "https://shop.example.com/checkout",
+        "http_user_agent": "Mozilla/5.0 (X11; Linux x86_64)",
+        "remote_addr": "198.51.100.7",
+        "remote_user": "alice",
+        "request": "POST /api/orders HTTP/1.1",
+        "status": 201,
+        "timestamp": "2026-11-09T10:01:15Z"
+      }
+    },
+    {
+      "line": "203.0.113.22 - - [09/Nov/2026:10:02:40 +0000] \"GET /static/app.js HTTP/2.0\" 304 0 \"https://shop.example.com/\" \"Mozilla/5.0 (Macintosh)\" \"192.0.2.44\"",
+      "fields": {
+        "body_bytes_size": 0,
+        "http_referer": "https://shop.example.com/",
+        "http_user_agent": "Mozilla/5.0 (Macintosh)",
+        "http_x_forwarded_for": "192.0.2.44",
+        "remote_addr": "203.0.113.22",
+        "request": "GET /static/app.js HTTP/2.0",
+        "status": 304,
+        "timestamp": "2026-11-09T10:02:40Z"
+      }
+    },
+    {
+      "line": "192.0.2.5 - - [09/Nov/2026:10:03:01 +0000] \"DELETE /api/cart/9 HTTP/1.1\" 404 153 \"-\" \"python-requests/2.31\" \"-\"",
+      "fields": {
+        "body_bytes_size": 153,
+        "http_user_agent": "python-requests/2.31",
+        "remote_addr": "192.0.2.5",
+        "request": "DELETE /api/cart/9 HTTP/1.1",
+        "status": 404,
+        "timestamp": "2026-11-09T10:03:01Z"
+      }
+    },
+    {
+      "line": "203.0.113.99 - - [09/Nov/2026:10:04:59 +0000] \"GET /health HTTP/1.0\" 500 21 \"-\" \"kube-probe/1.29\" \"198.51.100.2\"",
+      "fields": {
+        "body_bytes_size": 21,
+        "http_user_agent": "kube-probe/1.29",
+        "http_x_forwarded_for": "198.51.100.2",
+        "remote_addr": "203.0.113.99",
+        "request": "GET /health HTTP/1.0",
+        "status": 500,
+        "timestamp": "2026-11-09T10:04:59Z"
+      }
+    }
+  ],
+  "error": [
+    {
+      "line": "2026/11/09 10:00:02 [error] 1234#1234: *5 open() \"/usr/share/nginx/html/favicon.ico\" failed (2: No such file or directory), client: 203.0.113.10, server: shop.example.com, request: \"GET /favicon.ico HTTP/1.1\", host: \"shop.example.com\"",
+      "fields": {
+        "cid": 5,
+        "client": "203.0.113.10",
+        "error_message": "open() \"/usr/share/nginx/html/favicon.ico\" failed (2: No such file or directory)",
+        "host": "shop.example.com",
+        "pid": 1234,
+        "request": "GET /favicon.ico HTTP/1.1",
+        "server": "shop.example.com",
+        "severity": "error",
+        "tid": 1234
+      }
+    },
+    {
+      "line": "2026/11/09 10:01:15 [warn] 1234#1234: *17 an upstream response is buffered to a temporary file /var/cache/nginx/proxy_temp/1/00/0000000001, client: 198.51.100.7, server: shop.example.com, request: \"GET /api/export HTTP/1.1\", upstream: \"http://192.0.2.20:8080/api/export\", host: \"shop.example.com\"",
+      "fields": {
+        "cid": 17,
+        "client": "198.51.100.7",
+        "error_message": "an upstream response is buffered to a temporary file /var/cache/nginx/proxy_temp/1/00/0000000001",
+        "host": "shop.example.com",
+        "pid": 1234,
+        "request": "GET /api/export HTTP/1.1",
+        "server": "shop.example.com",
+        "severity": "warn",
+        "tid": 1234,
+        "upstream": "http://192.0.2.20:8080/api/export"
+      }
+    },
+    {
+      "line": "2026/11/09 10:02:40 [crit] 1234#1234: *21 SSL_do_handshake() failed (SSL: error:0A00006C:SSL routines::bad key share) while SSL handshaking, client: 203.0.113.22, server: 0.0.0.0:443",
+      "fields": {
+        "cid": 21,
+        "client": "203.0.113.22",
+        "error_message": "SSL_do_handshake() failed (SSL: error:0A00006C:SSL routines::bad key share) while SSL handshaking",
+        "pid": 1234,
+        "server": "0.0.0.0:443",
+        "severity": "crit",
+        "tid": 1234
+      }
+    },
+    {
+      "line": "2026/11/09 10:03:01 [error] 1234#1234: *30 connect() failed (111: Connection refused) while connecting to upstream, client: 192.0.2.5, server: shop.example.com, request: \"POST /api/cart HTTP/1.1\", upstream: \"http://192.0.2.21:8080/api/cart\", host: \"shop.example.com\"",
+      "fields": {
+        "cid": 30,
+        "client": "192.0.2.5",
+        "error_message": "connect() failed (111: Connection refused) while connecting to upstream",
+        "host": "shop.example.com",
+        "pid": 1234,
+        "request": "POST /api/cart HTTP/1.1",
+        "server": "shop.example.com",
+        "severity": "error",
+        "tid": 1234,
+        "upstream": "http://192.0.2.21:8080/api/cart"
+      }
+    },
+    {
+      "line": "2026/11/09 10:04:59 [error] 1234#1234: *42 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 203.0.113.99, server: shop.example.com, request: \"GET /api/slow HTTP/1.1\", upstream: \"http://192.0.2.22:8080/api/slow\", host: \"shop.example.com\"",
+      "fields": {
+        "cid": 42,
+        "client": "203.0.113.99",
+        "error_message": "upstream timed out (110: Connection timed out) while reading response header from upstream",
+        "host": "shop.example.com",
+        "pid": 1234,
+        "request": "GET /api/slow HTTP/1.1",
+        "server": "shop.example.com",
+        "severity": "error",
+        "tid": 1234,
+        "upstream": "http://192.0.2.22:8080/api/slow"
+      }
+    }
+  ]
+}

@@ -25,7 +25,7 @@ const keyPrefix = (packId: string) => `starter_pack.${packId}.`;
 export const recordKey = (packId: string, installId: string) => `${keyPrefix(packId)}${installId}`;
 
 // FNV-1a: a change detector for item bodies, and `crypto.subtle` is absent on plain http.
-const fnv1a = (text: string): string => {
+export const fnv1a = (text: string): string => {
   let hash = 0x811c9dc5;
   for (let index = 0; index < text.length; index += 1) {
     hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193);
