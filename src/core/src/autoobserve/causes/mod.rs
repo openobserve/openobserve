@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! The OSS records behind "what changed just before": one read per ask, covering all its issues.
+//! Records leave `provider` empty, since the enterprise context provider stamps its own id.
 
 pub mod audit;
 pub mod deploy;
@@ -31,6 +32,7 @@ use o2_enterprise::enterprise::autoobserve::{
     context::{ChangeAsk, ChangeRecord, Checked, DeepLink, subject_of},
     contract::EntityRef,
     names::{dims, kinds},
+    ports::OssSource,
 };
 
 /// The pipeline ids one read filters on, so its statement stays short.
@@ -156,8 +158,8 @@ pub fn link(path: &str, query: &[(&str, &str)]) -> Option<DeepLink> {
     })
 }
 
-pub fn failed(source: &str, org: &str, e: anyhow::Error) -> (Checked, Vec<ChangeRecord>) {
-    log::warn!("[autoobserve] org {org}: reading {source} for issue context failed: {e}");
+pub fn failed(source: OssSource, org: &str, e: anyhow::Error) -> (Checked, Vec<ChangeRecord>) {
+    log::warn!("[autoobserve] org {org}: reading {source:?} for issue context failed: {e}");
     (Checked::Failed(e.to_string()), Vec::new())
 }
 

@@ -23,7 +23,7 @@ use o2_enterprise::enterprise::{
         context::{ChangeAsk, ChangeKind, ChangeRecord, Checked, Need, PROVIDER_TIMEOUT},
         contract::{Confidence, EntityRef},
         names::{dims, kinds},
-        ports::SearchPort,
+        ports::{OssSource, SearchPort},
     },
     common::auditor::AUDIT_STREAM,
 };
@@ -35,7 +35,7 @@ use super::{
 };
 use crate::autoobserve::ports::SearchAdapter;
 
-const PROVIDER: &str = "audit_trail";
+/// Newest audited writes read per ask; a full page marks the answer partial.
 const ROWS: i64 = 200;
 const BODY_CHARS: usize = 2048;
 /// Past this many streams one prefix covers them all, so the statement stays short.
@@ -106,7 +106,7 @@ pub async fn read_with(
 ) -> (Checked, Vec<ChangeRecord>) {
     match changes(search, lookups, ask).await {
         Ok(answer) => answer,
-        Err(e) => failed(PROVIDER, &ask.org, e),
+        Err(e) => failed(OssSource::AuditTrail, &ask.org, e),
     }
 }
 
@@ -332,27 +332,27 @@ fn record(
                 // Gone since, so the stream it read is unknown and the change counts org-wide.
                 None => Vec::new(),
             };
-            let folder = stored.map_or("default", |s| s.folder.as_str());
-            let open = link(
-                "alerts",
-                &[("action", "update"), ("alert_id", &id), ("folder", folder)],
-            );
+            let open = stored.filter(|_| !a.deleted).and_then(|s| {
+                link(
+                    "alerts",
+                    &[
+                        ("action", "update"),
+                        ("alert_id", &id),
+                        ("folder", &s.folder),
+                    ],
+                )
+            });
             let name = a
                 .target
                 .clone()
                 .or_else(|| stored.map(|s| s.name.clone()))
                 .unwrap_or_default();
             let subject = EntityRef::new(kinds::ALERT, &[(dims::ENTITY_ID, &id)]);
-            (
-                subject,
-                name,
-                affects,
-                open.filter(|_| !a.deleted && stored.is_some()),
-            )
+            (subject, name, affects, open)
         }
     };
     Some(ChangeRecord {
-        provider: PROVIDER.to_string(),
+        provider: String::new(),
         kind: a.change.kind,
         at: a.at,
         until: None,

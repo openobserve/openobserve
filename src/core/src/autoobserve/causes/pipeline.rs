@@ -25,16 +25,13 @@ use o2_enterprise::enterprise::autoobserve::{
     context::{ChangeAsk, ChangeKind, ChangeRecord, Checked, PROVIDER_TIMEOUT},
     contract::{Confidence, EntityRef, SECOND_US},
     names::{dims, kinds},
-    ports::SearchPort,
+    ports::{OssSource, SearchPort},
 };
 use serde_json::Value;
 
 use super::{Fed, LiveLookups, Lookups, failed, fed_pipelines, issue_streams, link, quoted};
 use crate::autoobserve::ports::SearchAdapter;
 
-const PROVIDER: &str = "pipelines";
-/// The enterprise build publishes `errors` at least this often.
-const PUBLISH_CAP_SECS: i64 = 600;
 /// One row per pipeline and name it ran under in the window, and a renamed pipeline is rare.
 const ROWS: i64 = 1_000;
 const ERROR_CHARS: usize = 200;
@@ -64,7 +61,7 @@ pub async fn read_with(
     }
     let pipelines = match lookups.pipelines(&ask.org).await {
         Ok(pipelines) => pipelines,
-        Err(e) => return failed(PROVIDER, &ask.org, e),
+        Err(e) => return failed(OssSource::PipelineErrors, &ask.org, e),
     };
     let (fed, cut) = fed_pipelines(&pipelines, &streams);
     if fed.is_empty() {
@@ -72,7 +69,7 @@ pub async fn read_with(
     }
     let fields = match lookups.meta_fields(ERROR_STREAM).await {
         Ok(fields) => fields,
-        Err(e) => return failed(PROVIDER, &ask.org, e),
+        Err(e) => return failed(OssSource::PipelineErrors, &ask.org, e),
     };
     if !fields.contains("pipeline_id") {
         return (Checked::Ok, Vec::new());
@@ -89,7 +86,7 @@ pub async fn read_with(
         .await
     {
         Ok(page) => page,
-        Err(e) => return failed(PROVIDER, &ask.org, e),
+        Err(e) => return failed(OssSource::PipelineErrors, &ask.org, e),
     };
     let partial = cut || page.is_partial || page.hits.len() >= ROWS as usize;
     let settled_before = ask.to - publish_interval_us();
@@ -200,7 +197,7 @@ fn record(id: &str, f: Failing, fed: &Fed, settled_before: i64) -> ChangeRecord 
         );
     }
     ChangeRecord {
-        provider: PROVIDER.to_string(),
+        provider: String::new(),
         kind: ChangeKind::PipelineFailing,
         at: f.first,
         until: (f.last < settled_before).then_some(f.last),
@@ -217,8 +214,7 @@ fn record(id: &str, f: Failing, fed: &Fed, settled_before: i64) -> ChangeRecord 
 }
 
 fn publish_interval_us() -> i64 {
-    let secs = PUBLISH_CAP_SECS.min(config::get_config().common.usage_publish_interval);
-    secs.saturating_mul(SECOND_US)
+    config::enterprise_usage_publish_interval(&config::get_config()).saturating_mul(SECOND_US)
 }
 
 #[cfg(test)]

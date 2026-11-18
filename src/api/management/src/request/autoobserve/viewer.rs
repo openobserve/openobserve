@@ -32,12 +32,8 @@ use openobserve_core::{
     service_identity::access,
 };
 
-use super::{readable_streams, readable_subjects};
+use super::{PERMISSION_CHECK_CONCURRENCY, readable_streams, readable_subjects};
 use crate::request::{organization::require_credential_access, security::security_allowed};
-
-const PIPELINE_CHECK_CONCURRENCY: usize = 16;
-const FLEET_CHECK_CONCURRENCY: usize = 16;
-const EVIDENCE_CHECK_CONCURRENCY: usize = 16;
 
 /// The read check each subject kind's own GET route makes.
 #[async_trait]
@@ -205,13 +201,13 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
     keep(&mut readable, alerts.clone(), rights.alerts(alerts).await);
     let pipelines: Vec<(EntityRef, bool)> = stream::iter(pipelines)
         .map(|(s, id)| async move { (s, rights.pipeline(&id).await) })
-        .buffer_unordered(PIPELINE_CHECK_CONCURRENCY)
+        .buffer_unordered(PERMISSION_CHECK_CONCURRENCY)
         .collect()
         .await;
     readable.extend(pipelines.into_iter().filter_map(|(s, ok)| ok.then_some(s)));
     let fleets: Vec<(EntityRef, bool)> = stream::iter(fleets)
         .map(|(s, id)| async move { (s, rights.fleet(&id).await) })
-        .buffer_unordered(FLEET_CHECK_CONCURRENCY)
+        .buffer_unordered(PERMISSION_CHECK_CONCURRENCY)
         .collect()
         .await;
     readable.extend(fleets.into_iter().filter_map(|(s, ok)| ok.then_some(s)));
@@ -223,7 +219,7 @@ pub async fn resolve_with<R: ReadRights>(rights: &R, subjects: &[EntityRef]) -> 
                 let ok = ok && evidence_readable(rights, &s).await;
                 (s, ok)
             })
-            .buffer_unordered(EVIDENCE_CHECK_CONCURRENCY)
+            .buffer_unordered(PERMISSION_CHECK_CONCURRENCY)
             .collect()
             .await;
         readable.extend(services.into_iter().filter_map(|(s, ok)| ok.then_some(s)));

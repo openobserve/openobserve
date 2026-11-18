@@ -71,7 +71,7 @@ use crate::{
 
 /// Only whether a DELETE carries a body matters, so reading stops here.
 const MAX_DELETE_BODY: usize = 64 * 1024;
-const FOLDER_CHECK_CONCURRENCY: usize = 16;
+const PERMISSION_CHECK_CONCURRENCY: usize = 16;
 const DISABLED_MESSAGE: &str = "AutoObserve is disabled (O2_AUTOOBSERVE_ENABLED=false)";
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
@@ -976,7 +976,7 @@ async fn folder_writes<W: FolderWrites>(
                 (readable || allowed).then_some((id, allowed))
             }
         })
-        .buffer_unordered(FOLDER_CHECK_CONCURRENCY)
+        .buffer_unordered(PERMISSION_CHECK_CONCURRENCY)
         .filter_map(std::future::ready)
         .collect()
         .await)

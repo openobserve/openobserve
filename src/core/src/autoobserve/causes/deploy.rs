@@ -24,11 +24,11 @@ use o2_enterprise::enterprise::autoobserve::{
     context::{ChangeAsk, ChangeKind, ChangeRecord, Checked, subject_of},
     contract::{Confidence, EntityRef},
     names::{dims, kinds},
+    ports::OssSource,
 };
 
 use super::{failed, issue_streams, link};
 
-const PROVIDER: &str = "deploys";
 const ROWS: u64 = 50;
 const VERDICT_READS: usize = 3;
 /// Subject dims holding the evidence streams the viewer must read, as `source_streams` stores them.
@@ -42,7 +42,7 @@ pub async fn read(ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
     }
     match deploys(ask, &streams).await {
         Ok(answer) => answer,
-        Err(e) => failed(PROVIDER, &ask.org, e),
+        Err(e) => failed(OssSource::Deploys, &ask.org, e),
     }
 }
 
@@ -141,7 +141,7 @@ fn record(row: &Model, streams: &BTreeSet<EntityRef>) -> Option<ChangeRecord> {
         ("where".to_string(), row.where_key.clone()),
     ]);
     Some(ChangeRecord {
-        provider: PROVIDER.to_string(),
+        provider: String::new(),
         kind,
         at: row.at,
         until: None,
