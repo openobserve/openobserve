@@ -9,10 +9,10 @@
 
 ## Deployment facts
 
-- A super cluster always has exactly one scheduler. Only one scheduler is allowed to run across
-  all of its regions. Every new spec, design and code change must honor this: do not design for
-  two schedulers that run at the same time, and do not rely on more than one. This holds until
-  support for multiple schedulers is added.
+- In a super cluster, schedulers run in only one region. That region can run more than one
+  scheduler. Every new spec, design and code change must honor this: do not design for schedulers
+  that run in two regions at the same time, and do not assume that only one scheduler runs. This
+  holds until schedulers are supported in more than one region.
 
 ## Build & workflow
 
