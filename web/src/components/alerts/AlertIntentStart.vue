@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <i18n-t :keypath="sentenceKey" tag="span" scope="global">
         <template #noun>{{ active === "anyEvent" ? nounOne : noun }}</template>
         <template #field>
-          <span class="inline-flex align-middle">
+          <span class="-me-1.5 inline-flex align-middle">
             <OSelect
               :model-value="slots.field ?? ''"
               :options="fieldOptions"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #value>
-          <span class="inline-flex align-middle">
+          <span class="-me-1.5 inline-flex align-middle">
             <OSelect
               :model-value="slots.values ?? []"
               :options="valueOptions"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #group>
-          <span class="inline-flex align-middle">
+          <span class="-me-1.5 inline-flex align-middle">
             <OSelect
               :model-value="slots.group ?? ''"
               :options="groupOptions"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #measure>
-          <span class="inline-flex align-middle">
+          <span class="-me-1.5 inline-flex align-middle">
             <OSelect
               :model-value="slots.measure ?? ''"
               :options="measureOptions"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #label>
-          <span class="inline-flex align-middle">
+          <span class="-me-1.5 inline-flex align-middle">
             <OSelect
               :model-value="slots.label ?? ''"
               :options="labelOptions"
