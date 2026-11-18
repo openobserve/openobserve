@@ -71,6 +71,12 @@ pub struct ChartPayload {
     pub warn: Option<f64>,
     /// Evaluation timestamp (unix seconds) that fired this notification.
     pub trigger_ts: u64,
+    /// Anomaly charts only: (lower, upper) per entry of `points`, None where the bucket has none.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub band: Option<Vec<Option<(f64, f64)>>>,
+    /// Anomaly charts only: red dots as (unix_seconds, value); with marks no trigger dot is drawn.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub marks: Vec<(u64, f64)>,
 }
 
 /// Callers must fail closed on empty IKM: the public legacy salt alone must not produce a key.
@@ -205,6 +211,8 @@ mod tests {
             crit: Some(5.0),
             warn: Some(3.0),
             trigger_ts: 1_700_000_000 + n as u64 * 60,
+            band: None,
+            marks: Vec::new(),
         }
     }
 

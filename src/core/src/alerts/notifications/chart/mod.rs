@@ -226,6 +226,34 @@ pub struct ChartRequest<'a> {
     pub warn_threshold: Option<f64>,
 }
 
+/// One bucket of an anomaly chart: a stored judgment or a point of the current run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnomalySeriesPoint {
+    pub ts_us: i64,
+    pub value: f64,
+    pub lower: Option<f64>,
+    pub upper: Option<f64>,
+    pub is_anomaly: bool,
+    pub is_absence: bool,
+    pub is_partial_drop: bool,
+}
+
+/// Inputs of one anomaly chart, built once per run and shared by its destinations.
+pub struct AnomalyChartRequest<'a> {
+    pub org_id: &'a str,
+    pub anomaly_id: &'a str,
+    pub anomaly_name: &'a str,
+    pub stream_name: &'a str,
+    /// History reads only points of this model; None reads every model.
+    pub model_version: Option<i64>,
+    /// Data time of the fire; the chart ends here, not at wall-clock now.
+    pub window_end_us: i64,
+    pub judged_end_us: i64,
+    pub bucket_seconds: i64,
+    /// The run's scored points, which can be not yet searchable.
+    pub current: &'a [AnomalySeriesPoint],
+}
+
 /// A stream re-created after a delete lacks `actual_value` until a row carried it.
 fn may_hold_values(org_id: &str, schema: infra::errors::Result<arrow_schema::Schema>) -> bool {
     match schema {
@@ -277,7 +305,33 @@ pub async fn build_payload(req: &ChartRequest<'_>) -> Option<ChartPayload> {
         crit: req.crit_threshold,
         warn: req.warn_threshold,
         trigger_ts: req.trigger_ts,
+        band: None,
+        marks: Vec::new(),
     })
+}
+
+/// The signed URL and payload of an anomaly chart, cached 60 s per run, with a 5 s build cap.
+pub async fn build_anomaly_chart(req: &AnomalyChartRequest<'_>) -> Option<(String, ChartPayload)> {
+    let _ = req;
+    todo!("chart stream")
+}
+
+/// Latest judgment per bucket from `_anomalies`, ending at `window_end_us`, oldest first.
+pub async fn fetch_anomaly_series(
+    org_id: &str,
+    anomaly_id: &str,
+    model_version: Option<i64>,
+    window_end_us: i64,
+    lookback_secs: u64,
+) -> Option<Vec<AnomalySeriesPoint>> {
+    let _ = (
+        org_id,
+        anomaly_id,
+        model_version,
+        window_end_us,
+        lookback_secs,
+    );
+    todo!("chart stream")
 }
 
 /// The absolute render-endpoint URL for a signed payload.

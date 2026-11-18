@@ -37,6 +37,38 @@ use crate::{
     errors::Error,
 };
 
+/// One step of an anomaly thread: the thread row change and the order watermark, in one
+/// transaction that re-checks `data_us` against the locked watermark.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AnomalyThreadChange {
+    pub org_id: String,
+    pub destination_id: String,
+    pub anomaly_id: String,
+    pub data_us: i64,
+    pub row: AnomalyRowChange,
+    /// False while nodes of mixed builds run: advance an existing watermark only.
+    pub create_watermark: bool,
+    pub now: i64,
+}
+
+/// What `apply_thread_change_with` does to the thread row.
+#[derive(Clone, Debug, PartialEq)]
+pub enum AnomalyRowChange {
+    /// Watermark only, such as a recovery with no open thread.
+    None,
+    /// A new root, inserted with `message_ts` set; other open roots are closed first.
+    InsertRoot(Box<SlackAlertMessage>),
+    Reply {
+        key: SlackAlertMessageKey,
+        content: SlackMessageContent,
+    },
+    Close {
+        key: SlackAlertMessageKey,
+        state: MessageState,
+        content: Option<SlackMessageContent>,
+    },
+}
+
 /// False when the firing already has a row on this destination.
 pub async fn insert_firing(row: &SlackAlertMessage) -> Result<bool, Error> {
     insert_firing_with(get_orm_client_rw().await, row).await
@@ -290,6 +322,26 @@ pub async fn latest_cleared_for_with<C: ConnectionTrait>(
         .await?
         .map(from_model)
         .transpose()
+}
+
+/// The newest open row of the key with `message_ts` set.
+pub async fn latest_open_for_with<C: ConnectionTrait>(
+    conn: &C,
+    destination_id: &str,
+    alert_id: &str,
+    group_key: &str,
+) -> Result<Option<SlackAlertMessage>, Error> {
+    let _ = (conn, destination_id, alert_id, group_key);
+    todo!("threads stream")
+}
+
+/// False when the order re-check dropped the change; a failure leaves both rows unchanged.
+pub async fn apply_thread_change_with<C: ConnectionTrait + sea_orm::TransactionTrait>(
+    conn: &C,
+    change: &AnomalyThreadChange,
+) -> Result<bool, Error> {
+    let _ = (conn, change);
+    todo!("threads stream")
 }
 
 pub async fn bump_wanted_with<C: ConnectionTrait>(

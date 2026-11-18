@@ -229,6 +229,8 @@ mod tests {
             crit: Some(5.0),
             warn: Some(3.0),
             trigger_ts: 1_700_000_000 + 89 * 60,
+            band: None,
+            marks: Vec::new(),
         }
     }
 

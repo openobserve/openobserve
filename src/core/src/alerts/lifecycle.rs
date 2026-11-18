@@ -271,6 +271,7 @@ pub fn refresh_event(
         chart_png_b64: None,
         level,
         at,
+        anomaly: None,
     }
 }
 

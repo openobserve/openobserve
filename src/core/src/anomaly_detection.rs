@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod explore_state;
 #[cfg(feature = "enterprise")]
 mod partitioned_search;
 
@@ -361,6 +362,31 @@ pub struct UpdateAnomalyConfigRequest {
     /// `None` leaves stored tags untouched; `Some(vec![])` clears them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+}
+
+/// The alert values that an anomaly link carries for the banner of the page it opens.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AnomalyLinkSnapshot {
+    /// The unpadded anomaly window.
+    pub start_us: i64,
+    pub end_us: i64,
+    /// "value", "absence" or "partial_drop".
+    pub kind: String,
+    /// Such as "count(*) per 15 min".
+    pub measure: String,
+    pub actual: Option<f64>,
+    pub lower: Option<f64>,
+    pub upper: Option<f64>,
+}
+
+/// One explore link; `url` is empty when the detector has no stream to open.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AnomalyExploreLink {
+    pub url: String,
+    pub label: String,
+    /// "logs", "traces" or "metrics".
+    pub target: String,
+    pub filter_applied: bool,
 }
 
 /// The band and delivery settings as they stand after a request, so one rule set serves both paths.
@@ -3593,20 +3619,20 @@ fn anomaly_detail_link(org_id: &str, anomaly_id: &str) -> String {
 
 /// Lets the reader check the anomaly against the raw data around its window.
 #[cfg(feature = "enterprise")]
-fn anomaly_explore_link(
-    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
-) -> (String, String) {
+pub fn anomaly_explore_link(
+    org_id: &str,
+    anomaly_id: &str,
+    stream_type: &str,
+    target: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget,
+    window_end_us: i64,
+    snapshot: Option<&AnomalyLinkSnapshot>,
+) -> AnomalyExploreLink {
     use config::utils::base64::encode_url;
     // Keeps the whole link under common URL length limits of browsers and chat clients.
     const MAX_QUERY_LEN: usize = 4000;
-    let none = || (String::new(), String::new());
-    let Some(target) = actx.explore.as_ref() else {
-        return none();
-    };
-    if actx.window_start_us == 0
-        || actx.window_end_us == 0
-        || actx.window_end_us <= actx.window_start_us
-    {
+    let _ = (anomaly_id, snapshot);
+    let none = AnomalyExploreLink::default;
+    if window_end_us == 0 || window_end_us <= target.start_us {
         return none();
     }
     let cfg = config::get_config();
@@ -3618,7 +3644,7 @@ fn anomaly_explore_link(
     let Ok(mut url) = url::Url::parse(&base) else {
         return none();
     };
-    let traces = actx.stream_type == "traces";
+    let traces = stream_type == "traces";
     let page = if traces { "/web/traces" } else { "/web/logs" };
     let path = format!("{}{page}", url.path().trim_end_matches('/'));
     url.set_path(&path);
@@ -3637,7 +3663,7 @@ fn anomaly_explore_link(
         q => (q, false),
     };
     let from = target.start_us.to_string();
-    let to = actx.window_end_us.to_string();
+    let to = window_end_us.to_string();
     {
         let mut pairs = url.query_pairs_mut();
         if traces {
@@ -3645,7 +3671,7 @@ fn anomaly_explore_link(
                 .append_pair("stream", &target.stream)
                 .append_pair("from", &from)
                 .append_pair("to", &to)
-                .append_pair("org_identifier", &actx.org_id)
+                .append_pair("org_identifier", org_id)
                 .append_pair("tab", "spans")
                 .append_pair("show_histogram", "true");
             if let Some(q) = &query {
@@ -3653,7 +3679,7 @@ fn anomaly_explore_link(
             }
         } else {
             pairs
-                .append_pair("stream_type", &actx.stream_type)
+                .append_pair("stream_type", stream_type)
                 .append_pair("stream", &target.stream)
                 .append_pair("stream_value", &target.stream)
                 .append_pair("from", &from)
@@ -3663,16 +3689,22 @@ fn anomaly_explore_link(
                 pairs.append_pair("query", q);
             }
             pairs
-                .append_pair("org_identifier", &actx.org_id)
+                .append_pair("org_identifier", org_id)
                 .append_pair("show_histogram", "true");
         }
     }
-    let label = if target.filter_dropped || too_long {
-        "View stream around the window (detector filter not applied)"
-    } else {
+    let filter_applied = !(target.filter_dropped || too_long);
+    let label = if filter_applied {
         "View data around the window"
+    } else {
+        "View stream around the window (detector filter not applied)"
     };
-    (url.to_string(), label.to_string())
+    AnomalyExploreLink {
+        url: url.to_string(),
+        label: label.to_string(),
+        target: if traces { "traces" } else { "logs" }.to_string(),
+        filter_applied,
+    }
 }
 
 /// One honestly-labeled message per alert kind: a score-space deviation, a value-space
@@ -3981,7 +4013,22 @@ fn anomaly_attributes(
         AnomalyAlertKind::PartialDrop => "value_below_expected",
         _ => "",
     };
-    let (explore_url, explore_label) = anomaly_explore_link(actx);
+    let explore = actx
+        .explore
+        .as_ref()
+        .filter(|_| actx.window_start_us != 0 && actx.window_end_us > actx.window_start_us)
+        .map(|t| {
+            anomaly_explore_link(
+                &actx.org_id,
+                &actx.anomaly_id,
+                &actx.stream_type,
+                t,
+                actx.window_end_us,
+                None,
+            )
+        })
+        .unwrap_or_default();
+    let (explore_url, explore_label) = (explore.url, explore.label);
     [
         ("anomaly_id", actx.anomaly_id.clone()),
         ("anomaly_name", actx.config_name.clone()),
@@ -7505,6 +7552,15 @@ mod tests {
                 stream_type: "logs".to_string(),
                 event: Default::default(),
                 explore: None,
+                worst_expected_lower: None,
+                worst_expected_upper: None,
+                first_anomaly_us: None,
+                bucket_seconds: 0,
+                worst_direction: None,
+                thread_gap_secs: 0,
+                judged_end_us: 0,
+                model_version: None,
+                current_points: Vec::new(),
             }
         }
 
@@ -7762,8 +7818,27 @@ mod tests {
                 filter: filter.map(str::to_string),
                 filter_dropped,
                 start_us: 1_704_063_600_000_000,
+                ..Default::default()
             });
             c
+        }
+
+        fn explore_link(c: &AnomalyAlertContext) -> (String, String) {
+            let Some(t) = c.explore.as_ref() else {
+                return (String::new(), String::new());
+            };
+            if c.window_start_us == 0 || c.window_end_us <= c.window_start_us {
+                return (String::new(), String::new());
+            }
+            let l = super::super::anomaly_explore_link(
+                &c.org_id,
+                &c.anomaly_id,
+                &c.stream_type,
+                t,
+                c.window_end_us,
+                None,
+            );
+            (l.url, l.label)
         }
 
         fn pairs(url: &str) -> (url::Url, Vec<(String, String)>) {
@@ -7789,7 +7864,7 @@ mod tests {
         #[test]
         fn the_logs_explore_link_carries_the_window_and_the_filter_as_sql() {
             let c = explore_ctx("logs", Some("status >= 500"), false);
-            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (url, label) = explore_link(&c);
             let (u, p) = pairs(&url);
             assert!(u.path().ends_with("/web/logs"), "{url}");
             assert_eq!(get(&p, "stream_type"), Some("logs"));
@@ -7825,7 +7900,7 @@ mod tests {
         #[test]
         fn a_metrics_detector_links_to_the_logs_page_with_its_stream_type() {
             let c = explore_ctx("metrics", Some("job = 'api'"), false);
-            let (url, _) = super::super::anomaly_explore_link(&c);
+            let (url, _) = explore_link(&c);
             let (u, p) = pairs(&url);
             assert!(u.path().ends_with("/web/logs"), "{url}");
             assert_eq!(get(&p, "stream_type"), Some("metrics"));
@@ -7834,7 +7909,7 @@ mod tests {
         #[test]
         fn the_traces_explore_link_carries_the_filter_expression_only() {
             let c = explore_ctx("traces", Some("service_name = 'api'"), false);
-            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (url, label) = explore_link(&c);
             let (u, p) = pairs(&url);
             assert!(u.path().ends_with("/web/traces"), "{url}");
             assert_eq!(get(&p, "stream"), Some("app_logs"));
@@ -7850,8 +7925,7 @@ mod tests {
 
         #[test]
         fn a_detector_without_a_filter_links_without_a_query() {
-            let (url, label) =
-                super::super::anomaly_explore_link(&explore_ctx("logs", None, false));
+            let (url, label) = explore_link(&explore_ctx("logs", None, false));
             let (_, p) = pairs(&url);
             assert_eq!(get(&p, "query"), None);
             assert_eq!(get(&p, "sql_mode"), Some("true"));
@@ -7860,7 +7934,7 @@ mod tests {
 
         #[test]
         fn a_dropped_filter_gets_the_unfiltered_label() {
-            let (url, label) = super::super::anomaly_explore_link(&explore_ctx("logs", None, true));
+            let (url, label) = explore_link(&explore_ctx("logs", None, true));
             let (_, p) = pairs(&url);
             assert_eq!(get(&p, "query"), None);
             assert_eq!(label, UNFILTERED);
@@ -7871,18 +7945,18 @@ mod tests {
             let empty = (String::new(), String::new());
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.window_start_us = 0;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.window_end_us = 0;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.window_end_us = c.window_start_us;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
             c.window_end_us = c.window_start_us - 1;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.explore = None;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
         }
 
         /// A detector that scores one bucket per run gets a window one interval wide,
@@ -7896,7 +7970,7 @@ mod tests {
             c.window_start_us = 1_704_067_200_000_000;
             c.window_end_us = c.window_start_us + 5 * MIN_US;
             c.explore.as_mut().unwrap().start_us = c.window_start_us - 15 * MIN_US;
-            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (url, label) = explore_link(&c);
             assert!(!url.is_empty());
             let (_, p) = pairs(&url);
             let from: i64 = get(&p, "from").unwrap().parse().unwrap();
@@ -7912,7 +7986,7 @@ mod tests {
             let long = "x".repeat(5000);
             for stream_type in ["logs", "traces"] {
                 let c = explore_ctx(stream_type, Some(&long), false);
-                let (url, label) = super::super::anomaly_explore_link(&c);
+                let (url, label) = explore_link(&c);
                 let (_, p) = pairs(&url);
                 assert_eq!(get(&p, "query"), None, "{stream_type}");
                 assert_eq!(label, UNFILTERED, "{stream_type}");
@@ -7925,7 +7999,7 @@ mod tests {
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.org_id = "a&b".to_string();
             c.explore.as_mut().unwrap().stream = odd.to_string();
-            let (url, _) = super::super::anomaly_explore_link(&c);
+            let (url, _) = explore_link(&c);
             let (u, p) = pairs(&url);
             assert!(u.fragment().is_none(), "{url}");
             assert_eq!(get(&p, "stream"), Some(odd));
@@ -7943,7 +8017,7 @@ mod tests {
             let n = super::super::anomaly_notification_context(&c);
             let detail = super::super::anomaly_detail_link(&c.org_id, &c.anomaly_id);
             assert_eq!(n.alert_url, detail);
-            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (url, label) = explore_link(&c);
             assert_eq!(attr_of(&n, "anomaly_url"), Some(detail));
             assert_eq!(attr_of(&n, "anomaly_explore_url"), Some(url));
             assert_eq!(attr_of(&n, "anomaly_explore_label"), Some(label));

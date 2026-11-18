@@ -188,6 +188,7 @@ pub fn build_event(
             .and_then(|png| chart_b64(t.alert_id, png)),
         level,
         at,
+        anomaly: None,
     }
 }
 

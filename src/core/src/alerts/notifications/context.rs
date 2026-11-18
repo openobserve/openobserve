@@ -114,7 +114,11 @@ pub struct NotificationContext {
     /// Today's body for a generic webhook while no user template applies (D1).
     pub legacy_payload: Option<LegacyPayload>,
     pub render_hints: RenderHints,
+    /// Set only by the anomaly sender; the Slack app threads the message with it.
+    pub slack_thread: Option<SlackThreadHint>,
 }
+
+pub type SlackThreadHint = config::meta::slack::AnomalyThreadInfo;
 
 /// Producer choices the renderer honors; the defaults keep the alert output unchanged.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
