@@ -91,17 +91,10 @@ export function testRunKey(body: EvaluateAlertBody): string {
   return JSON.stringify(evaluated);
 }
 
-/** A span duration (microseconds) in the unit a person reads it in: "500 ms", "1.5 s". */
-export function microsText(micros: number, t: TranslateFn): I18nText {
-  const size = Math.abs(micros);
-  if (size >= 1_000_000) return valueWithUnit(micros / 1_000_000, "seconds", t);
-  if (size >= 1_000) return valueWithUnit(micros / 1_000, "milliseconds", t);
-  return valueWithUnit(micros, "microseconds", t);
-}
-
 /** A value in the alert's unit; span durations convert from microseconds. */
 export function testValueText(value: number, unit: string | null | undefined, t: TranslateFn) {
-  if (unit === "microseconds") return microsText(value, t);
+  // Span duration reads in ms everywhere the form shows it.
+  if (unit === "microseconds") return valueWithUnit(value / 1000, "milliseconds", t);
   return unit ? valueWithUnit(value, unit, t) : formatNumber(value);
 }
 
@@ -305,24 +298,3 @@ export function requestFailureReason(error: unknown, t: TranslateFn): I18nText {
   if (response?.status) return t("alerts.testRun.serverStatus", { status: response.status });
   return t("alerts.testRun.noAnswer");
 }
-
-// Span duration is microseconds by the traces contract; these functions keep the field's unit.
-const SPAN_DURATION_FIELD = "duration";
-const UNIT_KEEPING_FUNCTIONS = new Set([
-  "avg",
-  "min",
-  "max",
-  "sum",
-  "median",
-  "p50",
-  "p75",
-  "p90",
-  "p95",
-  "p99",
-]);
-
-/** True when a builder measure reads span duration, so its values are microseconds. */
-export const measuresSpanDuration = (streamType: unknown, fn: unknown, column: unknown): boolean =>
-  streamType === "traces" &&
-  column === SPAN_DURATION_FIELD &&
-  UNIT_KEEPING_FUNCTIONS.has(String(fn ?? ""));

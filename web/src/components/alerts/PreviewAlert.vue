@@ -161,14 +161,13 @@ import {
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import { keyToMs } from "@/utils/alerts/alertBacktest";
-import { isCountLimit, previewCountText } from "@/utils/alerts/alertReadBack";
-import { durationText, formatNumber } from "@/utils/alerts/alertCopy";
 import {
-  evaluateAlertBody,
-  measuresSpanDuration,
-  testRunKey,
-  testValueText,
-} from "@/utils/alerts/alertTestRun";
+  isCountLimit,
+  isSpanDurationMeasure,
+  previewCountText,
+} from "@/utils/alerts/alertReadBack";
+import { durationText, formatNumber } from "@/utils/alerts/alertCopy";
+import { evaluateAlertBody, testRunKey, testValueText } from "@/utils/alerts/alertTestRun";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import AlertTestRun from "./AlertTestRun.vue";
 import { promqlValueUnit, type MetricMeta } from "@/utils/alerts/alertValueUnit";
@@ -363,8 +362,6 @@ const evaluationStatus = ref<{
   label?: string;
   grouped?: boolean;
   value?: number;
-  /** Unit of `value` and the limit when the measure has one ("microseconds" for span duration). */
-  unit?: string;
   windowMinutes?: number;
 } | null>(null);
 const { t } = useI18nTyped();
@@ -422,7 +419,7 @@ const valueUnit = computed((): string | null => {
   if (
     props.selectedTab === "custom" &&
     props.isAggregationEnabled &&
-    measuresSpanDuration(
+    isSpanDurationMeasure(
       props.formData.stream_type,
       qc?.aggregation?.function,
       qc?.aggregation?.having?.column,
@@ -1550,7 +1547,6 @@ const setEvaluationStatus = (verdict: {
     atLeast: verdict.atLeast,
     label: args.label,
     ...(verdict.value === undefined ? {} : { value: verdict.value }),
-    ...(verdict.value !== undefined && valueUnit.value ? { unit: valueUnit.value } : {}),
     grouped:
       props.selectedTab === "custom" &&
       props.isAggregationEnabled &&

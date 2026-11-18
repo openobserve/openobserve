@@ -3491,18 +3491,29 @@ describe("PreviewAlert - value alerts without a value, span durations and Test i
     w.unmount();
   });
 
-  it("runs a PromQL preview while the builder's value threshold is blank", async () => {
+  it("draws a typed PromQL query with one run while the builder's value threshold is blank", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
     const w = await mountComp({
-      query: "up",
+      query: "",
       selectedTab: "promql",
       isAggregationEnabled: true,
       formData: valueAlert({ value: "" }),
     });
-    await w.setProps({ query: "sum(up)" });
-    await vi.waitFor(() => expect(w.vm.chartData?.queries?.[0]?.query).toBe("sum(up)"), {
-      timeout: 2000,
-    });
+    await vi.advanceTimersByTimeAsync(2000);
+    const runs: string[] = [];
+    w.vm.$watch(
+      () => w.vm.chartData,
+      (data: any) => data?.queries?.[0]?.query && runs.push(data.queries[0].query),
+      { flush: "sync" },
+    );
+    for (const query of ["s", "sum(", "sum(up)"]) {
+      await w.setProps({ query });
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(runs).toEqual(["sum(up)"]);
     w.unmount();
+    vi.useRealTimers();
   });
 
   it("reads a span duration threshold in ms and draws the axis from microseconds", async () => {

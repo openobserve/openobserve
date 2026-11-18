@@ -23,11 +23,11 @@ import errorsTruncated from "@/test/fixtures/alerts/evaluate-errors-truncated.js
 import {
   checkTimeText,
   evaluateAlertBody,
-  microsText,
   requestFailureReason,
   testRunDay,
   testRunKey,
   testRunReport,
+  testValueText,
 } from "./alertTestRun";
 
 const t = i18n.global.t as unknown as TranslateFn;
@@ -146,11 +146,11 @@ describe("testRunDay", () => {
 
 describe("value text", () => {
   it.each([
-    [500_000, "500 ms"],
-    [1_500_000, "1.5 s"],
-    [250, "250 µs"],
-  ])("reads %i µs as %s", (micros, text) => {
-    expect(String(microsText(micros, t))).toBe(text);
+    [500_000, "microseconds", "500 ms"],
+    [0.85, "percent-1", "0.85 (85 %)"],
+    [12, null, "12"],
+  ])("reads %s in %s as %s", (value, unit, text) => {
+    expect(String(testValueText(value, unit, t))).toBe(text);
   });
 
   it("adds the weekday to a time that is not today", () => {
