@@ -164,7 +164,11 @@ const padForStickyHeader = (): void => {
   let height = 0;
   if (props.snap) {
     for (const section of sections()) {
-      for (const child of Array.from(section.children)) {
+      const candidates = [
+        ...Array.from(section.children),
+        ...Array.from(section.querySelectorAll("[data-snap-sticky]")),
+      ];
+      for (const child of candidates) {
         if (child instanceof HTMLElement && getComputedStyle(child).position === "sticky") {
           height = Math.max(height, child.offsetHeight);
         }

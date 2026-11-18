@@ -216,12 +216,19 @@ describe("OSnapScroll", () => {
     }
   });
 
-  it("pads its top by the sticky section header while snapping, so focus lands below it", async () => {
+  it.each([
+    ["a direct child", false],
+    ["marked inside a card", true],
+  ])("pads its top by a sticky section header (%s) while snapping", async (_, nested) => {
     const header = () => {
       const el = document.createElement("header");
       el.style.position = "sticky";
       Object.defineProperty(el, "offsetHeight", { value: 96 });
-      return el;
+      if (!nested) return el;
+      el.setAttribute("data-snap-sticky", "");
+      const card = document.createElement("div");
+      card.append(el);
+      return card;
     };
     wrapper = mountScroll();
     const root = wrapper.find('[data-test="o-snap-scroll"]').element as HTMLElement;

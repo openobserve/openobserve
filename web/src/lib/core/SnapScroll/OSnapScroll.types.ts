@@ -14,7 +14,8 @@
  * nearest stop past where the scroll began when the next one shows, so short
  * wheels move on section by section. No glide follows a press on content,
  * leaves the section holding focus, or runs under reduced motion. A sticky
- * header in a section pads the scroller's top. PageDown/Space moves one stop
+ * header in a section (a direct child, or any element marked
+ * `data-snap-sticky`) pads the scroller's top. PageDown/Space moves one stop
  * and Alt+Down/Up a whole section.
  */
 export interface OSnapScrollProps {
