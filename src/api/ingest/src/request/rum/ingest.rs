@@ -26,14 +26,21 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{
-    meta::stream::{RUM_REPLAY_RESOURCE_STREAM, StreamType},
+    meta::stream::{SESSION_REPLAY_RESOURCES_STREAM, StreamType},
     utils::{base64, json},
 };
 use flate2::read::ZlibDecoder;
 use infra::errors::Error;
-use ingestion_common::{IngestUser, IngestionRequest, IngestionResponse, SystemJobType};
+use ingestion_common::{IngestUser, IngestionRequest};
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{auth::UserEmail, ingestion::check_ingestion_allowed};
+use openobserve_core::{
+    auth::UserEmail,
+    ingestion::{
+        check_ingestion_allowed,
+        feature_writer::{self, FeatureWriter, GrpcTransport},
+    },
+    traces::service_graph::v4::writer::max_request_bytes,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -55,7 +62,7 @@ const MAX_RESOURCE_IMAGE_BYTES: usize = 10 * 1024 * 1024;
 /// Maximum `image` parts per replay resource upload; the mobile SDK batches up to 500 items.
 const MAX_RESOURCE_IMAGES: usize = 500;
 const MAX_APP_ID_BYTES: usize = 256;
-/// Rows per internal write, so a 500-image upload never serializes into one multi-GB body.
+/// Rows per internal write, on top of the byte budget, so a request stays small.
 const RESOURCE_ROWS_PER_WRITE: usize = 5;
 
 /// Multipart form data being ingested in the form of session-replay
@@ -471,36 +478,49 @@ fn build_resource_rows(app_id: &str, images: &[(String, Bytes)]) -> Vec<json::Va
         .collect()
 }
 
-/// Written as an internal job, since the `_o2_` guard refuses every user write.
+/// Written with the org's replay writer token, since the `_o2_` guard refuses every user write.
 async fn write_resource_rows(org_id: &str, rows: &[json::Value]) -> Result<(), Error> {
-    let body = json::to_string(rows).map_err(|e| Error::Message(e.to_string()))?;
-    logs::ingest::ingest(
-        0,
-        org_id,
-        RUM_REPLAY_RESOURCE_STREAM,
-        IngestionRequest::Usage(body.into()),
-        IngestUser::SystemJob(SystemJobType::SelfReporting),
-        None,
-        false,
+    let body = json::to_vec(rows).map_err(|e| Error::Message(e.to_string()))?;
+    let token = feature_writer::token(FeatureWriter::SessionReplay, org_id)
+        .await
+        .map_err(|e| Error::Message(e.to_string()))?;
+    feature_writer::write(
+        &GrpcTransport,
+        &token,
+        SESSION_REPLAY_RESOURCES_STREAM,
+        body,
     )
     .await
-    .and_then(|resp| ensure_rows_written(&resp))
+    .map_err(|e| Error::Message(e.to_string()))
 }
 
-/// A 202 must not acknowledge rows the ingester rejected or failed to store.
-fn ensure_rows_written(resp: &IngestionResponse) -> Result<(), Error> {
-    if resp.write_failed || resp.stream_skipped || resp.status.iter().any(|s| s.status.failed > 0) {
-        return Err(Error::Message(
-            "replay resource rows were not stored".into(),
-        ));
+/// Groups images so one gRPC request stays under the size limit; an oversize image goes alone.
+fn write_batches(images: &[(String, Bytes)], max_encoded_bytes: usize) -> Vec<&[(String, Bytes)]> {
+    let mut batches = Vec::new();
+    let (mut start, mut encoded) = (0, 0);
+    for (idx, (_, data)) in images.iter().enumerate() {
+        let size = data.len().div_ceil(3) * 4;
+        let full = idx - start >= RESOURCE_ROWS_PER_WRITE || encoded + size > max_encoded_bytes;
+        if idx > start && full {
+            batches.push(&images[start..idx]);
+            (start, encoded) = (idx, 0);
+        }
+        encoded += size;
     }
-    Ok(())
+    if start < images.len() {
+        batches.push(&images[start..]);
+    }
+    batches
 }
 
 /// Skips each bad image instead of failing the batch because the SDK never retries a 4xx.
 async fn store_resource_upload(org_id: &str, app_id: &str, upload: ReplayUpload) -> Response {
-    if let Err(e) =
-        check_ingestion_allowed(org_id, StreamType::Logs, Some(RUM_REPLAY_RESOURCE_STREAM)).await
+    if let Err(e) = check_ingestion_allowed(
+        org_id,
+        StreamType::Logs,
+        Some(SESSION_REPLAY_RESOURCES_STREAM),
+    )
+    .await
     {
         return crate::request::ingestion_not_allowed_response(e);
     }
@@ -516,7 +536,7 @@ async fn store_resource_upload(org_id: &str, app_id: &str, upload: ReplayUpload)
             upload.dropped_images
         );
     }
-    for batch in images.chunks(RESOURCE_ROWS_PER_WRITE) {
+    for batch in write_batches(&images, max_request_bytes()) {
         if let Err(e) = write_resource_rows(org_id, &build_resource_rows(app_id, batch)).await {
             log::error!("[RUM] replay resource write failed for org={org_id} app={app_id:?}: {e}");
             return MetaHttpResponse::internal_error("Failed to store replay resource");
@@ -1158,24 +1178,44 @@ mod tests {
         assert_eq!(detect_image_type(b""), None);
     }
 
-    #[test]
-    fn ensure_rows_written_accepts_a_clean_response() {
-        assert!(ensure_rows_written(&IngestionResponse::new(200, vec![])).is_ok());
+    fn sized(len: usize) -> (String, Bytes) {
+        (String::new(), Bytes::from(vec![0u8; len]))
     }
 
     #[test]
-    fn ensure_rows_written_rejects_write_failed_and_stream_skipped() {
-        let failed = IngestionResponse::new(200, vec![]).with_write_failed(true);
-        let skipped = IngestionResponse::new(200, vec![]).with_stream_skipped(true);
-        assert!(ensure_rows_written(&failed).is_err());
-        assert!(ensure_rows_written(&skipped).is_err());
+    fn write_batches_cap_the_row_count() {
+        let images: Vec<_> = (0..12).map(|_| sized(1)).collect();
+        let sizes: Vec<_> = write_batches(&images, usize::MAX)
+            .iter()
+            .map(|b| b.len())
+            .collect();
+        assert_eq!(sizes, vec![5, 5, 2]);
     }
 
     #[test]
-    fn ensure_rows_written_rejects_failed_records() {
-        let mut stream = ingestion_common::StreamStatus::new(RUM_REPLAY_RESOURCE_STREAM);
-        stream.status.failed = 1;
-        assert!(ensure_rows_written(&IngestionResponse::new(200, vec![stream])).is_err());
+    fn write_batches_keep_each_request_under_the_byte_budget() {
+        // 3 raw bytes encode to 4, so a budget of 8 holds two of them.
+        let images: Vec<_> = (0..5).map(|_| sized(3)).collect();
+        let sizes: Vec<_> = write_batches(&images, 8).iter().map(|b| b.len()).collect();
+        assert_eq!(sizes, vec![2, 2, 1]);
+    }
+
+    #[test]
+    fn write_batches_send_an_image_over_the_budget_alone() {
+        let images = vec![sized(3), sized(300), sized(3)];
+        let sizes: Vec<_> = write_batches(&images, 8).iter().map(|b| b.len()).collect();
+        assert_eq!(sizes, vec![1, 1, 1]);
+        assert!(write_batches(&[], 8).is_empty());
+    }
+
+    #[test]
+    fn a_full_upload_of_max_size_images_never_exceeds_the_grpc_limit() {
+        let budget = max_request_bytes();
+        let images: Vec<_> = (0..5).map(|_| sized(MAX_RESOURCE_IMAGE_BYTES)).collect();
+        for batch in write_batches(&images, budget) {
+            let encoded: usize = batch.iter().map(|(_, d)| d.len().div_ceil(3) * 4).sum();
+            assert!(batch.len() == 1 || encoded <= budget);
+        }
     }
 
     #[test]
@@ -1280,10 +1320,13 @@ mod tests {
 
     #[test]
     fn resource_rows_use_the_internal_stream_the_web_player_queries() {
-        assert_eq!(RUM_REPLAY_RESOURCE_STREAM, "_o2_rum_sessionreplay_resource");
+        assert_eq!(
+            SESSION_REPLAY_RESOURCES_STREAM,
+            "_o2_sessionreplay_resources"
+        );
         assert!(config::meta::self_reporting::usage::is_system_stream(
             "any",
-            RUM_REPLAY_RESOURCE_STREAM
+            SESSION_REPLAY_RESOURCES_STREAM
         ));
     }
 

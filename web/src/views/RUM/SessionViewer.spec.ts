@@ -1273,7 +1273,7 @@ describe("SessionViewer.vue — application_id in the session lookup", () => {
     wrapper.unmount();
   });
 
-  const RES_STREAM = "_o2_rum_sessionreplay_resource";
+  const RES_STREAM = "_o2_sessionreplay_resources";
   const resId = (n: number) => n.toString(16).padStart(32, "0");
   const imageBody = (ids: string[]) => (row: any) => ({
     ...row,
@@ -1364,8 +1364,9 @@ describe("SessionViewer.vue — application_id in the session lookup", () => {
     const ids = Array.from({ length: 250 }, (_, i) => resId(i + 1));
     const wrapper = await mountAndroid(ids, {});
 
+    // Each chunk is asked again over the full retained range, since none of its ids was found.
     const counts = resourceSqls().map((sql) => (sql.match(/'[0-9a-f]{32}'/g) ?? []).length);
-    expect(counts).toEqual([100, 100, 50]);
+    expect(counts).toEqual([100, 100, 100, 100, 50, 50]);
     wrapper.unmount();
   });
 
@@ -1450,6 +1451,153 @@ describe("SessionViewer.vue — application_id in the session lookup", () => {
 
     expect(resourceSqls()).toEqual([]);
     wrapper.unmount();
+  });
+
+  describe("lookup retries and older images", () => {
+    const DAY_US = 86_400_000_000;
+    const SECOND_US = 1_000_000;
+    const minTs = sessionLookupRow.zo_sql_timestamp;
+    const maxTs = 1692884769270000;
+    // An image is visible to a query only once `ready` and only when its row is inside the query's window.
+    const store_ = { rows: {} as Record<string, { ready: boolean; ts?: number }> };
+    const windows = () =>
+      streaming.requests
+        .filter((r) => r.data.queryReq.query.sql.includes(RES_STREAM))
+        .map((r) => [r.data.queryReq.query.start_time, r.data.queryReq.query.end_time]);
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      store_.rows = {};
+      queryPayload.build.mockImplementation((p: any) => ({
+        query: { sql: "", start_time: p.timestamps.startTime, end_time: p.timestamps.endTime },
+        aggs: {},
+      }));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      queryPayload.build.mockImplementation(() => ({ query: { sql: "" }, aggs: {} }));
+    });
+
+    async function mountTimed(ids: string[]) {
+      replaySchema.fields = { application_id: true };
+      vi.mocked(searchService.search).mockResolvedValueOnce({
+        data: {
+          hits: [
+            {
+              ...sessionLookupRow,
+              source: "android",
+              application_id: "app-42",
+              max_ts: maxTs,
+            },
+          ],
+        },
+      } as any);
+      const segments = rowsResponder(fixtureRows, imageBody(ids));
+      resetStreaming((sql, from) => {
+        if (!sql.includes(RES_STREAM)) return segments(sql, from);
+        if (from > 0) return [];
+        const start = streaming.requests.at(-1)!.data.queryReq.query.start_time;
+        return Object.entries(store_.rows)
+          .filter(([id, row]) => row.ready && sql.includes(`'${id}'`) && (row.ts ?? start) >= start)
+          .map(([resource_id]) => ({ resource_id, mime: "image/png", image: "QUJD" }));
+      });
+      const wrapper = mountSessionViewer(await pushRoute());
+      await vi.advanceTimersByTimeAsync(200);
+      return wrapper;
+    }
+
+    const png = (id: string) => [id, "data:image/png;base64,QUJD"];
+
+    it("shows an image that is stored after the first lookup, without a reload", async () => {
+      const id = resId(1);
+      const wrapper = await mountTimed([id]);
+      expect(loadedImages(wrapper)).toEqual([]);
+
+      store_.rows[id] = { ready: true };
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      expect(loadedImages(wrapper)).toEqual([png(id)]);
+      wrapper.unmount();
+    });
+
+    it("keeps the ids a partial result left out eligible for the next lookup", async () => {
+      const [have, late] = [resId(1), resId(2)];
+      store_.rows[have] = { ready: true };
+      const wrapper = await mountTimed([have, late]);
+      expect(loadedImages(wrapper)).toEqual([png(have)]);
+
+      store_.rows[late] = { ready: true };
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      expect(loadedImages(wrapper)).toEqual([png(have), png(late)]);
+      wrapper.unmount();
+    });
+
+    it("stops retrying after three retries at 2 s, 5 s and 15 s", async () => {
+      const wrapper = await mountTimed([resId(1)]);
+      // A lookup asks the search window, then the full retained range.
+      expect(resourceSqls()).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(1_700);
+      expect(resourceSqls()).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(400);
+      expect(resourceSqls()).toHaveLength(4);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(resourceSqls()).toHaveLength(6);
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(resourceSqls()).toHaveLength(8);
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(resourceSqls()).toHaveLength(8);
+      wrapper.unmount();
+    });
+
+    it("clears the pending retry when the viewer unmounts", async () => {
+      const wrapper = await mountTimed([resId(1)]);
+      expect(resourceSqls()).toHaveLength(2);
+
+      wrapper.unmount();
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(resourceSqls()).toHaveLength(2);
+    });
+
+    it("never asks again for an id that was resolved", async () => {
+      const [have, late] = [resId(1), resId(2)];
+      store_.rows[have] = { ready: true };
+      const wrapper = await mountTimed([have, late]);
+
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      const later = resourceSqls().slice(1);
+      expect(later.length).toBeGreaterThan(0);
+      expect(later.every((sql) => !sql.includes(`'${have}'`))).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("finds an image uploaded more than 31 days before the session in a second, wider lookup", async () => {
+      const id = resId(1);
+      store_.rows[id] = { ready: true, ts: minTs - 40 * DAY_US };
+      const wrapper = await mountTimed([id]);
+
+      const end = maxTs + 60 * SECOND_US;
+      expect(windows()).toEqual([
+        [minTs - 31 * DAY_US, end],
+        [minTs - 3650 * DAY_US, end],
+      ]);
+      expect(loadedImages(wrapper)).toEqual([png(id)]);
+      wrapper.unmount();
+    });
+
+    it("skips the wider lookup when the first one finds every image", async () => {
+      const id = resId(1);
+      store_.rows[id] = { ready: true, ts: minTs - 5 * DAY_US };
+      const wrapper = await mountTimed([id]);
+
+      expect(windows()).toHaveLength(1);
+      expect(loadedImages(wrapper)).toEqual([png(id)]);
+      wrapper.unmount();
+    });
   });
 });
 

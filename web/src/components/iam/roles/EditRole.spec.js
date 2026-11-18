@@ -1255,7 +1255,7 @@ describe("EditRole - RUM presets", () => {
       { name: "app" },
       { name: "_rumdata" },
       { name: "_sessionreplay" },
-      { name: "_o2_rum_sessionreplay_resource" },
+      { name: "_o2_sessionreplay_resources" },
     ];
   });
 
@@ -1263,7 +1263,7 @@ describe("EditRole - RUM presets", () => {
     const wrapper = await mountWithPreset("rum_viewer");
     expect(staged(wrapper)).toEqual([
       "logs:_all_default AllowList",
-      "logs:_o2_rum_sessionreplay_resource AllowGet",
+      "logs:_o2_sessionreplay_resources AllowGet",
       "logs:_rumdata AllowGet",
       "logs:_sessionreplay AllowGet",
       "sourcemaps:_all_default AllowList",
@@ -1275,7 +1275,7 @@ describe("EditRole - RUM presets", () => {
     const wrapper = await mountWithPreset("rum_editor");
     expect(staged(wrapper)).toEqual([
       "logs:_all_default AllowList",
-      "logs:_o2_rum_sessionreplay_resource AllowGet",
+      "logs:_o2_sessionreplay_resources AllowGet",
       "logs:_rumdata AllowGet",
       "logs:_sessionreplay AllowGet",
       "rum_analytics:_all_default AllowDelete",

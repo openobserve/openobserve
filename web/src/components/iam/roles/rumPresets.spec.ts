@@ -27,7 +27,7 @@ import {
 
 describe("RUM role presets", () => {
   it("read the RUM streams the SDKs ingest into, including the mobile replay images", () => {
-    expect(RUM_STREAMS).toEqual(["_rumdata", "_sessionreplay", "_o2_rum_sessionreplay_resource"]);
+    expect(RUM_STREAMS).toEqual(["_rumdata", "_sessionreplay", "_o2_sessionreplay_resources"]);
     expect(RUM_STREAM_ROW_PERMS).toEqual(["AllowGet"]);
   });
 

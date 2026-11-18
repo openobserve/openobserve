@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const RUM_REPLAY_RESOURCE_STREAM = "_o2_rum_sessionreplay_resource";
+export const SESSION_REPLAY_RESOURCES_STREAM = "_o2_sessionreplay_resources";
 
 /** Streams the server marks is_internal that hold the customer's own data; USER_SOURCED_STREAM_NAMES in usage.rs must hold the same names. */
 export const USER_SOURCED_STREAM_NAMES = [
@@ -21,7 +21,7 @@ export const USER_SOURCED_STREAM_NAMES = [
   "_rumdata",
   "_rumlog",
   "_sessionreplay",
-  "_o2_rum_sessionreplay_resource",
+  "_o2_sessionreplay_resources",
   "synthetics_results",
   "synthetics_step_results",
 ] as const;

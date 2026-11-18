@@ -26,7 +26,7 @@ use crate::{
         db_monitoring::DBM_SERVER_STREAM,
         search::{SearchEventContext, SearchEventType},
         slo::stream::SLO_SLICES_STREAM,
-        stream::{FileMeta, RUM_REPLAY_RESOURCE_STREAM, StreamType},
+        stream::{FileMeta, SESSION_REPLAY_RESOURCES_STREAM, StreamType},
     },
 };
 
@@ -60,7 +60,7 @@ pub const USER_SOURCED_STREAM_NAMES: [&str; 7] = [
     "_rumdata",
     "_rumlog",
     "_sessionreplay",
-    RUM_REPLAY_RESOURCE_STREAM,
+    SESSION_REPLAY_RESOURCES_STREAM,
     "synthetics_results",
     "synthetics_step_results",
 ];
@@ -89,6 +89,7 @@ pub fn is_feature_writer_stream(stream_name: &str) -> bool {
     stream_name == crate::meta::alerts::alert_calibration::DIGEST_STREAM
         || stream_name.starts_with(crate::meta::autoobserve::AUTOOBSERVE_STREAM_PREFIX)
         || stream_name.starts_with(crate::meta::service_identity::SERVICE_SIGNALS_STREAM_PREFIX)
+        || stream_name == SESSION_REPLAY_RESOURCES_STREAM
 }
 
 /// Outcome of a single scheduled evaluation — "did it fire?".
