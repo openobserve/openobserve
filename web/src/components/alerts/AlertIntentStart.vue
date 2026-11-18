@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ headerText }}
           <OButton
-            v-if="area.state === 'ready' && !showAll"
+            v-if="area.state === 'ready'"
             variant="link"
             size="xs"
             data-test="add-alert-suggestions-toggle"
