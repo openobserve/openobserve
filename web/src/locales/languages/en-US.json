@@ -1316,6 +1316,8 @@
     "queryTooltip": "Write the query yourself",
     "queryNotParsableShort": "The builder can't show this query:",
     "clearAndBuild": "Clear and build",
+    "clearQueryTitle": "Clear the query?",
+    "clearQueryMessage": "The query is removed and the builder starts empty.",
     "where": "Where",
     "addCondition": "Add condition",
     "addGroup": "Add group",

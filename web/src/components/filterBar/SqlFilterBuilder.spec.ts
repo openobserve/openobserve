@@ -16,6 +16,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import SqlFilterBuilder from "./SqlFilterBuilder.vue";
+import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 import OChipInput from "@/lib/forms/ChipInput/OChipInput.vue";
 import type { FilterField } from "@/utils/query/filterBar";
 
@@ -25,10 +26,13 @@ const fields: FilterField[] = [
 ];
 
 let wrapper: VueWrapper | null = null;
+let provider: VueWrapper | null = null;
 
 afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
+  provider?.unmount();
+  provider = null;
   document.body.innerHTML = "";
 });
 
@@ -105,14 +109,41 @@ describe("SqlFilterBuilder", () => {
   });
 
   it("offers to keep a query it cannot draw as text, or clear it and build", async () => {
+    provider = mount(ConfirmDialogProvider, { attachTo: document.body });
     mountBuilder("upper(level) = 'ERROR'");
     expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);
     await wrapper!.find('[data-test="b-keep-query"]').trigger("click");
     expect(wrapper!.emitted("exit")).toHaveLength(1);
     await wrapper!.find('[data-test="b-clear-and-build"]').trigger("click");
     await flushPromises();
+    const dialog = () =>
+      document.body.querySelector<HTMLElement>('[data-test="confirm-dialog-provider"]');
+    dialog()!.querySelector<HTMLElement>('[data-test="o-dialog-primary-btn"]')!.click();
+    await flushPromises();
     expect(wrapper!.emitted("update:query")).toEqual([[""]]);
     expect(wrapper!.find('[data-test="b-bar-input"]').exists()).toBe(true);
+  });
+
+  it("asks before Clear and build discards the query, and keeps it on Cancel", async () => {
+    provider = mount(ConfirmDialogProvider, { attachTo: document.body });
+    mountBuilder("upper(level) = 'ERROR'");
+    await wrapper!.find('[data-test="b-clear-and-build"]').trigger("click");
+    await flushPromises();
+    const dialog = document.body.querySelector<HTMLElement>(
+      '[data-test="confirm-dialog-provider"]',
+    );
+    expect(dialog?.textContent).toContain("Clear the query?");
+    expect(wrapper!.emitted("update:query")).toBeUndefined();
+    dialog!.querySelector<HTMLElement>('[data-test="o-dialog-secondary-btn"]')!.click();
+    await flushPromises();
+    expect(wrapper!.emitted("update:query")).toBeUndefined();
+    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(true);
+  });
+
+  it("draws a value with a backslash before a quote again after a reload", () => {
+    mountBuilder("level != ('x\\' || '''y')");
+    expect(wrapper!.find('[data-test="b-unparsable"]').exists()).toBe(false);
+    expect(wrapper!.find('[data-test="b-bar-chip-level-value"]').text()).toBe("x\\'y");
   });
 
   it("shows the query it cannot draw, so the running filter stays visible", () => {

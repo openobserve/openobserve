@@ -153,6 +153,45 @@ describe("parseSqlFilter", () => {
     }
   });
 
+  it("reads the `||`-joined literal written for a backslash before a quote as one value", () => {
+    expect(parseSqlFilter("level != ('x\\' || '''y')")!.items[0]).toMatchObject({
+      operator: "neq",
+      values: ["x\\'y"],
+    });
+    const value = "a\\'b''c";
+    const operators = [
+      "eq",
+      "neq",
+      "in",
+      "not_in",
+      "contains",
+      "contains_ci",
+      "not_contains",
+      "starts_with",
+      "ends_with",
+      "regex",
+      "not_regex",
+      "match_all",
+    ] as const;
+    for (const operator of operators) {
+      const field = operator === "match_all" ? "" : "level";
+      const values = operator === "in" || operator === "not_in" ? [value, "z"] : [value];
+      const sql = filterTreeToSql(
+        {
+          kind: "group",
+          id: "root",
+          connector: "AND",
+          items: [{ kind: "condition", id: "c", connector: "AND", field, operator, values }],
+        },
+        fields,
+      );
+      expect(sql, operator).toContain("||");
+      const node = parseSqlFilter(sql)?.items[0];
+      expect(node, sql).toMatchObject({ field, operator, values });
+      expect(roundTrip(sql)).toBe(sql);
+    }
+  });
+
   it("does not turn a LIKE wildcard or unknown escape into chip text", () => {
     expect(parseSqlFilter("level LIKE 'user_service%'")).toBeNull();
     expect(parseSqlFilter("level NOT LIKE '%a_b%'")).toBeNull();
