@@ -23,7 +23,7 @@ use config::{
         histogram_origin::histogram_bucket_offset, search::Response, sql::OrderBy,
         stream::StreamType,
     },
-    utils::{file::scan_files, json},
+    utils::json,
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -795,11 +795,8 @@ pub async fn delete_cache(
     clean_start_ts: Option<i64>,
     clean_end_ts: Option<i64>,
 ) -> std::io::Result<bool> {
-    let root_dir = disk::get_dir().await;
     // Part 1: delete the results cache
-    let pattern = format!("{root_dir}/results/{path}");
-    let prefix = format!("{root_dir}/");
-    let files = scan_files(&pattern, "json", None).unwrap_or_default();
+    let files = disk::scan_keys(&format!("results/{path}"), "json").await;
     let mut remove_files: Vec<String> = vec![];
 
     let criteria = match (clean_start_ts, clean_end_ts, delete_ts) {
@@ -811,11 +808,10 @@ pub async fn delete_cache(
         _ => DeletionCriteria::DeleteAll,
     };
 
-    for file in files {
-        if !should_delete_cache_file(&file, &criteria) {
+    for file_key in files {
+        if !should_delete_cache_file(&file_key, &criteria) {
             continue;
         }
-        let file_key = file.strip_prefix(&prefix).unwrap().to_string();
         match disk::remove(&file_key).await {
             Ok(_) => remove_files.push(file_key),
             Err(e) => {
@@ -826,14 +822,13 @@ pub async fn delete_cache(
     }
 
     // Part 2: delete the aggregation cache
-    let aggs_pattern = format!("{root_dir}/{STREAMING_AGGS_CACHE_DIR}/{path}");
-    let aggs_files = scan_files(&aggs_pattern, "arrow", None).unwrap_or_default();
+    let aggs_files = disk::scan_keys(&format!("{STREAMING_AGGS_CACHE_DIR}/{path}"), "arrow").await;
 
-    for file in aggs_files {
-        if !should_delete_cache_file(&file, &criteria) {
+    for file_key in aggs_files {
+        if !should_delete_cache_file(&file_key, &criteria) {
             continue;
         }
-        if let Err(e) = disk::remove(file.strip_prefix(&prefix).unwrap()).await {
+        if let Err(e) = disk::remove(&file_key).await {
             log::error!("Error deleting cache: {:?}", e);
             return Err(std::io::Error::other("Error deleting cache"));
         }

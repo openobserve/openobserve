@@ -4,7 +4,7 @@
     {
       "label": "default",
       "_comment": "Files that need no server env of their own.",
-      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py tests/regression/test_topk_aggregate_error_reported.py tests/regression/test_fractional_epoch_timestamp.py tests/regression/test_user_folder_default_name_refused.py tests/regression/test_sourcemap_upload_limits.py",
+      "target": "tests/regression/test_histogram_bucket_count_matches_total.py tests/regression/test_grpc_ingest_org_binding.py tests/regression/test_topk_aggregate_error_reported.py tests/regression/test_fractional_epoch_timestamp.py tests/regression/test_user_folder_default_name_refused.py tests/regression/test_sourcemap_upload_limits.py tests/regression/test_timestamp_text_variants.py tests/regression/test_bulk_non_string_id.py tests/regression/test_metrics_ingest_window.py tests/regression/test_promql_late_wal_sample.py tests/regression/test_pipeline_cron_seconds.py tests/regression/test_remote_write_written_headers.py tests/regression/test_mcp_tool_errors.py tests/regression/test_pipeline_destination_name_format.py tests/regression/test_pipeline_schedule_delay.py tests/regression/test_vrl_network_functions_denied.py",
       "server_env": "",
       "category": "api_integration_tests"
     },
@@ -65,6 +65,27 @@
       "_comment": "openobserve#16515 needs rows ~130 days old to stay in WAL parquet: quick memtable rotation, no upload for an hour.",
       "target": "tests/regression/test_wal_month_boundary_search.py",
       "server_env": "ZO_INGEST_ALLOWED_UPTO=3120 ZO_MAX_FILE_RETENTION_TIME=10 ZO_FILE_PUSH_INTERVAL=3600",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "ingest_window_wide",
+      "_comment": "openobserve#16422 seeds rows either side of the latest 30-day grid edges, up to 30 days + 4 h old; the workflow envs allow 48 h (OSS) and 5 h (ENT).",
+      "target": "tests/regression/test_result_cache_histogram_reuse.py tests/regression/test_histogram_origin_grid_partitions.py",
+      "server_env": "ZO_INGEST_ALLOWED_UPTO=768",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "uds_enabled",
+      "_comment": "openobserve#16307 and openobserve#16861 only reproduce once a user-defined schema is saved, which needs the flag on; the #16861 file skips on OSS (service identity stamping is enterprise-only).",
+      "target": "tests/regression/test_uds_late_required_columns.py tests/regression/test_uds_traces_service_identity.py",
+      "server_env": "ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
+      "category": "api_integration_tests"
+    },
+    {
+      "label": "skip_ssrf_checks",
+      "_comment": "openobserve#16551: VRL network functions compile only with the SSRF checks skipped.",
+      "target": "tests/regression/test_vrl_network_functions_skip_ssrf.py",
+      "server_env": "ZO_SKIP_SSRF_CHECKS=true",
       "category": "api_integration_tests"
     }
   ]
