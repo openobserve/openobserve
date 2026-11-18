@@ -245,4 +245,11 @@ describe("the HTTP status is folded into code (which is why callers need no fall
     const parsed = parseSearchError({ status: 503, message: "unavailable" });
     expect(parsed.code).toBe(503);
   });
+
+  it("uses the HTTP status a streaming error carries in its content", () => {
+    const parsed = parseSearchError({
+      content: { status: 400, error: "invalid promql query", errorType: "bad_data" },
+    });
+    expect(parsed.code).toBe(400);
+  });
 });

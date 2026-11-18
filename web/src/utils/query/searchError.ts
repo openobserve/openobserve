@@ -129,7 +129,8 @@ export function parseSearchError(
   const rawMessage = str(body.error) || str(body.message) || bodyText || str(error?.message);
   const unwrapped = unwrapErrorCode(rawMessage);
 
-  const httpStatus = error?.response?.status ?? error?.status;
+  // A streaming error carries the HTTP status inside its content.
+  const httpStatus = error?.response?.status ?? error?.status ?? body.status;
   const code =
     unwrapped?.code ??
     (typeof body.code === "number" ? body.code : undefined) ??

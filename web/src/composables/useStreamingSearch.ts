@@ -299,9 +299,10 @@ const useHttpStreaming = () => {
 
       if (!response.ok) {
         try {
+          // A PromQL body carries its own `status: "error"`, which must not hide the HTTP status.
           onError(traceId, {
-            status: response.status,
             ...(await response.json()),
+            status: response.status,
           });
           return;
         } catch (e) {
