@@ -26651,7 +26651,7 @@
     "teamChannelSilent": "Kênh của nhóm này được cố ý để trống — các thông báo trực sẽ không được công bố ở bất kỳ đâu.",
     "slackChannelTitle": "Kênh Slack",
     "slackChannelSetWith": "Đặt kênh Slack bằng {command}",
-    "slackChannelLinkHint": "Nhập lệnh này trong kênh Slack đó. Bạn cần liên kết tài khoản Slack: nhập /o2 link trong Slack.",
+    "slackChannelLinkHint": "Nhập lệnh này trong kênh Slack đó. Bạn cần liên kết tài khoản Slack: nhập {command} link trong Slack.",
     "slackChannelSendTest": "Gửi tin nhắn thử",
     "slackChannelClear": "Xóa",
     "slackChannelBackup": "Chỉ dùng {webhook} làm dự phòng",

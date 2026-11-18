@@ -56,12 +56,49 @@ const checkTokenKinds = (t: Translate, v: TokenFields, ctx: z.RefinementCtx): vo
   }
 };
 
+export const DEFAULT_SLACK_APP_NAME = "OpenObserve";
+export const DEFAULT_SLACK_COMMAND = "/o2";
+export const SLACK_APP_NAME_MAX_LENGTH = 35;
+// Slack's limit, the leading "/" included.
+export const SLACK_COMMAND_MAX_LENGTH = 32;
+const SLACK_COMMAND = /^\/[a-z0-9_-]{1,31}$/;
+
+/**
+ * The server's default command for an app name: `/o2` for the default name, else the name in
+ * lowercase with each run of other characters as one `-`, such as `/main-dev-app`.
+ */
+export const defaultSlackCommand = (appName: string): string => {
+  const name = appName.trim() || DEFAULT_SLACK_APP_NAME;
+  if (name.toLowerCase() === DEFAULT_SLACK_APP_NAME.toLowerCase()) return DEFAULT_SLACK_COMMAND;
+  let slug = "";
+  for (const ch of name.toLowerCase()) {
+    if (/[a-z0-9_]/.test(ch)) slug += ch;
+    else if (slug && !slug.endsWith("-")) slug += "-";
+  }
+  slug = slug.slice(0, SLACK_COMMAND_MAX_LENGTH - 1).replace(/-+$/, "");
+  return slug ? `/${slug}` : DEFAULT_SLACK_COMMAND;
+};
+
+export const isSlackCommand = (value: string): boolean => SLACK_COMMAND.test(value);
+
 // One form for Step 2: the configuration-token path, or Set up manually (which alone asks for app secrets).
 export const makeCreateAppSchema = (t: Translate, isManual: () => boolean) =>
   z
     .object({
       mode: z.enum(["socket", "http"]),
       channel_history: z.boolean(),
+      app_name: trimmed()
+        .max(
+          SLACK_APP_NAME_MAX_LENGTH,
+          t("slackApp.wizard.create.appNameTooLong", { max: SLACK_APP_NAME_MAX_LENGTH }),
+        )
+        // Slack reads these as markup in the replies that name the app.
+        .refine((name) => !/[<>&]/.test(name), {
+          message: t("slackApp.wizard.create.appNameMarkup"),
+        }),
+      command: trimmed().refine(isSlackCommand, {
+        message: t("slackApp.wizard.create.commandInvalid", { max: SLACK_COMMAND_MAX_LENGTH }),
+      }),
       config_refresh_token: trimmed(),
       client_id: trimmed(),
       client_secret: trimmed(),
@@ -88,6 +125,8 @@ export const makeCreateAppSchema = (t: Translate, isManual: () => boolean) =>
 export type CreateAppForm = {
   mode: SlackMode;
   channel_history: boolean;
+  app_name: string;
+  command: string;
   config_refresh_token: string;
   client_id: string;
   client_secret: string;
@@ -97,6 +136,8 @@ export type CreateAppForm = {
 export const createAppDefaults = (): CreateAppForm => ({
   mode: "socket",
   channel_history: true,
+  app_name: DEFAULT_SLACK_APP_NAME,
+  command: DEFAULT_SLACK_COMMAND,
   config_refresh_token: "",
   client_id: "",
   client_secret: "",

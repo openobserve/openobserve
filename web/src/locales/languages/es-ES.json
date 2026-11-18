@@ -26651,7 +26651,7 @@
     "teamChannelSilent": "El canal de este equipo está vacío a propósito: los avisos no se anunciarán en ningún sitio.",
     "slackChannelTitle": "Canal de Slack",
     "slackChannelSetWith": "Configura un canal de Slack con {command}",
-    "slackChannelLinkHint": "Escríbelo en ese canal de Slack. Tu cuenta de Slack debe estar vinculada: escribe /o2 link en Slack.",
+    "slackChannelLinkHint": "Escríbelo en ese canal de Slack. Tu cuenta de Slack debe estar vinculada: escribe {command} link en Slack.",
     "slackChannelSendTest": "Enviar mensaje de prueba",
     "slackChannelClear": "Borrar",
     "slackChannelBackup": "Usa {webhook} solo como respaldo",

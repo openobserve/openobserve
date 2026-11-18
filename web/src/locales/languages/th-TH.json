@@ -26648,7 +26648,7 @@
     "teamChannelSilent": "This team's channel is empty on purpose — pages will not be announced anywhere.",
     "slackChannelTitle": "ช่อง Slack",
     "slackChannelSetWith": "ตั้งค่าช่อง Slack ด้วย {command}",
-    "slackChannelLinkHint": "พิมพ์ในช่อง Slack นั้น ต้องเชื่อมโยงบัญชี Slack ของคุณ: พิมพ์ /o2 link ใน Slack",
+    "slackChannelLinkHint": "พิมพ์ในช่อง Slack นั้น ต้องเชื่อมโยงบัญชี Slack ของคุณ: พิมพ์ {command} link ใน Slack",
     "slackChannelSendTest": "ส่งข้อความทดสอบ",
     "slackChannelClear": "ล้าง",
     "slackChannelBackup": "ใช้ {webhook} เป็นตัวสำรองเท่านั้น",

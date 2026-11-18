@@ -26651,7 +26651,7 @@
     "teamChannelSilent": "قناة هذا الفريق فارغة عن قصد — لن يتم الإعلان عن الاستدعاءات في أي مكان.",
     "slackChannelTitle": "قناة Slack",
     "slackChannelSetWith": "عيّن قناة Slack باستخدام {command}",
-    "slackChannelLinkHint": "اكتبه في قناة Slack تلك. يلزم ربط حساب Slack الخاص بك: اكتب /o2 link في Slack.",
+    "slackChannelLinkHint": "اكتبه في قناة Slack تلك. يلزم ربط حساب Slack الخاص بك: اكتب {command} link في Slack.",
     "slackChannelSendTest": "أرسل رسالة اختبار",
     "slackChannelClear": "امسح",
     "slackChannelBackup": "استخدم {webhook} كنسخة احتياطية فقط",

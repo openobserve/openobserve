@@ -26651,7 +26651,7 @@
     "teamChannelSilent": "该团队的频道是特意留空的——呼叫不会在任何地方发布。",
     "slackChannelTitle": "Slack 频道",
     "slackChannelSetWith": "使用 {command} 设置 Slack 频道",
-    "slackChannelLinkHint": "在该 Slack 频道中输入。这需要先关联您的 Slack 账户：在 Slack 中输入 /o2 link。",
+    "slackChannelLinkHint": "在该 Slack 频道中输入。这需要先关联您的 Slack 账户：在 Slack 中输入 {command} link。",
     "slackChannelSendTest": "发送测试消息",
     "slackChannelClear": "清除",
     "slackChannelBackup": "仅将 {webhook} 用作备用",

@@ -26651,7 +26651,7 @@
     "teamChannelSilent": "Het kanaal van dit team is expres leeg — oproepen worden nergens aangekondigd.",
     "slackChannelTitle": "Slack-kanaal",
     "slackChannelSetWith": "Stel een Slack-kanaal in met {command}",
-    "slackChannelLinkHint": "Typ het in dat Slack-kanaal. Je Slack-account moet gekoppeld zijn: typ /o2 link in Slack.",
+    "slackChannelLinkHint": "Typ het in dat Slack-kanaal. Je Slack-account moet gekoppeld zijn: typ {command} link in Slack.",
     "slackChannelSendTest": "Testbericht verzenden",
     "slackChannelClear": "Wissen",
     "slackChannelBackup": "Gebruik {webhook} alleen als back-up",

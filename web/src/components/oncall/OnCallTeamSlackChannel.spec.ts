@@ -101,6 +101,21 @@ describe("OnCallTeamSlackChannel", () => {
     expect(find(wrapper, "clear").exists()).toBe(false);
   });
 
+  it("issue 3608: names the serving app's own slash command", () => {
+    const wrapper = render(
+      channel({
+        slack_channel_set: false,
+        slack_channel_name: null,
+        slack_native: false,
+        slack_command: "/o2-dev",
+      }),
+    );
+    const text = find(wrapper, "guidance").text();
+    expect(text).toContain("Set a Slack channel with /o2-dev oncall here Cloud SRE");
+    expect(text).toContain("type /o2-dev link in Slack");
+    expect(text).not.toContain("/o2 ");
+  });
+
   it("set: shows #name with Send test message and Clear, and Clear sends clear_slack", async () => {
     const wrapper = render(channel());
 

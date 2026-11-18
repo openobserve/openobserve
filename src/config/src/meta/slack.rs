@@ -170,11 +170,20 @@ pub enum ConnectionSource {
     Instance,
 }
 
+/// A missing field reads as the wizard's default, so the column default `{}` still loads; an
+/// empty name and command then mean `OpenObserve` and `/o2` (issue 3608).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ManifestOptions {
+    #[serde(default)]
     pub app_name: String,
+    #[serde(default = "default_channel_history")]
     pub channel_history: bool,
+    #[serde(default)]
     pub command: String,
+}
+
+fn default_channel_history() -> bool {
+    true
 }
 
 /// A `slack_installations` row; secrets are plaintext here and encrypted only inside the table ops.
@@ -648,6 +657,29 @@ pub struct HeldAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manifest_options_read_missing_fields_as_defaults() {
+        let empty: ManifestOptions = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            (
+                empty.app_name.as_str(),
+                empty.channel_history,
+                empty.command.as_str()
+            ),
+            ("", true, "")
+        );
+        let old: ManifestOptions =
+            serde_json::from_str(r#"{"app_name":"Acme","channel_history":false}"#).unwrap();
+        assert_eq!(
+            (
+                old.app_name.as_str(),
+                old.channel_history,
+                old.command.as_str()
+            ),
+            ("Acme", false, "")
+        );
+    }
 
     #[test]
     fn instance_scope_and_access_serialize_as_the_columns_store_them() {
