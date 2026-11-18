@@ -12130,7 +12130,9 @@
         "realtimeEach": "About {notifications} a day: each matching event notifies at once.",
         "changeWait": "Change the wait",
         "addWait": "Add a wait",
-        "lastHour": "Last hour"
+        "lastHour": "Last hour",
+        "heldByMustLast": "It matched, but never for as long as Must last, so Must last held every match back.",
+        "changeMustLast": "Change Must last"
       },
       "filtersMode": "Filters",
       "typeHelp": {
@@ -14028,7 +14030,8 @@
         "p99": "99th percentile of a numeric field"
       },
       "customMode": "Custom",
-      "groupByHelpLabels": "Checks each combination of these labels. Choose below: one alert, or one per combination."
+      "groupByHelpLabels": "Checks each combination of these labels. Choose below: one alert, or one per combination.",
+      "alertWhenTooltip": "Alert when a series value meets this comparison. Example: more than 100 alerts when a series is above 100."
     },
     "anomaly": {
       "addFilter": "Add filter",
@@ -15451,7 +15454,9 @@
       "realtimeNoCount": "Fires on each matching event.",
       "realtimeNoFilter": "Fires on each matching event: {count} in the last {window}. Add a filter to narrow it.",
       "promqlFires": "Would alert now: {count} {label} (threshold {limit}).",
-      "promqlQuiet": "Quiet now: {count} {label} (threshold {limit})."
+      "promqlQuiet": "Quiet now: {count} {label} (threshold {limit}).",
+      "eventCount": "number of {noun}",
+      "eventCountWith": "number of {noun} with {field}"
     },
     "readBack": {
       "title": "Here's your alert",
@@ -15473,7 +15478,8 @@
       "cron": "checked on the cron schedule {cron}",
       "asItHappens": "checked as events arrive",
       "cooldown": ", at most once every {duration}",
-      "composite": "{who} when its alerts match {expression}{hold}{cooldown}."
+      "composite": "{who} when its alerts match {expression}{hold}{cooldown}.",
+      "measureIs": "{measure} is {op} {value} over {window}"
     },
     "editMode": {
       "muteFor": "Mute for",
@@ -15684,7 +15690,8 @@
         "countNameSeries": "Number of series",
         "seriesOption": "Series",
         "totalPer": "total {noun} per",
-        "switchedToCount": "Switched to count, so it counts {noun} per {field}"
+        "switchedToCount": "Switched to count, so it counts {noun} per {field}",
+        "eachSeriesHelp": "One per series: each series over the threshold alerts on its own."
       },
       "editor": {
         "promql": "PromQL",
@@ -15923,7 +15930,10 @@
       "anomalyDelay": "Checks every {every}, so a spike can wait up to {duration} to alert.",
       "seenWithout": "without {label} ({count})",
       "valueNotSeenIn": "{value} hasn't appeared in the last {window}. Seen: {seen}.",
-      "fieldEmptyIn": "{field} has no values in the last {window}."
+      "fieldEmptyIn": "{field} has no values in the last {window}.",
+      "mustLastOneCheckFix": "Checks every {every}, so this is 1 check.",
+      "checkEvery": "Check every {every}",
+      "breachUnseen": "Every value in the window must cross the threshold and checks don't overlap, so a breach can last up to {duration} unseen."
     },
     "discovery": {
       "lastEvent": "Last event {ago} ago · {rate}/h",
@@ -15976,7 +15986,9 @@
         "label": "Above a value",
         "sentence": "{metric} per {label} above a value",
         "sentencePer": "{metric} per {group} {window}, above a value",
-        "sentenceAll": "{metric} {window}, above a value"
+        "sentenceAll": "{metric} {window}, above a value",
+        "rateSentencePer": "{metric} per second, per {group} {window}, above a value",
+        "rateSentenceAll": "{metric} per second {window}, above a value"
       },
       "ratio": {
         "label": "Share of one metric over another (error rate)",
@@ -16001,13 +16013,19 @@
         "fieldPrompt": "pick a field",
         "labelPrompt": "pick a label",
         "groupPrompt": "pick a group",
-        "valuePrompt": "pick values"
+        "valuePrompt": "pick values",
+        "patternOption": "Every value like {pattern}",
+        "valueHelpSeries": "Numbers are series seen in the last 24 hours. Type a value, or a pattern like {example}, and press Enter to add it.",
+        "valueHelpEvents": "Numbers are {noun} in the last 24 hours. Type a value and press Enter to add it."
       },
       "noGroup": "No grouping",
       "addGroup": "Add a group",
       "cardWhy": "{fit} · {detail}",
       "needsChoice": "Needs a choice",
-      "previewWaits": "Pick what the sentence leaves empty to see a preview"
+      "previewWaits": "Pick what the sentence leaves empty to see a preview",
+      "promql": {
+        "label": "Write PromQL"
+      }
     },
     "librarySuggest": {
       "suggestedStarter": "Suggested starter",
@@ -16068,7 +16086,9 @@
       "heldOther": "Notify at most every held back the other {count} firing. | Notify at most every held back the other {count} firings.",
       "closest": "Closest: {series} reached {value} at {time}.",
       "closestValue": "Closest: {value} at {time}."
-    }
+    },
+    "conditionCountWith": "{noun} with",
+    "promRuleModeHelp": "Every series the query returns alerts: the comparison is in the query (for example > 0.9), with no threshold here."
   },
   "alert_dependencies": {
     "actionOpen": "Open",

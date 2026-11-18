@@ -347,7 +347,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     const agg = fd.query_condition?.aggregation;
     const column = agg?.having?.column;
     // Every row of a group carries the group's own field, so counting it counts the group's events.
-    return agg?.function === "count" && (!hasValue(column) || groupLabels(fd).includes(column));
+    return (
+      agg?.function === "count" && (!hasValue(column) || groupLabels(fd).includes(column ?? ""))
+    );
   };
   const ruleComparison = (fd: AlertSectionsFormData) => {
     const qc = fd.query_condition ?? {};

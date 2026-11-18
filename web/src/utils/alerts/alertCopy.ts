@@ -73,7 +73,7 @@ export function dataNoun(
 /** A builder measure in words. A count counts events carrying its field, so counting a group's own
  * field reads as the group's events, never as a count of field values. */
 export function measureWords(
-  aggregation: { function?: string; having?: { column?: string } } | undefined,
+  aggregation: { function?: string; having?: { column?: string } } | null | undefined,
   groups: readonly string[],
   streamType: string | undefined,
   t: TranslateFn,

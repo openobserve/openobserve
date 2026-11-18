@@ -2618,6 +2618,7 @@ export default defineComponent({
         )?.syncMeasureFromForm?.();
       }
       appliedIntent.value = { fill, label };
+      if (fill.intent === "promql") goToSection("condition");
     };
 
     const onIntentPending = async ({ intent }: { intent: IntentId }) => {

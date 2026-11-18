@@ -871,7 +871,7 @@ export default defineComponent({
     };
     interface LinkNote {
       text: I18nText | null;
-      action: I18nText;
+      action: I18nText | null;
       separated: boolean;
       run: () => void;
     }
