@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             multiple
             searchable
             :placeholder="t('alerts.summary.noDestination')"
-            class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
+            class="h-auto! min-h-auto! max-w-75 min-w-45 flex-1 max-md:max-w-none max-md:min-w-0 max-md:basis-[calc(100%-2rem)]"
             :aria-label="t('alerts.destination')"
             data-test="anomaly-destination"
           >
@@ -73,12 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSelect>
           <OButton
             variant="ghost"
-            size="sm"
+            size="icon-circle-sm"
             :title="t('alerts.alertSettings.refreshDestinations')"
             data-test="anomaly-refresh-destinations"
             @click="$emit('refresh:destinations')"
-            icon-left="refresh"
-          />
+          >
+            <OIcon name="refresh" size="sm" />
+          </OButton>
           <OButton
             variant="outline"
             size="sm"
