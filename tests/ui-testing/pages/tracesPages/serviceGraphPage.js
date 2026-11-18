@@ -92,6 +92,7 @@ export class ServiceGraphPage {
     this.metricsStreamItem = '[data-test="telemetry-correlation-metric-stream-item"]';
     this.metricsError = '[data-test="service-graph-side-panel-metrics-error"]';
     this.metricsEmpty = '[data-test="service-graph-side-panel-metrics-empty"]';
+    this.metricsNoStreams = '[data-test="correlation-no-metric-streams"]';
 
     // ===== TELEMETRY CORRELATION DIALOG =====
     this.correlationDashboardClose = '[data-test="correlation-dashboard-close"]';
@@ -530,19 +531,21 @@ export class ServiceGraphPage {
    * loading spinner) — NOT on the dashboard's data-test, which the fragment-root component drops
    * (see this.metricsStreamItem). Throws if the panel never renders (a genuinely broken tab).
    * @returns {Promise<boolean>} true if real metric-stream rows rendered (data present); false for
-   *   a resolved-but-streamless view (zero-stream dashboard / empty / error) — all acceptable.
+   *   a resolved-but-streamless view (zero-stream dashboard / no-streams / empty / error) — all
+   *   acceptable.
    */
   async clickMetricsTabAndWait() {
     await this.page.locator(this.metricsTab).click();
 
     // Wait until the metrics tab RESOLVES into a rendered content state — the correlation view
-    // (header) OR a terminal empty/error state. We race real content elements (never the swallowed
-    // panel wrapper); if none appears within the window the race rejects and the caller fails,
+    // (header) OR a terminal empty/error/no-streams state. We race real content elements (never the
+    // swallowed panel wrapper); if none appears within the window the race rejects and the caller fails,
     // which is the correct outcome for a genuinely broken/hung tab.
     await Promise.race([
       this.page.locator(this.metricsCorrelationHeader).first().waitFor({ state: 'visible', timeout: 30000 }),
       this.page.locator(this.metricsError).first().waitFor({ state: 'visible', timeout: 30000 }),
       this.page.locator(this.metricsEmpty).first().waitFor({ state: 'visible', timeout: 30000 }),
+      this.page.locator(this.metricsNoStreams).first().waitFor({ state: 'visible', timeout: 30000 }),
     ]);
 
     // Report whether real metric-stream rows rendered (.first() — the selector matches every row,
@@ -565,7 +568,7 @@ export class ServiceGraphPage {
       .isVisible({ timeout: 3000 }).catch(() => false);
   }
 
-  /** Terminal state of the Metrics tab: 'correlation', 'error', 'empty', or 'unknown' when none rendered. */
+  /** Terminal state of the Metrics tab: 'correlation', 'error', 'empty', 'no-streams', or 'unknown'. */
   async getMetricsTerminalState() {
     if (await this.page.locator(this.metricsCorrelationHeader).first().isVisible().catch(() => false)) {
       return 'correlation';
@@ -575,6 +578,9 @@ export class ServiceGraphPage {
     }
     if (await this.page.locator(this.metricsEmpty).first().isVisible().catch(() => false)) {
       return 'empty';
+    }
+    if (await this.page.locator(this.metricsNoStreams).first().isVisible().catch(() => false)) {
+      return 'no-streams';
     }
     return 'unknown';
   }

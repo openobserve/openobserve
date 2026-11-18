@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "ページ番号が範囲外です。有効なページ番号を指定してください。",
       "noMatchingService": "相関に一致するサービスが見つかりません",
       "unableToRetrieveCorrelation": "相関データを取得できません",
-      "noMetricStreams": "サービス \"{service}\" のメトリックストリームが見つかりません",
       "correlationError": "相関エラー: {error}",
       "contentCopied": "コンテンツのコピーに成功しました！",
       "noTraceIdForInspection": "検査に使用できるトレース ID がありません"

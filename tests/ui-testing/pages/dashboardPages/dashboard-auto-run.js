@@ -121,6 +121,11 @@ export default class DashboardAutoRun {
     }, [AUTO_RUN_STORAGE_KEY, value]);
   }
 
+  // Where auto_query_enabled, a live-preview run can start as Apply is clicked and turn that click into Cancel.
+  async disableAutoRun() {
+    await this.setStoredAutoRun("false");
+  }
+
   async getStoredAutoRun() {
     return this.page.evaluate((key) => localStorage.getItem(key), AUTO_RUN_STORAGE_KEY);
   }

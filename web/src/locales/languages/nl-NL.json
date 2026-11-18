@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "Paginanummer is buiten bereik. Geef een geldig paginanummer op.",
       "noMatchingService": "Geen overeenkomende service gevonden voor correlatie",
       "unableToRetrieveCorrelation": "Kan correlatiegegevens niet ophalen",
-      "noMetricStreams": "Geen metriekstreams gevonden voor service \"{service}\"",
       "correlationError": "Correlatiefout: {error}",
       "contentCopied": "Inhoud succesvol gekopieerd!",
       "noTraceIdForInspection": "Geen trace-ID beschikbaar voor inspectie"

@@ -131,6 +131,10 @@ describe("TraceLanes", () => {
     expect(sqls.some((sql) => sql.endsWith("DESC"))).toBe(true);
     expect(search.mock.calls.every(([arg]) => arg.query.query.size === 100)).toBe(true);
     expect(wrapper.findAll('[data-test="trace-lane-log-tick"]')).toHaveLength(2);
+    expect(findRelatedTelemetry.mock.calls[0][4]).toEqual({
+      start: (START_S - 300) * 1_000_000,
+      end: (START_S + 300) * 1_000_000,
+    });
   });
 
   it("shows the restart inside the axis when the scrape grid puts the rise after the spans", async () => {

@@ -20613,7 +20613,6 @@
       "pageOutOfRange": "Numer strony poza zakresem. Podaj poprawny numer strony.",
       "noMatchingService": "Nie znaleziono pasującej usługi dla korelacji",
       "unableToRetrieveCorrelation": "Nie można pobrać danych korelacji",
-      "noMetricStreams": "Nie znaleziono strumieni metrycznych dla usługi \"{service}\"",
       "correlationError": "Błąd korelacji: {error}",
       "contentCopied": "Treść skopiowana pomyślnie!",
       "noTraceIdForInspection": "Brak identyfikatora trace do inspekcji."

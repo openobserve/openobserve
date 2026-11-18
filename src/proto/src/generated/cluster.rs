@@ -531,8 +531,6 @@ pub struct MetricsQueryRequest {
     pub job: ::core::option::Option<Job>,
     #[prost(string, tag = "2")]
     pub org_id: ::prost::alloc::string::String,
-    #[prost(bool, tag = "4")]
-    pub need_wal: bool,
     #[prost(message, optional, tag = "5")]
     pub query: ::core::option::Option<MetricsQueryStmt>,
     #[prost(int64, tag = "8")]
@@ -549,6 +547,9 @@ pub struct MetricsQueryRequest {
     pub is_super_cluster: bool,
     #[prost(message, optional, tag = "14")]
     pub search_event_context: ::core::option::Option<SearchEventContext>,
+    /// time from which groups read the WAL, probed in this cluster; 0 = unknown, read the whole ingest window
+    #[prost(int64, tag = "15")]
+    pub wal_start_time: i64,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
