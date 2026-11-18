@@ -111,22 +111,9 @@ fn same_spec(a: &str, b: &str) -> bool {
     matches!((value(a), value(b)), (Some(a), Some(b)) if a == b)
 }
 
-/// The body limit on a draft spec, measured as the editor saves it: the body text trimmed, JSON
-/// with two-space indents, and no keys for absent optional values.
+/// The body limit on a draft spec, measured as the editor saves it.
 pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
-    // A spec serializes to JSON infallibly; on a failure fall back to the body text alone.
-    let size = serde_json::to_value(spec)
-        .map(|mut value| {
-            drop_nulls(&mut value);
-            if let Some(body) = value.get_mut("body")
-                && let Some(text) = body.as_str()
-            {
-                *body = serde_json::Value::String(editor_trim(text).to_string());
-            }
-            value
-        })
-        .and_then(|value| serde_json::to_vec_pretty(&value))
-        .map_or(spec.body.len(), |json| json.len());
+    let size = draft_len(spec);
     if size <= BODY_MAX_BYTES {
         return Ok(());
     }
@@ -136,20 +123,39 @@ pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
     })
 }
 
+/// The bytes `serializeContentSpec` in the editor writes for `spec`: the body text trimmed, JSON
+/// with two-space indents, and no `show_when` key when it is absent. The editor keeps the other
+/// null keys (`rows.columns`, `rows.format`).
+fn draft_len(spec: &ContentSpec) -> usize {
+    // A spec serializes to JSON infallibly; on a failure fall back to the body text alone.
+    serde_json::to_value(spec)
+        .map(|mut value| {
+            drop_absent_show_when(&mut value);
+            if let Some(body) = value.get_mut("body")
+                && let Some(text) = body.as_str()
+            {
+                *body = serde_json::Value::String(editor_trim(text).to_string());
+            }
+            value
+        })
+        .and_then(|value| serde_json::to_vec_pretty(&value))
+        .map_or(spec.body.len(), |json| json.len())
+}
+
 /// The body text as the editor saves it. JavaScript `trim` also removes U+FEFF, which Rust does
 /// not count as whitespace.
 fn editor_trim(body: &str) -> &str {
     body.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}')
 }
 
-/// Removes object keys whose value is null, at every depth.
-fn drop_nulls(value: &mut serde_json::Value) {
+/// Removes `show_when: null` keys at every depth.
+fn drop_absent_show_when(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Object(map) => {
-            map.retain(|_, v| !v.is_null());
-            map.values_mut().for_each(drop_nulls);
+            map.retain(|key, v| !(key == "show_when" && v.is_null()));
+            map.values_mut().for_each(drop_absent_show_when);
         }
-        serde_json::Value::Array(items) => items.iter_mut().for_each(drop_nulls),
+        serde_json::Value::Array(items) => items.iter_mut().for_each(drop_absent_show_when),
         _ => {}
     }
 }
@@ -1618,9 +1624,13 @@ mod tests {
         .unwrap();
         let mut with_nulls = serde_json::to_value(&many_fields).unwrap();
         assert!(serde_json::to_vec_pretty(&with_nulls).unwrap().len() > BODY_MAX_BYTES);
-        drop_nulls(&mut with_nulls);
+        drop_absent_show_when(&mut with_nulls);
         assert!(serde_json::to_vec_pretty(&with_nulls).unwrap().len() < BODY_MAX_BYTES);
         assert!(check_spec_size(&many_fields).is_ok());
+        // The measured size is the editor's `JSON.stringify(spec, null, 2)` output, byte for byte.
+        let editor_json = "{\n  \"title\": \"t\",\n  \"title_overrides\": {},\n  \"body\": \"b\",\n  \"fields\": [\n    {\n      \"label\": \"l\",\n      \"value\": \"v\"\n    }\n  ],\n  \"rows\": {\n    \"enabled\": false,\n    \"max\": 5,\n    \"columns\": null,\n    \"format\": null\n  },\n  \"links\": [],\n  \"chart\": {\n    \"enabled\": false\n  }\n}";
+        let one_field = ContentSpec::parse(editor_json).unwrap();
+        assert_eq!(draft_len(&one_field), editor_json.len());
         // Trailing blank lines are not measured: the editor trims them on save.
         let padded_body = ContentSpec {
             title: "t".into(),
