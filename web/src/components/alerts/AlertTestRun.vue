@@ -21,7 +21,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { starterContentSpec } from "@/components/alerts/template-content/contentSpec";
-import alertsService from "@/services/alerts";
+import destinationService from "@/services/alert_destination";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatNumber, joinList, joinListMore } from "@/utils/alerts/alertCopy";
@@ -32,8 +32,6 @@ const props = defineProps<{
   /** The unsaved alert, or null when the form can't build one yet. */
   body: EvaluateAlertBody | null;
   folder?: string;
-  /** Unit of the compared value, as the preview draws it. */
-  unit?: string | null;
   destinations: string[];
   /** The alert's own message template; otherwise a sample message is sent. */
   template?: string | null;
@@ -76,7 +74,6 @@ const report = computed(() => {
   if (!result || (running.value && !sameAlert.value)) return null;
   return testRunReport(result, {
     t,
-    unit: props.unit,
     timeZone: store.state.timezone,
     nowMs: Date.now(),
   });
@@ -100,7 +97,10 @@ const send = async () => {
     : { definition: starterContentSpec(), kind: "alert" };
   const outcomes = await Promise.allSettled(
     names.map((destination_name) =>
-      alertsService.testSendDestination(org(), destination_name, data),
+      destinationService.testSend(
+        { org_identifier: org(), destination_name, data },
+        { silentForbidden: true },
+      ),
     ),
   );
   const sent: string[] = [];
@@ -133,106 +133,126 @@ const send = async () => {
   ];
   sending.value = false;
 };
-
-defineExpose({ run });
 </script>
 
 <template>
   <section
-    class="bg-surface-base absolute inset-0 z-10 flex flex-col gap-2 overflow-y-auto px-4 pt-2"
+    class="bg-surface-base absolute inset-0 z-10 flex flex-col"
     :aria-label="t('alerts.testRun.region')"
     :aria-busy="running"
     data-test="alert-test-run"
   >
-    <div class="flex items-start gap-2">
-      <div
-        class="flex min-w-0 flex-1 flex-col gap-1"
-        :class="running && report ? 'opacity-60' : ''"
-        aria-live="polite"
-      >
-        <p
-          v-if="running && !report"
-          class="text-text-secondary m-0 text-sm"
-          data-test="alert-test-run-running"
+    <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pt-2 pb-3">
+      <div class="flex items-start gap-2">
+        <div
+          class="flex min-w-0 flex-1 flex-col gap-1"
+          :class="running && report ? 'opacity-60' : ''"
+          aria-live="polite"
         >
-          {{ t("alerts.testRun.running") }}
-          <OButton variant="link" data-test="alert-test-run-cancel" @click="cancelRun">
-            {{ t("common.cancel") }}
-          </OButton>
-        </p>
-        <p
-          v-else-if="testRun.state.value === 'failed'"
-          class="text-status-error-text m-0 text-sm"
-          role="alert"
-          data-test="alert-test-run-failed"
-        >
-          {{ t("alerts.testRun.failed", { reason: testRun.failure.value ?? "" }) }}
-        </p>
-        <template v-else-if="report">
           <p
-            v-for="line in report.lines"
-            :key="line.id"
-            class="m-0"
-            :class="TONE_CLASS[line.tone]"
-            :data-test="`alert-test-run-${line.id}`"
+            v-if="running && !report"
+            class="text-text-secondary m-0 text-sm"
+            data-test="alert-test-run-running"
           >
-            {{ line.text }}
+            {{ t("alerts.testRun.running") }}
+            <OButton variant="link" data-test="alert-test-run-cancel" @click="cancelRun">
+              {{ t("common.cancel") }}
+            </OButton>
           </p>
-          <p v-if="stale" class="text-text-secondary m-0 text-xs" data-test="alert-test-run-stale">
-            {{ t("alerts.testRun.stale") }}
+          <p
+            v-else-if="testRun.state.value === 'failed'"
+            class="text-status-error-text m-0 text-sm"
+            role="alert"
+            data-test="alert-test-run-failed"
+          >
+            {{ t("alerts.testRun.failed", { reason: testRun.failure.value ?? "" }) }}
           </p>
-        </template>
+          <template v-else-if="report">
+            <p
+              v-for="line in report.lines"
+              :key="line.id"
+              class="m-0"
+              :class="TONE_CLASS[line.tone]"
+              :data-test="`alert-test-run-${line.id}`"
+            >
+              {{ line.text }}
+            </p>
+            <p
+              v-if="stale"
+              class="text-text-secondary m-0 text-xs"
+              data-test="alert-test-run-stale"
+            >
+              {{ t("alerts.testRun.staleRunAgain") }}
+            </p>
+          </template>
+        </div>
+        <OButton
+          variant="ghost"
+          size="icon-xs"
+          icon-left="close"
+          :aria-label="t('common.close')"
+          data-test="alert-test-run-close"
+          @click="emit('close')"
+        />
+      </div>
+      <ul
+        v-if="report && report.groups.length"
+        class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs"
+        :class="running ? 'opacity-60' : ''"
+        data-test="alert-test-run-groups"
+      >
+        <li v-for="group in report.groups" :key="group.label" class="flex min-w-0 gap-2">
+          <OTruncatedText class="text-text-body min-w-0 font-medium">{{
+            group.label
+          }}</OTruncatedText>
+          <span class="text-text-secondary shrink-0">{{ group.text }}</span>
+        </li>
+        <li v-if="report.groupsMore" class="text-text-secondary">
+          {{
+            t("alerts.copy.nMore", { count: formatNumber(report.groupsMore) }, report.groupsMore)
+          }}
+        </li>
+      </ul>
+    </div>
+    <div
+      class="border-border-default flex shrink-0 items-center gap-3 border-t px-4 py-2"
+      data-test="alert-test-run-actions"
+    >
+      <div class="flex min-w-0 flex-1 flex-col items-start gap-1">
+        <OButton
+          v-if="destinations.length"
+          variant="outline"
+          size="xs"
+          :loading="sending"
+          data-test="alert-test-run-send"
+          @click="confirmOpen = true"
+        >
+          {{ t("alerts.testRun.sendTest") }}
+        </OButton>
+        <span v-else class="text-text-secondary text-xs" data-test="alert-test-run-no-destination">
+          {{ t("alerts.testRun.noDestination") }}
+        </span>
+        <span
+          v-for="(line, i) in sendLines"
+          :key="i"
+          :class="TONE_CLASS[line.tone]"
+          :role="line.tone === 'error' ? 'alert' : undefined"
+          data-test="alert-test-run-send-result"
+        >
+          {{ line.text }}
+        </span>
       </div>
       <OButton
-        variant="ghost"
-        size="icon-xs"
-        icon-left="close"
-        :aria-label="t('common.close')"
-        data-test="alert-test-run-close"
-        @click="emit('close')"
-      />
-    </div>
-    <ul
-      v-if="report && report.groups.length"
-      class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs"
-      :class="running ? 'opacity-60' : ''"
-      data-test="alert-test-run-groups"
-    >
-      <li v-for="group in report.groups" :key="group.label" class="flex min-w-0 gap-2">
-        <OTruncatedText class="text-text-body min-w-0 font-medium">{{
-          group.label
-        }}</OTruncatedText>
-        <span class="text-text-secondary shrink-0">{{ group.text }}</span>
-      </li>
-      <li v-if="report.groupsMore" class="text-text-secondary">
-        {{ t("alerts.copy.nMore", { count: formatNumber(report.groupsMore) }, report.groupsMore) }}
-      </li>
-    </ul>
-    <div
-      class="border-border-default bg-surface-base sticky bottom-0 mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2"
-    >
-      <OButton
-        v-if="destinations.length"
+        class="shrink-0"
         variant="outline"
         size="xs"
-        :loading="sending"
-        data-test="alert-test-run-send"
-        @click="confirmOpen = true"
+        :loading="running"
+        :disabled="!body"
+        data-test="alert-test-run-rerun"
+        @click="run"
       >
-        {{ t("alerts.testRun.sendTest") }}
+        {{ t("alerts.testRun.runAgain") }}
       </OButton>
-      <span v-else class="text-text-secondary text-xs" data-test="alert-test-run-no-destination">
-        {{ t("alerts.testRun.noDestination") }}
-      </span>
-      <span
-        v-for="(line, i) in sendLines"
-        :key="i"
-        :class="TONE_CLASS[line.tone]"
-        :role="line.tone === 'error' ? 'alert' : undefined"
-        data-test="alert-test-run-send-result"
-      >
-        {{ line.text }}
-      </span>
     </div>
     <ConfirmDialog
       v-model="confirmOpen"

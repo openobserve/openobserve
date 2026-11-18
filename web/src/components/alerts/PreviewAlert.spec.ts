@@ -74,6 +74,7 @@ vi.mock("@/composables/useStreams", () => ({
 
 // Imported after the mock above so it resolves to the mocked module.
 import searchService from "@/services/search";
+import alertsService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 
 const baseFormData = () => ({
@@ -3540,5 +3541,31 @@ describe("PreviewAlert - value alerts without a value, span durations and Test i
     await flushPromises();
     expect(w.find('[data-test="alert-preview-test-it"]').exists()).toBe(offered);
     w.unmount();
+  });
+
+  it("covers Test it with its panel and hands focus back to it on close", async () => {
+    vi.spyOn(alertsService, "evaluate").mockReturnValue(new Promise(() => {}));
+    const w = mount(PreviewAlert, {
+      attachTo: document.body,
+      global: { plugins: [i18n, store] },
+      props: {
+        query: "SELECT * FROM logs",
+        formData: baseFormData(),
+        isAggregationEnabled: false,
+        selectedTab: "sql",
+        isUsingBackendSql: false,
+        isEditorOpen: false,
+      },
+    });
+    await flushPromises();
+    await w.find('[data-test="alert-preview-test-it"]').trigger("click");
+    expect(w.find('[data-test="alert-test-run"]').exists()).toBe(true);
+    expect(w.find('[data-test="alert-preview-test-it"]').exists()).toBe(false);
+
+    await w.find('[data-test="alert-test-run-close"]').trigger("click");
+    await flushPromises();
+    expect(document.activeElement).toBe(w.find('[data-test="alert-preview-test-it"]').element);
+    w.unmount();
+    vi.restoreAllMocks();
   });
 });

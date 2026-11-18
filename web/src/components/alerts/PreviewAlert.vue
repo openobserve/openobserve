@@ -42,10 +42,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </div>
     </Teleport>
-    <!-- Chart -->
+    <!-- Its own stacking context keeps the chart's loading line under the Test it panel. -->
     <div
       data-test="alert-preview-chart"
-      class="preview-alert-chart relative min-h-0 flex-1 px-4"
+      class="preview-alert-chart relative isolate min-h-0 flex-1 px-4"
       :class="showChartKey ? 'pb-1' : 'pb-4'"
     >
       <!-- Empty query placeholder -->
@@ -88,16 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #actions />
       </QueryErrorState>
-      <AlertTestRun
-        v-if="testOpen && testable"
-        ref="testRunPanel"
-        :body="testBody"
-        :folder="testFolder"
-        :unit="valueUnit"
-        :destinations="formData.destinations ?? []"
-        :template="formData.template || null"
-        @close="testOpen = false"
-      />
     </div>
     <div
       v-if="showChartKey"
@@ -130,18 +120,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ seriesCountText }}
         </OTruncatedText>
         <OButton
-          v-if="testable"
+          v-if="testable && !testOpen"
+          ref="testItButton"
           variant="link"
           size="xs"
           class="shrink-0"
           :loading="testRun.state.value === 'running'"
           data-test="alert-preview-test-it"
-          @click="onTestIt"
+          @click="testOpen = true"
         >
           {{ t("alerts.testRun.action") }}
         </OButton>
       </span>
     </div>
+    <AlertTestRun
+      v-if="testOpen && testable"
+      :body="testBody"
+      :folder="testFolder"
+      :destinations="formData.destinations ?? []"
+      :template="formData.template || null"
+      @close="closeTest"
+    />
   </div>
 </template>
 
@@ -470,10 +469,12 @@ onBeforeUnmount(() => {
   testRun.currentKey.value = null;
 });
 const testOpen = ref(false);
-const testRunPanel = ref<{ run: () => void } | null>(null);
-const onTestIt = () => {
-  if (testOpen.value) testRunPanel.value?.run();
-  else testOpen.value = true;
+const testItButton = ref<{ $el: HTMLElement } | null>(null);
+// The panel covers Test it, so closing it hands focus back to the button that opened it.
+const closeTest = async () => {
+  testOpen.value = false;
+  await nextTick();
+  testItButton.value?.$el?.focus();
 };
 
 type PreviewRange = "checks" | "12h" | "24h";
