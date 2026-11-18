@@ -80,6 +80,23 @@ const COMPARE: Record<string, (value: number, limit: number) => boolean> = {
 const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
 const wholeMinutes = (value: number) => Math.max(1, Math.floor(Number(value)) || 1);
 
+/** The replay counts events against a count threshold, so only a builder count on a timer or real time has a day to show. */
+export function replaysDay(
+  form: {
+    stream_name?: string;
+    is_real_time?: string | boolean;
+    query_condition?: { type?: string };
+  },
+  aggregated: boolean,
+): boolean {
+  return (
+    !!form.stream_name &&
+    !["anomaly", "composite"].includes(String(form.is_real_time)) &&
+    (form.query_condition?.type || "custom") === "custom" &&
+    !aggregated
+  );
+}
+
 /** The largest bucket that every check window starts and ends on; cron times only line up per minute. */
 export function backtestBucketMinutes(
   options: Pick<BacktestOptions, "period" | "frequency" | "checkTimesMs">,

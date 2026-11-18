@@ -1322,6 +1322,7 @@ import {
 } from "@/composables/alerts/useStreamDiscovery";
 import AlertCheckTimeline from "./AlertCheckTimeline.vue";
 import AlertBacktest from "./AlertBacktest.vue";
+import { replaysDay } from "@/utils/alerts/alertBacktest";
 import { provideAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { getCronIntervalDifferenceInSeconds, isAboveMinRefreshInterval } from "@/utils/queryUtils";
@@ -1774,15 +1775,9 @@ export default defineComponent({
       alertForm.setF("trigger_condition.threshold", preset.threshold);
     };
 
-    // The 24-hour check replays an event count, so it needs a builder alert counting events.
-    const showsBacktest = computed(() => {
-      const fd = alertForm.formData.value;
-      return (
-        !!fd.stream_name &&
-        (fd.query_condition?.type || "custom") === "custom" &&
-        !alertForm.isAggregationEnabled.value
-      );
-    });
+    const showsBacktest = computed(() =>
+      replaysDay(alertForm.formData.value, alertForm.isAggregationEnabled.value),
+    );
 
     // Test it's answer draws the 24-hour row for any query while the alert is unchanged.
     const alertTestRun = provideAlertTestRun();
