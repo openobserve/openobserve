@@ -47,10 +47,8 @@ export const useAnnotations = (
     if (!enableAnnotations) return null;
     if (!panelId || !dashboardId) return undefined;
     try {
-      // One request per dashboard and window: the key has no panel id, so every
-      // panel joins the same in-flight request and reads the same cache entry.
-      // Each panel then keeps the annotations the server would have returned
-      // for it alone: its own and the dashboard-wide ones (no panels).
+      // No panel id in the key, so all panels share one request per window, then
+      // each keeps the rows the server's panel filter would have returned for it.
       const all = await queryClient.fetchQuery(
         dashboardAnnotationsQuery(organization, dashboardId, { start_time, end_time }),
       );

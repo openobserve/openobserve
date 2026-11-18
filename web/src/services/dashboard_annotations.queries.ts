@@ -19,9 +19,8 @@ import { annotationKeys } from "./dashboard_annotations.querykeys";
 import { EMPTY_LIST_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { queryClient } from "@/composables/query/queryClient";
 
-// One counter per dashboard, moved after each annotation write. Every panel of
-// a dashboard shares one read, so the reload after a write needs a new key: on
-// the old key it would join a read that another panel started before the write.
+// Moved by each write, so the reload after a write gets a new key and never
+// joins a shared read that another panel started before the write.
 const revisions = new Map<string, number>();
 const revisionKey = (org: string, dashboardId: string) => `${org}/${dashboardId}`;
 const revisionOf = (org: string, dashboardId: string) =>
@@ -49,10 +48,8 @@ export const dashboardAnnotationsQuery = (org: string, dashboardId: string, para
           null
         );
       } catch (err: any) {
-        // A 503 means the permission service is overloaded. Annotations are an
-        // optional overlay, so the panels draw without them: no retry, and the
-        // empty answer is kept for a short time so that the other panels do not
-        // send the same request again.
+        // Annotations are optional: on a 503 (overload, no node) draw without them,
+        // with no retry, and keep the empty answer briefly so other panels do not ask.
         if (err?.response?.status === 503) return null;
         throw err;
       }
