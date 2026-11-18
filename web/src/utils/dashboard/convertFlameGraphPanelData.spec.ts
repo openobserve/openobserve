@@ -18,7 +18,7 @@ import { convertPanelData } from "./convertPanelData";
 import { buildFoldedStackTree, convertFlameGraphPanelData } from "./convertFlameGraphPanelData";
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 

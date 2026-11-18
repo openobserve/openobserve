@@ -70,6 +70,7 @@ const mockSparklines = ref({
 });
 const mockLoading = ref(false);
 const mockP95Loading = ref(false);
+const mockP95Unavailable = ref(false);
 const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
 const mockAvailableStreams = ref<string[]>([]);
@@ -82,6 +83,7 @@ vi.mock("./composables/useLLMInsights", () => ({
     sparklines: mockSparklines,
     loading: mockLoading,
     p95Loading: mockP95Loading,
+    p95Unavailable: mockP95Unavailable,
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
     availableStreams: mockAvailableStreams,
@@ -218,6 +220,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   kpiCache.clear();
   queryClient.clear();
+  mockP95Unavailable.value = false;
   panelMounts = [];
   for (const k of Object.keys(mockRouteQuery)) delete mockRouteQuery[k];
   mockRouteQuery.type = "stream";
@@ -357,6 +360,18 @@ describe("LLMInsightsDashboard — loadInsights guards", () => {
     await (wrapper.vm as any).loadInsights();
     expect(mockFetchAll).not.toHaveBeenCalled();
     expect(mockRestore).toHaveBeenCalledWith(expect.objectContaining({ kpi: {}, sparklines: {} }));
+  });
+
+  it("does not cache a load whose P95 query failed, so a return asks for it again", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockP95Unavailable.value = true;
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights();
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
+    expect(mockRestore).not.toHaveBeenCalled();
   });
 
   it("does not serve another org's KPI snapshot for the same stream and window", async () => {

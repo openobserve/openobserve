@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "Yinelenen panel kimliği bulundu: {id}",
       "panelMissingLayoutI": "Panel {id} için layout.i değeri eksik",
       "duplicateLayoutI": "Sekme {tabId} içinde yinelenen layout.i değeri bulundu: {value}",
-      "customChartCallbacksDropped": "Özel grafik: Bu panelin kodundaki {count} fonksiyon geri çağrısı yok sayıldı. Kayıtlı grafik kodu uygulamada geri çağrıları çalıştıramaz; bunun yerine düz değerler kullanın. | Özel grafik: Bu panelin kodundaki {count} fonksiyon geri çağrısı yok sayıldı. Kayıtlı grafik kodu uygulamada geri çağrıları çalıştıramaz; bunun yerine düz değerler kullanın.",
       "unsafeCodeDetected": "Güvenli olmayan kod tespit edildi: {error}",
       "forbiddenFunctionCall": "'{name}()' kullanımına izin verilmiyor.",
       "forbiddenInsideSetTimeout": "'setTimeout()' içinde {name} kullanımına izin verilmiyor.",
@@ -20614,7 +20613,6 @@
       "pageOutOfRange": "Sayfa numarası aralık dışında. Lütfen geçerli bir sayfa numarası girin.",
       "noMatchingService": "Korelasyon için eşleşen hizmet bulunamadı",
       "unableToRetrieveCorrelation": "Korelasyon verileri alınamıyor",
-      "noMetricStreams": "\"{service}\" hizmeti için metrik akışı bulunamadı",
       "correlationError": "Korelasyon hatası: {error}",
       "contentCopied": "İçerik Başarıyla Kopyalandı!",
       "noTraceIdForInspection": "İnceleme için iz kimliği yok"

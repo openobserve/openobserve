@@ -89,15 +89,6 @@ pub async fn write_results_to_cache(
         && !merged_response.hits.is_empty();
 
     if cfg.common.result_cache_enabled && should_cache_results {
-        // Determine if this is a non-timestamp histogram query for websocket streaming
-        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
-            && !merged_response.order_by_metadata.is_empty()
-            && merged_response
-                .order_by_metadata
-                .first()
-                .map(|(field, _)| field != &c_resp.ts_column)
-                .unwrap_or(false);
-
         cache::write_results(
             &c_resp.trace_id,
             &c_resp.ts_column,
@@ -108,7 +99,6 @@ pub async fn write_results_to_cache(
             c_resp.is_aggregate,
             c_resp.is_descending,
             clear_cache,
-            is_histogram_non_ts_order,
         )
         .await;
         log::info!(

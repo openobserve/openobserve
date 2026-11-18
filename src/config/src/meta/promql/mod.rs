@@ -391,28 +391,30 @@ pub struct RequestParseTree {
     pub query: String,
 }
 
+/// Only functions that give the same result when re-applied to their own output: a downsampled
+/// hour is merged again on a job retry or late data, so `avg` and `count` are not offered.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Function {
-    Avg,
     Sum,
-    Count,
     Min,
     Max,
     Last,
     First,
 }
 
-impl From<&str> for Function {
-    fn from(s: &str) -> Self {
+impl std::str::FromStr for Function {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "avg" => Self::Avg,
-            "sum" => Self::Sum,
-            "count" => Self::Count,
-            "min" => Self::Min,
-            "max" => Self::Max,
-            "last" => Self::Last,
-            "first" => Self::First,
-            _ => panic!("invalid downsampling function: {s}"),
+            "sum" => Ok(Self::Sum),
+            "min" => Ok(Self::Min),
+            "max" => Ok(Self::Max),
+            "last" => Ok(Self::Last),
+            "first" => Ok(Self::First),
+            _ => Err(anyhow::anyhow!(
+                "invalid downsampling function: {s}, supported: sum, min, max, last, first"
+            )),
         }
     }
 }
@@ -420,9 +422,7 @@ impl From<&str> for Function {
 impl Function {
     pub fn fun(&self) -> String {
         match self {
-            Function::Avg => "avg".to_string(),
             Function::Sum => "sum".to_string(),
-            Function::Count => "count".to_string(),
             Function::Min => "min".to_string(),
             Function::Max => "max".to_string(),
             Function::Last => "last_value".to_string(),
@@ -663,27 +663,24 @@ mod tests {
 
     #[test]
     fn test_function_from_str() {
-        assert_eq!(Function::from("avg"), Function::Avg);
-        assert_eq!(Function::from("AVG"), Function::Avg);
-        assert_eq!(Function::from("sum"), Function::Sum);
-        assert_eq!(Function::from("count"), Function::Count);
-        assert_eq!(Function::from("min"), Function::Min);
-        assert_eq!(Function::from("max"), Function::Max);
-        assert_eq!(Function::from("last"), Function::Last);
-        assert_eq!(Function::from("first"), Function::First);
+        assert_eq!("SUM".parse::<Function>().unwrap(), Function::Sum);
+        assert_eq!("min".parse::<Function>().unwrap(), Function::Min);
+        assert_eq!("max".parse::<Function>().unwrap(), Function::Max);
+        assert_eq!("last".parse::<Function>().unwrap(), Function::Last);
+        assert_eq!("first".parse::<Function>().unwrap(), Function::First);
     }
 
     #[test]
-    #[should_panic(expected = "invalid downsampling function")]
-    fn test_function_from_str_invalid_panics() {
-        let _ = Function::from("median");
+    fn test_function_from_str_rejects_non_reapplicable() {
+        for name in ["avg", "count", "median"] {
+            let err = name.parse::<Function>().unwrap_err().to_string();
+            assert!(err.contains("invalid downsampling function"), "{err}");
+        }
     }
 
     #[test]
     fn test_function_fun() {
-        assert_eq!(Function::Avg.fun(), "avg");
         assert_eq!(Function::Sum.fun(), "sum");
-        assert_eq!(Function::Count.fun(), "count");
         assert_eq!(Function::Min.fun(), "min");
         assert_eq!(Function::Max.fun(), "max");
         assert_eq!(Function::Last.fun(), "last_value");
@@ -696,7 +693,7 @@ mod tests {
 
         let rule_with_regex = DownsamplingRule {
             rule: Some(Regex::new("^http_").unwrap()),
-            function: Function::Avg,
+            function: Function::Max,
             offset: 0,
             step: 60,
         };
@@ -805,12 +802,12 @@ mod tests {
     fn test_downsampling_rule_default() {
         let rule = DownsamplingRule {
             rule: None,
-            function: Function::Avg,
+            function: Function::Max,
             offset: 0,
             step: 0,
         };
         assert!(rule.rule.is_none());
-        assert_eq!(rule.function, Function::Avg);
+        assert_eq!(rule.function, Function::Max);
     }
 
     #[test]

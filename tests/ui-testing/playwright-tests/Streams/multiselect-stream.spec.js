@@ -447,23 +447,16 @@ async function multistreamselect(page) {
     await pageManager.logsPage.expectLogsTableVisible();
     testLogger.info('Verified: Query results are displayed after loading saved view');
     
-    // Clean up: Try to delete the saved view (with error handling)
-    try {
-      await pageManager.logsPage.clickSavedViewsExpand();
-      await pageManager.logsPage.clickSavedViewSearchInput();
-      await pageManager.logsPage.fillSavedViewSearchInput(randomSavedViewName);
-      await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.UI_INTERACTION);
-      
-      // Delete the saved view using POM
-      await pageManager.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
-      await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.TOAST_WAIT);
-      await pageManager.logsPage.clickConfirmButton();
-      
-      testLogger.info(`Successfully deleted multistream saved view: ${randomSavedViewName}`);
-    } catch (cleanupError) {
-      testLogger.warn(`Cleanup failed - saved view may still exist: ${randomSavedViewName}`, { error: cleanupError.message });
-      // Test is still successful even if cleanup fails
-    }
+    await pageManager.logsPage.clickSavedViewsExpand();
+    await pageManager.logsPage.clickSavedViewSearchInput();
+    await pageManager.logsPage.fillSavedViewSearchInput(randomSavedViewName);
+    await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.UI_INTERACTION);
+
+    await pageManager.logsPage.clickDeleteSavedViewButton(randomSavedViewName);
+    await page.waitForTimeout(MULTISTREAM_CONFIG.TIMEOUTS.TOAST_WAIT);
+    await pageManager.logsPage.clickConfirmButton();
+    await pageManager.logsPage.expectSavedViewAbsent(randomSavedViewName);
+    testLogger.info(`Deleted multistream saved view: ${randomSavedViewName}`);
     
     testLogger.info('Multistream saved view creation and deletion test completed successfully');
   });

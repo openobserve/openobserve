@@ -28,6 +28,8 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
  * Tools for correlating logs, traces, and metrics using service_streams data
  */
 
+const CORRELATION_WINDOW_US = 5 * 60 * 1_000_000;
+
 export type TelemetryType = "logs" | "traces" | "metrics";
 
 export interface TelemetryContext {
@@ -532,4 +534,12 @@ export function findMatchingService(
   }
 
   return bestMatch;
+}
+
+/** The _correlate search range: 5 minutes either side of a record, never past now (microseconds). */
+export function correlationWindow(timestampUs: number): { start: number; end: number } {
+  return {
+    start: timestampUs - CORRELATION_WINDOW_US,
+    end: Math.min(timestampUs + CORRELATION_WINDOW_US, Date.now() * 1000),
+  };
 }

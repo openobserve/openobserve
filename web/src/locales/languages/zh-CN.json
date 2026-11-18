@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "发现重复的面板 ID：{id}",
       "panelMissingLayoutI": "面板 {id} 缺少 layout.i 值",
       "duplicateLayoutI": "在选项卡 {tabId} 中发现重复的 layout.i 值：{value}",
-      "customChartCallbacksDropped": "自定义图表：此面板代码中的 {count} 个函数回调已被忽略。存储的图表代码无法在应用中运行回调；请改用普通值。 | 自定义图表：此面板代码中的 {count} 个函数回调已被忽略。存储的图表代码无法在应用中运行回调；请改用普通值。",
       "unsafeCodeDetected": "检测到不安全的代码：{error}",
       "forbiddenFunctionCall": "不允许使用 '{name}()'。",
       "forbiddenInsideSetTimeout": "不允许在 'setTimeout()' 内使用 {name}。",
@@ -20614,7 +20613,6 @@
       "pageOutOfRange": "页码超出范围。请提供有效的页码。",
       "noMatchingService": "未找到关联的匹配服务",
       "unableToRetrieveCorrelation": "无法检索关联数据",
-      "noMetricStreams": "未找到服务 \"{service}\" 的指标流",
       "correlationError": "关联错误：{error}",
       "contentCopied": "内容复制成功！",
       "noTraceIdForInspection": "没有可用于检查的追踪ID"

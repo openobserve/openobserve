@@ -308,6 +308,27 @@ pub async fn get_public_ids_by_pks<C: ConnectionTrait>(
         .collect())
 }
 
+/// Primary keys of the `folder_type` folders with these public ids; unknown ids are skipped.
+pub async fn get_pks_by_names<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    folder_ids: &[String],
+    folder_type: FolderType,
+) -> Result<Vec<String>, sea_orm::DbErr> {
+    if folder_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .filter(Column::Type.eq(folder_type_into_i16(folder_type)))
+        .filter(Column::FolderId.is_in(folder_ids))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|model| model.id)
+        .collect())
+}
+
 /// Returns `(folder name, display name)` for the given primary-key `id`.
 ///
 /// Both values are needed when building API list responses for anomaly configs

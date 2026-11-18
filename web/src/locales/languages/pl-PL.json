@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "Znaleziono zduplikowane ID panelu: {id}",
       "panelMissingLayoutI": "Panel {id} nie ma wartości layout.i",
       "duplicateLayoutI": "Znaleziono zduplikowaną wartość layout.i w karcie {tabId}: {value}",
-      "customChartCallbacksDropped": "Wykres niestandardowy: zignorowano {count} wywołanie zwrotne funkcji w kodzie tego panelu. Zapisany kod wykresu nie może uruchamiać wywołań zwrotnych w aplikacji; użyj zwykłych wartości. | Wykres niestandardowy: zignorowano {count} wywołań zwrotnych funkcji w kodzie tego panelu. Zapisany kod wykresu nie może uruchamiać wywołań zwrotnych w aplikacji; użyj zwykłych wartości.",
       "unsafeCodeDetected": "Wykryto niebezpieczny kod: {error}",
       "forbiddenFunctionCall": "Użycie '{name}()' jest niedozwolone.",
       "forbiddenInsideSetTimeout": "Użycie {name} wewnątrz 'setTimeout()' jest niedozwolone.",
@@ -20614,7 +20613,6 @@
       "pageOutOfRange": "Numer strony poza zakresem. Podaj poprawny numer strony.",
       "noMatchingService": "Nie znaleziono pasującej usługi dla korelacji",
       "unableToRetrieveCorrelation": "Nie można pobrać danych korelacji",
-      "noMetricStreams": "Nie znaleziono strumieni metrycznych dla usługi \"{service}\"",
       "correlationError": "Błąd korelacji: {error}",
       "contentCopied": "Treść skopiowana pomyślnie!",
       "noTraceIdForInspection": "Brak identyfikatora trace do inspekcji."

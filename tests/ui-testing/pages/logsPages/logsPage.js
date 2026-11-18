@@ -3648,6 +3648,13 @@ export class LogsPage {
         return await this.savedViewApplyLocator(text).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
+    async expectSavedViewAbsent(name) {
+        await this.clickSavedViewsExpand();
+        await this.clickSavedViewSearchInput();
+        await this.fillSavedViewSearchInput(name);
+        await expect(this.savedViewApplyLocator(name)).toHaveCount(0, { timeout: 10000 });
+    }
+
     /**
      * Wait briefly for the success OToast after creating a saved view.
      * Resolves true on toast visible, false on timeout. Non-throwing — toasts may
@@ -3663,6 +3670,21 @@ export class LogsPage {
         } catch (e) {
             return false;
         }
+    }
+
+    async waitForSavedViewViaApi(org, viewName, timeout = 30000) {
+        let view;
+        await expect.poll(async () => {
+            const response = await this.page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/savedviews`, { headers: getAuthHeaders() });
+            view = response.ok() ? ((await response.json()).views ?? []).find((v) => v.view_name === viewName) : undefined;
+            return Boolean(view);
+        }, { timeout }).toBe(true);
+        return view;
+    }
+
+    async fetchSavedViewViaApi(org, viewId) {
+        const response = await this.page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/savedviews/${viewId}`, { headers: getAuthHeaders() });
+        return response.json();
     }
 
     async clickDeleteSavedViewButton(savedViewName) {

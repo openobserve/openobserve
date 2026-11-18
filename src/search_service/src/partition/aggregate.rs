@@ -25,7 +25,7 @@ use ::search::{
     sql::visitor::streaming_aggregate,
 };
 use config::{
-    ider,
+    TIMESTAMP_COL_NAME, ider,
     meta::{
         search::{CardinalityLevel, SearchPartitionRequest, generate_aggregation_search_interval},
         sql::resolve_stream_names,
@@ -34,10 +34,18 @@ use config::{
 };
 use infra::errors::Error;
 
-use crate::partition::sql_context::PartitionSqlContext;
+use crate::{
+    cache::result_utils::{is_ranked_by_non_timestamp, normalize_ts_order_by},
+    partition::sql_context::PartitionSqlContext,
+    sql::Sql,
+};
 
 /// Determine whether a streaming aggregate query should be used for the given SQL query.
-pub fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
+pub fn is_streaming_aggregate(
+    sql: &str,
+    ts_column: Option<&str>,
+    is_ranked_histogram: bool,
+) -> bool {
     let feature_query_streaming_aggs = config::get_config().search.feature_query_streaming_aggs;
     let mut is_cachable_aggs = is_simple_aggregate_query(sql).unwrap_or(false);
 
@@ -45,7 +53,16 @@ pub fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
         is_cachable_aggs = matches_pattern || is_cachable_aggs;
     }
 
-    ts_column.is_none() && is_cachable_aggs && feature_query_streaming_aggs
+    (ts_column.is_none() || is_ranked_histogram) && is_cachable_aggs && feature_query_streaming_aggs
+}
+
+/// A histogram whose leading ORDER BY is not its time column: its top-N is only right after
+/// every slice is merged, which the aggregation cache does and the result cache cannot.
+pub fn is_ranked_histogram(sql: &Sql, ts_column: Option<&str>) -> bool {
+    sql.histogram_interval.is_some()
+        && ts_column.is_some_and(|ts| {
+            is_ranked_by_non_timestamp(&normalize_ts_order_by(&sql.order_by, ts, &sql.aliases), ts)
+        })
 }
 
 /// Prepare streaming aggregate execution: discover cache, generate partition strategy,
@@ -74,7 +91,7 @@ pub async fn prepare_streaming_aggregate(
         };
 
         // check cardinality for group by fields
-        let group_by_fields = crate::sql::visitor::group_by::get_group_by_fields(&ctx.sql).await?;
+        let group_by_fields = cardinality_fields(&ctx.sql).await?;
         let cardinality_map = crate::cardinality::check_cardinality(
             org_id,
             stream_type,
@@ -96,7 +113,8 @@ pub async fn prepare_streaming_aggregate(
         let cache_interval_mins = cache_interval.get_duration_minutes();
         if cache_interval_mins > 0 {
             let streaming_id = ider::uuid();
-            let hashed_query = get_aggregation_cache_key_from_request(req);
+            let hashed_query =
+                get_aggregation_cache_key_from_request(req, ctx.sql.histogram_interval);
             let cache_file_path = create_aggregation_cache_file_path(
                 org_id,
                 &stream_type.to_string(),
@@ -196,4 +214,14 @@ pub async fn prepare_streaming_aggregate(
         streaming_id,
         streaming_aggs_cache_strategy,
     ))
+}
+
+/// GROUP BY fields whose distinct counts size the aggregation cache chunks.
+pub(crate) async fn cardinality_fields(sql: &Sql) -> Result<Vec<String>, Error> {
+    let mut fields = crate::sql::visitor::group_by::get_group_by_fields(sql).await?;
+    // A chunk holds a bounded number of histogram buckets, not one per distinct _timestamp.
+    if sql.histogram_interval.is_some() {
+        fields.retain(|field| field != TIMESTAMP_COL_NAME);
+    }
+    Ok(fields)
 }

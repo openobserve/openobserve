@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "Trovato ID pannello duplicato: {id}",
       "panelMissingLayoutI": "Al pannello {id} manca il valore layout.i",
       "duplicateLayoutI": "Trovato valore layout.i duplicato nella scheda {tabId}: {value}",
-      "customChartCallbacksDropped": "Grafico personalizzato: {count} callback di funzione nel codice di questo pannello è stato ignorato. Il codice salvato del grafico non può eseguire callback nell'app; usa invece valori semplici. | Grafico personalizzato: {count} callback di funzione nel codice di questo pannello sono stati ignorati. Il codice salvato del grafico non può eseguire callback nell'app; usa invece valori semplici.",
       "unsafeCodeDetected": "Rilevato codice non sicuro: {error}",
       "forbiddenFunctionCall": "L'uso di '{name}()' non è consentito.",
       "forbiddenInsideSetTimeout": "L'uso di {name} all'interno di 'setTimeout()' non è consentito.",
@@ -20614,7 +20613,6 @@
       "pageOutOfRange": "Il numero di pagina è fuori intervallo. Fornisci un numero di pagina valido.",
       "noMatchingService": "Nessun servizio corrispondente trovato per la correlazione",
       "unableToRetrieveCorrelation": "Impossibile recuperare i dati di correlazione",
-      "noMetricStreams": "Nessuno stream di metrica trovato per il servizio \"{service}\"",
       "correlationError": "Errore di correlazione: {error}",
       "contentCopied": "Contenuto copiato con successo!",
       "noTraceIdForInspection": "Nessun ID traccia disponibile per l'ispezione"

@@ -34,7 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         t("correlation.timeRangeWithDuration", timeRangeParams(timeRange, timezone))
       }}</template>
     </ServiceNameLabel>
-    <CorrelationScopeChips v-if="scope" :scope="scope" :by-pod="byPod" @close="emit('close')" />
+    <CorrelationScopeChips
+      v-if="scope || candidates.length || instanceVersion"
+      :scope="scope"
+      :service="displayServiceName || serviceName"
+      :instance-version="instanceVersion"
+      :candidates="candidates"
+      @close="emit('close')"
+    />
   </div>
 </template>
 <script setup lang="ts">
@@ -47,18 +54,22 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ServiceNameLabel from "@/components/shared/ServiceNameLabel.vue";
 import CorrelationScopeChips from "./CorrelationScopeChips.vue";
 import { timeRangeParams, type CorrelationTimeRange } from "./correlationVersions";
-import type { ScopeByPod } from "./useCorrelationVersions";
 
-defineProps<{
+const props = defineProps<{
   serviceName: string;
   displayServiceName?: string;
   serviceDisplay?: Omit<ServiceDisplayFields, "display_name">;
   scope: Scope | null;
-  byPod?: ScopeByPod | null;
+  instanceVersion: string | null | undefined;
   timeRange?: CorrelationTimeRange;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const { t } = useI18nTyped();
 const store = useStore();
 const timezone = computed<string>(() => store.state.timezone || "UTC");
+const candidates = computed(() =>
+  props.serviceDisplay?.display_source === "detection_ambiguous"
+    ? (props.serviceDisplay.display_candidates ?? [])
+    : [],
+);
 </script>

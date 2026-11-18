@@ -7,6 +7,9 @@ export class IncidentsPage {
     this.statusFilterGroup = '[data-test="incident-status-filter-group"]';
     this.incidentTable = '[data-test="incident-list-table"]';
     this.emptyState = '[data-test="o2-table-empty"]';
+    this.confirmDialogRoot = '[data-test="confirm-dialog-provider"]';
+    this.confirmDialogPrimary = '[data-test="o-dialog-primary-btn"]';
+    this.confirmDialogSecondary = '[data-test="o-dialog-secondary-btn"]';
   }
 
   statusTab(status) {
@@ -105,5 +108,35 @@ export class IncidentsPage {
 
   async clickMutedViewDowntime() {
     await this.page.locator('[data-test="incident-detail-muted-view"]').click();
+  }
+
+  async gotoDetail(incidentId) {
+    const org = process.env.ORGNAME || 'default';
+    const base = (process.env.ZO_BASE_URL || '').replace(/\/+$/, '');
+    await this.page.goto(`${base}/web/incidents/${incidentId}?org_identifier=${org}`);
+  }
+
+  // The detail drawer's Resolve/Reopen buttons carry no data-test.
+  statusAction(label) {
+    return this.page.getByRole('button', { name: label, exact: true }).first();
+  }
+
+  confirmDialog() {
+    return this.page.locator(this.confirmDialogRoot);
+  }
+
+  async expectConfirmDialog(title) {
+    await expect(this.confirmDialog()).toBeVisible({ timeout: 10000 });
+    await expect(this.confirmDialog()).toContainText(title);
+  }
+
+  async cancelConfirmDialog() {
+    await this.confirmDialog().locator(this.confirmDialogSecondary).click();
+    await expect(this.confirmDialog()).toBeHidden({ timeout: 10000 });
+  }
+
+  async acceptConfirmDialog() {
+    await this.confirmDialog().locator(this.confirmDialogPrimary).click();
+    await expect(this.confirmDialog()).toBeHidden({ timeout: 10000 });
   }
 }

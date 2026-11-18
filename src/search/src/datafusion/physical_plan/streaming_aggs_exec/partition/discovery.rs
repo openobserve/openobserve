@@ -31,9 +31,10 @@ pub struct CacheEntry {
 }
 
 impl CacheEntry {
-    /// Checks if this cache entry overlaps with the given time range
-    pub fn overlaps_with(&self, start: i64, end: i64, interval: Interval) -> bool {
-        self.start_time < end && self.end_time > start && self.interval <= interval
+    /// Whether this entry can serve the given range: its whole state merges into the result,
+    /// so a file that extends past either edge would add rows outside the window.
+    pub fn is_within(&self, start: i64, end: i64, interval: Interval) -> bool {
+        self.start_time >= start && self.end_time <= end && self.interval <= interval
     }
 }
 
@@ -152,11 +153,10 @@ pub async fn discover_cache_for_query(
         }
 
         // Parse the cache entry
-        if let Some(entry) = parse_cache_file_name(cache_file_path, file_name_str) {
-            // Only include entries that overlap with the query range
-            if entry.overlaps_with(query_start, query_end, query_interval) {
-                cache_entries.push(entry);
-            }
+        if let Some(entry) = parse_cache_file_name(cache_file_path, file_name_str)
+            && entry.is_within(query_start, query_end, query_interval)
+        {
+            cache_entries.push(entry);
         }
     }
 
@@ -298,7 +298,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cache_entry_overlaps_with() {
+    fn test_cache_entry_is_within() {
         let interval = Interval::OneHour;
         let entry = CacheEntry {
             file_path: "test.arrow".to_string(),
@@ -307,17 +307,17 @@ mod tests {
             interval,
         };
 
-        // Test overlapping ranges
-        assert!(entry.overlaps_with(500, 1500, interval)); // Starts before, ends during
-        assert!(entry.overlaps_with(1500, 2500, interval)); // Starts during, ends after
-        assert!(entry.overlaps_with(1200, 1800, interval)); // Completely within
-        assert!(entry.overlaps_with(500, 2500, interval)); // Completely encompasses
+        assert!(entry.is_within(1000, 2000, interval)); // Same range
+        assert!(entry.is_within(500, 2500, interval)); // Completely encompassed by the query
 
-        // Test non-overlapping ranges
-        assert!(!entry.overlaps_with(0, 1000, interval)); // Ends exactly at start
-        assert!(!entry.overlaps_with(2000, 3000, interval)); // Starts exactly at end
-        assert!(!entry.overlaps_with(0, 500, interval)); // Completely before
-        assert!(!entry.overlaps_with(2500, 3000, interval)); // Completely after
+        // The file's rows outside the query window would be merged into the result
+        assert!(!entry.is_within(500, 1500, interval)); // Query ends inside the file
+        assert!(!entry.is_within(1500, 2500, interval)); // Query starts inside the file
+        assert!(!entry.is_within(1200, 1800, interval)); // Query inside the file
+
+        assert!(!entry.is_within(0, 1000, interval)); // Ends exactly at start
+        assert!(!entry.is_within(2000, 3000, interval)); // Starts exactly at end
+        assert!(!entry.is_within(500, 2500, Interval::ThirtyMinutes)); // Coarser than the query
     }
 
     #[test]

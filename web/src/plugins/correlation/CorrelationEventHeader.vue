@@ -98,9 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Subject chips (View by) — shown when subjectChips are provided -->
     <div v-if="showSubjectSection" class="flex shrink-0 items-center gap-3">
-      <OSeparator vertical class="my-2" />
+      <OSeparator v-if="contextChips && contextChips.length > 0" vertical class="my-2" />
       <span class="text-2! text-typography-meta m-0">{{ t("correlation.viewBy") }}</span>
       <OToggleGroup
         :model-value="activeSubject ?? undefined"
@@ -134,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Selected subject as a "label = value" badge (when it carries a value) -->
       <OTag
-        v-if="activeSubjectChip && activeSubjectChip.value"
+        v-if="activeSubjectChip && activeSubjectBadge"
         type="correlationChip"
         value="subject"
         :data-test="`correlation-event-header-active-subject-${activeSubjectChip.key}`"
@@ -167,6 +166,8 @@ import {
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { repeatsChip } from "./correlationHeader";
+import type { FieldAlias } from "@/services/service_streams";
 
 const { t } = useI18nTyped();
 
@@ -191,6 +192,7 @@ const props = withDefaults(
     contextChips?: DimensionChip[];
     subjectChips?: DimensionChip[];
     activeSubject?: string | null;
+    semanticGroups?: FieldAlias[];
     overflowMode?: "responsive" | "threshold";
     overflowThreshold?: number;
     getSubjectButtonLabel?: (id: string) => string;
@@ -240,13 +242,28 @@ onBeforeUnmount(() => {
 
 // ── Derived display state ─────────────────────────────────────────────────────
 
-const showSubjectSection = computed(() => (props.subjectChips?.length ?? 0) > 0);
+// A switch whose only option is disabled offers no choice, so it is hidden rather than greyed.
+const showSubjectSection = computed(() => {
+  const chips = props.subjectChips ?? [];
+  return chips.length > 1 || (chips.length === 1 && !chips[0].disabled);
+});
 
 // The currently-selected subject chip, shown as a "label = value" badge after the
 // View-by toggles. Only meaningful when it carries a concrete value (trace/log);
 // incidents' valueless subjects leave this null so no empty badge renders.
 const activeSubjectChip = computed<DimensionChip | undefined>(() =>
   props.subjectChips?.find((c) => c.key === props.activeSubject),
+);
+
+const activeSubjectBadge = computed(
+  () =>
+    !!activeSubjectChip.value?.value &&
+    !repeatsChip(
+      props.contextChips,
+      activeSubjectChip.value.key,
+      activeSubjectChip.value.value,
+      props.semanticGroups ?? [],
+    ),
 );
 
 const hasChips = computed(() => (props.contextChips?.length ?? 0) > 0 || showSubjectSection.value);

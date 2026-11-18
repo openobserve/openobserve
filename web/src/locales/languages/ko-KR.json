@@ -9871,7 +9871,6 @@
       "duplicatePanelId": "중복된 패널 ID 발견: {id}",
       "panelMissingLayoutI": "패널 {id}에 layout.i 값이 없습니다.",
       "duplicateLayoutI": "탭 {tabId}에서 중복된 layout.i 값 발견: {value}",
-      "customChartCallbacksDropped": "사용자 지정 차트: 이 패널 코드의 함수 콜백 {count}개가 무시되었습니다. 저장된 차트 코드는 앱에서 콜백을 실행할 수 없으므로 대신 일반 값을 사용하세요. | 사용자 지정 차트: 이 패널 코드의 함수 콜백 {count}개가 무시되었습니다. 저장된 차트 코드는 앱에서 콜백을 실행할 수 없으므로 대신 일반 값을 사용하세요.",
       "unsafeCodeDetected": "안전하지 않은 코드 감지: {error}",
       "forbiddenFunctionCall": "'{name}()' 사용은 허용되지 않습니다.",
       "forbiddenInsideSetTimeout": "'setTimeout()' 내에서 {name} 사용은 허용되지 않습니다.",
@@ -20614,7 +20613,6 @@
       "pageOutOfRange": "페이지 번호가 범위를 벗어났습니다. 유효한 페이지 번호를 제공하세요.",
       "noMatchingService": "상관관계에 일치하는 서비스가 없습니다",
       "unableToRetrieveCorrelation": "상관관계 데이터를 검색할 수 없습니다",
-      "noMetricStreams": "서비스 \"{service}\"에 대한 메트릭 스트림이 없습니다",
       "correlationError": "상관관계 오류: {error}",
       "contentCopied": "콘텐츠가 성공적으로 복사되었습니다!",
       "noTraceIdForInspection": "검사에 사용할 수 있는 트레이스 ID가 없습니다."
