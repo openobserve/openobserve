@@ -202,7 +202,8 @@ const title = computed<I18nText>(() => {
 const absenceText = computed<I18nText | null>(() => {
   const s = view.value?.summary;
   if (!s || s.kind !== "absence" || view.value?.state !== "ongoing") return null;
-  const since = s.started_us ?? view.value.startedUs;
+  // since_us is when this absence began; the episode can start earlier with high values.
+  const since = s.since_us ?? s.started_us ?? view.value.startedUs;
   const stream = raw(props.response?.stream ?? "");
   return since === null
     ? t("alerts.anomaly.stripAbsence", { stream })

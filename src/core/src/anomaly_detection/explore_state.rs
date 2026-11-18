@@ -177,8 +177,11 @@ pub fn decide(
         clipped: first == 0 || start_us <= range_start_us,
     };
     let ongoing = last + 1 == buckets.len();
+    // An ongoing absence reports when the data stopped: its first bucket, not the run start.
     let since_us = if ongoing {
-        None
+        run.iter()
+            .rposition(|b| !b.is_absence)
+            .map_or(Some(start_us), |i| run.get(i + 1).map(|b| b.ts_us))
     } else {
         buckets[last + 1..]
             .iter()
@@ -620,6 +623,18 @@ mod tests {
         assert_eq!(d.state, ExploreState::BackInRange);
         assert_eq!(d.window.unwrap().end_us, 4 * B);
         assert_eq!(d.summary.unwrap().since_us, Some(4 * B));
+    }
+
+    #[test]
+    fn test_an_ongoing_absence_after_high_values_is_since_its_own_first_bucket() {
+        let buckets = [normal(1), high(2, 900.0), high(3, 600.0), absent(4)];
+        let s = decide(&buckets, B, 0, true, true).summary.unwrap();
+        assert_eq!(s.kind, "absence");
+        assert_eq!((s.started_us, s.since_us), (Some(2 * B), Some(4 * B)));
+        let only_absence = decide(&[normal(1), absent(2)], B, 0, true, true);
+        assert_eq!(only_absence.summary.unwrap().since_us, Some(2 * B));
+        let value = decide(&[normal(1), high(2, 900.0)], B, 0, true, true);
+        assert_eq!(value.summary.unwrap().since_us, None);
     }
 
     #[test]

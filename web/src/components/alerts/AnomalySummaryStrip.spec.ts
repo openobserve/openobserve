@@ -144,6 +144,27 @@ describe("AnomalySummaryStrip", () => {
     expect(text(w, "readings").exists()).toBe(false);
   });
 
+  it("dates an absence after high values from the absence, not the episode start", () => {
+    const w = mountStrip({
+      response: response({
+        state: "ongoing",
+        summary: summary({
+          kind: "absence",
+          actual: null,
+          expected: null,
+          expected_lower: null,
+          expected_upper: null,
+          change_percent: null,
+          started_us: at("17:30"),
+          since_us: at("18:15"),
+        }),
+        window: { start_us: at("17:30"), end_us: at("18:30"), clipped: false },
+      }),
+    });
+    expect(text(w, "absence").text()).toBe("k8s_logs returned no data since 18:15 UTC");
+    expect(text(w, "state-ongoing").text()).toContain("17:30");
+  });
+
   it("shows a partial drop with the expected value and no range", () => {
     const w = mountStrip({
       response: response({
