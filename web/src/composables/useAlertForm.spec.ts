@@ -228,6 +228,10 @@ describe("the SQL tab seed from the builder", () => {
     ],
     ['select *  from "app" ', 'SELECT _timestamp FROM "app"'],
     [
+      'SELECT * FROM "app"  WHERE ("level" = \'error\')',
+      'SELECT _timestamp FROM "app" WHERE ("level" = \'error\')',
+    ],
+    [
       'SELECT "svc", AVG("d") AS alert_agg_value FROM "t" GROUP BY "svc" HAVING alert_agg_value > 5',
       'SELECT "svc", AVG("d") AS alert_agg_value FROM "t" GROUP BY "svc" HAVING alert_agg_value > 5',
     ],

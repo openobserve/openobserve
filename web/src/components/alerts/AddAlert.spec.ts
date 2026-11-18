@@ -360,9 +360,29 @@ describe("AddAlert (OForm owner)", () => {
   // the top of onSubmit, i.e. only after the composed schema passes). Same
   // toast messages as pre-migration.
   describe("imperative query-text gates (runImperativeQueryChecks)", () => {
+    it("opens the SQL tab with the builder's alert SQL, and keeps a query of the user's own", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+      await flushPromises();
+      form.setFieldValue("query_condition.type", "sql");
+      await vi.waitFor(() =>
+        expect(form.state.values.query_condition.sql).toBe("SELECT _timestamp FROM test"),
+      );
+
+      form.setFieldValue("query_condition.sql", "SELECT a FROM b");
+      form.setFieldValue("query_condition.type", "custom");
+      await flushPromises();
+      form.setFieldValue("query_condition.type", "sql");
+      await flushPromises();
+      expect(form.state.values.query_condition.sql).toBe("SELECT a FROM b");
+    });
+
     it("blocks a SQL save when the SQL query is empty", async () => {
       wrapper = mountAlert();
       await flushPromises();
+      vi.mocked(alertsService.generate_sql).mockRejectedValueOnce(new Error("no builder SQL"));
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");
@@ -1946,31 +1966,43 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-details-name-auto"]').exists()).toBe(true);
 
       const input = wrapper.get('[data-test="add-alert-details-name-input"] input');
-      await input.setValue("checkout errors");
+      const savedAs = () => wrapper.find('[data-test="add-alert-details-name-saved-as"]');
+      await input.setValue("checkout errors > 5%");
       await flushPromises();
-      expect(wrapper.vm.formData.name).toBe("checkout_errors");
-      await input.setValue("checkout#errors");
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(true);
-      await input.setValue("checkout/errors");
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(true);
+      expect(wrapper.vm.formData.name).toBe("checkout errors > 5%");
+      expect(savedAs().text()).toBe(
+        i18n.global.t("alerts.form.names.savedAs", { name: "checkout_errors_>_5" }),
+      );
       await input.trigger("blur");
       await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-details-name-error"]').exists()).toBe(false);
+      expect(wrapper.vm.formData.name).toBe("checkout_errors_>_5");
+      expect(savedAs().exists()).toBe(false);
       const suggest = wrapper.get('[data-test="add-alert-details-name-suggest"]');
       await suggest.trigger("click");
       await flushPromises();
       expect(wrapper.vm.formData.name).toBe(wrapper.vm.alertNameSuggestion);
 
-      const submit = vi
-        .spyOn(HTMLFormElement.prototype, "requestSubmit")
-        .mockImplementation(() => {});
-      await wrapper
-        .get('[data-test="add-alert-details-name-input"] input')
-        .trigger("keydown.enter");
-      expect(submit).toHaveBeenCalledTimes(1);
-      submit.mockRestore();
+      // Enter saves; a save the form blocks says what stopped it.
+      await input.setValue("");
+      await input.trigger("keydown.enter");
+      await flushPromises();
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: expect.stringContaining(i18n.global.t("alerts.sections.details.nav")),
+        }),
+      );
+    });
+
+    it("suggests a name no alert in the folder already has", async () => {
+      vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+        data: { list: [{ name: "k8s_logs_alert" }] },
+      } as any);
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
+      await flushPromises();
+      expect(wrapper.vm.alertNameSuggestion).toBe("k8s_logs_alert_2");
     });
   });
 
@@ -2601,7 +2633,7 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-save-reason"]').exists()).toBe(false);
       const input = wrapper.get('[data-test="add-alert-details-name-input"] input');
-      await input.setValue("bad/name");
+      await input.setValue("///");
       await flushPromises();
       expect(wrapper.get('[data-test="add-alert-submit-btn"]').text()).toBe(
         i18n.global.t("alerts.save"),
@@ -3198,6 +3230,7 @@ describe("AddAlert (OForm owner)", () => {
     it("warns that no query is written when the picked SQL holds only the starter query", async () => {
       wrapper = mountAlert();
       await flushPromises();
+      vi.mocked(alertsService.generate_sql).mockRejectedValueOnce(new Error("no builder SQL"));
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");
@@ -3364,6 +3397,7 @@ describe("AddAlert (OForm owner)", () => {
     it("says no query is written when the picked SQL mode is empty", async () => {
       wrapper = mountAlert();
       await flushPromises();
+      vi.mocked(alertsService.generate_sql).mockRejectedValueOnce(new Error("no builder SQL"));
       const form = wrapper.vm.form;
       seedValidScheduled(form);
       form.setFieldValue("query_condition.type", "sql");

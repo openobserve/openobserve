@@ -427,7 +427,10 @@ export const streamNamesUserFirst = (list: { name: string; is_internal?: boolean
 
 /** The SQL tab opens with the builder's alert SQL; SQL alerts refuse `SELECT *`, so it names the timestamp instead (same rows). */
 export const sqlTabSeed = (builderSql: string, timestampColumn: string): string =>
-  builderSql.trim().replace(/^SELECT\s+\*\s+FROM/i, `SELECT ${timestampColumn} FROM`);
+  builderSql
+    .trim()
+    .replace(/^SELECT\s+\*\s+FROM\s+("[^"]*")\s*/i, `SELECT ${timestampColumn} FROM $1 `)
+    .trim();
 
 /** The SQL tab takes a new seed only while it holds no query of the user's own. */
 export const canSeedSqlTab = (current: string | undefined, lastSeed: string): boolean => {
@@ -1296,14 +1299,21 @@ export function useAlertForm(
       : "";
   });
   const valueThresholdAtPick = ref<{ path: string; value: unknown } | null>(null);
+  // A string key: formData is replaced on every edit, so an array source would re-snapshot each keystroke.
   watch(
-    () => [formData.value.stream_name, valueThresholdPath.value],
+    () => `${formData.value.stream_name}\u0000${valueThresholdPath.value}`,
     async () => {
       await nextTick();
       const path = valueThresholdPath.value;
       valueThresholdAtPick.value = path ? { path, value: get(formData.value, path) } : null;
     },
   );
+  /** The condition compares against a value threshold that is still empty. */
+  const valueThresholdMissing = computed(() => {
+    const path = valueThresholdPath.value;
+    const value = path ? get(formData.value, path) : 0;
+    return value === "" || value === null || value === undefined;
+  });
   /** A value threshold the form filled in and nobody has changed since the stream was picked. */
   const valueThresholdUntouched = computed(() => {
     const pick = valueThresholdAtPick.value;
@@ -1434,11 +1444,8 @@ export function useAlertForm(
   // the one-per-group builder query leaves to the server.
   const lastSeededSql = ref("");
   const seedSqlTabFromBuilder = async () => {
-    if (
-      !formData.value.stream_name ||
-      !canSeedSqlTab(formData.value.query_condition?.sql, lastSeededSql.value)
-    )
-      return;
+    const sqlAtSwitch = formData.value.query_condition?.sql ?? "";
+    if (!formData.value.stream_name || !canSeedSqlTab(sqlAtSwitch, lastSeededSql.value)) return;
     const conditions = formData.value.query_condition?.conditions;
     if (conditions && !allConditionsValid(conditions)) return;
     if (!isAggregationValid()) return;
@@ -1453,10 +1460,11 @@ export function useAlertForm(
       const seed = response?.data?.sql
         ? sqlTabSeed(response.data.sql, store.state.zoConfig.timestamp_column || "_timestamp")
         : "";
+      // A query typed while the seed was on its way is the user's and stays.
       if (
         !seed ||
         formData.value.query_condition?.type !== "sql" ||
-        !canSeedSqlTab(formData.value.query_condition?.sql, lastSeededSql.value)
+        (formData.value.query_condition?.sql ?? "") !== sqlAtSwitch
       )
         return;
       lastSeededSql.value = seed;
@@ -2061,7 +2069,15 @@ export function useAlertForm(
    *  formData had none of them, so strip them to show the alert resource the
    *  user actually edits (Rule ④). cloneDeep first — formData is a readonly
    *  read-view and stripFormExtras mutates. */
-  const jsonEditorData = computed(() => stripFormExtras(cloneDeep(formData.value)));
+  // An aggregation the form does not use saves as null, so the JSON shows null, not its blank defaults.
+  const jsonEditorData = computed(() => {
+    const data = stripFormExtras(cloneDeep(formData.value));
+    const qc = data.query_condition;
+    const sqlMultiAlert = qc?.type === "sql" && !!qc.aggregation?.multi_alert;
+    if (qc && !sqlMultiAlert && (!isAggregationEnabled.value || qc.type !== "custom"))
+      qc.aggregation = null;
+    return data;
+  });
 
   const saveAlertJson = async (json: any) => {
     // Unparseable JSON falls through to the shared validation, which reports it.
@@ -3651,6 +3667,7 @@ export function useAlertForm(
     generatedSqlQuery,
     promqlStreamNote,
     valueThresholdUntouched,
+    valueThresholdMissing,
 
     // Form (Rule ③ owner) + write helpers
     form,

@@ -2108,6 +2108,7 @@ export default defineComponent({
     // Red when the threshold that fires is one the form filled in, not one the user chose.
     const firesOnSave = computed<"untouched" | "set" | null>(() => {
       if (isEditingAlert.value || railVerdict.value?.tone !== "fires") return null;
+      if (alertForm.valueThresholdMissing.value) return null;
       return alertForm.valueThresholdUntouched.value ? "untouched" : "set";
     });
 
