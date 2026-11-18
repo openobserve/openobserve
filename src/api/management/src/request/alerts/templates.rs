@@ -620,7 +620,7 @@ mod tests {
         assert_eq!(
             status(TemplateError::BodyTooLarge {
                 size: 2_000_000,
-                max: 1_048_576
+                max: 5_242_880
             }),
             StatusCode::BAD_REQUEST
         );

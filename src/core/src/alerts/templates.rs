@@ -1522,7 +1522,7 @@ mod tests {
                 if size == BODY_MAX_BYTES + 1 && max == BODY_MAX_BYTES),
             "{err}"
         );
-        assert!(err.to_string().contains("1048576"), "{err}");
+        assert!(err.to_string().contains("5242880"), "{err}");
         // A changed body over the limit is refused, even when the stored row is also large.
         let old_large = "b".repeat(BODY_MAX_BYTES + 10);
         assert!(limit(&over, Some(&old_large), false).is_err());
@@ -1609,7 +1609,7 @@ mod tests {
         // Absent optional values are not measured: the editor saves no key for them.
         let fields = serde_json::to_value(vec![
             serde_json::json!({"label": "l", "value": "v"});
-            14_000
+            70_000
         ])
         .unwrap();
         let many_fields: ContentSpec = serde_json::from_value(serde_json::json!({
@@ -1624,7 +1624,7 @@ mod tests {
         // Trailing blank lines are not measured: the editor trims them on save.
         let padded_body = ContentSpec {
             title: "t".into(),
-            body: format!("{}{}", "b".repeat(1_048_000), "\n".repeat(400)),
+            body: format!("{}{}", "b".repeat(BODY_MAX_BYTES - 576), "\n".repeat(400)),
             ..Default::default()
         };
         assert!(check_spec_size(&padded_body).is_ok());
