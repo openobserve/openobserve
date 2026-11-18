@@ -67,7 +67,7 @@ describe("useAlertFormSections", () => {
       composite_condition: { expression: "({id-b} && {id-a}) || !{id-b}" },
       children: [{ alert_id: "id-a" }, { alert_id: "id-b" }],
     });
-    expect(byId(items.value, "condition").summary).toBe("(B && A) || !B");
+    expect(byId(items.value, "condition").summary).toBe("(B AND A) OR NOT B");
   });
 
   it("counts a problem the save found outside the form against its section", () => {

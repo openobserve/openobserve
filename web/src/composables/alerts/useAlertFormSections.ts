@@ -24,6 +24,7 @@ import {
   sectionOfField,
   type AlertSectionId,
 } from "@/components/alerts/alertFormSections";
+import { operatorsToWords } from "@/components/alerts/composite/expression";
 import { alertConditionText } from "@/utils/alerts/alertCondition";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { eventCountText, operatorSymbol, type ReadBackAlert } from "@/utils/alerts/alertReadBack";
@@ -143,10 +144,11 @@ const lettersForAlertIds = (expression: string, childIds: string[]): string => {
   const letters = new Map(
     childIds.map((id, index) => [`{${id}}`, String.fromCharCode(65 + index)]),
   );
-  return expression.replace(/\{[^}]+\}/g, (token) => {
+  const lettered = expression.replace(/\{[^}]+\}/g, (token) => {
     if (!letters.has(token)) letters.set(token, String.fromCharCode(65 + letters.size));
     return letters.get(token)!;
   });
+  return operatorsToWords(lettered);
 };
 
 export function useAlertFormSections(input: AlertFormSectionsInput): {
