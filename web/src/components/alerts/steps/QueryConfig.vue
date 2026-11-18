@@ -139,40 +139,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
                         <!-- Measurement sentence: WHAT to measure. Severity rows
                          below say WHEN it fires (mock: multi-alert-form.html). -->
-                        <div class="flex flex-nowrap items-start gap-2">
-                          <div class="w-50">
-                            <OSelect
-                              v-model="selectedFunction"
-                              :aria-label="t('alerts.queryConfig.aggregationFunction')"
-                              :options="logFunctionOptions"
-                              labelKey="label"
-                              valueKey="value"
-                              @update:model-value="onLogFunctionChange"
-                            />
-                            <OTooltip
-                              :content="
-                                logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                                  ?.tooltip || raw('')
-                              "
-                              :delay="400"
-                            />
+                        <div class="flex min-w-0 flex-wrap items-start gap-2">
+                          <div class="flex min-w-0 items-start gap-2">
+                            <div class="w-50 min-w-28 shrink">
+                              <OSelect
+                                v-model="selectedFunction"
+                                :aria-label="t('alerts.queryConfig.aggregationFunction')"
+                                :options="logFunctionOptions"
+                                labelKey="label"
+                                valueKey="value"
+                                @update:model-value="onLogFunctionChange"
+                              />
+                              <OTooltip
+                                :content="
+                                  logFunctionOptions.find((o: any) => o.value === selectedFunction)
+                                    ?.tooltip || raw('')
+                                "
+                                :delay="400"
+                              />
+                            </div>
+                            <!-- "of [field]" shown for measure modes -->
+                            <template v-if="selectedFunction !== 'total_events'">
+                              <span
+                                class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
+                                >{{ t("alerts.conditionOf") }}</span
+                              >
+                              <OFormSelect
+                                :aria-label="t('alerts.form.names.field')"
+                                name="query_condition.aggregation.having.column"
+                                :options="numericColumns"
+                                searchable
+                                :placeholder="t('alerts.placeholders.selectColumn')"
+                                class="w-50! min-w-28 shrink"
+                                @update:model-value="onLogMeasureColumnChange($event)"
+                              />
+                            </template>
                           </div>
-                          <!-- "of [field]" shown for measure modes -->
-                          <template v-if="selectedFunction !== 'total_events'">
-                            <span
-                              class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                              >{{ t("alerts.conditionOf") }}</span
-                            >
-                            <OFormSelect
-                              :aria-label="t('alerts.form.names.field')"
-                              name="query_condition.aggregation.having.column"
-                              :options="numericColumns"
-                              searchable
-                              :placeholder="t('alerts.placeholders.selectColumn')"
-                              class="w-50!"
-                              @update:model-value="onLogMeasureColumnChange($event)"
-                            />
-                          </template>
                           <span
                             v-if="leafFilterCount > 0"
                             class="text-text-secondary text-compact leading-8.5 whitespace-nowrap"
@@ -444,65 +446,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
                         <!-- Measurement sentence: WHAT to measure. Severity rows
                          below say WHEN it fires (mock: multi-alert-form.html). -->
-                        <div class="flex flex-nowrap items-start gap-2">
-                          <div class="w-50">
-                            <OSelect
-                              v-model="selectedFunction"
-                              :aria-label="t('alerts.queryConfig.aggregationFunction')"
-                              :options="logFunctionOptions"
-                              labelKey="label"
-                              valueKey="value"
-                              @update:model-value="onMetricFunctionChange"
-                            />
-                            <OTooltip
-                              :content="
-                                logFunctionOptions.find((o: any) => o.value === selectedFunction)
-                                  ?.tooltip || raw('')
-                              "
-                              :delay="400"
-                            />
-                          </div>
-
-                          <!-- "of [field]" hidden for count mode -->
-                          <template v-if="selectedFunction !== 'total_events'">
-                            <span
-                              class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                              >{{ t("alerts.conditionOf") }}</span
-                            >
-                            <div class="relative inline-flex">
-                              <OFormSelect
-                                name="query_condition.aggregation.having.column"
-                                :aria-label="t('alerts.form.names.field')"
-                                :options="columns"
-                                searchable
-                                :placeholder="t('alerts.placeholders.selectColumn')"
-                                :readonly="
-                                  inputData.aggregation?.having?.column === 'value' &&
-                                  columns.some(
-                                    (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                                  )
-                                "
-                                :disable="
-                                  inputData.aggregation?.having?.column === 'value' &&
-                                  columns.some(
-                                    (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                                  )
-                                "
-                                @update:model-value="onLogMeasureColumnChange($event)"
-                                class="w-50"
+                        <div class="flex min-w-0 flex-wrap items-start gap-2">
+                          <div class="flex min-w-0 items-start gap-2">
+                            <div class="w-50 min-w-28 shrink">
+                              <OSelect
+                                v-model="selectedFunction"
+                                :aria-label="t('alerts.queryConfig.aggregationFunction')"
+                                :options="logFunctionOptions"
+                                labelKey="label"
+                                valueKey="value"
+                                @update:model-value="onMetricFunctionChange"
                               />
                               <OTooltip
-                                v-if="
-                                  inputData.aggregation?.having?.column === 'value' &&
-                                  columns.some(
-                                    (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
-                                  )
+                                :content="
+                                  logFunctionOptions.find((o: any) => o.value === selectedFunction)
+                                    ?.tooltip || raw('')
                                 "
-                                :content="t('alerts.metricsValueFieldTooltip')"
-                                side="bottom"
+                                :delay="400"
                               />
                             </div>
-                          </template>
+
+                            <!-- "of [field]" hidden for count mode -->
+                            <template v-if="selectedFunction !== 'total_events'">
+                              <span
+                                class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
+                                >{{ t("alerts.conditionOf") }}</span
+                              >
+                              <div class="relative inline-flex min-w-28 shrink">
+                                <OFormSelect
+                                  name="query_condition.aggregation.having.column"
+                                  :aria-label="t('alerts.form.names.field')"
+                                  :options="columns"
+                                  searchable
+                                  :placeholder="t('alerts.placeholders.selectColumn')"
+                                  :readonly="
+                                    inputData.aggregation?.having?.column === 'value' &&
+                                    columns.some(
+                                      (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                                    )
+                                  "
+                                  :disable="
+                                    inputData.aggregation?.having?.column === 'value' &&
+                                    columns.some(
+                                      (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                                    )
+                                  "
+                                  @update:model-value="onLogMeasureColumnChange($event)"
+                                  class="w-50 min-w-0"
+                                />
+                                <OTooltip
+                                  v-if="
+                                    inputData.aggregation?.having?.column === 'value' &&
+                                    columns.some(
+                                      (c: any) => (typeof c === 'string' ? c : c.value) === 'value',
+                                    )
+                                  "
+                                  :content="t('alerts.metricsValueFieldTooltip')"
+                                  side="bottom"
+                                />
+                              </div>
+                            </template>
+                          </div>
                           <span
                             v-if="leafFilterCount > 0"
                             class="text-text-secondary text-compact leading-8.5 whitespace-nowrap"
