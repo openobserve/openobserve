@@ -339,13 +339,17 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
 
     const defaults = { period: 10, frequency: 10, silence: 10, frequency_type: "minutes" };
 
-    const mountLive = (trigger: TriggerValues = defaults, minAutoRefreshInterval = 60) =>
+    const mountLive = (
+      trigger: TriggerValues = defaults,
+      minAutoRefreshInterval = 60,
+      values: Record<string, unknown> = {},
+    ) =>
       mount(
         defineComponent({
           components: { OForm, LiveStep },
           setup: () => ({
             schema: parentSchema,
-            defaultValues: { trigger_condition: { ...trigger }, destinations: [] },
+            defaultValues: { trigger_condition: { ...trigger }, destinations: [], ...values },
           }),
           template: `
             <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
@@ -518,6 +522,36 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       expect(await click(host, "alert-settings-silence-hint")).toMatchObject({ silence: 60 });
       expect(hint().exists()).toBe(false);
     });
+
+    it.each([
+      {
+        name: "Must last over one check",
+        values: { pending_period_sec: 10, _ui: { pendingPeriod: 10 } },
+        line: "alert-settings-pending-period-warning",
+      },
+      {
+        name: "a lowest value over non-overlapping checks",
+        values: {
+          query_condition: {
+            type: "custom",
+            aggregation: { function: "min", having: { column: "v", operator: ">", value: 1 } },
+          },
+        },
+        line: "alert-settings-breach-warning",
+      },
+    ])(
+      "$name warns in amber; its action checks more often and keeps the look back",
+      async (row) => {
+        const host = mountLive(defaults, 60, row.values);
+        expect(note(host, `${row.line}-action`).text()).toBe(
+          t("alerts.guard.checkEvery", { every: everyWords(2, i18n.global.t as any) }),
+        );
+
+        expect(await click(host, row.line)).toMatchObject({ period: 10, frequency: 2 });
+        expect(note(host, row.line).exists()).toBe(false);
+        expect(await typePeriod(host, "20")).toMatchObject({ period: "20", frequency: 2 });
+      },
+    );
   });
 
   it("period cleared: emits update:trigger without cascading", () => {
@@ -1161,8 +1195,8 @@ describe("AlertSettings — notify and timing in their sections", () => {
   });
 
   it.each([
-    [10, 10, "alerts.guard.mustLastOneCheck"],
-    [10, 5, "alerts.guard.mustLastOneCheck"],
+    [10, 10, "alerts.guard.mustLastOneCheckFix"],
+    [10, 5, "alerts.guard.mustLastOneCheckFix"],
     [10, 15, "alerts.validation.pendingPeriodNotMultiple"],
     [1, 10, null],
   ])("checks every %i min with Must last %i min warns %s", (frequency, pending, key) => {
@@ -1176,7 +1210,7 @@ describe("AlertSettings — notify and timing in their sections", () => {
       { reveal: ["holdFor"] },
     );
     const warning = targets.settingsHold.querySelector(
-      '[data-test="alert-settings-pending-period-warning"]',
+      '[data-test="alert-settings-pending-period-warning-text"]',
     );
     const every = everyWords(frequency, i18n.global.t as any);
     expect(warning?.textContent?.trim() ?? null).toBe(key && t(key, { every, minutes: frequency }));

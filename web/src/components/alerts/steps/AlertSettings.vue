@@ -168,17 +168,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ pendingPeriodError }}
                 </div>
-                <div
+                <AlertLinkNote
                   v-if="!pendingPeriodError && pendingPeriodWarning"
-                  class="text-status-warning-text w-0 min-w-full text-xs"
+                  class="w-0 min-w-full"
+                  :text="pendingPeriodWarning.text"
+                  :action="pendingPeriodWarning.action"
+                  warning
                   data-test="alert-settings-pending-period-warning"
-                  role="alert"
-                >
-                  {{ pendingPeriodWarning }}
-                </div>
+                  @action="pendingPeriodWarning.run"
+                />
               </div>
             </AlertSentenceRow>
           </AlertTierPlace>
+          <AlertLinkNote
+            v-if="breachWarning"
+            :text="breachWarning.text"
+            :action="breachWarning.action"
+            warning
+            data-test="alert-settings-breach-warning"
+            @action="breachWarning.run"
+          />
         </Teleport>
 
         <Teleport :to="sectionTargets?.settingsNotify" :disabled="!sectionTargets?.settingsNotify">
@@ -533,6 +542,7 @@ import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
 import { describeDestinations } from "@/utils/alerts/destinationDescription";
 import { durationWords, everyWords } from "@/utils/alerts/alertCopy";
+import { finerCheckMinutes, missedBreachMinutes } from "@/utils/alerts/checkCadence";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import {
@@ -776,26 +786,59 @@ export default defineComponent({
       }
     };
 
-    const pendingPeriodWarning = computed<string>(() => {
-      if (props.isRealTime !== "false") return "";
+    const pendingPeriodWarning = computed<LinkNote | null>(() => {
+      if (props.isRealTime !== "false") return null;
       const pendingMinutes = Number(fv("pending_period_sec"));
-      if (!Number.isFinite(pendingMinutes) || pendingMinutes <= 0) return "";
+      if (!Number.isFinite(pendingMinutes) || pendingMinutes <= 0) return null;
 
       const freqMinutes = frequencyMinutes();
-      if (!Number.isFinite(freqMinutes) || freqMinutes <= 0) return "";
+      if (!Number.isFinite(freqMinutes) || freqMinutes <= 0) return null;
       // The scheduler fires on the next check after Pending, so a span of one interval is never sampled in between.
-      if (pendingMinutes <= freqMinutes)
-        return t("alerts.guard.mustLastOneCheck", { every: everyWords(freqMinutes, t) });
+      if (pendingMinutes <= freqMinutes) {
+        const fix = isCron.value ? checkEveryFix(undefined) : checkEveryFix(pendingMinutes);
+        const every = everyWords(freqMinutes, t);
+        return {
+          text: fix
+            ? t("alerts.guard.mustLastOneCheckFix", { every })
+            : t("alerts.guard.mustLastOneCheck", { every }),
+          ...fix,
+        };
+      }
 
       // Float-safe "is a multiple of" — see QueryConfig's original comment:
       // a cron interval can be fractional minutes, where exact `%` comparisons
       // can miss by floating-point dust at either edge of the wrap.
       const remainder = pendingMinutes % freqMinutes;
       const EPSILON = 1e-6;
-      if (remainder < EPSILON || freqMinutes - remainder < EPSILON) return "";
-      return t("alerts.validation.pendingPeriodNotMultiple", {
-        minutes: Math.round(freqMinutes * 100) / 100,
+      if (remainder < EPSILON || freqMinutes - remainder < EPSILON) return null;
+      return {
+        text: t("alerts.validation.pendingPeriodNotMultiple", {
+          minutes: Math.round(freqMinutes * 100) / 100,
+        }),
+        action: null,
+        separated: false,
+        run: () => {},
+      };
+    });
+
+    // A lowest (or highest) value must cross the threshold over a whole window, so a breach that
+    // straddles two non-overlapping checks is seen by neither.
+    const breachWarning = computed<LinkNote | null>(() => {
+      if (!isScheduled.value || isCron.value) return null;
+      const query = fv("query_condition") ?? {};
+      if ((query.type ?? "custom") !== "custom" || !query.aggregation) return null;
+      const period = Number(fv("trigger_condition.period"));
+      const missed = missedBreachMinutes({
+        fn: query.aggregation.function,
+        operator: query.aggregation.having?.operator,
+        period,
+        frequency: frequencyMinutes(),
       });
+      if (missed === undefined) return null;
+      return {
+        text: t("alerts.guard.breachUnseen", { duration: durationWords(missed, t) }),
+        ...checkEveryFix(period),
+      };
     });
 
     // The schema's floor: none when the org sets no minimum refresh interval.
@@ -812,6 +855,16 @@ export default defineComponent({
       emit: (trigger) => emit("update:trigger", trigger),
     });
     const { handlePeriodChange } = lookBack;
+    // Checking more often never moves the look back, since that is the window the condition reads.
+    const checkEveryFix = (spanMinutes: number | undefined) => {
+      const minutes = spanMinutes ? finerCheckMinutes(spanMinutes, minFrequency()) : undefined;
+      if (!minutes) return { action: null, separated: false, run: () => {} };
+      return {
+        action: t("alerts.guard.checkEvery", { every: everyWords(minutes, t) }),
+        separated: false,
+        run: () => lookBack.setCheckEvery(minutes),
+      };
+    };
     const LINKED_LABEL: Record<LinkedField, I18nKey> = {
       period: "alerts.form.names.lookBack",
       frequency: "alerts.queryConfig.checkEvery",
@@ -1134,6 +1187,7 @@ export default defineComponent({
       notifiesNobody,
       pendingPeriodError,
       pendingPeriodWarning,
+      breachWarning,
       pendingPeriodUnit,
       pendingPeriodUnitOptions,
       onPendingPeriodChange,

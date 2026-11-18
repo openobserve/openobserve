@@ -174,6 +174,12 @@ export function useLookBackLink(options: LookBackLinkOptions) {
     move.value = null;
   };
 
+  /** Sets Check every alone, unlinked, so the look back the condition reads stays as it is. */
+  const setCheckEvery = (minutes: number) => {
+    unlink();
+    emitWithPeriod({ ...options.trigger(), frequency: minutes });
+  };
+
   /** Links again; Check every takes the look back, since the look back is what the condition reads. */
   const relink = () => {
     unlinked.value = false;
@@ -187,5 +193,5 @@ export function useLookBackLink(options: LookBackLinkOptions) {
     emitWithPeriod({ ...trigger, frequency: period });
   };
 
-  return { handlePeriodChange, isLinked, lastMove, undo, unlink, relink };
+  return { handlePeriodChange, isLinked, lastMove, undo, unlink, relink, setCheckEvery };
 }
