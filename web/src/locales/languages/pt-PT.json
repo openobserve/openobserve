@@ -14453,6 +14453,7 @@
     "testSendGroupLabel": "Enviar uma mensagem de teste real",
     "testSend": "Enviar teste",
     "testSendDestinationLabel": "Destino",
+    "testSendFixedSample": "Os envios de teste usam uma amostra fixa.",
     "testSendConfirmTitle": "Enviar uma mensagem de teste real?",
     "testSendConfirm": "Isto publicará uma mensagem real no canal selecionado, marcada como [TEST].",
     "testSendSuccess": "Mensagem de teste enviada",

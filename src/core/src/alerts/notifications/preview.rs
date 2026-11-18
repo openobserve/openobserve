@@ -22,12 +22,15 @@
 //! reimplementation. See `preview_uses_production_renderer` below.
 
 use config::meta::alerts::{
-    content_spec::ContentSpec, level::AlertLevel, notification_kind::NotificationKind,
+    content_spec::ContentSpec,
+    level::AlertLevel,
+    notification_kind::{NotificationEvent, NotificationKind},
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::{
+    STATUS_FIRING, STATUS_RESOLVED,
     context::NotificationContext,
     format::ChannelFormat,
     render::{RenderedMessage, markdown::markdown_to_html, render, severity_color},
@@ -174,6 +177,8 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         None => "",
     }
     .to_string();
+    // An Ok preview shows the recovery message, as a live resolved alert sends it.
+    let resolved = level == Some(AlertLevel::Ok);
 
     NotificationContext {
         org_name: "default".into(),
@@ -187,7 +192,17 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         alert_count: "2".into(),
         alert_agg_value: "92.5".into(),
         alert_level: alert_level_str,
-        alert_status: "firing".to_string(),
+        alert_status: if resolved {
+            STATUS_RESOLVED
+        } else {
+            STATUS_FIRING
+        }
+        .to_string(),
+        event: if resolved {
+            NotificationEvent::Resolved
+        } else {
+            NotificationEvent::Firing
+        },
         episode_id: None,
         recovery_reason: String::new(),
         alert_priority: "P1".into(),
@@ -737,8 +752,6 @@ mod tests {
 
     #[test]
     fn a_playground_sample_carries_the_level_and_event_a_live_send_has() {
-        use config::meta::alerts::notification_kind::NotificationEvent;
-
         use super::super::examples::example_context_at;
         let at = |kind, level| {
             let ctx = example_context_at(kind, level);
@@ -755,6 +768,11 @@ mod tests {
             (Some(AlertLevel::Warning), firing)
         );
         assert_eq!(at(NotificationKind::OnCall, None), (None, firing));
+        // P4 is informational: a live P4 incident has no level.
+        assert_eq!(
+            at(NotificationKind::Incident, Some(AlertLevel::NoData)),
+            (None, firing)
+        );
         assert_eq!(
             at(NotificationKind::Synthetics, Some(AlertLevel::NoData)),
             (Some(AlertLevel::Warning), notice)
@@ -762,6 +780,42 @@ mod tests {
         assert_eq!(
             at(NotificationKind::Synthetics, Some(AlertLevel::Warning)),
             (Some(AlertLevel::Warning), notice)
+        );
+    }
+
+    #[test]
+    fn a_p4_incident_and_a_p3_page_preview_with_the_blue_dot() {
+        assert_eq!(
+            sample_title(NotificationKind::Incident, "no_data", "{status_dot}"),
+            "🔵"
+        );
+        assert_eq!(
+            sample_title(NotificationKind::OnCall, "single_level", "{status_dot}"),
+            "🔵"
+        );
+        assert_eq!(
+            sample_title(NotificationKind::Incident, "single_level", "{status_dot}"),
+            "🟠"
+        );
+    }
+
+    #[test]
+    fn an_ok_alert_preview_reads_resolved_in_the_title_and_the_event() {
+        let read = |severity: &str| {
+            sample_title(
+                NotificationKind::Alert,
+                severity,
+                "{status_dot} {alert_name} {alert_status}|{notification_event}",
+            )
+        };
+        assert_eq!(read("ok"), "🟢 Sample CPU alert resolved|resolved");
+        assert_eq!(read("critical"), "🔴 Sample CPU alert firing|firing");
+        let ctx = synthetic_context(Some(AlertLevel::Ok));
+        assert_eq!(ctx.event, NotificationEvent::Resolved);
+        assert_eq!(ctx.alert_status, "resolved");
+        assert_eq!(
+            synthetic_context(Some(AlertLevel::Warning)).event,
+            NotificationEvent::Firing
         );
     }
 

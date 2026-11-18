@@ -14453,6 +14453,7 @@
     "testSendGroupLabel": "Gửi tin nhắn kiểm tra thực tế",
     "testSend": "Gửi kiểm tra",
     "testSendDestinationLabel": "Đích",
+    "testSendFixedSample": "Gửi thử dùng một mẫu cố định.",
     "testSendConfirmTitle": "Gửi một tin nhắn kiểm tra thực tế?",
     "testSendConfirm": "Thao tác này sẽ đăng một tin nhắn thực tế tới kênh đã chọn, được đánh dấu [TEST].",
     "testSendSuccess": "Tin nhắn kiểm tra đã được gửi",
