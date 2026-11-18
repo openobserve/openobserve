@@ -158,6 +158,8 @@ pub async fn submit_job(
         };
 
         req.use_cache = get_use_cache_from_request(&query);
+        // search jobs never refresh the shared result cache
+        req.clear_cache = false;
 
         // update timeout
         if req.timeout == 0 {
