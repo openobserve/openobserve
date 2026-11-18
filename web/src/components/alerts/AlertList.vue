@@ -640,7 +640,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         :data-row-action="row.enabled ? 'pause' : 'resume'"
                         :data-test="`alert-list-${row.name}-pause-start-alert`"
-                        :aria-label="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                        :aria-label="row.enabled ? t('alerts.pause') : t('alerts.resume')"
                         variant="ghost"
                         size="icon-sm"
                         icon-left="lock"
@@ -656,13 +656,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-xs-sq"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :aria-label="row.enabled ? t('alerts.pause') : t('alerts.resume')"
                     :loading="!!alertStateLoadingMap[row.uuid]"
                     @click.stop="toggleAlertState(row)"
                   >
                     <OTooltip
                       side="bottom"
                       exclusive
-                      :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                      :content="row.enabled ? t('alerts.pause') : t('alerts.resume')"
                       :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
                     />
                   </OButton>
@@ -783,7 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="sm"
                         />
                       </template>
-                      {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                      {{ row.enabled ? t("alerts.pause") : t("alerts.resume") }}
                     </ODropdownItem>
                     <ODropdownItem
                       class="md:hidden"
@@ -4082,7 +4083,7 @@ export default defineComponent({
     let withdrawLeftFilterNote: (() => void) | null = null;
     // A write that settles after the page is left must not announce on the page the user went to.
     let leftFilterNoteOwned = true;
-    // The polite line is the screen reader's confirmation; sighted users have the tag and the tile counts, so there is no toast.
+    // A bulk write has no one row to undo, so the polite line is its only confirmation.
     const announceLeftFilter = (names: string[], enabled: boolean) => {
       if (!leftFilterNoteOwned || !names.length) return;
       const params = { name: raw(names[0]), count: names.length };
@@ -4118,7 +4119,36 @@ export default defineComponent({
       if (hit) store.dispatch("setAllAlertsListByFolderId", next);
     };
 
-    const toggleAlertState = (row: any) => {
+    // One toast per row write is its confirmation and the way back from a misclick; an undo offers no second undo.
+    const confirmRowWrite = (
+      row: any,
+      enabled: boolean,
+      leftFilter: boolean,
+      undoable: boolean,
+    ) => {
+      const params = { name: raw(row.name), count: 1 };
+      const message = enabled
+        ? leftFilter
+          ? t("alerts.rowAction.resumedLeftFilter", params, 1)
+          : t("alerts.rowAction.resumed", params)
+        : leftFilter
+          ? t("alerts.rowAction.pausedLeftFilter", params, 1)
+          : t("alerts.rowAction.paused", params);
+      toast({
+        variant: "success",
+        message,
+        ...(undoable
+          ? {
+              action: {
+                label: t("alerts.rowAction.undo"),
+                handler: () => void setAlertState(row, !enabled, false),
+              },
+            }
+          : {}),
+      });
+    };
+
+    const setAlertState = (row: any, enabled: boolean, undoable = true) => {
       if (anomalyRowLocked(row)) return;
       alertStateLoadingMap.value[row.uuid] = true;
 
@@ -4128,13 +4158,13 @@ export default defineComponent({
       return toggle
         .mutateAsync({
           alertId: row.alert_id,
-          enabled: !row?.enabled,
+          enabled,
           folderId: rowFolderId(row),
         })
         .then((res: any) => {
           const isEnabled = res.data.enabled;
-          if (applyConfirmedState(row.alert_id, isEnabled))
-            announceLeftFilter([row.name], isEnabled);
+          const left = applyConfirmedState(row.alert_id, isEnabled);
+          confirmRowWrite(row, isEnabled, left && leftFilterNoteOwned, undoable);
         })
         .catch(() => {
           /* the mutation handler already toasts the failure; this only keeps the rejection handled */
@@ -4143,6 +4173,8 @@ export default defineComponent({
           alertStateLoadingMap.value[row.uuid] = false;
         });
     };
+
+    const toggleAlertState = (row: any) => setAlertState(row, !row?.enabled);
 
     const routeTo = (name: string) => {
       router.push({

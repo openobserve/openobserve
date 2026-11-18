@@ -266,7 +266,7 @@ export class AlertManagement {
         await expect(pauseButton).toBeVisible({ timeout: 5000 });
         await pauseButton.click();
 
-        // A confirmed pause has no toast: the same button turns into Resume.
+        // A confirmed pause turns the same button into Resume.
         await expect(pauseButton).toHaveAttribute('data-row-action', 'resume', { timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);

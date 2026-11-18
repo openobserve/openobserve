@@ -880,7 +880,7 @@ describe("AlertList - row actions", () => {
       .filter((tip) =>
         [
           i18n.global.t("alerts.pause"),
-          i18n.global.t("alerts.start"),
+          i18n.global.t("alerts.resume"),
           i18n.global.t("alerts.edit"),
           i18n.global.t("alerts.clone"),
         ].includes(tip.props("content")),
@@ -1459,6 +1459,10 @@ describe("AlertList - row actions keep the view", () => {
     wrapper.find(`[data-test="alert-list-${name}-pause-start-alert"]`);
   const errorToasts = () =>
     (toast as any).mock.calls.filter(([opts]: any[]) => opts?.variant === "error");
+  const successToasts = () =>
+    (toast as any).mock.calls
+      .map(([opts]: any[]) => opts)
+      .filter((opts: any) => opts?.variant === "success");
 
   // 25 active alerts, five a page, opened on page 2 under the Active tile.
   const mountOnPageTwo = async (stateFilter: string | null = "active") => {
@@ -1505,56 +1509,51 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
     expect(toggleBtn(wrapper, "Alert 6").attributes("aria-busy")).toBeUndefined();
     expect(toggleBtn(wrapper, "Alert 6").attributes("data-row-action")).toBe("resume");
-    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
   });
 
-  it("announces a row leaving the filter once, politely, with no toast", async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      const wrapper = await mountOnPageTwo();
+  it.each([
+    ["active", false, "Alert 6 paused. No longer matches filter"],
+    ["paused", true, "Alert 6 resumed. No longer matches filter"],
+    [null, false, "Alert 6 paused"],
+  ])(
+    "confirms one row's write once, in a toast with Undo (filter %s)",
+    async (filter, enabled, message) => {
+      const wrapper = await mountOnPageTwo(enabled ? "active" : filter);
+      if (enabled) {
+        await toggleBtn(wrapper, "Alert 6").trigger("click");
+        await flushPromises();
+        wrapper.vm.stateFilters = [filter];
+        await flushPromises();
+      }
       vi.mocked(announcePolite).mockClear();
       (toast as any).mockClear();
 
       await toggleBtn(wrapper, "Alert 6").trigger("click");
       await flushPromises();
-      vi.advanceTimersByTime(100);
+      expect(successToasts()).toEqual([
+        expect.objectContaining({ message, action: expect.objectContaining({ label: "Undo" }) }),
+      ]);
+      expect(announcePolite).not.toHaveBeenCalled();
+    },
+  );
 
-      expect(announcePolite).toHaveBeenCalledTimes(1);
-      expect(announcePolite).toHaveBeenCalledWith("Alert 6 paused. No longer matches filter");
-      expect(document.querySelector('[data-test="region-announcer"]')?.textContent).toBe(
-        "Alert 6 paused. No longer matches filter",
-      );
-      expect(
-        document.querySelector('[data-test="region-announcer"]')?.getAttribute("aria-live"),
-      ).toBe("polite");
-      expect(toast).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("names the resume when a resumed row leaves the Paused tile", async () => {
-    const wrapper = await mountOnPageTwo();
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-    wrapper.vm.stateFilters = ["paused"];
-    await flushPromises();
-    vi.mocked(announcePolite).mockClear();
-    alertsSvc.toggle_state_by_alert_id.mockResolvedValueOnce({ data: { enabled: true } });
-
-    await toggleBtn(wrapper, "Alert 6").trigger("click");
-    await flushPromises();
-    expect(announcePolite).toHaveBeenCalledTimes(1);
-    expect(announcePolite).toHaveBeenCalledWith("Alert 6 resumed. No longer matches filter");
-  });
-
-  it("says nothing when the toggled row still matches the filter", async () => {
+  it("Undo writes the previous state back and offers no second Undo", async () => {
     const wrapper = await mountOnPageTwo(null);
-    vi.mocked(announcePolite).mockClear();
+    expect(toggleBtn(wrapper, "Alert 6").attributes("aria-label")).toBeTruthy();
     await toggleBtn(wrapper, "Alert 6").trigger("click");
     await flushPromises();
-    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(false);
-    expect(announcePolite).not.toHaveBeenCalled();
+    const undo = successToasts()[0].action.handler;
+    (toast as any).mockClear();
+    alertsSvc.toggle_state_by_alert_id.mockClear();
+
+    undo();
+    await flushPromises();
+    expect(alertsSvc.toggle_state_by_alert_id.mock.calls.map((c: any[]) => c.slice(1, 3))).toEqual([
+      ["alert-6", true],
+    ]);
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect(successToasts()).toEqual([expect.objectContaining({ message: "Alert 6 resumed" })]);
+    expect(successToasts()[0].action).toBeUndefined();
   });
 
   it("announces a bulk write once, naming one row and counting many", async () => {
