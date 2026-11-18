@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-import { expect } from '@playwright/test';
 import { discardEditorDraftIfAsked, clearEditorDrafts } from '../alertsPages/editorDraftHelpers.js';
 
 export class AiToolsetsFormValidationPage {
@@ -17,7 +16,6 @@ export class AiToolsetsFormValidationPage {
 
         // ── List page ─────────────────────────────────────────────────────────
         this.addToolsetBtn = '[data-test="ai-toolsets-add-btn"]';
-        this.settingsMenuEntry = '[data-test="ai-toolsets-tab"]';
 
         // ── AddAiToolset form ─────────────────────────────────────────────────
         // OInput data-test="ai-toolset-name-input" → -field / -error
@@ -79,26 +77,6 @@ export class AiToolsetsFormValidationPage {
             testLogger.debug('AI Toolsets list page not available (likely OSS build)');
             return false;
         }
-    }
-
-    /** Opens Settings on its default section, so the AI Toolsets page is reached only through the menu. */
-    async openSettingsHome() {
-        const orgId = process.env['ORGNAME'] || 'default';
-        const baseUrl = process.env['ZO_BASE_URL'] || 'http://localhost:5080';
-        await this.page.goto(`${baseUrl}/web/settings?org_identifier=${orgId}`);
-        await expect(this.page.locator('[data-test="section-rail"]')).toBeVisible({ timeout: 30000 });
-    }
-
-    async openAiToolsetsFromSettingsMenu() {
-        const entry = this.page.locator(this.settingsMenuEntry);
-        await expect(entry, 'Settings must list AI Toolsets').toBeVisible({ timeout: 15000 });
-        await entry.click();
-        await this.page.waitForURL(/\/settings\/ai_toolsets/, { timeout: 15000 });
-        await expect(this.page.locator(this.addToolsetBtn)).toBeVisible({ timeout: 15000 });
-    }
-
-    async expectSettingsMenuEntryActive() {
-        await expect(this.page.locator(this.settingsMenuEntry)).toHaveAttribute('aria-selected', 'true', { timeout: 10000 });
     }
 
     // ── List page actions ─────────────────────────────────────────────────────
