@@ -20,6 +20,8 @@
 //! output can be locked by a golden corpus.
 
 pub mod chart;
+#[cfg(test)]
+mod compat_tests;
 pub mod context;
 pub mod custom;
 pub mod default_template;

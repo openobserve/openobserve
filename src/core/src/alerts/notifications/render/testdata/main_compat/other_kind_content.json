@@ -1,0 +1,266 @@
+{
+  "Slack": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme|error rate on web-logs firing>*"
+        }
+      },
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]"
+        }
+      },
+      {
+        "type": "section",
+        "fields": [
+          {
+            "type": "mrkdwn",
+            "text": "*Host*\nweb-1"
+          }
+        ]
+      },
+      {
+        "type": "actions",
+        "elements": [
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "View logs"
+            },
+            "url": "https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme",
+            "style": "primary"
+          },
+          {
+            "type": "button",
+            "text": {
+              "type": "plain_text",
+              "text": "Open alert"
+            },
+            "url": "https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme"
+          }
+        ]
+      }
+    ]
+  },
+  "TeamsAdaptiveCard": {
+    "type": "message",
+    "attachments": [
+      {
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {
+              "type": "TextBlock",
+              "text": "error rate on web-logs firing",
+              "weight": "Bolder",
+              "size": "Large",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]",
+              "wrap": true
+            },
+            {
+              "type": "FactSet",
+              "facts": [
+                {
+                  "title": "Host",
+                  "value": "web-1"
+                }
+              ]
+            }
+          ],
+          "actions": [
+            {
+              "type": "Action.OpenUrl",
+              "title": "View logs",
+              "url": "https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme",
+              "style": "positive"
+            },
+            {
+              "type": "Action.OpenUrl",
+              "title": "Open alert",
+              "url": "https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "TeamsMessageCard": {
+    "@type": "MessageCard",
+    "@context": "http://schema.org/extensions",
+    "summary": "error rate on web-logs firing",
+    "sections": [
+      {
+        "activityTitle": "error rate on web-logs firing",
+        "markdown": false,
+        "text": "Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]",
+        "facts": [
+          {
+            "name": "Host",
+            "value": "web-1"
+          }
+        ]
+      }
+    ],
+    "potentialAction": [
+      {
+        "@type": "OpenUri",
+        "name": "View logs",
+        "targets": [
+          {
+            "os": "default",
+            "uri": "https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme"
+          }
+        ]
+      },
+      {
+        "@type": "OpenUri",
+        "name": "Open alert",
+        "targets": [
+          {
+            "os": "default",
+            "uri": "https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme"
+          }
+        ]
+      }
+    ]
+  },
+  "Discord": {
+    "embeds": [
+      {
+        "title": "error rate on web-logs firing",
+        "description": "Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0\\.97]\n\n[Open alert](https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme)",
+        "fields": [
+          {
+            "name": "Host",
+            "value": "web\\-1",
+            "inline": true
+          }
+        ],
+        "url": "https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme"
+      }
+    ]
+  },
+  "PagerDuty": {
+    "event_action": "trigger",
+    "payload": {
+      "summary": "error rate on web-logs firing",
+      "source": "web-logs",
+      "severity": "critical",
+      "custom_details": {
+        "Host": "web-1",
+        "body": "Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]"
+      }
+    },
+    "links": [
+      {
+        "href": "https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme",
+        "text": "View logs"
+      },
+      {
+        "href": "https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme",
+        "text": "Open alert"
+      }
+    ]
+  },
+  "Opsgenie": {
+    "message": "error rate on web-logs firing",
+    "description": "Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]",
+    "priority": "P1",
+    "details": {
+      "Host": "web-1"
+    }
+  },
+  "ServiceNow": {
+    "short_description": "error rate on web-logs firing",
+    "description": "Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]\n\nHost: web-1"
+  },
+  "Email": {
+    "subject": "error rate on web-logs firing",
+    "html": "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#202124;\"><tr><td style=\"padding:16px;\"><h2 style=\"margin:0 0 8px 0;font-size:20px;line-height:1.3;color:#202124;\">error rate on web-logs firing</h2><div style=\"margin:16px 0;color:#202124;\"><p>Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]</p></div><table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:16px 0;\"><tr><td style=\"padding:4px 16px 4px 0;color:#5F6368;vertical-align:top;white-space:nowrap;\">Host</td><td style=\"padding:4px 0;color:#202124;\">web-1</td></tr></table><div style=\"margin:16px 0;\"><a href=\"https://o2.acme.com/web/logs?stream=web-logs&amp;org_identifier=acme\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;background-color:#2EB67D;border-radius:4px;color:#FFFFFF;font-weight:600;text-decoration:none;\">View logs</a><a href=\"https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme\" style=\"display:inline-block;margin:0 8px 8px 0;padding:8px 16px;border:1px solid #DADCE0;border-radius:4px;color:#1A73E8;text-decoration:none;\">Open alert</a></div><div style=\"margin:24px 0 0 0;padding-top:12px;border-top:1px solid #DADCE0;color:#5F6368;font-size:12px;\">Sent by OpenObserve.</div></td></tr></table>",
+    "text": "error rate on web-logs firing\n\nErrors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]\n\nHost: web-1\n\nView logs: https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme\nOpen alert: https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme\n\nSent by OpenObserve."
+  },
+  "Sns": {
+    "subject": "error rate on web-logs firing",
+    "message": "error rate on web-logs firing\n\nErrors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0.97]\n\nHost: web-1\n\nView logs: https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme\nOpen alert: https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme"
+  },
+  "Webhook": {
+    "version": 1,
+    "title": "error rate on web-logs firing",
+    "body_markdown": "Errors over the threshold n0=[–] n1=[10] n2=[20] n3=[–] n4=[–] n5=[–] n6=[–] score=[0\\.97]",
+    "fields": {
+      "Host": "web-1"
+    },
+    "rows": [
+      {
+        "host": "web-1",
+        "expected_lower": "10",
+        "expected_upper": "20",
+        "anomaly_score": "0.97"
+      }
+    ],
+    "links": [
+      {
+        "label": "",
+        "url": "https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme"
+      }
+    ],
+    "severity": "critical",
+    "chart_url": null,
+    "context": {
+      "org_name": "acme",
+      "stream_type": "logs",
+      "stream_name": "web-logs",
+      "alert_name": "error rate on web-logs",
+      "alert_type": "scheduled",
+      "alert_period": "10",
+      "alert_operator": ">=",
+      "alert_threshold": "5",
+      "alert_count": "12",
+      "alert_agg_value": "12",
+      "alert_level": "critical",
+      "alert_status": "firing",
+      "episode_id": null,
+      "recovery_reason": null,
+      "alert_priority": null,
+      "alert_tags": null,
+      "alert_threshold_crit": null,
+      "alert_threshold_warn": null,
+      "alert_warning_threshold": null,
+      "alert_start_time": null,
+      "alert_end_time": null,
+      "alert_url": "https://o2.acme.com/web/logs?stream=web-logs&org_identifier=acme",
+      "alert_url_label": "View logs",
+      "alert_detail_url": "https://o2.acme.com/web/alerts/detail/a1?org_identifier=acme",
+      "alert_detail_label": "Open alert",
+      "alert_trigger_time_str": "2026-11-02T10:05:00Z",
+      "alert_time": "2026-11-02T10:05:00Z",
+      "alert_description": "Errors over the threshold",
+      "host": [
+        "web-1"
+      ],
+      "expected_lower": [
+        "10"
+      ],
+      "expected_upper": [
+        "20"
+      ],
+      "anomaly_score": [
+        "0.97"
+      ]
+    }
+  }
+}
