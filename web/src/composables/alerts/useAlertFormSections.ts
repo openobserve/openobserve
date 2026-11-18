@@ -29,6 +29,14 @@ import { operatorsToWords } from "@/components/alerts/composite/expression";
 import { alertConditionText } from "@/utils/alerts/alertCondition";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import {
+  dataNoun,
+  durationWords,
+  everyWords,
+  forecastWindowWords as windowWords,
+  formatNumber,
+} from "@/utils/alerts/alertCopy";
+import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
+import {
   CONDITION_GAP_KEYS,
   conditionGap,
   eventCountText,
@@ -54,6 +62,9 @@ export interface AlertSectionsFormData extends Omit<
   creates_incident?: boolean;
   children?: { alert_id?: string }[];
   composite_condition?: { expression?: string } | null;
+  _ui?: {
+    forecast?: { T?: number | string | null; W?: string; direction?: string } | null;
+  } | null;
 }
 
 /** The slice of the anomaly config the section list reads. */
@@ -66,6 +77,11 @@ export interface AlertSectionsAnomalyConfig {
   alert_destination_ids?: string[];
   schedule_interval_value?: number | string;
   schedule_interval_unit?: string;
+  histogram_interval_value?: number | string;
+  histogram_interval_unit?: string;
+  detection_window_value?: number | string;
+  detection_window_unit?: string;
+  alert_direction?: string | null;
 }
 
 /** The bits of the alert form the section list reads; `formData` is the form's read-view. */
@@ -102,13 +118,28 @@ export interface AlertReviewLine {
 }
 
 type ConditionKind =
-  "events" | "rows" | "value" | "realtime" | "anomaly" | "composite" | "unset" | ConditionGap;
+  | "events"
+  | "rows"
+  | "value"
+  | "promqlAny"
+  | "promqlEach"
+  | "forecast"
+  | "forecastUnset"
+  | "realtime"
+  | "anomaly"
+  | "composite"
+  | "unset"
+  | ConditionGap;
 type ReviewSentence = Omit<AlertReviewLine, "id">;
 
 const FIRES_KEYS: Record<ConditionKind, I18nKey> = {
   events: "alerts.sections.review.firesCount",
   rows: "alerts.sections.review.firesRows",
   value: "alerts.sections.review.firesValue",
+  promqlAny: "alerts.sections.review.firesPromqlAny",
+  promqlEach: "alerts.sections.review.firesPromqlEach",
+  forecast: "alerts.sections.review.firesForecast",
+  forecastUnset: "alerts.forecast.needsThreshold",
   realtime: "alerts.sections.review.firesRealtime",
   anomaly: "alerts.sections.review.firesAnomaly",
   composite: "alerts.sections.review.firesComposite",
@@ -127,7 +158,33 @@ const STREAM_TYPE_LABELS: Record<string, I18nKey> = {
   traces: "alerts.sections.dataTypes.traces.label",
 };
 
+const OPERATOR_WORDS: Record<string, I18nKey> = {
+  ">=": "alerts.sections.operators.gte",
+  ">": "alerts.sections.operators.gt",
+  "<=": "alerts.sections.operators.lte",
+  "<": "alerts.sections.operators.lt",
+  "=": "alerts.sections.operators.eq",
+  "==": "alerts.sections.operators.eq",
+  "!=": "alerts.sections.operators.ne",
+};
+
+const DIRECTION_WORDS: Record<string, I18nKey> = {
+  both: "alerts.sections.review.anomalyBoth",
+  above: "alerts.sections.review.anomalyAbove",
+  below: "alerts.sections.review.anomalyBelow",
+};
+
 const hasValue = (v: unknown): boolean => v !== null && v !== undefined && String(v).trim() !== "";
+
+/** "at least 1", "not exactly 5": a comparison in the words the operator menu uses. */
+const comparisonWords = (operator: string | undefined, value: unknown, t: TranslateFn): I18nText =>
+  t("alerts.sections.review.comparison", {
+    op: t(OPERATOR_WORDS[operator ?? ">="] ?? "alerts.sections.operators.gte"),
+    value: formatNumber(value),
+  });
+
+const minutesOf = (value: unknown, unit: string | undefined): number =>
+  Number(value ?? 0) * (unit === "h" ? 60 : unit === "d" ? 1440 : 1);
 
 /** Label for the scheduled "How it checks" choice, from the stored frequency (always minutes). */
 export function checkEveryLabel(formData: AlertSectionsFormData, t: TranslateFn): I18nText {
@@ -135,9 +192,9 @@ export function checkEveryLabel(formData: AlertSectionsFormData, t: TranslateFn)
   if (tc.frequency_type === "cron") return t("alerts.sections.onCron");
   const minutes = Number(tc.frequency ?? 10);
   if (minutes >= 60 && minutes % 60 === 0) {
-    return t("alerts.sections.everyHours", { count: minutes / 60 });
+    return t("alerts.sections.everyHours", { count: minutes / 60 }, minutes / 60);
   }
-  return t("alerts.sections.everyMinutes", { count: minutes });
+  return t("alerts.sections.everyMinutes", { count: minutes }, minutes);
 }
 
 /** A read-back line as plain text, the way its slots render it. */
@@ -199,15 +256,44 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     return counts;
   });
 
+  const forecastOf = (fd: AlertSectionsFormData) => fd._ui?.forecast ?? null;
+  const forecastReady = (fd: AlertSectionsFormData): boolean => {
+    const forecast = forecastOf(fd);
+    return (
+      !!forecast &&
+      hasValue(forecast.T) &&
+      Number.isFinite(Number(forecast.T)) &&
+      isForecastHorizonValid(Number(fd.query_condition?.promql_condition?.value))
+    );
+  };
+  const forecastHorizon = (fd: AlertSectionsFormData): I18nText => {
+    const days = Number(fd.query_condition?.promql_condition?.value);
+    return t("alerts.forecast.dayCount", { n: days }, days);
+  };
+
   // PromQL's one-alert answer counts the series past the value limit.
   const promqlPhrase = (fd: AlertSectionsFormData): I18nText => {
     const qc = fd.query_condition ?? {};
-    if (qc.promql_rule_mode || qc.promql_multi_alert) return raw(alertConditionText(fd));
+    if (forecastOf(fd)) {
+      return forecastReady(fd)
+        ? t("alerts.forecast.navSummary", {
+            threshold: formatNumber(forecastOf(fd)?.T),
+            horizon: forecastHorizon(fd),
+          })
+        : t("alerts.forecast.needsThreshold");
+    }
+    if (qc.promql_rule_mode) return raw(alertConditionText(fd));
+    if (qc.promql_multi_alert) {
+      const pc = qc.promql_condition;
+      return hasValue(pc?.value)
+        ? raw(`${operatorSymbol(pc?.operator)} ${formatNumber(pc?.value)}`)
+        : raw(alertConditionText(fd));
+    }
     const tc = fd.trigger_condition ?? {};
     const count = countLimit(tc.operator, tc.threshold ?? 1);
     const pc = qc.promql_condition;
     if (!pc || !hasValue(pc.value)) return t("alerts.sections.condition.series", { count });
-    const limit = `${operatorSymbol(pc.operator)} ${pc.value}`.trim();
+    const limit = `${operatorSymbol(pc.operator)} ${formatNumber(pc.value)}`.trim();
     return t("alerts.sections.condition.seriesOver", { count, limit });
   };
 
@@ -237,14 +323,30 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     const qc = fd.query_condition ?? {};
     if (qc.type === "promql") return { kind: "value", text: promqlPhrase(fd) };
     if (qc.aggregation && input.isAggregationEnabled.value) {
-      return { kind: "value", text: raw(alertConditionText(fd)) };
+      const having = qc.aggregation.having ?? {};
+      return {
+        kind: "value",
+        text: t("alerts.sections.condition.measureNav", {
+          measure: measureWords(fd),
+          op: operatorSymbol(having.operator),
+          value: formatNumber(having.value),
+        }),
+      };
     }
     if (qc.type === "sql") {
       const tc = fd.trigger_condition ?? {};
       const count = countLimit(tc.operator, tc.threshold ?? "");
       return { kind: "rows", text: t("alerts.sections.condition.rows", { count }) };
     }
-    return { kind: "events", text: eventCountText(fd.trigger_condition, t) };
+    return { kind: "events", text: eventCountText(fd.trigger_condition, t, fd.stream_type) };
+  };
+
+  const measureWords = (fd: AlertSectionsFormData): I18nText => {
+    const agg = fd.query_condition?.aggregation;
+    return t("alerts.verdict.measure", {
+      fn: agg?.function ?? "",
+      field: agg?.having?.column ?? "",
+    });
   };
 
   // Until the detection is fully described there is nothing for the step to be done with.
@@ -299,8 +401,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       const anomaly = input.anomalyConfig.value ?? {};
       const value = Number(anomaly.schedule_interval_value ?? 1);
       return anomaly.schedule_interval_unit === "m"
-        ? t("alerts.sections.everyMinutes", { count: value })
-        : t("alerts.sections.everyHours", { count: value });
+        ? t("alerts.sections.everyMinutes", { count: value }, value)
+        : t("alerts.sections.everyHours", { count: value }, value);
     }
     if (fd.trigger_condition?.frequency_type === "cron") {
       return t("alerts.sections.schedule.cron", { cron: fd.trigger_condition?.cron ?? "" });
@@ -386,10 +488,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     });
   });
 
-  const durationPart = (minutes: number): I18nText =>
-    minutes >= 60 && minutes % 60 === 0
-      ? t("alerts.sections.review.hours", { count: minutes / 60 }, minutes / 60)
-      : t("alerts.sections.review.minutes", { count: minutes }, minutes);
+  const durationPart = (minutes: number): I18nText => durationWords(minutes, t);
   const strong = (text: I18nText) => ({ text, strong: true });
   const plain = (text: I18nText) => ({ text });
 
@@ -415,15 +514,102 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     };
   };
 
+  // The review says in words what the nav line says in symbols.
+  const reviewCondition = (fd: AlertSectionsFormData, kind: ConditionKind, text: I18nText) => {
+    const tc = fd.trigger_condition ?? {};
+    const qc = fd.query_condition ?? {};
+    if ((kind === "events" || kind === "rows") && (!tc.operator || tc.operator === ">=")) {
+      return t("alerts.sections.review.atLeastCount", {
+        count: formatNumber(tc.threshold ?? 1),
+        noun: dataNoun(fd.stream_type, kind === "rows" ? "sql" : "custom", 2, t),
+      });
+    }
+    if (kind === "value" && qc.type !== "promql") {
+      const having = qc.aggregation?.having ?? {};
+      return t("alerts.sections.review.measureIs", {
+        measure: measureWords(fd),
+        comparison: comparisonWords(having.operator, having.value, t),
+      });
+    }
+    return text;
+  };
+
+  // PromQL's one alert counts a series met at any step; one per series judges only its latest value.
+  const promqlKind = (fd: AlertSectionsFormData): ConditionKind | null => {
+    const qc = fd.query_condition ?? {};
+    if (qc.type !== "promql" || qc.promql_rule_mode) return null;
+    if (forecastOf(fd)) return forecastReady(fd) ? "forecast" : "forecastUnset";
+    if (!hasValue(qc.promql_condition?.value)) return null;
+    if (qc.promql_multi_alert) return "promqlEach";
+    const op = fd.trigger_condition?.operator;
+    return !op || op === ">=" ? "promqlAny" : null;
+  };
+
   const conditionLine = (fd: AlertSectionsFormData): ReviewSentence => {
     const { kind, text } = conditionPhrase(fd);
     const window = plain(durationPart(Number(fd.trigger_condition?.period ?? 0)));
+    const promql = kind === "value" ? promqlKind(fd) : null;
+    if (promql) return promqlLine(fd, promql, window);
     let parts: ReviewSentence["parts"] = {};
     if (kind === "composite") parts = { expression: strong(text) };
+    else if (kind === "anomaly") parts = anomalyParts();
     else if (kind === "events" || kind === "rows" || kind === "value") {
-      parts = { condition: strong(text), window };
+      parts = { condition: strong(reviewCondition(fd, kind, text)), window };
     }
     return { keypath: FIRES_KEYS[kind], parts };
+  };
+
+  const promqlLine = (
+    fd: AlertSectionsFormData,
+    kind: ConditionKind,
+    window: { text: I18nText },
+  ): ReviewSentence => {
+    const pc = fd.query_condition?.promql_condition ?? {};
+    const forecast = forecastOf(fd);
+    if (kind === "forecastUnset") return { keypath: FIRES_KEYS[kind], parts: {} };
+    if (kind === "forecast") {
+      const trigger = t(
+        forecast?.direction === "falls"
+          ? "alerts.forecast.triggerFalls"
+          : "alerts.forecast.triggerRises",
+        { threshold: formatNumber(forecast?.T), horizon: forecastHorizon(fd) },
+      );
+      return {
+        keypath: FIRES_KEYS.forecast,
+        parts: { trigger: strong(trigger), window: plain(forecastWindowWords(fd)) },
+      };
+    }
+    const comparison = strong(comparisonWords(pc.operator, pc.value, t));
+    if (kind === "promqlEach") return { keypath: FIRES_KEYS.promqlEach, parts: { comparison } };
+    const count = Number(fd.trigger_condition?.threshold ?? 1);
+    return {
+      keypath: FIRES_KEYS.promqlAny,
+      parts: { count: strong(formatNumber(count)), comparison, window },
+      plural: count,
+    };
+  };
+
+  const forecastWindowWords = (fd: AlertSectionsFormData): I18nText =>
+    windowWords(forecastOf(fd)?.W, t);
+
+  const anomalyParts = (): ReviewSentence["parts"] => {
+    const anomaly = input.anomalyConfig.value ?? {};
+    const fn = anomaly.detection_function ?? "count";
+    const measure =
+      anomaly.query_mode === "custom_sql" || fn === "count" || !anomaly.detection_function_field
+        ? raw(fn)
+        : t("alerts.verdict.measure", { fn, field: anomaly.detection_function_field });
+    const resolution = minutesOf(
+      anomaly.histogram_interval_value ?? 5,
+      anomaly.histogram_interval_unit ?? "m",
+    );
+    return {
+      measure: strong(measure),
+      resolution: strong(durationPart(resolution)),
+      direction: plain(
+        t(DIRECTION_WORDS[anomaly.alert_direction ?? "both"] ?? DIRECTION_WORDS.both),
+      ),
+    };
   };
 
   const notifyLine = (fd: AlertSectionsFormData): ReviewSentence => {
@@ -434,7 +620,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     const silence = mode.value === "anomaly" ? 0 : Number(fd.trigger_condition?.silence ?? 0);
     const reminder = plain(
       silence > 0
-        ? t("alerts.sections.review.reminder", { duration: durationPart(silence) })
+        ? t("alerts.sections.review.reminder", { duration: everyWords(silence, t) })
         : raw(""),
     );
     const listed = (fd.destinations?.length ?? 0) + (fd.workflows?.length ?? 0);
@@ -460,20 +646,34 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   };
 
   const scheduleLine = (fd: AlertSectionsFormData): ReviewSentence => {
-    if (mode.value === "true" || mode.value === "composite") {
-      return { keypath: "alerts.sections.review.checksRealtime", parts: {} };
+    if (mode.value === "composite") {
+      return { keypath: "alerts.sections.review.checksComposite", parts: {} };
     }
     if (mode.value === "anomaly") {
       const anomaly = input.anomalyConfig.value ?? {};
       const value = Number(anomaly.schedule_interval_value ?? 1);
       return {
-        keypath: "alerts.sections.review.checksAnomaly",
+        keypath: "alerts.sections.review.checksEvery",
         parts: {
-          every: strong(durationPart(anomaly.schedule_interval_unit === "m" ? value : value * 60)),
+          every: strong(everyWords(anomaly.schedule_interval_unit === "m" ? value : value * 60, t)),
+          window: plain(
+            durationPart(
+              minutesOf(anomaly.detection_window_value ?? 3, anomaly.detection_window_unit ?? "h"),
+            ),
+          ),
         },
       };
     }
     const tc = fd.trigger_condition ?? {};
+    if (forecastOf(fd) && fd.query_condition?.type === "promql" && tc.frequency_type !== "cron") {
+      return {
+        keypath: "alerts.sections.review.checksForecast",
+        parts: {
+          every: strong(everyWords(Number(tc.frequency ?? 10), t)),
+          window: plain(forecastWindowWords(fd)),
+        },
+      };
+    }
     const window = plain(durationPart(Number(tc.period ?? 0)));
     if (tc.frequency_type === "cron") {
       return {
@@ -483,18 +683,20 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     }
     return {
       keypath: "alerts.sections.review.checksEvery",
-      parts: { every: strong(durationPart(Number(tc.frequency ?? 10))), window },
+      parts: { every: strong(everyWords(Number(tc.frequency ?? 10), t)), window },
     };
   };
 
   const review = computed<AlertReviewLine[]>(() => {
     const fd = input.formData.value ?? {};
-    return [
+    const lines: AlertReviewLine[] = [
       { id: "watch", ...watchLine(fd) },
       { id: "condition", ...conditionLine(fd) },
       { id: "notify", ...notifyLine(fd) },
-      { id: "schedule", ...scheduleLine(fd) },
     ];
+    // A real-time alert has no schedule; its watch line and verdict already say so.
+    if (mode.value !== "true") lines.push({ id: "schedule", ...scheduleLine(fd) });
+    return lines;
   });
 
   return { sections, items, errorCounts, review };

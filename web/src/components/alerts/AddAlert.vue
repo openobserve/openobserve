@@ -29,6 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="alert-v3-topbar border-border-default [container-type:inline-size] shrink-0 border-b [container-name:topbar]"
           :back="{
             label: activeFolderName || t('alerts.header'),
+            ariaLabel: activeFolderName
+              ? t('alerts.form.header.backToFolder', { folder: activeFolderName })
+              : undefined,
             onClick: goBackToAlertsList,
             dataTest: 'add-alert-back-btn',
           }"
@@ -561,6 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :frequencyType="formData.trigger_condition.frequency_type"
                     :cron="formData.trigger_condition.cron"
                     :selectedTab="formData.query_condition.type || 'custom'"
+                    :has-function="!!formData.query_condition.vrl_function?.trim()"
                     @update:multiTimeRange="updateMultiTimeRange"
                   />
                 </div>
@@ -682,6 +686,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="showsCheckTimeline"
                   :frequency="Number(formData.trigger_condition.frequency)"
                   :period="Number(formData.trigger_condition.period)"
+                  :forecast-window="checkTimelineForecastWindow"
                 />
               </div>
             </AlertFormSection>
@@ -973,6 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isEditingAlert && editAlertId"
                 :alert-id="editAlertId"
                 :folder-id="editFolderId"
+                :expected-every-minutes="recentChecksExpectedEvery"
               />
             </div>
           </Teleport>
@@ -1032,7 +1038,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-alert-save-reason"
         >
           <OIcon name="error" size="xs" class="mt-0.5 shrink-0" />
-          <i18n-t keypath="alerts.form.save.issuesIn" tag="span" scope="global">
+          <i18n-t
+            keypath="alerts.form.save.issuesIn"
+            tag="span"
+            scope="global"
+            :plural="issueCount"
+          >
+            <template #count>{{ issueCount }}</template>
             <template #sections>
               <OButton
                 variant="link"
@@ -1251,6 +1263,8 @@ import {
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { previewVerdictSentence } from "@/utils/alerts/alertReadBack";
+import { dataNoun, forecastWindowWords } from "@/utils/alerts/alertCopy";
+import { countCompleteConditions } from "@/utils/alerts/alertCondition";
 import config from "@/aws-exports";
 import { getUUID } from "@/utils/zincutils";
 import {
@@ -1282,6 +1296,7 @@ const RAIL_VERDICT_ICONS = {
   fires: { name: "notifications-active", class: "text-status-error-text" },
   quiet: { name: "check-circle", class: "text-status-positive" },
   note: { name: "info", class: "text-text-secondary" },
+  warn: { name: "warning", class: "text-status-warning-text" },
 } as const;
 // A jump has landed once no scroll event has fired for this long (the snap scroller's own settle time).
 const JUMP_SETTLE_MS = 150;
@@ -1625,7 +1640,9 @@ export default defineComponent({
     const conditionPresetOptions = computed<ChoiceCardOption[]>(() => [
       ...ALERT_CONDITION_PRESETS.map((preset) => ({
         value: preset.id,
-        label: alertForm.t(preset.labelKey),
+        label: alertForm.t(preset.labelKey, {
+          noun: dataNoun(alertForm.formData.value.stream_type, "custom", 1, alertForm.t),
+        }),
         description: alertForm.t("alerts.sections.presets.orMore", { count: preset.threshold }),
         dataTest: `add-alert-condition-preset-${preset.id}`,
       })),
@@ -1680,11 +1697,6 @@ export default defineComponent({
     // back button's label, so the subtitle no longer repeats it.
     const headerModeLabel = computed(() => {
       const editing = alertForm.beingUpdated.value || alertForm.anomalyEditMode.value;
-      if (alertForm.isAnomalyMode.value) {
-        return editing
-          ? alertForm.t("alerts.editAnomalyMode")
-          : alertForm.t("alerts.addAnomalyMode");
-      }
       return editing ? alertForm.t("alerts.editAlertMode") : alertForm.t("alerts.addAlertMode");
     });
 
@@ -2003,12 +2015,28 @@ export default defineComponent({
     };
 
     // A real-time alert has no window to count, so the preview offers no verdict to restate.
-    const railVerdict = computed<{ text: string; tone: "fires" | "quiet" | "note" } | null>(() => {
+    const railVerdict = computed<{
+      text: string;
+      tone: "fires" | "quiet" | "note" | "warn";
+    } | null>(() => {
       const status = activeEvaluationStatus.value;
       const fd = alertForm.formData.value;
       if (alertForm.isAnomalyMode.value || !fd.stream_name) return null;
-      if (fd.is_real_time === "true")
-        return { text: alertForm.t("alerts.verdict.realtime"), tone: "note" };
+      if (fd.is_real_time === "true") {
+        // Every matching event fires, so with no filter every event in the stream does.
+        const hasFilter = countCompleteConditions(fd.query_condition?.conditions) > 0;
+        return {
+          text: previewVerdictSentence(
+            status ?? { wouldTrigger: true, reason: "" },
+            fd,
+            alertForm.t,
+            {
+              hasFilter,
+            },
+          ),
+          tone: status?.count !== undefined && !hasFilter ? "warn" : "note",
+        };
+      }
       // The save check is stricter than the preview run, so its error also leaves nothing to judge.
       if (!status || fd.is_real_time !== "false" || sqlCheckFailed.value) return null;
       return {
@@ -2136,6 +2164,24 @@ export default defineComponent({
       reveal: (el: HTMLElement) => snapScrollRef.value?.revealElement(el),
     });
 
+    const checkTimelineForecastWindow = computed(() => {
+      const forecast = alertForm.formData.value._ui?.forecast;
+      return forecast && alertForm.formData.value.query_condition?.type === "promql"
+        ? forecastWindowWords(forecast.W, alertForm.t)
+        : undefined;
+    });
+    // An enabled alert checking at least daily should have recent checks; none is then a problem.
+    const recentChecksExpectedEvery = computed(() => {
+      const fd = alertForm.formData.value;
+      const every = Number(fd.trigger_condition?.frequency);
+      return fd.enabled !== false &&
+        fd.is_real_time === "false" &&
+        fd.trigger_condition?.frequency_type !== "cron" &&
+        every > 0 &&
+        every <= 1440
+        ? every
+        : undefined;
+    });
     const isCronSchedule = computed(
       () => alertForm.formData.value.trigger_condition?.frequency_type === "cron",
     );
@@ -2148,6 +2194,12 @@ export default defineComponent({
         return alertForm.t("alerts.sections.condition.helpAnomaly");
       if (alertForm.formData.value.is_real_time === "true")
         return alertForm.t("alerts.sections.condition.helpRealtime");
+      const fd = alertForm.formData.value;
+      const mode = fd.query_condition?.type;
+      if (mode === "sql") return alertForm.t("alerts.sections.condition.helpSql");
+      if (mode === "promql") return alertForm.t("alerts.sections.condition.helpPromql");
+      if (fd.stream_type === "traces") return alertForm.t("alerts.sections.condition.helpSpans");
+      if (fd.stream_type === "metrics") return alertForm.t("alerts.sections.condition.helpMetrics");
       return alertForm.t("alerts.sections.condition.help");
     });
 
@@ -2336,6 +2388,8 @@ export default defineComponent({
       showAll,
       setShowAll,
       isCronSchedule,
+      checkTimelineForecastWindow,
+      recentChecksExpectedEvery,
       railInCondition,
       conditionHelp,
       settingFind,

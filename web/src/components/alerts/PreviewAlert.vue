@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty query placeholder -->
       <div v-if="awaitsQuery" class="flex h-full flex-col items-center justify-center gap-2">
         <OIcon name="edit" size="xl" class="opacity-20" />
-        <span class="text-text-secondary text-sm">{{ t("alerts.writeQueryToSeePreview") }}</span>
+        <span class="text-text-secondary text-sm">{{ awaitsQueryText }}</span>
       </div>
       <PanelSchemaRenderer
         ref="panelRendererRef"
@@ -301,6 +301,8 @@ const evaluationStatus = ref<{
   atLeast?: boolean;
   label?: string;
   grouped?: boolean;
+  value?: number;
+  windowMinutes?: number;
 } | null>(null);
 const { t } = useI18nTyped();
 // The renderer's last run outcome; an empty message means it answered. Results it emits after
@@ -379,12 +381,21 @@ const verdictNeedsOwnSearch = (): boolean => {
 };
 // Hours, never days, so the default reads on the same scale as 12h and 24h.
 const compactDuration = (minutes: number): I18nText => {
-  if (minutes % 60 === 0) return t("common.hrCompact", { count: minutes / 60 });
-  return t("common.minCompact", { count: minutes });
+  if (minutes % 60 === 0) return t("alerts.form.preview.hrCompact", { count: minutes / 60 });
+  return t("alerts.form.preview.minCompact", { count: minutes });
+};
+// "Last 3 checks" is true only when back-to-back checks tile the range: on a schedule, Check every = Look back.
+const checksTileRange = (): boolean => {
+  const tc = props.formData.trigger_condition ?? {};
+  return (
+    String(props.formData.is_real_time ?? "false") === "false" &&
+    tc.frequency_type !== "cron" &&
+    Number(tc.frequency) === alertWindowMinutes()
+  );
 };
 const defaultRangeTooltip = (minutes: number): I18nText => {
   const checks = previewChecks.value;
-  if (orgPreviewMinutes() > 0 || checks * alertWindowMinutes() !== minutes)
+  if (orgPreviewMinutes() > 0 || !checksTileRange() || checks * alertWindowMinutes() !== minutes)
     return t("alerts.form.preview.lastMinutes", { minutes });
   return t("alerts.form.preview.checksSpan", { count: checks, minutes }, checks);
 };
@@ -468,6 +479,15 @@ watch(
   },
 );
 const awaitsQuery = computed(() => writesOwnQuery.value && (!props.query || !chartData.value));
+// A forecast's query stays empty until its threshold is a number, so the prompt asks for that.
+const awaitsQueryText = computed((): I18nText => {
+  const forecast = props.formData._ui?.forecast;
+  const thresholdMissing =
+    forecast && String(forecast.U ?? "").trim() && !Number.isFinite(Number(forecast.T ?? NaN));
+  return thresholdMissing || (forecast && forecast.T === "")
+    ? t("alerts.forecast.previewNeedsThreshold")
+    : t("alerts.writeQueryToSeePreview");
+});
 
 // Computed property to determine if histogram should be used
 // For SQL/custom with aggregations (GROUP BY), we should use histogram
@@ -850,7 +870,7 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   // stale promql_condition around after the user switches modes.
   // (This makes the `selectedTab === "promql"` arm of the chain below dead code.)
   if (props.selectedTab === "promql" || verdictNeedsOwnSearch()) return;
-  if (bucketsCoarserThanWindow(resultMetaData)) {
+  if (!isRealTimeAlert() && bucketsCoarserThanWindow(resultMetaData)) {
     evaluationStatus.value = null;
     return;
   }
@@ -864,7 +884,10 @@ const stoppedAtRowCap = (rows: number): boolean => {
 };
 
 /** Counts a run's frames into the verdict; `inWindow` keeps the hits of the latest window. */
-const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boolean) => {
+const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) => boolean) => {
+  // A real-time alert counts every matching event the chart shows, not one window.
+  const realTime = isRealTimeAlert();
+  const inWindow = realTime ? () => true : windowFilter;
   // resultMetaData structure from usePanelDataLoader:
   // resultMetaData[queryIndex] is an array of metadata objects from streaming partitions
   // Each metadata object has structure: {...content, ...content.results}
@@ -872,6 +895,7 @@ const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boo
 
   let resultCount = 0;
   let atLeast = false;
+  let measured: number | undefined;
 
   try {
     if (Array.isArray(resultMetaData) && resultMetaData.length > 0) {
@@ -925,6 +949,12 @@ const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boo
               allHits.push(...partition.hits.filter(inWindow));
             }
           }
+          // A partition stopped at the row cap may hold more groups than it returned.
+          atLeast =
+            groupByFields.length > 0 &&
+            firstQueryMetadata.some(
+              (p: any) => Array.isArray(p?.hits) && stoppedAtRowCap(p.hits.length),
+            );
 
           if (allHits.length > 0 && groupByFields.length > 0) {
             // Group hits by the user's group_by field combination (strip time bucket dimension)
@@ -977,6 +1007,7 @@ const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boo
                 break;
             }
             if (passesHaving(aggVal)) resultCount = 1;
+            measured = aggVal;
           }
 
           // Fallback: if no hits available, use total row count
@@ -1120,7 +1151,7 @@ const evaluateResultMetadata = (resultMetaData: any, inWindow: (hit: any) => boo
         //
         // A derived count of ZERO is still a verdict and is still written — the
         // guard is on the payload being usable, never on the count being nonzero.
-        evaluateAndSetStatus(resultCount, atLeast);
+        evaluateAndSetStatus(resultCount, atLeast, measured);
       }
     }
   } catch (error) {
@@ -1317,12 +1348,14 @@ const resultLabelFor = (resultCount: number): I18nText => {
  * there is no verdict to compute. Checked by every entry point BEFORE it counts
  * anything, so nothing is evaluated only to be thrown away.
  */
-const writeRealTimeStatus = (): boolean => {
-  const isRealTime = props.formData.is_real_time === "true" || props.formData.is_real_time === true;
-  if (!isRealTime) return false;
+const isRealTimeAlert = (): boolean =>
+  props.formData.is_real_time === "true" || props.formData.is_real_time === true;
+const writeRealTimeStatus = (count?: number): boolean => {
+  if (!isRealTimeAlert()) return false;
   evaluationStatus.value = {
     wouldTrigger: true,
     reason: t("alerts.previewEvaluation.realTimeReason"),
+    ...(count === undefined ? {} : { count, windowMinutes: previewMinutes() }),
   };
   return true;
 };
@@ -1338,6 +1371,7 @@ const setEvaluationStatus = (verdict: {
   wouldTrigger: boolean;
   comparison: string;
   level?: PreviewLevel | null;
+  value?: number;
 }) => {
   const args = {
     count: previewCountText(verdict.count, verdict.atLeast, t),
@@ -1354,6 +1388,7 @@ const setEvaluationStatus = (verdict: {
     count: verdict.count,
     atLeast: verdict.atLeast,
     label: args.label,
+    ...(verdict.value === undefined ? {} : { value: verdict.value }),
     grouped:
       props.selectedTab === "custom" &&
       props.isAggregationEnabled &&
@@ -1372,8 +1407,8 @@ const setEvaluationStatus = (verdict: {
 
 // Evaluate and set status based on a result count already gated on value
 // (rows, groups, data points). PromQL goes through evaluatePromqlSeries instead.
-const evaluateAndSetStatus = (resultCount: number, atLeast = false) => {
-  if (writeRealTimeStatus()) return;
+const evaluateAndSetStatus = (resultCount: number, atLeast = false, value?: number) => {
+  if (writeRealTimeStatus(resultCount)) return;
 
   // A lower bound decides only when every count from it up gets the same answer.
   const threshold = Number(props.formData.trigger_condition?.threshold || 0);
@@ -1391,6 +1426,7 @@ const evaluateAndSetStatus = (resultCount: number, atLeast = false) => {
     atLeast,
     wouldTrigger: gate.passes,
     comparison: gate.comparison,
+    value,
   });
 };
 

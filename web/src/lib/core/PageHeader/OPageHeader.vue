@@ -265,6 +265,8 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 interface BackTarget {
   /** Optional; button falls back to plain "Back" aria-label when omitted. */
   label?: I18nText;
+  /** Replaces the "Back to {label}" name when the label alone does not say where it goes. */
+  ariaLabel?: I18nText;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;
@@ -409,8 +411,10 @@ const statusClass = (): string[] => [
   rowWraps.value ? "" : "order-last ms-auto",
   !rowWraps.value && (hasActions() || hasActionsOverflow()) ? "-me-2" : "",
 ];
-const backLabel = computed(() =>
-  props.back?.label ? t("common.backTo", { label: props.back.label }) : t("common.back"),
+const backLabel = computed(
+  () =>
+    props.back?.ariaLabel ??
+    (props.back?.label ? t("common.backTo", { label: props.back.label }) : t("common.back")),
 );
 
 const onBack = () => {

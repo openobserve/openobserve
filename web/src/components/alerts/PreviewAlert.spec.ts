@@ -3124,16 +3124,97 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
     w.unmount();
   });
 
+  it("counts every matching event a real-time chart shows, over its whole range", async () => {
+    const formData = { ...baseFormData(), is_real_time: "true" };
+    const w = await mountComp({
+      query: "SELECT * FROM logs",
+      selectedTab: "custom",
+      isAggregationEnabled: false,
+      formData,
+    });
+    w.vm.refreshData();
+    await flushPromises();
+    const at = (minutesAgo: number) => (Date.now() - minutesAgo * 60_000) * 1000;
+    await emitResultMetadata(w, [
+      [
+        {
+          hits: [
+            { zo_sql_key: at(25), zo_sql_num: 90 },
+            { zo_sql_key: at(4), zo_sql_num: 3 },
+          ],
+        },
+      ],
+    ]);
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 93, windowMinutes: 30 });
+    w.unmount();
+  });
+
+  it("keeps a group count stopped at the row cap as a lower bound", async () => {
+    store.state.zoConfig.query_default_limit = 2;
+    try {
+      const formData = baseFormData();
+      formData.query_condition.aggregation.group_by = ["host"];
+      formData.trigger_condition.threshold = 1;
+      const w = await mountComp({
+        query: "SELECT * FROM logs",
+        selectedTab: "custom",
+        isAggregationEnabled: true,
+        formData,
+      });
+      await emitResultMetadata(w, [
+        [
+          {
+            hits: [
+              { host: "a", zo_sql_num: 3 },
+              { host: "b", zo_sql_num: 4 },
+            ],
+          },
+        ],
+      ]);
+      expect(w.vm.evaluationStatus).toMatchObject({ grouped: true, count: 2, atLeast: true });
+      w.unmount();
+    } finally {
+      delete store.state.zoConfig.query_default_limit;
+    }
+  });
+
   it.each([
-    ["custom", 10, "30m"],
-    ["custom", 60, "3h"],
-    ["custom", 1, "5m"],
-    ["sql", 10, "10m"],
+    ["custom", 10, "30 min"],
+    ["custom", 60, "3 h"],
+    ["custom", 1, "5 min"],
+    ["sql", 10, "10 min"],
   ])("names a %s alert's default range from its %s min window", async (tab, period, label) => {
     const formData = baseFormData();
     formData.trigger_condition.period = period;
     const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: tab, formData });
     expect(w.find('[data-test="alert-preview-range-checks"]').text()).toBe(label);
+    w.unmount();
+  });
+
+  it.each([
+    ["checks back to back", { period: 10, frequency: 10 }, "false", "Last 3 checks (30 minutes)"],
+    ["checks with gaps", { period: 5, frequency: 30 }, "false", "Last 15 minutes"],
+    [
+      "a cron schedule",
+      { period: 10, frequency: 10, frequency_type: "cron" },
+      "false",
+      "Last 30 minutes",
+    ],
+    ["a real-time alert", { period: 10, frequency: 10 }, "true", "Last 30 minutes"],
+  ])("names the default range of %s by what it covers", async (_, trigger, realTime, tooltip) => {
+    const formData = { ...baseFormData(), is_real_time: realTime };
+    formData.trigger_condition = { ...formData.trigger_condition, ...trigger };
+    const w = await mountComp({ query: "SELECT * FROM logs", formData });
+    expect(w.vm.previewRangeOptions[0].tooltip).toBe(tooltip);
+    w.unmount();
+  });
+
+  it("asks a forecast for its threshold before it can draw", async () => {
+    const formData = { ...baseFormData(), _ui: { forecast: { U: "up", T: "", H: 7, W: "1d" } } };
+    const w = await mountComp({ query: "", selectedTab: "promql", formData });
+    expect(w.find('[data-test="alert-preview-chart"]').text()).toBe(
+      "Enter a threshold to see the forecast.",
+    );
     w.unmount();
   });
 

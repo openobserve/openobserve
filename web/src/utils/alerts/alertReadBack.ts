@@ -15,6 +15,7 @@
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { hasDeliveryTarget } from "./deliveryTarget";
+import { dataNoun, formatNumber } from "./alertCopy";
 import {
   nameResolvedExpression,
   type CompositeChildDisplay,
@@ -23,6 +24,7 @@ import {
 /** The slice of the alert form the plain-words sentences read. */
 export interface ReadBackAlert {
   stream_name?: string;
+  stream_type?: string;
   is_real_time?: string;
   destinations?: string[];
   workflows?: string[];
@@ -71,6 +73,10 @@ export interface PreviewVerdict {
   atLeast?: boolean;
   label?: string;
   grouped?: boolean;
+  /** The measured aggregate of an ungrouped builder measure, when the preview computed one. */
+  value?: number;
+  /** The minutes a real-time count covers (the chart's range). */
+  windowMinutes?: number;
 }
 
 const OPERATOR_SYMBOLS: Record<string, string> = {
@@ -103,16 +109,16 @@ const CONDITION_KEYS: Record<string, I18nKey> = {
 export const operatorSymbol = (op: string | undefined): string =>
   OPERATOR_SYMBOLS[op ?? ""] ?? op ?? "";
 
-/** "3" for the default at-least operator, otherwise "> 3", "≤ 3"... */
+/** "3" for the default at-least operator, otherwise "> 3", "≤ 3"...; numbers in the locale's form. */
 export const limitText = (op: string | undefined, value: unknown): string =>
-  !op || op === ">=" ? String(value) : `${operatorSymbol(op)} ${value}`;
+  !op || op === ">=" ? formatNumber(value) : `${operatorSymbol(op)} ${formatNumber(value)}`;
 
 const num = (value: unknown): number => Number(value ?? 0) || 0;
 
-/** A preview count as people read it: "1,000+" when the server stopped counting there. */
+/** A preview count in a sentence: "at least 1,000" when the server stopped counting there. */
 export const previewCountText = (count: number, atLeast: boolean | undefined, t: TranslateFn) => {
-  const value = count.toLocaleString();
-  return atLeast ? t("alerts.incidents.panel.atLeast", { value }) : raw(value);
+  const value = formatNumber(count);
+  return atLeast ? t("alerts.verdict.atLeast", { value }) : value;
 };
 
 /** An event, row or series count limit: a whole number of 1 or more. */
@@ -159,23 +165,23 @@ function whoText(
   return t("alerts.readBack.targets", { targets });
 }
 
-/** An event-count test in words: "3+ events", "fewer than 3 events". */
+/** A count test in words: "3+ events", "less than 3 spans"; the noun follows the stream type. */
 export function eventCountText(
   tc: ReadBackAlert["trigger_condition"] | undefined,
   t: TranslateFn,
+  streamType?: string,
 ): I18nText {
   const threshold = tc?.threshold ?? "";
   const operator = tc?.operator ?? "";
+  // "1+ events" stays plural; only "exactly 1 event" reads as one.
+  const one = ["=", "==", "!="].includes(operator) && num(threshold) === 1;
+  const noun = dataNoun(streamType, "custom", one ? 1 : 2, t);
   if (operator === "=" || operator === "==") {
-    return t(
-      "alerts.summary.plainEnglish.conditionExactly",
-      { threshold },
-      num(threshold) === 1 ? 1 : 2,
-    );
+    return t("alerts.summary.plainEnglish.conditionExactly", { threshold, noun });
   }
   return CONDITION_KEYS[operator]
-    ? t(CONDITION_KEYS[operator], { threshold })
-    : t("alerts.summary.plainEnglish.conditionOther", { threshold, operator });
+    ? t(CONDITION_KEYS[operator], { threshold, noun })
+    : t("alerts.summary.plainEnglish.conditionOther", { threshold, operator, noun });
 }
 
 function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: boolean): I18nText {
@@ -219,7 +225,10 @@ function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: bool
       window,
     });
   }
-  return t("alerts.readBack.eventsIn", { condition: eventCountText(tc, t), window });
+  return t("alerts.readBack.eventsIn", {
+    condition: eventCountText(tc, t, alert.stream_type),
+    window,
+  });
 }
 
 function scheduleText(alert: ReadBackAlert, t: TranslateFn): I18nText {
@@ -281,29 +290,59 @@ export function previewVerdictSentence(
   verdict: PreviewVerdict,
   alert: ReadBackAlert,
   t: TranslateFn,
-  opts: { countsEvents?: boolean } = {},
+  opts: { countsEvents?: boolean; hasFilter?: boolean } = {},
 ): I18nText {
   const tc = alert.trigger_condition ?? {};
+  const qc = alert.query_condition ?? {};
+  if (alert.is_real_time === "true") {
+    if (verdict.count === undefined) return t("alerts.verdict.realtimeNoCount");
+    return t(
+      opts.hasFilter === false ? "alerts.verdict.realtimeNoFilter" : "alerts.verdict.realtime",
+      {
+        count: previewCountText(verdict.count, verdict.atLeast, t),
+        window: t(
+          "alerts.verdict.window",
+          { n: verdict.windowMinutes ?? num(tc.period) },
+          verdict.windowMinutes ?? num(tc.period),
+        ),
+      },
+    );
+  }
   if (verdict.count === undefined) {
     return t(verdict.wouldTrigger ? "alerts.verdict.firesReason" : "alerts.verdict.quietReason", {
       reason: verdict.reason,
     });
   }
   const limit = limitText(tc.operator, tc.threshold ?? 0);
+  const count = previewCountText(verdict.count, verdict.atLeast, t);
   if (verdict.grouped) {
     if (verdict.wouldTrigger) {
-      return t("alerts.verdict.groupsFire", { count: verdict.count }, verdict.count);
+      return t("alerts.verdict.groupsFire", { count }, verdict.count);
     }
-    return t("alerts.verdict.groupsQuiet", { count: verdict.count, limit }, verdict.count);
+    return t("alerts.verdict.groupsQuiet", { count, limit }, verdict.count);
   }
-  const countsEvents =
-    opts.countsEvents ??
-    (alert.query_condition?.type === "custom" && !alert.query_condition?.aggregation);
-  const label = countsEvents ? t("alerts.verdict.events", verdict.count) : raw(verdict.label ?? "");
+  const window = t("alerts.verdict.window", { n: num(tc.period) }, num(tc.period));
+  const having = qc.aggregation?.having;
+  if (verdict.value !== undefined && having?.column) {
+    return t(verdict.wouldTrigger ? "alerts.verdict.valueFires" : "alerts.verdict.valueQuiet", {
+      measure: t("alerts.verdict.measure", {
+        fn: qc.aggregation?.function ?? "",
+        field: having.column,
+      }),
+      value: formatNumber(verdict.value),
+      window,
+      limit: limitText(having.operator, having.value ?? ""),
+    });
+  }
+  const countsEvents = opts.countsEvents ?? (qc.type === "custom" && !qc.aggregation);
+  const label =
+    countsEvents || qc.type === "sql" || qc.type === "promql"
+      ? dataNoun(alert.stream_type, qc.type, verdict.count, t)
+      : raw(verdict.label ?? "");
   return t(verdict.wouldTrigger ? "alerts.verdict.fires" : "alerts.verdict.quiet", {
-    count: previewCountText(verdict.count, verdict.atLeast, t),
+    count,
     label,
-    window: t("alerts.verdict.window", { n: num(tc.period) }),
+    window,
     limit,
   });
 }

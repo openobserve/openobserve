@@ -10,6 +10,7 @@ import {
   previewVerdictSentence,
   type ReadBackAlert,
 } from "./alertReadBack";
+import { dataNoun } from "./alertCopy";
 
 const t = i18n.global.t as unknown as TranslateFn;
 const SQL = "SELECT count(*) FROM checkout_logs";
@@ -35,14 +36,14 @@ const alert = (over: Partial<ReadBackAlert> = {}): ReadBackAlert => ({
 describe("describeAlertInPlainWords", () => {
   it("says nobody is alerted yet when no destination is picked", () => {
     expect(describeAlertInPlainWords(alert(), t)).toBe(
-      "Won't notify anyone yet. Fires when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
+      "Won't notify anyone yet. Fires when 3+ events match in 10 minutes, checked every 10 min, at most once every 10 minutes.",
     );
   });
 
   it("says an incident opens when nobody else is told", () => {
     expect(
       describeAlertInPlainWords(alert({ creates_incident: true }), t, { incidentsEnabled: true }),
-    ).toMatch(/^Opens an incident when 3\+ events turn up/);
+    ).toMatch(/^Opens an incident when 3\+ events match/);
   });
 
   it("ignores a stored incident flag where incidents are off", () => {
@@ -56,7 +57,7 @@ describe("describeAlertInPlainWords", () => {
       alert({ trigger_condition: { ...alert().trigger_condition, period: "" } }),
       t,
     );
-    expect(text).toContain("turn up in 0 minutes");
+    expect(text).toContain("match in 0 minutes");
   });
 
   it("keeps singular and plural units right for 1 and 2 hours", () => {
@@ -65,16 +66,16 @@ describe("describeAlertInPlainWords", () => {
         alert({ trigger_condition: { ...alert().trigger_condition, period: n } }),
         t,
       );
-    expect(period(1)).toContain("turn up in 1 minute,");
-    expect(period(60)).toContain("turn up in 1 hour,");
-    expect(period(120)).toContain("turn up in 2 hours,");
+    expect(period(1)).toContain("match in 1 minute,");
+    expect(period(60)).toContain("match in 1 hour,");
+    expect(period(120)).toContain("match in 2 hours,");
   });
 
   it("names the destinations and the hold", () => {
     expect(
       describeAlertInPlainWords(alert({ destinations: ["team-email"], pending_period_sec: 60 }), t),
     ).toBe(
-      "Alerts team-email when 3+ events turn up in 10 minutes, for at least 1 hour, checked every 10 min, at most once every 10 minutes.",
+      "Alerts team-email when 3+ events match in 10 minutes, for at least 1 hour, checked every 10 min, at most once every 10 minutes.",
     );
   });
 
@@ -143,7 +144,7 @@ describe("describeAlertInPlainWords", () => {
       { aggregationEnabled: false },
     );
     expect(text).toBe(
-      "Won't notify anyone yet. Fires when 3+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
+      "Won't notify anyone yet. Fires when 3+ events match in 10 minutes, checked every 10 min, at most once every 10 minutes.",
     );
   });
 
@@ -203,86 +204,115 @@ describe("describeCompositeInPlainWords", () => {
 });
 
 describe("previewVerdictSentence", () => {
-  it("states a firing verdict in events with the limit", () => {
-    expect(
-      previewVerdictSentence(
-        { wouldTrigger: true, reason: "", count: 7, label: "data points" },
-        alert(),
-        t,
-      ),
-    ).toBe("Right now this would alert you: 7 events in the last 10 min (your limit is 3).");
+  const sql = alert({ query_condition: { type: "sql", aggregation: null } });
+  const measure = alert({
+    stream_type: "metrics",
+    query_condition: {
+      type: "custom",
+      aggregation: { function: "avg", having: { column: "value", operator: ">=", value: 1 } },
+    },
   });
-
-  it("states a quiet verdict", () => {
-    expect(
-      previewVerdictSentence(
-        { wouldTrigger: false, reason: "", count: 1, label: "data point" },
-        alert(),
-        t,
-      ),
-    ).toBe("Quiet right now: 1 event in the last 10 min (limit 3).");
+  const traces = alert({
+    stream_type: "traces",
+    trigger_condition: { ...alert().trigger_condition, threshold: 100000000 },
   });
-
-  it("uses the preview's own noun outside the builder count mode", () => {
-    const sql = alert({ query_condition: { type: "sql", aggregation: null } });
-    expect(
-      previewVerdictSentence({ wouldTrigger: false, reason: "", count: 2, label: "rows" }, sql, t),
-    ).toBe("Quiet right now: 2 rows in the last 10 min (limit 3).");
-  });
-
   it.each([
-    [2000, true, `${t("alerts.incidents.panel.atLeast", { value: (2000).toLocaleString() })} `],
-    [2000, false, `${(2000).toLocaleString()} `],
-  ])("states %s rows (a lower bound: %s) as the server counted them", (count, atLeast, shown) => {
-    const sql = alert({ query_condition: { type: "sql", aggregation: null } });
-    expect(
-      previewVerdictSentence(
-        { wouldTrigger: true, reason: "", count, label: "rows", atLeast },
-        sql,
-        t,
-      ),
-    ).toContain(shown);
+    [
+      "a firing event count",
+      { wouldTrigger: true, reason: "", count: 7 },
+      alert(),
+      {},
+      "Would alert now: 7 events in the last 10 minutes (threshold 3).",
+    ],
+    [
+      "a quiet span count with a large threshold",
+      { wouldTrigger: false, reason: "", count: 20232 },
+      traces,
+      {},
+      "Quiet now: 20,232 spans in the last 10 minutes (threshold 100,000,000).",
+    ],
+    [
+      "SQL rows the server capped",
+      { wouldTrigger: true, reason: "", count: 2000, atLeast: true, label: "rows" },
+      sql,
+      {},
+      "Would alert now: at least 2,000 rows in the last 10 minutes (threshold 3).",
+    ],
+    [
+      "a builder that counts samples",
+      { wouldTrigger: false, reason: "", count: 0, label: "data points" },
+      alert({ stream_type: "metrics", query_condition: { type: "custom", aggregation: {} } }),
+      { countsEvents: true },
+      "Quiet now: 0 samples in the last 10 minutes (threshold 3).",
+    ],
+    [
+      "an ungrouped measure",
+      { wouldTrigger: true, reason: "", count: 1, value: 42.125 },
+      measure,
+      {},
+      "Would alert now: avg of value is 42.13 in the last 10 minutes (threshold 1).",
+    ],
+    [
+      "groups capped at the row limit",
+      { wouldTrigger: true, reason: "", count: 1000, atLeast: true, grouped: true },
+      alert(),
+      {},
+      "Would alert now: at least 1,000 groups are over the threshold.",
+    ],
+    [
+      "no group over",
+      { wouldTrigger: false, reason: "", count: 0, grouped: true },
+      alert(),
+      {},
+      "Quiet now: no group is over the threshold.",
+    ],
+    [
+      "one group short",
+      { wouldTrigger: false, reason: "", count: 1, grouped: true },
+      alert(),
+      {},
+      "Quiet now: 1 group is over the threshold (needs 3).",
+    ],
+    [
+      "nothing counted",
+      { wouldTrigger: true, reason: "When conditions match" },
+      alert(),
+      {},
+      "Would alert now: When conditions match.",
+    ],
+    [
+      "real time before a count",
+      { wouldTrigger: true, reason: "" },
+      alert({ is_real_time: "true" }),
+      {},
+      "Fires on each matching event.",
+    ],
+    [
+      "real time with no filter",
+      { wouldTrigger: true, reason: "", count: 1500, windowMinutes: 30 },
+      alert({ is_real_time: "true" }),
+      { hasFilter: false },
+      "Fires on each matching event: 1,500 in the last 30 minutes. Add a filter to narrow it.",
+    ],
+  ] as const)("states %s", (_, verdict, readBack, opts, sentence) => {
+    expect(previewVerdictSentence({ ...verdict }, readBack, t, opts)).toBe(sentence);
   });
 
-  it("lets the editor say the builder counts events", () => {
-    const withAgg = alert({
-      query_condition: { type: "custom", aggregation: { function: "avg" } },
-    });
-    expect(
-      previewVerdictSentence(
-        { wouldTrigger: false, reason: "", count: 0, label: "data points" },
-        withAgg,
-        t,
-        { countsEvents: true },
-      ),
-    ).toBe("Quiet right now: 0 events in the last 10 min (limit 3).");
-  });
-
-  it("counts groups over the limit", () => {
-    expect(
-      previewVerdictSentence(
-        { wouldTrigger: true, reason: "", count: 2, grouped: true },
-        alert(),
-        t,
-      ),
-    ).toBe("Right now 2 groups are over the limit.");
-    expect(
-      previewVerdictSentence(
-        { wouldTrigger: false, reason: "", count: 0, grouped: true },
-        alert(),
-        t,
-      ),
-    ).toBe("Quiet right now: no group is over the limit.");
-  });
-
-  it("falls back to the preview's reason when nothing was counted", () => {
-    expect(
-      previewVerdictSentence({ wouldTrigger: true, reason: "When conditions match" }, alert(), t),
-    ).toBe("Right now this would alert you: When conditions match.");
-  });
-
-  it("writes the operator only when it is not at-least", () => {
-    expect(limitText(">=", 3)).toBe("3");
+  it("writes the operator only when it is not at-least, in the locale's numbers", () => {
+    expect(limitText(">=", 3000)).toBe("3,000");
     expect(limitText("<", 3)).toBe("< 3");
+  });
+});
+
+describe("dataNoun", () => {
+  it.each([
+    ["logs", "custom", 2, "events"],
+    ["metrics", "custom", 1, "sample"],
+    ["traces", "custom", 2, "spans"],
+    ["logs", "sql", 1, "row"],
+    ["metrics", "promql", 2, "series"],
+    [undefined, undefined, 2, "events"],
+  ])("a %s stream in %s mode counts %s %s", (streamType, mode, count, noun) => {
+    expect(dataNoun(streamType, mode, count, t)).toBe(noun);
   });
 });

@@ -52,13 +52,14 @@ const setup = (
   editing = false,
   incidentsEnabled = true,
   queryFailed = false,
+  extra: { anomaly?: Record<string, unknown>; aggregation?: boolean } = {},
 ) =>
   useAlertFormSections({
     fieldMeta: ref(meta),
     formData: ref(formData),
-    anomalyConfig: ref({}),
+    anomalyConfig: ref(extra.anomaly ?? {}),
     isAnomalyMode: ref(formData.is_real_time === "anomaly"),
-    isAggregationEnabled: ref(false),
+    isAggregationEnabled: ref(extra.aggregation ?? false),
     isEditing: ref(editing),
     incidentsEnabled: ref(incidentsEnabled),
     queryFailed: ref(queryFailed),
@@ -253,10 +254,10 @@ describe("useAlertFormSections", () => {
         "condition",
       ).summary;
     expect(summary(">")).toBe("more than 3 events");
-    expect(summary("<=")).toBe("3 or fewer events");
-    expect(summary("<")).toBe("fewer than 3 events");
+    expect(summary("<=")).toBe("at most 3 events");
+    expect(summary("<")).toBe("less than 3 events");
     expect(summary("=")).toBe("exactly 3 events");
-    expect(summary("!=")).toBe("not 3 events");
+    expect(summary("!=")).toBe("not exactly 3 events");
   });
 
   it("counts invalid fields per section from the form's field meta; a silence error counts against Who to tell", () => {
@@ -318,8 +319,8 @@ describe("useAlertFormSections", () => {
       {},
       [
         "Watches Logs in default, on a schedule.",
-        "Fires when 1+ events turn up in the last 5 minutes.",
-        "Tells ops-slack, reminding at most every 10 minutes.",
+        "Fires when 1 or more events match in the last 5 minutes.",
+        "Tells ops-slack, notifying at most every 10 minutes.",
         "Checks every 5 minutes, looking at the last 5 minutes.",
       ],
     ],
@@ -338,24 +339,133 @@ describe("useAlertFormSections", () => {
       },
       [
         "Watches Logs in default, on a schedule.",
-        "Fires when the query returns 1+ rows in the last 5 minutes.",
-        "Opens an incident, reminding at most every 2 hours.",
+        "Fires when the query returns 1 or more rows in the last 5 minutes.",
+        "Opens an incident, notifying at most every 2 hours.",
         "Checks on the cron schedule 0 9 * * *, looking at the last 5 minutes.",
       ],
     ],
     [
       "a real-time alert telling nobody",
       { is_real_time: "true", destinations: [], trigger_condition: { silence: 0 } },
+      ["Watches Logs in default.", "Fires on each matching event.", "Tells no one yet."],
+    ],
+    [
+      "a traces alert checking every minute",
+      {
+        stream_type: "traces",
+        trigger_condition: { ...base.trigger_condition, frequency: 1, silence: 1 },
+      },
       [
-        "Watches Logs in default, as events arrive.",
-        "Fires on each matching event.",
-        "Tells no one yet.",
-        "Checks as events arrive.",
+        "Watches Traces in default, on a schedule.",
+        "Fires when 1 or more spans match in the last 5 minutes.",
+        "Tells ops-slack, notifying at most every minute.",
+        "Checks every minute, looking at the last 5 minutes.",
+      ],
+    ],
+    [
+      "a combined alert with no alerts yet",
+      { is_real_time: "composite", children: [], composite_condition: null },
+      [
+        "No alerts picked yet.",
+        "Fires once you choose how its alerts combine.",
+        "Tells ops-slack, notifying at most every 10 minutes.",
+        "Checks whenever one of its alerts changes state.",
       ],
     ],
   ])("reads back %s in sentences", (_, over, sentences) => {
     const { review } = setup({ ...base, ...over });
     expect(review.value.map((line) => reviewLineText(line, t))).toEqual(sentences);
+  });
+
+  const metrics = { ...base, stream_type: "metrics" };
+  it.each([
+    [
+      "a measure",
+      {
+        query_condition: {
+          type: "custom",
+          aggregation: { function: "avg", having: { column: "value", operator: ">=", value: 1 } },
+        },
+      },
+      "avg of value ≥ 1",
+      "Fires when avg of value is at least 1 in the last 5 minutes.",
+    ],
+    [
+      "PromQL with one alert",
+      { query_condition: { type: "promql", promql_condition: { operator: ">=", value: 1 } } },
+      "1+ series ≥ 1",
+      "Fires when 1 or more series are at least 1 at any point in the last 5 minutes.",
+    ],
+    [
+      "PromQL with one alert per series",
+      {
+        query_condition: {
+          type: "promql",
+          promql_multi_alert: true,
+          promql_condition: { operator: "<", value: 0.5 },
+        },
+      },
+      "< 0.5",
+      "Fires for each series whose latest value is less than 0.5.",
+    ],
+    [
+      "a forecast",
+      {
+        query_condition: {
+          type: "promql",
+          promql_multi_alert: true,
+          promql_condition: { operator: "<=", value: 7 },
+        },
+        _ui: { forecast: { T: 90, W: "2d", direction: "rises" } },
+      },
+      "Reaches 90 within 7 days",
+      "Fires when a series is forecast to rise to 90 within 7 days, based on the last 2 days.",
+    ],
+    [
+      "a forecast with no threshold yet",
+      {
+        query_condition: { type: "promql", promql_condition: { operator: "<=", value: 7 } },
+        _ui: { forecast: { T: "", W: "2d", direction: "rises" } },
+      },
+      "Forecast needs a threshold",
+      "Forecast needs a threshold",
+    ],
+  ])("reads %s on metrics in symbols in the list and words in the review", (_, over, nav, line) => {
+    const { items, review } = setup({ ...metrics, ...over }, {}, false, true, false, {
+      aggregation: true,
+    });
+    expect(byId(items.value, "condition").summary).toBe(nav);
+    expect(reviewLineText(byId(review.value, "condition") as never, t)).toBe(line);
+  });
+
+  it("reads a forecast's schedule as a trend fit, and an anomaly's measure and window", () => {
+    const forecast = setup({
+      ...metrics,
+      query_condition: { type: "promql", promql_condition: { operator: "<=", value: 7 } },
+      _ui: { forecast: { T: 90, W: "2d" } },
+      trigger_condition: { ...base.trigger_condition, frequency: 30 },
+    });
+    expect(reviewLineText(byId(forecast.review.value, "schedule") as never, t)).toBe(
+      "Checks every 30 minutes, fitting the trend over the last 2 days.",
+    );
+    const anomaly = setup({ ...base, is_real_time: "anomaly" }, {}, false, true, false, {
+      anomaly: {
+        detection_function: "count",
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+        schedule_interval_value: 1,
+        schedule_interval_unit: "h",
+        detection_window_value: 3,
+        detection_window_unit: "h",
+        alert_direction: "both",
+      },
+    });
+    expect(anomaly.review.value.map((l) => reviewLineText(l, t))).toEqual([
+      "Watches Logs in default for unusual values.",
+      "Fires when count per 5 minutes is unusual (spikes or drops).",
+      "Tells no one yet.",
+      "Checks every hour, looking at the last 3 hours.",
+    ]);
   });
 
   it.each([
@@ -397,6 +507,9 @@ describe("useAlertFormSections", () => {
 
 describe("checkEveryLabel", () => {
   it("names the schedule in minutes, whole hours or cron", () => {
+    expect(checkEveryLabel(scheduled({ trigger_condition: { frequency: 1 } }), t)).toBe(
+      "Every minute",
+    );
     expect(checkEveryLabel(scheduled(), t)).toBe("Every 10 min");
     expect(checkEveryLabel(scheduled({ trigger_condition: { frequency: 120 } }), t)).toBe(
       "Every 2 h",

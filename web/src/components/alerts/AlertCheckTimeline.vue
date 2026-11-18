@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { scheduleOverlap, type ScheduleOverlapKind } from "@/utils/alerts/scheduleOverlap";
 
 const props = defineProps<{
@@ -25,6 +25,8 @@ const props = defineProps<{
   frequency: number;
   /** Minutes of data each check reads. */
   period: number;
+  /** A forecast fits a trend over this window, whatever the look back, so gaps do not apply. */
+  forecastWindow?: I18nText;
 }>();
 
 const WIDTH = 600;
@@ -91,7 +93,11 @@ const overlap = computed(() => scheduleOverlap(props.period, props.frequency));
       <span v-for="tick in ticks" :key="tick.x">{{ tick.label }}</span>
     </div>
     <p class="text-text-body m-0 mt-2 text-sm" data-test="add-alert-check-timeline-caption">
-      {{ t(CAPTION[overlap.kind], { period, minutes: overlap.minutes }) }}
+      {{
+        forecastWindow
+          ? t("alerts.form.schedule.forecast", { window: forecastWindow })
+          : t(CAPTION[overlap.kind], { period, minutes: overlap.minutes })
+      }}
     </p>
   </OSettingRow>
 </template>

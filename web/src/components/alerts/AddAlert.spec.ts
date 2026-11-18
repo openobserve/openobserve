@@ -1729,7 +1729,9 @@ describe("AddAlert (OForm owner)", () => {
         const scrollToSection = vi.fn();
         wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
         await wrapper.get('[data-test="add-alert-section-notify-next"]').trigger("click");
-        await wrapper.get('[data-test="add-alert-review-schedule"]').trigger("click");
+        // A real-time alert says nothing about a schedule; a combined one says when it checks.
+        const line = type === "true" ? "condition" : "schedule";
+        await wrapper.get(`[data-test="add-alert-review-${line}"]`).trigger("click");
         expect(scrollToSection.mock.calls).toEqual([["details"], ["condition"]]);
       },
     );
@@ -1897,7 +1899,7 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       expect(wrapper.vm.settingFind.items.value[0]).toMatchObject({
         id: "keepFiring",
-        label: "Keep firing after it clears",
+        label: "Keep firing for",
       });
       expect(wrapper.vm.tiers.isVisible("keepFiring")).toBe(false);
       // jsdom has no layout: the stubbed step renders no control, so the jump falls back to the section.
@@ -2160,7 +2162,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.form.setFieldValue("is_real_time", "true");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-rail-verdict"]').text()).toBe(
-        "Checked as each event arrives, so there is no count to judge yet. The graph shows recent matching events.",
+        "Fires on each matching event.",
       );
     });
   });
@@ -3025,14 +3027,14 @@ describe("AddAlert (OForm owner)", () => {
       await clickSave();
       expect(dialogEl("dialog")?.textContent).toContain("Choose Query Mode");
       expect(dialogEl("lead")?.textContent?.trim()).toBe(
-        "Builder is selected but empty. SQL is set up.",
+        "Filters is selected but empty. SQL is set up.",
       );
       expect(dialogEl("dialog")?.textContent).not.toContain("-line query");
       // The dialog opens on the mode selected in the form; only a click changes it.
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
-      expect(dialogButton("primary")?.textContent).toContain("Save with Builder Mode");
+      expect(dialogButton("primary")?.textContent).toContain("Save with Filters Mode");
       expect(dialogEl("warning")?.textContent).toContain("No filters, so every row in");
-      expect(noteText()).toBe("Only Builder mode runs. SQL mode is not used.");
+      expect(noteText()).toBe("Only Filters mode runs. SQL mode is not used.");
 
       dialogEl("option-sql")!.click();
       await flushPromises();
@@ -3078,7 +3080,7 @@ describe("AddAlert (OForm owner)", () => {
       await clickSave();
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(dialogEl("dialog")?.textContent).toContain("Builder and SQL are both set up.");
+      expect(dialogEl("dialog")?.textContent).toContain("Filters and SQL are both set up.");
       expect(dialogEl("option-sql")?.getAttribute("data-state")).toBe("on");
     });
 
@@ -3092,12 +3094,12 @@ describe("AddAlert (OForm owner)", () => {
       form.setFieldValue("query_condition.conditions", builderTree);
 
       await clickSave();
-      expect(noteText()).toBe("Only SQL mode runs. Builder mode is not used.");
+      expect(noteText()).toBe("Only SQL mode runs. Filters mode is not used.");
       dialogEl("option-custom")!.click();
       await flushPromises();
-      expect(noteText()).toBe("Only Builder mode runs. SQL mode is not used.");
+      expect(noteText()).toBe("Only Filters mode runs. SQL mode is not used.");
       expect(dialogEl("dialog")?.textContent).not.toContain("filter condition");
-      expect(dialogButton("primary")?.textContent).toContain("Save with Builder Mode");
+      expect(dialogButton("primary")?.textContent).toContain("Save with Filters Mode");
 
       await clickDialog("primary");
 
@@ -3168,7 +3170,7 @@ describe("AddAlert (OForm owner)", () => {
       await clickSave();
 
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
-      expect(dialogEl("dialog")?.textContent).toContain("Builder and SQL are both set up.");
+      expect(dialogEl("dialog")?.textContent).toContain("Filters and SQL are both set up.");
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
     });
 
@@ -3187,7 +3189,7 @@ describe("AddAlert (OForm owner)", () => {
 
       await clickSave();
 
-      expect(dialogEl("lead")?.textContent?.trim()).toBe("Builder and SQL are both set up.");
+      expect(dialogEl("lead")?.textContent?.trim()).toBe("Filters and SQL are both set up.");
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
       expect(dialogEl("warning")).toBeNull();
     });
@@ -3204,7 +3206,7 @@ describe("AddAlert (OForm owner)", () => {
       await clickSave();
 
       expect(dialogEl("lead")?.textContent?.trim()).toBe(
-        "SQL is selected but empty. Builder is set up.",
+        "SQL is selected but empty. Filters is set up.",
       );
       expect(dialogEl("option-sql")?.getAttribute("data-state")).toBe("on");
       expect(dialogEl("warning")?.textContent?.trim()).toBe("No query written yet");
@@ -3265,8 +3267,8 @@ describe("AddAlert (OForm owner)", () => {
       expect(dialogEl("option-custom")).not.toBeNull();
       expect(dialogEl("option-sql")).not.toBeNull();
       expect(dialogEl("option-promql")).not.toBeNull();
-      expect(dialogEl("dialog")?.textContent).toContain("Builder, SQL and PromQL are all set up.");
-      expect(noteText()).toBe("Only PromQL mode runs. Builder and SQL modes are not used.");
+      expect(dialogEl("dialog")?.textContent).toContain("Filters, SQL and PromQL are all set up.");
+      expect(noteText()).toBe("Only PromQL mode runs. Filters and SQL modes are not used.");
     });
 
     // The reported alert, as the GET returns it: Builder with no conditions
