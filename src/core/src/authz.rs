@@ -1028,52 +1028,6 @@ pub fn stream_access_forbidden(request_org: &str, denied: &StreamAccessDenied) -
     (StatusCode::FORBIDDEN, Json(body)).into_response()
 }
 
-/// In `_meta` the cached membership names the role, whatever role the request carries.
-#[cfg(feature = "enterprise")]
-fn effective_role(org_id: &str, user_id: &str, role: String) -> String {
-    use common::infra::config::ORG_USERS;
-
-    if org_id != config::META_ORG_ID {
-        return role;
-    }
-    match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
-        Some(user) => user.role.to_string(),
-        None => role,
-    }
-}
-
-#[cfg(feature = "enterprise")]
-async fn cipher_key_allowed(
-    org_id: &str,
-    user_id: &str,
-    user: &config::meta::user::User,
-    key: &str,
-) -> bool {
-    use o2_openfga::meta::mapping::OFGA_MODELS;
-
-    let key_model = OFGA_MODELS
-        .get("cipher_keys")
-        .map_or("cipher_keys", |model| model.key);
-    check_permissions(
-        user_id,
-        AuthExtractor {
-            auth: "".to_string(),
-            method: "GET".to_string(),
-            o2_type: format!("{key_model}:{key}"),
-            org_id: org_id.to_string(),
-            bypass_check: false,
-            parent_id: "".to_string(),
-            use_all_org: false,
-            use_self_context: false,
-            use_self_parent: true,
-            feature: None,
-        },
-        user.role.clone(),
-        user.is_external,
-    )
-    .await
-}
-
 /// The streams of `org_id` the user can read, or `None` when RBAC lets them read every stream.
 #[cfg(any(feature = "enterprise", test))]
 pub(crate) async fn readable_streams(
@@ -1126,6 +1080,52 @@ pub(crate) async fn readable_streams(
         .await;
     readable.extend(checked);
     Some(readable)
+}
+
+/// In `_meta` the cached membership names the role, whatever role the request carries.
+#[cfg(feature = "enterprise")]
+fn effective_role(org_id: &str, user_id: &str, role: String) -> String {
+    use common::infra::config::ORG_USERS;
+
+    if org_id != config::META_ORG_ID {
+        return role;
+    }
+    match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
+        Some(user) => user.role.to_string(),
+        None => role,
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn cipher_key_allowed(
+    org_id: &str,
+    user_id: &str,
+    user: &config::meta::user::User,
+    key: &str,
+) -> bool {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    let key_model = OFGA_MODELS
+        .get("cipher_keys")
+        .map_or("cipher_keys", |model| model.key);
+    check_permissions(
+        user_id,
+        AuthExtractor {
+            auth: "".to_string(),
+            method: "GET".to_string(),
+            o2_type: format!("{key_model}:{key}"),
+            org_id: org_id.to_string(),
+            bypass_check: false,
+            parent_id: "".to_string(),
+            use_all_org: false,
+            use_self_context: false,
+            use_self_parent: true,
+            feature: None,
+        },
+        user.role.clone(),
+        user.is_external,
+    )
+    .await
 }
 
 /// True when OpenFGA accepts the stream's own Check, so an org-wide grant is known to cover it.
