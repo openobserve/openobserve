@@ -3,6 +3,7 @@ import { useAnnotations } from "./useAnnotations";
 import { annotationService } from "../../services/dashboard_annotations";
 import { queryClient } from "@/composables/query/queryClient";
 import { createAnnotationMutation } from "@/services/dashboard_annotations.queries";
+import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
 
 // Mock the annotation service
 vi.mock("../../services/dashboard_annotations", async (importOriginal) => {
@@ -382,6 +383,24 @@ describe("useAnnotations: one request per dashboard", () => {
 
     expect(later).toBeNull();
     expect(mockAnnotationService.get_timed_annotations).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops the idle lists of older revisions after a write", async () => {
+    mockAnnotationService.get_timed_annotations.mockResolvedValue({ data: [] } as any);
+    vi.spyOn(annotationService, "create_timed_annotations").mockResolvedValue({ data: {} } as any);
+    const lists = () =>
+      queryClient.getQueryCache().findAll({ queryKey: annotationKeys.dashboard("org", "dash") });
+
+    for (let i = 0; i < 3; i++) {
+      await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+      await queryClient
+        .getMutationCache()
+        .build(queryClient, createAnnotationMutation("org", "dash"))
+        .execute([{ title: `edit ${i}` }]);
+    }
+    await useAnnotations("org", "dash", "p1").refreshAnnotations(1, 2);
+
+    expect(lists()).toHaveLength(1);
   });
 
   it("does not let the reload after a write join a read that started before it", async () => {

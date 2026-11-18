@@ -17,6 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { annotationService } from "./dashboard_annotations";
 import { annotationKeys } from "./dashboard_annotations.querykeys";
 import { EMPTY_LIST_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { queryClient } from "@/composables/query/queryClient";
 
 // One counter per dashboard, moved after each annotation write. Every panel of
 // a dashboard shares one read, so the reload after a write needs a new key: on
@@ -25,8 +26,15 @@ const revisions = new Map<string, number>();
 const revisionKey = (org: string, dashboardId: string) => `${org}/${dashboardId}`;
 const revisionOf = (org: string, dashboardId: string) =>
   revisions.get(revisionKey(org, dashboardId)) ?? 0;
-const bumpRevision = (org: string, dashboardId: string) =>
+// Older revisions can never be read again, so the idle ones leave the cache
+// now. A read still in flight stays, because a panel waits on it.
+const bumpRevision = (org: string, dashboardId: string) => {
   revisions.set(revisionKey(org, dashboardId), revisionOf(org, dashboardId) + 1);
+  const cache = queryClient.getQueryCache();
+  for (const query of cache.findAll({ queryKey: annotationKeys.dashboard(org, dashboardId) })) {
+    if (query.state.fetchStatus === "idle") cache.remove(query);
+  }
+};
 
 export const dashboardAnnotationsQuery = (org: string, dashboardId: string, params: object) =>
   queryOptions({
