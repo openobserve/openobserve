@@ -3876,7 +3876,13 @@ async fn settle_resolution(
     use infra::table::alert_incidents::AutomaticResolution;
 
     Ok(
-        match infra::table::alert_incidents::resolve_if_recovered(org_id, incident_id).await? {
+        match infra::table::alert_incidents::resolve_if_recovered(
+            org_id,
+            incident_id,
+            quiet_enabled(),
+        )
+        .await?
+        {
             AutomaticResolution::Kept => IncidentAfter::Kept,
             AutomaticResolution::Owned => IncidentAfter::Owned,
             AutomaticResolution::AlreadyResolved(_) if !repair => {
@@ -6590,13 +6596,9 @@ pub async fn record_ack_change(
     if let Some(by) = row.and_then(|m| m.acknowledged_by.zip(m.acknowledged_at))
         && status == config::meta::alerts::incidents::IncidentStatus::Acknowledged
     {
-        use crate::autoobserve::incidents::{RespondedAs, responder_outcome};
+        use crate::autoobserve::incidents::{RespondedAs, respond_to_incident};
         let (org, id) = (org_id.to_string(), incident_id.to_string());
-        tokio::spawn(responder_outcome(
-            org,
-            id,
-            RespondedAs::Acknowledged { by: by.0, at: by.1 },
-        ));
+        respond_to_incident(org, id, RespondedAs::Acknowledged { by: by.0, at: by.1 });
     }
 }
 
@@ -8024,7 +8026,7 @@ mod tests {
                 offset: 0,
             };
             let now = config::utils::time::now_micros();
-            crate::autoobserve::incidents::list_with(org, page, true, now)
+            crate::autoobserve::incidents::list_with(org, page, None, true, now)
                 .await
                 .unwrap()
                 .items
@@ -8045,7 +8047,7 @@ mod tests {
                 offset: 0,
             };
             let now = config::utils::time::now_micros();
-            crate::autoobserve::incidents::list_with(org, page, oncall_on, now)
+            crate::autoobserve::incidents::list_with(org, page, None, oncall_on, now)
                 .await
                 .unwrap()
                 .items

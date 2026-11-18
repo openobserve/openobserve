@@ -34,6 +34,8 @@ pub struct IncidentsQuery {
     /// 1 to 500; 100 by default.
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+    /// Only this incident: an empty list when AutoObserve did not open it in this org.
+    pub incident_id: Option<String>,
 }
 
 #[utoipa::path(
@@ -75,7 +77,7 @@ pub async fn list_incidents(
     if page.limit == 0 || page.limit > MAX_LIMIT {
         return MetaHttpResponse::bad_request(format!("limit must be 1 to {MAX_LIMIT}"));
     }
-    match incidents::list(&org_id, page).await {
+    match incidents::list(&org_id, page, query.incident_id.as_deref()).await {
         Ok(mut body) => {
             let viewer = WebViewer {
                 user_id: user.user_id,

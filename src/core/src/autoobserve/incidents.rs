@@ -319,15 +319,28 @@ pub fn recovery_subject(r: &Recovery) -> String {
 }
 
 /// The org's AutoObserve incidents, newest first, with whether paging is on for it.
-pub async fn list(org: &str, page: Page) -> Result<AutoObserveIncidents, anyhow::Error> {
+/// `only` narrows the list to one incident id.
+pub async fn list(
+    org: &str,
+    page: Page,
+    only: Option<&str>,
+) -> Result<AutoObserveIncidents, anyhow::Error> {
     let oncall_on = o2_enterprise::enterprise::oncall::is_enabled();
-    list_with(org, page, oncall_on, config::utils::time::now_micros()).await
+    list_with(
+        org,
+        page,
+        only,
+        oncall_on,
+        config::utils::time::now_micros(),
+    )
+    .await
 }
 
 /// [list], told whether on-call runs and when now is, so every page outcome can be tested.
 pub async fn list_with(
     org: &str,
     page: Page,
+    only: Option<&str>,
     oncall_on: bool,
     now: i64,
 ) -> Result<AutoObserveIncidents, anyhow::Error> {
@@ -335,6 +348,7 @@ pub async fn list_with(
     let (rows, has_more) = infra::table::alert_incidents::list_by_alert_kind(
         org,
         kind,
+        only,
         u64::try_from(page.limit)?,
         u64::try_from(page.offset)?,
     )
@@ -505,15 +519,22 @@ pub async fn responder_outcome(org: String, incident_id: String, responded: Resp
     }
 }
 
-/// Spawns [responder_outcome] for the incident a page record belongs to, if it has one.
+/// Spawns [responder_outcome] unless AutoObserve is off: then no issue takes the response,
+/// so a responder's action costs no read of the incident's alerts.
+pub fn respond_to_incident(org: String, incident_id: String, responded: RespondedAs) {
+    if o2_enterprise::enterprise::autoobserve::is_enabled() {
+        tokio::spawn(responder_outcome(org, incident_id, responded));
+    }
+}
+
+/// [respond_to_incident] for the incident a page record belongs to, if it has one.
 pub fn respond_to_page(record: &Response, responded: RespondedAs) {
     let incident = record.incident_id.clone().or_else(|| {
         (record.subject.subject_type == SubjectType::Incident)
             .then(|| record.subject.source_id.clone())
     });
     if let Some(incident_id) = incident {
-        let org = record.org_id.clone();
-        tokio::spawn(responder_outcome(org, incident_id, responded));
+        respond_to_incident(record.org_id.clone(), incident_id, responded);
     }
 }
 
@@ -658,7 +679,10 @@ fn issue_incident(
         team_name: page.team_name.clone(),
         acked_by: record.and_then(|r| r.acked_by.clone()),
         acked_at: record.and_then(|r| r.acked_at),
-        page_url: record.map(|r| page_url(org, &r.id)),
+        page_url: record.map(|r| {
+            let cfg = config::get_config();
+            page_url(&cfg.common.web_url, &cfg.common.base_uri, org, &r.id)
+        }),
     }
 }
 
@@ -842,11 +866,8 @@ fn paged_kind(org: &str, finding: &str, entity: &str) -> Option<&'static str> {
 }
 
 /// The on-call page's own address, as on-call's chat messages link it.
-fn page_url(org: &str, response_id: &str) -> String {
-    format!(
-        "{}/web/oncall/responses/{response_id}?org_identifier={org}",
-        config::get_config().common.web_url
-    )
+fn page_url(web_url: &str, base_uri: &str, org: &str, response_id: &str) -> String {
+    format!("{web_url}{base_uri}/web/oncall/responses/{response_id}?org_identifier={org}")
 }
 
 /// Each paged kind's finding id for every stream the org still has, so a member reads by name.
@@ -940,6 +961,14 @@ mod tests {
 
     fn finding_dims() -> serde_json::Value {
         serde_json::to_value(finding_dimensions("stream_silence", "logs", "checkout")).unwrap()
+    }
+
+    #[test]
+    fn the_page_link_keeps_a_sub_path_deployment_base() {
+        assert_eq!(
+            page_url("https://o2.acme.com", "/o2", "acme", "resp_1"),
+            "https://o2.acme.com/o2/web/oncall/responses/resp_1?org_identifier=acme"
+        );
     }
 
     #[test]

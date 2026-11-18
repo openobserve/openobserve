@@ -20,6 +20,7 @@ use o2_enterprise::enterprise::{
         alert_findings::AlertFindingsRead,
         api::{self, DEFAULT_LIMIT, Deps, MAX_LIMIT, Page, SuggestionFilter},
         context::{self, ChannelResolver, IssueView},
+        contract::WEEK_US,
         decisions::Family,
     },
     slack::insights::feed::{
@@ -32,7 +33,7 @@ use openobserve_core::autoobserve::incidents;
 use super::{LiveDigest, decisions, readable_subjects, run_read_by};
 
 /// As far back as an issue decision finds its issue, so a thread can still close a long outage.
-const ISSUES_SINCE_US: i64 = 7 * 24 * 3_600_000_000;
+const ISSUES_SINCE_US: i64 = WEEK_US;
 /// Every decision a feed message reflects, an applied change and its effect included.
 const FEED_FAMILIES: [Family; 3] = [Family::Suggestion, Family::Issue, Family::AlertFinding];
 
@@ -118,7 +119,7 @@ async fn open_issues(deps: &Deps, org: &str, now: i64) -> anyhow::Result<Vec<Iss
         limit: DEFAULT_LIMIT,
         offset: 0,
     };
-    let listed = incidents::list(org, page).await?.items;
+    let listed = incidents::list(org, page, None).await?.items;
     for view in &mut issues {
         view.incident = incidents::incident_of(org, &view.issue, &listed);
     }
