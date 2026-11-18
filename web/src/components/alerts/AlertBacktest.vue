@@ -246,7 +246,6 @@ const hint = computed(() => {
     v-if="sql"
     ref="rowRef"
     :label="t('alerts.sections.backtest.label')"
-    :description="t('alerts.sections.backtest.help')"
     fill
     wide
     data-test="add-alert-backtest"

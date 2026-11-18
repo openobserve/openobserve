@@ -12109,7 +12109,6 @@
       },
       "backtest": {
         "label": "Last 24 hours",
-        "help": "How this limit would have behaved",
         "loading": "Checking the last 24 hours…",
         "failed": "Could not check the last 24 hours.",
         "slow": "Took too long to check the last 24 hours.",
