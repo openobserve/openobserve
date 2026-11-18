@@ -129,7 +129,7 @@ onMounted(maybeApplyDefault);
     </div>
 
     <div class="flex flex-wrap items-center gap-1.5">
-      <span class="text-text-secondary text-xs">{{ t("alerts.composite.insert") }}</span>
+      <span class="text-text-secondary text-xs">{{ t("alerts.form.composite.insert") }}</span>
       <OButton
         v-for="(child, index) in selectedChildren"
         :key="child.alert_id"
@@ -220,7 +220,7 @@ onMounted(maybeApplyDefault);
       variant="ghost-primary"
       size="sm"
       icon-left="add"
-      class="self-start"
+      class="-ms-3.5 self-start max-[85.5rem]:-ms-3"
       data-test="add-alert-add-compositeExpression"
       @click="tiers?.reveal('compositeExpression')"
     >
@@ -231,7 +231,6 @@ onMounted(maybeApplyDefault);
         :model-value="modelValue"
         :aria-label="t('alerts.composite.advancedExpression')"
         data-test="alerts-composite-expression-advanced"
-        :help-text="t('alerts.composite.advancedExpressionHelp')"
         :rows="3"
         class="font-mono"
         @update:model-value="emit('update:modelValue', $event)"

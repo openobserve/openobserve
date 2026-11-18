@@ -346,7 +346,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disabled="beingUpdated || anomalyEditMode"
                       @update:model-value="onStreamTypeChange"
                     />
-                    <div class="w-75 min-w-0 max-md:w-full max-md:basis-full">
+                    <div
+                      class="max-w-75 min-w-36 flex-1 max-md:w-full max-md:max-w-none max-md:basis-full"
+                    >
                       <OFormSelect
                         ref="streamNameRef"
                         name="stream_name"
@@ -480,13 +482,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:model-value="applyConditionPreset"
                   />
                 </OSettingRow>
-                <p
+                <OSettingRow
                   v-if="formData.is_real_time === 'true'"
-                  class="text-text-secondary m-0 py-3 text-sm"
+                  :label="t('alerts.groups.schedule')"
+                  wide
                   data-test="add-alert-schedule-note"
                 >
-                  {{ t("alerts.form.schedule.realtime") }}
-                </p>
+                  <span class="text-text-body text-sm">{{
+                    t("alerts.form.schedule.realtime")
+                  }}</span>
+                </OSettingRow>
                 <div
                   v-if="!beingUpdated"
                   v-show="!isAnomalyMode && !isCompositeMode"
@@ -510,13 +515,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
-                <p
+                <OSettingRow
                   v-if="isCompositeMode"
-                  class="text-text-secondary m-0 py-3 text-sm"
+                  :label="t('alerts.groups.schedule')"
+                  wide
                   data-test="add-alert-schedule-note"
                 >
-                  {{ t("alerts.form.schedule.composite") }}
-                </p>
+                  <span class="text-text-body text-sm">{{
+                    t("alerts.form.schedule.composite")
+                  }}</span>
+                </OSettingRow>
                 <div
                   v-show="isAnomalyMode"
                   :ref="(el) => setSectionTarget('anomalyCondition', el)"

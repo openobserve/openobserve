@@ -83,11 +83,11 @@ const stalePolicyOptions = computed(() => [
 const stalePolicyHelp = computed(() => {
   switch (draft.value.composite_condition.stale_child_policy) {
     case "treat_as_false":
-      return t("alerts.composite.treatStaleFalseHelp");
+      return t("alerts.form.composite.staleFalse");
     case "treat_as_true":
-      return t("alerts.composite.treatStaleTrueHelp");
+      return t("alerts.form.composite.staleTrue");
     default:
-      return t("alerts.composite.useLastStateHelp");
+      return t("alerts.form.composite.staleLastState");
   }
 });
 
@@ -196,8 +196,8 @@ watch(
   >
     <div class="flex min-w-0 flex-col">
       <OSettingRow
-        :label="t('alerts.composite.whichAlerts')"
-        :description="t('alerts.composite.whichAlertsHelp')"
+        :label="t('alerts.form.composite.alerts')"
+        :description="t('alerts.form.composite.alertsHelp')"
         fill
         data-test="alerts-composite-sub-alerts-row"
       >
@@ -215,7 +215,6 @@ watch(
       >
         <OSettingRow
           :label="t('alerts.composite.fireWhen')"
-          :description="t('alerts.composite.fireWhenHelp')"
           :info="t('alerts.composite.banner')"
           fill
           data-test="alerts-composite-expression-row"
@@ -230,7 +229,8 @@ watch(
 
         <OSettingRow
           v-if="tierShows('compositeWarningCounts')"
-          :label="t('alerts.composite.warningCountsAsFiring')"
+          :label="t('alerts.tiers.names.compositeWarningCounts')"
+          fill
           data-test="alerts-composite-warning-row"
         >
           <OSwitch
@@ -245,13 +245,14 @@ watch(
 
         <OSettingRow
           v-if="tierShows('compositeStalePolicy')"
-          :label="t('alerts.composite.stalePolicy')"
+          :label="t('alerts.tiers.names.compositeStalePolicy')"
+          fill
           data-test="alerts-composite-stale-policy-row"
         >
           <template #description>
             <span data-test="alerts-composite-stale-policy-help">{{ stalePolicyHelp }}</span>
           </template>
-          <div class="w-60 max-md:w-full">
+          <div class="w-50 max-md:w-full">
             <OSelect
               :model-value="draft.composite_condition.stale_child_policy"
               :options="stalePolicyOptions"

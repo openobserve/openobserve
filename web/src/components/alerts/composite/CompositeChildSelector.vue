@@ -85,7 +85,7 @@ const childLink = (child: CompositeChildOption): string =>
         <OTooltip v-if="addUnavailableReason" :content="addUnavailableReason" />
         <OButton
           variant="outline"
-          size="xs"
+          size="sm"
           icon-left="add"
           :disabled="!!addUnavailableReason"
           focusable-unavailable
@@ -173,7 +173,7 @@ const childLink = (child: CompositeChildOption): string =>
         class="text-text-secondary text-xs"
         data-test="alerts-composite-child-empty"
       >
-        {{ t("alerts.composite.noAlertsChosen") }}
+        {{ t("alerts.form.composite.empty") }}
       </div>
     </div>
   </section>
