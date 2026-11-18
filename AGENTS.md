@@ -7,6 +7,13 @@
   Read it before any change bigger than a one-cause patch; reviewers apply its §2 tests. On
   anything mechanical (ordering, comments, lint thresholds, schema, PR rules) this file wins.
 
+## Deployment facts
+
+- A super cluster always has exactly one scheduler. Only one scheduler is allowed to run across
+  all of its regions. Every new spec, design and code change must honor this: do not design for
+  two schedulers that run at the same time, and do not rely on more than one. This holds until
+  support for multiple schedulers is added.
+
 ## Build & workflow
 
 - Build with `cargo build` (debug). Never use `--release` unless explicitly asked.

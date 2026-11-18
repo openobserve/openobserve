@@ -22,7 +22,7 @@ Look for, in priority order:
 Do not report: formatting, naming taste, anything `cargo fmt` or `cargo clippy` already enforces, or speculative issues you cannot point to a concrete line for.
 
 ## Deployment facts
-- A super cluster always has exactly one scheduler. Only one scheduler is allowed to run across all of its regions. Do not report a finding that needs two schedulers to run at the same time in a super cluster, for example the same scheduled job triggered twice from two regions.
+- A super cluster always has exactly one scheduler. Only one scheduler is allowed to run across all of its regions. Do not report a finding that needs two schedulers to run at the same time in a super cluster, for example the same scheduled job triggered twice from two regions. Report a spec or design in the change set that assumes more than one scheduler. This holds until support for multiple schedulers is added.
 
 ## Output rules
 - Every finding names its `repo` (the repository name given in the change-set or paired-repository section) and cites a real `file` and `line` in that checkout, with a `detail` that states the failing input or state and the wrong outcome. `line` may be null only for a file-level finding such as a missing test file, and never for a finding above low severity.
