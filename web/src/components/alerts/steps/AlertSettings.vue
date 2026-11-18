@@ -111,29 +111,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex flex-col gap-1">
               <div class="flex flex-wrap items-center gap-2">
                 <span>{{ t("alerts.form.holdFor.sentence") }}</span>
-                <div class="w-21.75">
+                <div class="flex items-center gap-2">
                   <OFormInput
                     :aria-label="t('alerts.plain.forAtLeast')"
                     name="_ui.pendingPeriod"
                     type="number"
                     min="0"
+                    class="w-16!"
                     data-test="alert-settings-pending-period-input"
                     @update:model-value="onPendingPeriodChange"
                   >
                     <template #error />
                   </OFormInput>
+                  <OSelect
+                    :aria-label="t('common.unitFor', { label: t('alerts.plain.forAtLeast') })"
+                    class="max-w-25 min-w-20"
+                    :model-value="pendingPeriodUnit"
+                    :options="pendingPeriodUnitOptions"
+                    labelKey="label"
+                    valueKey="value"
+                    :searchable="false"
+                    data-test="alert-settings-pending-period-unit"
+                    @update:model-value="onPendingPeriodUnitChange"
+                  />
                 </div>
-                <OSelect
-                  :aria-label="t('common.unitFor', { label: t('alerts.plain.forAtLeast') })"
-                  class="max-w-25 min-w-20"
-                  :model-value="pendingPeriodUnit"
-                  :options="pendingPeriodUnitOptions"
-                  labelKey="label"
-                  valueKey="value"
-                  :searchable="false"
-                  data-test="alert-settings-pending-period-unit"
-                  @update:model-value="onPendingPeriodUnitChange"
-                />
               </div>
               <div
                 v-if="pendingPeriodError"
