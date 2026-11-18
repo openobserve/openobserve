@@ -13,6 +13,7 @@
 import { z } from "zod";
 
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import {
   FORECAST_MAX_DAYS,
   FORECAST_MIN_DAYS,
@@ -172,7 +173,7 @@ export type ConditionsTree = z.infer<typeof conditionGroupNodeSchema>;
 
 // ── Validation messages are i18n-driven (`alerts.validation.*` locale keys),
 //    resolved via the injected `t` inside `makeQueryConfigSchema`:
-//      threshold ≥ 1   → alerts.validation.thresholdPositive
+//      threshold whole ≥ 1 → alerts.validation.limitWholeNumber
 //      frequency ≥ 1   → alerts.validation.frequencyPositive
 //      org min-freq    → alerts.validation.minimumFrequency ({minutes} = the
 //                        ceil(min_auto_refresh_interval / 60) floor)
@@ -348,11 +349,11 @@ export const makeQueryConfigSchema = (t: Translator) =>
       // Shown+required in every scheduled branch: custom (count OR the measure
       // "having groups" — forced to 1 when no group-by, so ≥1 always holds), SQL
       // ("no. of events"), PromQL ("having series"). One rule covers them all.
-      if (isBelowOne(tc.threshold)) {
+      if (!isCountLimit(tc.threshold)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["trigger_condition", "threshold"],
-          message: t("alerts.validation.thresholdPositive"),
+          message: t("alerts.validation.limitWholeNumber"),
         });
       }
 

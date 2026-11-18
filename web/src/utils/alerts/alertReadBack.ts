@@ -31,6 +31,7 @@ export interface ReadBackAlert {
   pending_period_sec?: number | string | null;
   query_condition?: {
     type?: string;
+    sql?: string;
     aggregation?: {
       multi_alert?: boolean;
       function?: string;
@@ -80,6 +81,14 @@ const OPERATOR_SYMBOLS: Record<string, string> = {
   "!=": "≠",
 };
 
+/** Why a scheduled alert's condition cannot be read back as a rule yet. */
+export type ConditionGap = "noQuery" | "fixLimit";
+
+export const CONDITION_GAP_KEYS: Record<ConditionGap, I18nKey> = {
+  noQuery: "alerts.saveModeDialog.noQuery",
+  fixLimit: "alerts.sections.condition.fixLimit",
+};
+
 const CONDITION_KEYS: Record<string, I18nKey> = {
   ">=": "alerts.summary.plainEnglish.conditionAtLeast",
   ">": "alerts.summary.plainEnglish.conditionMoreThan",
@@ -96,6 +105,23 @@ export const limitText = (op: string | undefined, value: unknown): string =>
   !op || op === ">=" ? String(value) : `${operatorSymbol(op)} ${value}`;
 
 const num = (value: unknown): number => Number(value ?? 0) || 0;
+
+/** An event, row or series count limit: a whole number of 1 or more. */
+export const isCountLimit = (value: unknown): boolean =>
+  value !== null &&
+  String(value ?? "").trim() !== "" &&
+  Number.isInteger(Number(value)) &&
+  Number(value) >= 1;
+
+/** A scheduled alert's condition gap; an absent limit falls back to the default, so only a typed one can be bad. */
+export function conditionGap(
+  alert: Pick<ReadBackAlert, "query_condition" | "trigger_condition">,
+): ConditionGap | null {
+  const qc = alert.query_condition;
+  if (qc?.type === "sql" && !qc.sql?.trim()) return "noQuery";
+  const threshold = alert.trigger_condition?.threshold;
+  return threshold !== undefined && !isCountLimit(threshold) ? "fixLimit" : null;
+}
 
 // The plural choice must be the count itself: vue-i18n puts the choice in {n} when n is 0.
 const durationText = (minutes: number, t: TranslateFn): I18nText =>
@@ -213,6 +239,8 @@ export function describeAlertInPlainWords(
   opts: { aggregationEnabled?: boolean; incidentsEnabled?: boolean } = {},
 ): I18nText {
   if (!alert?.stream_name) return raw("");
+  const gap = alert.is_real_time === "true" ? null : conditionGap(alert);
+  if (gap) return t(CONDITION_GAP_KEYS[gap]);
   return t("alerts.readBack.sentence", {
     who: whoText(alert, t, opts.incidentsEnabled === true),
     what: whatText(alert, t, opts.aggregationEnabled ?? true),

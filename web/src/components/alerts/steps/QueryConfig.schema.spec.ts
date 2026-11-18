@@ -25,7 +25,7 @@ const t = (key: string, named?: Record<string, unknown>): string =>
 const conditionsTreeSchema = makeConditionsTreeSchema(t);
 const queryConfigSchema = makeQueryConfigSchema(t);
 const CONDITION_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
-const THRESHOLD_REQUIRED_MESSAGE = t("alerts.validation.thresholdPositive");
+const THRESHOLD_REQUIRED_MESSAGE = t("alerts.validation.limitWholeNumber");
 const FREQUENCY_REQUIRED_MESSAGE = t("alerts.validation.frequencyPositive");
 const CONDITION_VALUE_REQUIRED_MESSAGE = t("alerts.validation.fieldRequired");
 const AGGREGATION_COLUMN_REQUIRED_MESSAGE = t("alerts.validation.aggregationColumnRequired");
@@ -232,9 +232,10 @@ describe("QueryConfig.schema — conditions tree", () => {
       expect(r.error!.issues[0].message).toBe(THRESHOLD_REQUIRED_MESSAGE);
     });
 
-    it("blocks threshold < 1 and threshold 0 (scheduled)", () => {
-      expect(parse({ trigger_condition: { threshold: 0 } }).success).toBe(false);
-      expect(parse({ trigger_condition: { threshold: "0" } }).success).toBe(false);
+    it.each([0, "0", -5, 2.5, "2.5"])("blocks threshold %s (scheduled)", (threshold) => {
+      const r = parse({ trigger_condition: { threshold } });
+      expect(paths(r)).toContain("trigger_condition.threshold");
+      expect(r.error!.issues[0].message).toBe(THRESHOLD_REQUIRED_MESSAGE);
     });
 
     it("coerces a numeric STRING threshold — '5' passes", () => {

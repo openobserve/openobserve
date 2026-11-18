@@ -10,10 +10,15 @@ import {
   reviewLineText,
   type FieldMetaMap,
 } from "./useAlertFormSections";
-import { AGGREGATION_ENABLED_FIELD, sectionOfField } from "@/components/alerts/alertFormSections";
+import {
+  AGGREGATION_ENABLED_FIELD,
+  conditionPresetFor,
+  sectionOfField,
+} from "@/components/alerts/alertFormSections";
 import config from "@/aws-exports";
 
 const t = i18n.global.t as unknown as TranslateFn;
+const SQL = "SELECT count(*) FROM default";
 
 const scheduled = (over: Record<string, unknown> = {}) => ({
   name: "",
@@ -290,8 +295,8 @@ describe("useAlertFormSections", () => {
   });
 
   it.each([
-    ["SQL", { type: "sql" }, ">=", "3+ rows"],
-    ["SQL with a strict limit", { type: "sql" }, ">", "> 3 rows"],
+    ["SQL", { type: "sql", sql: SQL }, ">=", "3+ rows"],
+    ["SQL with a strict limit", { type: "sql", sql: SQL }, ">", "> 3 rows"],
     [
       "PromQL",
       { type: "promql", promql_condition: { operator: ">=", value: 80 } },
@@ -318,7 +323,7 @@ describe("useAlertFormSections", () => {
     [
       "a SQL alert on cron that opens an incident",
       {
-        query_condition: { type: "sql" },
+        query_condition: { type: "sql", sql: SQL },
         destinations: [],
         creates_incident: true,
         trigger_condition: {
@@ -350,6 +355,26 @@ describe("useAlertFormSections", () => {
     expect(review.value.map((line) => reviewLineText(line, t))).toEqual(sentences);
   });
 
+  it.each([
+    ["a SQL alert with no query", { type: "sql", sql: "" }, 3, "alerts.saveModeDialog.noQuery"],
+    ["a negative limit", { type: "custom" }, -5, "alerts.sections.condition.fixLimit"],
+    ["a fractional limit", { type: "custom" }, 2.5, "alerts.sections.condition.fixLimit"],
+    ["an emptied limit", { type: "sql", sql: SQL }, "", "alerts.sections.condition.fixLimit"],
+  ] as const)("flags %s in the list and the read-back", (_, query_condition, threshold, key) => {
+    const fd = {
+      ...base,
+      query_condition,
+      trigger_condition: { ...base.trigger_condition, threshold },
+    };
+    const { items, review } = setup(fd);
+    expect(byId(items.value, "condition")).toMatchObject({
+      state: "attention",
+      stateLabel: t(key),
+      summary: t(key),
+    });
+    expect(reviewLineText(byId(review.value, "condition") as never, t)).toBe(t(key));
+  });
+
   it("names the stream and its type in the watch summary", () => {
     const { items } = setup(scheduled({ stream_name: "default", stream_type: "logs" }));
     expect(byId(items.value, "watch").summary).toBe("default · Logs");
@@ -370,6 +395,19 @@ describe("checkEveryLabel", () => {
     expect(checkEveryLabel(scheduled({ trigger_condition: { frequency_type: "cron" } }), t)).toBe(
       "On a cron schedule",
     );
+  });
+});
+
+describe("conditionPresetFor", () => {
+  it.each([
+    [">=", 5, "few"],
+    [">=", 7, "custom"],
+    [">=", -5, undefined],
+    [">=", 2.5, undefined],
+    [">=", "", undefined],
+    [">", 5, undefined],
+  ])("picks the card for %s %s", (operator, threshold, card) => {
+    expect(conditionPresetFor({ operator, threshold })).toBe(card);
   });
 });
 

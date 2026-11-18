@@ -838,6 +838,23 @@ describe("QueryConfig.vue", () => {
       expect(await submit()).toBe(true);
     });
 
+    it("shows a bad limit's error once the field is left, then on every change", async () => {
+      const input = () => wrapper.find('[data-test="alert-trigger-threshold-input"] input');
+      const error = () => wrapper.find('[data-test="alert-trigger-threshold-error"]');
+      await input().setValue("-5");
+      await flushPromises();
+      expect(error().exists()).toBe(false);
+      await input().trigger("blur");
+      await flushPromises();
+      expect(error().text()).toBe(t("alerts.validation.limitWholeNumber"));
+      await input().setValue("3");
+      await flushPromises();
+      expect(error().exists()).toBe(false);
+      await input().setValue("2.5");
+      await flushPromises();
+      expect(error().exists()).toBe(true);
+    });
+
     it("blocks an empty threshold in SQL mode (REHOMED rule)", async () => {
       hostForm().setFieldValue("trigger_condition.threshold", "");
       await flushPromises();

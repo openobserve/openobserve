@@ -27,7 +27,14 @@ import {
 import { operatorsToWords } from "@/components/alerts/composite/expression";
 import { alertConditionText } from "@/utils/alerts/alertCondition";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
-import { eventCountText, operatorSymbol, type ReadBackAlert } from "@/utils/alerts/alertReadBack";
+import {
+  CONDITION_GAP_KEYS,
+  conditionGap,
+  eventCountText,
+  operatorSymbol,
+  type ConditionGap,
+  type ReadBackAlert,
+} from "@/utils/alerts/alertReadBack";
 
 export type FieldMetaMap = Record<string, { errors?: readonly unknown[] } | undefined>;
 
@@ -91,7 +98,8 @@ export interface AlertReviewLine {
   plural?: number;
 }
 
-type ConditionKind = "events" | "rows" | "value" | "realtime" | "anomaly" | "composite" | "unset";
+type ConditionKind =
+  "events" | "rows" | "value" | "realtime" | "anomaly" | "composite" | "unset" | ConditionGap;
 type ReviewSentence = Omit<AlertReviewLine, "id">;
 
 const FIRES_KEYS: Record<ConditionKind, I18nKey> = {
@@ -102,6 +110,7 @@ const FIRES_KEYS: Record<ConditionKind, I18nKey> = {
   anomaly: "alerts.sections.review.firesAnomaly",
   composite: "alerts.sections.review.firesComposite",
   unset: "alerts.sections.review.firesCompositeUnset",
+  ...CONDITION_GAP_KEYS,
 };
 
 const WATCH_KEYS: Record<string, I18nKey> = {
@@ -213,6 +222,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
           }
         : { kind: "unset", text: t("alerts.sections.condition.composite") };
     }
+    const gap = conditionGap(fd);
+    if (gap) return { kind: gap, text: t(CONDITION_GAP_KEYS[gap]) };
     const qc = fd.query_condition ?? {};
     if (qc.type === "promql") return { kind: "value", text: promqlPhrase(fd) };
     if (qc.aggregation && input.isAggregationEnabled.value) {
@@ -314,7 +325,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         const incomplete =
           mode.value !== "composite" &&
           (!hasValue(fd.stream_name) || (mode.value === "anomaly" && anomalyConditionMissing()));
-        return { missing: false, empty: incomplete, summary: conditionPhrase(fd).text };
+        const { kind, text } = conditionPhrase(fd);
+        const gap = kind === "noQuery" || kind === "fixLimit";
+        return { missing: gap && !incomplete, empty: incomplete, summary: text };
       }
       case "notify": {
         const count = notifyCount(fd);

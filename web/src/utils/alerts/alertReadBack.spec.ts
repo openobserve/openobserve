@@ -12,6 +12,7 @@ import {
 } from "./alertReadBack";
 
 const t = i18n.global.t as unknown as TranslateFn;
+const SQL = "SELECT count(*) FROM checkout_logs";
 
 const alert = (over: Partial<ReadBackAlert> = {}): ReadBackAlert => ({
   stream_name: "checkout_logs",
@@ -113,6 +114,23 @@ describe("describeAlertInPlainWords", () => {
     expect(describeAlertInPlainWords(alert({ stream_name: "" }), t)).toBe("");
   });
 
+  const limit = (threshold: unknown) => ({
+    trigger_condition: {
+      ...alert().trigger_condition,
+      threshold,
+    } as ReadBackAlert["trigger_condition"],
+  });
+  it.each([
+    ["a SQL alert with no query", { query_condition: { type: "sql", sql: " " } }, "noQuery"],
+    ["a negative limit", limit(-5), "fixLimit"],
+    ["a fractional limit", limit(2.5), "fixLimit"],
+    ["an emptied limit", limit(""), "fixLimit"],
+  ] as const)("names the gap instead of a rule for %s", (_, over, gap) => {
+    const key =
+      gap === "noQuery" ? "alerts.saveModeDialog.noQuery" : "alerts.sections.condition.fixLimit";
+    expect(describeAlertInPlainWords(alert(over), t)).toBe(t(key));
+  });
+
   const leftoverMeasure = {
     function: "avg",
     having: { column: "latency_ms", operator: ">", value: 500 },
@@ -131,7 +149,7 @@ describe("describeAlertInPlainWords", () => {
 
   it("reads SQL rows after a switch from a builder measure", () => {
     const text = describeAlertInPlainWords(
-      alert({ query_condition: { type: "sql", aggregation: leftoverMeasure } }),
+      alert({ query_condition: { type: "sql", sql: SQL, aggregation: leftoverMeasure } }),
       t,
       { aggregationEnabled: true },
     );
@@ -144,6 +162,7 @@ describe("describeAlertInPlainWords", () => {
       alert({
         query_condition: {
           type: "sql",
+          sql: SQL,
           aggregation: {
             multi_alert: true,
             function: "count",

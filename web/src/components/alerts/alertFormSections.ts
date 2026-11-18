@@ -15,6 +15,7 @@
 
 import type { I18nKey } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import { isCountLimit } from "@/utils/alerts/alertReadBack";
 
 export type AlertSectionId = "watch" | "condition" | "notify" | "schedule" | "details";
 
@@ -153,4 +154,13 @@ export function sectionOfField(name: string): AlertSectionId {
       name.startsWith(`${prefix}_`),
   );
   return hit ? hit[1] : "watch";
+}
+
+/** The selected limit card; a typed limit no card fits gets "custom", and a limit that needs fixing gets none. */
+export function conditionPresetFor(
+  tc: { operator?: string; threshold?: unknown } | undefined,
+): string | undefined {
+  if (tc?.operator !== ">=" || !isCountLimit(tc.threshold)) return undefined;
+  const threshold = Number(tc.threshold);
+  return ALERT_CONDITION_PRESETS.find((preset) => preset.threshold === threshold)?.id ?? "custom";
 }

@@ -1850,6 +1850,7 @@ import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { savedBrowserTimezone } from "@/utils/timezoneAliases";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
+import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
@@ -2652,8 +2653,17 @@ export default defineComponent({
     // suppresses the built-in message and we render it in a full-width sibling
     // below the row. These read the same R3-timed field errors OFormInput would
     // have surfaced — single source of truth, just displayed at column width.
-    const thresholdError = form.useStore((s: any) =>
+    const savedThresholdError = form.useStore((s: any) =>
       firstFieldError(s.fieldMeta?.["trigger_condition.threshold"]?.errors ?? []),
+    );
+    // The form validates on Save; a limit the user has left is checked here so its error shows at once.
+    const thresholdLeft = ref(false);
+    const thresholdError = computed(
+      () =>
+        savedThresholdError.value ||
+        (thresholdLeft.value && !isCountLimit(triggerThreshold.value)
+          ? t("alerts.validation.limitWholeNumber")
+          : undefined),
     );
     // Warning validation, §4.5 matrix. "Less severe" is OPERATOR-DEPENDENT —
     // a plain `warning < critical` check is wrong for `<`/`<=`, and `=`/`!=`
@@ -3211,6 +3221,7 @@ export default defineComponent({
     };
 
     const restoreDefaultThreshold = () => {
+      thresholdLeft.value = true;
       if (
         triggerThreshold.value === null ||
         triggerThreshold.value === "" ||

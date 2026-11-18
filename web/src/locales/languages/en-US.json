@@ -12225,7 +12225,8 @@
         "composite": "When the expression holds",
         "rows": "{count} rows",
         "series": "{count} series",
-        "seriesOver": "{count} series {limit}"
+        "seriesOver": "{count} series {limit}",
+        "fixLimit": "Limit needs fixing"
       },
       "notify": {
         "title": "Who should hear about it?",
@@ -12509,6 +12510,7 @@
       "pendingPeriodNonNegative": "Pending period should be greater than or equal to 0",
       "periodPositive": "Period should be greater than 0",
       "thresholdPositive": "Threshold should be greater than 0",
+      "limitWholeNumber": "Enter a whole number of 1 or more",
       "frequencyPositive": "Frequency should be greater than 0",
       "aggregationColumnRequired": "Column is required when using an aggregate function.",
       "minimumOneDay": "Minimum 1 day",
