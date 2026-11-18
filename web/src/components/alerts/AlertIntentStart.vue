@@ -62,15 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #value>
-          <span class="inline-flex w-64 max-w-full align-middle">
+          <span class="inline-flex align-middle">
             <OSelect
               :model-value="slots.values ?? []"
               :options="valueOptions"
               multiple
               searchable
               creatable
+              appearance="inline"
               size="xs"
-              class="w-full"
               :loading="valuesLoading"
               :placeholder="t('alerts.intent.slots.valuePlaceholder')"
               :aria-label="t('alerts.intent.slots.value')"
@@ -80,7 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :search-debounce="300"
               @search="valueSearch = $event"
               @close="reapply"
-            />
+              ><template #trigger>{{ valuesText }}</template></OSelect
+            >
           </span>
         </template>
         <template #group>
@@ -262,7 +263,13 @@ import {
   type ValueCountContext,
 } from "@/composables/alerts/useStreamDiscovery";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
-import { dataNoun, durationWords, formatNumber, joinListMore } from "@/utils/alerts/alertCopy";
+import {
+  dataNoun,
+  durationWords,
+  formatNumber,
+  joinListMore,
+  joinListOrMore,
+} from "@/utils/alerts/alertCopy";
 import {
   DEFAULT_FACTOR,
   SHAPE_NUMBER_CAP,
@@ -528,6 +535,13 @@ const valueOptions = computed<SelectOption[]>(() => {
     .map((v) => ({ label: raw(v), value: v }));
   return [...typed, ...listed];
 });
+
+// The picked values read as words in the sentence, so the picker sizes to them like the other slots.
+const valuesText = computed<I18nText>(() =>
+  slots.values?.length
+    ? joinListOrMore(slots.values, t)
+    : t("alerts.intent.slots.valuePlaceholder"),
+);
 
 const offersGroup = computed(() => !!props.active && wantsGroup(props.active));
 const SENTENCES: Record<IntentId, [I18nKey, I18nKey]> = {

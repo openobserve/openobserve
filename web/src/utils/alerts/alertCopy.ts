@@ -119,6 +119,16 @@ export const joinListMore = (items: readonly string[], t: TranslateFn, max = 3):
   ]);
 };
 
+/** Alternatives, at most `max`, the rest counted: "A, B, or 2 more". */
+export const joinListOrMore = (items: readonly string[], t: TranslateFn, max = 3): I18nText => {
+  const rest = items.length - max;
+  const shown =
+    rest > 0
+      ? [...items.slice(0, max), t("alerts.copy.nMore", { count: formatNumber(rest) }, rest)]
+      : items;
+  return raw(new Intl.ListFormat(getIntlLocale(), { type: "disjunction" }).format(shown));
+};
+
 /**
  * A number with its unit: "90 %", "0.85 (85 %)", "500 ms". `unit` is a canonical id from
  * metricDefaults (`percent-1` is a 0-1 ratio) or a display glyph such as "°C".
