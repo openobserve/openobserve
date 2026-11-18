@@ -42,6 +42,7 @@ const NAVIGATION_TOOL: &str = "create_navigation";
 const FIRST_PARTY_MCP_PREFIX: &str = "o2_";
 const O2_DELETE_TOOL: &str = "o2_delete";
 const MCP_SERVER_PREFIXES: [&str; 1] = ["o2"];
+pub(crate) const TOOLSET_CALL: &str = "toolset_tool_call";
 const SEARCH_SQL_MAX_HITS: usize = 10;
 const TEST_FUNCTION_MAX_INPUT_EVENTS: usize = 5;
 const TEST_FUNCTION_MAX_OUTPUT_RESULTS: usize = 5;
@@ -49,8 +50,10 @@ const ERROR_DUMP_CHARS: usize = 500;
 const FIRST_ERR_CHARS: usize = 200;
 
 /// Tools no projection shows; the sentinels at the end are RCA thread structure.
-pub(crate) const HIDDEN_TOOLS: [&str; 25] = [
+pub(crate) const HIDDEN_TOOLS: [&str; 27] = [
     "tool_search",
+    "toolset_list",
+    "toolset_list_tools",
     "convert_time_to_microseconds",
     "calculate_time_range",
     "format_timestamp_for_display",
@@ -717,6 +720,32 @@ pub(crate) fn strip_mcp_prefix(tool_name: &str) -> &str {
     }
 }
 
+/// The `(toolset, tool)` a `toolset_tool_call` names; `None` for any other tool or a blank name.
+pub(crate) fn toolset_call_target<'a>(
+    tool_name: &str,
+    input: Option<&'a Map<String, Value>>,
+) -> Option<(&'a str, &'a str)> {
+    if tool_name != TOOLSET_CALL {
+        return None;
+    }
+    let field = |key| {
+        input?
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+    };
+    Some((field("toolset_name")?, field("tool_name")?))
+}
+
+pub(crate) fn toolset_call_label(toolset: &str, tool: &str) -> String {
+    format!("{toolset} · {tool}")
+}
+
+/// The `<server>_<tool>` shape signal classes key toolset calls on.
+pub(crate) fn toolset_call_key(toolset: &str, tool: &str) -> String {
+    format!("{toolset}_{tool}")
+}
+
 fn resolve_tool_call(
     tool_name: &str,
     args: &Map<String, Value>,
@@ -732,6 +761,11 @@ fn resolve_tool_call(
         }
         let inner = obj(args.get("args")).cloned().unwrap_or_default();
         return Some((actual.to_string(), inner));
+    }
+    if tool_name == TOOLSET_CALL {
+        let (toolset, tool) = toolset_call_target(tool_name, Some(args))?;
+        let inner = obj(args.get("args")).cloned().unwrap_or_default();
+        return Some((toolset_call_label(toolset, tool), inner));
     }
     Some((tool_name.to_string(), args.clone()))
 }
@@ -1459,6 +1493,74 @@ mod tests {
         );
         let projected = project(&events).to_string();
         assert!(!projected.contains("record_step"), "{projected}");
+    }
+
+    fn tool_part(id: &str, tool: &str, status: &str, input: Value, output: &str) -> Value {
+        json!({"id": id, "callID": format!("call_{id}"), "type": "tool", "tool": tool,
+            "state": {"status": status, "input": input, "output": output}})
+    }
+
+    fn frames_of(parts: &[Value]) -> Vec<Value> {
+        let mut state = StreamState::default();
+        let mut frames = Vec::new();
+        for part in parts {
+            state.handle_tool_part(part.as_object().unwrap(), &mut frames);
+        }
+        frames
+    }
+
+    #[test]
+    fn a_toolset_tool_call_projects_as_toolset_and_tool() {
+        let input = json!({"toolset_name": "datadog-prod", "tool_name": "search_logs",
+            "args": {"query": "service:checkout"}});
+        let frames = frames_of(&[
+            tool_part("p1", "toolset_tool_call", "running", input.clone(), ""),
+            tool_part(
+                "p1",
+                "toolset_tool_call",
+                "completed",
+                input,
+                "{\"hits\":3}",
+            ),
+        ]);
+        assert_eq!(frames.len(), 2, "{frames:?}");
+        assert_eq!(frames[0]["type"], "tool_call");
+        assert_eq!(frames[0]["tool"], "datadog-prod · search_logs");
+        assert_eq!(frames[0]["message"], "Executing datadog-prod · search_logs");
+        assert_eq!(frames[0]["context"], json!({"query": "service:checkout"}));
+        assert_eq!(frames[1]["type"], "tool_result");
+        assert_eq!(frames[1]["tool"], "datadog-prod · search_logs");
+        assert_eq!(frames[1]["success"], true);
+    }
+
+    #[test]
+    fn toolset_listings_and_nameless_toolset_calls_are_hidden() {
+        let frames = frames_of(&[
+            tool_part("p1", "toolset_list", "running", json!({}), ""),
+            tool_part("p1", "toolset_list", "completed", json!({}), "[]"),
+            tool_part(
+                "p2",
+                "toolset_list_tools",
+                "running",
+                json!({"toolset_name": "dd"}),
+                "",
+            ),
+            tool_part(
+                "p2",
+                "toolset_list_tools",
+                "completed",
+                json!({"toolset_name": "dd"}),
+                "[]",
+            ),
+            tool_part(
+                "p3",
+                "toolset_tool_call",
+                "running",
+                json!({"toolset_name": "dd"}),
+                "",
+            ),
+        ]);
+        assert!(frames.is_empty(), "{frames:?}");
     }
 
     #[test]

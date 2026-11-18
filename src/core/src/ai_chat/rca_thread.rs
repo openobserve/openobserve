@@ -15,6 +15,8 @@
 
 //! The investigation thread of an RCA run, projected from its chat session.
 
+use std::borrow::Cow;
+
 use config::{
     meta::{
         alerts::rca_steering::SteerKind,
@@ -35,8 +37,9 @@ use utoipa::ToSchema;
 
 use super::{
     projection::{
-        Folded, HIDDEN_TOOLS, SESSION_ARG, coerce_tool_output, extract_error_message,
-        extract_mcp_response, is_injected, obj, strip_mcp_prefix, truthy,
+        Folded, HIDDEN_TOOLS, SESSION_ARG, TOOLSET_CALL, coerce_tool_output, extract_error_message,
+        extract_mcp_response, is_injected, obj, strip_mcp_prefix, toolset_call_key,
+        toolset_call_label, toolset_call_target, truthy,
     },
     rca_ledger::{ASK_RESPONDERS, question_of, split_steers},
 };
@@ -89,9 +92,12 @@ impl ThreadPart {
 
 pub(crate) struct ToolPart<'a> {
     part: &'a Map<String, Value>,
-    /// Empty when a `tools_call` names no tool.
-    pub(crate) tool: &'a str,
-    /// `tools_call`'s `args`, else the part's input.
+    /// Empty when a `tools_call` or `toolset_tool_call` names no tool; `<toolset>_<tool>` for the
+    /// latter.
+    pub(crate) tool: Cow<'a, str>,
+    /// `<toolset> · <tool>` for a `toolset_tool_call`, which is always a vendor row.
+    label: Option<String>,
+    /// `tools_call`'s or `toolset_tool_call`'s `args`, else the part's input.
     input: Option<&'a Map<String, Value>>,
     pub(crate) state: Option<&'a Map<String, Value>>,
     /// `state.status`: `pending`, `running`, `completed` or `error`.
@@ -110,20 +116,28 @@ impl<'a> ToolPart<'a> {
             .and_then(Value::as_str)
             .unwrap_or_default();
         let mut input = state.and_then(|s| obj(s.get("input")));
-        let mut tool =
-            strip_mcp_prefix(part.get("tool").and_then(Value::as_str).unwrap_or_default());
-        if tool == "tools_call" {
-            tool = strip_mcp_prefix(
+        let name = strip_mcp_prefix(part.get("tool").and_then(Value::as_str).unwrap_or_default());
+        let mut tool = Cow::Borrowed(name);
+        let mut label = None;
+        if name == "tools_call" {
+            tool = Cow::Borrowed(strip_mcp_prefix(
                 input
                     .and_then(|i| i.get("tool"))
                     .and_then(Value::as_str)
                     .unwrap_or_default(),
-            );
+            ));
             input = input.and_then(|i| obj(i.get("args")));
+        } else if let Some((toolset, vendor_tool)) = toolset_call_target(name, input) {
+            tool = Cow::Owned(toolset_call_key(toolset, vendor_tool));
+            label = Some(toolset_call_label(toolset, vendor_tool));
+            input = input.and_then(|i| obj(i.get("args")));
+        } else if name == TOOLSET_CALL {
+            tool = Cow::Borrowed("");
         }
         Some(Self {
             part,
             tool,
+            label,
             input,
             state,
             status,
@@ -132,7 +146,20 @@ impl<'a> ToolPart<'a> {
 
     /// How the part counts in the thread.
     pub(crate) fn kind(&self) -> ThreadPart {
-        ThreadPart::of(self.tool, self.status, self.arg("stage"))
+        if self.label.is_some() {
+            return ThreadPart::Row;
+        }
+        ThreadPart::of(&self.tool, self.status, self.arg("stage"))
+    }
+
+    /// What a row shows: `tool`, or `<toolset> · <tool>` for a vendor call.
+    pub(crate) fn label(&self) -> &str {
+        self.label.as_deref().unwrap_or(&self.tool)
+    }
+
+    /// The tool for matching RCA control tools; empty for a vendor call, whose key can spell one.
+    pub(crate) fn control_tool(&self) -> &str {
+        if self.label.is_some() { "" } else { &self.tool }
     }
 
     /// One argument.
@@ -561,7 +588,7 @@ impl Builder {
             ThreadPart::FailedStep => return,
             ThreadPart::Hidden => {
                 if call.status == "completed" {
-                    match call.tool {
+                    match call.control_tool() {
                         SUBMIT_REPORT => self.report_submitted = true,
                         ASK_RESPONDERS => {
                             let asked = question_of(&call);
@@ -586,7 +613,7 @@ impl Builder {
         let (status, result_summary, error) = match call.status {
             "completed" => (
                 ToolCallStatus::Ok,
-                Some(summarize_result(call.tool, &tool_body(state)).0),
+                Some(summarize_result(&call.tool, &tool_body(state)).0),
                 None,
             ),
             "error" => (
@@ -602,7 +629,6 @@ impl Builder {
             ),
         };
         let input = call.args();
-        let tool = call.tool.to_string();
         let call_id = call.call_id();
         let (input_out, output) = if self.show_tool_io {
             (Some(Value::Object(input.clone())), raw_output(state))
@@ -611,8 +637,8 @@ impl Builder {
         };
         let row = ThreadToolCall {
             call_id,
-            key_arg: key_arg(&tool, &input),
-            tool,
+            key_arg: key_arg(&call.tool, &input),
+            tool: call.label().to_string(),
             status,
             interrupted: !self.active && !matches!(call.status, "completed" | "error"),
             started_at,
@@ -1298,6 +1324,93 @@ pub(crate) mod tests {
                 assert!(row.result_summary.is_some(), "{row:?}");
             }
         }
+    }
+
+    #[test]
+    fn a_toolset_tool_call_is_a_toolset_row_and_listings_are_hidden() {
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        s.tool(
+            "msg_a1",
+            "prt_t1",
+            "toolset_list_tools",
+            "completed",
+            json!({"toolset_name": "datadog-prod"}),
+            json!({"output": "[]"}),
+            100,
+            110,
+        );
+        s.tool(
+            "msg_a1",
+            "prt_t2",
+            "toolset_tool_call",
+            "completed",
+            json!({"toolset_name": "datadog-prod", "tool_name": "search_logs",
+                "args": {"query": "service:checkout status:error"}}),
+            json!({"output": "{\"hits\":3}"}),
+            120,
+            180,
+        );
+
+        let thread = project_rca_thread(&s.events, &[], false, false);
+        let rows = &thread.steps[0].tool_calls;
+        assert_eq!(rows.len(), 1, "toolset_list_tools is no row");
+        assert_eq!(rows[0].tool, "datadog-prod · search_logs");
+        assert_eq!(
+            rows[0].key_arg.as_deref(),
+            Some("{\"query\":\"service:checkout status:error\"}")
+        );
+
+        let part = json!({"type": "tool", "tool": "toolset_tool_call", "state": {"status": "completed",
+            "input": {"toolset_name": "datadog-prod", "tool_name": "search_logs", "args": {"q": 1}}}});
+        let call = ToolPart::of(part.as_object().unwrap()).unwrap();
+        assert_eq!(
+            call.tool, "datadog-prod_search_logs",
+            "the signal-class key"
+        );
+        assert_eq!(call.args(), *json!({"q": 1}).as_object().unwrap());
+        let nameless = json!({"type": "tool", "tool": "toolset_tool_call",
+            "state": {"status": "completed", "input": {"toolset_name": "datadog-prod"}}});
+        let call = ToolPart::of(nameless.as_object().unwrap()).unwrap();
+        assert_eq!(call.kind(), ThreadPart::Hidden);
+    }
+
+    #[test]
+    fn a_vendor_call_whose_key_spells_a_control_or_hidden_tool_is_a_vendor_row() {
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        let cases = [
+            (
+                "record",
+                "step",
+                json!({"stage": "metrics", "title": "Vendor step"}),
+            ),
+            ("submit", "report", json!({"markdown": "## Root cause"})),
+            ("tool", "search", json!({"query": "x"})),
+        ];
+        for (i, (toolset, tool, args)) in cases.iter().enumerate() {
+            s.tool(
+                "msg_a1",
+                &format!("prt_v{i}"),
+                "toolset_tool_call",
+                "completed",
+                json!({"toolset_name": toolset, "tool_name": tool, "args": args}),
+                json!({"output": "{}"}),
+                100 + i as i64 * 10,
+                105 + i as i64 * 10,
+            );
+        }
+
+        let thread = project_rca_thread(&s.events, &[], false, false);
+        assert_eq!(thread.steps.len(), 1, "record · step opens no step");
+        assert_eq!(thread.steps[0].title, "Investigation");
+        let rows: Vec<&str> = thread.steps[0]
+            .tool_calls
+            .iter()
+            .map(|c| c.tool.as_str())
+            .collect();
+        assert_eq!(rows, ["record · step", "submit · report", "tool · search"]);
+        assert!(!thread.report_submitted);
     }
 
     #[test]

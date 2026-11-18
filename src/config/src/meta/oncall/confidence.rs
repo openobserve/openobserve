@@ -120,7 +120,8 @@ impl SignalClass {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ToolCallRecord {
     pub call_id: String,
-    /// `o2_` stripped and `tools_call` unwrapped; toolset calls keep the `<server>_` prefix.
+    /// `o2_` stripped and `tools_call` unwrapped; a toolset call is `<toolset>_<tool>`, a
+    /// `toolset_tool_call` included.
     pub tool: String,
     /// The same key argument as the thread's, max 4 KB.
     pub key_arg: String,
