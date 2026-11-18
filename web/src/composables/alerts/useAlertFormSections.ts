@@ -46,6 +46,7 @@ import {
   eventCountText,
   filterPhrase,
   limitText,
+  measureValueText,
   operatorSymbol,
   type ConditionGap,
   type ReadBackAlert,
@@ -221,10 +222,15 @@ const offsetWords = (code: string | undefined, t: TranslateFn): I18nText => {
 };
 
 /** "at least 1", "not exactly 5": a comparison in the words the operator menu uses. */
-const comparisonWords = (operator: string | undefined, value: unknown, t: TranslateFn): I18nText =>
+const comparisonWords = (
+  operator: string | undefined,
+  value: unknown,
+  t: TranslateFn,
+  shown: I18nText = formatNumber(value),
+): I18nText =>
   t("alerts.sections.review.comparison", {
     op: t(OPERATOR_WORDS[operator ?? ">="] ?? "alerts.sections.operators.gte"),
-    value: formatNumber(value),
+    value: shown,
   });
 
 const minutesOf = (value: unknown, unit: string | undefined): number =>
@@ -371,7 +377,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       mode.value === "true" || (mode.value === "false" && (qc.type ?? "custom") === "custom");
     return builder ? filterPhrase(qc.conditions, "alert", t) : null;
   };
-  const warningLimit = (fd: AlertSectionsFormData) => {
+  const warningLimit = (
+    fd: AlertSectionsFormData,
+  ): { operator?: string; value: unknown; shown?: I18nText } | null => {
     const qc = fd.query_condition ?? {};
     if (qc.type === "promql") {
       if (forecastOf(fd) || qc.promql_rule_mode || !hasValue(qc.promql_warning_value)) return null;
@@ -380,7 +388,11 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     if (sqlRowValue(fd) || builderMeasure(fd)) {
       const agg = qc.aggregation;
       return hasValue(agg?.warning_value)
-        ? { operator: agg?.having?.operator, value: agg?.warning_value }
+        ? {
+            operator: agg?.having?.operator,
+            value: agg?.warning_value,
+            shown: measureValueText(fd, agg?.warning_value, t),
+          }
         : null;
     }
     const tc = fd.trigger_condition ?? {};
@@ -443,7 +455,10 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
           }
         : { kind: "unset", text: t("alerts.sections.condition.composite") };
     }
-    const gap = conditionGap(fd, { queryFailed: input.queryFailed?.value === true });
+    const gap = conditionGap(fd, {
+      queryFailed: input.queryFailed?.value === true,
+      aggregationEnabled: input.isAggregationEnabled.value,
+    });
     if (gap) return { kind: gap, text: t(CONDITION_GAP_KEYS[gap]) };
     const qc = fd.query_condition ?? {};
     if (qc.type === "promql") {
@@ -454,12 +469,15 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       return { kind: "value", text };
     }
     const having = qc.aggregation?.having ?? {};
+    // Value thresholds start empty, so the line names the measure alone until one is typed.
     const measureNav = (measure: I18nText) =>
-      t("alerts.sections.condition.measureNav", {
-        measure,
-        op: operatorSymbol(having.operator),
-        value: formatNumber(having.value),
-      });
+      hasValue(having.value)
+        ? t("alerts.sections.condition.measureNav", {
+            measure,
+            op: operatorSymbol(having.operator),
+            value: measureValueText(fd, having.value, t),
+          })
+        : measure;
     if (qc.type === "sql") {
       if (sqlRowValue(fd)) return { kind: "value", text: measureNav(raw(having.column)) };
       const tc = fd.trigger_condition ?? {};
@@ -496,7 +514,10 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     const warning = warningLimit(fd);
     if (warning) {
       facts.push(
-        fact(t("alerts.form.warning.label"), raw(limitText(warning.operator, warning.value))),
+        fact(
+          t("alerts.form.warning.label"),
+          raw(limitText(warning.operator, warning.value, warning.shown)),
+        ),
       );
     }
     const offsets = compareOffsets(fd);
@@ -725,7 +746,12 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       const having = qc.aggregation?.having ?? {};
       return t("alerts.sections.review.measureIs", {
         measure: measureWords(fd),
-        comparison: comparisonWords(having.operator, having.value, t),
+        comparison: comparisonWords(
+          having.operator,
+          having.value,
+          t,
+          measureValueText(fd, having.value, t),
+        ),
       });
     }
     return text;
@@ -788,7 +814,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       };
     }
     const having = qc.aggregation?.having ?? {};
-    const comparison = strong(comparisonWords(having.operator, having.value, t));
+    const comparison = strong(
+      comparisonWords(having.operator, having.value, t, measureValueText(fd, having.value, t)),
+    );
     if (sqlRowValue(fd)) {
       return {
         keypath: "alerts.sections.review.firesEachGroupValue",
@@ -860,8 +888,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         parts: {
           comparison: strong(
             atLeast
-              ? formatNumber(warning.value)
-              : comparisonWords(warning.operator, warning.value, t),
+              ? (warning.shown ?? formatNumber(warning.value))
+              : comparisonWords(warning.operator, warning.value, t, warning.shown),
           ),
         },
       });

@@ -4,12 +4,12 @@ import { describe, it, expect } from "vitest";
 import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import {
+  CONDITION_GAP_KEYS,
   describeAlertInPlainWords,
   describeCompositeInPlainWords,
   filterPhrase,
   limitText,
   previewVerdictSentence,
-  realtimeDailyVolume,
   type ReadBackAlert,
 } from "./alertReadBack";
 import { dataNoun } from "./alertCopy";
@@ -113,6 +113,23 @@ describe("describeAlertInPlainWords", () => {
     );
   });
 
+  it("reads a span duration measure, stored in µs, in milliseconds", () => {
+    const text = describeAlertInPlainWords(
+      alert({
+        stream_type: "traces",
+        query_condition: {
+          type: "custom",
+          aggregation: {
+            function: "p95",
+            having: { column: "duration", operator: ">", value: 500000 },
+          },
+        },
+      }),
+      t,
+    );
+    expect(text).toContain("p95 of duration is > 500 ms over 10 minutes");
+  });
+
   it("is empty until a stream is picked", () => {
     expect(describeAlertInPlainWords(alert({ stream_name: "" }), t)).toBe("");
   });
@@ -128,10 +145,23 @@ describe("describeAlertInPlainWords", () => {
     ["a negative limit", limit(-5), "fixLimit"],
     ["a fractional limit", limit(2.5), "fixLimit"],
     ["an emptied limit", limit(""), "fixLimit"],
+    [
+      "a measure with no threshold yet",
+      {
+        query_condition: {
+          type: "custom",
+          aggregation: { function: "avg", having: { column: "value", value: "" } },
+        },
+      },
+      "noThreshold",
+    ],
+    [
+      "PromQL with no threshold yet",
+      { query_condition: { type: "promql", promql: "up", promql_condition: { value: null } } },
+      "noThreshold",
+    ],
   ] as const)("names the gap instead of a rule for %s", (_, over, gap) => {
-    const key =
-      gap === "noQuery" ? "alerts.saveModeDialog.noQuery" : "alerts.sections.condition.fixLimit";
-    expect(describeAlertInPlainWords(alert(over), t)).toBe(t(key));
+    expect(describeAlertInPlainWords(alert(over), t)).toBe(t(CONDITION_GAP_KEYS[gap]));
   });
 
   const leftoverMeasure = {
@@ -260,6 +290,35 @@ describe("previewVerdictSentence", () => {
       "Would alert now: avg of value is 42.13 in the last 10 minutes (threshold 1).",
     ],
     [
+      "an ungrouped measure with no threshold yet",
+      { wouldTrigger: true, reason: "", count: 1, value: 42.125 },
+      alert({
+        stream_type: "metrics",
+        query_condition: {
+          type: "custom",
+          aggregation: { function: "avg", having: { column: "value", operator: ">=", value: "" } },
+        },
+      }),
+      {},
+      "Now: avg of value is 42.13 in the last 10 minutes.",
+    ],
+    [
+      "a span duration measure, in milliseconds",
+      { wouldTrigger: false, reason: "", count: 1, value: 182400 },
+      alert({
+        stream_type: "traces",
+        query_condition: {
+          type: "custom",
+          aggregation: {
+            function: "avg",
+            having: { column: "duration", operator: ">", value: 500000 },
+          },
+        },
+      }),
+      {},
+      "Quiet now: avg of duration is 182.4 ms in the last 10 minutes (threshold > 500 ms).",
+    ],
+    [
       "groups capped at the row limit",
       { wouldTrigger: true, reason: "", count: 1000, atLeast: true, grouped: true },
       alert(),
@@ -313,14 +372,14 @@ describe("previewVerdictSentence", () => {
       { wouldTrigger: true, reason: "", count: 1500, windowMinutes: 30 },
       alert({ is_real_time: "true" }),
       { hasFilter: false },
-      "Fires on each matching event: 1,500 in the last 30 minutes. Add a filter to narrow it. About 72,000 notifications a day before Notify at most every.",
+      "Fires on each matching event: 1,500 in the last 30 minutes. Add a filter to narrow it.",
     ],
     [
-      "real time with a filter that still matches a lot",
+      "real time with a filter that still matches a lot, leaving the daily volume to the 24-hour row",
       { wouldTrigger: true, reason: "", count: 30952, windowMinutes: 30 },
       alert({ is_real_time: "true" }),
       { hasFilter: true },
-      "Fires on each matching event: 30,952 in the last 30 minutes. About 1,500,000 notifications a day before Notify at most every.",
+      "Fires on each matching event: 30,952 in the last 30 minutes.",
     ],
     [
       "real time with nothing matched",
@@ -349,16 +408,6 @@ describe("dataNoun", () => {
     [undefined, undefined, 2, "events"],
   ])("a %s stream in %s mode counts %s %s", (streamType, mode, count, noun) => {
     expect(dataNoun(streamType, mode, count, t)).toBe(noun);
-  });
-});
-
-describe("realtimeDailyVolume", () => {
-  it.each([
-    ["a count over half an hour", { count: 30952, windowMinutes: 30 }, 1485696],
-    ["no count yet", { windowMinutes: 30 }, null],
-    ["no window", { count: 5, windowMinutes: 0 }, null],
-  ])("projects %s to a day", (_, verdict, perDay) => {
-    expect(realtimeDailyVolume({ wouldTrigger: true, reason: "", ...verdict })).toBe(perDay);
   });
 });
 

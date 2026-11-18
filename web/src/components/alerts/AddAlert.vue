@@ -1306,7 +1306,7 @@ import {
 } from "./alertSuggestions";
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
-import { previewVerdictSentence, realtimeDailyVolume } from "@/utils/alerts/alertReadBack";
+import { previewVerdictSentence } from "@/utils/alerts/alertReadBack";
 import { dataNoun, forecastWindowWords } from "@/utils/alerts/alertCopy";
 import { countCompleteConditions } from "@/utils/alerts/alertCondition";
 import config from "@/aws-exports";
@@ -1347,8 +1347,6 @@ const RAIL_VERDICT_ICONS = {
 } as const;
 // A jump has landed once no scroll event has fired for this long (the snap scroller's own settle time).
 const JUMP_SETTLE_MS = 150;
-// Past one matching event a minute on average, a real-time alert is likely too broad.
-const NOISY_REALTIME_PER_DAY = 1440;
 const SENTENCE_GAP = raw(" ");
 
 // The focused control stays put when it survives the fold; otherwise the section in view does.
@@ -2087,21 +2085,20 @@ export default defineComponent({
               hasFilter,
             },
           ),
-          tone:
-            status?.count !== undefined &&
-            (!hasFilter || (realtimeDailyVolume(status) ?? 0) > NOISY_REALTIME_PER_DAY)
-              ? "warn"
-              : "note",
+          tone: status?.count !== undefined && !hasFilter ? "warn" : "note",
         };
       }
       // The save check is stricter than the preview run, so its error also leaves nothing to judge.
       if (!status || fd.is_real_time !== "false" || sqlCheckFailed.value) return null;
+      // An empty value threshold leaves nothing to judge; a measured value still helps pick one.
+      const noThreshold = alertForm.valueThresholdMissing.value;
+      if (noThreshold && status.value === undefined) return null;
       return {
         text: previewVerdictSentence(status, fd, alertForm.t, {
           countsEvents:
             fd.query_condition?.type === "custom" && !alertForm.isAggregationEnabled.value,
         }),
-        tone: status.wouldTrigger ? "fires" : "quiet",
+        tone: noThreshold ? "note" : status.wouldTrigger ? "fires" : "quiet",
       };
     });
 

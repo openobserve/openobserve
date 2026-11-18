@@ -416,6 +416,23 @@ describe("useAlertFormSections", () => {
       "Fires when avg of value is at least 1 in the last 5 minutes.",
     ],
     [
+      "a measure with no threshold yet",
+      {
+        query_condition: {
+          type: "custom",
+          aggregation: { function: "avg", having: { column: "value", operator: ">=", value: "" } },
+        },
+      },
+      "Needs a threshold",
+      "Needs a threshold",
+    ],
+    [
+      "PromQL with no threshold yet",
+      { query_condition: { type: "promql", promql_condition: { operator: ">=", value: "" } } },
+      "Needs a threshold",
+      "Needs a threshold",
+    ],
+    [
       "PromQL with one alert",
       { query_condition: { type: "promql", promql_condition: { operator: ">=", value: 1 } } },
       "1+ series ≥ 1",
@@ -673,6 +690,32 @@ describe("useAlertFormSections", () => {
         "Checks every 15 minutes, looking at the last 15 minutes.",
       ],
       nav: ["p95_us > 500,000 · One per service_name", "No one yet"],
+    },
+    {
+      scenario: "LAT: builder p95 of span duration per service, read in milliseconds",
+      aggregation: true,
+      form: {
+        stream_name: "default",
+        stream_type: "traces",
+        logGroupBy: ["service_name"],
+        query_condition: {
+          type: "custom",
+          aggregation: {
+            function: "p95",
+            group_by: ["service_name"],
+            having: { column: "duration", operator: ">", value: 500000 },
+            warning_value: 300000,
+          },
+        },
+        trigger_condition: every(15),
+      },
+      card: [
+        "Watches Traces in default, on a schedule.",
+        "Fires when p95 of duration is more than 500 ms for at least 1 service_name group in the last 15 minutes. Warns at more than 300 ms.",
+        "Tells no one yet.",
+        "Checks every 15 minutes, looking at the last 15 minutes.",
+      ],
+      nav: ["p95 of duration > 500 ms · Group by service_name · Warning > 300 ms", "No one yet"],
     },
     {
       scenario: "CMP: SQL against last week through a function",

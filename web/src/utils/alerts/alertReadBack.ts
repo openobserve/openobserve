@@ -15,7 +15,7 @@
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { hasDeliveryTarget } from "./deliveryTarget";
-import { dataNoun, formatNumber, joinList } from "./alertCopy";
+import { dataNoun, formatNumber, joinList, valueWithUnit } from "./alertCopy";
 import { describeFilterNode, filterSentenceParts } from "./filterSentence";
 import {
   nameResolvedExpression,
@@ -48,6 +48,7 @@ export interface ReadBackAlert {
     vrl_function?: string | null;
     multi_time_range?: { offSet?: string }[] | null;
     promql_warning_value?: number | string | null;
+    promql_rule_mode?: boolean;
     aggregation?: {
       multi_alert?: boolean;
       function?: string;
@@ -107,11 +108,12 @@ const OPERATOR_SYMBOLS: Record<string, string> = {
 };
 
 /** Why a scheduled alert's condition cannot be read back as a rule yet. */
-export type ConditionGap = "noQuery" | "fixQuery" | "fixLimit";
+export type ConditionGap = "noQuery" | "fixQuery" | "noThreshold" | "fixLimit";
 
 export const CONDITION_GAP_KEYS: Record<ConditionGap, I18nKey> = {
   noQuery: "alerts.saveModeDialog.noQuery",
   fixQuery: "alerts.sections.condition.fixQuery",
+  noThreshold: "alerts.sections.condition.noThreshold",
   fixLimit: "alerts.sections.condition.fixLimit",
 };
 
@@ -123,17 +125,64 @@ const CONDITION_KEYS: Record<string, I18nKey> = {
   "!=": "alerts.summary.plainEnglish.conditionNot",
 };
 
-const MINUTES_PER_DAY = 1440;
 const FILTER_CONDITIONS_SHOWN = 3;
+// Span duration is microseconds by the traces contract, whatever unit the user typed it in.
+const SPAN_DURATION_FIELD = "duration";
+const MICROS_PER_MS = 1000;
+
+/** Measure functions whose result keeps the measured field's unit. */
+export const UNIT_KEEPING_FUNCTIONS: ReadonlySet<string> = new Set([
+  "avg",
+  "min",
+  "max",
+  "sum",
+  "median",
+  "p50",
+  "p75",
+  "p90",
+  "p95",
+  "p99",
+]);
 
 export const operatorSymbol = (op: string | undefined): string =>
   OPERATOR_SYMBOLS[op ?? ""] ?? op ?? "";
 
 /** "3" for the default at-least operator, otherwise "> 3", "≤ 3"...; numbers in the locale's form. */
-export const limitText = (op: string | undefined, value: unknown): string =>
-  !op || op === ">=" ? formatNumber(value) : `${operatorSymbol(op)} ${formatNumber(value)}`;
+export const limitText = (
+  op: string | undefined,
+  value: unknown,
+  shown: string = formatNumber(value),
+): string => (!op || op === ">=" ? shown : `${operatorSymbol(op)} ${shown}`);
 
 const num = (value: unknown): number => Number(value ?? 0) || 0;
+
+/** True when a traces measure reads span duration, which is stored in µs. */
+export const isSpanDurationMeasure = (
+  streamType: string | undefined,
+  fn: string | undefined,
+  column: string | undefined,
+): boolean =>
+  streamType === "traces" && column === SPAN_DURATION_FIELD && UNIT_KEEPING_FUNCTIONS.has(fn ?? "");
+
+/** A builder measure's value as the user reads it: span duration in ms, anything else as a number. */
+export const measureValueText = (
+  alert: Pick<ReadBackAlert, "stream_type" | "query_condition">,
+  value: unknown,
+  t: TranslateFn,
+): I18nText => {
+  const qc = alert.query_condition ?? {};
+  const n = typeof value === "number" ? value : Number(value);
+  const spanDuration =
+    (qc.type ?? "custom") === "custom" &&
+    isSpanDurationMeasure(
+      alert.stream_type,
+      qc.aggregation?.function,
+      qc.aggregation?.having?.column,
+    );
+  if (!spanDuration || value === "" || value == null || !Number.isFinite(n))
+    return formatNumber(value);
+  return valueWithUnit(n / MICROS_PER_MS, "milliseconds", t);
+};
 
 /** A preview count in a sentence: "at least 1,000" when the server stopped counting there. */
 export const previewCountText = (count: number, atLeast: boolean | undefined, t: TranslateFn) => {
@@ -150,13 +199,33 @@ export const isCountLimit = (value: unknown): boolean =>
 /** A scheduled alert's condition gap; an absent limit falls back to the default, so only a typed one can be bad. */
 export function conditionGap(
   alert: Pick<ReadBackAlert, "query_condition" | "trigger_condition">,
-  opts: { queryFailed?: boolean } = {},
+  opts: { queryFailed?: boolean; aggregationEnabled?: boolean } = {},
 ): ConditionGap | null {
   const qc = alert.query_condition;
   if (qc?.type === "sql" && !qc.sql?.trim()) return "noQuery";
   if (opts.queryFailed) return "fixQuery";
+  if (valueThresholdBlank(qc, opts.aggregationEnabled ?? true)) return "noThreshold";
   const threshold = alert.trigger_condition?.threshold;
   return threshold !== undefined && !isCountLimit(threshold) ? "fixLimit" : null;
+}
+
+const isBlank = (value: unknown): boolean =>
+  value === undefined || value === null || String(value).trim() === "";
+
+// Value thresholds start empty, so a measure or PromQL value with none yet is not a rule to read back.
+function valueThresholdBlank(
+  qc: ReadBackAlert["query_condition"],
+  aggregationEnabled: boolean,
+): boolean {
+  if (qc?.type === "promql") {
+    return !qc.promql_rule_mode && !!qc.promql_condition && isBlank(qc.promql_condition.value);
+  }
+  return (
+    (qc?.type ?? "custom") === "custom" &&
+    aggregationEnabled &&
+    !!qc?.aggregation &&
+    isBlank(qc.aggregation.having?.value)
+  );
 }
 
 // The plural choice must be the count itself: vue-i18n puts the choice in {n} when n is 0.
@@ -225,7 +294,7 @@ function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: bool
       fn: qc.aggregation.function ?? "",
       field: having.column,
       op: operatorSymbol(having.operator),
-      value: having.value ?? "",
+      value: measureValueText(alert, having.value ?? "", t),
       window,
     });
   }
@@ -278,7 +347,10 @@ export function describeAlertInPlainWords(
   opts: { aggregationEnabled?: boolean; incidentsEnabled?: boolean } = {},
 ): I18nText {
   if (!alert?.stream_name) return raw("");
-  const gap = alert.is_real_time === "true" ? null : conditionGap(alert);
+  const gap =
+    alert.is_real_time === "true"
+      ? null
+      : conditionGap(alert, { aggregationEnabled: opts.aggregationEnabled ?? true });
   if (gap) return t(CONDITION_GAP_KEYS[gap]);
   return t("alerts.readBack.sentence", {
     who: whoText(alert, t, opts.incidentsEnabled === true),
@@ -317,17 +389,14 @@ export function previewVerdictSentence(
   if (alert.is_real_time === "true") {
     if (verdict.count === undefined) return t("alerts.verdict.realtimeNoCount");
     const window = verdict.windowMinutes ?? num(tc.period);
-    const counted = t(
+    // The daily volume is the 24-hour row's to state, so the verdict counts only the window.
+    return t(
       opts.hasFilter === false ? "alerts.verdict.realtimeNoFilter" : "alerts.verdict.realtime",
       {
         count: previewCountText(verdict.count, verdict.atLeast, t),
         window: t("alerts.verdict.window", { n: window }, window),
       },
     );
-    const perDay = realtimeDailyVolume({ ...verdict, windowMinutes: window });
-    if (!perDay) return counted;
-    const about = roundForAbout(perDay);
-    return raw(`${counted} ${t("alerts.guard.volume", { count: formatNumber(about) }, about)}`);
   }
   if (verdict.count === undefined) {
     return t(verdict.wouldTrigger ? "alerts.verdict.firesReason" : "alerts.verdict.quietReason", {
@@ -350,14 +419,18 @@ export function previewVerdictSentence(
   const window = t("alerts.verdict.window", { n: num(tc.period) }, num(tc.period));
   const having = qc.aggregation?.having;
   if (verdict.value !== undefined && having?.column) {
+    const measure = t("alerts.verdict.measure", {
+      fn: qc.aggregation?.function ?? "",
+      field: having.column,
+    });
+    const value = measureValueText(alert, verdict.value, t);
+    // With no threshold yet there is nothing to judge, but the value now helps pick one.
+    if (isBlank(having.value)) return t("alerts.verdict.valueNow", { measure, value, window });
     return t(verdict.wouldTrigger ? "alerts.verdict.valueFires" : "alerts.verdict.valueQuiet", {
-      measure: t("alerts.verdict.measure", {
-        fn: qc.aggregation?.function ?? "",
-        field: having.column,
-      }),
-      value: formatNumber(verdict.value),
+      measure,
+      value,
       window,
-      limit: limitText(having.operator, having.value ?? ""),
+      limit: limitText(having.operator, null, measureValueText(alert, having.value, t)),
     });
   }
   const countsEvents = opts.countsEvents ?? (qc.type === "custom" && !qc.aggregation);
@@ -372,16 +445,6 @@ export function previewVerdictSentence(
     limit,
   });
 }
-
-/** A real-time alert's matches in the preview window, scaled to a day; null when nothing was counted. */
-export function realtimeDailyVolume(verdict: PreviewVerdict): number | null {
-  const window = num(verdict.windowMinutes);
-  if (verdict.count === undefined || !verdict.count || window <= 0) return null;
-  return Math.round((verdict.count * MINUTES_PER_DAY) / window);
-}
-
-// An estimate reads as one: two significant figures.
-const roundForAbout = (value: number): number => Number(value.toPrecision(2));
 
 // The builder's own blank starter row is not a filter.
 const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
