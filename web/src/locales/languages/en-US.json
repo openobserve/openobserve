@@ -12129,7 +12129,8 @@
         "realtimeWait": "About {events} a day. The first notifies at once, then it waits {wait} before the next: at most {notifications} a day.",
         "realtimeEach": "About {notifications} a day: each matching event notifies at once.",
         "changeWait": "Change the wait",
-        "addWait": "Add a wait"
+        "addWait": "Add a wait",
+        "lastHour": "Last hour"
       },
       "filtersMode": "Filters",
       "typeHelp": {
@@ -15445,7 +15446,9 @@
       "valueQuiet": "Quiet now: {measure} is {value} in the last {window} (threshold {limit}).",
       "valueNow": "Now: {measure} is {value} in the last {window}.",
       "realtimeNoCount": "Fires on each matching event.",
-      "realtimeNoFilter": "Fires on each matching event: {count} in the last {window}. Add a filter to narrow it."
+      "realtimeNoFilter": "Fires on each matching event: {count} in the last {window}. Add a filter to narrow it.",
+      "promqlFires": "Would alert now: {count} {label} (threshold {limit}).",
+      "promqlQuiet": "Quiet now: {count} {label} (threshold {limit})."
     },
     "readBack": {
       "title": "Here's your alert",
@@ -15782,7 +15785,9 @@
         "hrCompact": "{count} h",
         "seriesNoneCross": "{count} series, quiet | {count} series, all quiet",
         "ruleMatch": "no series match | {count} series matches. It must keep matching for {duration} before it fires | {count} series match. Each must keep matching for {duration} before it fires",
-        "ruleMatchNow": "no series match | {count} series matches | {count} series match"
+        "ruleMatchNow": "no series match | {count} series matches | {count} series match",
+        "compareNote": "The preview runs this window alone. Test it also reads the same window {offset} earlier.",
+        "compareNoBaseline": "No data {offset} earlier to compare with, so any match may fire."
       },
       "anomaly": {
         "sensitivityAuto": "Auto",
@@ -16026,8 +16031,6 @@
     "testRun": {
       "action": "Test it",
       "running": "Testing the last 24 hours…",
-      "firedTimes": "Over the last 24 hours this would have fired {count} time ({times}). | Over the last 24 hours this would have fired {count} times ({times}).",
-      "firedTimesGroups": "Over the last 24 hours this would have fired {count} time ({times}), for {groups}. | Over the last 24 hours this would have fired {count} times ({times}), for {groups}.",
       "neverFired": "Over the last 24 hours this would not have fired.",
       "held": "{count} more firing was held by Notify at most every. | {count} more firings were held by Notify at most every.",
       "noSeries": "The query matched no series; {metric} has no series. | The query matched no series; {metric} has {count} series. | The query matched no series; {metric} has {count} series.",
@@ -16050,7 +16053,14 @@
       "groupChecksBelow": "below the threshold in {count} check | below the threshold in {count} checks",
       "groupChecksMatched": "matched the condition in {count} check | matched the condition in {count} checks",
       "runAgain": "Run again",
-      "staleRunAgain": "The alert changed after this test. Run again for the new answer."
+      "staleRunAgain": "The alert changed after this test. Run again for the new answer.",
+      "elapsed": "{seconds} s so far. A busy stream can take a minute or more.",
+      "firedInChecks": "Over the last 24 hours this would have fired in {fired} of {checks} checks and notified {count} time ({times}). | Over the last 24 hours this would have fired in {fired} of {checks} checks and notified {count} times ({times}).",
+      "firedInChecksGroups": "Over the last 24 hours this would have fired in {fired} of {checks} checks, for {groups}, and notified {count} time ({times}). | Over the last 24 hours this would have fired in {fired} of {checks} checks, for {groups}, and notified {count} times ({times}).",
+      "groupCount": "{count} group | {count} groups",
+      "heldOther": "Notify at most every held back the other {count} firing. | Notify at most every held back the other {count} firings.",
+      "closest": "Closest: {series} reached {value} at {time}.",
+      "closestValue": "Closest: {value} at {time}."
     }
   },
   "alert_dependencies": {
