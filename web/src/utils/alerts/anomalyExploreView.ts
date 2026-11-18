@@ -98,6 +98,10 @@ export function anomalyStripView(
   if (noRecentRuns) return { ...base, state: "no_recent_runs" };
   if (noNewData) return { ...base, state: "no_new_data" };
   if (!config.isTrained) return { ...base, state: "learning" };
+  // A peer cluster sends no run time, and there the strip shows no stale state.
+  if (res.state === "no_runs" && res.last_detection_run !== null) {
+    return { ...base, state: "no_recent_runs" };
+  }
   if (res.state === "back_in_range") return { ...base, state: "back_in_range", summary };
   return base;
 }

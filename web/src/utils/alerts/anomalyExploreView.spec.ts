@@ -143,6 +143,14 @@ describe("anomalyStripView", () => {
     ).toBe("learning");
   });
 
+  it("shows No recent runs, not No anomalies, for a trained detector that never ran", () => {
+    const view = anomalyStripView(response({ state: "no_runs", cursor_us: null }), CONFIG, NOW);
+    expect(view.state).toBe("no_recent_runs");
+    expect(view.lastRunUs).toBe(NOW - 2 * MIN);
+    const peer = response({ state: "no_runs", last_detection_run: null, cursor_us: null });
+    expect(anomalyStripView(peer, CONFIG, NOW).state).toBe("none");
+  });
+
   it("shows Back in range with since and duration", () => {
     const view = anomalyStripView(
       response({
