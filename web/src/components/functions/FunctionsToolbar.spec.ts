@@ -291,4 +291,24 @@ describe("FunctionsToolbar", () => {
     expect(onSubmit).toHaveBeenCalled();
     expect(onSubmit.mock.calls[0][0].name).toBe("validFunctionName");
   });
+
+  // Naming the function comes before testing its body, so Enter only commits the name.
+  it("does not save the function when Enter is pressed in the name field", async () => {
+    const onSubmit = vi.fn();
+    const wrapper = mountToolbar(
+      { transformTypeOptions: [{ label: "VRL", value: "0" }] },
+      { name: "validFunctionName", transType: "0" },
+      onSubmit,
+    );
+    document.body.appendChild(wrapper.element);
+    await wrapper.find('[data-test="add-function-name-input-trigger"]').trigger("click");
+    await wrapper.find('[data-test="add-function-name-input-input"]').trigger("keydown.enter");
+    await flushPromises();
+
+    // The save handler runs after async validation; an attempt is counted at once.
+    expect(getForm(wrapper).state.submissionAttempts).toBe(0);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="add-function-name-input-input"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
 });

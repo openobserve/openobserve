@@ -175,8 +175,8 @@ const restoreTriggerFocus = async () => {
 };
 
 // Enter commits AND submits the owning form — Enter in the boxed name field
-// this replaced is how a panel or a function got saved from the keyboard, and
-// that has to survive the field becoming a title. The browser's own implicit
+// this replaced is how a panel got saved from the keyboard, and that has to
+// survive the field becoming a title (`submitOnEnter: false` opts out). The browser's own implicit
 // submission can't carry it: closing the editor unmounts the input before the
 // keypress that would have triggered it, so ask the form directly. A title with
 // no form owner (a workflow name, an incident title) submits nothing.
