@@ -978,7 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
 
-                  <!-- VRL pane — with its own header, side-by-side with SQL pane -->
+                  <!-- VRL pane — with its own header, beside or under the SQL pane -->
                   <div
                     class="border-border-default flex shrink-0 flex-col overflow-hidden"
                     :class="sectionTargets ? 'h-1/2 w-full border-t' : 'w-1/2 border-s'"
