@@ -1009,6 +1009,7 @@ fn incident_page_url(web_url: &str, base_uri: &str, org_id: &str, incident_id: &
 
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 fn apply_incident_to_context(
     ctx: &mut crate::alerts::notifications::NotificationContext,
     org_id: &str,
