@@ -125,6 +125,10 @@ const clearFieldLabels = (data: any) => {
 };
 
 const hasLimitValue = (v: unknown): boolean => v !== undefined && v !== null && v !== "";
+// 0 stays a gate the backend honours (`<= 0` fires on no series); the form still asks for 1 or more.
+const isPreviewCountLimit = (v: unknown): boolean =>
+  isCountLimit(v) ||
+  ((typeof v === "number" || typeof v === "string") && String(v).trim() !== "" && Number(v) === 0);
 
 /** The limits the current mode draws; a count limit that needs fixing draws none. */
 // Warning comes from the critical's family (aggregate value or count), or it lands on the wrong scale.
@@ -144,7 +148,7 @@ const currentLimits = (): [unknown, unknown] => {
   ) {
     return [aggregation.having.value, aggregation.warning_value];
   }
-  return [isCountLimit(tc?.threshold) ? tc.threshold : undefined, tc?.warning_threshold];
+  return [isPreviewCountLimit(tc?.threshold) ? tc.threshold : undefined, tc?.warning_threshold];
 };
 
 /**
@@ -1614,5 +1618,15 @@ const refreshDataFromParent = () => {
   refreshData();
 };
 
-defineExpose({ refreshData: refreshDataFromParent, resizeChart, evaluationStatus });
+// Every verdict is counted against the limit, so a limit that needs fixing has none to give.
+const shownEvaluationStatus = computed(() => {
+  const threshold = props.formData.trigger_condition?.threshold;
+  return threshold !== undefined && !isPreviewCountLimit(threshold) ? null : evaluationStatus.value;
+});
+
+defineExpose({
+  refreshData: refreshDataFromParent,
+  resizeChart,
+  evaluationStatus: shownEvaluationStatus,
+});
 </script>

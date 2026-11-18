@@ -108,8 +108,7 @@ const num = (value: unknown): number => Number(value ?? 0) || 0;
 
 /** An event, row or series count limit: a whole number of 1 or more. */
 export const isCountLimit = (value: unknown): boolean =>
-  value !== null &&
-  String(value ?? "").trim() !== "" &&
+  (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) &&
   Number.isInteger(Number(value)) &&
   Number(value) >= 1;
 

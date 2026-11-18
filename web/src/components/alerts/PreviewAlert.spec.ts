@@ -430,6 +430,17 @@ describe("PreviewAlert - refreshData method", () => {
     w.unmount();
   });
 
+  it("withdraws the verdict while the limit needs fixing", async () => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "custom" });
+    (w.vm as any).evaluateAndSetStatus(3);
+    const next = baseFormData();
+    await w.setProps({
+      formData: { ...next, trigger_condition: { ...next.trigger_condition, threshold: -5 } },
+    });
+    expect((w.vm.$.exposed as any).evaluationStatus.value).toBeNull();
+    w.unmount();
+  });
+
   it("widens the y-axis for the PromQL threshold too", async () => {
     const formData = baseFormData() as any;
     formData.query_condition.promql_condition = { column: "value", operator: "=", value: 2 };

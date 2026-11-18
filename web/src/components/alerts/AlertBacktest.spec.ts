@@ -121,6 +121,19 @@ describe("AlertBacktest", () => {
     wrapper.unmount();
   });
 
+  it("replays nothing against a limit that needs fixing, and publishes null", async () => {
+    const signal = ref<BacktestSignal | null>(null);
+    const wrapper = mountBacktest(SQL("default"), signal);
+    await vi.advanceTimersByTimeAsync(700);
+    respond(calls[0], [{ zo_sql_key: (NOW - 7 * 60_000) * 1000, zo_sql_val: 9 }]);
+    await wrapper.setProps({ threshold: -5 });
+    await flushPromises();
+    expect(status(wrapper)).toBe(i18n.global.t("alerts.sections.condition.fixLimit"));
+    expect(wrapper.find('[data-test="add-alert-backtest-result"]').exists()).toBe(false);
+    expect(signal.value).toBeNull();
+    wrapper.unmount();
+  });
+
   it("a failed check publishes null and shows Retry", async () => {
     const signal = ref<BacktestSignal | null>(null);
     const wrapper = mountBacktest(SQL("default"), signal);

@@ -28,6 +28,7 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { useI18nTyped } from "@/types/i18n";
+import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
 import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
 import {
@@ -174,7 +175,8 @@ onBeforeUnmount(() => {
   observer?.disconnect();
 });
 
-const status = computed<"loading" | "slow" | "failed" | "ready">(() => {
+const status = computed<"fixLimit" | "loading" | "slow" | "failed" | "ready">(() => {
+  if (!isCountLimit(props.threshold)) return "fixLimit";
   if (runKey.value !== ranKey.value) return "loading";
   if (timedOut.value) return "slow";
   if (search.state.value === "failed") return "failed";
@@ -254,11 +256,13 @@ const hint = computed(() => {
       data-test="add-alert-backtest-status"
     >
       {{
-        status === "slow"
-          ? t("alerts.sections.backtest.slow")
-          : status === "failed"
-            ? t("alerts.sections.backtest.failed")
-            : t("alerts.sections.backtest.loading")
+        status === "fixLimit"
+          ? t("alerts.sections.condition.fixLimit")
+          : status === "slow"
+            ? t("alerts.sections.backtest.slow")
+            : status === "failed"
+              ? t("alerts.sections.backtest.failed")
+              : t("alerts.sections.backtest.loading")
       }}
       <OButton
         v-if="status === 'slow' || status === 'failed'"
