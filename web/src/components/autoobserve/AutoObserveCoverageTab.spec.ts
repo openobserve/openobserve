@@ -317,6 +317,21 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(options.map((o) => o.value)).toEqual(["state", "detectors", "scanned"]);
     });
 
+    it.each([
+      ["Needs action again once a scan finds a gap", null, ["db"]],
+      ["All still when a link asked for All", "all", ["db", "api"]],
+    ])("shows All while nothing needs action, then %s", async (_case, link, expected) => {
+      routeQuery.cov = "table";
+      const w = mountTab(live(coverage([watched("api"), watched("db")])));
+      const shown = () =>
+        (w.findComponent(OTable).props("data") as { service: string }[]).map((r) => r.service);
+      expect(shown()).toHaveLength(2);
+      if (link) routeQuery.filter = link;
+      await flushPromises();
+      await w.setProps({ source: live(coverage([watched("api"), row("db", "none")])) });
+      expect(shown()).toEqual(expected);
+    });
+
     it("filters the table by Needs action, All, Watched, Partly watched and Coverage gap while nothing learns", () => {
       routeQuery.cov = "table";
       const wrapper = mountTab(live(FEW));

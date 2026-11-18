@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="filter"
           :aria-label="t('autoobserve.coverage.filterLabel')"
           data-test="autoobserve-coverage-filter"
-          @update:model-value="(v) => v && (filter = v as CoverageFilter)"
+          @update:model-value="(v) => v && chooseFilter(v as CoverageFilter)"
         >
           <OToggleGroupItem
             v-for="option in filters"
@@ -418,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="filterHidesTitle"
               :action-label="t('autoobserveLive.coverage.showAll')"
               data-test="autoobserve-coverage-filter-hides"
-              @action="filter = 'all'"
+              @action="chooseFilter('all')"
             />
             <OEmptyState
               v-else-if="term"
@@ -773,15 +773,34 @@ const filter = ref(linked.filter);
 const settled = computed(() => !props.skeleton && props.source.status === "ready");
 // Learning is only offered once a settled read holds a learning service, so a link's filter waits for it.
 watch(
-  () =>
-    settled.value &&
-    (!filters.value.includes(filter.value) ||
-      (filter.value === "needs" && !totals.value.gaps && !totals.value.partial)),
+  () => settled.value && !filters.value.includes(filter.value),
   (gone) => {
     if (gone) filter.value = "all";
   },
   { immediate: true },
 );
+// Needs action reads All while nothing needs action, and comes back when a later scan finds some.
+const needsFellBack = ref(false);
+watch(
+  [settled, () => totals.value.gaps + totals.value.partial, filter],
+  ([ready, needing]) => {
+    if (filter.value !== "all") needsFellBack.value = false;
+    if (!ready) return;
+    if (!needing && filter.value === "needs") {
+      needsFellBack.value = true;
+      filter.value = "all";
+    } else if (needing && needsFellBack.value) {
+      needsFellBack.value = false;
+      filter.value = "needs";
+    }
+  },
+  { immediate: true },
+);
+// A filter the reader or a link picks is theirs, even when it is the All a fallback already showed.
+const chooseFilter = (next: CoverageFilter) => {
+  needsFellBack.value = false;
+  filter.value = next;
+};
 const view = ref(linked.view);
 const fill = ref(linked.fill);
 const sortBy = ref(linked.sortBy);
@@ -809,7 +828,7 @@ watch(
   () => JSON.stringify(fromUrl()),
   () => {
     const next = fromUrl();
-    filter.value = next.filter;
+    chooseFilter(next.filter);
     view.value = next.view;
     fill.value = next.fill;
     sortBy.value = next.sortBy;
@@ -835,7 +854,7 @@ watch([view, fill, selected, filter, groupPick, sortBy, sortOrder], () => {
       ...route.query,
       cov: view.value === "table" ? undefined : view.value,
       fill: fill.value === "state" ? undefined : fill.value,
-      filter: filter.value === "needs" ? undefined : filter.value,
+      filter: filter.value === "needs" || needsFellBack.value ? undefined : filter.value,
       group: groupPick.value === "auto" ? undefined : groupPick.value,
       sort: sorted ? sortBy.value : undefined,
       order: sorted ? sortOrder.value : undefined,
@@ -1094,7 +1113,7 @@ const selectHex = async (key: string) => {
   const hex = mapView.value.items.find((r) => r.service === key);
   if (!hex || !isGroup(hex)) return selectService(key);
   if (!showsGroup(hex.children, searched.value)) query.value = "";
-  if (!showsGroup(hex.children, rows.value)) filter.value = "all";
+  if (!showsGroup(hex.children, rows.value)) chooseFilter("all");
   if (group.value !== mapGroup.value) groupPick.value = mapGroup.value;
   view.value = "table";
   // Regrouping clears the open rows, so the group opens once that has run.
@@ -1110,7 +1129,7 @@ const selectHex = async (key: string) => {
 
 // The hexes past the cap include services Needs action hides, so the table lists them all.
 const showAllInTable = () => {
-  filter.value = "all";
+  chooseFilter("all");
   view.value = "table";
 };
 
