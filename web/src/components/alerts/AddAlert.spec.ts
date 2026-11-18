@@ -2167,11 +2167,16 @@ describe("AddAlert (OForm owner)", () => {
     });
 
     it.each([
-      ["a new alert", {}, {}, true],
-      ["an edit", { isUpdated: true, modelValue: savedAlert() }, {}, false],
-      ["a prefilled open", {}, { prefill: "logs" }, false],
-    ])("stream picker focus on %s", async (_, props, query, focused) => {
+      ["a new alert", {}, {}, true, true],
+      ["a new alert on a phone", {}, {}, false, false],
+      ["an edit", { isUpdated: true, modelValue: savedAlert() }, {}, true, false],
+      ["a prefilled open", {}, { prefill: "logs" }, true, false],
+    ])("stream picker focus on %s", async (_, props, query, lg, focused) => {
       await router.replace({ query });
+      breakpoint.lgUp!.value = lg;
+      onTestFinished(() => {
+        breakpoint.lgUp!.value = true;
+      });
       wrapper = mountAlert(props, { attachTo: document.body });
       await flushPromises();
       const picker = document.querySelector('[data-test="add-alert-stream-name-select-dropdown"]');

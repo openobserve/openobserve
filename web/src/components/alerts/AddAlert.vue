@@ -1428,7 +1428,8 @@ export default defineComponent({
         snapScrollRef.value?.scrollToSection("condition");
         return;
       }
-      if (opened.prefill) return;
+      // On a phone a focused field scrolls the page past the alert type and opens the keyboard.
+      if (opened.prefill || !lgUp.value) return;
       await nextTick();
       document
         .querySelector<HTMLElement>(
