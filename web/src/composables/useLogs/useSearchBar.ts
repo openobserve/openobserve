@@ -17,6 +17,7 @@ import { ref } from "vue";
 import { savedViewsQuery } from "@/services/saved_views.queries";
 import { viewTypeOf } from "@/services/saved_views";
 import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
@@ -466,10 +467,11 @@ export const useSearchBar = (t: TranslateFn) => {
     }
     noteGridQuery(options.origin, options.generationId);
     const run = () => withQueryOrigin(options.origin, () => runQueryData(isPagination, options));
-    const groupsLoad = isPagination ? null : pendingFilterSemanticGroups();
+    const loads = isPagination ? [] : [pendingFilterSemanticGroups(), pendingQueryFunctions()];
+    const pending = loads.filter((load): load is Promise<unknown> => load !== null);
     // The origin only covers runQueryData's synchronous part, so the wait happens before it, never inside it.
-    if (!groupsLoad) return run();
-    return groupsLoad.then(() => {
+    if (!pending.length) return run();
+    return Promise.all(pending).then(() => {
       const superseded =
         options.generationId !== undefined &&
         !useLogsAutoRun().engine.isCurrent(options.generationId);
@@ -483,6 +485,14 @@ export const useSearchBar = (t: TranslateFn) => {
     if (!searchObj.data.query?.trim()) return null;
     const org = store.state.selectedOrganization.identifier;
     return getCachedSemanticGroups(org) ? null : loadSemanticGroups(org);
+  };
+
+  // hasAggregation reads aggregate names from the function catalog, so SQL runs wait for it once.
+  const pendingQueryFunctions = (): Promise<unknown> | null => {
+    if (!searchObj.meta.sqlMode) return null;
+    const org = store.state.selectedOrganization.identifier;
+    if (queryClient.getQueryData(queryFunctionsQuery(org).queryKey)) return null;
+    return queryClient.fetchQuery(queryFunctionsQuery(org)).catch(() => undefined);
   };
 
   const runQueryData = async (isPagination: boolean, options: QueryDataOptions) => {

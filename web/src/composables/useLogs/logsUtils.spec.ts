@@ -137,6 +137,8 @@ vi.mock("@openobserve/node-sql-parser/build/datafusionsql", () => ({
 
 // Import the module under test (after mocks are set up)
 import { logsUtils } from "./logsUtils";
+import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
 
 describe("logsUtils", () => {
   let utils: ReturnType<typeof logsUtils>;
@@ -364,22 +366,41 @@ describe("logsUtils", () => {
       expect(utils.hasAggregation(undefined as any)).toBe(false);
     });
 
-    it("should treat aggregates the parser reads as plain functions as aggregation", () => {
-      mockSearchObj.data.query = "";
-      for (const name of ["approx_distinct", "approx_percentile_cont", "APPROX_TOPK", "median"]) {
-        const columns = [
-          { expr: { type: "function", name: { name: [{ type: "default", value: name }] } } },
-        ];
-        expect(utils.hasAggregation(columns as any)).toBe(true);
-      }
-    });
-
-    it("should not treat scalar functions as aggregation", () => {
-      mockSearchObj.data.query = "";
-      const columns = [
-        { expr: { type: "function", name: { name: [{ type: "default", value: "lower" }] } } },
+    describe("with the server function catalog", () => {
+      const catalogKey = queryFunctionsQuery("test-org").queryKey;
+      const functionColumn = (name: string) => [
+        { expr: { type: "function", name: { name: [{ type: "default", value: name }] } } },
       ];
-      expect(utils.hasAggregation(columns as any)).toBe(false);
+
+      beforeEach(() => {
+        mockSearchObj.data.query = "";
+        queryClient.setQueryData(catalogKey, [
+          { name: "approx_distinct", kind: "aggregate" },
+          { name: "approx_topk", kind: "aggregate" },
+          { name: "lower", kind: "scalar" },
+          { name: "row_number", kind: "window" },
+        ]);
+      });
+
+      afterEach(() => {
+        queryClient.removeQueries({ queryKey: catalogKey });
+      });
+
+      it("should treat catalog aggregates the parser reads as plain functions as aggregation", () => {
+        expect(utils.hasAggregation(functionColumn("approx_distinct") as any)).toBe(true);
+        expect(utils.hasAggregation(functionColumn("APPROX_TOPK") as any)).toBe(true);
+      });
+
+      it("should not treat scalar or window functions as aggregation", () => {
+        expect(utils.hasAggregation(functionColumn("lower") as any)).toBe(false);
+        expect(utils.hasAggregation(functionColumn("row_number") as any)).toBe(false);
+      });
+
+      it("should fall back to aggr_func only when the catalog is not loaded", () => {
+        queryClient.removeQueries({ queryKey: catalogKey });
+        expect(utils.hasAggregation(functionColumn("approx_distinct") as any)).toBe(false);
+        expect(utils.hasAggregation([{ expr: { type: "aggr_func", name: "COUNT" } }])).toBe(true);
+      });
     });
   });
 

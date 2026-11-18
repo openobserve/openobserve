@@ -19,6 +19,8 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar, { streamSwitchPending } from "./useSearchBar";
+import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
 import searchState from "./searchState";
 import { resetLogsAutoRunForTests, useLogsAutoRun } from "./logsAutoRun";
 import { REFRESH_QUERY_ORIGIN } from "./logsRowNav";
@@ -382,6 +384,57 @@ describe("useSearchBar Composable", () => {
       releaseGroups([]);
       await run;
       expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getQueryData — function catalog SQL mode needs", () => {
+    let releaseCatalog: (list: unknown[]) => void;
+    let fetchSpy: ReturnType<typeof vi.spyOn>;
+    const catalogKey = () =>
+      queryFunctionsQuery(store.state.selectedOrganization.identifier).queryKey;
+
+    const prime = (sqlMode: boolean) => {
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.meta.sqlMode = sqlMode;
+    };
+
+    beforeEach(() => {
+      queryClient.removeQueries({ queryKey: catalogKey() });
+      fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockReturnValue(
+        new Promise((resolve) => {
+          releaseCatalog = resolve as (list: unknown[]) => void;
+        }) as any,
+      );
+    });
+
+    afterEach(() => {
+      fetchSpy.mockRestore();
+      queryClient.removeQueries({ queryKey: catalogKey() });
+      searchState().searchObj.meta.sqlMode = false;
+    });
+
+    it("waits for an uncached catalog before building a SQL search", async () => {
+      prime(true);
+      const run = (wrapper.vm as any).getQueryData(false);
+      await flushPromises();
+      expect(mockGetDataThroughStream).not.toHaveBeenCalled();
+
+      releaseCatalog([]);
+      await run;
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["a cached catalog", true, true],
+      ["non-SQL mode", false, false],
+    ])("dispatches in the same tick with %s", (_case, sqlMode, cached) => {
+      if (cached) queryClient.setQueryData(catalogKey(), []);
+      prime(sqlMode as boolean);
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 

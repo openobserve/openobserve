@@ -29,6 +29,9 @@ import {
 import { searchState } from "@/composables/useLogs/searchState";
 import { encodeFtScan } from "@/utils/logs/freeTextScan";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
+import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
+import type { ServerQueryFunction } from "@/services/query_functions";
 import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -100,56 +103,15 @@ export const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any 
   return whereNode;
 };
 
-// Aggregates the SQL parser returns as a plain "function" node rather than "aggr_func".
-const FUNCTION_NODE_AGGREGATES = new Set([
-  "approx_distinct",
-  "approx_median",
-  "approx_percentile_cont",
-  "approx_percentile_cont_with_weight",
-  "approx_topk",
-  "approx_topk_distinct",
-  "bit_and",
-  "bit_or",
-  "bit_xor",
-  "bool_and",
-  "bool_or",
-  "corr",
-  "covar",
-  "covar_pop",
-  "covar_samp",
-  "first_value",
-  "last_value",
-  "mean",
-  "median",
-  "nth_value",
-  "percentile_cont",
-  "regr_avgx",
-  "regr_avgy",
-  "regr_count",
-  "regr_intercept",
-  "regr_r2",
-  "regr_slope",
-  "regr_sxx",
-  "regr_sxy",
-  "regr_syy",
-  "stddev",
-  "stddev_pop",
-  "stddev_samp",
-  "string_agg",
-  "summary_percentile",
-  "var",
-  "var_pop",
-  "var_population",
-  "var_samp",
-  "var_sample",
-]);
+const aggregateNamesByCatalog = new WeakMap<ServerQueryFunction[], Set<string>>();
 
-const isAggregateColumn = (column: SQLColumn): boolean => {
+// The parser types only a few aggregates as aggr_func; the rest are plain function nodes.
+const isAggregateColumn = (column: SQLColumn, aggregates: Set<string>): boolean => {
   const expr = column?.expr;
   if (expr?.type === "aggr_func") return true;
   if (expr?.type !== "function" || typeof expr.name !== "object") return false;
   const name = expr.name.name?.at(-1)?.value;
-  return typeof name === "string" && FUNCTION_NODE_AGGREGATES.has(name.toLowerCase());
+  return typeof name === "string" && aggregates.has(name.toLowerCase());
 };
 
 // node-sql-parser CTE entry: a named WITH clause whose statement is another AST node
@@ -305,10 +267,28 @@ export const logsUtils = () => {
    * @param columns - Array of parsed SQL column objects from the query AST
    * @returns true if aggregation is detected, false otherwise
    */
+  // Aggregate names from the server's function catalog, which the logs search loads before it runs.
+  const catalogAggregates = (): Set<string> => {
+    const org = store.state.selectedOrganization?.identifier;
+    const catalog = org
+      ? queryClient.getQueryData<ServerQueryFunction[]>(queryFunctionsQuery(org).queryKey)
+      : undefined;
+    if (!Array.isArray(catalog)) return new Set();
+    let names = aggregateNamesByCatalog.get(catalog);
+    if (!names) {
+      names = new Set(
+        catalog.filter((f) => f?.kind === "aggregate").map((f) => String(f.name).toLowerCase()),
+      );
+      aggregateNamesByCatalog.set(catalog, names);
+    }
+    return names;
+  };
+
   const hasAggregation = (columns: SQLColumn[]): boolean => {
     // Check for aggregation functions in column expressions
     if (columns && Array.isArray(columns)) {
-      if (columns.some(isAggregateColumn)) {
+      const aggregates = catalogAggregates();
+      if (columns.some((column) => isAggregateColumn(column, aggregates))) {
         return true;
       }
     }
