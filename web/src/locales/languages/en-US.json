@@ -12120,7 +12120,13 @@
         "neverCheck": "It would not have alerted. If you expected it to, check the threshold and filters.",
         "noisyLower": "That is often, so people may start to ignore it. A lower threshold would make it quieter.",
         "noisyCheck": "That is often, so people may start to ignore it. Check the threshold and filters.",
-        "volume": "No notifications a day. | About {count} notification a day. | About {count} notifications a day, before Notify at most every reduces them."
+        "firingChecks": "No checks would fire. | About {count} check a day would fire; the wait after each notification holds back the rest. | About {count} checks a day would fire; the wait after each notification holds back the rest.",
+        "matchingEvents": "{count} matching event | {count} matching events",
+        "notifications": "{count} notification | {count} notifications",
+        "realtimeWait": "About {events} a day. The first notifies at once, then it waits {wait} before the next: at most {notifications} a day.",
+        "realtimeEach": "About {notifications} a day: each matching event notifies at once.",
+        "changeWait": "Change the wait",
+        "addWait": "Add a wait"
       },
       "filtersMode": "Filters",
       "typeHelp": {
@@ -15687,7 +15693,9 @@
       "remind": {
         "label": "Notify at most every",
         "help": "After a notification, wait this long before the next one",
-        "realtimeHelp": "The first event notifies at once; later ones wait this long"
+        "realtimeHelp": "The first event notifies at once; later ones wait this long",
+        "noEffect": "Checks run every {every}, so this has no effect.",
+        "matchChecks": "Set to {duration}"
       },
       "units": {
         "months": "months",
@@ -15824,11 +15832,12 @@
         "savedAs": "Saved as {name}"
       },
       "link": {
-        "follows": "Follows Look back ({duration})",
         "unlink": "Unlink",
-        "relink": "Follow Look back",
         "alsoSet": "Also set {fields} to {duration}.",
-        "undo": "Undo"
+        "undo": "Undo",
+        "linked": "Linked: editing one sets the other",
+        "separate": "Set separately",
+        "link": "Link them"
       },
       "promqlStream": {
         "fromQuery": "Reads {metric}, from the query",
