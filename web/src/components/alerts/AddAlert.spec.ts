@@ -2211,18 +2211,38 @@ describe("AddAlert (OForm owner)", () => {
   });
 
   describe("section 1 folds to a summary line", () => {
-    it("edit opens on section 2 with section 1 locked", async () => {
-      wrapper = mountAlert({ isUpdated: true, modelValue: savedAlert() });
+    it("edit opens on section 2, and the list, Back and leaving keep section 1 reachable and locked", async () => {
+      const rects = vi
+        .spyOn(Element.prototype, "getClientRects")
+        .mockReturnValue([new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList);
+      onTestFinished(() => rects.mockRestore());
+      wrapper = mountAlert(
+        { isUpdated: true, modelValue: savedAlert() },
+        { attachTo: document.body },
+      );
       const scrollToSection = vi.fn();
       wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
       await flushPromises();
       expect(wrapper.vm.activeSection).toBe("condition");
-      expect(scrollToSection).toHaveBeenCalledWith("condition");
-      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(false);
-      const summary = wrapper.get('[data-test="add-alert-watch-summary"]');
-      expect(summary.text()).toContain("app_logs");
-      expect(summary.find('[data-test="add-alert-watch-summary-locked"]').exists()).toBe(true);
-      expect(summary.find('[data-test="add-alert-watch-summary-change"]').exists()).toBe(false);
+      expect(scrollToSection.mock.calls).toEqual([["condition"]]);
+      const watch = () => wrapper.find('[data-test="add-alert-section-watch"]');
+      expect(watch().exists()).toBe(true);
+      expect(watch().find('[data-test="add-alert-watch-locked"]').exists()).toBe(true);
+      const trigger = watch().get('[data-test="add-alert-stream-name-select-dropdown-trigger"]');
+      expect(trigger.attributes()).toHaveProperty("disabled");
+      expect(wrapper.find('[data-test="add-alert-watch-summary"]').exists()).toBe(false);
+
+      await wrapper.get('[data-test="o-section-nav-item-watch"]').trigger("click");
+      expect(scrollToSection).toHaveBeenLastCalledWith("watch");
+      await wrapper.get('[data-test="add-alert-section-2-back"]').trigger("click");
+      expect(scrollToSection).toHaveBeenLastCalledWith("watch");
+      await vi.waitFor(() => expect(watch().element.contains(document.activeElement)).toBe(true));
+
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      expect(watch().exists()).toBe(true);
     });
 
     it("create collapses section 1 after moving on and Change reopens it", async () => {

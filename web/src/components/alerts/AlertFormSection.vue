@@ -32,10 +32,8 @@ const props = withDefaults(
     help: I18nText;
     /** False while another section is in view: its step buttons fade out but stay in the Tab order. */
     current?: boolean;
-    /** False when the previous section cannot be opened from here, as section 1 of an edit. */
-    canGoBack?: boolean;
   }>(),
-  { sections: () => ALERT_SECTIONS, current: undefined, canGoBack: true },
+  { sections: () => ALERT_SECTIONS, current: undefined },
 );
 
 const emit = defineEmits<{
@@ -61,7 +59,6 @@ const nextLabel = computed(() =>
     ? t("alerts.sections.next", { title: t(next.value.navKey) })
     : t("alerts.sections.nextStep"),
 );
-const footerBack = computed(() => (props.canGoBack ? previous.value : undefined));
 
 // The key also tells nested steps to drop their own card; the body restores the S4 rule and padding.
 provide(SETTING_ROW_BARE_KEY, true);
@@ -152,12 +149,12 @@ provide(SETTING_ROW_BARE_KEY, true);
         :data-test="`add-alert-section-${index}-footer`"
       >
         <OButton
-          v-if="footerBack"
+          v-if="previous"
           variant="ghost"
           size="sm"
           icon-left="arrow-upward"
           :data-test="`add-alert-section-${index}-back`"
-          @click="emit('step', footerBack.id)"
+          @click="emit('step', previous.id)"
         >
           {{ previousLabel }}
         </OButton>

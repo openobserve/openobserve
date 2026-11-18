@@ -286,6 +286,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @step="stepToSection"
             >
               <p
+                v-if="isEditing"
+                class="text-text-secondary m-0 flex items-center gap-1 pt-2.5 pb-2 text-sm"
+                data-test="add-alert-watch-locked"
+              >
+                <OIcon name="lock" size="xs" />
+                {{ t("alerts.form.watch.locked") }}
+              </p>
+              <p
                 v-if="showsLibraryLink"
                 class="text-text-secondary m-0 pt-2.5 pb-2 text-sm"
                 data-test="add-alert-library-line"
@@ -366,7 +374,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               id="condition"
               :current="activeSection === 'condition'"
               :sections="formSections"
-              :can-go-back="!isEditing"
               :title="t('alerts.sections.condition.title')"
               :help="conditionHelp"
               @go="goToSection"
@@ -378,16 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-watch-summary"
                 >
                   <span>{{ watchSummary }}</span>
-                  <span
-                    v-if="isEditing"
-                    class="text-text-secondary inline-flex items-center gap-1"
-                    data-test="add-alert-watch-summary-locked"
-                  >
-                    <OIcon name="lock" size="xs" />
-                    {{ t("alerts.form.watch.locked") }}
-                  </span>
                   <OButton
-                    v-else
                     variant="link"
                     data-test="add-alert-watch-summary-change"
                     @click="expandWatch"
@@ -1373,14 +1371,13 @@ export default defineComponent({
       emit(event as Parameters<typeof emit>[0], ...args);
     }) as AlertFormEmit;
     const snapScrollRef = ref<OSnapScrollExpose | null>(null);
-    // A folded section 1 lives on section 2's summary line, which is where a jump to it lands.
+    // A folded section 1 lives on section 2's summary line; a jump to it reopens it.
     const goToSection = (requested: string) => {
       // A step this alert type drops says its one sentence in step 2.
       const id = formSections.value.some((s) => s.id === requested) ? requested : "condition";
       startJump();
       if (id === "watch" && watchCollapsed.value) {
-        if (isEditing.value) snapScrollRef.value?.scrollToSection("condition");
-        else expandWatch();
+        expandWatch();
         return;
       }
       snapScrollRef.value?.scrollToSection(id);
@@ -1751,11 +1748,14 @@ export default defineComponent({
       focusOnLanding = null;
       if (!id) return;
       // The card, not the folded summary line above it, holds the section's first field.
+      // A locked section 1 on edit has no enabled field, so its heading takes focus.
       void nextTick(() => {
         const card = document.querySelector<HTMLElement>(
           `[data-test="add-alert-section-${id}-card"]`,
         );
-        if (card) focusFirstControl(card, "[data-snap-sticky]");
+        if (card && !focusFirstControl(card, "[data-snap-sticky]")) {
+          card.querySelector<HTMLElement>("[data-snap-heading]")?.focus({ preventScroll: true });
+        }
       });
     };
     const onJumpScroll = () => {
@@ -1784,8 +1784,8 @@ export default defineComponent({
     const isEditing = computed(
       () => alertForm.beingUpdated.value || alertForm.anomalyEditMode.value,
     );
-    // Section 1 cannot change after the alert is created, so an edit always shows it folded.
-    const watchCollapsed = computed(() => isEditing.value || leftWatch.value);
+    // An edit keeps section 1 open, read-only: it cannot change, but it stays one jump away.
+    const watchCollapsed = computed(() => !isEditing.value && leftWatch.value);
     const editNameInDetails = () => {
       goToSection("details");
       void nextTick(() =>
@@ -1802,7 +1802,7 @@ export default defineComponent({
     // Folding removes content above the view; scrolling back by the shift holds the view and focus still.
     // A view resting on a section's start stays on it, since the summary line lands atop that section.
     watch(watchCollapsed, (folded) => {
-      if (!folded || isEditing.value) return;
+      if (!folded) return;
       const anchor = foldAnchor(activeSection.value);
       if (!anchor) return;
       const section = anchor.closest<HTMLElement>("[data-snap-section]") ?? anchor;

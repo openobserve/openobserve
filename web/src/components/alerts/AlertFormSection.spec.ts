@@ -32,19 +32,18 @@ describe("AlertFormSection", () => {
 
   const fourSteps = ALERT_SECTIONS.filter((section) => section.id !== "schedule");
   it.each([
-    [5, "watch", true, null, "condition"],
-    [5, "condition", true, "watch", "notify"],
-    [5, "condition", false, null, "notify"],
-    [5, "details", true, "schedule", null],
-    [4, "notify", true, "condition", "details"],
-    [4, "details", true, "notify", null],
+    [5, "watch", null, "condition"],
+    [5, "condition", "watch", "notify"],
+    [5, "details", "schedule", null],
+    [4, "notify", "condition", "details"],
+    [4, "details", "notify", null],
   ] as const)(
-    "in %i steps, %s's footer (back allowed: %s) steps to its neighbours by name",
-    async (steps, id, canGoBack, back, next) => {
+    "in %i steps, %s's footer steps to its neighbours by name",
+    async (steps, id, back, next) => {
       const sections = steps === 5 ? ALERT_SECTIONS : fourSteps;
       const index = sections.findIndex((section) => section.id === id) + 1;
       const wrapper = mount(AlertFormSection, {
-        props: { id, sections, title: raw("T"), help: raw("H"), canGoBack },
+        props: { id, sections, title: raw("T"), help: raw("H") },
         global: { plugins: [i18n] },
       });
       const nav = (target: AlertSectionId) =>
