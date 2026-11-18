@@ -623,6 +623,21 @@ describe("AnomalyDetectionChart", () => {
       expect(wrapper.emitted("reload")).toHaveLength(1);
     });
 
+    it("reloads again for a second retrain after the first one finished", async () => {
+      exploreReturns({ model_version: 0 });
+      wrapper = await mountChart(TRAINED);
+      await wrapper.setProps({ alert: { ...TRAINED, is_trained: false } });
+      await settle();
+      exploreReturns({ model_version: 8 });
+      await wrapper.setProps({ alert: { ...TRAINED, is_trained: false, name: "x" } });
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(2);
+      exploreReturns({ model_version: 0 });
+      await wrapper.setProps({ alert: { ...TRAINED, current_model_version: 8 } });
+      await settle();
+      expect(wrapper.emitted("reload")).toHaveLength(3);
+    });
+
     it("does not reload again when the reloaded config still lags the server", async () => {
       exploreReturns({ model_version: 9 });
       wrapper = await mountChart(TRAINED);

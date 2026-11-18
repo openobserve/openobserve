@@ -578,7 +578,10 @@ async function loadSummary(force = false) {
     summary.value = res;
     summaryFailed.value = false;
     nowUs.value = Date.now() * 1000;
-    if (res.model_version !== loadedModel.value) requestReload(`model:${res.model_version}`);
+    // Keyed by both models, so a second retrain to 0 is not taken for the first.
+    if (res.model_version !== loadedModel.value) {
+      requestReload(`model:${loadedModel.value}:${res.model_version}`);
+    }
   } catch (e) {
     if (seq !== summarySeq) return;
     if (statusOf(e) === 409) requestReload(`stale:${loadedModel.value}`);
