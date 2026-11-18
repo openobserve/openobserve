@@ -189,7 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="configModel.alert_window_fire_pct"
                   type="number"
                   :model-modifiers="{ number: true }"
-                  class="w-20"
+                  fit-content
+                  class="min-w-20"
                   :aria-label="t('alerts.anomaly.windowFirePct')"
                   :placeholder="raw('100')"
                   :error="!!windowShareErrors.fire"
@@ -201,7 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="configModel.alert_window_buckets"
                   type="number"
                   :model-modifiers="{ number: true }"
-                  class="w-20"
+                  fit-content
+                  class="min-w-20"
                   :aria-label="t('alerts.anomaly.windowBuckets')"
                   :placeholder="raw('1')"
                   :error="!!windowShareErrors.buckets"
@@ -213,7 +215,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="configModel.alert_window_recover_pct"
                   type="number"
                   :model-modifiers="{ number: true }"
-                  class="w-32"
+                  fit-content
+                  class="min-w-32"
                   :aria-label="t('alerts.anomaly.windowRecoverPct')"
                   :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
                   :error="!!windowShareErrors.recover"

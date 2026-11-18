@@ -50,7 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :id="thresholdId"
               name="_ui.forecast.T"
               type="number"
-              width="xs"
+              fit-content
+              class="min-w-field-width-xs"
               :placeholder="t('alerts.forecast.threshold')"
               :debounce="300"
               data-test="alert-forecast-threshold"
@@ -64,7 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :id="horizonId"
               name="_ui.forecast.H"
               type="number"
-              width="xs"
+              fit-content
+              class="min-w-field-width-xs"
               :debounce="300"
               data-test="alert-forecast-horizon"
             >

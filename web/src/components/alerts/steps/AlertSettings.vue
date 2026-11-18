@@ -55,11 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("alerts.form.schedule.lookingAt")
                 }}</span>
                 <div class="flex items-center">
-                  <div class="w-16">
+                  <div>
                     <OFormInput
                       :aria-label="t('alerts.period')"
                       name="trigger_condition.period"
                       type="number"
+                      fit-content
+                      class="min-w-16"
                       min="1"
                       :debounce="300"
                       data-test="alert-settings-period-input"
@@ -117,7 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="_ui.pendingPeriod"
                     type="number"
                     min="0"
-                    class="w-16!"
+                    fit-content
+                    class="min-w-16"
                     data-test="alert-settings-pending-period-input"
                     @update:model-value="onPendingPeriodChange"
                   >
@@ -191,12 +194,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center gap-2">
-                <div class="w-21.75">
+                <div>
                   <component :is="formField" v-if="formField" name="trigger_condition.silence">
                     <template #default="{ field }">
                       <OInput
                         :aria-label="t('alerts.form.remind.label')"
                         type="number"
+                        fit-content
+                        class="min-w-21.75"
                         min="0"
                         :debounce="isScheduled ? 300 : undefined"
                         :model-value="silence.amount"
@@ -395,12 +400,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="flex flex-col gap-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <div class="w-21.75">
+                  <div>
                     <component :is="formField" v-if="formField" name="keep_firing_for">
                       <template #default="{ field }">
                         <OInput
                           :aria-label="t('alerts.alertSettings.keepFiringFor')"
                           type="number"
+                          fit-content
+                          class="min-w-21.75"
                           min="0"
                           :debounce="300"
                           :model-value="keepFiring.amount"

@@ -96,6 +96,11 @@ export interface InputProps {
    */
   width?: FieldWidth;
   /**
+   * Sizes the field to its value or placeholder, up to `field-width-sm`; set the floor with a
+   * `min-w-*` class. Takes the place of `width`.
+   */
+  fitContent?: boolean;
+  /**
    * Position of the label: 'outside' renders above the field (default),
    * 'inside' renders as a compact floating mini-label inside the field border.
    */

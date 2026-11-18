@@ -230,7 +230,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="histogram_interval_value"
                 type="number"
                 min="1"
-                class="alert-v3-input max-w-21.75 min-w-21.75"
+                fit-content
+                class="alert-v3-input min-w-21.75"
                 :aria-label="t('alerts.anomaly.detectionResolution')"
                 data-test="anomaly-histogram-interval-value"
               >
@@ -275,7 +276,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="schedule_interval_value"
                 type="number"
                 min="1"
-                class="alert-v3-input max-w-21.75 min-w-21.75"
+                fit-content
+                class="alert-v3-input min-w-21.75"
                 :aria-label="t('alerts.anomaly.checkEvery')"
                 data-test="anomaly-schedule-interval-value"
               >
@@ -312,7 +314,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="detection_window_value"
                 type="number"
                 min="1"
-                class="alert-v3-input max-w-21.75 min-w-21.75"
+                fit-content
+                class="alert-v3-input min-w-21.75"
                 :aria-label="t('alerts.anomaly.lookBackWindow')"
                 data-test="anomaly-detection-window-value"
               >
@@ -375,7 +378,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :suffix="t('alerts.anomaly.daysUnit')"
                 :aria-label="t('alerts.trainingWindow')"
                 data-test="anomaly-training-window"
-                class="alert-v3-input max-w-30 min-w-30"
+                fit-content
+                class="alert-v3-input min-w-30"
               />
               <OButton
                 v-if="!tierShows('anomalyRetrain')"
@@ -485,7 +489,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     min="1"
                     :model-modifiers="{ number: true }"
                     :aria-label="t('alerts.anomaly.budgetLabel')"
-                    class="alert-v3-input max-w-21.75 min-w-21.75"
+                    fit-content
+                    class="alert-v3-input min-w-21.75"
                     data-test="anomaly-budget-count"
                   >
                     <template #error />
@@ -552,7 +557,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :aria-describedby="
                         sensitivityError ? 'anomaly-manual-level-error' : undefined
                       "
-                      class="max-w-21.75 min-w-21.75"
+                      fit-content
+                      class="min-w-21.75"
                       data-test="anomaly-sensitivity-level"
                     >
                       <template #error />

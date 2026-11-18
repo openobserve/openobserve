@@ -123,6 +123,7 @@ watch(canReveal, (allowed) => {
 
 // ── Width ──────────────────────────────────────────────────────────────────
 const fieldWidthClass = computed(() => {
+  if (props.fitContent && !isTextarea.value) return "w-fit max-w-field-width-sm shrink-0";
   switch (props.width) {
     case "xs":
       return "w-field-width-xs";
@@ -415,7 +416,8 @@ const wrapperClasses = computed(() => [
         v-bind="controlAttrs"
         :aria-describedby="describedBy"
         :class="[
-          'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
+          'min-w-0 rounded-[inherit] bg-transparent outline-none',
+          fitContent ? 'field-sizing-content flex-auto' : 'flex-1',
           'text-input-text placeholder:text-input-placeholder',
           'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'h-full',

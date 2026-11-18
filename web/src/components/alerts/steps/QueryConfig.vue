@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :aria-label="t('common.operator')"
                               name="trigger_condition.operator"
                               :options="plainOperators"
-                              width="xs"
+                              class="w-32!"
                               data-test="alert-trigger-operator-select"
                               :searchable="false"
                               @update:model-value="onTriggerOperatorChange"
@@ -218,7 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="trigger_condition.threshold"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 data-test="alert-trigger-threshold-input"
                                 @blur="restoreDefaultThreshold"
                                 min="1"
@@ -242,13 +243,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
-                          <div v-if="countWarningVisible" class="flex basis-full items-start gap-2">
+                          <div
+                            v-if="countWarningVisible"
+                            class="flex basis-full flex-wrap items-start gap-2"
+                          >
                             <span
                               class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                               >{{ t("alerts.plain.warnWhen") }}</span
                             >
                             <span
-                              class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                              class="text-text-secondary text-compact shrink-0 leading-8.5 font-semibold"
                               >{{ operatorLabel(triggerOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
@@ -256,7 +260,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('alerts.warningIf')"
                                 name="trigger_condition.warning_threshold"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 data-test="alert-warning-threshold-input-136"
                                 :placeholder="t('alerts.optional')"
                               >
@@ -307,7 +312,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               name="query_condition.aggregation.having.operator"
                               :options="plainOperators"
                               :searchable="false"
-                              width="xs"
+                              class="w-32!"
                               data-test="alert-condition-operator-select"
                               @update:model-value="onConditionOperatorChange"
                             />
@@ -317,7 +322,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('common.value')"
                                 name="query_condition.aggregation.having.value"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 :placeholder="t('alerts.placeholders.value')"
                                 @update:model-value="onConditionValueChange($event)"
                               >
@@ -339,13 +345,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
-                          <div v-if="aggWarningVisible" class="flex basis-full items-start gap-2">
+                          <div
+                            v-if="aggWarningVisible"
+                            class="flex basis-full flex-wrap items-start gap-2"
+                          >
                             <span
                               class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                               >{{ t("alerts.plain.warnWhen") }}</span
                             >
                             <span
-                              class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                              class="text-text-secondary text-compact shrink-0 leading-8.5 font-semibold"
                               >{{ operatorLabel(conditionOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
@@ -353,7 +362,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('alerts.warningIf')"
                                 name="query_condition.aggregation.warning_value"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 data-test="alert-aggregation-warning-value-input-182"
                                 :placeholder="t('alerts.optional')"
                               >
@@ -546,7 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               name="trigger_condition.operator"
                               :options="plainOperators"
                               :searchable="false"
-                              width="xs"
+                              class="w-32!"
                               @update:model-value="onTriggerOperatorChange"
                             />
                             <!-- Message hangs under the threshold field it describes. -->
@@ -555,7 +565,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="trigger_condition.threshold"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 @update:model-value="onTriggerThresholdChange($event)"
                               >
                                 <template #error />
@@ -576,13 +587,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
-                          <div v-if="countWarningVisible" class="flex basis-full items-start gap-2">
+                          <div
+                            v-if="countWarningVisible"
+                            class="flex basis-full flex-wrap items-start gap-2"
+                          >
                             <span
                               class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                               >{{ t("alerts.plain.warnWhen") }}</span
                             >
                             <span
-                              class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                              class="text-text-secondary text-compact shrink-0 leading-8.5 font-semibold"
                               >{{ operatorLabel(triggerOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
@@ -590,7 +604,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('alerts.warningIf')"
                                 name="trigger_condition.warning_threshold"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 data-test="alert-warning-threshold-input-381"
                                 :placeholder="t('alerts.optional')"
                               >
@@ -641,7 +656,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               name="query_condition.aggregation.having.operator"
                               :options="plainOperators"
                               :searchable="false"
-                              width="xs"
+                              class="w-32!"
                               @update:model-value="onConditionOperatorChange"
                             />
                             <!-- Message hangs under the value field it describes. -->
@@ -650,7 +665,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('common.value')"
                                 name="query_condition.aggregation.having.value"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 :placeholder="t('alerts.placeholders.value')"
                                 @update:model-value="onConditionValueChange($event)"
                               >
@@ -672,13 +688,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
-                          <div v-if="aggWarningVisible" class="flex basis-full items-start gap-2">
+                          <div
+                            v-if="aggWarningVisible"
+                            class="flex basis-full flex-wrap items-start gap-2"
+                          >
                             <span
                               class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                               >{{ t("alerts.plain.warnWhen") }}</span
                             >
                             <span
-                              class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                              class="text-text-secondary text-compact shrink-0 leading-8.5 font-semibold"
                               >{{ operatorLabel(conditionOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
@@ -686,7 +705,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('alerts.warningIf')"
                                 name="query_condition.aggregation.warning_value"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 data-test="alert-aggregation-warning-value-input-413"
                                 :placeholder="t('alerts.optional')"
                               >
@@ -812,7 +832,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="trigger_condition.operator"
                                   :options="plainOperators"
                                   :searchable="false"
-                                  class="w-23!"
+                                  class="w-32!"
                                   :disabled="groupAnswer === 'each'"
                                   :data-test="countTestIds.operator"
                                   @update:model-value="onTriggerOperatorChange"
@@ -822,7 +842,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    class="w-16!"
+                                    fit-content
+                                    class="min-w-16"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -851,7 +872,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    class="w-16!"
+                                    fit-content
+                                    class="min-w-16"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -1273,7 +1295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="trigger_condition.operator"
                           :options="plainOperators"
                           :searchable="false"
-                          class="w-23!"
+                          class="w-32!"
                           data-test="alert-trigger-operator-select"
                           @update:model-value="onTriggerOperatorChange"
                         />
@@ -1282,7 +1304,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :aria-label="t('alerts.alertIfNoOfEvents')"
                             name="trigger_condition.threshold"
                             type="number"
-                            class="w-16!"
+                            fit-content
+                            class="min-w-16"
                             min="1"
                             data-test="alert-trigger-threshold-input"
                             @update:model-value="onTriggerThresholdChange($event)"
@@ -1326,7 +1349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="trigger_condition.operator"
                                   :options="plainOperators"
                                   :searchable="false"
-                                  class="w-23!"
+                                  class="w-32!"
                                   :disabled="groupAnswer === 'each'"
                                   :data-test="countTestIds.operator"
                                   @update:model-value="onTriggerOperatorChange"
@@ -1336,7 +1359,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    class="w-16!"
+                                    fit-content
+                                    class="min-w-16"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -1369,7 +1393,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('alerts.alertIfNoOfEvents')"
                                     name="trigger_condition.threshold"
                                     type="number"
-                                    class="w-16!"
+                                    fit-content
+                                    class="min-w-16"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -1417,7 +1442,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="query_condition.aggregation.having.operator"
                                   :options="plainOperators"
                                   :searchable="false"
-                                  class="w-16!"
+                                  class="w-32!"
                                   :disabled="groupAnswer === 'one'"
                                   data-test="alert-sql-agg-operator-select"
                                   @update:model-value="onConditionOperatorChange"
@@ -1427,7 +1452,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('common.value')"
                                     name="query_condition.aggregation.having.value"
                                     type="number"
-                                    class="w-20!"
+                                    fit-content
+                                    class="min-w-20"
                                     :disabled="groupAnswer === 'one'"
                                     data-test="alert-sql-agg-value-input"
                                     :placeholder="t('alerts.placeholders.value')"
@@ -1451,13 +1477,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ORadioGroup>
                       <div v-if="localTab === 'sql'" :class="!sqlPlainLimit && 'ps-6'">
                         <template v-if="groupAnswer === 'one'">
-                          <div v-if="countWarningVisible" class="flex items-start gap-2">
+                          <div v-if="countWarningVisible" class="flex flex-wrap items-start gap-2">
                             <span
                               class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                               >{{ t("alerts.plain.warnWhen") }}</span
                             >
                             <span
-                              class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                              class="text-text-secondary text-compact shrink-0 leading-8.5 font-semibold"
                               >{{ operatorLabel(triggerOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
@@ -1465,7 +1491,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('alerts.warningIf')"
                                 name="trigger_condition.warning_threshold"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 data-test="alert-warning-threshold-input-1020"
                                 :placeholder="t('alerts.optional')"
                               >
@@ -1504,13 +1531,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </template>
                         <template v-else>
-                          <div v-if="aggWarningVisible" class="flex items-start gap-2">
+                          <div v-if="aggWarningVisible" class="flex flex-wrap items-start gap-2">
                             <span
                               class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                               >{{ t("alerts.plain.warnWhen") }}</span
                             >
                             <span
-                              class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                              class="text-text-secondary text-compact shrink-0 leading-8.5 font-semibold"
                               >{{ operatorLabel(conditionOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
@@ -1518,7 +1545,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :aria-label="t('alerts.warningIf')"
                                 name="query_condition.aggregation.warning_value"
                                 type="number"
-                                width="xs"
+                                fit-content
+                                class="min-w-field-width-xs"
                                 data-test="alert-sql-agg-warning-value-input"
                                 :placeholder="t('alerts.optional')"
                               >
@@ -1598,7 +1626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="plainOperators"
                             :searchable="false"
                             data-test="alert-threshold-operator-select"
-                            width="xs"
+                            class="w-32!"
                             @update:model-value="onPromqlOperatorChange"
                           />
                           <!-- Message hangs under the value field it describes. -->
@@ -1607,7 +1635,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :aria-label="t('alerts.alertIfValueIs')"
                               name="query_condition.promql_condition.value"
                               type="number"
-                              width="xs"
+                              fit-content
+                              class="min-w-field-width-xs"
                               data-test="alert-threshold-value-input"
                               :debounce="300"
                               @update:model-value="onPromqlValueChange"
@@ -1628,13 +1657,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          PromQL bakes the threshold into the query itself, so severity
                          belongs here — not on the series-count row, which is coverage.
                          Shares critical's operator, so the row only echoes it. -->
-                        <div v-if="promqlWarningVisible" class="flex basis-full items-start gap-2">
+                        <div
+                          v-if="promqlWarningVisible"
+                          class="flex basis-full flex-wrap items-start gap-2"
+                        >
                           <span
                             class="text-status-warning-text text-compact shrink-0 leading-8.5 font-semibold whitespace-nowrap"
                             >{{ t("alerts.plain.warnWhen") }}</span
                           >
                           <span
-                            class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
+                            class="text-text-secondary text-compact shrink-0 leading-8.5 font-semibold"
                             >{{ operatorLabel(promqlOperatorEcho) }}</span
                           >
                           <div class="flex flex-col gap-1">
@@ -1642,7 +1674,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :aria-label="t('alerts.warningIf')"
                               name="query_condition.promql_warning_value"
                               type="number"
-                              width="xs"
+                              fit-content
+                              class="min-w-field-width-xs"
                               data-test="alert-promql-warning-value-input"
                               :placeholder="t('alerts.optional')"
                               :debounce="300"
@@ -1701,7 +1734,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="_ui.checkEvery"
               data-test="alert-check-every-input"
               type="number"
-              class="w-16!"
+              fit-content
+              class="min-w-16"
               min="1"
               @update:model-value="onCheckEveryChange($event)"
               @blur="restoreDefaultFrequency"
