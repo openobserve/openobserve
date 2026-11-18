@@ -1815,7 +1815,9 @@ function slotUptimePercent(up: number, measured: number): number | null {
  * One query does all the counting on the server, so the answer does not depend on how many
  * confirm runs the window holds, and up and measured come from the same read. A slot counts in
  * the bucket of its first row, aligned to the epoch the same way [`mapHistogram`] aligns
- * buckets. Rows without a run_id (older rows, reaper rows) are each their own slot.
+ * buckets. Rows without a run_id (older rows, reaper rows) are each their own slot. With
+ * `splitByEnvironment`, the outer query also groups by environment; the inner slot always
+ * includes it when the stream has the field.
  *
  * Returns `null` when the stream lacks a field the slot key needs; uptime then uses the estimate.
  */
@@ -1832,7 +1834,9 @@ export function buildSlotUptimeSql(
   const id = escapeSqlLiteral(monitorId);
   const stepUs = intervalSeconds(interval) * 1_000_000;
   const envCol = splitByEnvironment ? ", environment" : "";
-  const keyCols = [F.location, F.device, F.engine]
+  // Environment is part of the slot even when the chart does not split by it: one run can test
+  // two environments with the same location and device.
+  const keyCols = [F.location, F.device, F.engine, F.environment]
     .filter((f) => schemaFields.has(f))
     .map((f) => `, ${f}`)
     .join("");
@@ -1850,7 +1854,7 @@ FROM (
     MAX(CASE WHEN NOT (${confirm}) AND ${up} THEN 1 ELSE 0 END) as orig_up
   FROM ${TABLE}
   WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}
-  GROUP BY CASE WHEN run_id IS NULL OR run_id = '' THEN ${F.executionId} ELSE run_id END${keyCols}${envCol}
+  GROUP BY CASE WHEN run_id IS NULL OR run_id = '' THEN ${F.executionId} ELSE run_id END${keyCols}
 ) slots
 GROUP BY bucket_us${envCol}
 ORDER BY bucket_us`;
@@ -1869,7 +1873,12 @@ export function applySlotUptime(
   splitByEnvironment: boolean,
 ): Record<string, unknown>[] {
   const keyOf = (ts: string, env: string) => `${ts}\u0000${splitByEnvironment ? env : ""}`;
-  const rows = histogramRows.map((h) => ({ ...h, slot_up: 0, slot_measured: 0, slot_counted: 1 }));
+  const rows: Record<string, unknown>[] = histogramRows.map((h) => ({
+    ...h,
+    slot_up: 0,
+    slot_measured: 0,
+    slot_counted: 1,
+  }));
   const byKey = new Map(rows.map((r) => [keyOf(str(r.ts), str(r.environment)), r]));
   for (const s of slotRows) {
     const ts = new Date(num(s.bucket_us) / 1000).toISOString().slice(0, 19);

@@ -1895,6 +1895,7 @@ describe("confirm jobs in uptime", () => {
       "location",
       "device",
       "engine",
+      "environment",
     ]);
 
     it("should show 50% when desktop passes, mobile fails, and the confirm job repeats both", () => {
@@ -1994,6 +1995,11 @@ describe("confirm jobs in uptime", () => {
         "GROUP BY CASE WHEN run_id IS NULL OR run_id = '' THEN execution_id ELSE run_id END, location, device, engine, environment",
       );
       expect(sql).toContain("environment = 'prod'");
+      // Environment stays in the slot key when the chart does not split, so a run that tested
+      // two environments counts one result for each.
+      const unsplit = buildSlotUptimeSql("m", "1 minute", fields)!;
+      expect(unsplit).toContain("location, device, engine, environment\n) slots");
+      expect(unsplit).toContain("GROUP BY bucket_us\n");
       // Absent fields stay out of the slot key, because the search API rejects them.
       const noDevice = buildSlotUptimeSql(
         "m",
