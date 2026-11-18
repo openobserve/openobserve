@@ -175,18 +175,34 @@ pub(crate) async fn delete_covers_daily_days(
 ) -> Result<bool, anyhow::Error> {
     let range = config::meta::stream::TimeRange::new(start_time, end_time);
     // only a logs delete can be sent by the hour: every other type is deleted by date
-    let needs_whole_days = stream.stream_type != config::meta::stream::StreamType::Logs
-        || stream::delete_range_needs_whole_days(
+    let needs_whole_days = if stream.stream_type != config::meta::stream::StreamType::Logs {
+        Ok(true)
+    } else {
+        stream::delete_range_needs_whole_days(
             org_id,
             stream.stream_type,
             &stream.stream_name,
             &range,
         )
-        .await;
+        .await
+    };
+    check_delete_range(&stream.stream_name, start_time, end_time, needs_whole_days)
+}
+
+/// Refuses a partial-day delete that must cover whole days, and one whose partition level is
+/// unknown because the settings read failed.
+fn check_delete_range(
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+    needs_whole_days: Result<bool, infra::errors::Error>,
+) -> Result<bool, anyhow::Error> {
+    let needs_whole_days = needs_whole_days.map_err(|e| {
+        anyhow::anyhow!("Stream {stream_name} partition settings could not be read: {e}")
+    })?;
     if needs_whole_days && !is_day_aligned(start_time, end_time) {
         return Err(anyhow::anyhow!(
-            "Stream {} is deleted by whole days for this range (a day of it is stored as one daily file, or the stream is not a logs stream), so with delete_before_backfill enabled start_time and end_time must be aligned to day boundary (e.g., 2024-01-15T00:00:00Z)",
-            stream.stream_name
+            "Stream {stream_name} is deleted by whole days for this range (a day of it is stored as one daily file, or the stream is not a logs stream), so with delete_before_backfill enabled start_time and end_time must be aligned to day boundary (e.g., 2024-01-15T00:00:00Z)"
         ));
     }
     Ok(needs_whole_days)
@@ -776,6 +792,26 @@ mod tests {
     #[test]
     fn test_hourly_alignment_day_boundary_is_valid() {
         assert!(validate_time_alignment_hourly(DAY_ALIGNED_START, DAY_ALIGNED_END).is_ok());
+    }
+
+    #[test]
+    fn test_a_delete_that_cannot_be_proven_safe_gets_no_range() {
+        let day = config::utils::time::day_micros(1);
+        let hour = config::utils::time::hour_micros(1);
+        let down = || Err(infra::errors::Error::Message("down".to_string()));
+        // two hours of a day stored as one daily file
+        let partial = check_delete_range("web", day + hour, day + 3 * hour, Ok(true));
+        assert!(partial.unwrap_err().to_string().contains("whole days"));
+        let unread = check_delete_range("web", day + hour, day + 3 * hour, down());
+        assert!(
+            unread
+                .unwrap_err()
+                .to_string()
+                .contains("could not be read")
+        );
+        assert!(check_delete_range("web", day, 2 * day, down()).is_err());
+        assert!(!check_delete_range("web", day + hour, day + 3 * hour, Ok(false)).unwrap());
+        assert!(check_delete_range("web", day, 2 * day, Ok(true)).unwrap());
     }
 
     #[test]

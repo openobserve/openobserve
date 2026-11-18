@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::response::Response;
-use config::meta::stream::{StreamType, UpdateStreamSettings};
+use config::meta::stream::{DataRetentionDefaults, StreamType, UpdateStreamSettings};
 use o2_enterprise::enterprise::security::streams::{is_security_source, weakens_security_source};
 
 use super::security_allowed;
@@ -63,9 +63,8 @@ pub async fn guard_settings_update(
     Ok(source || update.security.is_some())
 }
 
-/// Judges the update by the days a stream with no value of its own keeps data, where 0 keeps
-/// it forever. After a failed read the value is unknown, so the update is refused if it weakens
-/// the source under the shortest or the longest value.
+/// Judges `data_retention: 0` by what the stream then inherits, where 0 keeps data forever.
+/// After a failed read the update is refused if the shortest or the longest value weakens it.
 fn weakens_under(
     current: &config::meta::stream::StreamSettings,
     update: &UpdateStreamSettings,
@@ -84,77 +83,80 @@ fn weakens_under(
         .any(|days| weakens_security_source(current, update, days))
 }
 
-/// Refuses an org retention default that shortens a Security source which inherits it, unless
-/// the user holds the Security delete grant.
+/// Refuses org defaults that shorten a Security source without the Security delete grant.
+/// `Some` holds the stored defaults the answer rests on; the write must still find them.
 pub async fn guard_org_retention_update(
     org_id: &str,
     user_id: &str,
-    update: &config::meta::stream::DataRetentionDefaults,
-) -> Result<(), Response> {
-    // `None` after a failed read: every type then counts as shortened
-    let defaults = match db::organization::org_retention_defaults(org_id).await {
-        Ok(current) => Some((
-            db::organization::resolved_retention_defaults(&current),
-            db::organization::resolved_retention_defaults(update),
-        )),
+    stored: Option<DataRetentionDefaults>,
+    update: &DataRetentionDefaults,
+) -> Result<Option<DataRetentionDefaults>, Response> {
+    // `stored` is what a write found under its lock; without one the cached value is judged
+    let current = match stored {
+        Some(stored) => Some(stored),
+        None => db::organization::org_retention_defaults(org_id)
+            .await
+            .inspect_err(|e| log::error!("[SECURITY] org retention read failed: {e}"))
+            .ok(),
+    };
+    // unknown stored defaults are refused: a source may get shorter under them
+    let destructive = match &current {
+        Some(current) => shortens_a_security_source(org_id, current, update).await,
+        None => true,
+    };
+    refuse_unless_admin(org_id, user_id, destructive).await?;
+    Ok(current.filter(|_| !destructive))
+}
+
+/// Whether any Security source keeps its data for fewer days under `update` than `current`.
+async fn shortens_a_security_source(
+    org_id: &str,
+    current: &DataRetentionDefaults,
+    update: &DataRetentionDefaults,
+) -> bool {
+    if current == update {
+        return false;
+    }
+    let streams = match stream::try_get_streams(org_id, None, false, None).await {
+        Ok(streams) => streams,
         Err(e) => {
-            log::error!("[SECURITY] org retention read failed: {e}");
-            None
+            log::error!("[SECURITY] stream listing failed for {org_id}: {e}");
+            return true;
         }
     };
-    let shortened = |stream_type| {
-        defaults
-            .as_ref()
-            .is_none_or(|(current, update)| default_shortened_for(stream_type, current, update))
-    };
-    let any_shortened = defaults.as_ref().is_none_or(|(current, update)| {
-        RETENTION_TYPES
-            .into_iter()
-            .chain([StreamType::Metadata])
-            .any(|t| default_shortened_for(t, current, update))
-    });
-    // a failed listing is refused: a source may sit behind it
-    let destructive = any_shortened
-        && match stream::try_get_streams(org_id, None, false, None).await {
-            Ok(streams) => streams.iter().any(|stream| {
-                shortened(stream.stream_type) && inherits_as_security_source(&stream.settings)
-            }),
-            Err(e) => {
-                log::error!("[SECURITY] stream listing failed for {org_id}: {e}");
-                true
-            }
+    for stream in streams {
+        if !is_security_source(stream.settings.security.as_ref()) {
+            continue;
+        }
+        let days = |org| {
+            db::organization::stream_retention_days_under(
+                org,
+                org_id,
+                stream.stream_type,
+                &stream.name,
+                stream.settings.data_retention,
+            )
         };
-    refuse_unless_admin(org_id, user_id, destructive).await
+        if retention_shortened(days(current).await, days(update).await) {
+            return true;
+        }
+    }
+    false
 }
 
-/// The stream types with an org retention default of their own.
-const RETENTION_TYPES: [StreamType; 4] = [
-    StreamType::Logs,
-    StreamType::Metrics,
-    StreamType::Traces,
-    StreamType::Profiles,
-];
-
-/// Whether the resolved default that a stream of this type inherits gets shorter. 0 keeps the
-/// data forever. A type with no value of its own follows the generic default or, as a derived
-/// metadata or index stream, the type of its source, so any shorter default counts for it.
-fn default_shortened_for(
-    stream_type: StreamType,
-    current: &config::meta::stream::DataRetentionDefaults,
-    update: &config::meta::stream::DataRetentionDefaults,
+/// 0 keeps the data forever; a failed read is treated as shortened.
+fn retention_shortened(
+    before: Result<i64, infra::errors::Error>,
+    after: Result<i64, infra::errors::Error>,
 ) -> bool {
     let days = |days: i64| if days > 0 { days } else { i64::MAX };
-    let shorter = |t: StreamType| days(update.for_type(t)) < days(current.for_type(t));
-    if RETENTION_TYPES.contains(&stream_type) {
-        shorter(stream_type)
-    } else {
-        days(update.default) < days(current.default) || RETENTION_TYPES.into_iter().any(shorter)
+    match (before, after) {
+        (Ok(before), Ok(after)) => days(after) < days(before),
+        (Err(e), _) | (_, Err(e)) => {
+            log::error!("[SECURITY] effective retention read failed: {e}");
+            true
+        }
     }
-}
-
-/// A Security source with no retention of its own, so the org default decides its data.
-fn inherits_as_security_source(settings: &config::meta::stream::StreamSettings) -> bool {
-    settings.data_retention <= 0 && is_security_source(settings.security.as_ref())
 }
 
 /// A `security` change is audited by its summary row, so its request row is not stamped too.
@@ -226,47 +228,15 @@ mod tests {
     }
 
     #[test]
-    fn test_an_org_default_is_judged_per_type_and_only_for_inheriting_sources() {
-        use config::meta::stream::{DataRetentionDefaults, SecuritySourceSetting, StreamSettings};
-        let defaults = |default, logs| DataRetentionDefaults {
-            default,
-            logs,
-            metrics: 30,
-            traces: 30,
-            profiles: 30,
-        };
-        let shortened =
-            |stream_type, current, update| default_shortened_for(stream_type, &current, &update);
-        let (logs, metrics, metadata) =
-            (StreamType::Logs, StreamType::Metrics, StreamType::Metadata);
-        assert!(shortened(logs, defaults(30, 30), defaults(30, 3)));
-        assert!(!shortened(metrics, defaults(30, 30), defaults(30, 3)));
-        assert!(!shortened(logs, defaults(30, 30), defaults(30, 60)));
-        assert!(
-            shortened(logs, defaults(30, 0), defaults(30, 3)),
-            "0 kept the data forever"
-        );
-        assert!(!shortened(logs, defaults(30, 3), defaults(30, 0)));
-        // a type with no value of its own follows the generic default or its source's type
-        assert!(shortened(metadata, defaults(30, 30), defaults(3, 30)));
-        assert!(!shortened(logs, defaults(30, 30), defaults(3, 30)));
-        assert!(shortened(metadata, defaults(30, 30), defaults(30, 3)));
-        assert!(!shortened(metadata, defaults(30, 30), defaults(60, 60)));
-
-        let stream = |data_retention, source: bool| StreamSettings {
-            data_retention,
-            security: source.then(|| SecuritySourceSetting {
-                included: Some(true),
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        assert!(inherits_as_security_source(&stream(0, true)));
-        assert!(
-            !inherits_as_security_source(&stream(30, true)),
-            "its own retention decides"
-        );
-        assert!(!inherits_as_security_source(&stream(0, false)));
+    fn test_a_source_is_shortened_only_by_fewer_effective_days() {
+        let down = || Err(infra::errors::Error::Message("down".to_string()));
+        assert!(retention_shortened(Ok(30), Ok(3)));
+        assert!(!retention_shortened(Ok(30), Ok(30)));
+        assert!(!retention_shortened(Ok(30), Ok(60)));
+        assert!(retention_shortened(Ok(0), Ok(3)), "0 kept the data forever");
+        assert!(!retention_shortened(Ok(3), Ok(0)));
+        assert!(retention_shortened(down(), Ok(30)));
+        assert!(retention_shortened(Ok(30), down()));
     }
 
     #[test]

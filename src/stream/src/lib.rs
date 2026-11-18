@@ -1106,14 +1106,26 @@ fn apply_partition_level_settings(
 }
 
 /// Whether a delete of `time_range` on this stream must cover whole days.
+/// A failed settings read is an error: the partition level then stays unknown.
 pub async fn delete_range_needs_whole_days(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     time_range: &TimeRange,
-) -> bool {
-    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
-    delete_needs_whole_days(stream_type, settings.as_deref(), time_range)
+) -> Result<bool, infra::errors::Error> {
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    let settings = match infra::schema::get_stream_settings_atomic(&key) {
+        Some(settings) => Some(settings),
+        None => {
+            let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+            infra::schema::unwrap_stream_settings(&schema).map(std::sync::Arc::new)
+        }
+    };
+    Ok(delete_needs_whole_days(
+        stream_type,
+        settings.as_deref(),
+        time_range,
+    ))
 }
 
 /// A delete must cover whole days when a day of the range is stored by day.
