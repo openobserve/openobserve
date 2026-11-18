@@ -168,8 +168,10 @@ pub async fn environments_of(org_id: &str, id: &str) -> anyhow::Result<Option<Ve
 }
 
 /// A check's stored template override, read without decrypting its secrets; `None` when absent.
+/// Read from the write connection: an update writes this value back, so a lagging replica would
+/// restore an old override.
 pub async fn template_of(org_id: &str, id: &str) -> anyhow::Result<Option<String>> {
-    let conn = get_orm_client_ro().await;
+    let conn = get_orm_client_rw().await;
     Ok(synthetics_checks::get(conn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
