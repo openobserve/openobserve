@@ -333,7 +333,7 @@ pub(crate) trait FindingPager: Send + Sync {
         streams: &[(String, String)],
     ) -> RoutedIncident;
     async fn attach(&self, org_id: &str, record_id: &str, incident_id: &str) -> anyhow::Result<()>;
-    /// The org's daily page budget; a failed read is an error, so the incident retries unheld.
+    /// The org's page budget; a failed read is an error, so the incident retries unheld.
     async fn pages_per_day(&self, org_id: &str) -> anyhow::Result<u32>;
     /// The newest `limit` of the org's AutoObserve incident pages opened after `since` that name a
     /// team, one per incident, newest first.
@@ -4226,7 +4226,7 @@ async fn page_budget_holds(
     pager: &dyn FindingPager,
     turn: &FindingTurn,
 ) -> Result<bool, anyhow::Error> {
-    use o2_enterprise::enterprise::autoobserve::paging_settings::PAGE_BUDGET_WINDOW_US;
+    use o2_enterprise::enterprise::autoobserve::paging_settings::page_budget_window_us;
 
     if budgeted_page(&f.org_id, incident_id).await?.is_some() {
         return Ok(true);
@@ -4235,7 +4235,7 @@ async fn page_budget_holds(
     let limit = pager.pages_per_day(&f.org_id).await?;
     let now = config::utils::time::now_micros();
     let pages = pager
-        .pages_since(&f.org_id, now - PAGE_BUDGET_WINDOW_US, limit)
+        .pages_since(&f.org_id, now - page_budget_window_us(), limit)
         .await?;
     let Some(spent) = page_budget_spent(limit, &pages, now) else {
         return Ok(false);
@@ -4245,18 +4245,19 @@ async fn page_budget_holds(
 }
 
 /// The newest team page once `limit` of them opened inside the window; one exactly a window old
-/// is out, so no UTC day holds more than `limit`.
+/// is out, so no span one window long holds more than `limit`.
 #[cfg(feature = "enterprise")]
 fn page_budget_spent(
     limit: u32,
     pages: &[infra::table::oncall_responses::TeamPage],
     now: i64,
 ) -> Option<&infra::table::oncall_responses::TeamPage> {
-    use o2_enterprise::enterprise::autoobserve::paging_settings::PAGE_BUDGET_WINDOW_US;
+    use o2_enterprise::enterprise::autoobserve::paging_settings::page_budget_window_us;
 
+    let since = now - page_budget_window_us();
     let inside: Vec<_> = pages
         .iter()
-        .filter(|p| p.team_id.is_some() && p.opened_at > now - PAGE_BUDGET_WINDOW_US)
+        .filter(|p| p.team_id.is_some() && p.opened_at > since)
         .collect();
     if inside.len() < limit as usize {
         return None;
@@ -7621,7 +7622,7 @@ mod tests {
                 pager
             }
 
-            /// None makes the budget read fail; an org never set reads one page a day.
+            /// None makes the budget read fail; an org never set reads the deployment default.
             fn set_budget(&self, org_id: &str, pages: Option<u32>) {
                 let mut s = self.state.lock().unwrap();
                 s.budgets.insert(org_id.to_string(), pages);
@@ -7739,11 +7740,13 @@ mod tests {
             }
 
             async fn pages_per_day(&self, org_id: &str) -> anyhow::Result<u32> {
+                use o2_enterprise::enterprise::autoobserve::paging_settings::PagingSettings;
+
                 let s = self.state.lock().unwrap();
                 match s.budgets.get(org_id) {
                     Some(None) => anyhow::bail!("the budget read failed"),
                     Some(Some(pages)) => Ok(*pages),
-                    None => Ok(1),
+                    None => Ok(PagingSettings::default().pages_per_day()),
                 }
             }
 
@@ -7883,6 +7886,8 @@ mod tests {
 
         #[tokio::test]
         async fn one_three_and_forty_streams_stopping_together_open_one_incident_and_page_once() {
+            use o2_enterprise::enterprise::autoobserve::context::COHORT_NAMES_SHOWN;
+
             let _db = store().await;
             for n in [1, 3, 40] {
                 let (org, pager) = (new_org(), Pager::default());
@@ -7929,7 +7934,7 @@ mod tests {
                     None => assert_eq!(n, 1, "only a lone member has no cohort"),
                     Some(c) => {
                         assert_eq!(c.streams as usize, n);
-                        assert_eq!(c.names.len(), 3, "{n}: at most three named");
+                        assert_eq!(c.names.len(), COHORT_NAMES_SHOWN, "{n}: the shown cap");
                         assert!(c.names.iter().all(|m| names.contains(m)), "{c:?}");
                     }
                 }
@@ -8115,8 +8120,8 @@ mod tests {
         }
 
         #[test]
-        fn the_page_budget_counts_team_pages_inside_the_rolling_day() {
-            use o2_enterprise::enterprise::autoobserve::paging_settings::PAGE_BUDGET_WINDOW_US;
+        fn the_page_budget_counts_team_pages_inside_the_window() {
+            use o2_enterprise::enterprise::autoobserve::paging_settings::page_budget_window_us;
 
             let hour = 3_600_000_000;
             let page =
@@ -8128,12 +8133,12 @@ mod tests {
                 };
             let recent = page("a", Some("shop"), hour);
             let older = page("b", Some("shop"), 2 * hour);
-            let day_old = page("c", Some("shop"), PAGE_BUDGET_WINDOW_US);
+            let window_old = page("c", Some("shop"), page_budget_window_us());
             let teamless = page("d", None, hour);
             let cases: [(u32, Vec<_>, Option<&str>); 6] = [
                 (1, vec![], None),
                 (1, vec![recent.clone()], Some("page-a")),
-                (1, vec![day_old], None),
+                (1, vec![window_old], None),
                 (1, vec![teamless], None),
                 (2, vec![recent.clone()], None),
                 (2, vec![older, recent], Some("page-a")),
@@ -8147,7 +8152,7 @@ mod tests {
         #[tokio::test]
         async fn a_spent_page_budget_opens_and_analyses_the_incident_but_pages_nobody() {
             use o2_enterprise::enterprise::autoobserve::{
-                INTERVAL_SECS, paging_settings::PAGE_BUDGET_WINDOW_US,
+                INTERVAL_SECS, paging_settings::page_budget_window_us,
             };
 
             let _db = store().await;
@@ -8198,7 +8203,7 @@ mod tests {
             let b_second = open(&unread, &pager).await.unwrap();
             assert_eq!(budgeted_page(&b, &b_second).await.unwrap(), None);
             assert_eq!(pager.pages(), 3, "its retry pages inside B's budget of two");
-            pager.age_pages(PAGE_BUDGET_WINDOW_US);
+            pager.age_pages(page_budget_window_us());
             assert_eq!(open(&held, &pager).await.unwrap(), second);
             assert_eq!(pager.pages(), 3, "a held incident never pages later");
             age(&second, gap, 0).await;
@@ -8206,7 +8211,7 @@ mod tests {
             assert_eq!(
                 pager.pages(),
                 4,
-                "a day after the page, the next stop pages"
+                "a window after the page, the next stop pages"
             );
         }
 

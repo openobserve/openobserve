@@ -211,7 +211,7 @@ pub enum PageOutcome {
     Failed,
     /// Opened under two ticks ago and not routed yet.
     Pending,
-    /// The org's daily page budget was spent, so it opened and was analysed but paged nobody.
+    /// The org's page budget was spent, so it opened and was analysed but paged nobody.
     Budgeted,
 }
 

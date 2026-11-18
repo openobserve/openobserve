@@ -52,7 +52,7 @@ pub struct PagingBody {
     tag = "AutoObserve",
     operation_id = "AutoObserveGetPagingSettings",
     summary = "Read whether AutoObserve pages for this organization",
-    description = "`page_on_stop` says whether a stream that stops sending data opens an incident and pages on-call through the organization's routing rules. It is off until someone turns it on. `pages_per_day` is the organization's page budget: at most that many AutoObserve pages reach a team in any 24 hours (1 unless changed). A stop past the budget still opens an incident and gets its analysis, but pages nobody. `available` says whether this deployment lets AutoObserve page at all (`O2_AUTOOBSERVE_PAGING_ENABLED`); while it is false nothing pages, whatever the organization chose.",
+    description = "`page_on_stop` says whether a stream that stops sending data opens an incident and pages on-call through the organization's routing rules. It is off until someone turns it on. `pages_per_day` is the organization's page budget: at most that many AutoObserve pages reach a team in any `O2_AUTOOBSERVE_PAGE_BUDGET_WINDOW_HOURS` window; an organization that set none reads `O2_AUTOOBSERVE_PAGES_PER_DAY`. A stop past the budget still opens an incident and gets its analysis, but pages nobody. `available` says whether this deployment lets AutoObserve page at all (`O2_AUTOOBSERVE_PAGING_ENABLED`); while it is false nothing pages, whatever the organization chose.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
@@ -82,7 +82,7 @@ pub async fn get_paging_settings(Path(org_id): Path<String>) -> Response {
     tag = "AutoObserve",
     operation_id = "AutoObservePutPagingSettings",
     summary = "Turn AutoObserve paging on or off for this organization",
-    description = "With `page_on_stop` true, a stream that stops sending data opens an incident and pages on-call: an ownership rule on the stream's service picks the team, otherwise the organization's default team, otherwise it waits on the unrouted queue. Streams that stop together share one incident and one page. `pages_per_day`, optional and at least 1, caps how many AutoObserve pages reach a team in any 24 hours; left out, the stored value is kept. A stop past it still opens an incident and gets its analysis, but pages nobody. Needs the permission that changes on-call routing.",
+    description = "With `page_on_stop` true, a stream that stops sending data opens an incident and pages on-call: an ownership rule on the stream's service picks the team, otherwise the organization's default team, otherwise it waits on the unrouted queue. Streams that stop together share one incident and one page. `pages_per_day`, optional and at least 1, caps how many AutoObserve pages reach a team in any `O2_AUTOOBSERVE_PAGE_BUDGET_WINDOW_HOURS` window; left out, the stored value is kept. A stop past it still opens an incident and gets its analysis, but pages nobody. Needs the permission that changes on-call routing.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(PagingBody), content_type = "application/json"),
