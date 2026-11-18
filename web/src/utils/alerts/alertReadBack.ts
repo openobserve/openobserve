@@ -15,11 +15,14 @@
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { hasDeliveryTarget } from "./deliveryTarget";
-import { dataNoun, formatNumber } from "./alertCopy";
+import { dataNoun, formatNumber, joinList } from "./alertCopy";
+import { describeFilterNode, filterSentenceParts } from "./filterSentence";
 import {
   nameResolvedExpression,
   type CompositeChildDisplay,
 } from "@/components/alerts/composite/expression";
+import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
+import type { FilterGroup, FilterNode } from "@/utils/query/filterBar";
 
 /** The slice of the alert form the plain-words sentences read. */
 export interface ReadBackAlert {
@@ -31,12 +34,25 @@ export interface ReadBackAlert {
   oncall_team?: string | null;
   creates_incident?: boolean;
   pending_period_sec?: number | string | null;
+  /** Seconds. */
+  keep_firing_for?: number | string | null;
+  notify_on_recovery?: boolean;
+  suppress_repeats?: boolean;
+  /** The builder's group-by for logs and traces; metrics keep theirs on `aggregation.group_by`. */
+  logGroupBy?: string[];
   query_condition?: {
     type?: string;
     sql?: string;
+    promql?: string;
+    conditions?: unknown;
+    vrl_function?: string | null;
+    multi_time_range?: { offSet?: string }[] | null;
+    promql_warning_value?: number | string | null;
     aggregation?: {
       multi_alert?: boolean;
       function?: string;
+      group_by?: string[];
+      warning_value?: number | string | null;
       having?: { column?: string; operator?: string; value?: number | string | null };
     } | null;
     promql_condition?: { operator?: string; value?: number | string | null } | null;
@@ -44,6 +60,7 @@ export interface ReadBackAlert {
   trigger_condition?: {
     operator?: string;
     threshold?: number | string | null;
+    warning_threshold?: number | string | null;
     period?: number | string | null;
     frequency?: number | string | null;
     frequency_type?: string;
@@ -105,6 +122,9 @@ const CONDITION_KEYS: Record<string, I18nKey> = {
   "<": "alerts.summary.plainEnglish.conditionFewerThan",
   "!=": "alerts.summary.plainEnglish.conditionNot",
 };
+
+const MINUTES_PER_DAY = 1440;
+const FILTER_CONDITIONS_SHOWN = 3;
 
 export const operatorSymbol = (op: string | undefined): string =>
   OPERATOR_SYMBOLS[op ?? ""] ?? op ?? "";
@@ -296,17 +316,18 @@ export function previewVerdictSentence(
   const qc = alert.query_condition ?? {};
   if (alert.is_real_time === "true") {
     if (verdict.count === undefined) return t("alerts.verdict.realtimeNoCount");
-    return t(
+    const window = verdict.windowMinutes ?? num(tc.period);
+    const counted = t(
       opts.hasFilter === false ? "alerts.verdict.realtimeNoFilter" : "alerts.verdict.realtime",
       {
         count: previewCountText(verdict.count, verdict.atLeast, t),
-        window: t(
-          "alerts.verdict.window",
-          { n: verdict.windowMinutes ?? num(tc.period) },
-          verdict.windowMinutes ?? num(tc.period),
-        ),
+        window: t("alerts.verdict.window", { n: window }, window),
       },
     );
+    const perDay = realtimeDailyVolume({ ...verdict, windowMinutes: window });
+    if (!perDay) return counted;
+    const about = roundForAbout(perDay);
+    return raw(`${counted} ${t("alerts.guard.volume", { count: formatNumber(about) }, about)}`);
   }
   if (verdict.count === undefined) {
     return t(verdict.wouldTrigger ? "alerts.verdict.firesReason" : "alerts.verdict.quietReason", {
@@ -350,4 +371,58 @@ export function previewVerdictSentence(
     window,
     limit,
   });
+}
+
+/** A real-time alert's matches in the preview window, scaled to a day; null when nothing was counted. */
+export function realtimeDailyVolume(verdict: PreviewVerdict): number | null {
+  const window = num(verdict.windowMinutes);
+  if (verdict.count === undefined || !verdict.count || window <= 0) return null;
+  return Math.round((verdict.count * MINUTES_PER_DAY) / window);
+}
+
+// An estimate reads as one: two significant figures.
+const roundForAbout = (value: number): number => Number(value.toPrecision(2));
+
+// The builder's own blank starter row is not a filter.
+const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
+  ...group,
+  items: group.items.flatMap((item): FilterNode[] => {
+    if (item.kind === "group") {
+      const inner = withoutBlankRows(item);
+      return inner.items.length ? [inner] : [];
+    }
+    return item.kind === "condition" && !item.field ? [] : [item];
+  }),
+});
+
+/** A stored filter tree as plain words, the first three conditions written out and the rest counted; null when there is no filter. */
+export function filterPhrase(
+  stored: unknown,
+  profile: "alert" | "anomaly",
+  t: TranslateFn,
+): { text: I18nText; count: number } | null {
+  const { codec, dialect } = FILTER_PROFILES[profile];
+  const group = withoutBlankRows(codec.parse(stored as never, { fields: [] }));
+  const parts = filterSentenceParts(group, (n) => describeFilterNode(n, dialect, t));
+  const total = parts.filter((part) => part.kind === "condition").length;
+  if (!total) return null;
+  const words: string[] = [];
+  let shown = 0;
+  let open = 0;
+  for (const part of parts) {
+    if (shown >= FILTER_CONDITIONS_SHOWN) break;
+    if (part.kind === "connector") {
+      words.push(t(part.connector === "OR" ? "alerts.form.filter.or" : "alerts.form.filter.and"));
+      continue;
+    }
+    words.push(`${"(".repeat(part.opens)}${part.phrase.text}${")".repeat(part.closes)}`);
+    open += part.opens - part.closes;
+    shown += 1;
+  }
+  const phrase = `${words.join(" ")}${")".repeat(Math.max(0, open))}`;
+  const rest = total - shown;
+  const text = rest
+    ? joinList([phrase, t("alerts.copy.nMore", { count: formatNumber(rest) }, rest)])
+    : raw(phrase);
+  return { text, count: total };
 }

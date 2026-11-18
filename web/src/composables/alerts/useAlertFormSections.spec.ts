@@ -57,6 +57,7 @@ const setup = (
   useAlertFormSections({
     fieldMeta: ref(meta),
     formData: ref(formData),
+    destinationObjects: ref(DESTINATIONS),
     anomalyConfig: ref(extra.anomaly ?? {}),
     isAnomalyMode: ref(formData.is_real_time === "anomaly"),
     isAggregationEnabled: ref(extra.aggregation ?? false),
@@ -65,6 +66,33 @@ const setup = (
     queryFailed: ref(queryFailed),
     t,
   });
+
+const DESTINATIONS = [
+  { name: "O2K8SAlerts", type: "http", destination_type_name: "slack" },
+  { name: "StandardAlert", type: "http" },
+  { name: "oncall-mail", type: "email" },
+];
+const cond = (column: string, operator: string, value: unknown, logicalOperator = "AND") => ({
+  filterType: "condition",
+  column,
+  operator,
+  value,
+  logicalOperator,
+});
+const tree = (...conditions: unknown[]) => ({
+  filterType: "group",
+  logicalOperator: "AND",
+  conditions,
+});
+const every = (minutes: number, over: Record<string, unknown> = {}) => ({
+  operator: ">=",
+  threshold: 1,
+  period: minutes,
+  frequency: minutes,
+  frequency_type: "minutes",
+  silence: 30,
+  ...over,
+});
 
 const byId = (items: { id: string }[], id: string) => items.find((i) => i.id === id)!;
 
@@ -206,13 +234,10 @@ describe("useAlertFormSections", () => {
       config.isCloud = isCloud;
     });
 
-    it("counts an on-call team as someone notified where on-call exists", () => {
+    it("names an on-call team as someone notified where on-call exists", () => {
       config.isEnterprise = "true";
       const { items } = setup(scheduled({ stream_name: "cpu", oncall_team: "team-1" }));
-      expect(byId(items.value, "notify")).toMatchObject({
-        state: "done",
-        summary: "1 destination",
-      });
+      expect(byId(items.value, "notify")).toMatchObject({ state: "done", summary: "team-1" });
     });
 
     it("names the on-call team an incident is opened for", () => {
@@ -493,6 +518,205 @@ describe("useAlertFormSections", () => {
       expect(reviewLineText(byId(review.value, "condition") as never, t)).toBe(t(key));
     },
   );
+
+  // Each cold-test scenario as the form holds it before Save, read back in full.
+  it.each([
+    {
+      scenario: "CPU: PromQL per node with Must last and a warning",
+      form: {
+        stream_name: "node_cpu_seconds_total",
+        stream_type: "metrics",
+        destinations: ["O2K8SAlerts"],
+        pending_period_sec: 5,
+        query_condition: {
+          type: "promql",
+          promql: '100 * (1 - avg by (k8s_node_name) (rate(cpu{mode="idle"}[5m])))',
+          promql_multi_alert: true,
+          promql_condition: { operator: ">", value: 90 },
+          promql_warning_value: 80,
+        },
+        trigger_condition: every(1),
+      },
+      card: [
+        "Watches Metrics in node_cpu_seconds_total, on a schedule.",
+        "Fires for each k8s_node_name whose latest value is more than 90. Fires only after it lasts 5 minutes. Warns at more than 80.",
+        "Tells O2K8SAlerts (Slack webhook), notifying at most every 30 minutes.",
+        "Checks every minute, looking at the last 1 minute.",
+      ],
+      nav: ["> 90 · One per k8s_node_name · Must last 5 min · Warning > 80", "O2K8SAlerts"],
+    },
+    {
+      scenario: "MEM: PromQL rule per pod with recovery and suppress",
+      form: {
+        stream_name: "k8s_pod_memory_limit_utilization",
+        stream_type: "metrics",
+        destinations: ["O2K8SAlerts"],
+        pending_period_sec: 10,
+        notify_on_recovery: true,
+        suppress_repeats: true,
+        query_condition: {
+          type: "promql",
+          promql:
+            "max by (k8s_cluster, k8s_namespace_name, k8s_pod_name) (k8s_pod_memory_limit_utilization) > 0.85",
+          promql_rule_mode: true,
+          promql_multi_alert: true,
+          promql_condition: null,
+        },
+        trigger_condition: every(1, { period: 2, silence: 60 }),
+      },
+      card: [
+        "Watches Metrics in k8s_pod_memory_limit_utilization, on a schedule.",
+        "Fires for each k8s_cluster, k8s_namespace_name, and k8s_pod_name whose latest value is more than 0.85. Fires only after it lasts 10 minutes.",
+        "Tells O2K8SAlerts (Slack webhook), notifying at most every hour, only when the level changes, with a recovery message.",
+        "Checks every minute, looking at the last 2 minutes.",
+      ],
+      nav: [
+        "> 0.85 · One per k8s_cluster, k8s_namespace_name, and k8s_pod_name · Must last 10 min",
+        "O2K8SAlerts",
+      ],
+    },
+    {
+      scenario: "LOG: count of errors, one alert over service groups",
+      aggregation: true,
+      form: {
+        stream_name: "otel_demo",
+        destinations: ["StandardAlert"],
+        logGroupBy: ["service_name"],
+        query_condition: {
+          type: "custom",
+          conditions: tree(cond("severity", "=", "ERROR")),
+          aggregation: {
+            function: "count",
+            group_by: [],
+            multi_alert: false,
+            having: { column: "", operator: ">", value: 50 },
+          },
+        },
+        trigger_condition: every(5),
+      },
+      card: [
+        "Watches Logs in otel_demo where severity is ERROR, on a schedule.",
+        "Fires when at least 1 service_name group has more than 50 events in the last 5 minutes.",
+        "Tells StandardAlert (Webhook), notifying at most every 30 minutes.",
+        "Checks every 5 minutes, looking at the last 5 minutes.",
+      ],
+      nav: ["more than 50 events · Group by service_name · matching 1 filter", "StandardAlert"],
+    },
+    {
+      scenario: "OOM: real-time with an OR filter",
+      form: {
+        is_real_time: "true",
+        stream_name: "k8s_events",
+        destinations: ["O2K8SAlerts"],
+        query_condition: {
+          type: "custom",
+          conditions: tree(
+            cond("body_object_reason", "in", ["Killing", "OOMKilled"]),
+            cond("body_object_note", "contains", "oomkilled", "OR"),
+          ),
+        },
+        trigger_condition: { silence: 10 },
+      },
+      card: [
+        "Watches Logs in k8s_events where body_object_reason is any of Killing, OOMKilled or body_object_note contains oomkilled.",
+        "Fires on each matching event.",
+        "Tells O2K8SAlerts (Slack webhook), notifying at most every 10 minutes.",
+      ],
+      nav: ["Any matching event · matching 2 filters", "O2K8SAlerts"],
+    },
+    {
+      scenario: "ANO: unusual volume of one upstream",
+      form: { is_real_time: "anomaly", stream_name: "nginx" },
+      anomaly: {
+        query_mode: "filters",
+        filters: [{ field: "upstream", operator: "=", value: "router-5080" }],
+        detection_function: "count",
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+        schedule_interval_value: 10,
+        schedule_interval_unit: "m",
+        detection_window_value: 3,
+        detection_window_unit: "h",
+        alert_direction: "both",
+        alert_enabled: true,
+        alert_destination_ids: ["O2K8SAlerts"],
+      },
+      card: [
+        "Watches Logs in nginx where upstream is router-5080, for unusual values.",
+        "Fires when count per 5 minutes is unusual (spikes or drops).",
+        "Tells O2K8SAlerts (Slack webhook).",
+        "Checks every 10 minutes, looking at the last 3 hours.",
+      ],
+      nav: ["Unusual values · matching 1 filter", "O2K8SAlerts"],
+    },
+    {
+      scenario: "LAT: SQL percentile, one per returned group",
+      aggregation: true,
+      form: {
+        stream_name: "default",
+        stream_type: "traces",
+        query_condition: {
+          type: "sql",
+          sql: "SELECT service_name, approx_percentile_cont(duration, 0.95) AS p95_us FROM t GROUP BY service_name",
+          aggregation: {
+            multi_alert: true,
+            function: "p95",
+            having: { column: "p95_us", operator: ">", value: 500000 },
+          },
+        },
+        trigger_condition: every(15),
+      },
+      card: [
+        "Watches Traces in default, on a schedule.",
+        "Fires for each service_name whose p95_us is more than 500,000 in the last 15 minutes.",
+        "Tells no one yet.",
+        "Checks every 15 minutes, looking at the last 15 minutes.",
+      ],
+      nav: ["p95_us > 500,000 · One per service_name", "No one yet"],
+    },
+    {
+      scenario: "CMP: SQL against last week through a function",
+      form: {
+        stream_name: "error_logs",
+        destinations: ["O2K8SAlerts", "StandardAlert", "oncall-mail", "unknown-hook"],
+        workflows: ["triage"],
+        keep_firing_for: 600,
+        query_condition: {
+          type: "sql",
+          sql: "SELECT count(*) AS n FROM error_logs",
+          multi_time_range: [{ offSet: "1w" }],
+          vrl_function: ".ratio = 2",
+        },
+        trigger_condition: every(5, { warning_threshold: 2, silence: 0 }),
+      },
+      card: [
+        "Watches Logs in error_logs, on a schedule.",
+        "Fires when the query returns 1 or more rows in the last 5 minutes. Keeps firing for 10 minutes after it clears. Warns at 2. Compared with the same window 1 week earlier, through a function.",
+        "Tells O2K8SAlerts (Slack webhook), StandardAlert (Webhook), oncall-mail (Email), and 2 more.",
+        "Checks every 5 minutes, looking at the last 5 minutes.",
+      ],
+      nav: [
+        "1+ rows · Keep firing for 10 min · Warning 2 · Compare with 1 week · Function",
+        "O2K8SAlerts, StandardAlert, oncall-mail, and 2 more",
+      ],
+    },
+  ])("reads back $scenario", ({ form, card, nav, anomaly, aggregation }) => {
+    const { review, items } = setup(
+      { ...base, destinations: [], ...form },
+      {},
+      false,
+      true,
+      false,
+      {
+        anomaly,
+        aggregation,
+      },
+    );
+    expect(review.value.map((line) => reviewLineText(line, t))).toEqual(card);
+    expect([byId(items.value, "condition").summary, byId(items.value, "notify").summary]).toEqual(
+      nav,
+    );
+  });
 
   it("names the stream and its type in the watch summary", () => {
     const { items } = setup(scheduled({ stream_name: "default", stream_type: "logs" }));

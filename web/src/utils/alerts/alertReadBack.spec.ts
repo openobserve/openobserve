@@ -6,8 +6,10 @@ import type { TranslateFn } from "@/types/i18n";
 import {
   describeAlertInPlainWords,
   describeCompositeInPlainWords,
+  filterPhrase,
   limitText,
   previewVerdictSentence,
+  realtimeDailyVolume,
   type ReadBackAlert,
 } from "./alertReadBack";
 import { dataNoun } from "./alertCopy";
@@ -311,7 +313,21 @@ describe("previewVerdictSentence", () => {
       { wouldTrigger: true, reason: "", count: 1500, windowMinutes: 30 },
       alert({ is_real_time: "true" }),
       { hasFilter: false },
-      "Fires on each matching event: 1,500 in the last 30 minutes. Add a filter to narrow it.",
+      "Fires on each matching event: 1,500 in the last 30 minutes. Add a filter to narrow it. About 72,000 notifications a day before Notify at most every",
+    ],
+    [
+      "real time with a filter that still matches a lot",
+      { wouldTrigger: true, reason: "", count: 30952, windowMinutes: 30 },
+      alert({ is_real_time: "true" }),
+      { hasFilter: true },
+      "Fires on each matching event: 30,952 in the last 30 minutes. About 1,500,000 notifications a day before Notify at most every",
+    ],
+    [
+      "real time with nothing matched",
+      { wouldTrigger: true, reason: "", count: 0, windowMinutes: 30 },
+      alert({ is_real_time: "true" }),
+      { hasFilter: true },
+      "Fires on each matching event: 0 in the last 30 minutes.",
     ],
   ] as const)("states %s", (_, verdict, readBack, opts, sentence) => {
     expect(previewVerdictSentence({ ...verdict }, readBack, t, opts)).toBe(sentence);
@@ -333,5 +349,54 @@ describe("dataNoun", () => {
     [undefined, undefined, 2, "events"],
   ])("a %s stream in %s mode counts %s %s", (streamType, mode, count, noun) => {
     expect(dataNoun(streamType, mode, count, t)).toBe(noun);
+  });
+});
+
+describe("realtimeDailyVolume", () => {
+  it.each([
+    ["a count over half an hour", { count: 30952, windowMinutes: 30 }, 1485696],
+    ["no count yet", { windowMinutes: 30 }, null],
+    ["no window", { count: 5, windowMinutes: 0 }, null],
+  ])("projects %s to a day", (_, verdict, perDay) => {
+    expect(realtimeDailyVolume({ wouldTrigger: true, reason: "", ...verdict })).toBe(perDay);
+  });
+});
+
+describe("filterPhrase", () => {
+  const cond = (column: string, operator: string, value: unknown, logicalOperator = "AND") => ({
+    filterType: "condition",
+    column,
+    operator,
+    value,
+    logicalOperator,
+  });
+  const tree = (...conditions: unknown[]) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions,
+  });
+  it.each([
+    ["no filter", tree(), null],
+    ["only the builder's blank row", tree(cond("", "=", "")), null],
+    ["one condition", tree(cond("severity", "=", "ERROR")), "severity is ERROR"],
+    [
+      "an OR inside a group",
+      tree(cond("level", "=", "error"), {
+        ...tree(cond("reason", "=", "Killing"), cond("note", "contains", "oom", "OR")),
+      }),
+      "level is error and (reason is Killing or note contains oom)",
+    ],
+    [
+      "more than three conditions, closing an open group",
+      tree(
+        cond("a", "=", "1"),
+        cond("b", "=", "2"),
+        tree(cond("c", "=", "3"), cond("d", "=", "4", "OR")),
+        cond("e", "=", "5"),
+      ),
+      "a is 1 and b is 2 and (c is 3) and 2 more",
+    ],
+  ])("reads %s", (_, conditions, phrase) => {
+    expect(filterPhrase(conditions, "alert", t)?.text ?? null).toBe(phrase);
   });
 });
