@@ -37,24 +37,42 @@ def _gen_ai_rows(client: OpenObserveClient, stream: str, want: int) -> dict[str,
     return rows if len(rows) >= want else None
 
 
-def test_gen_ai_messages_survive_a_prompt_reference_and_traceloop_keys(client: OpenObserveClient, temp_trace_stream: str):
+def test_gen_ai_messages_survive_a_prompt_reference_and_traceloop_keys(
+    client: OpenObserveClient, temp_trace_stream: str
+):
     """o2-enterprise#3138: `gen_ai.prompt.name` read as a TraceLoop message key and swallowed the span's real messages."""
     trace_id = uuid.uuid4().hex
     spans = [
-        _gen_ai_span("plain", trace_id, string_attr("gen_ai.input.messages", GEN_AI_INPUT),
-                     string_attr("gen_ai.output.messages", GEN_AI_OUTPUT)),
-        _gen_ai_span("with-prompt-ref", trace_id, string_attr("gen_ai.input.messages", GEN_AI_INPUT),
-                     string_attr("gen_ai.output.messages", GEN_AI_OUTPUT),
-                     string_attr("gen_ai.prompt.name", "support-answer"), string_attr("gen_ai.prompt.version", "3"),
-                     string_attr("gen_ai.prompt.label", "production")),
-        _gen_ai_span("traceloop", trace_id, string_attr("gen_ai.prompt.0.role", "user"),
-                     string_attr("gen_ai.prompt.0.content", "Hello"), string_attr("gen_ai.completion.0.role", "assistant"),
-                     string_attr("gen_ai.completion.0.content", "Hi")),
+        _gen_ai_span(
+            "plain",
+            trace_id,
+            string_attr("gen_ai.input.messages", GEN_AI_INPUT),
+            string_attr("gen_ai.output.messages", GEN_AI_OUTPUT),
+        ),
+        _gen_ai_span(
+            "with-prompt-ref",
+            trace_id,
+            string_attr("gen_ai.input.messages", GEN_AI_INPUT),
+            string_attr("gen_ai.output.messages", GEN_AI_OUTPUT),
+            string_attr("gen_ai.prompt.name", "support-answer"),
+            string_attr("gen_ai.prompt.version", "3"),
+            string_attr("gen_ai.prompt.label", "production"),
+        ),
+        _gen_ai_span(
+            "traceloop",
+            trace_id,
+            string_attr("gen_ai.prompt.0.role", "user"),
+            string_attr("gen_ai.prompt.0.content", "Hello"),
+            string_attr("gen_ai.completion.0.role", "assistant"),
+            string_attr("gen_ai.completion.0.content", "Hi"),
+        ),
     ]
     resp = client.post("v1/traces", json=traces_request(spans), headers={"stream-name": temp_trace_stream})
     assert resp.status_code == 200, resp.text
 
-    rows = wait_until(lambda: _gen_ai_rows(client, temp_trace_stream, 3), timeout=30, msg="the three spans never became searchable")
+    rows = wait_until(
+        lambda: _gen_ai_rows(client, temp_trace_stream, 3), timeout=30, msg="the three spans never became searchable"
+    )
     for name in ("plain", "with-prompt-ref"):
         row = rows[name]
         assert {"gen_ai_input_messages", "gen_ai_output_messages"} <= row.keys(), f"{name} lost its messages: {row}"
@@ -62,7 +80,10 @@ def test_gen_ai_messages_survive_a_prompt_reference_and_traceloop_keys(client: O
         assert json.loads(row["gen_ai_output_messages"]) == json.loads(GEN_AI_OUTPUT), f"{name}: {row}"
     ref = rows["with-prompt-ref"]
     assert (ref.get("gen_ai_prompt_name"), ref.get("gen_ai_prompt_version"), ref.get("gen_ai_prompt_label")) == (
-        "support-answer", "3", "production"), ref
+        "support-answer",
+        "3",
+        "production",
+    ), ref
 
     traceloop = rows["traceloop"]
     assert json.loads(traceloop["gen_ai_input_messages"]) == [{"role": "user", "content": "Hello"}], traceloop

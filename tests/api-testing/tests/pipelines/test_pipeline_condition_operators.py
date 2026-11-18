@@ -140,5 +140,8 @@ def test_save_refuses_a_regex_that_does_not_compile(client: OpenObserveClient):
         condition = {"column": "msg", "operator": "re_match", "value": "disk (full"}
         resp = client.post("pipelines", json=_condition_payload(name, source, f"{source}_out", condition))
         assert resp.status_code == 400, f"an invalid regex must be refused: {resp.status_code} {resp.text}"
+        message = resp.json().get("message", "")
+        assert "invalid regex" in message, f"the error must say the regex is invalid: {message}"
+        assert "'msg'" in message, f"the error must name the condition's column: {message}"
     finally:
         _delete_pipeline_by_name(client, name)
