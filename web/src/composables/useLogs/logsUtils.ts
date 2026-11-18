@@ -55,7 +55,8 @@ import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 interface SQLColumn {
   expr?: {
     type: string;
-    name?: string;
+    // aggr_func nodes name the function directly; function nodes hold its dotted path
+    name?: string | { name?: { value?: string }[] };
   };
   as?: string;
 }
@@ -97,6 +98,58 @@ export const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any 
   }
 
   return whereNode;
+};
+
+// Aggregates the SQL parser returns as a plain "function" node rather than "aggr_func".
+const FUNCTION_NODE_AGGREGATES = new Set([
+  "approx_distinct",
+  "approx_median",
+  "approx_percentile_cont",
+  "approx_percentile_cont_with_weight",
+  "approx_topk",
+  "approx_topk_distinct",
+  "bit_and",
+  "bit_or",
+  "bit_xor",
+  "bool_and",
+  "bool_or",
+  "corr",
+  "covar",
+  "covar_pop",
+  "covar_samp",
+  "first_value",
+  "last_value",
+  "mean",
+  "median",
+  "nth_value",
+  "percentile_cont",
+  "regr_avgx",
+  "regr_avgy",
+  "regr_count",
+  "regr_intercept",
+  "regr_r2",
+  "regr_slope",
+  "regr_sxx",
+  "regr_sxy",
+  "regr_syy",
+  "stddev",
+  "stddev_pop",
+  "stddev_samp",
+  "string_agg",
+  "summary_percentile",
+  "var",
+  "var_pop",
+  "var_population",
+  "var_samp",
+  "var_sample",
+]);
+
+const isAggregateColumn = (column: SQLColumn): boolean => {
+  const expr = column?.expr;
+  if (expr?.type === "aggr_func") return true;
+  if (expr?.type !== "function" || typeof expr.name !== "object") return false;
+  const name = expr.name.name?.at(-1)?.value;
+  return typeof name === "string" && FUNCTION_NODE_AGGREGATES.has(name.toLowerCase());
 };
 
 // node-sql-parser CTE entry: a named WITH clause whose statement is another AST node
@@ -255,10 +308,8 @@ export const logsUtils = () => {
   const hasAggregation = (columns: SQLColumn[]): boolean => {
     // Check for aggregation functions in column expressions
     if (columns && Array.isArray(columns)) {
-      for (const column of columns) {
-        if (column?.expr?.type === "aggr_func") {
-          return true;
-        }
+      if (columns.some(isAggregateColumn)) {
+        return true;
       }
     }
 
@@ -271,19 +322,22 @@ export const logsUtils = () => {
     return false;
   };
 
+  // The parser attaches a set operation's trailing LIMIT to its last branch.
+  const getOuterLimit = (parsedSQL: ExtendedParsedSQLResult | null = null) => {
+    let node = parsedSQL;
+    while (node?._next) node = node._next;
+    return node?.limit ?? null;
+  };
+
   /**
    * Determines if a parsed SQL query contains a LIMIT clause.
    *
    * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
    * @returns true if a LIMIT clause with values is present, false otherwise
    */
-  const isLimitQuery = (parsedSQL: ParsedSQLResult | null = null): boolean => {
-    return Boolean(
-      parsedSQL?.limit &&
-      parsedSQL.limit.value &&
-      Array.isArray(parsedSQL.limit.value) &&
-      parsedSQL.limit.value.length > 0,
-    );
+  const isLimitQuery = (parsedSQL: ExtendedParsedSQLResult | null = null): boolean => {
+    const limit = getOuterLimit(parsedSQL);
+    return Boolean(limit?.value && Array.isArray(limit.value) && limit.value.length > 0);
   };
 
   /**
@@ -699,6 +753,7 @@ export const logsUtils = () => {
     extractTimestamps,
     hasAggregation,
     isLimitQuery,
+    getOuterLimit,
     isDistinctQuery,
     isWithQuery,
     addTraceId,

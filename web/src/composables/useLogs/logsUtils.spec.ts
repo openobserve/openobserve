@@ -363,6 +363,24 @@ describe("logsUtils", () => {
       expect(utils.hasAggregation(null as any)).toBe(false);
       expect(utils.hasAggregation(undefined as any)).toBe(false);
     });
+
+    it("should treat aggregates the parser reads as plain functions as aggregation", () => {
+      mockSearchObj.data.query = "";
+      for (const name of ["approx_distinct", "approx_percentile_cont", "APPROX_TOPK", "median"]) {
+        const columns = [
+          { expr: { type: "function", name: { name: [{ type: "default", value: name }] } } },
+        ];
+        expect(utils.hasAggregation(columns as any)).toBe(true);
+      }
+    });
+
+    it("should not treat scalar functions as aggregation", () => {
+      mockSearchObj.data.query = "";
+      const columns = [
+        { expr: { type: "function", name: { name: [{ type: "default", value: "lower" }] } } },
+      ];
+      expect(utils.hasAggregation(columns as any)).toBe(false);
+    });
   });
 
   describe("isLimitQuery", () => {
@@ -391,6 +409,23 @@ describe("logsUtils", () => {
 
     it("should return false for undefined input", () => {
       expect(utils.isLimitQuery(undefined as any)).toBe(false);
+    });
+
+    it("should read the trailing LIMIT of a UNION from its last branch", () => {
+      const parsedSQL = {
+        limit: { seperator: "", value: [] },
+        _next: { limit: { seperator: "", value: [{ type: "number", value: 100 }] } },
+      };
+      expect(utils.isLimitQuery(parsedSQL as any)).toBe(true);
+      expect(utils.getOuterLimit(parsedSQL as any)?.value[0].value).toBe(100);
+    });
+
+    it("should not treat a LIMIT on the first UNION branch as the query's LIMIT", () => {
+      const parsedSQL = {
+        limit: { seperator: "", value: [{ type: "number", value: 5 }] },
+        _next: { limit: { seperator: "", value: [] } },
+      };
+      expect(utils.isLimitQuery(parsedSQL as any)).toBe(false);
     });
   });
 
