@@ -255,9 +255,11 @@ fn draw_line(
     for seg in segments(points, gap, |_| true) {
         let seg = &points[seg];
         if seg.len() == 1 {
+            // The scheduled chart keeps the dot size it always had.
+            let radius = if fill { 2 } else { 3 };
             chart.draw_series(std::iter::once(Circle::new(
                 (seg[0].0, seg[0].1),
-                3,
+                radius,
                 PURPLE.filled(),
             )))?;
             continue;
