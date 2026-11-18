@@ -14453,6 +14453,7 @@
     "testSendGroupLabel": "Gerçek bir test mesajı gönder",
     "testSend": "Test gönder",
     "testSendDestinationLabel": "Hedef",
+    "testSendFixedSample": "Test gönderimleri sabit bir örnek kullanır.",
     "testSendConfirmTitle": "Gerçek bir test mesajı gönderilsin mi?",
     "testSendConfirm": "Bu, seçilen kanala [TEST] olarak işaretlenmiş gerçek bir mesaj gönderir.",
     "testSendSuccess": "Test mesajı gönderildi",

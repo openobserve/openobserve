@@ -14450,6 +14450,7 @@
     "testSendGroupLabel": "Send a real test message",
     "testSend": "Send test",
     "testSendDestinationLabel": "Destination",
+    "testSendFixedSample": "การส่งทดสอบใช้ตัวอย่างที่กำหนดไว้",
     "testSendConfirmTitle": "Send a real test message?",
     "testSendConfirm": "This will post a real message to the selected channel, marked [TEST].",
     "testSendSuccess": "Test message sent",

@@ -81,7 +81,7 @@
         "type": "section",
         "text": {
           "type": "mrkdwn",
-          "text": "*<https://example.openobserve.ai/alerts/sample|🟢 Sample CPU alert firing>*"
+          "text": "*<https://example.openobserve.ai/alerts/sample|🟢 Sample CPU alert resolved>*"
         }
       },
       {

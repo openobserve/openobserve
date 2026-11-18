@@ -651,6 +651,15 @@ pub(crate) fn status_dot(ctx: &NotificationContext) -> &'static str {
         (NotificationEvent::Informational, _) => "🔵",
         // A maintenance window opening is a notice, not a failure.
         _ if ctx.kind == NotificationKind::Downtime => "🔵",
+        // A P4 incident and a P3 page carry no level on purpose: they are informational.
+        (_, None)
+            if matches!(
+                ctx.kind,
+                NotificationKind::Incident | NotificationKind::OnCall
+            ) =>
+        {
+            "🔵"
+        }
         _ => "🔴",
     }
 }
@@ -1257,9 +1266,15 @@ mod tests {
     #[test]
     fn status_dot_colors_by_event_and_level() {
         use NotificationEvent::{Firing, Informational, Resolved};
-        use NotificationKind::{Alert, Downtime, Synthetics};
+        use NotificationKind::{Alert, Downtime, Incident, OnCall, Synthetics};
         for (kind, event, level, expected) in [
             (Alert, Resolved, Some(AlertLevel::Critical), "🟢"),
+            // A P4 incident and a P3 page carry no level: informational, not urgent.
+            (Incident, Firing, None, "🔵"),
+            (OnCall, Firing, None, "🔵"),
+            (Incident, Firing, Some(AlertLevel::Warning), "🟠"),
+            (OnCall, Firing, Some(AlertLevel::Critical), "🔴"),
+            (Incident, Resolved, None, "🟢"),
             (Alert, Firing, Some(AlertLevel::Ok), "🟢"),
             (Synthetics, Informational, Some(AlertLevel::Warning), "🟠"),
             (Alert, Informational, None, "🔵"),
