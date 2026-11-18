@@ -14453,6 +14453,7 @@
     "testSendGroupLabel": "실제 테스트 메시지 보내기",
     "testSend": "테스트 보내기",
     "testSendDestinationLabel": "대상",
+    "testSendFixedSample": "테스트 전송은 고정된 샘플을 사용합니다.",
     "testSendConfirmTitle": "실제 테스트 메시지를 보내시겠습니까?",
     "testSendConfirm": "선택한 채널에 [TEST]로 표시된 실제 메시지를 게시합니다.",
     "testSendSuccess": "테스트 메시지 전송됨",
