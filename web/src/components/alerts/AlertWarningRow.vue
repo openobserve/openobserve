@@ -49,6 +49,7 @@ const { t } = useI18nTyped();
       :name="name"
       type="number"
       fit-content
+      class="max-w-32! min-w-16"
       :data-test="inputDataTest"
       :placeholder="t('alerts.form.warning.placeholder')"
     >

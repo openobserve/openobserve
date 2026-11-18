@@ -12169,7 +12169,6 @@
       },
       "presets": {
         "label": "Start from",
-        "help": "Pick one, then adjust it below",
         "any": "Any event",
         "few": "A few",
         "burst": "A burst",
@@ -12263,15 +12262,13 @@
         "streamTypeLabel": "Type of data",
         "streamType": "Logs, metrics or traces",
         "streamLabel": "Stream",
-        "stream": "The data this alert reads",
         "whichEvents": "Events",
         "whichEventsAll": "Every event in this stream counts. Add a filter to narrow it down.",
         "whichEventsFiltered": "Only events that match these filters count.",
         "whichEventsSql": "Each returned row counts",
         "whichEventsPromql": "The value it returns is checked",
         "rowTemplate": "How each row reads",
-        "descriptionPlaceholder": "Optional. What should someone do when this fires?",
-        "name": "Shown in the alert list and in notifications"
+        "descriptionPlaceholder": "Optional. What should someone do when this fires?"
       }
     },
     "moreActions": "More actions",
@@ -13747,13 +13744,12 @@
       "currentWindow": "Current window",
       "cycle": "Cycle",
       "cycleTooltip": "Compare results with the same time in the previous cycle.",
-      "runningFor": "Running for {period} in the interval of every {frequency}",
       "currentWindowCannotBeDeleted": "Current window cannot be deleted",
       "comparingWith": "Comparing with",
       "referenceWindow": "Reference Window",
       "timeFrame": "Time Frame",
       "timeFrameTooltip": "Time range for your query.",
-      "comparingText": "the same window {offset} earlier",
+      "comparingText": "{offset} earlier",
       "addComparisonWindow": "Add Comparison Window",
       "comparisonDisabledTooltip": "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.",
       "secondCount": "{n} Second | {n} Seconds",
@@ -13882,7 +13878,6 @@
       "recoveryChatMessage": "new \"Resolved\" message",
       "recoveryJiraComment": "comment on the open ticket",
       "keepFiringFor": "Keep firing for",
-      "keepFiringForTooltip": "Wait this long after the condition clears before recovering. 0 recovers immediately.",
       "suppressRepeats": "Suppress repeats",
       "suppressRepeatsTooltip": "Notify once when the alert starts firing or changes level, not on every evaluation. Leave it off to keep getting reminders after each silence period.",
       "keepFiringForInvalid": "Enter 0 or more seconds",
@@ -15603,7 +15598,6 @@
         "promqlOneTail": "series cross the limit",
         "builderOne": "One, when at least",
         "builderOneTail": "groups cross the limit",
-        "lookBack": "Each check looks at the last {minutes} min",
         "row": "row",
         "series": "series"
       },
@@ -15623,8 +15617,7 @@
         "custom": "Custom"
       },
       "remind": {
-        "label": "Repeat every",
-        "help": "Quiet time between repeats"
+        "label": "Repeat every"
       },
       "units": {
         "months": "months",
@@ -15637,8 +15630,8 @@
         "seconds": "seconds"
       },
       "keepFiring": {
-        "label": "Keep firing for",
-        "tail": "after it clears"
+        "help": "After the condition clears",
+        "label": "Keep firing for"
       },
       "incident": {
         "label": "Incident",
@@ -15652,14 +15645,13 @@
       },
       "schedule": {
         "lookingAt": "looking at the last",
-        "lookingAtRow": "Looking at the last",
+        "lookingAtRow": "Look back",
         "cronRow": "Cron",
         "cronHint": "Second, minute, hour, day of month, month, day of week",
-        "cronIn": "in",
-        "overlap": "Each check looks at the last {period} min, so checks overlap by {minutes} min.",
-        "equal": "Each check looks at the last {period} min, the same as the time between checks: no gaps, no overlap.",
-        "gaps": "Each check looks at the last {period} min, so there are gaps of {minutes} min between checks.",
-        "cron": "Each check looks at the {period} min before it runs.",
+        "overlap": "Each check looks at the last {period} minutes, so checks overlap by {minutes} minutes.",
+        "equal": "Each check looks at the last {period} minutes, the same as the time between checks: no gaps, no overlap.",
+        "gaps": "Each check looks at the last {period} minutes, so there are gaps of {minutes} minutes between checks.",
+        "cron": "Each check looks at the {period} minutes before it runs.",
         "realtime": "Each event is checked as it arrives.",
         "composite": "It checks whenever one of its alerts fires."
       },
@@ -15709,7 +15701,8 @@
         "addWindow": "Past window"
       },
       "forecast": {
-        "sentence": "{direction} {threshold} within {horizon}, based on the last {window}"
+        "thresholdPlaceholder": "e.g. 90",
+        "sentence": "{direction} {threshold} within {horizon} based on the last {window}"
       },
       "composite": {
         "previewEmpty": "Add two or more alerts to see when they would have fired together."

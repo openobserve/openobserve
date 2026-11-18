@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="trigger_condition.period"
                       type="number"
                       fit-content
-                      class="min-w-16"
+                      class="max-w-32! min-w-16"
                       min="1"
                       :debounce="300"
                       data-test="alert-settings-period-input"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     type="number"
                     min="0"
                     fit-content
-                    class="min-w-16"
+                    class="max-w-32! min-w-16"
                     data-test="alert-settings-pending-period-input"
                     @update:model-value="onPendingPeriodChange"
                   >
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                   <OSelect
                     :aria-label="t('common.unitFor', { label: t('alerts.plain.forAtLeast') })"
-                    class="max-w-25 min-w-20"
+                    class="w-32!"
                     :model-value="pendingPeriodUnit"
                     :options="pendingPeriodUnitOptions"
                     labelKey="label"
@@ -181,12 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @refresh="$emit('refresh:destinations')"
           />
 
-          <OSettingRow
-            ref="silenceFieldRef"
-            :label="t('alerts.form.remind.label')"
-            :description="t('alerts.form.remind.help')"
-            fill
-          >
+          <OSettingRow ref="silenceFieldRef" :label="t('alerts.form.remind.label')" fill>
             <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center gap-2">
                 <div>
@@ -196,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :aria-label="t('alerts.form.remind.label')"
                         type="number"
                         fit-content
-                        class="min-w-21.75"
+                        class="max-w-32! min-w-16"
                         min="0"
                         :debounce="isScheduled ? 300 : undefined"
                         :model-value="silence.amount"
@@ -210,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <OSelect
                   :aria-label="t('common.unitFor', { label: t('alerts.form.remind.label') })"
-                  class="max-w-25 min-w-20"
+                  class="w-32!"
                   :model-value="silence.unit"
                   :options="silence.options"
                   labelKey="label"
@@ -384,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="tierShows('keepFiring')"
               ref="keepFiringForFieldRef"
               :label="t('alerts.form.keepFiring.label')"
-              :description="t('alerts.alertSettings.keepFiringForTooltip')"
+              :description="t('alerts.form.keepFiring.help')"
               fill
             >
               <div class="flex flex-col gap-1">
@@ -396,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :aria-label="t('alerts.alertSettings.keepFiringFor')"
                           type="number"
                           fit-content
-                          class="min-w-21.75"
+                          class="max-w-32! min-w-16"
                           min="0"
                           :debounce="300"
                           :model-value="keepFiring.amount"
@@ -412,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :aria-label="
                       t('common.unitFor', { label: t('alerts.alertSettings.keepFiringFor') })
                     "
-                    class="max-w-28 min-w-20"
+                    class="w-32!"
                     :model-value="keepFiring.unit"
                     :options="keepFiring.options"
                     labelKey="label"
@@ -421,7 +416,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-settings-keep-firing-unit-select"
                     @update:model-value="keepFiring.onUnit"
                   />
-                  <span class="text-text-body text-sm">{{ t("alerts.form.keepFiring.tail") }}</span>
                 </div>
                 <div
                   v-if="keepFiringError"

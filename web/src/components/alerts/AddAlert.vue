@@ -332,12 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OSettingRow>
               <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
-                <OSettingRow
-                  :label="t('alerts.sections.rows.streamLabel')"
-                  :description="t('alerts.sections.rows.stream')"
-                  required
-                  fill
-                >
+                <OSettingRow :label="t('alerts.sections.rows.streamLabel')" required fill>
                   <div class="flex min-w-0 flex-wrap items-center gap-2">
                     <OFormSelect
                       ref="streamTypeRef"
@@ -346,11 +341,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-alert-stream-type-select-dropdown"
                       :options="streamTypeOptions"
                       :searchable="false"
-                      class="w-37.5 max-md:w-full"
+                      class="w-32 max-md:w-full"
                       :disabled="beingUpdated || anomalyEditMode"
                       @update:model-value="onStreamTypeChange"
                     />
-                    <div class="max-w-75 min-w-0 flex-1 max-md:max-w-none max-md:basis-full">
+                    <div class="w-75 min-w-0 max-md:w-full max-md:basis-full">
                       <OFormSelect
                         ref="streamNameRef"
                         name="stream_name"
@@ -473,7 +468,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSettingRow
                   v-if="showsConditionPresets"
                   :label="t('alerts.sections.presets.label')"
-                  :description="t('alerts.sections.presets.help')"
                   fill
                   data-test="add-alert-condition-presets"
                 >
@@ -709,13 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ formData.name }}
                   </OTruncatedText>
                 </OSettingRow>
-                <OSettingRow
-                  v-else
-                  :label="t('alerts.sections.details.name')"
-                  :description="t('alerts.sections.rows.name')"
-                  fill
-                  data-snap-stop
-                >
+                <OSettingRow v-else :label="t('alerts.sections.details.name')" fill data-snap-stop>
                   <div
                     ref="step1Ref"
                     class="flex max-w-120 min-w-0 flex-col gap-1.5"
@@ -819,49 +807,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
-                <AlertSuggestionLine section="details" anchor="end" />
-                <section
-                  class="border-border-default bg-surface-base rounded-surface mt-1 flex flex-col overflow-hidden border"
-                  aria-labelledby="add-alert-review-title"
-                  data-test="add-alert-review"
-                >
-                  <h3
-                    id="add-alert-review-title"
-                    class="text-text-heading m-0 px-3.5 pt-2 pb-1 text-sm font-semibold"
-                  >
-                    {{ t("alerts.sections.review.title") }}
-                  </h3>
-                  <div
-                    v-for="(line, index) in reviewLines"
-                    :key="line.id"
-                    class="text-compact flex min-w-0 items-center gap-3 px-3.5 py-1.5"
-                    :class="{ 'border-border-subtle border-t': index > 0 }"
-                  >
-                    <i18n-t
-                      :keypath="line.keypath"
-                      :plural="line.plural"
-                      tag="span"
-                      scope="global"
-                      class="text-text-body min-w-0 flex-1 break-words"
-                      :data-test="`add-alert-review-${line.id}-text`"
-                    >
-                      <template v-for="(part, name) in line.parts" :key="name" #[name]>
-                        <strong v-if="part.strong" class="text-text-heading font-semibold">{{
-                          part.text
-                        }}</strong>
-                        <template v-else>{{ part.text }}</template>
-                      </template>
-                    </i18n-t>
-                    <OButton
-                      variant="link"
-                      :data-test="`add-alert-review-${line.id}`"
-                      @click="goToSection(line.id)"
-                      >{{ t("alerts.form.change") }}</OButton
-                    >
-                  </div>
-                </section>
-              </div>
-              <template #optional>
                 <div v-show="!isAnomalyMode" data-snap-stop>
                   <Advanced
                     :section-targets="sectionTargets"
@@ -886,6 +831,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:rowTemplateType="updateRowTemplateType"
                   />
                 </div>
+                <AlertSuggestionLine section="details" anchor="end" />
+                <section
+                  class="border-border-default bg-surface-base rounded-surface mt-1 flex flex-col overflow-hidden border"
+                  aria-labelledby="add-alert-review-title"
+                  data-test="add-alert-review"
+                >
+                  <h3
+                    id="add-alert-review-title"
+                    class="text-text-heading m-0 px-3.5 pt-2 pb-1 text-sm font-semibold"
+                  >
+                    {{ t("alerts.sections.review.title") }}
+                  </h3>
+                  <div
+                    v-for="(line, index) in reviewLines"
+                    :key="line.id"
+                    class="text-compact flex min-w-0 items-center gap-6 py-1 ps-3.5"
+                    :class="{ 'border-border-subtle border-t': index > 0 }"
+                  >
+                    <i18n-t
+                      :keypath="line.keypath"
+                      :plural="line.plural"
+                      tag="span"
+                      scope="global"
+                      class="text-text-body min-w-0 flex-1 break-words"
+                      :data-test="`add-alert-review-${line.id}-text`"
+                    >
+                      <template v-for="(part, name) in line.parts" :key="name" #[name]>
+                        <strong v-if="part.strong" class="text-text-heading font-semibold">{{
+                          part.text
+                        }}</strong>
+                        <template v-else>{{ part.text }}</template>
+                      </template>
+                    </i18n-t>
+                    <span class="flex w-18 shrink-0 justify-end">
+                      <OButton
+                        variant="ghost-primary"
+                        size="sm"
+                        :data-test="`add-alert-review-${line.id}`"
+                        @click="goToSection(line.id)"
+                        >{{ t("alerts.form.change") }}</OButton
+                      >
+                    </span>
+                  </div>
+                </section>
+              </div>
+              <template #optional>
                 <AlertTierLinks
                   section="details"
                   :view="tiers.view('details')"

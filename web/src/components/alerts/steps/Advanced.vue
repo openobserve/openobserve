@@ -60,12 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="formattedTemplates"
                     clearable
                     :placeholder="t('alerts.advanced.selectTemplate')"
-                    class="max-w-75 min-w-60"
+                    class="w-75"
                     data-test="advanced-template-override-select"
                   >
                     <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>
                   </OFormSelect>
-                  <OButton
+                </div>
+                <template #actions
+                  ><OButton
                     variant="ghost"
                     size="icon-circle-sm"
                     :title="t('alerts.advanced.refreshTemplates')"
@@ -81,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('alerts.alertSettings.helpLearnMore')"
                     @click="openHelp('template')"
                   >
-                    <OIcon name="help" size="sm" />
-                  </OButton></div
+                    <OIcon name="help" size="sm" /> </OButton></template
               ></OSettingRow>
 
               <OSettingRow
@@ -92,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 fill
               >
                 <div class="flex flex-col gap-1">
-                  <div class="flex items-start gap-2">
+                  <div class="flex flex-col items-start gap-2">
                     <OFormToggleGroup
                       data-test="add-alert-row-template-type-toggle"
                       name="row_template_type"
@@ -113,17 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="row_template"
                       :placeholder="rowTemplatePlaceholder"
                       autogrow
-                      class="min-w-0 flex-1"
+                      class="w-full min-w-0"
                     />
-                    <OButton
-                      data-test="add-alert-row-input-info-btn"
-                      variant="ghost-primary"
-                      size="icon-circle-sm"
-                      :title="t('alerts.alertSettings.helpLearnMore')"
-                      @click="openHelp('rowTemplate')"
-                    >
-                      <OIcon name="help" size="sm" />
-                    </OButton>
                   </div>
                   <span
                     v-if="isForecastMode"
@@ -132,7 +124,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ t("alerts.forecast.rowTemplateHint") }}</span
                   >
                 </div>
-              </OSettingRow>
+                <template #actions
+                  ><OButton
+                    data-test="add-alert-row-input-info-btn"
+                    variant="ghost-primary"
+                    size="icon-circle-sm"
+                    :title="t('alerts.alertSettings.helpLearnMore')"
+                    @click="openHelp('rowTemplate')"
+                  >
+                    <OIcon name="help" size="sm" /> </OButton></template
+              ></OSettingRow>
 
               <OSettingRow v-if="tierShows('variables')" :label="t('alerts.plain.variables')" fill
                 ><div class="flex items-start gap-2">
@@ -196,15 +197,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </template>
                   </div>
-                  <OButton
+                </div>
+                <template #actions
+                  ><OButton
                     data-test="advanced-variables-info-btn"
                     variant="ghost-primary"
                     size="icon-circle-sm"
                     :title="t('alerts.alertSettings.helpLearnMore')"
                     @click="openHelp('variables')"
                   >
-                    <OIcon name="help" size="sm" />
-                  </OButton></div
+                    <OIcon name="help" size="sm" /> </OButton></template
               ></OSettingRow></div
           ></Teleport>
 

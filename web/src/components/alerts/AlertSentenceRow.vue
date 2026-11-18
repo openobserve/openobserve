@@ -22,6 +22,7 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 const props = defineProps<{
   label?: I18nText;
   description?: I18nText;
+  info?: I18nText;
   dataTest: string;
   changeable?: boolean;
   removable?: boolean;
@@ -41,6 +42,7 @@ const noLabel = raw("");
   <OSettingRow
     :label="props.label ?? noLabel"
     :description="props.description"
+    :info="props.info"
     fill
     :data-test="props.dataTest"
   >

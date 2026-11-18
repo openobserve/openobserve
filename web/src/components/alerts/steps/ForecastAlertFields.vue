@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <AlertSentenceRow
     :label="t('alerts.forecast.alertWhen')"
-    :description="t('alerts.forecast.help')"
+    :info="t('alerts.forecast.help')"
     data-test="alert-forecast-fields"
     removable
     @remove="emit('remove')"
@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="_ui.forecast.T"
               type="number"
               fit-content
-              class="min-w-field-width-xs"
-              :placeholder="t('alerts.forecast.threshold')"
+              class="max-w-32! min-w-16"
+              :placeholder="t('alerts.form.forecast.thresholdPlaceholder')"
               :debounce="300"
               data-test="alert-forecast-threshold"
             />
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="_ui.forecast.H"
               type="number"
               fit-content
-              class="min-w-field-width-xs"
+              class="max-w-32! min-w-16"
               :debounce="300"
               data-test="alert-forecast-horizon"
             >

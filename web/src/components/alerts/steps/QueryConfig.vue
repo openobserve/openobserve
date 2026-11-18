@@ -74,15 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ tab.label }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <OButton
-            v-if="localTab !== 'custom'"
-            data-test="step2-view-editor-btn"
-            variant="outline"
-            size="sm"
-            @click="viewSqlEditor = true"
-          >
-            {{ t("alerts.queryConfig.openFullEditor") }}
-          </OButton>
         </OSettingRow>
         <div
           v-else-if="!sectionTargets && shouldShowTabs"
@@ -143,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Measurement sentence: WHAT to measure. Severity rows
                          below say WHEN it fires (mock: multi-alert-form.html). -->
                         <div class="flex flex-nowrap items-start gap-2">
-                          <div class="max-w-45 min-w-32.5">
+                          <div class="w-50">
                             <OSelect
                               v-model="selectedFunction"
                               :aria-label="t('alerts.queryConfig.aggregationFunction')"
@@ -172,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :options="numericColumns"
                               searchable
                               :placeholder="t('alerts.placeholders.selectColumn')"
-                              :class="['max-w-50 min-w-35']"
+                              class="w-50"
                               @update:model-value="onLogMeasureColumnChange($event)"
                             />
                           </template>
@@ -208,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 name="trigger_condition.threshold"
                                 type="number"
                                 fit-content
-                                class="min-w-field-width-xs"
+                                class="max-w-32! min-w-16"
                                 data-test="alert-trigger-threshold-input"
                                 @blur="restoreDefaultThreshold"
                                 min="1"
@@ -267,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 name="query_condition.aggregation.having.value"
                                 type="number"
                                 fit-content
-                                class="min-w-field-width-xs"
+                                class="max-w-32! min-w-16"
                                 :placeholder="t('alerts.placeholders.value')"
                                 @update:model-value="onConditionValueChange($event)"
                               >
@@ -388,7 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Measurement sentence: WHAT to measure. Severity rows
                          below say WHEN it fires (mock: multi-alert-form.html). -->
                         <div class="flex flex-nowrap items-start gap-2">
-                          <div class="max-w-45 min-w-32.5">
+                          <div class="w-50">
                             <OSelect
                               v-model="selectedFunction"
                               :aria-label="t('alerts.queryConfig.aggregationFunction')"
@@ -432,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   )
                                 "
                                 @update:model-value="onLogMeasureColumnChange($event)"
-                                class="max-w-50 min-w-35"
+                                class="w-50"
                               />
                               <OTooltip
                                 v-if="
@@ -482,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 name="trigger_condition.threshold"
                                 type="number"
                                 fit-content
-                                class="min-w-field-width-xs"
+                                class="max-w-32! min-w-16"
                                 @update:model-value="onTriggerThresholdChange($event)"
                               >
                                 <template #error />
@@ -537,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 name="query_condition.aggregation.having.value"
                                 type="number"
                                 fit-content
-                                class="min-w-field-width-xs"
+                                class="max-w-32! min-w-16"
                                 :placeholder="t('alerts.placeholders.value')"
                                 @update:model-value="onConditionValueChange($event)"
                               >
@@ -626,7 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :options="columns"
                               searchable
                               :placeholder="t('alerts.placeholders.selectColumn')"
-                              class="max-w-45 min-w-30"
+                              class="w-50"
                               @update:model-value="syncMetricGroupByToProps"
                             />
                             <OButton
@@ -654,7 +645,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSettingRow
                     v-if="groupQuestion.offered"
                     :label="groupQuestionTitle"
-                    :description="t('alerts.form.group.lookBack', { minutes: periodMinutes })"
                     fill
                     data-test="add-alert-group-question-row"
                   >
@@ -689,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     name="trigger_condition.threshold"
                                     type="number"
                                     fit-content
-                                    class="min-w-16"
+                                    class="max-w-32! min-w-16"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -719,7 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     name="trigger_condition.threshold"
                                     type="number"
                                     fit-content
-                                    class="min-w-16"
+                                    class="max-w-32! min-w-16"
                                     min="1"
                                     :disabled="groupAnswer === 'each'"
                                     :data-test="countTestIds.threshold"
@@ -828,13 +818,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               sectionTargets
                 ? {
                     label: t('alerts.sections.rows.query'),
-                    description: whichEventsHelp,
                     wide: true,
                     fill: true,
                   }
                 : {}
             "
           >
+            <template v-if="sectionTargets" #description>
+              <span class="block">{{ whichEventsHelp }}</span>
+              <OButton
+                data-test="step2-view-editor-btn"
+                variant="link"
+                size="sm"
+                class="h-auto! p-0! text-start"
+                @click="viewSqlEditor = true"
+              >
+                {{ t("alerts.queryConfig.openFullEditor") }}
+              </OButton>
+            </template>
             <div class="flex w-full flex-col gap-2 overflow-hidden">
               <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
               <!-- isolate keeps the editor's own z-index (its AI button) under the sticky section heading. -->
@@ -843,11 +844,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="relative isolate motion-safe:transition-[height]"
                 :class="editorShellClass"
               >
-                <div class="absolute inset-0 flex overflow-hidden">
+                <!-- The step's control column is too narrow for two panes side by side, so they stack. -->
+                <div
+                  class="absolute inset-0 flex overflow-hidden"
+                  :class="sectionTargets && 'flex-col'"
+                >
                   <!-- SQL/PromQL pane — with its own header -->
                   <div
                     class="flex shrink-0 flex-col overflow-hidden"
-                    :class="showVrl && localTab === 'sql' ? 'w-1/2' : 'w-full'"
+                    :class="
+                      showVrl && localTab === 'sql'
+                        ? sectionTargets
+                          ? 'h-1/2 w-full'
+                          : 'w-1/2'
+                        : 'h-full w-full'
+                    "
                   >
                     <div
                       class="flex h-9 shrink-0 items-center justify-between px-2.5"
@@ -966,7 +977,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- VRL pane — with its own header, side-by-side with SQL pane -->
                   <div
-                    class="border-border-default flex w-1/2 shrink-0 flex-col overflow-hidden border-s"
+                    class="border-border-default flex shrink-0 flex-col overflow-hidden"
+                    :class="sectionTargets ? 'h-1/2 w-full border-t' : 'w-1/2 border-s'"
                     v-if="showVrl && localTab === 'sql'"
                     data-test="add-alert-vrl-pane"
                   >
@@ -1143,7 +1155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           (localTab === 'sql' || promqlCondition || isPromRuleMode))
                       "
                       :label="sqlPlainLimit ? t('alerts.plain.queryReturns') : groupQuestionTitle"
-                      :description="t('alerts.form.group.lookBack', { minutes: periodMinutes })"
                       fill
                       data-test="add-alert-group-question-row"
                     >
@@ -1167,7 +1178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               name="trigger_condition.threshold"
                               type="number"
                               fit-content
-                              class="min-w-16"
+                              class="max-w-32! min-w-16"
                               min="1"
                               data-test="alert-trigger-threshold-input"
                               @update:model-value="onTriggerThresholdChange($event)"
@@ -1224,7 +1235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       name="trigger_condition.threshold"
                                       type="number"
                                       fit-content
-                                      class="min-w-16"
+                                      class="max-w-32! min-w-16"
                                       min="1"
                                       :disabled="groupAnswer === 'each'"
                                       :data-test="countTestIds.threshold"
@@ -1258,7 +1269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       name="trigger_condition.threshold"
                                       type="number"
                                       fit-content
-                                      class="min-w-16"
+                                      class="max-w-32! min-w-16"
                                       min="1"
                                       :disabled="groupAnswer === 'each'"
                                       :data-test="countTestIds.threshold"
@@ -1295,7 +1306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     name="query_condition.aggregation.having.column"
                                     :options="sqlAggColumnOptions"
                                     searchable
-                                    class="w-36!"
+                                    class="w-50!"
                                     :disabled="groupAnswer === 'one'"
                                     data-test="alert-sql-agg-column-select"
                                     :placeholder="t('alerts.placeholders.selectColumn')"
@@ -1317,7 +1328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                       name="query_condition.aggregation.having.value"
                                       type="number"
                                       fit-content
-                                      class="min-w-20"
+                                      class="max-w-32! min-w-16"
                                       :disabled="groupAnswer === 'one'"
                                       data-test="alert-sql-agg-value-input"
                                       :placeholder="t('alerts.placeholders.value')"
@@ -1451,7 +1462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 name="query_condition.promql_condition.value"
                                 type="number"
                                 fit-content
-                                class="min-w-field-width-xs"
+                                class="max-w-32! min-w-16"
                                 data-test="alert-threshold-value-input"
                                 :debounce="300"
                                 @update:model-value="onPromqlValueChange"
@@ -1515,7 +1526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-check-every-input"
               type="number"
               fit-content
-              class="min-w-16"
+              class="max-w-32! min-w-16"
               min="1"
               @update:model-value="onCheckEveryChange($event)"
               @blur="restoreDefaultFrequency"
@@ -1524,7 +1535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OFormInput>
             <OSelect
               :aria-label="t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })"
-              class="max-w-25 min-w-20"
+              class="w-32!"
               :model-value="frequencyMode"
               data-test="alert-check-every-unit-select"
               :options="frequencyUnitOptions"
@@ -1556,7 +1567,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             v-else
             :label="t('alerts.form.schedule.cronRow')"
-            :description="t('alerts.form.schedule.cronHint')"
+            :info="t('alerts.form.schedule.cronHint')"
             fill
             data-test="add-alert-cron-row"
           >
@@ -1567,15 +1578,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   name="trigger_condition.cron"
                   data-test="alert-cron-input"
                   :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
-                  class="max-w-37.5 min-w-37.5"
+                  class="w-50"
                   @update:model-value="onCronExpressionChange"
                 >
                   <template #error />
                 </OFormInput>
-                <span class="text-text-secondary text-sm">{{
-                  t("alerts.form.schedule.cronIn")
-                }}</span>
-                <span class="inline-block max-w-37.5 min-w-37.5">
+                <span class="inline-block">
                   <OFormSelect
                     :aria-label="t('alerts.downtimes.scheduleForm.timezone')"
                     name="trigger_condition.timezone"
@@ -1583,19 +1591,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="timezoneSelectOptions"
                     searchable
                     :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
-                    class="max-w-37.5 min-w-37.5"
+                    class="w-75"
                     @update:model-value="onCronTimezoneChange"
                   />
                   <OTooltip v-if="cronTimezone" :content="raw(cronTimezone)" side="bottom" />
                 </span>
-                <OButton
-                  variant="ghost-primary"
-                  size="sm"
-                  data-test="add-alert-cron-row-remove"
-                  @click="removeCronSchedule"
-                >
-                  {{ t("common.remove") }}
-                </OButton>
               </div>
               <div
                 v-if="cronDescription && !cronError"
@@ -1613,6 +1613,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ cronError }}
               </div>
             </div>
+            <template #actions>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                data-test="add-alert-cron-row-remove"
+                @click="removeCronSchedule"
+              >
+                {{ t("common.remove") }}
+              </OButton>
+            </template>
           </OSettingRow>
         </Teleport>
       </div>

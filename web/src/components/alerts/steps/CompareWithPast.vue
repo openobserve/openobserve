@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               min="1"
               fit-content
+              class="max-w-32! min-w-16"
               :model-value="parseOffset(picker.offSet).amount"
               :aria-label="t('alerts.plain.compareTitle')"
               data-test="multi-time-range-offset-input"
