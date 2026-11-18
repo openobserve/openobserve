@@ -76,8 +76,8 @@
     },
     {
       "label": "uds_enabled",
-      "_comment": "openobserve#16307 only reproduces once a user-defined schema is saved, which needs the flag on.",
-      "target": "tests/regression/test_uds_late_required_columns.py",
+      "_comment": "openobserve#16307 and openobserve#16861 only reproduce once a user-defined schema is saved, which needs the flag on; the #16861 file skips on OSS (service identity stamping is enterprise-only).",
+      "target": "tests/regression/test_uds_late_required_columns.py tests/regression/test_uds_traces_service_identity.py",
       "server_env": "ZO_ALLOW_USER_DEFINED_SCHEMAS=true",
       "category": "api_integration_tests"
     },
