@@ -3042,20 +3042,20 @@ export function useAlertForm(
     },
   );
 
-  // Watch for condition/stream/aggregation changes to regenerate SQL
+  // Every edit replaces formData, so a deep watch here fired on each name keystroke; a string key compares by value.
   watch(
-    () => [
-      formData.value.query_condition?.conditions,
-      formData.value.stream_name,
-      formData.value.query_condition?.aggregation,
-      isAggregationEnabled.value,
-    ],
+    () =>
+      JSON.stringify([
+        formData.value.query_condition?.conditions,
+        formData.value.stream_name,
+        formData.value.query_condition?.aggregation,
+        isAggregationEnabled.value,
+      ]),
     () => {
       if (formData.value.query_condition?.type === "custom") {
         debouncedGenerateSql();
       }
     },
-    { deep: true },
   );
 
   // Watch for stream changes to update context provider

@@ -1639,32 +1639,33 @@ const refreshFromProps = () => {
 // Typing a query fires this on every keystroke; each refresh is a result_schema call.
 const debouncedRefreshFromProps = debounce(refreshFromProps, 800);
 
-// Watch for changes to props and refresh chart data automatically
+// Query, look-back and limits are typed: one edit is one run after the pause, not one per keystroke.
+const TYPED_INPUTS = new Set([0, 3, 4, 6]);
+// One getter per input: formData is a new object on every edit, so a deep watch fired on each name keystroke.
 watch(
-  () => [
-    props.query,
-    props.formData.stream_name,
-    props.formData.stream_type,
-    props.formData.trigger_condition?.period,
-    props.formData.trigger_condition?.threshold,
-    props.formData.trigger_condition?.operator,
-    props.formData.query_condition?.promql_condition?.value,
-    props.formData.query_condition?.promql_rule_mode,
-    props.selectedTab,
-    props.isUsingBackendSql,
+  [
+    () => props.query,
+    () => props.formData.stream_name,
+    () => props.formData.stream_type,
+    () => props.formData.trigger_condition?.period,
+    () => props.formData.trigger_condition?.threshold,
+    () => props.formData.trigger_condition?.operator,
+    () => props.formData.query_condition?.promql_condition?.value,
+    () => props.formData.query_condition?.promql_rule_mode,
+    () => props.selectedTab,
+    () => props.isUsingBackendSql,
   ],
   (next, prev) => {
-    if (next[0] !== prev?.[0]) {
-      // A query that fails to run emits no new result, so the old verdict would linger.
-      evaluationStatus.value = null;
+    // A query that fails to run emits no new result, so the old verdict would linger.
+    if (next[0] !== prev?.[0]) evaluationStatus.value = null;
+    if (next.some((value, index) => TYPED_INPUTS.has(index) && value !== prev?.[index])) {
       debouncedRefreshFromProps();
       return;
     }
-    // Only typing needs the debounce; a stream, tab or threshold change must not show stale results.
+    // A stream, tab or operator pick must not show stale results.
     debouncedRefreshFromProps.cancel();
     refreshFromProps();
   },
-  { deep: true },
 );
 
 onBeforeUnmount(() => debouncedRefreshFromProps.cancel());

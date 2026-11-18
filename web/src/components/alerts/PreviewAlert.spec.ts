@@ -2808,6 +2808,32 @@ describe("PreviewAlert - debounced props refresh", () => {
     w.unmount();
   });
 
+  it("refreshes once for a limit typed digit by digit, after the pause", async () => {
+    const w = await mountSqlSettled();
+
+    for (const threshold of [2, 25, 250]) {
+      await w.setProps({
+        formData: {
+          ...baseFormData(),
+          trigger_condition: { period: 10, threshold, operator: ">=" },
+        },
+      });
+      await vi.advanceTimersByTimeAsync(300);
+    }
+    await w.setProps({
+      formData: {
+        ...baseFormData(),
+        name: "cpu",
+        trigger_condition: { period: 10, threshold: 250, operator: ">=" },
+      },
+    });
+    expect(searchService.result_schema).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(800);
+    expect(searchService.result_schema).toHaveBeenCalledTimes(1);
+    w.unmount();
+  });
+
   it("refreshes a stream switch at once instead of waiting for the debounce", async () => {
     const w = await mountSqlSettled();
 

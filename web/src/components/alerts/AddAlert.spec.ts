@@ -1315,6 +1315,39 @@ describe("AddAlert (OForm owner)", () => {
 
       expect(wrapper.vm.previewQuery).toBe("");
     });
+
+    it.each([
+      ["name", "cpu high"],
+      ["description", "why it fires"],
+      ["destinations", ["ops"]],
+      ["template", "tpl"],
+      ["row_template", "{host}"],
+      ["trigger_condition.threshold", 25],
+    ])("asks the server for no SQL when %s changes", async (field, value) => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      try {
+        wrapper = mountAlert();
+        const form = wrapper.vm.form;
+        form.setFieldValue("stream_name", "logs_a");
+        form.setFieldValue("query_condition.conditions", {
+          filterType: "group",
+          logicalOperator: "AND",
+          conditions: [{ filterType: "condition", column: "host", operator: "=", value: "a" }],
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        vi.mocked(alertsService.generate_sql).mockClear();
+
+        form.setFieldValue(field, value);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(alertsService.generate_sql).not.toHaveBeenCalled();
+
+        form.setFieldValue("query_condition.conditions.conditions.0.value", "b");
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(alertsService.generate_sql).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe("anomaly save path", () => {
