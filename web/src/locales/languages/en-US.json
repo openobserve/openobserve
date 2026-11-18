@@ -15758,7 +15758,10 @@
         "limitKey": "Threshold {value}",
         "warningKey": "Warning {value}",
         "minCompact": "{count} min",
-        "hrCompact": "{count} h"
+        "hrCompact": "{count} h",
+        "seriesNoneCross": "{count} series, quiet | {count} series, all quiet",
+        "ruleMatch": "no series match | {count} series matches. It must keep matching for {duration} before it fires | {count} series match. Each must keep matching for {duration} before it fires",
+        "ruleMatchNow": "no series match | {count} series matches | {count} series match"
       },
       "anomaly": {
         "sensitivityAuto": "Auto",
@@ -15876,12 +15879,13 @@
       "labelMissingNone": "{label} isn't a label of {metric}, which has no labels.",
       "valueNotSeen": "{value} hasn't appeared in the last 24 hours. Seen: {seen}.",
       "alwaysOneRow": "This query always returns 1 row, so it fires on every check. Filter with HAVING, or alert on its value.",
-      "volume": "About {count} notification a day before Notify at most every | About {count} notifications a day before Notify at most every",
+      "volume": "About {count} notification a day before Notify at most every. | About {count} notifications a day before Notify at most every.",
       "thresholdRequired": "Enter a threshold, for example {example}",
       "mustLastOneCheck": "Checks every {every}, so this is 1 check. Check more often or last longer.",
       "matchedNothing": "Your filters matched nothing in 24 hours. Check the filter values.",
       "firesOnSave": "Fires as soon as it is saved",
-      "anomalyDelay": "Checks every {every}, so a spike can wait up to {duration} to alert."
+      "anomalyDelay": "Checks every {every}, so a spike can wait up to {duration} to alert.",
+      "seenWithout": "without {label} ({count})"
     },
     "discovery": {
       "lastEvent": "Last event {ago} ago · {rate}/h",
