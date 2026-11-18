@@ -179,6 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OSettingRow
             :label="t('alerts.form.anomaly.measure')"
+            :info="t('alerts.anomaly.detectionFunctionTooltip')"
             fill
             data-test="anomaly-measure-row"
           >
