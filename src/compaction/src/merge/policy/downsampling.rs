@@ -111,7 +111,7 @@ mod tests {
         let schema = indexed_schema();
         let older = DownsamplingRule {
             rule: None,
-            function: Function::Avg,
+            function: Function::Sum,
             offset: 36 * 3600,
             step: 300,
         };
@@ -258,7 +258,7 @@ mod tests {
         let schema = indexed_schema();
         let rule = DownsamplingRule {
             rule: None,
-            function: Function::Avg,
+            function: Function::Sum,
             offset: 3600,
             step: 60,
         };

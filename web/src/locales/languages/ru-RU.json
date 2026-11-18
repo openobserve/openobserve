@@ -5128,6 +5128,7 @@
     "storageSize": "Принятые данные",
     "compressedSize": "Сжатый размер",
     "schemaHeader": "Детали потока",
+    "searchFieldOrIndexType": "Поиск поля или типа индекса",
     "indexTypeOptions": {
       "fullTextSearch": "Полнотекстовый поиск",
       "secondaryIndex": "Вторичный индекс",
@@ -20613,7 +20614,6 @@
       "pageOutOfRange": "Номер страницы вне диапазона. Укажите корректный номер страницы.",
       "noMatchingService": "Не найдено соответствующего сервиса для корреляции",
       "unableToRetrieveCorrelation": "Не удалось получить данные корреляции",
-      "noMetricStreams": "Для сервиса \"{service}\" не найдено потоков метрик",
       "correlationError": "Ошибка корреляции: {error}",
       "contentCopied": "Содержимое успешно скопировано!",
       "noTraceIdForInspection": "Нет доступного Trace ID для просмотра"

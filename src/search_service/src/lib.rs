@@ -37,7 +37,7 @@ use config::{
             ai_chat::AI_CHAT_EVENTS_STREAM,
             usage::{RequestStats, UsageType},
         },
-        sql::{OrderBy, resolve_stream_names},
+        sql::resolve_stream_names,
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     utils::{base64, json, schema::filter_source_by_partition_key, time::now_micros},
@@ -609,7 +609,6 @@ pub async fn search_partition(
         streaming_aggs: false,
         streaming_id: None,
         is_histogram_eligible: ctx.is_histogram_eligible,
-        non_ts_order_by_cols: vec![],
     };
 
     let total_secs = estimated_secs(trace_id, &ctx, role_group, resp.original_size).await?;
@@ -626,27 +625,20 @@ pub async fn search_partition(
         return Ok(resp);
     }
 
-    if ctx.detect_non_ts_order_by() {
-        resp.non_ts_order_by_cols = ctx
-            .sql
-            .order_by
-            .iter()
-            .map(|(col, dir)| (col.clone(), matches!(dir, OrderBy::Desc)))
-            .collect();
-        if cfg.limit.disable_partitions_for_non_ts_order_by {
-            log::info!(
-                "[trace_id {trace_id}] search_partition: non-ts ORDER BY, disabling partitions (circuit breaker)"
-            );
-            resp.partitions = vec![[req.start_time, req.end_time]];
-            return Ok(resp);
-        }
-    }
-
     let (streaming_aggs, streaming_id, cache_strategy) =
         prepare_streaming_aggregate(trace_id, req, &ctx, use_cache).await?;
     resp.streaming_output = streaming_aggs;
     resp.streaming_aggs = streaming_aggs;
     resp.streaming_id = streaming_id;
+
+    // The agg cache can still decline a ranked histogram, e.g. on huge cardinality.
+    if ctx.is_ranked_by_non_ts && !streaming_aggs {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: return single partition because the leading ORDER BY is not the time column"
+        );
+        resp.partitions = vec![[req.start_time, req.end_time]];
+        return Ok(resp);
+    }
 
     if let Some(strategy) = cache_strategy {
         resp.partitions = strategy.to_time_partitions(ctx.sql_order_by);

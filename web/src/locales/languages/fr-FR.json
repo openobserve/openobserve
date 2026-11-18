@@ -5128,6 +5128,7 @@
     "storageSize": "Données ingérées",
     "compressedSize": "Taille compressée",
     "schemaHeader": "Détail du stream",
+    "searchFieldOrIndexType": "Rechercher un champ ou un type d'index",
     "indexTypeOptions": {
       "fullTextSearch": "Recherche en texte intégral",
       "secondaryIndex": "Index secondaire",
@@ -20613,7 +20614,6 @@
       "pageOutOfRange": "Le numéro de page est hors limites. Veuillez fournir un numéro de page valide.",
       "noMatchingService": "Aucun service correspondant trouvé pour la corrélation",
       "unableToRetrieveCorrelation": "Impossible de récupérer les données de corrélation",
-      "noMetricStreams": "Aucun flux de métriques trouvé pour le service \"{service}\"",
       "correlationError": "Erreur de corrélation : {error}",
       "contentCopied": "Contenu copié avec succès !",
       "noTraceIdForInspection": "Aucun ID de trace disponible pour l'inspection."

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+use std::collections::HashMap;
 #[cfg(any(feature = "enterprise", test))]
 use std::collections::HashSet;
 #[cfg(all(feature = "enterprise", feature = "test-utils"))]
@@ -36,6 +38,10 @@ use db::user::is_root_user;
 use infra::table::service_streams::ServiceRecord;
 
 use crate::auth::AuthExtractor;
+
+/// The longest stream object id the org-wide shortcut accepts; OpenFGA refuses objects past 256.
+#[cfg(any(feature = "enterprise", test))]
+const MAX_SHORTCUT_ID_LEN: usize = 200;
 
 #[cfg(any(feature = "enterprise", test))]
 pub const STREAM_ACCESS_HINT: &str = "Ask an org admin for read access to the listed streams, or change the query to streams you can read.";
@@ -179,6 +185,16 @@ pub trait StreamAccessChecker: Send + Sync {
     async fn is_root(&self, user_id: &str) -> bool;
     async fn is_root_or_admin(&self, org_id: &str, user_id: &str) -> bool;
     async fn can_read_stream(&self, user_id: &str, stream: &TypedStream) -> bool;
+    /// The types of `wanted` with a confirmed read grant on every stream of the org.
+    /// The default, no type, sends each stream to `can_read_stream`.
+    async fn org_wide_readable(
+        &self,
+        _user_id: &str,
+        _org_id: &str,
+        _wanted: &[StreamType],
+    ) -> HashSet<StreamType> {
+        HashSet::new()
+    }
     async fn can_use_cipher_key(&self, org_id: &str, user_id: &str, key: &str) -> bool;
     async fn can_read_dashboard(
         &self,
@@ -220,6 +236,9 @@ pub struct FakeStreamChecker {
     roots: RwLock<HashSet<String>>,
     admins: RwLock<HashSet<(String, String)>>,
     grants: RwLock<HashSet<(String, String)>>,
+    org_wide: RwLock<HashSet<(String, String, StreamType)>>,
+    org_wide_failures: RwLock<HashSet<String>>,
+    calls: RwLock<HashMap<String, CheckCalls>>,
 }
 
 #[cfg(all(feature = "enterprise", feature = "test-utils"))]
@@ -249,11 +268,37 @@ impl FakeStreamChecker {
         ));
     }
 
+    pub fn grant_read_all(&self, user_id: &str, org_id: &str, stream_type: StreamType) {
+        write_set(&self.org_wide).insert((user_id.to_string(), org_id.to_string(), stream_type));
+    }
+
+    /// Makes the next org-wide question of this user come back empty, as a failed Check does.
+    pub fn fail_org_wide_once(&self, user_id: &str) {
+        write_set(&self.org_wide_failures).insert(user_id.to_string());
+    }
+
+    pub fn calls(&self, user_id: &str) -> CheckCalls {
+        let calls = self.calls.read().unwrap_or_else(|e| e.into_inner());
+        calls.get(user_id).cloned().unwrap_or_default()
+    }
+
+    fn count(&self, user_id: &str, add: impl FnOnce(&mut CheckCalls)) {
+        let mut calls = self.calls.write().unwrap_or_else(|e| e.into_inner());
+        add(calls.entry(user_id.to_string()).or_default());
+    }
+
     fn granted(&self, user_id: &str, key: String) -> bool {
         self.grants
             .read()
             .unwrap_or_else(|e| e.into_inner())
             .contains(&(user_id.to_string(), key))
+    }
+
+    fn reads_all(&self, user_id: &str, org_id: &str, stream_type: StreamType) -> bool {
+        self.org_wide
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains(&(user_id.to_string(), org_id.to_string(), stream_type))
     }
 }
 
@@ -279,8 +324,26 @@ impl StreamAccessChecker for FakeStreamChecker {
     }
 
     async fn can_read_stream(&self, user_id: &str, stream: &TypedStream) -> bool {
+        self.count(user_id, |calls| calls.streams += 1);
         let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
-        self.granted(user_id, key)
+        self.granted(user_id, key) || self.reads_all(user_id, &stream.org_id, stream.stream_type)
+    }
+
+    async fn org_wide_readable(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        wanted: &[StreamType],
+    ) -> HashSet<StreamType> {
+        self.count(user_id, |calls| calls.org_wide.push(wanted.to_vec()));
+        if write_set(&self.org_wide_failures).remove(user_id) {
+            return HashSet::new();
+        }
+        wanted
+            .iter()
+            .copied()
+            .filter(|stream_type| self.reads_all(user_id, org_id, *stream_type))
+            .collect()
     }
 
     async fn can_use_cipher_key(&self, org_id: &str, user_id: &str, key: &str) -> bool {
@@ -299,6 +362,14 @@ impl StreamAccessChecker for FakeStreamChecker {
             format!("{org_id}/dashboards/{folder}/{dashboard_id}"),
         )
     }
+}
+
+/// What one user asked a [`FakeStreamChecker`], so a test can count the Checks a path costs.
+#[cfg(all(feature = "enterprise", feature = "test-utils"))]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CheckCalls {
+    pub streams: usize,
+    pub org_wide: Vec<Vec<StreamType>>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -353,6 +424,42 @@ impl StreamAccessChecker for OpenFgaStreamChecker {
             user.is_external,
         )
         .await
+    }
+
+    async fn org_wide_readable(
+        &self,
+        user_id: &str,
+        org_id: &str,
+        wanted: &[StreamType],
+    ) -> HashSet<StreamType> {
+        use o2_openfga::meta::mapping::OFGA_MODELS;
+
+        // a non-member of the org reads no stream there, as `can_read_stream` answers
+        let Some(user) = crate::users::get_user(Some(org_id), user_id).await else {
+            return HashSet::new();
+        };
+        if !o2_openfga::config::get_config().enabled || user.role == UserRole::Root {
+            return wanted.iter().copied().collect();
+        }
+        let role = effective_role(org_id, user_id, user.role.to_string());
+        let models: Vec<&str> = wanted
+            .iter()
+            .map(|stream_type| {
+                let type_str = stream_type.as_str();
+                OFGA_MODELS
+                    .get(type_str)
+                    .map_or(type_str, |model| model.key)
+            })
+            .collect();
+        let readable =
+            o2_openfga::authorizer::authz::org_wide_readable_types(org_id, user_id, &role, &models)
+                .await;
+        wanted
+            .iter()
+            .zip(models)
+            .filter(|(_, model)| readable.contains(*model))
+            .map(|(stream_type, _)| *stream_type)
+            .collect()
     }
 
     async fn can_use_cipher_key(&self, org_id: &str, user_id: &str, key: &str) -> bool {
@@ -528,8 +635,6 @@ pub async fn check_permissions(
     role: UserRole,
     _is_external: bool,
 ) -> bool {
-    use common::infra::config::ORG_USERS;
-
     if !o2_openfga::config::get_config().enabled {
         return true;
     }
@@ -551,14 +656,7 @@ pub async fn check_permissions(
     }
 
     let org_id = &auth_info.org_id;
-    let effective_role = if org_id == config::META_ORG_ID {
-        match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
-            Some(user) => user.role.to_string(),
-            None => role,
-        }
-    } else {
-        role
-    };
+    let effective_role = effective_role(org_id, user_id, role);
 
     o2_openfga::authorizer::authz::is_allowed(
         org_id,
@@ -930,6 +1028,74 @@ pub fn stream_access_forbidden(request_org: &str, denied: &StreamAccessDenied) -
     (StatusCode::FORBIDDEN, Json(body)).into_response()
 }
 
+/// The streams of `org_id` the user can read, or `None` when RBAC lets them read every stream.
+#[cfg(any(feature = "enterprise", test))]
+pub(crate) async fn readable_streams(
+    checker: &dyn StreamAccessChecker,
+    user_id: &str,
+    org_id: &str,
+    streams: HashSet<(StreamType, String)>,
+) -> Option<HashSet<(StreamType, String)>> {
+    use futures::stream::StreamExt;
+
+    if !checker.enforces_rbac().await
+        || checker.is_root(user_id).await
+        || checker.is_root_or_admin(org_id, user_id).await
+    {
+        return None;
+    }
+    let (covered, mut to_check): (Vec<_>, Vec<_>) = streams
+        .into_iter()
+        .partition(|(_, name)| org_wide_grant_covers(name));
+    let mut readable = HashSet::new();
+    if !covered.is_empty() {
+        let mut types: Vec<StreamType> = Vec::new();
+        for (stream_type, _) in &covered {
+            if !types.contains(stream_type) {
+                types.push(*stream_type);
+            }
+        }
+        let org_wide = checker.org_wide_readable(user_id, org_id, &types).await;
+        for stream in covered {
+            if org_wide.contains(&stream.0) {
+                readable.insert(stream);
+            } else {
+                to_check.push(stream);
+            }
+        }
+    }
+    let checked: Vec<(StreamType, String)> = futures::stream::iter(to_check)
+        .map(|(stream_type, name)| async move {
+            let stream = TypedStream {
+                org_id: org_id.to_string(),
+                stream_type,
+                name,
+            };
+            let allowed = checker.can_read_stream(user_id, &stream).await;
+            allowed.then_some((stream.stream_type, stream.name))
+        })
+        .buffer_unordered(16)
+        .filter_map(std::future::ready)
+        .collect()
+        .await;
+    readable.extend(checked);
+    Some(readable)
+}
+
+/// In `_meta` the cached membership names the role, whatever role the request carries.
+#[cfg(feature = "enterprise")]
+fn effective_role(org_id: &str, user_id: &str, role: String) -> String {
+    use common::infra::config::ORG_USERS;
+
+    if org_id != config::META_ORG_ID {
+        return role;
+    }
+    match ORG_USERS.get(&format!("{}/{user_id}", config::META_ORG_ID)) {
+        Some(user) => user.role.to_string(),
+        None => role,
+    }
+}
+
 #[cfg(feature = "enterprise")]
 async fn cipher_key_allowed(
     org_id: &str,
@@ -962,37 +1128,15 @@ async fn cipher_key_allowed(
     .await
 }
 
-/// The streams of `org_id` the user can read, or `None` when RBAC lets them read every stream.
+/// True when OpenFGA accepts the stream's own Check, so an org-wide grant is known to cover it.
+/// A name outside this strict form keeps its own Check, whose answer may be a refusal.
 #[cfg(any(feature = "enterprise", test))]
-async fn readable_streams(
-    checker: &dyn StreamAccessChecker,
-    user_id: &str,
-    org_id: &str,
-    streams: HashSet<(StreamType, String)>,
-) -> Option<HashSet<(StreamType, String)>> {
-    use futures::stream::StreamExt;
-
-    if !checker.enforces_rbac().await
-        || checker.is_root(user_id).await
-        || checker.is_root_or_admin(org_id, user_id).await
-    {
-        return None;
-    }
-    let readable = futures::stream::iter(streams)
-        .map(|(stream_type, name)| async move {
-            let stream = TypedStream {
-                org_id: org_id.to_string(),
-                stream_type,
-                name,
-            };
-            let allowed = checker.can_read_stream(user_id, &stream).await;
-            allowed.then_some((stream.stream_type, stream.name))
-        })
-        .buffer_unordered(16)
-        .filter_map(std::future::ready)
-        .collect()
-        .await;
-    Some(readable)
+fn org_wide_grant_covers(stream_name: &str) -> bool {
+    let id = config::utils::str::into_ofga_supported_format(stream_name);
+    (1..=MAX_SHORTCUT_ID_LEN).contains(&id.len())
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'=' | b'-'))
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -1120,6 +1264,9 @@ mod tests {
         admins: HashSet<(String, String)>,
         readable: HashSet<(String, String)>,
         stream_checks: std::sync::atomic::AtomicUsize,
+        org_wide: HashSet<(String, String, StreamType)>,
+        org_wide_fails: bool,
+        org_wide_asked: std::sync::Mutex<Vec<Vec<StreamType>>>,
     }
 
     impl FakeChecker {
@@ -1131,6 +1278,21 @@ mod tests {
         fn reads(mut self, user: &str, stream: &str) -> Self {
             self.readable.insert((user.to_string(), stream.to_string()));
             self
+        }
+
+        fn reads_all(mut self, user: &str, org: &str, stream_type: StreamType) -> Self {
+            self.org_wide
+                .insert((user.to_string(), org.to_string(), stream_type));
+            self
+        }
+
+        fn stream_checks(&self) -> usize {
+            self.stream_checks
+                .load(std::sync::atomic::Ordering::Relaxed)
+        }
+
+        fn org_wide_asked(&self) -> Vec<Vec<StreamType>> {
+            self.org_wide_asked.lock().unwrap().clone()
         }
     }
 
@@ -1154,6 +1316,26 @@ mod tests {
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let key = format!("{}/{}/{}", stream.org_id, stream.stream_type, stream.name);
             self.readable.contains(&(user_id.to_string(), key))
+        }
+
+        async fn org_wide_readable(
+            &self,
+            user_id: &str,
+            org_id: &str,
+            wanted: &[StreamType],
+        ) -> HashSet<StreamType> {
+            self.org_wide_asked.lock().unwrap().push(wanted.to_vec());
+            if self.org_wide_fails {
+                return HashSet::new();
+            }
+            wanted
+                .iter()
+                .copied()
+                .filter(|stream_type| {
+                    let key = (user_id.to_string(), org_id.to_string(), *stream_type);
+                    self.org_wide.contains(&key)
+                })
+                .collect()
         }
 
         async fn can_use_cipher_key(&self, org_id: &str, user_id: &str, key: &str) -> bool {
@@ -1701,6 +1883,207 @@ mod tests {
             .stream_checks
             .load(std::sync::atomic::Ordering::Relaxed);
         assert_eq!(checks, 3, "logs/shared, traces/shared and metrics/cpu");
+    }
+
+    fn wanted(streams: &[(StreamType, &str)]) -> HashSet<(StreamType, String)> {
+        streams
+            .iter()
+            .map(|(stream_type, name)| (*stream_type, name.to_string()))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn an_org_wide_grant_keeps_every_stream_of_its_type_without_a_stream_check() {
+        use StreamType::{Logs, Metrics, Profiles, Traces};
+
+        let all = wanted(&[
+            (Logs, "app"),
+            (Logs, "audit"),
+            (Metrics, "cpu"),
+            (Traces, "default"),
+            (Profiles, "heap"),
+        ]);
+        let checker = [Logs, Metrics, Traces, Profiles]
+            .into_iter()
+            .fold(FakeChecker::default(), |c, t| c.reads_all("u1", "o1", t));
+        let kept = readable_streams(&checker, "u1", "o1", all.clone()).await;
+        assert_eq!(kept, Some(all.clone()));
+        assert_eq!(checker.stream_checks(), 0);
+        assert_eq!(checker.org_wide_asked().len(), 1);
+
+        let other_org = readable_streams(&checker, "u1", "o2", all).await;
+        assert_eq!(other_org, Some(HashSet::new()), "a grant opens one org");
+    }
+
+    #[tokio::test]
+    async fn only_the_types_without_an_org_wide_grant_cost_stream_checks() {
+        use StreamType::{Logs, Metrics};
+
+        let metrics: Vec<String> = (0..10).map(|i| format!("m{i}")).collect();
+        let mut all = wanted(&[(Logs, "app"), (Logs, "audit")]);
+        all.extend(metrics.iter().map(|name| (Metrics, name.clone())));
+        let checker = FakeChecker::default()
+            .reads_all("u1", "o1", Logs)
+            .reads("u1", "o1/metrics/m3")
+            .reads("u1", "o1/metrics/m7");
+        let kept = readable_streams(&checker, "u1", "o1", all).await;
+        let expected = wanted(&[
+            (Logs, "app"),
+            (Logs, "audit"),
+            (Metrics, "m3"),
+            (Metrics, "m7"),
+        ]);
+        assert_eq!(kept, Some(expected));
+        assert_eq!(checker.stream_checks(), 10, "one per metrics stream");
+    }
+
+    #[tokio::test]
+    async fn without_an_org_wide_grant_each_stream_is_checked_as_before() {
+        use StreamType::{Logs, Traces};
+
+        let all = wanted(&[(Logs, "app"), (Logs, "audit"), (Traces, "default")]);
+        let granted = FakeChecker::default().reads("u1", "o1/logs/audit");
+        let failed = FakeChecker {
+            org_wide_fails: true,
+            ..FakeChecker::default()
+                .reads("u1", "o1/logs/audit")
+                .reads_all("u1", "o1", Logs)
+        };
+        for (case, checker) in [("no org-wide grant", granted), ("failed question", failed)] {
+            let kept = readable_streams(&checker, "u1", "o1", all.clone()).await;
+            assert_eq!(kept, Some(wanted(&[(Logs, "audit")])), "{case}");
+            assert_eq!(checker.stream_checks(), 3, "{case}");
+            assert_eq!(checker.org_wide_asked().len(), 1, "{case}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_user_who_reads_everything_is_asked_nothing() {
+        let all = || wanted(&[(StreamType::Logs, "app")]);
+        let mut root = FakeChecker::default();
+        root.roots.insert("u1".to_string());
+        let rbac_off = FakeChecker {
+            rbac_off: true,
+            ..FakeChecker::default()
+        };
+        let admin = FakeChecker::default().admin("u1", "o1");
+        for checker in [root, rbac_off, admin] {
+            assert_eq!(readable_streams(&checker, "u1", "o1", all()).await, None);
+            assert_eq!(checker.stream_checks(), 0);
+            assert!(checker.org_wide_asked().is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn the_org_wide_question_names_only_the_wanted_types() {
+        let logs_only = FakeChecker::default();
+        let all = wanted(&[(StreamType::Logs, "app"), (StreamType::Logs, "audit")]);
+        readable_streams(&logs_only, "u1", "o1", all).await;
+        assert_eq!(logs_only.org_wide_asked(), [vec![StreamType::Logs]]);
+
+        let nothing = FakeChecker::default();
+        let kept = readable_streams(&nothing, "u1", "o1", HashSet::new()).await;
+        assert_eq!(kept, Some(HashSet::new()));
+        assert_eq!(nothing.stream_checks(), 0);
+        assert!(nothing.org_wide_asked().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_name_openfga_may_refuse_keeps_its_own_check() {
+        use StreamType::Logs;
+
+        let longest = "a".repeat(MAX_SHORTCUT_ID_LEN);
+        let too_long = "a".repeat(MAX_SHORTCUT_ID_LEN + 1);
+        let refused = [too_long.as_str(), "", "*", "a\u{1}b", "caf\u{e9}"];
+        let mut all = wanted(&[(Logs, longest.as_str())]);
+        all.extend(wanted(&refused.map(|name| (Logs, name))));
+        let checker = FakeChecker::default().reads_all("u1", "o1", Logs);
+        let kept = readable_streams(&checker, "u1", "o1", all).await;
+        assert_eq!(kept, Some(wanted(&[(Logs, longest.as_str())])));
+        assert_eq!(checker.stream_checks(), refused.len());
+
+        let only_refused = FakeChecker::default().reads_all("u1", "o1", Logs);
+        readable_streams(&only_refused, "u1", "o1", wanted(&[(Logs, "*")])).await;
+        assert!(only_refused.org_wide_asked().is_empty());
+        assert_eq!(only_refused.stream_checks(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_covered_stream_keeps_its_own_name() {
+        let checker = FakeChecker::default().reads_all("u1", "o1", StreamType::Metrics);
+        let all = wanted(&[(StreamType::Metrics, "a:b")]);
+        let kept = readable_streams(&checker, "u1", "o1", all.clone()).await;
+        assert_eq!(kept, Some(all));
+        assert_eq!(checker.stream_checks(), 0);
+    }
+
+    #[tokio::test]
+    async fn service_records_and_related_streams_follow_an_org_wide_grant() {
+        let checker = || {
+            FakeChecker::default()
+                .reads_all("u1", "o1", StreamType::Logs)
+                .reads("u1", "o1/traces/t1")
+        };
+        let records = vec![
+            service("a", &["l1", "l2"], &["t1", "t2"]),
+            service("b", &[], &["t2"]),
+        ];
+        let kept = readable_service_records(&checker(), "u1", "o1", records).await;
+        let lists = serde_json::json!([["l1", "l2"], ["t1"], []]);
+        assert_eq!(
+            service_names(&kept),
+            [("a".to_string(), lists.as_array().unwrap().clone())]
+        );
+
+        let streams = related(&["l2", "l1"], &["t2", "t1"], &["cpu"]);
+        let kept = readable_related_streams(&checker(), "u1", "o1", streams).await;
+        let names = |list: &[StreamInfo]| -> Vec<String> {
+            list.iter().map(|info| info.stream_name.clone()).collect()
+        };
+        assert_eq!(names(&kept.logs), ["l2", "l1"]);
+        assert_eq!(names(&kept.traces), ["t1"]);
+        assert!(kept.metrics.is_empty() && kept.profiles.is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_meta_org_reads_its_role_from_the_membership_for_every_check() {
+        use common::infra::config::ORG_USERS;
+
+        let user = "issue3592-meta-role@example.com";
+        let asked = UserRole::Viewer.to_string();
+        assert_eq!(effective_role("o1", user, asked.clone()), asked);
+        assert_eq!(
+            effective_role(config::META_ORG_ID, user, asked.clone()),
+            asked
+        );
+        ORG_USERS.insert(
+            format!("{}/{user}", config::META_ORG_ID),
+            infra::table::org_users::OrgUserRecord {
+                email: user.to_string(),
+                org_id: config::META_ORG_ID.to_string(),
+                role: UserRole::Editor,
+                token: String::new(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+        let in_meta = effective_role(config::META_ORG_ID, user, asked.clone());
+        assert_eq!(in_meta, UserRole::Editor.to_string());
+        assert_eq!(effective_role("o1", user, asked.clone()), asked);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_user_outside_the_org_reads_no_type_org_wide() {
+        // with OpenFGA off a member gets every type, so only the member lookup can empty this
+        assert!(!o2_openfga::config::get_config().enabled);
+        let wanted = [StreamType::Logs, StreamType::Metrics];
+        let types = OpenFgaStreamChecker
+            .org_wide_readable("issue3592-nobody@example.com", "issue3592_org", &wanted)
+            .await;
+        assert!(types.is_empty());
     }
 
     #[cfg(feature = "enterprise")]

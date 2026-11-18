@@ -382,55 +382,48 @@ def test_missing_child_is_non_disclosing_across_create_update_and_validate(
     assert [set(body) for body in bodies] == [set(bodies[0])] * 3
 
 
-def test_cycle_and_graph_wide_depth_conflicts_have_distinct_stable_codes(
+def test_a_composite_child_is_refused_on_create_update_and_validate(
     client: OpenObserveClient, composite_prereqs: dict[str, Any]
 ):
     child_a, child_b, child_c = composite_prereqs["child_ids"]
-    first_name = unique_name("cmp_depth_one")
-    first = _tracked_create(
+    inner = _tracked_create(
         client,
         composite_prereqs,
-        _composite_payload(name=first_name, child_ids=[child_a, child_b]),
+        _composite_payload(name=unique_name("cmp_inner"), child_ids=[child_a, child_b]),
     )
-    second_name = unique_name("cmp_depth_two")
-    second = _tracked_create(
-        client,
-        composite_prereqs,
-        _composite_payload(name=second_name, child_ids=[first, child_c]),
-    )
+    outer_name = unique_name("cmp_outer")
+    nested = _composite_payload(name=outer_name, child_ids=[inner, child_c])
 
-    cycle_payload = _composite_payload(
-        name=first_name,
-        child_ids=[second, child_a],
+    response = client.post(
+        f"alerts?folder={composite_prereqs['folder_id']}", prefix="api/v2/", json=nested
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["code"] == "child_is_composite"
+    assert not any(row.get("name") == outer_name for row in _list(client))
+
+    outer = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(name=outer_name, child_ids=[child_b, child_c]),
     )
     response = client.put(
-        f"alerts/{first}?folder={composite_prereqs['folder_id']}",
+        f"alerts/{outer}?folder={composite_prereqs['folder_id']}",
         prefix="api/v2/",
-        json=cycle_payload,
+        json=nested,
     )
-    assert response.status_code == 409, response.text
-    assert response.json()["code"] == "composite_cycle"
+    assert response.status_code == 400, response.text
+    assert response.json()["code"] == "child_is_composite"
 
-    # Existing parent(second) is depth 2.  Making its child(first) depth 2
-    # makes the existing ancestor depth 3; validation must inspect all nodes,
-    # not just the edited subtree in isolation.
-    nested_name = unique_name("cmp_new_depth_two")
-    nested = _tracked_create(
-        client,
-        composite_prereqs,
-        _composite_payload(name=nested_name, child_ids=[child_a, child_b]),
-    )
-    too_deep_payload = _composite_payload(
-        name=first_name,
-        child_ids=[nested, child_c],
-    )
-    response = client.put(
-        f"alerts/{first}?folder={composite_prereqs['folder_id']}",
+    response = client.post(
+        "alerts/composites/validate",
         prefix="api/v2/",
-        json=too_deep_payload,
+        json={
+            "folder_id": composite_prereqs["folder_id"],
+            "composite_condition": nested["composite_condition"],
+        },
     )
-    assert response.status_code == 409, response.text
-    assert response.json()["code"] == "composite_too_deep"
+    assert response.status_code == 400, response.text
+    assert response.json()["code"] == "child_is_composite"
 
 
 def test_reference_endpoint_and_single_delete_conflict_are_disclosure_bounded(
@@ -838,40 +831,6 @@ def test_cloning_a_parent_extends_the_child_delete_guard_to_the_copy(
     assert client.get(f"alerts/{child}", prefix="api/v2/").status_code == 200
 
 
-def test_clone_preserves_a_composite_child_of_a_nested_composite(
-    client: OpenObserveClient, composite_prereqs: dict[str, Any]
-):
-    first, second, third = composite_prereqs["child_ids"][:3]
-    inner = _tracked_create(
-        client,
-        composite_prereqs,
-        _composite_payload(
-            name=unique_name("cmp_clone_inner"), child_ids=[first, second]
-        ),
-    )
-    outer = _tracked_create(
-        client,
-        composite_prereqs,
-        _composite_payload(name=unique_name("cmp_clone_outer"), child_ids=[inner, third]),
-    )
-    outer_detail = client.get(f"alerts/{outer}", prefix="api/v2/").json()
-
-    clone = _clone(
-        client, composite_prereqs, outer, {"name": unique_name("cmp_clone_outer_copy")}
-    )["id"]
-    detail = client.get(f"alerts/{clone}", prefix="api/v2/").json()
-
-    assert (
-        detail["composite_condition"]["expression"]
-        == outer_detail["composite_condition"]["expression"]
-    )
-    assert [(child["alert_id"], child["alert_type"]) for child in detail["children"]] == [
-        (inner, "composite"),
-        (third, "scheduled"),
-    ]
-    assert all(child["accessible"] for child in detail["children"])
-
-
 def test_clone_of_a_simple_alert_keeps_the_source_enabled_state(
     client: OpenObserveClient, composite_prereqs: dict[str, Any]
 ):
@@ -1056,10 +1015,9 @@ def test_validate_rejects_empty_single_operand_and_malformed_expressions(
 def test_composite_cannot_reference_itself(
     client: OpenObserveClient, composite_prereqs: dict[str, Any]
 ):
-    """A self-edge is the shortest cycle and must be refused like any other.
+    """A self-reference names a composite child, so it is refused like any other.
 
-    Only expressible on update: create has no id to point at yet, so nothing
-    upstream of this test can exercise it.
+    Only expressible on update: create has no id to point at yet.
     """
     child_a, child_b, _ = composite_prereqs["child_ids"]
     name = unique_name("cmp_self_ref")
@@ -1074,8 +1032,8 @@ def test_composite_cannot_reference_itself(
         prefix="api/v2/",
         json=_composite_payload(name=name, child_ids=[composite, child_b]),
     )
-    assert response.status_code == 409, response.text
-    assert response.json()["code"] == "composite_cycle", response.text
+    assert response.status_code == 400, response.text
+    assert response.json()["code"] == "child_is_composite", response.text
 
     # The refusal must be total: the stored definition is untouched.
     response = client.get(
