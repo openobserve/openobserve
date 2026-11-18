@@ -9733,6 +9733,7 @@
       "variables": "Değişkenler",
       "tabsCount": "{n} Sekme",
       "panelsCount": "{n} Panel",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "Bağlı olduğu: {names}",
       "variablesDependencyGraph": "Değişken Bağımlılık Grafiği",
       "scope": "Kapsam",

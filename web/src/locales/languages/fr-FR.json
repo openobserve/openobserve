@@ -9733,6 +9733,7 @@
       "variables": "Variables",
       "tabsCount": "{n} onglet(s)",
       "panelsCount": "{n} panneau(x)",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "Dépend de : {names}",
       "variablesDependencyGraph": "Graphe de dépendance des variables",
       "scope": "Portée",

@@ -9733,6 +9733,7 @@
       "variables": "变量",
       "tabsCount": "{n} 个选项卡",
       "panelsCount": "{n} 个面板",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "依赖：{names}",
       "variablesDependencyGraph": "变量依赖关系图",
       "scope": "作用域",

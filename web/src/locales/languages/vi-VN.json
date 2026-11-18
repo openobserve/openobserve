@@ -9733,6 +9733,7 @@
       "variables": "Biến",
       "tabsCount": "{n} Tab",
       "panelsCount": "{n} Panel",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "Phụ thuộc vào: {names}",
       "variablesDependencyGraph": "Biểu đồ phụ thuộc biến",
       "scope": "Phạm vi",

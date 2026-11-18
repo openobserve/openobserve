@@ -9733,6 +9733,7 @@
       "variables": "Variabelen",
       "tabsCount": "{n} tabbladen",
       "panelsCount": "{n} panelen",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "Afhankelijk van: {names}",
       "variablesDependencyGraph": "Afhankelijkheidsgrafiek van variabelen",
       "scope": "Bereik",

@@ -9733,6 +9733,7 @@
       "variables": "المتغيرات",
       "tabsCount": "التبويبات: {n}",
       "panelsCount": "اللوحات: {n}",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "يعتمد على: {names}",
       "variablesDependencyGraph": "رسم بياني اعتماد المتغيرات",
       "scope": "النطاق",

@@ -9733,6 +9733,7 @@
       "variables": "Переменные",
       "tabsCount": "Вкладок: {n}",
       "panelsCount": "Панелей: {n}",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "Зависит от: {names}",
       "variablesDependencyGraph": "Граф зависимостей переменных",
       "scope": "Область",

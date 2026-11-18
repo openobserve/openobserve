@@ -9733,6 +9733,7 @@
       "variables": "変数",
       "tabsCount": "{n} タブ",
       "panelsCount": "{n} パネル",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "依存先: {names}",
       "variablesDependencyGraph": "変数依存関係グラフ",
       "scope": "スコープ",

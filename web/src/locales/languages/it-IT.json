@@ -9733,6 +9733,7 @@
       "variables": "Variabili",
       "tabsCount": "{n} schede",
       "panelsCount": "{n} pannelli",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "Dipende da: {names}",
       "variablesDependencyGraph": "Grafico delle dipendenze delle variabili",
       "scope": "Ambito",

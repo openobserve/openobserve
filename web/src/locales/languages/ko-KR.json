@@ -9733,6 +9733,7 @@
       "variables": "변수",
       "tabsCount": "{n}개 탭",
       "panelsCount": "{n}개 패널",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "다음에 따라 달라짐: {names}",
       "variablesDependencyGraph": "변수 종속성 그래프",
       "scope": "범위",

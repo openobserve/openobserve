@@ -9728,6 +9728,7 @@
       "variables": "變數",
       "tabsCount": "{n} 個分頁",
       "panelsCount": "{n} 個面板",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "依賴於：{names}",
       "variablesDependencyGraph": "變數相依性圖表",
       "scope": "範圍",

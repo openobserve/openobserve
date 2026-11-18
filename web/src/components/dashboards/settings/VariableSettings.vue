@@ -219,6 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('dashboard.deleteVariable')"
           message-keypath="dashboard.deleteVariableMsg"
           :message-name="selectedDelete?.name"
+          :warning-message="deleteDependentsWarning"
           ok-variant="destructive"
           @update:ok="deleteVariableFn"
           @update:cancel="confirmDeleteDialog = false"
@@ -388,6 +389,15 @@ export default defineComponent({
     const selectedVariable = ref<string | null>(null);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete: any = ref(null);
+    const deleteDependentsWarning = computed(() => {
+      const name = selectedDelete.value?.name;
+      const users: string[] = name ? (dependencyGraph.value?.[name]?.childVariables ?? []) : [];
+      if (!users.length) return undefined;
+      return t("dashboard.variableSettingsPage.deleteUsedByWarning", {
+        names: users.join(", "),
+        name,
+      });
+    });
     const variableTypes = [
       {
         label: t("dashboard.queryValues"),
@@ -655,6 +665,7 @@ export default defineComponent({
       isAddVariable,
       showDeleteDialogFn,
       confirmDeleteDialog,
+      deleteDependentsWarning,
       deleteVariableFn,
       goBackToDashboardList,
       editVariableFn,

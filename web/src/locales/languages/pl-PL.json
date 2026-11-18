@@ -9733,6 +9733,7 @@
       "variables": "Zmienne",
       "tabsCount": "Zakładki: {n}",
       "panelsCount": "Panele: {n}",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "Zależy od: {names}",
       "variablesDependencyGraph": "Graf zależności zmiennych",
       "scope": "Zakres",

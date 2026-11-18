@@ -9730,6 +9730,7 @@
       "variables": "Variables",
       "tabsCount": "{n} Tabs",
       "panelsCount": "{n} Panels",
+      "deleteUsedByWarning": "Used by {names}, which will show no values after ${name} is deleted.",
       "dependsOn": "Depends on: {names}",
       "variablesDependencyGraph": "Variables Dependency Graph",
       "scope": "Scope",

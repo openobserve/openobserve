@@ -239,6 +239,23 @@ test.describe("Query Values variables - Custom SQL", { tag: ["@dashboards", "@da
     await expect(cycleError).toHaveText("svc can't depend on itself.");
   });
 
+  test("deleting a variable another custom query uses warns before it is deleted", async ({ page }) => {
+    const qv = new PageManager(page).dashboardQueryVariable;
+    const id = await createDashboard([
+      fx.customVariable("env", ["payments", "default"]),
+      customSql(`SELECT DISTINCT service_name FROM "${S}" WHERE k8s_namespace = '$env'`),
+    ]);
+    await qv.openDashboard(fx.dashboardUrl(id));
+    await qv.openVariablesSettings();
+    // Rows keep the saved order, so env's delete button is the first one.
+    await page.locator('[data-test="dashboard-delete-variable"]').first().click();
+    const dialog = page.locator('[data-test="confirm-dialog"]');
+    await expect(dialog).toContainText("Used by svc, which will show no values after $env is deleted.");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    expect((await fx.getVariable(id, "env")).name).toBe("env");
+  });
+
   test("D6: reopening a custom SQL variable shows Custom mode with its query and columns", async ({ page }) => {
     const qv = new PageManager(page).dashboardQueryVariable;
     const id = await createDashboard([customSql(ERRORS_QUERY, { value_field: "service_name", label_field: "service_id" })]);
