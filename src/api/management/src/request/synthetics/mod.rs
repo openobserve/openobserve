@@ -1087,14 +1087,18 @@ where
     Deserialize::deserialize(de).map(Some)
 }
 
-/// The override an update saves: the sent one, or the stored one when the field is absent.
-async fn update_template(
-    sent: Option<Option<String>>,
-    stored: impl std::future::Future<Output = anyhow::Result<Option<String>>>,
-) -> anyhow::Result<Option<String>> {
-    match sent {
-        Some(template) => Ok(template),
-        None => stored.await,
+impl SyntheticUpdate {
+    /// The check to save: the sent override, or the stored one when the field is absent.
+    async fn into_check(
+        self,
+        stored: impl std::future::Future<Output = anyhow::Result<Option<String>>>,
+    ) -> anyhow::Result<config::meta::synthetics::Synthetic> {
+        let mut check = self.check;
+        check.template = match self.template {
+            Some(template) => template,
+            None => stored.await?,
+        };
+        Ok(check)
     }
 }
 
@@ -1129,10 +1133,9 @@ pub async fn update_synthetic(
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(update): Json<SyntheticUpdate>,
 ) -> Response {
-    let SyntheticUpdate {
-        check: body,
-        template,
-    } = update;
+    // The stored override is read only after the permission checks pass.
+    #[cfg(feature = "enterprise")]
+    let body = &update.check;
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &id,
@@ -1187,7 +1190,7 @@ pub async fn update_synthetic(
     }
 
     #[cfg(feature = "enterprise")]
-    match caller_can_read_children(&org_id, &user_email.user_id, &body, Some(id.as_str())).await {
+    match caller_can_read_children(&org_id, &user_email.user_id, body, Some(id.as_str())).await {
         Ok(None) => {}
         Ok(Some(child)) => {
             return MetaHttpResponse::forbidden(format!(
@@ -1208,15 +1211,11 @@ pub async fn update_synthetic(
     #[cfg(not(feature = "enterprise"))]
     let user_id = "";
 
-    let mut body = body;
-    // A kept override is checked again, because its template can change after it was set.
-    body.template = match update_template(
-        template,
-        openobserve_synthetics::service::template_of(&org_id, &id),
-    )
-    .await
+    let mut body = match update
+        .into_check(openobserve_synthetics::service::template_of(&org_id, &id))
+        .await
     {
-        Ok(template) => template,
+        Ok(body) => body,
         Err(e) => {
             tracing::error!("[synthetics] update_synthetic: load stored template: {e}");
             return MetaHttpResponse::error(
@@ -1226,6 +1225,7 @@ pub async fn update_synthetic(
             .into_response();
         }
     };
+    // A kept override is checked again, because its template can change after it was set.
     if let Err(response) = checked_template(&org_id, &mut body).await {
         return response;
     }
@@ -2720,19 +2720,39 @@ mod tests {
     }
 
     async fn resolved(body: super::SyntheticUpdate) -> Option<String> {
-        super::update_template(body.template, async { Ok(Some("ops-short".to_string())) })
+        let check = body
+            .into_check(async { Ok(Some("ops-short".to_string())) })
             .await
-            .unwrap()
+            .unwrap();
+        // The rest of the check still reaches the save.
+        assert_eq!(check.name, "login-check");
+        assert_eq!(check.destinations, ["slack-ops"]);
+        check.template
     }
 
     #[tokio::test]
     async fn an_update_without_template_keeps_the_stored_override() {
         let body = update_body(None);
         assert_eq!(body.template, None);
-        // The rest of the check still reaches the handler.
-        assert_eq!(body.check.name, "login-check");
-        assert_eq!(body.check.destinations, ["slack-ops"]);
         assert_eq!(resolved(body).await.as_deref(), Some("ops-short"));
+    }
+
+    #[test]
+    fn a_raw_update_body_reads_the_same_as_a_plain_check() {
+        // An alias, an unknown field and nested config, as raw JSON a client sends.
+        let raw = r#"{
+            "name": "login-check", "type": "http", "target": "https://example.com",
+            "config": {"headers": {"a": [1, 2]}}, "frequency": {"type": "minutes", "interval": 5},
+            "locations": ["us-east-1"], "enabled": true, "destinations": ["slack-ops"],
+            "cooldown_secs": 7, "client_metadata": {"x": 1}, "template": "ops-long"
+        }"#;
+        let update: super::SyntheticUpdate = serde_json::from_str(raw).unwrap();
+        let plain: config::meta::synthetics::Synthetic = serde_json::from_str(raw).unwrap();
+        assert_eq!(update.template, Some(Some("ops-long".to_string())));
+        assert_eq!(update.check.template, None);
+        let mut plain = serde_json::to_value(plain).unwrap();
+        plain.as_object_mut().unwrap().remove("template");
+        assert_eq!(serde_json::to_value(update.check).unwrap(), plain);
     }
 
     #[tokio::test]
@@ -2752,25 +2772,26 @@ mod tests {
             super::normalized_template(Some(" ops-short ".to_string())).as_deref(),
             Some("ops-short")
         );
+        assert_eq!(super::normalized_template(Some("   ".to_string())), None);
     }
 
     #[tokio::test]
     async fn an_update_with_a_template_sets_it_without_reading_the_stored_one() {
         let body = update_body(Some(serde_json::json!("ops-long")));
         assert_eq!(body.template, Some(Some("ops-long".to_string())));
-        let template = super::update_template(body.template, async {
-            panic!("a sent template must not load the stored one")
-        })
-        .await
-        .unwrap();
-        assert_eq!(template.as_deref(), Some("ops-long"));
+        let check = body
+            .into_check(async { panic!("a sent template must not load the stored one") })
+            .await
+            .unwrap();
+        assert_eq!(check.template.as_deref(), Some("ops-long"));
     }
 
     #[tokio::test]
     async fn a_failed_stored_read_fails_the_update() {
         let body = update_body(None);
-        let result =
-            super::update_template(body.template, async { Err(anyhow::anyhow!("db down")) }).await;
+        let result = body
+            .into_check(async { Err(anyhow::anyhow!("db down")) })
+            .await;
         assert!(result.is_err());
     }
 
