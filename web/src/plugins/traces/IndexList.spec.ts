@@ -19,6 +19,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
+import { applyFilterTerm } from "@/utils/traces/filterUtils";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -891,6 +892,23 @@ describe("IndexList Component", () => {
       wrapper.vm.handleAddMultipleSearchTerms("service_name", ["o'brien", "plain"], "include");
       expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
         "(service_name='o''brien' or service_name='plain')",
+      );
+    });
+
+    it.each([
+      ["include", "(code is null or code='200')"],
+      ["exclude", "(code is not null and code!='200')"],
+    ])("checks the null row for missing values next to another value (%s)", (action, expr) => {
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200"], action);
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(expr);
+    });
+
+    it("replaces the null row's group when a third value is ticked", () => {
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200"], "include");
+      const first = applyFilterTerm(wrapper.vm.searchObj.data.stream.addToFilter, "x='1'");
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200", "500"], "include");
+      expect(applyFilterTerm(wrapper.vm.searchObj.data.stream.addToFilter, first)).toBe(
+        "x='1' and (code is null or code='200' or code='500')",
       );
     });
   });
