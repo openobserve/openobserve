@@ -24,6 +24,7 @@ class SlackWorkspaceCardPage {
     this.helpContactForm = page.locator('[data-test="slack-help-contact-form"]');
     this.channelDefaults = page.locator('[data-test="slack-channel-defaults"]');
     this.linking = page.locator('[data-test="slack-linking"]');
+    this.refused = page.locator('[data-test="slack-workspace-refused"]');
   }
 
   testCheck(id) {
