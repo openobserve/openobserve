@@ -17429,9 +17429,7 @@
       "inAllColumn": "in {column}",
       "awaitingRun": {
         "spansTitle": "Run the query to see results",
-        "description": "Nothing has run yet. Run query sends the SQL in the editor.",
-        "rate": "Rate",
-        "errors": "Errors"
+        "description": "Nothing has run yet. Run query sends the SQL in the editor."
       },
       "errors": {
         "fieldNotFoundTitle": "Field not found: {field}",

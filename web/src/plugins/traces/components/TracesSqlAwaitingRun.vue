@@ -16,22 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="bg-card-glass-bg flex h-full flex-col" data-test="traces-sql-awaiting-run">
-    <div
-      v-if="showCharts"
-      class="flex shrink-0 flex-col gap-1 p-1 md:h-40 md:flex-row"
-      data-test="traces-sql-awaiting-run-charts"
-    >
-      <div
-        v-for="frame in frames"
-        :key="frame.key"
-        class="border-border-default bg-surface-base rounded-default flex h-40 min-w-0 flex-col overflow-hidden border md:h-auto md:flex-1"
-        :data-test="`traces-sql-awaiting-run-frame-${frame.key}`"
-      >
-        <PanelBar class="w-full">
-          <span class="truncate">{{ frame.title }}</span>
-        </PanelBar>
-      </div>
-    </div>
     <OEmptyState
       class="min-h-0 flex-1"
       illustration="query"
@@ -47,25 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import PanelBar from "@/components/common/PanelBar.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-
-/** SQL waiting for Run: the chart frames keep their place, with no data and no count, above a run prompt. */
-defineProps<{
-  showCharts: boolean;
-}>();
 
 const emit = defineEmits<{
   (e: "run"): void;
 }>();
 
 const { t } = useI18nTyped();
-
-const frames = computed(() => [
-  { key: "rate", title: t("traces.sqlMode.awaitingRun.rate") },
-  { key: "errors", title: t("traces.sqlMode.awaitingRun.errors") },
-  { key: "duration", title: t("traces.latencyHeatmap.title") },
-]);
 </script>

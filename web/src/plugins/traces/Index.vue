@@ -269,7 +269,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <TracesSqlAwaitingRun
                       v-else-if="!searchObj.loadingStream && sqlAwaitingRun"
-                      :show-charts="!!searchObj.meta.showHistogram"
                       @run="() => searchData()"
                     />
                     <div

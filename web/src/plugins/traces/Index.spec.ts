@@ -5854,12 +5854,12 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockSqlTexts().sqlTexts.filter).toBe(typed);
       });
 
-      it("the SQL switch waits with the chart frames and a run prompt, not a full-page state", async () => {
+      it("the SQL switch waits with a run prompt and no chart frames", async () => {
         await leaveForTraces(grouped);
         wrapper.vm.onOpenSpansSql();
         await redraw();
         const waiting = wrapper.find('[data-test="traces-sql-awaiting-run"]');
-        expect(waiting.find('[data-test="traces-sql-awaiting-run-charts"]').exists()).toBe(true);
+        expect(waiting.find('[data-test="traces-sql-awaiting-run-charts"]').exists()).toBe(false);
         expect(waiting.text()).toContain("Run the query to see results");
       });
 
