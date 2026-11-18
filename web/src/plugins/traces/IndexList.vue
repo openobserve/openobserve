@@ -541,11 +541,12 @@ export default defineComponent({
 
     const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
       const joinOp = action === "include" ? " or " : " and ";
-      const expressions = values.map((v) =>
-        action === "include"
-          ? `${fieldName}='${escapeSingleQuotes(v)}'`
-          : `${fieldName}!='${escapeSingleQuotes(v)}'`,
-      );
+      // useFieldValuesStream keys the row of missing values "null".
+      const condition = (v: string) => {
+        if (v === "null") return `${fieldName} ${action === "include" ? "is" : "is not"} null`;
+        return `${fieldName}${action === "include" ? "=" : "!="}'${escapeSingleQuotes(v)}'`;
+      };
+      const expressions = values.map(condition);
       const combined = expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
       addSearchTerm(combined);
     };
