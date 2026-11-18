@@ -429,7 +429,7 @@ export const streamNamesUserFirst = (list: { name: string; is_internal?: boolean
 export const sqlTabSeed = (builderSql: string, timestampColumn: string): string =>
   builderSql
     .trim()
-    .replace(/^SELECT\s+\*\s+FROM\s+("[^"]*")\s*/i, `SELECT ${timestampColumn} FROM $1 `)
+    .replace(/^SELECT\s+\*\s+FROM\s+("[^"]*"|\S+)\s*/i, `SELECT ${timestampColumn} FROM $1 `)
     .trim();
 
 /** The SQL tab takes a new seed only while it holds no query of the user's own. */

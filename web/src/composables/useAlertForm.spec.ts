@@ -227,6 +227,7 @@ describe("the SQL tab seed from the builder", () => {
       "SELECT _timestamp FROM \"app\" WHERE level = 'error'",
     ],
     ['select *  from "app" ', 'SELECT _timestamp FROM "app"'],
+    ["SELECT * FROM app", "SELECT _timestamp FROM app"],
     [
       'SELECT * FROM "app"  WHERE ("level" = \'error\')',
       'SELECT _timestamp FROM "app" WHERE ("level" = \'error\')',
