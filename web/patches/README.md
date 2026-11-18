@@ -97,6 +97,18 @@ already behaves this way via `useIsomorphicLayoutEffect(formApi.mount, [])`.
 navigation. It was the worst-affected route in the product, roughly 6× the
 dashboard list.
 
+### `useField` / `useFormGroup`: unmounted before mounted
+
+Both call the teardown from `onUnmounted` unconditionally. Since Vue 3.5 a
+component created and removed in the same render flush never runs its
+`onMounted` hook but still runs `onUnmounted`, so `cleanup` is `undefined` and
+the hook throws `cleanup is not a function`. In a dev build Vue rethrows it,
+which aborts the flush and drops every queued render, route changes included:
+saving a real-time alert left its form on screen under the list URL. The patch
+calls the teardown only when mount produced one. Not fixed upstream as of
+1.33.5; `OForm.spec.ts` ("a field created and replaced in one render flush")
+fails if this part stops applying.
+
 ---
 
 ## `vue-draggable-next`
