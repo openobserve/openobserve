@@ -5128,6 +5128,7 @@
     "storageSize": "Załadowane dane",
     "compressedSize": "Rozmiar skompresowany",
     "schemaHeader": "Szczegóły strumienia",
+    "searchFieldOrIndexType": "Szukaj pola lub typu indeksu",
     "indexTypeOptions": {
       "fullTextSearch": "Wyszukiwanie pełnotekstowe",
       "secondaryIndex": "Indeks pomocniczy",

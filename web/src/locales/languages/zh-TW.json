@@ -5128,6 +5128,7 @@
     "storageSize": "攝取資料量",
     "compressedSize": "壓縮大小",
     "schemaHeader": "串流詳細資訊",
+    "searchFieldOrIndexType": "搜尋欄位或索引類型",
     "indexTypeOptions": {
       "fullTextSearch": "全文檢索",
       "secondaryIndex": "次要索引",

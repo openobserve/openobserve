@@ -5127,6 +5127,7 @@
     "storageSize": "Ingested Data",
     "compressedSize": "Compressed Size",
     "schemaHeader": "Stream Detail",
+    "searchFieldOrIndexType": "ค้นหาฟิลด์หรือประเภทดัชนี",
     "indexTypeOptions": {
       "fullTextSearch": "Full text search",
       "secondaryIndex": "Secondary index",
