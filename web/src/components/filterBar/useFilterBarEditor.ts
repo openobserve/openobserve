@@ -486,7 +486,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
           });
     } else {
       const condition = makeCondition(current.field, current.operator, filled, nextConnector.value);
-      next = nestMixed(place(tree.value, condition), targetGroup.value.id);
+      next = nestUpFrom(place(tree.value, condition), targetGroup.value.id);
     }
     const wasEditing = Boolean(editingId.value);
     pendingConnector.value = "AND";
@@ -627,6 +627,14 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return next;
   }
 
+  // A group started empty joins its level only when its first condition lands, so nest every level above too.
+  function nestUpFrom(base: FilterGroup, groupId: string): FilterGroup {
+    let next = base;
+    for (let id: string | undefined = groupId; id; id = findParent(next, id)?.id)
+      next = nestMixed(next, id);
+    return next;
+  }
+
   // The chip after the caret may now sit in another group; the caret goes with it.
   function followCaret(next: FilterGroup) {
     const holder = caretBeforeId.value ? findParent(next, caretBeforeId.value) : undefined;
@@ -686,7 +694,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       connector: advanced.value ? (groupConnector(siblings) ?? pendingConnector.value) : "AND",
       items: [],
     };
-    next = nestMixed(place(next, group), siblings.id);
+    // Nesting waits for the group's first condition, so a group left empty leaves the row as it was.
+    next = place(next, group);
     pendingConnector.value = "AND";
     text.value = "";
     openGroupId.value = group.id;
