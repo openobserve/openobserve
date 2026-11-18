@@ -372,11 +372,19 @@ const shapes = computed(() =>
     sampleSearch.hits.value,
   ),
 );
-const categoryCandidates = computed(() =>
+// One kind of event wants the field naming the most kinds; a count or a share wants a rare minority.
+const categoriesFor = (id: IntentId | null) =>
   isMetrics.value
-    ? rankMetricCategory(profile.value).filter((l) => l !== slots.group)
-    : rankCategory(stringFields.value, shapes.value),
-);
+    ? rankMetricCategory(profile.value, {
+        group: slots.group,
+        series: series.value[props.streamName],
+      }).filter((l) => l !== slots.group)
+    : rankCategory(
+        stringFields.value,
+        shapes.value,
+        id === "anyEvent" ? "variety" : "split",
+      ).filter((f) => f !== slots.group);
+const categoryCandidates = computed(() => categoriesFor(props.active));
 const groupCandidates = computed(() =>
   isMetrics.value
     ? rankMetricGroup(profile.value)
@@ -571,8 +579,8 @@ const seedSlots = (id: IntentId) => {
   if (id === "percentile") slots.measure ??= measureCandidates.value[0];
   if (id === "compareLastWeek") slots.factor ??= DEFAULT_FACTOR;
   if (!wantsValue(id)) return;
-  if (isMetrics.value) slots.label ??= categoryCandidates.value[0];
-  else slots.field ??= categoryCandidates.value[0];
+  if (isMetrics.value) slots.label ??= categoriesFor(id)[0];
+  else slots.field ??= categoriesFor(id)[0];
 };
 
 /** The value slot waits for the field's counts, then suggests its rarest value and that value's case variants. */

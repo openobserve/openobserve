@@ -45,10 +45,12 @@ export interface FieldShape {
   /** Events carrying the field. */
   present: number;
   distinct?: number;
-  /** Share of sampled events holding the field's most common value. */
+  /** Share of the field's events holding its most common value. */
   topShare?: number;
-  /** Share of sampled values that read as words rather than numbers, times or addresses. */
+  /** Share of its values that read as words rather than numbers, times or addresses. */
   wordShare?: number;
+  /** Entropy of its values in bits: how many ways, and how evenly, they split the events. */
+  entropy?: number;
   p50?: number;
   p99?: number;
 }
@@ -106,6 +108,15 @@ export const DEFAULT_FACTOR = 2;
 const CATEGORY_MAX_DISTINCT = 20;
 const GROUP_MAX_DISTINCT = 200;
 const CATEGORY_MIN_COVERAGE = 0.9;
+const GROUP_MIN_COVERAGE = 0.8;
+const GROUP_FULL_COVERAGE = 0.95;
+const GROUP_MIN_DISTINCT = 3;
+// A filter only needs the events it selects, so a field on a third of them still qualifies.
+const FILTER_MIN_COVERAGE = 0.3;
+const MAJORITY_SHARE = 0.6;
+const FIXED_BY_GROUP = 0.75;
+/** Commonest values per text field the shape search returns, for hour-wide shares. */
+export const SHAPE_TOP_VALUES = 10;
 const MEASURE_MIN_COVERAGE = 0.5;
 const HEAVY_TAIL_RATIO = 5;
 const RARE_SHARE = 0.05;
@@ -159,11 +170,16 @@ export function fieldsBySamplePresence(
 const quoteId = (name: string) => `"${name.replace(/"/g, '""')}"`;
 const quoteText = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
-/** One aggregate search giving coverage and distinct count per string field and p50/p99 per number field. */
+/** One aggregate search giving coverage, distinct count and commonest values per string field and
+ * p50/p99 per number field. */
 export function shapeQuerySql(stream: string, strings: string[], numbers: string[]): string {
   const parts = ['count(*) AS "t"'];
   strings.forEach((f, i) =>
-    parts.push(`count(${quoteId(f)}) AS "c${i}"`, `approx_distinct(${quoteId(f)}) AS "d${i}"`),
+    parts.push(
+      `count(${quoteId(f)}) AS "c${i}"`,
+      `approx_distinct(${quoteId(f)}) AS "d${i}"`,
+      `approx_topk(${quoteId(f)}, ${SHAPE_TOP_VALUES}) AS "v${i}"`,
+    ),
   );
   numbers.forEach((f, i) =>
     parts.push(
@@ -182,27 +198,40 @@ const num = (value: unknown): number | undefined => {
     : n;
 };
 
-const topShare = (rows: readonly Record<string, unknown>[], field: string): number | undefined => {
+/** Value counts of a field: the search's commonest values over the hour, else the sampled events. */
+const valueCounts = (
+  top: unknown,
+  rows: readonly Record<string, unknown>[],
+  field: string,
+): Map<string, number> => {
   const counts = new Map<string, number>();
-  let total = 0;
-  for (const row of rows) {
-    const value = row[field];
-    if (value === undefined || value === null || value === "") continue;
-    total += 1;
-    counts.set(String(value), (counts.get(String(value)) ?? 0) + 1);
-  }
-  return total ? Math.max(...counts.values()) / total : undefined;
+  const add = (value: unknown, n: number) => {
+    if (value === undefined || value === null || value === "" || !(n > 0)) return;
+    counts.set(String(value), (counts.get(String(value)) ?? 0) + n);
+  };
+  if (Array.isArray(top)) top.forEach((v) => add(v?.value, num(v?.count) ?? 0));
+  else rows.forEach((row) => add(row[field], 1));
+  return counts;
 };
 
 const WORD_DIGIT_SHARE = 0.3;
-const wordShare = (rows: readonly Record<string, unknown>[], field: string): number | undefined => {
-  const values = rows
-    .map((row) => row[field])
-    .filter((v) => v !== undefined && v !== null && v !== "")
-    .map(String);
-  if (!values.length) return undefined;
-  const wordy = values.filter((v) => (v.match(/\d/g)?.length ?? 0) / v.length < WORD_DIGIT_SHARE);
-  return wordy.length / values.length;
+const isWord = (v: string) => (v.match(/\d/g)?.length ?? 0) / v.length < WORD_DIGIT_SHARE;
+
+/** Top share, word share and entropy; values past the listed ones spread evenly over the rest. */
+const valueShape = (counts: Map<string, number>, present: number, distinct: number | undefined) => {
+  const listed = [...counts.values()].reduce((a, b) => a + b, 0);
+  if (!listed) return {};
+  const total = Math.max(present, listed);
+  const rest = total - listed;
+  const restValues = Math.max(1, (distinct ?? counts.size) - counts.size);
+  const bits = (n: number, spread = 1) =>
+    n > 0 ? -(n / total) * Math.log2(n / total / spread) : 0;
+  const words = [...counts.entries()].filter(([v]) => isWord(v)).reduce((a, [, n]) => a + n, 0);
+  return {
+    topShare: Math.max(...counts.values()) / total,
+    wordShare: words / listed,
+    entropy: [...counts.values()].reduce((h, n) => h + bits(n), 0) + bits(rest, restValues),
+  };
 };
 
 /** Reads `shapeQuerySql`'s one row back into shapes, in the order the fields were asked. */
@@ -215,15 +244,20 @@ export function readFieldShapes(
   const total = num(row?.t) ?? 0;
   const share = (n: unknown) => (total > 0 ? Math.min(1, (num(n) ?? 0) / total) : 0);
   return [
-    ...strings.map((name, i) => ({
-      name,
-      kind: "string" as const,
-      coverage: share(row?.[`c${i}`]),
-      present: num(row?.[`c${i}`]) ?? 0,
-      distinct: num(row?.[`d${i}`]),
-      topShare: topShare(sample, name),
-      wordShare: wordShare(sample, name),
-    })),
+    ...strings.map((name, i) => {
+      const counts = valueCounts(row?.[`v${i}`], sample, name);
+      const present = num(row?.[`c${i}`]) ?? 0;
+      const distinct = num(row?.[`d${i}`]);
+      const fromSearch = Array.isArray(row?.[`v${i}`]);
+      return {
+        name,
+        kind: "string" as const,
+        coverage: share(row?.[`c${i}`]),
+        present,
+        distinct,
+        ...valueShape(counts, fromSearch ? present : 0, fromSearch ? distinct : undefined),
+      };
+    }),
     ...numbers.map((name, i) => ({
       name,
       kind: "number" as const,
@@ -250,33 +284,78 @@ const byShape = (
   return [...fit, ...candidates.filter((name) => !fit.includes(name))];
 };
 
-/** Categories first: a handful of word values on nearly every event, the most lopsided leading, since a
- * dominant value with rare others is what an alert watches; then the rest in the order given. */
-export const rankCategory = (candidates: string[], shapes: readonly FieldShape[]): string[] =>
+/** Repeating word values (not numbers, times, ids or one-per-event text) on enough events. */
+const isCategory = (s: FieldShape, minCoverage: number, minDistinct: number) =>
+  s.coverage >= minCoverage &&
+  (s.distinct ?? 0) >= minDistinct &&
+  (s.distinct ?? 0) <= GROUP_MAX_DISTINCT &&
+  (s.distinct ?? 0) * 2 <= s.present &&
+  (s.wordShare ?? 1) >= MIN_WORD_SHARE;
+
+const byEntropy = (a: FieldShape, b: FieldShape) =>
+  (b.entropy ?? 0) - (a.entropy ?? 0) || (a.distinct ?? 0) - (b.distinct ?? 0);
+
+/** How far a group's value predicts a field's minority values: 1 when each group holds a single value
+ * of the field, 0 when knowing the group says nothing beyond the field's commonest value. */
+export function fixedByGroup(
+  rows: readonly Record<string, unknown>[],
+  field: string,
+  group: string,
+): number {
+  const byGroup = new Map<string, Map<string, number>>();
+  const overall = new Map<string, number>();
+  let total = 0;
+  for (const row of rows) {
+    const value = row[field];
+    if (value === undefined || value === null || value === "") continue;
+    const key = String(row[group] ?? "");
+    const counts = byGroup.get(key) ?? new Map<string, number>();
+    counts.set(String(value), (counts.get(String(value)) ?? 0) + 1);
+    byGroup.set(key, counts);
+    overall.set(String(value), (overall.get(String(value)) ?? 0) + 1);
+    total += 1;
+  }
+  if (field === group) return 1;
+  if (!total) return 0;
+  const top = Math.max(...overall.values()) / total;
+  if (top >= 1) return 1;
+  const held = [...byGroup.values()].reduce((sum, c) => sum + Math.max(...c.values()), 0) / total;
+  return Math.max(0, (held - top) / (1 - top));
+}
+
+export type CategoryWant = "split" | "variety";
+
+const isSplit = (s: FieldShape) => (s.topShare ?? 0) >= MAJORITY_SHARE && (s.topShare ?? 1) < 1;
+
+/** Filter fields. "split" (a count, a comparison) leads with a big majority beside a small minority, the
+ * most lopsided first; "variety" (one kind of event) leads with the field naming the most kinds. */
+export const rankCategory = (
+  candidates: string[],
+  shapes: readonly FieldShape[],
+  want: CategoryWant = "split",
+): string[] =>
   byShape(
     candidates,
     shapes,
-    (s) =>
-      s.coverage >= CATEGORY_MIN_COVERAGE &&
-      (s.distinct ?? 0) >= 2 &&
-      (s.distinct ?? 0) <= CATEGORY_MAX_DISTINCT &&
-      (s.wordShare ?? 1) >= MIN_WORD_SHARE,
-    (a, b) => (b.topShare ?? 0) - (a.topShare ?? 0) || (a.distinct ?? 0) - (b.distinct ?? 0),
+    (s) => isCategory(s, FILTER_MIN_COVERAGE, 2),
+    want === "variety"
+      ? byEntropy
+      : (a, b) =>
+          Number(isSplit(b)) - Number(isSplit(a)) ||
+          (isSplit(a) ? (b.topShare ?? 0) - (a.topShare ?? 0) : byEntropy(a, b)),
   );
 
-// A group names things (words, not numbers or times), repeats across events and spreads them evenly;
-// the most even one leads, the fewer values on a tie.
+/** Group fields: several word values, none holding most events; those on (nearly) every event lead,
+ * then the most even split. */
 export const rankGroup = (candidates: string[], shapes: readonly FieldShape[]): string[] =>
   byShape(
     candidates,
     shapes,
     (s) =>
-      s.coverage >= CATEGORY_MIN_COVERAGE &&
-      (s.distinct ?? 0) >= 2 &&
-      (s.distinct ?? 0) <= GROUP_MAX_DISTINCT &&
-      (s.distinct ?? 0) * 2 <= s.present &&
-      (s.wordShare ?? 1) >= MIN_WORD_SHARE,
-    (a, b) => (a.topShare ?? 1) - (b.topShare ?? 1) || (a.distinct ?? 0) - (b.distinct ?? 0),
+      isCategory(s, GROUP_MIN_COVERAGE, GROUP_MIN_DISTINCT) && (s.topShare ?? 0) < MAJORITY_SHARE,
+    (a, b) =>
+      Number(b.coverage >= GROUP_FULL_COVERAGE) - Number(a.coverage >= GROUP_FULL_COVERAGE) ||
+      byEntropy(a, b),
   );
 
 const tailRatio = (s: FieldShape) =>
@@ -592,14 +671,20 @@ export function rankMetricGroup(profile: ReturnType<typeof labelProfile>): strin
   return [...fit, ...profile.map((p) => p.label).filter((l) => !fit.includes(l))];
 }
 
-/** Labels ranked for "where [label] matches": few values, on nearly every series. */
-export function rankMetricCategory(profile: ReturnType<typeof labelProfile>): string[] {
+/** Labels ranked for "where [label] matches": few values, on nearly every series, never one the group
+ * already fixes (each group's share would be 0 or 100 %). */
+export function rankMetricCategory(
+  profile: ReturnType<typeof labelProfile>,
+  opts: { group?: string; series?: readonly SeriesLabels[] } = {},
+): string[] {
+  const { group, series = [] } = opts;
   const fit = profile
     .filter(
       (p) =>
         p.coverage >= CATEGORY_MIN_COVERAGE &&
         p.values.length >= 2 &&
-        p.values.length <= CATEGORY_MAX_DISTINCT,
+        p.values.length <= CATEGORY_MAX_DISTINCT &&
+        (!group || fixedByGroup(series, p.label, group) < FIXED_BY_GROUP),
     )
     .sort((a, b) => b.coverage - a.coverage || a.values.length - b.values.length)
     .map((p) => p.label);

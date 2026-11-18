@@ -28,12 +28,14 @@ import {
   rankCategory,
   rankGroup,
   rankMeasure,
+  rankMetricCategory,
   rankMetricGroup,
   rareValue,
   readFieldShapes,
   shapeQuerySql,
   slotFields,
   withCaseVariants,
+  type FieldShape,
 } from "./alertIntents";
 
 let n = 0;
@@ -77,42 +79,112 @@ describe("alertIntents", () => {
     expect(fieldsBySamplePresence(rows, ["a", "b", "c", "d"])).toEqual(["c", "a"]);
   });
 
-  it("ranks slot fields by value shape from one shape search, keeping the rest in schema order", () => {
+  it("measures shapes from the search's commonest values over the hour, the sample only as a fallback", () => {
     expect(shapeQuerySql("s", ["a"], ["b"])).toBe(
-      'SELECT count(*) AS "t", count("a") AS "c0", approx_distinct("a") AS "d0", count("b") AS "k0", approx_percentile_cont("b", 0.5) AS "m0", approx_percentile_cont("b", 0.99) AS "q0" FROM "s"',
+      'SELECT count(*) AS "t", count("a") AS "c0", approx_distinct("a") AS "d0", approx_topk("a", 10) AS "v0", count("b") AS "k0", approx_percentile_cont("b", 0.5) AS "m0", approx_percentile_cont("b", 0.99) AS "q0" FROM "s"',
     );
-    const strings = ["body", "node", "level", "svc", "rare", "started"];
-    const numbers = ["status", "took"];
-    // body: on every event, all distinct · node, level: categories · svc: an entity · rare: on few events
     const row = {
-      ...{ t: 100, c0: 100, d0: 95, c1: 100, d1: 3, c2: 100, d2: 4, c3: 98, d3: 30, c4: 10, d4: 3 },
-      ...{ c5: 100, d5: 3 }, // started: a time, which names nothing
-      // status: flat · took: heavy-tailed
-      ...{ k0: 100, m0: 200, q0: 500, k1: 90, m1: 1000, q1: 90000 },
+      t: 100,
+      c0: 80,
+      d0: 3,
+      v0: [
+        { value: "", count: 20 },
+        { value: "x", count: 60 },
+        { value: "y", count: 20 },
+      ],
     };
-    const sample = Array.from({ length: 10 }, (_, i) => ({
-      node: `node-${"abc"[i % 3]}`,
-      level: i ? "INFO" : "ERROR",
-      svc: `svc-${"abcdefghij"[i]}`,
-      started: `2026-11-1${i % 3}T10:00:00Z`,
-    }));
-    const shapes = readFieldShapes(row, strings, numbers, sample);
-    expect(rankCategory(strings, shapes)).toEqual([
+    expect(readFieldShapes(row, ["a"], [])[0]).toMatchObject({
+      coverage: 0.8,
+      topShare: 0.75,
+      wordShare: 1,
+    });
+    const sample = [{ a: "10.0.0.1" }, { a: "10.0.0.1" }, { a: "x" }];
+    expect(readFieldShapes({ t: 3, c0: 3, d0: 2 }, ["a"], [], sample)[0].topShare).toBeCloseTo(
+      2 / 3,
+    );
+  });
+
+  // Shaped like the live misses: an error rate picking a sender label, a count of OOM kills grouped by
+  // cluster, a latency grouped by node.
+  const shapesOf = (fields: Record<string, [number, number, Record<string, number>]>) => {
+    const names = Object.keys(fields);
+    const row: Record<string, unknown> = { t: 100 };
+    names.forEach((name, i) => {
+      const [present, distinct, top] = fields[name];
+      row[`c${i}`] = present;
+      row[`d${i}`] = distinct;
+      row[`v${i}`] = Object.entries(top).map(([value, count]) => ({ value, count }));
+    });
+    return { names, shapes: readFieldShapes(row, names, []) };
+  };
+  const even = (prefix: string, n: number, each: number) =>
+    Object.fromEntries(Array.from({ length: n }, (_, i) => [`${prefix}${i}`, each]));
+  it.each([
+    [
+      "a count filters on the field with a small minority",
+      {
+        svc: [100, 4, even("svc-", 4, 25)],
+        level: [100, 3, { INFO: 90, WARN: 7, ERROR: 3 }],
+        ip: [100, 4, even("10.0.0.", 4, 25)],
+      },
+      (n: string[], s: FieldShape[]) => rankCategory(n, s),
       "level",
-      "node",
-      "body",
-      "svc",
-      "rare",
-      "started",
-    ]);
-    expect(rankGroup(["body", "started", "node", "svc", "rare"], shapes)).toEqual([
-      "svc",
-      "node",
-      "body",
-      "started",
-      "rare",
-    ]);
-    expect(rankMeasure(numbers, shapes)).toEqual(["took", "status"]);
+    ],
+    [
+      "one kind of event filters on the field naming the most kinds, not the lopsided sender",
+      {
+        cluster: [100, 3, { dev: 94, prod: 5, edge: 1 }],
+        reason: [50, 20, { Scheduled: 10, Pulled: 8, Killing: 2, OOMKilling: 1 }],
+        type: [50, 2, { Normal: 35, Warning: 15 }],
+      },
+      (n: string[], s: FieldShape[]) => rankCategory(n, s, "variety"),
+      "reason",
+    ],
+    [
+      "a group never holds most events in one value",
+      {
+        cluster: [100, 3, { dev: 94, prod: 5, edge: 1 }],
+        namespace: [96, 29, even("ns-", 10, 8)],
+      },
+      (n: string[], s: FieldShape[]) => rankGroup(n, s),
+      "namespace",
+    ],
+    [
+      "a group on every event beats a more even one on fewer",
+      {
+        node: [93, 21, even("node-", 10, 7)],
+        service: [100, 5, { querier: 40, ingester: 25, router: 20, compactor: 15 }],
+        ip: [100, 21, even("10.0.0.", 10, 9)],
+      },
+      (n: string[], s: FieldShape[]) => rankGroup(n, s),
+      "service",
+    ],
+  ])("%s", (_, fields, rank, first) => {
+    const { names, shapes } = shapesOf(
+      fields as Record<string, [number, number, Record<string, number>]>,
+    );
+    expect(rank(names, shapes)[0]).toBe(first);
+  });
+
+  it("never filters a share on a label its group already fixes, which reads 0 or 100 % per group", () => {
+    const series = [
+      { lib: "aspnet", svc: "cart", route: "/get", node: "a" },
+      { lib: "aspnet", svc: "cart", route: "/add", node: "b" },
+      { lib: "flagd", svc: "flagd", route: "/eval", node: "a" },
+      { lib: "flagd", svc: "flagd", route: "/eval", node: "c" },
+    ];
+    const profile = labelProfile(series);
+    expect(rankMetricCategory(profile)[0]).toBe("lib");
+    expect(rankMetricCategory(profile, { group: "svc", series })[0]).toBe("route");
+  });
+
+  it("ranks numbers by tail weight, heavy-tailed first", () => {
+    const shapes = readFieldShapes(
+      { t: 100, k0: 100, m0: 200, q0: 500, k1: 90, m1: 1000, q1: 90000 },
+      [],
+      ["status", "took"],
+    );
+    expect(rankMeasure(["status", "took"], shapes)).toEqual(["took", "status"]);
   });
 
   it("picks the rarest value under 5 % and adds the case variants of a picked value", () => {
