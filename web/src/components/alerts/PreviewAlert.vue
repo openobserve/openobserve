@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div ref="chartPanelRef" class="border-border-default relative flex h-full flex-col border">
     <!-- Chart -->
-    <div data-test="alert-preview-chart" class="preview-alert-chart min-h-0 flex-1 p-4">
+    <div data-test="alert-preview-chart" class="preview-alert-chart min-h-0 flex-1 px-4 pb-4">
       <!-- Empty query placeholder -->
       <div
         v-if="!query && (selectedTab === 'sql' || selectedTab === 'promql')"
