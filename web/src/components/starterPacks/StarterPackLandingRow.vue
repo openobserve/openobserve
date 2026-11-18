@@ -119,7 +119,8 @@ const viewPack = () => router.push(flow.packRoute.value).catch(() => {});
   </OBanner>
   <OBanner
     v-else-if="visible"
-    :variant="failedCount > 0 ? 'warning' : 'success'"
+    :variant="failedCount > 0 ? 'error-soft' : 'default'"
+    :icon="failedCount > 0 ? 'error' : 'check'"
     dense
     inline-actions
     :data-test="rowTest"
@@ -143,20 +144,12 @@ const viewPack = () => router.push(flow.packRoute.value).catch(() => {});
       <div class="flex items-center gap-2">
         <OButton
           v-if="off > 0 && !readOnly"
-          variant="outline"
+          variant="primary"
           size="sm-action"
           data-test="kubernetes-pack-turn-on-btn"
           @click="turnOnOpen = true"
         >
           {{ t("starterPacks.home.turnOn") }}
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="sm-action"
-          data-test="kubernetes-pack-view-btn"
-          @click="viewPack"
-        >
-          {{ t("starterPacks.home.viewPack") }}
         </OButton>
         <template v-if="flow.canUndo.value">
           <OButton
@@ -165,10 +158,18 @@ const viewPack = () => router.push(flow.packRoute.value).catch(() => {});
             data-test="kubernetes-pack-undo-btn"
             @click="undoOpen = true"
           >
-            {{ t("starterPacks.installDialog.undoAll", { count: madeCount }) }}
+            {{ t("starterPacks.landing.undo") }}
           </OButton>
           <OText variant="meta" data-test="kubernetes-pack-undo-left">{{ availableLabel }}</OText>
         </template>
+        <OButton
+          variant="ghost"
+          size="sm-action"
+          data-test="kubernetes-pack-view-btn"
+          @click="viewPack"
+        >
+          {{ t("starterPacks.home.viewPack") }}
+        </OButton>
         <OButton
           variant="ghost"
           size="icon-sm"

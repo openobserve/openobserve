@@ -17,14 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import { useStarterPackMatcher } from "@/composables/starterPacks/useStarterPackMatcher";
 import StarterPackDrawer from "./StarterPackDrawer.vue";
-import StarterPackInstallCard from "./StarterPackInstallCard.vue";
+import StarterPackInstallCard, { type StarterPackCardStatus } from "./StarterPackInstallCard.vue";
 
 const props = defineProps<{ org: string; clusterName?: string }>();
 const emit = defineEmits<{ offered: [offered: boolean] }>();
@@ -71,6 +70,34 @@ const startSetup = async () => {
     await flow.land();
   }
 };
+const showCard = computed(
+  () =>
+    matcher.state.value !== "error" &&
+    (flow.forbidden.value || pending.value || flow.interrupted.value || offering.value),
+);
+const status = computed<StarterPackCardStatus>(() => {
+  if (flow.forbidden.value) return "forbidden";
+  if (pending.value) return "checking";
+  if (flow.interrupted.value) return "interrupted";
+  if (flow.running.value) return "running";
+  if (flow.failed.value.length) return "failed";
+  if (matcher.waitedLong.value) return "waiting";
+  return "ready";
+});
+const primaryTestId = computed(() => {
+  if (status.value === "checking") return "first-event-status-pack-checking";
+  if (status.value === "waiting") return "first-event-status-pack-partial-btn";
+  return "first-event-status-pack-setup-btn";
+});
+const primaryLabel = computed(() => {
+  if (status.value === "interrupted") return t("starterPacks.progress.finish");
+  if (status.value === "waiting") return t("starterPacks.partial");
+  return undefined;
+});
+const onPrimary = () => {
+  if (flow.interrupted.value) drawerOpen.value = true;
+  else void startSetup();
+};
 const copyLink = () => copyToClipboard(flow.packLink(), t);
 </script>
 
@@ -85,8 +112,20 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
     >
       {{ t("starterPacks.retryCheck") }}
     </OButton>
-    <template v-else-if="flow.forbidden.value">
-      <OText data-test="first-event-status-pack-card">{{ t("starterPacks.noPermission") }}</OText>
+  </Teleport>
+  <StarterPackInstallCard
+    v-if="showCard"
+    :title="t(KUBERNETES_PACK.titleKey)"
+    :flow="flow"
+    :status="status"
+    :stream-count="matcher.streams.value.length"
+    test-id="first-event-status-pack-card"
+    :primary-label="primaryLabel"
+    :primary-test-id="primaryTestId"
+    @install="onPrimary"
+    @details="drawerOpen = true"
+  >
+    <template v-if="status === 'forbidden'" #actions>
       <OButton
         variant="outline"
         size="sm-action"
@@ -97,43 +136,7 @@ const copyLink = () => copyToClipboard(flow.packLink(), t);
         {{ t("starterPacks.copyLink") }}
       </OButton>
     </template>
-    <OButton
-      v-else-if="pending"
-      class="w-68"
-      variant="primary"
-      size="sm-action"
-      disabled
-      data-test="first-event-status-pack-checking"
-    >
-      {{ t("starterPacks.checking") }}
-    </OButton>
-    <template v-else-if="flow.interrupted.value">
-      <OButton
-        class="w-68"
-        variant="primary"
-        size="sm-action"
-        data-test="first-event-status-pack-setup-btn"
-        @click="drawerOpen = true"
-      >
-        {{ t("starterPacks.progress.finish") }}
-      </OButton>
-    </template>
-  </Teleport>
-  <StarterPackInstallCard
-    :title="t(KUBERNETES_PACK.titleKey)"
-    v-if="offering && !pending && !flow.interrupted.value && !flow.forbidden.value"
-    :flow="flow"
-    :stream-count="matcher.streams.value.length"
-    test-id="first-event-status-pack-card"
-    :primary-label="matcher.waitedLong.value ? t('starterPacks.partial') : undefined"
-    :primary-test-id="
-      matcher.waitedLong.value
-        ? 'first-event-status-pack-partial-btn'
-        : 'first-event-status-pack-setup-btn'
-    "
-    @install="startSetup"
-    @details="drawerOpen = true"
-  />
+  </StarterPackInstallCard>
   <StarterPackDrawer
     v-model:open="drawerOpen"
     :flow="flow"

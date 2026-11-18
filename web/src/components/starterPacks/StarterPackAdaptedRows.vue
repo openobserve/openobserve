@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { PackBinding, PackQuestion } from "@/composables/starterPacks/types";
 import type { StarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
@@ -26,7 +27,7 @@ import StarterPackRepairDialog from "./StarterPackRepairDialog.vue";
 
 const VISIBLE_FIELDS = 3;
 
-const props = defineProps<{ flow: StarterPackFlow }>();
+const props = defineProps<{ flow: StarterPackFlow; readonly?: boolean }>();
 
 const { t } = useI18nTyped();
 
@@ -132,6 +133,7 @@ const changeBinding = (binding: PackBinding) => {
     >
       <template #actions>
         <OButton
+          v-if="!readonly"
           variant="outline"
           size="sm-action"
           data-test="starter-pack-adapted-choose-btn"
@@ -148,10 +150,14 @@ const changeBinding = (binding: PackBinding) => {
         class="border-border-default flex items-center justify-between gap-3 border-b py-1"
         data-test="starter-pack-adapted-stream"
       >
-        <span class="min-w-0 truncate" :title="String(questionRow(question))">{{
-          questionRow(question)
-        }}</span>
+        <div class="flex min-w-0 items-center gap-2">
+          <OIcon name="swap-horiz" size="sm" class="text-text-secondary shrink-0" />
+          <span class="min-w-0 truncate" :title="String(questionRow(question))">{{
+            questionRow(question)
+          }}</span>
+        </div>
         <OButton
+          v-if="!readonly"
           variant="ghost-primary"
           size="sm-action"
           data-test="starter-pack-adapted-change-btn"
@@ -173,6 +179,7 @@ const changeBinding = (binding: PackBinding) => {
           })
         }}</span>
         <OButton
+          v-if="!readonly"
           variant="ghost-primary"
           size="sm-action"
           data-test="starter-pack-adapted-field-change-btn"

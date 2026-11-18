@@ -36,7 +36,7 @@ const MINUTE_US = 60 * 1_000_000;
 const HOUR_US = 60 * MINUTE_US;
 
 const props = withDefaults(
-  defineProps<{ org: string; variant?: "button" | "row"; dailyToggle?: boolean }>(),
+  defineProps<{ org: string; variant?: "button" | "link"; dailyToggle?: boolean }>(),
   { variant: "button", dailyToggle: false },
 );
 
@@ -144,28 +144,19 @@ const toggleDaily = async (on: unknown) => {
 </script>
 
 <template>
-  <div
-    v-if="variant === 'row'"
-    class="border-border-default rounded-surface mt-2.5 flex items-center justify-between gap-3 border px-3 py-2"
-    data-test="starter-pack-find-more-row"
+  <OButton
+    v-if="variant === 'link'"
+    variant="ghost-primary"
+    size="sm"
+    icon-right="keyboard-double-arrow-right"
+    data-test="starter-pack-find-more-btn"
+    @click="openFinder"
   >
-    <OText class="text-text-secondary text-sm">
-      {{
-        suggested > 0
-          ? t("starterPacks.findMore.homeRow", { count: suggested }, suggested)
-          : t("starterPacks.findMore.homeRowIdle")
-      }}
-    </OText>
-    <OButton
-      variant="outline"
-      size="sm"
-      icon-left="search"
-      data-test="starter-pack-find-more-btn"
-      @click="openFinder"
-    >
-      {{ suggested > 0 ? t("starterPacks.findMore.review") : t("starterPacks.findMore.title") }}
-    </OButton>
-  </div>
+    {{ t("starterPacks.home.findOther") }}
+    <OBadge v-if="suggested > 0" variant="primary-soft" data-test="starter-pack-find-more-count">
+      {{ suggested }}
+    </OBadge>
+  </OButton>
   <OButton
     v-else
     variant="outline"

@@ -72,9 +72,7 @@ describe("StarterPackLandingRow", () => {
     expect(wrapper.get('[data-test="kubernetes-pack-installed-message"]').text()).toBe(
       "Kubernetes pack installed · 2 items",
     );
-    expect(wrapper.get('[data-test="kubernetes-pack-undo-btn"]').text()).toBe(
-      "Undo — remove all 2",
-    );
+    expect(wrapper.get('[data-test="kubernetes-pack-undo-btn"]').text()).toBe("Undo setup");
     expect(wrapper.get('[data-test="kubernetes-pack-undo-left"]').text()).toBe("available for 5 h");
     expect(has(wrapper, "kubernetes-pack-view-btn")).toBe(true);
     expect(wrapper.get('[data-test="kubernetes-pack-scope"]').text()).toContain("c1");

@@ -22,7 +22,8 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { ALERT_LIBRARY_S3_BASE } from "@/constants/alertLibrary";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -63,6 +64,11 @@ const ROW_KEYS: Partial<Record<PackItemKind, I18nKey>> = {
   savedView: "starterPacks.progress.rowViews",
 };
 
+const SEVERITY_BADGES: Record<string, "error-soft" | "warning-soft"> = {
+  critical: "error-soft",
+  warning: "warning-soft",
+};
+
 const flow = props.flow;
 const pack = flow.pack;
 const title = t(pack.titleKey);
@@ -83,8 +89,10 @@ const host = computed(() => raw(new URL(ALERT_LIBRARY_S3_BASE).host));
 const preview = computed(() => flow.preview.value);
 const planned = (kind: PackItemKind) =>
   (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
-const streamOf = (itemId: string) =>
-  pack.bundledAlerts?.find(({ entry }) => entry.id === itemId)?.entry.stream ?? "";
+const entryOf = (itemId: string) =>
+  pack.bundledAlerts?.find(({ entry }) => entry.id === itemId)?.entry;
+const streamOf = (itemId: string) => entryOf(itemId)?.stream ?? "";
+const severityOf = (itemId: string) => entryOf(itemId)?.severity;
 const notIncluded = computed(() => {
   // A preview read after the install finds the pack's own items as existing.
   const madeIds = new Set(flow.made.value.map(({ itemId }) => itemId));
@@ -116,6 +124,24 @@ const panelNote = computed(() => {
     ? t("starterPacks.drawer.panelsFit", { count: kept }, kept)
     : t("starterPacks.drawer.dashboardNote");
 });
+
+const installedLine = computed(() => {
+  const record = flow.record.value;
+  if (!record) return "";
+  const date = raw(
+    record.installedAt
+      ? new Date(record.installedAt / 1000).toLocaleString()
+      : t("starterPacks.libraryTabs.unknownDate"),
+  );
+  return record.installedBy
+    ? t("starterPacks.libraryTabs.installedBy", { who: raw(record.installedBy), date })
+    : t("starterPacks.libraryTabs.installedByUnknown", { date });
+});
+const reachLine = computed(() =>
+  pack.clusterScoped
+    ? t("starterPacks.drawer.reachScoped", { scope: raw(packScopeValue(t, props.clusters)) })
+    : t("starterPacks.drawer.reach"),
+);
 
 const total = computed(() => flow.toCreate.value.length);
 const made = computed(() => flow.made.value.length);
@@ -208,7 +234,12 @@ const askConfirm = (mode: "undo" | "remove") => {
       class="flex flex-col gap-3 text-sm"
       data-test="starter-pack-installed"
     >
-      <strong data-test="starter-pack-progress-summary">{{ summary }}</strong>
+      <strong class="text-text-heading" data-test="starter-pack-progress-summary">{{
+        summary
+      }}</strong>
+      <OText v-if="installedLine" variant="meta" data-test="starter-pack-installed-by">{{
+        installedLine
+      }}</OText>
       <OText v-if="pack.clusterScoped" variant="meta" data-test="starter-pack-progress-scope">{{
         scope
       }}</OText>
@@ -218,7 +249,11 @@ const askConfirm = (mode: "undo" | "remove") => {
           :key="row.kind"
           class="border-border-default flex items-center gap-2 border-b py-2"
         >
-          <OIcon :name="row.done ? 'check-circle' : 'schedule'" size="sm" />
+          <OIcon
+            :name="row.done ? 'check-circle' : 'schedule'"
+            size="sm"
+            :class="row.done ? 'text-status-positive' : 'text-text-muted'"
+          />
           <strong>{{ row.word }}</strong>
           <span>{{ row.label }}</span>
           <OText v-if="row.off" variant="meta">{{ t("starterPacks.progress.alertsOff") }}</OText>
@@ -228,13 +263,11 @@ const askConfirm = (mode: "undo" | "remove") => {
 
     <div
       v-else-if="flow.previewState.value === 'loading'"
-      class="flex flex-col gap-3"
+      class="text-text-secondary flex items-center gap-2 text-sm"
       data-test="starter-pack-drawer-loading"
     >
-      <OSkeleton class="h-5 w-full" />
-      <OSkeleton class="h-5 w-full" />
-      <OSkeleton class="h-5 w-3/4" />
-      <OSkeleton class="h-5 w-1/2" />
+      <OSpinner size="sm" />
+      <span>{{ t("starterPacks.drawer.loadingFit") }}</span>
     </div>
 
     <div
@@ -252,7 +285,7 @@ const askConfirm = (mode: "undo" | "remove") => {
       </OButton>
     </div>
 
-    <div v-else class="flex flex-col gap-4 text-sm" data-test="starter-pack-drawer-items">
+    <div v-else class="flex flex-col gap-2 text-sm" data-test="starter-pack-drawer-items">
       <OBanner
         v-if="flow.installFailed.value"
         variant="error-soft"
@@ -261,121 +294,115 @@ const askConfirm = (mode: "undo" | "remove") => {
         data-test="starter-pack-drawer-install-error"
       />
 
-      <section
-        v-if="planned('dashboard').length"
-        class="flex flex-col gap-2"
-        data-test="starter-pack-drawer-dashboards"
-      >
-        <OText variant="section">{{
-          t(
-            "starterPacks.manifest.dashboards",
-            { count: planned("dashboard").length },
-            planned("dashboard").length,
-          )
-        }}</OText>
-        <div class="grid grid-cols-3 gap-2">
+      <section v-if="planned('dashboard').length" data-test="starter-pack-drawer-dashboards">
+        <OCollapsible
+          :label="
+            t(
+              'starterPacks.manifest.dashboards',
+              { count: planned('dashboard').length },
+              planned('dashboard').length,
+            )
+          "
+          :caption="t('starterPacks.drawer.folderValue', { name: raw(pack.folder.name) })"
+        >
           <div
             v-for="item in planned('dashboard')"
             :key="item.itemId"
-            class="border-border-default rounded-default flex flex-col overflow-hidden border"
+            class="border-border-default flex items-center gap-2 border-b py-2"
             data-test="starter-pack-drawer-dashboard-card"
           >
-            <div
-              class="bg-surface-subtle text-text-secondary flex h-14 items-center justify-center"
-            >
-              <OIcon name="dashboard" size="md" />
+            <OIcon name="dashboard" size="sm" class="text-text-secondary shrink-0" />
+            <span class="min-w-0 truncate">{{ raw(flow.nameOf(item.itemId)) }}</span>
+          </div>
+          <OText variant="meta" class="pt-2" data-test="starter-pack-drawer-panels">{{
+            panelNote
+          }}</OText>
+        </OCollapsible>
+      </section>
+
+      <section v-if="planned('alert').length" data-test="starter-pack-drawer-alerts">
+        <OCollapsible
+          default-open
+          :label="
+            t(
+              'starterPacks.drawer.groupAlerts',
+              { count: planned('alert').length },
+              planned('alert').length,
+            )
+          "
+          :caption="t('starterPacks.drawer.alertsSilentMeta')"
+        >
+          <div
+            v-for="item in planned('alert')"
+            :key="item.itemId"
+            class="border-border-default flex items-center justify-between gap-3 border-b py-2"
+            data-test="starter-pack-drawer-alert-row"
+          >
+            <div class="flex min-w-0 flex-col">
+              <span class="truncate">{{ raw(flow.nameOf(item.itemId)) }}</span>
+              <OText v-if="streamOf(item.itemId)" variant="meta" class="truncate">{{
+                raw(streamOf(item.itemId))
+              }}</OText>
             </div>
-            <span class="truncate px-2 py-1">{{ raw(flow.nameOf(item.itemId)) }}</span>
+            <OBadge
+              v-if="severityOf(item.itemId)"
+              :variant="SEVERITY_BADGES[severityOf(item.itemId)!] ?? 'default-soft'"
+              size="sm"
+              class="shrink-0"
+              data-test="starter-pack-drawer-alert-severity"
+              >{{ raw(severityOf(item.itemId) ?? "") }}</OBadge
+            >
           </div>
-        </div>
-        <OText variant="meta" data-test="starter-pack-drawer-panels">{{ panelNote }}</OText>
+        </OCollapsible>
       </section>
 
-      <section
-        v-if="planned('alert').length"
-        class="flex flex-col"
-        data-test="starter-pack-drawer-alerts"
-      >
-        <OText variant="section" class="pb-1">{{
-          t(
-            "starterPacks.manifest.alerts",
-            { count: planned("alert").length },
-            planned("alert").length,
-          )
-        }}</OText>
-        <div
-          v-for="item in planned('alert')"
-          :key="item.itemId"
-          class="border-border-default flex items-center justify-between gap-3 border-b py-2"
-          data-test="starter-pack-drawer-alert-row"
+      <section v-if="planned('savedView').length" data-test="starter-pack-drawer-saved-searches">
+        <OCollapsible
+          :label="
+            t(
+              'starterPacks.drawer.groupSavedViews',
+              { count: planned('savedView').length },
+              planned('savedView').length,
+            )
+          "
+          :caption="t('starterPacks.drawer.savedViewsNote')"
         >
-          <span class="min-w-0 truncate">{{ raw(flow.nameOf(item.itemId)) }}</span>
-          <OText variant="mono" class="shrink-0">{{ raw(streamOf(item.itemId)) }}</OText>
-        </div>
-      </section>
-
-      <section
-        v-if="planned('savedView').length"
-        class="flex flex-col"
-        data-test="starter-pack-drawer-saved-searches"
-      >
-        <OText variant="section" class="pb-1">{{
-          t(
-            "starterPacks.manifest.savedSearches",
-            { count: planned("savedView").length },
-            planned("savedView").length,
-          )
-        }}</OText>
-        <div
-          v-for="item in planned('savedView')"
-          :key="item.itemId"
-          class="border-border-default flex items-center justify-between gap-3 border-b py-2"
-        >
-          <span class="min-w-0 truncate">{{ raw(flow.nameOf(item.itemId)) }}</span>
-          <OText variant="meta">{{ t("starterPacks.manifest.savedSearch") }}</OText>
-        </div>
-      </section>
-
-      <section
-        v-if="notIncluded.length"
-        class="flex flex-col"
-        data-test="starter-pack-drawer-not-included"
-      >
-        <OText variant="section" class="pb-1">{{
-          t("starterPacks.manifest.leftOut", { count: notIncluded.length }, notIncluded.length)
-        }}</OText>
-        <div
-          v-for="row in notIncluded"
-          :key="row.key"
-          class="border-border-default flex items-center gap-2 border-b py-2"
-        >
-          <OBadge variant="default-soft" size="sm">{{ row.tag }}</OBadge>
-          <OText variant="meta">{{ row.text }}</OText>
-        </div>
-      </section>
-
-      <section class="flex flex-col" data-test="starter-pack-drawer-reach">
-        <OText variant="section" class="pb-1">{{ t("starterPacks.manifest.adapted") }}</OText>
-        <StarterPackAdaptedRows :flow="flow" />
-        <div
-          v-if="pack.clusterScoped"
-          class="border-border-default flex justify-between gap-3 border-b py-2"
-        >
-          <div class="flex flex-col">
-            <span>{{ t("starterPacks.drawer.scope") }}</span>
-            <OText variant="meta">{{ t("starterPacks.drawer.scopeNote") }}</OText>
+          <div
+            v-for="item in planned('savedView')"
+            :key="item.itemId"
+            class="border-border-default flex items-center gap-2 border-b py-2"
+          >
+            <OIcon name="bookmark" size="sm" class="text-text-secondary shrink-0" />
+            <span class="min-w-0 truncate">{{ raw(flow.nameOf(item.itemId)) }}</span>
           </div>
-          <span class="text-right">{{ packScopeValue(t, clusters) }}</span>
-        </div>
-        <div class="border-border-default flex justify-between gap-3 border-b py-2">
-          <div class="flex flex-col">
-            <span>{{ t("starterPacks.drawer.background") }}</span>
-            <OText variant="meta">{{ t("starterPacks.drawer.backgroundNote") }}</OText>
-          </div>
-          <span class="shrink-0">{{ t("starterPacks.drawer.backgroundValue") }}</span>
-        </div>
+        </OCollapsible>
       </section>
 
+      <section v-if="notIncluded.length" data-test="starter-pack-drawer-not-included">
+        <OCollapsible
+          :label="t('starterPacks.drawer.notIncluded')"
+          :caption="
+            t('starterPacks.manifest.leftOut', { count: notIncluded.length }, notIncluded.length)
+          "
+        >
+          <div
+            v-for="row in notIncluded"
+            :key="row.key"
+            class="border-border-default flex items-center gap-2 border-b py-2"
+          >
+            <OBadge variant="default-soft" size="sm">{{ row.tag }}</OBadge>
+            <OText variant="meta">{{ row.text }}</OText>
+          </div>
+        </OCollapsible>
+      </section>
+
+      <section data-test="starter-pack-drawer-reach">
+        <OCollapsible :label="t('starterPacks.manifest.adapted')">
+          <StarterPackAdaptedRows :flow="flow" />
+        </OCollapsible>
+      </section>
+
+      <OText variant="meta" data-test="starter-pack-drawer-reach-line">{{ reachLine }}</OText>
       <OText variant="meta" data-test="starter-pack-drawer-source">{{
         t(preview?.offline ? "starterPacks.drawer.sourceOffline" : "starterPacks.drawer.source", {
           host,
@@ -385,6 +412,14 @@ const askConfirm = (mode: "undo" | "remove") => {
 
     <template #footer>
       <div class="flex w-full items-center gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="starter-pack-drawer-close-btn"
+          @click="open = false"
+        >
+          {{ t("starterPacks.drawer.close") }}
+        </OButton>
         <template v-if="flow.forbidden.value">
           <OText class="flex-1">{{ t("starterPacks.noPermission") }}</OText>
           <OButton
@@ -419,6 +454,11 @@ const askConfirm = (mode: "undo" | "remove") => {
           </OButton>
         </template>
         <template v-else>
+          <OText variant="meta" class="flex-1" data-test="starter-pack-drawer-note">{{
+            nothingToCreate
+              ? t("starterPacks.drawer.nothingToCreate")
+              : t("starterPacks.manifest.footerNote")
+          }}</OText>
           <OButton
             v-if="nothingToCreate"
             variant="primary"
@@ -438,11 +478,6 @@ const askConfirm = (mode: "undo" | "remove") => {
           >
             {{ t("starterPacks.card.install", { count: createCount }, createCount) }}
           </OButton>
-          <OText variant="meta" class="flex-1 text-right" data-test="starter-pack-drawer-note">{{
-            nothingToCreate
-              ? t("starterPacks.drawer.nothingToCreate")
-              : t("starterPacks.manifest.footerNote")
-          }}</OText>
         </template>
       </div>
     </template>

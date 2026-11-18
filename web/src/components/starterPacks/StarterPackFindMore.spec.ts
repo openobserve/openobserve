@@ -142,13 +142,15 @@ describe("StarterPackFindMore", () => {
     expect(has(render({ dailyToggle: true }), "starter-pack-find-more-daily")).toBe(false);
   });
 
-  it("counts the daily suggestions on the button and the Home row", () => {
+  it("counts the daily suggestions on the button and the Home link", () => {
     fake.daily.enabled.value = true;
     fake.daily.last.value = { checkedAt: 1, sources: [NGINX], dismissed: 0 };
     expect(render().get('[data-test="starter-pack-find-more-count"]').text()).toBe("1");
-    expect(
-      render({ variant: "row" }).get('[data-test="starter-pack-find-more-row"]').text(),
-    ).toContain("1 source has new matches for your data");
+    const link = render({ variant: "link" });
+    expect(link.get('[data-test="starter-pack-find-more-btn"]').text()).toContain(
+      "Find packs for other data",
+    );
+    expect(link.get('[data-test="starter-pack-find-more-count"]').text()).toBe("1");
   });
 
   it("follows the drawer's latest check once one has run", () => {

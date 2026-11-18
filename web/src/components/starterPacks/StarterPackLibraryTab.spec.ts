@@ -128,7 +128,7 @@ describe("StarterPackLibraryTab", () => {
     expect(wrapper.get('[data-test="library-tab-chip-ready"]').text()).toBe("Fits your data · 1");
     expect(wrapper.get('[data-test="library-tab-chip-all"]').text()).toBe("All · 1");
     expect(wrapper.get('[data-test="library-tab-install-kubernetes"]').text()).toBe(
-      "Install 4 items",
+      "Set up Kubernetes monitoring",
     );
     expect(wrapper.find('[data-test="library-tab-see-kubernetes"]').exists()).toBe(true);
   });
@@ -169,7 +169,7 @@ describe("StarterPackLibraryTab", () => {
     const items = wrapper.get('[data-test="library-tab-items-one"]').text();
     expect(items).toContain("1 of 2 items installed");
     expect(items).toContain("1 item could not be created");
-    expect(wrapper.get('[data-test="library-tab-state-one"]').text()).toBe("Installed");
+    expect(wrapper.get('[data-test="library-tab-state-one"]').text()).toBe("1 failed");
     expect(wrapper.find('[data-test="library-tab-open-dashboard-one"]').exists()).toBe(true);
   });
 
