@@ -43,6 +43,8 @@ import {
   takeValueGuardSnapshot,
   VALUE_WAIT_BUDGET_MS,
   buildOperatorLane,
+  buildFilledValueEntries,
+  buildFilledWordEntries,
   isCaretInComment,
   isPredicatePosition,
   parseOperatorContext,
@@ -1765,5 +1767,112 @@ describe("isValueFunction — what may stand as a comparison operand", () => {
       expect(isValueFunction(SQL_FUNCTIONS.find((f) => f.name === name)), name).toBe(false);
     }
     expect(isValueFunction(SQL_FUNCTIONS.find((f) => f.name === "spath"))).toBe(true);
+  });
+});
+
+describe("buildFilledWordEntries — search functions with the typed word", () => {
+  const catalog = SQL_FUNCTIONS as any[];
+
+  it("offers every value-taking search function the catalog has, filled with the word", () => {
+    const rows = buildFilledWordEntries("error", catalog);
+    expect(rows.map((r) => `${r.label}${r.labelDetail}`)).toEqual([
+      "match_all('error')",
+      "str_match(…, 'error')",
+      "str_match_ignore_case(…, 'error')",
+      "re_match(…, 'error')",
+      "re_not_match(…, 'error')",
+    ]);
+    expect(rows[0].insertText).toBe("match_all('error')");
+    expect(rows[1]).toMatchObject({
+      insertText: "str_match(${1}, 'error')",
+      insertTextRules: "InsertAsSnippet",
+      command: { id: "editor.action.triggerSuggest" },
+    });
+  });
+
+  it("ranks after every name the word starts, without being filtered out by it", () => {
+    const rows = buildFilledWordEntries("Err", catalog);
+    for (const row of rows) {
+      expect(row.filterText).toBe("err\u0001");
+      expect(row.sortText! > "\u0003").toBe(true);
+    }
+    expect(matchesTyped(rows[0], "zzz")).toBe(true);
+  });
+
+  it("escapes a quote for SQL and a dollar sign for the snippet", () => {
+    const rows = buildFilledWordEntries("it's$1", catalog);
+    expect(rows[0].insertText).toBe("match_all('it''s$1')");
+    expect(rows[1].insertText).toBe("str_match(${1}, 'it''s\\$1')");
+  });
+
+  it("skips a function the catalog does not have, and offers nothing for no word", () => {
+    const onlyMatchAll = catalog.filter((e) => e.name === "match_all");
+    expect(buildFilledWordEntries("error", onlyMatchAll).map((r) => r.label)).toEqual([
+      "match_all",
+    ]);
+    expect(buildFilledWordEntries("", catalog)).toEqual([]);
+  });
+});
+
+describe("buildFilledValueEntries — the typed value as a string-search call", () => {
+  const catalog = SQL_FUNCTIONS as any[];
+  const build = (text: string, opts: Partial<Parameters<typeof buildFilledValueEntries>[0]> = {}) =>
+    buildFilledValueEntries({
+      context: parseValueContext(text)!,
+      textUntilCaret: text,
+      filterMode: true,
+      fieldType: "Utf8",
+      lineNumber: 1,
+      column: text.length + 1,
+      closingQuoteAhead: false,
+      catalog,
+      ...opts,
+    });
+  const apply = (text: string, after: string, row: any) => {
+    const line = text + after;
+    const edits = [
+      { ...row.additionalTextEdits[0].range, text: row.additionalTextEdits[0].text },
+      { ...row.range, text: row.insertText },
+    ].sort((a, b) => b.startColumn - a.startColumn);
+    return edits.reduce(
+      (out, e) => out.slice(0, e.startColumn - 1) + e.text + out.slice(e.endColumn - 1),
+      line,
+    );
+  };
+
+  it("rewrites a quoted value, swallowing the auto-closed quote", () => {
+    const text = "level = 'err";
+    const rows = build(text, { closingQuoteAhead: true });
+    expect(rows.map((r) => `${r.label}${r.labelDetail}`)).toEqual([
+      "str_match(level, 'err')",
+      "str_match_ignore_case(level, 'err')",
+      "re_match(level, 'err')",
+      "re_not_match(level, 'err')",
+    ]);
+    expect(apply(text, "' AND x", rows[0])).toBe("str_match(level, 'err') AND x");
+    expect(apply(text, "' AND x", rows[2])).toBe("re_match(level, 'err') AND x");
+    // The main edit starts after the quote, so Monaco filters by what was typed.
+    expect(rows[0].range!.startColumn).toBe(text.length + 1 - "err".length);
+  });
+
+  it("rewrites a bare value and keeps what comes before the field", () => {
+    const text = "code = 'x' AND level = err";
+    const rows = build(text);
+    expect(apply(text, "", rows[1])).toBe("code = 'x' AND str_match_ignore_case(level, 'err')");
+  });
+
+  it("offers nothing for an empty value, another operator, a number column or a non-predicate", () => {
+    expect(build("level = '")).toEqual([]);
+    expect(build("level != 'err")).toEqual([]);
+    expect(build("level >= 'err")).toEqual([]);
+    expect(build("level IN ('err")).toEqual([]);
+    expect(build("code = 'err", { fieldType: "Int64" })).toEqual([]);
+    expect(build("SELECT level = 'err", { filterMode: false })).toEqual([]);
+    expect(build("WHERE t.level = 'err", { filterMode: false })).toEqual([]);
+  });
+
+  it("works in a full query's WHERE clause and on a column of unknown type", () => {
+    const text = 'SELECT * FROM "default" WHERE level = \'warn';
+    expect(build(text, { filterMode: false, fieldType: undefined })).toHaveLength(4);
   });
 });

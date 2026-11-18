@@ -3083,11 +3083,7 @@ describe("SearchBar", () => {
       await flushPromises();
       searchObjInstance.data.editorValue = "";
       searchObjInstance.meta.queryEditorPlaceholderFlag = true;
-      const vm = wrapper.vm as unknown as {
-        recentFocusOpen: boolean;
-        toggleFilterBuilder: () => void;
-      };
-      vm.toggleFilterBuilder();
+      const vm = wrapper.vm as unknown as { recentFocusOpen: boolean };
       vm.recentFocusOpen = false;
       await flushPromises();
       expect(wrapper.find(".query-editor-placeholder-overlay").exists()).toBe(true);
@@ -3164,7 +3160,7 @@ describe("SearchBar", () => {
         >);
       store.state.zoConfig.query_history_enabled = true;
       queryClient.clear();
-      localStorage.removeItem("o2.traces.queryInput");
+      localStorage.setItem("o2.traces.queryInput", "builder");
       searchObjInstance.data.editorValue = "";
       wrapper = mountSearchBar();
       await flushPromises();
@@ -3178,6 +3174,7 @@ describe("SearchBar", () => {
         expect.objectContaining({ id: "a" }),
       ]);
       expect(wrapper.emitted("recent-restore")![0][2]).toBe(true);
+      localStorage.removeItem("o2.traces.queryInput");
       delete store.state.zoConfig.query_history_enabled;
       list.mockRestore();
       count.mockRestore();

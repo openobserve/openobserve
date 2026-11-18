@@ -93,6 +93,8 @@ export interface SqlCompletionEntry {
   additionalTextEdits?: unknown[];
   /** A group header or status row: navigation and Tab step over it, and accepting it changes nothing. */
   skipRow?: boolean;
+  /** Built from the typed text, so the typed-text filter always keeps it. */
+  filled?: boolean;
 }
 
 /** An entry as it may arrive from the `suggestions` prop — callers outside this
