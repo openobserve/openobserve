@@ -41,6 +41,8 @@ const PROMQL_WORDS = new Set(
 
 const VARIABLE = /\$\{?(\w+)/g;
 
+const LABEL_LIST = /\b(?:by|without|on|ignoring|group_left|group_right)\s*\(([^)]*)\)/gi;
+
 const addAll = <T>(target: Set<T>, values: Iterable<T>) => {
   for (const value of values) target.add(value);
 };
@@ -73,12 +75,12 @@ const sqlNeeds = (query: string): PanelNeeds => {
 const promqlNeeds = (query: string): PanelNeeds => {
   const variables = new Set([...query.matchAll(VARIABLE)].map((match) => match[1]));
   const text = query
-    .replace(/"[^"]*"/g, '""')
+    .replace(/"[^"]*"|'[^']*'/g, '""')
     .replace(/#[^\n]*/g, " ")
     .replace(VARIABLE, "");
   const streams = new Set<string>();
   const fields = new Set<string>();
-  for (const [, labels] of text.matchAll(/\b(?:by|without)\s*\(([^)]*)\)/gi)) {
+  for (const [, labels] of text.matchAll(LABEL_LIST)) {
     addAll(fields, labels.match(/\w+/g) ?? []);
   }
   for (const [, block] of text.matchAll(/\{([^}]*)\}/g)) {
@@ -88,7 +90,7 @@ const promqlNeeds = (query: string): PanelNeeds => {
     );
   }
   const bare = text
-    .replace(/\b(?:by|without)\s*\([^)]*\)/gi, " ")
+    .replace(LABEL_LIST, " ")
     .replace(/\{[^}]*\}/g, " ")
     .replace(/\[[^\]]*\]/g, " ");
   for (const [, name] of bare.matchAll(/\b([a-zA-Z_:][\w:]*)\b(?!\s*\()/g)) {
@@ -97,11 +99,15 @@ const promqlNeeds = (query: string): PanelNeeds => {
   return { streams, fields, variables };
 };
 
+/** The streams and fields one query reads. */
+export const queryNeeds = (query: string, type: "promql" | "sql"): PanelNeeds =>
+  type === "promql" ? promqlNeeds(query) : sqlNeeds(query);
+
 const panelNeeds = (panel: Record<string, any>): PanelNeeds => {
   const needs: PanelNeeds = { streams: new Set(), fields: new Set(), variables: new Set() };
   for (const query of panel.queries ?? []) {
     const text = String(query.query ?? "");
-    const part = panel.queryType === "promql" ? promqlNeeds(text) : sqlNeeds(text);
+    const part = queryNeeds(text, panel.queryType === "promql" ? "promql" : "sql");
     addAll(needs.streams, part.streams);
     addAll(needs.fields, part.fields);
     addAll(needs.variables, part.variables);
@@ -141,6 +147,10 @@ const compact = (panels: Array<Record<string, any>>) => {
     return { ...panel, layout };
   });
 };
+
+/** What each panel reads, for the readiness check. */
+export const dashboardPanelNeeds = (doc: Record<string, any>): PanelNeeds[] =>
+  (doc.tabs ?? []).flatMap((tab: Record<string, any>) => (tab.panels ?? []).map(panelNeeds));
 
 /** Every stream a dashboard could read, so a caller fetches each schema once. */
 export const dashboardStreams = (doc: Record<string, any>): string[] => {

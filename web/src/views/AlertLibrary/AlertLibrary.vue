@@ -71,7 +71,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <div class="flex min-h-0 flex-1">
+      <template v-if="packsEnabled" #subnav>
+        <OTabs
+          :model-value="libraryTab"
+          align="left"
+          class="px-page-edge"
+          data-test="alert-library-tabs"
+          @change="onLibraryTabChange"
+        >
+          <OTab
+            v-for="tab in LIBRARY_TABS"
+            :key="tab"
+            :name="tab"
+            :data-test="`alert-library-tab-${tab}`"
+          >
+            {{ t(`starterPacks.libraryTabs.${tab}`) }}
+          </OTab>
+        </OTabs>
+      </template>
+
+      <StarterPackLibraryTab
+        v-if="libraryTab !== 'alerts'"
+        :key="libraryTab"
+        :org="store.state.selectedOrganization?.identifier"
+        :view="libraryTab"
+      />
+      <div v-else class="flex min-h-0 flex-1">
         <div class="w-rail border-border-default h-full shrink-0 border-e max-md:hidden">
           <LibraryRail
             :categories="categoryFacets"
@@ -375,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -411,9 +436,13 @@ import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { KUBERNETES_PACK } from "@/composables/starterPacks/kubernetesPack";
+import StarterPackLibraryTab from "@/components/starterPacks/StarterPackLibraryTab.vue";
+import { KUBERNETES_PACK, STARTER_PACKS } from "@/composables/starterPacks/kubernetesPack";
+import { ingestTimes, matchAlerts } from "@/composables/starterPacks/packMatchData";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -432,11 +461,16 @@ import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 /** Where the alerts are authored. Not the serving URL — that is a constant. */
 const CONTRIBUTE_URL = "https://github.com/openobserve/o2-alerts-library";
+const LIBRARY_TABS = ["alerts", "packs", "dashboards"] as const;
 
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const packsEnabled = STARTER_PACKS_ENABLED;
+const libraryTab = ref<(typeof LIBRARY_TABS)[number]>("alerts");
+const onLibraryTabChange = (tab: string | number) => {
+  libraryTab.value = tab as (typeof LIBRARY_TABS)[number];
+};
 const openPack = () =>
   router
     .push({
@@ -447,6 +481,8 @@ const openPack = () =>
     .catch(() => {});
 
 const { manifest, isLoading, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
+const packVerdicts = shallowRef<Map<string, boolean> | null>(null);
+let matchRun = 0;
 const anomalyAccess = useAnomalyLibraryAccess();
 const { open: openEditionUpgradeDialog } = useEnterpriseUpgradeDialog();
 const { lockedReason: anomalyLockedReason } = useLicenseLock("anomaly_detection");
@@ -540,8 +576,10 @@ const errorDescription = computed(() => {
 });
 
 // ── readiness ──────────────────────────────────────────────────────────────
-const entryReady = (entry: AlertLibraryEntry): boolean =>
-  readinessKnown.value ? isReady(entry, streamsByType.value) : true;
+const entryReady = (entry: AlertLibraryEntry): boolean => {
+  if (!readinessKnown.value) return true;
+  return packVerdicts.value?.get(entry.id) ?? isReady(entry, streamsByType.value);
+};
 
 const isLocked = (entry: AlertLibraryEntry): boolean =>
   anomalyAccess.value !== "enabled" && alertTypeOf(entry) === "anomaly";
@@ -1005,6 +1043,25 @@ const goToIngestion = () => {
   });
 };
 
+// Falls back to the stream names, so a failed check never reads as "no data".
+const matchEntries = async (list: Parameters<typeof ingestTimes>[0]) => {
+  const org = store.state.selectedOrganization?.identifier;
+  matchRun += 1;
+  const run = matchRun;
+  let verdicts: Map<string, boolean> | null = null;
+  try {
+    await loadManifest();
+    verdicts = await matchAlerts(org, entries.value, ingestTimes(list), {
+      loadFile: loadAlertFile,
+      packs: STARTER_PACKS,
+    });
+  } catch {
+    verdicts = null;
+  }
+  // A slower, older refresh must not overwrite a newer answer.
+  if (run === matchRun) packVerdicts.value = verdicts;
+};
+
 const loadStreams = async () => {
   streamsPending.value = true;
   try {
@@ -1015,6 +1072,7 @@ const loadStreams = async () => {
     };
     streamsByType.value = toStreamsByType(payload?.list);
     readinessKnown.value = true;
+    if (packsEnabled) await matchEntries(payload?.list);
   } catch {
     // Keep whatever verdict we already had. Clearing it here meant a failed
     // REFRESH threw away a correct answer: streamsByType still held the good

@@ -23,7 +23,12 @@ import store from "@/test/unit/helpers/store";
 import type { StarterPack } from "./types";
 import { StarterPackPermissionError } from "./types";
 
-const library = vi.hoisted(() => ({ down: false }));
+const library = vi.hoisted(() => ({ down: false, matcher: false, lastIngested: 0 }));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return library.matcher;
+  },
+}));
 const fake = vi.hoisted(() => {
   type Row = Record<string, any>;
   type Fault = { method: string; url: RegExp; status?: number; afterCommit?: boolean };
@@ -48,7 +53,8 @@ const fake = vi.hoisted(() => {
   const commit = (method: string, url: string, body: any, config?: Row) => {
     let match: RegExpMatchArray | null;
     if (url.includes("/streams")) {
-      return reply({ list: [{ name: "kube_present" }], schema: [{ name: "value" }] });
+      const stats = { doc_time_max: library.lastIngested };
+      return reply({ list: [{ name: "kube_present", stats }], schema: [{ name: "value" }] });
     }
     if (url.endsWith("/parse_tree")) {
       if (state.parseFails) throw httpError(state.parseFails);
@@ -188,7 +194,7 @@ vi.mock("@/composables/alerts/useAlertLibrary", async () => {
           destinations: ["someone"],
           enabled: true,
           trigger_condition: {},
-          query_condition: { type: "promql", promql: "s" },
+          query_condition: { type: "promql", promql: library.matcher ? "kube_present" : "s" },
         };
       },
     }),
@@ -490,6 +496,20 @@ describe("useStarterPacks", () => {
   });
 
   describe("previewPack", () => {
+    it("leaves out an alert the shared matcher rejects once the constant is on", async () => {
+      library.matcher = true;
+      const stale = (Date.now() - 25 * 60 * 60 * 1000) * 1000;
+      const reasons = async (lastIngested: number) => {
+        library.lastIngested = lastIngested;
+        const { notIncluded } = await packs().previewPack(PACK);
+        return notIncluded.map(({ itemId }) => itemId);
+      };
+      const [live, old] = [await reasons(Date.now() * 1000), await reasons(stale)];
+      library.matcher = false;
+      expect(live).not.toContain("k8s/one");
+      expect(old).toContain("k8s/one");
+    });
+
     it("names items and gives a reason for each one left out, creating nothing", async () => {
       fake.state.views.push({ view_id: "v9", view_name: "Events", data: {}, view_type: "logs" });
       const preview = await packs().previewPack({
