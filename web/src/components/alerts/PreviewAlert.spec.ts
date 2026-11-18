@@ -2852,6 +2852,7 @@ describe("PromQL rule preview", () => {
       formData: {
         stream_name: "",
         stream_type: "metrics",
+        pending_period_sec: 600,
         trigger_condition: { period: 5, threshold: 1, operator: ">=" },
         query_condition: {
           promql_rule_mode: true,
@@ -2863,7 +2864,9 @@ describe("PromQL rule preview", () => {
     await flushPromises();
     expect(searchService.metrics_query).toHaveBeenCalled();
     expect(w.vm.evaluationStatus?.wouldTrigger).toBe(true);
-    expect(w.vm.evaluationStatus?.reason).toContain("2 returned series");
+    expect(w.vm.evaluationStatus?.reason).toBe(
+      i18n.global.t("alerts.form.preview.ruleMatch", { count: 2, duration: "10 minutes" }, 2),
+    );
     w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
       options: { series: [] },
     });

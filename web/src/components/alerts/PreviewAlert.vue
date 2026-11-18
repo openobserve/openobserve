@@ -138,7 +138,7 @@ import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import { keyToMs } from "@/utils/alerts/alertBacktest";
 import { isCountLimit, previewCountText } from "@/utils/alerts/alertReadBack";
-import { formatNumber, valueWithUnit } from "@/utils/alerts/alertCopy";
+import { durationText, formatNumber, valueWithUnit } from "@/utils/alerts/alertCopy";
 import { promqlValueUnit, type MetricMeta } from "@/utils/alerts/alertValueUnit";
 import { noSeriesReason, noSeriesSentence, selectorsOf } from "@/utils/alerts/promqlNoSeries";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
@@ -1709,9 +1709,17 @@ const refreshRulePreview = async (at: number) => {
       !props.formData.query_condition?.promql_rule_mode
     )
       return;
+    const holdSec = Number(props.formData.pending_period_sec) || 0;
     evaluationStatus.value = {
       wouldTrigger: count > 0,
-      reason: t("alerts.promRulePreview", { count }),
+      reason:
+        holdSec > 0
+          ? t(
+              "alerts.form.preview.ruleMatch",
+              { count: formatNumber(count), duration: durationText(holdSec, t) },
+              count,
+            )
+          : t("alerts.form.preview.ruleMatchNow", { count: formatNumber(count) }, count),
     };
   } catch {
     if (generation === rulePreviewGeneration) evaluationStatus.value = null;
