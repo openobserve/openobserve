@@ -212,6 +212,18 @@ describe("QueryVariableEditor", () => {
     wrapper.unmount();
   });
 
+  it("shows a parent set to All as All, not the internal placeholder", async () => {
+    routeQuery.value = { period: "1h", "var-svc": "_o2_all_" };
+    const wrapper = mountEditor({ query: "SELECT host FROM t WHERE service IN ($svc)" }, [
+      { name: "svc", type: "query_values", multiSelect: true, options: [] },
+    ]);
+    await flushPromises();
+    expect(wrapper.find('[data-test="dashboard-variable-query-parent-svc"]').text()).toBe(
+      "$svc = All",
+    );
+    wrapper.unmount();
+  });
+
   it("previews SQL rows in a table and defaults the value column to the first column", async () => {
     streamRespondsWith([
       { service: "checkout", errors: 4 },

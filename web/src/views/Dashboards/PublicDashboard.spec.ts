@@ -815,6 +815,24 @@ describe("PublicDashboard viewer", () => {
     expect(list.map((v: { value: string }) => v.value)).toEqual(["default-env"]);
   });
 
+  it("shows a variable frozen at All as All, not the internal placeholder", async () => {
+    vi.mocked(service.getConfig).mockResolvedValue({
+      data: {
+        ...CONFIG,
+        variables: [
+          { label: "svc", value: ["_o2_all_"] },
+          { label: "env", value: "_o2_all_" },
+        ],
+      },
+      status: 200,
+    } as never);
+    vi.mocked(service.getData).mockResolvedValue(okSnapshot([]) as never);
+    const w = buildWrapper();
+    await flushPromises();
+    const list = grid(w).props("dashboardData").variables.list;
+    expect(list.map((v: { value: string }) => v.value)).toEqual(["All", "All"]);
+  });
+
   it("names each frozen variable as the dashboard does, so a panel title resolves its value", async () => {
     vi.mocked(service.getConfig).mockResolvedValue({
       data: {

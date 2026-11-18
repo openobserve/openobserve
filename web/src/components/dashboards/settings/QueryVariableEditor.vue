@@ -264,6 +264,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import { generateTraceContext } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { extractVariableNames } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
   defaultSqlValueColumn,
   getQueryVariableMaxRecords,
@@ -389,7 +390,11 @@ const referencedParents = computed(() => {
     .filter((v) => referenced.includes(v.name))
     .map((v) => {
       const values = Array.isArray(v.value) ? v.value : [v.value];
-      const shown = values.filter((value) => value !== null && value !== undefined && value !== "");
+      const shown = values
+        .filter((value) => value !== null && value !== undefined && value !== "")
+        .map((value) =>
+          value === SELECT_ALL_VALUE ? t("dashboard.variableQueryValueSelector.all") : value,
+        );
       return { name: v.name, display: shown.length ? shown.join(", ") : "—" };
     });
 });
