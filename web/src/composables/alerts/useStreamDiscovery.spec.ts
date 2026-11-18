@@ -57,12 +57,18 @@ describe("streamOptions", () => {
 
   it.each([
     {
-      name: "receiving first with last event and rate, no-data streams last and greyed",
-      streams: [row("old", 2 * DAY_US), row("nginx", 12_000_000), row("never", null)],
+      name: "receiving first with last event and rate, system streams after user ones, no-data last and greyed",
+      streams: [
+        row("_sys", 12_000_000),
+        row("old", 2 * DAY_US),
+        row("nginx", 12_000_000),
+        row("never", null),
+      ],
       recent: [],
       expected: [
         ["Receiving data", undefined],
         ["nginx", "Last event 12 s ago · 22K/h"],
+        ["_sys", "Last event 12 s ago · 22K/h"],
         ["No recent data", undefined],
         ["old", "No data in 24 h"],
         ["never", "No data in 24 h"],
@@ -226,14 +232,26 @@ describe("value counts", () => {
     expect(text && String(text)).toBe(hint);
   });
 
-  it("trusts a cut-off top list once a lookup for the value itself finds nothing", async () => {
-    answerWith({ "": full, rare: [] });
+  it.each([
+    {
+      name: "a look-alike found by the value's first letters is named first",
+      answers: { "": full, OOMK: [["OOMKilling", 412]] as [string, number][] },
+      typed: "OOMKilled",
+      hint: "OOMKilled hasn't appeared in the last 24 hours. Seen: OOMKilling (412), v0 (100), v1 (99), and 18 more.",
+    },
+    {
+      name: "a value beyond the cut-off top list is seen",
+      answers: { "": full, rare: [["rare", 2]] as [string, number][] },
+      typed: "rare",
+      hint: undefined,
+    },
+  ])("$name, once its lookup answers", async ({ answers, typed, hint }) => {
+    answerWith(answers);
     await loadValueCounts(ctx, "reason");
-    expect(valueNotSeenHint(ctx, "reason", ["rare"], "eq", t)).toBeUndefined();
+    expect(valueNotSeenHint(ctx, "reason", [typed], "eq", t)).toBeUndefined();
     await flush();
-    expect(String(valueNotSeenHint(ctx, "reason", ["rare"], "eq", t))).toContain(
-      "rare hasn't appeared",
-    );
+    const text = valueNotSeenHint(ctx, "reason", [typed], "eq", t);
+    expect(text && String(text)).toBe(hint);
   });
 });
 

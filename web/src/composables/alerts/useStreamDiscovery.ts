@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive } from "vue";
-import store from "@/stores";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
@@ -41,6 +40,8 @@ export const VALUE_COUNT_SIZE = 20;
 const CACHE_TTL_MS = 5 * 60_000;
 const RECENT_MAX = 3;
 const SEEN_MAX = 3;
+// A lookup by a value's first letters also finds its look-alikes (OOMKilled → OOMKilling).
+const PROBE_PREFIX = 4;
 const METRIC_TYPE_KEYS = {
   counter: "metrics.badge.counter",
   gauge: "metrics.badge.gauge",
@@ -143,8 +144,8 @@ export function recentStreams(org: string, streamType: string): string[] {
 }
 
 /**
- * Picker rows for a stream list: Recent, Receiving data, then No recent data (greyed), each in the
- * incoming order; headings only when more than one group has rows.
+ * Picker rows for a stream list: Recent, Receiving data, then No recent data (greyed), user streams
+ * before system ones in each; headings only when more than one group has rows.
  */
 export function streamOptions(
   streams: DiscoveryStream[],
@@ -154,9 +155,10 @@ export function streamOptions(
   const { familyOfStream } = buildMetricFamilies(
     streams.filter((s) => s.stream_type === "metrics" || s.metrics_meta),
   );
-  const rows = streams
-    .filter((stream) => stream?.name)
-    .map((stream): StreamOption => {
+  const isSystem = (s: DiscoveryStream) => s.is_internal === true || s.name.startsWith("_");
+  const named = streams.filter((stream) => stream?.name);
+  const rows = [...named.filter((s) => !isSystem(s)), ...named.filter(isSystem)].map(
+    (stream): StreamOption => {
       const freshness = streamFreshness(stream.stats, nowUs);
       const family = familyOfStream.get(stream.name);
       const meta = family
@@ -170,7 +172,8 @@ export function streamOptions(
         searchText: meta?.help ? meta.help.toLowerCase() : undefined,
         stale: !freshness.receiving,
       };
-    });
+    },
+  );
   const recentNames = new Set((options.recent ?? []).filter(Boolean).slice(0, RECENT_MAX));
   const groups: [I18nText, StreamOption[]][] = [
     [t("alerts.discovery.groupRecent"), rows.filter((row) => recentNames.has(row.value))],
@@ -316,23 +319,54 @@ const matches = (seen: string, typed: string, operator: FilterOperatorId) => {
 
 /** "Seen: OOMKilling (412), Killing (53,920)": the values closest to what was typed first, then the busiest. */
 export function seenList(typed: string, values: ValueCount[], t: TranslateFn): I18nText {
-  const ranked = [...values].sort(
-    (a, b) => sharedPrefix(b.value, typed) - sharedPrefix(a.value, typed) || b.count - a.count,
+  const best = new Map<string, number>();
+  for (const v of values) if (v.value) best.set(v.value, Math.max(best.get(v.value) ?? 0, v.count));
+  const ranked = [...best].sort(
+    ([a, x], [b, y]) => sharedPrefix(b, typed) - sharedPrefix(a, typed) || y - x,
   );
   return joinListMore(
-    ranked.map((v) =>
-      String(
-        t("alerts.discovery.valueCount", { value: raw(v.value), count: formatNumber(v.count) }),
-      ),
+    ranked.map(([value, count]) =>
+      String(t("alerts.discovery.valueCount", { value: raw(value), count: formatNumber(count) })),
     ),
     t,
     SEEN_MAX,
   );
 }
 
+// Asked outside the caller's render; the reactive cache brings the answer back.
+const probe = (ctx: ValueCountContext, field: string, keyword: string) => {
+  const entry = cachedValueCounts(ctx, field, keyword);
+  if (!entry) queueMicrotask(() => void loadValueCounts(ctx, field, keyword));
+  return entry?.state === "ready" ? entry : undefined;
+};
+
+/**
+ * Whether a value appeared, from the top list, else a lookup by its first letters (which also finds
+ * look-alikes), else by the whole value; undefined while a lookup runs.
+ */
+function lookupSeen(
+  ctx: ValueCountContext,
+  field: string,
+  base: ValueCountEntry,
+  typed: string,
+  operator: FilterOperatorId,
+): { seen: boolean | undefined; nearby: ValueCount[] } {
+  const hit = (entry: ValueCountEntry) =>
+    entry.values.some((v) => matches(v.value, typed, operator));
+  if (hit(base)) return { seen: true, nearby: [] };
+  if (!base.truncated) return { seen: false, nearby: [] };
+  const prefix = probe(ctx, field, typed.slice(0, PROBE_PREFIX));
+  if (!prefix) return { seen: undefined, nearby: [] };
+  if (hit(prefix)) return { seen: true, nearby: [] };
+  if (!prefix.truncated || typed.length <= PROBE_PREFIX)
+    return { seen: false, nearby: prefix.values };
+  const whole = probe(ctx, field, typed);
+  return { seen: whole ? hit(whole) : undefined, nearby: prefix.values };
+}
+
 /**
  * The amber note for a chip whose value never appeared in the window, or nothing while unknown.
- * A truncated top list is only trusted after a keyword lookup for the value itself.
+ * A truncated top list is only trusted after a lookup for the value itself.
  */
 export function valueNotSeenHint(
   ctx: ValueCountContext | null,
@@ -345,18 +379,18 @@ export function valueNotSeenHint(
   const base = cachedValueCounts(ctx, field);
   if (base?.state !== "ready") return undefined;
   if (!base.values.length) return t("alerts.discovery.fieldEmpty");
-  const unseen = typedValues.filter((typed) => {
-    if (!typed || base.values.some((v) => matches(v.value, typed, operator))) return false;
-    if (!base.truncated) return true;
-    const probe = cachedValueCounts(ctx, field, typed);
-    // Asked outside the caller's render; the reactive cache brings the answer back.
-    if (!probe) queueMicrotask(() => void loadValueCounts(ctx, field, typed));
-    return probe?.state === "ready" && !probe.values.some((v) => matches(v.value, typed, operator));
-  });
+  const unseen: string[] = [];
+  const nearby: ValueCount[] = [];
+  for (const typed of typedValues.filter(Boolean)) {
+    const found = lookupSeen(ctx, field, base, typed, operator);
+    if (found.seen !== false) continue;
+    unseen.push(typed);
+    nearby.push(...found.nearby);
+  }
   if (!unseen.length) return undefined;
   return t("alerts.guard.valueNotSeen", {
     value: joinList(unseen),
-    seen: seenList(unseen[0], base.values, t),
+    seen: seenList(unseen[0], [...nearby, ...base.values], t),
   });
 }
 
