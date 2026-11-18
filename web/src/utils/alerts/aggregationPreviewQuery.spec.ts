@@ -130,6 +130,27 @@ describe("cleanAggregationQuery", () => {
     expect(cleaned).toMatch(/GROUP BY 1\b/);
     expect(cleaned).not.toMatch(/GROUP BY zo_sql_key\b/);
   });
+
+  it("drops the per-group severity ORDER BY, whose quoted alias the rename cannot reach", () => {
+    const sql =
+      'SELECT "service_name", approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY "duration") AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "default" GROUP BY "service_name" ORDER BY CASE WHEN "alert_agg_value" > 500000 THEN 2 ELSE 0 END DESC, "service_name"';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).not.toContain("alert_agg_value");
+    expect(cleaned).toMatch(/GROUP BY 1, "service_name"$/);
+    expect(cleaned).toContain('WITHIN GROUP (ORDER BY "duration") AS zo_sql_num');
+    expect(parensBalanced(cleaned)).toBe(true);
+  });
+
+  it("moves an aggregate whose arguments hold a comma as one SELECT entry", () => {
+    const sql =
+      'SELECT histogram(_timestamp) AS zo_sql_key, approx_percentile_cont(duration, 0.95) as zo_sql_val , concat(service_name) as x_axis_2 FROM "default" GROUP BY zo_sql_key , x_axis_2 ORDER BY zo_sql_key ASC';
+
+    expect(cleanAggregationQuery(sql)).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, approx_percentile_cont(duration, 0.95) as zo_sql_num , concat(service_name) as x_axis_2 FROM "default" GROUP BY zo_sql_key , x_axis_2',
+    );
+  });
 });
 
 describe("buildCountChartQuery", () => {

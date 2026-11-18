@@ -159,6 +159,12 @@ export const cleanAggregationQuery = (query: string): string => {
   if (havingMatch && havingMatch.index !== undefined) {
     cleaned = cleaned.slice(0, havingMatch.index);
   }
+  // A per-group query's severity ORDER BY names the quoted "alert_agg_value",
+  // which the alias rename below skips; a chart has no use for that order.
+  const orderByMatch = maskForKeywordSearch(cleaned).match(/\s+ORDER\s+BY\s+/i);
+  if (orderByMatch && orderByMatch.index !== undefined) {
+    cleaned = cleaned.slice(0, orderByMatch.index);
+  }
   // Remove zo_sql_min_time and zo_sql_max_time from SELECT list
   cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_min_time/g, "");
   cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_max_time/g, "");
@@ -205,14 +211,15 @@ export const cleanAggregationQuery = (query: string): string => {
       }
     }
   }
-  // Move zo_sql_num field to sit right after zo_sql_key in the SELECT list.
-  // Pattern: remove ", <expr> AS zo_sql_num" from wherever it is, then
-  // re-insert it immediately after the zo_sql_key field expression.
-  const numFieldMatch = cleaned.match(/,\s*([^,]+?\s+[aA][sS]\s+zo_sql_num)/);
-  if (numFieldMatch) {
-    const numExpr = numFieldMatch[1].trim();
+  // Move zo_sql_num to sit right after zo_sql_key, matched on the masked copy so
+  // a comma inside the aggregate's call (percentile(x, 0.95)) can't split the entry.
+  const numFieldMatch = maskForKeywordSearch(cleaned).match(/,\s*[^,]+?\s+[aA][sS]\s+zo_sql_num\b/);
+  if (numFieldMatch && numFieldMatch.index !== undefined) {
+    const start = numFieldMatch.index;
+    const end = start + numFieldMatch[0].length;
+    const numExpr = cleaned.slice(start, end).replace(/^,/, "").trim();
     // Remove the original occurrence (with its leading comma)
-    cleaned = cleaned.replace(numFieldMatch[0], "");
+    cleaned = cleaned.slice(0, start) + cleaned.slice(end);
     // Insert right after zo_sql_key field (before the next comma or FROM)
     cleaned = cleaned.replace(/(\bzo_sql_key\b(?:\s*\))?)/i, `$1, ${numExpr}`);
   }
