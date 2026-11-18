@@ -169,6 +169,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSeparator class="mt-1 shrink-0" />
               <div
+                v-if="missingStreams.length"
+                class="flex flex-col gap-2 p-2.5 text-sm"
+                data-test="dashboard-import-stream-map"
+              >
+                <strong>{{ t("dashboard.importDashboardPage.streamMapTitle") }}</strong>
+                <div v-for="stream in missingStreams" :key="stream" class="w-75">
+                  <OSelect
+                    v-model="streamChoices[stream]"
+                    :options="streamNames"
+                    searchable
+                    :label="
+                      t('dashboard.importDashboardPage.streamMapLabel', { stream: raw(stream) })
+                    "
+                    :data-test="`dashboard-import-stream-map-${stream}`"
+                  />
+                </div>
+              </div>
+              <div
                 class="error-section mb-2.5 min-h-0 flex-1 overflow-auto p-2.5"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
@@ -278,7 +296,7 @@ import {
   watch,
   defineAsyncComponent,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList, dedupeDashboardIds } from "../../utils/commons.js";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -300,6 +318,11 @@ import OFormFile from "@/lib/forms/File/OFormFile.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { readQuery } from "@/composables/query/readQuery";
+import { dashboardStreams } from "@/composables/starterPacks/dashboardFit";
+import { rewriteDashboard } from "@/composables/starterPacks/streamRewriter";
+import { useRewriteChecks } from "@/composables/starterPacks/useRewriteChecks";
+import { streamNameListQuery } from "@/services/stream.queries";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import analytics from "@/services/product_analytics";
@@ -324,6 +347,11 @@ export default defineComponent({
     // Monaco editor content (a non-OForm* code editor, bridged at @submit).
     // url + jsonFiles are form-owned and read below via form.useStore.
     const jsonStr = ref("");
+    const missingStreams = ref<string[]>([]);
+    const streamNames = ref<string[]>([]);
+    let missingStreamsRun = 0;
+    const streamChoices = reactive<Record<string, string>>({});
+    const rewriteChecks = useRewriteChecks(store.state.selectedOrganization.identifier);
 
     const tabs = reactive([
       {
@@ -428,6 +456,7 @@ export default defineComponent({
     });
 
     watch(jsonStr, (newVal) => {
+      void refreshMissingStreams(newVal);
       if (newVal) {
         try {
           // If newVal is an object, stringify it directly
@@ -496,13 +525,81 @@ export default defineComponent({
     // Counts confirmed creates for the running import action; a later refresh failure must not hide them.
     let createdInAction = 0;
 
+    const parsedDashboards = (value: unknown): any[] => {
+      const parsed = typeof value === "string" ? JSON.parse(value || "[]") : value;
+      const list = Array.isArray(parsed) ? parsed : [parsed];
+      return list.flatMap((entry) =>
+        typeof entry === "string" ? parsedDashboards(entry) : [entry],
+      );
+    };
+
+    // A name counts as present only under the type its panel reads.
+    const panelStreamTypes = (dashboards: any[]) => {
+      const types = new Map<string, string>();
+      for (const dashboard of dashboards) {
+        for (const tab of dashboard?.tabs ?? []) {
+          for (const panel of tab.panels ?? []) {
+            for (const { fields } of panel.queries ?? []) {
+              if (fields?.stream && fields.stream_type)
+                types.set(fields.stream, fields.stream_type);
+            }
+          }
+        }
+      }
+      return types;
+    };
+
+    const refreshMissingStreams = async (value: unknown) => {
+      missingStreamsRun += 1;
+      const run = missingStreamsRun;
+      try {
+        const dashboards = parsedDashboards(value);
+        const wanted = dashboards.flatMap(dashboardStreams);
+        if (!wanted.length) {
+          missingStreams.value = [];
+          return;
+        }
+        const types = ["logs", "metrics", "traces"];
+        const lists = await Promise.all(
+          types.map((type) =>
+            readQuery(streamNameListQuery(store.state.selectedOrganization.identifier, type)),
+          ),
+        );
+        if (run !== missingStreamsRun) return;
+        const byType = new Map(
+          types.map((type, index) => [type, new Set(lists[index].map(({ name }) => name))]),
+        );
+        const panelTypes = panelStreamTypes(dashboards);
+        streamNames.value = [...new Set(lists.flat().map(({ name }) => name))];
+        missingStreams.value = [...new Set(wanted)].filter((name) => {
+          const own = byType.get(panelTypes.get(name) ?? "");
+          return own ? !own.has(name) : !streamNames.value.includes(name);
+        });
+      } catch {
+        if (run === missingStreamsRun) missingStreams.value = [];
+      }
+    };
+
+    const chosenRenames = () =>
+      missingStreams.value
+        .filter((from) => streamChoices[from])
+        .map((from) => ({ from, to: streamChoices[from] }));
+
     const importDashboardFromJSON = async (jsonObj: any, selectedFolder: any) => {
-      const data =
+      const parsed =
         typeof jsonObj == "string"
           ? JSON.parse(jsonObj)
           : typeof jsonObj == "object"
             ? jsonObj
             : jsonObj;
+      const renames = chosenRenames();
+      const data = renames.length
+        ? (
+            await rewriteDashboard(parsed, renames, rewriteChecks).catch(() => {
+              throw new Error(t("dashboard.importDashboardPage.streamRewriteFailed"));
+            })
+          ).doc
+        : parsed;
 
       //set owner name and creator name to import dashboard
       data.owner = store.state.userInfo.name;
@@ -912,6 +1009,11 @@ export default defineComponent({
       goToCommunityDashboards,
       updateDashboardTitle,
       updateStreamType,
+      missingStreams,
+      streamNames,
+      streamChoices,
+      importDashboardFromJSON,
+      raw,
       streamTypeOptions,
       streamTypeSelectOptions,
       dashboardTitles,

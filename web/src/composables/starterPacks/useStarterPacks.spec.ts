@@ -37,6 +37,7 @@ const fake = vi.hoisted(() => {
     faults: [] as Fault[],
     calls: [] as string[],
     tagSearchLag: 0,
+    parseFails: 0,
   };
   const reply = (data: unknown) => ({ status: 200, data });
   const httpError = (status: number) => Object.assign(new Error("http"), { response: { status } });
@@ -48,6 +49,10 @@ const fake = vi.hoisted(() => {
     let match: RegExpMatchArray | null;
     if (url.includes("/streams")) {
       return reply({ list: [{ name: "kube_present" }], schema: [{ name: "value" }] });
+    }
+    if (url.endsWith("/parse_tree")) {
+      if (state.parseFails) throw httpError(state.parseFails);
+      return reply({ data: { type: "selector", name: (body as Row).query, matchers: [] } });
     }
     if ((match = url.match(/\/kv\/(.+)$/))) {
       const key = decodeURIComponent(match[1]);
@@ -183,6 +188,7 @@ vi.mock("@/composables/alerts/useAlertLibrary", async () => {
           destinations: ["someone"],
           enabled: true,
           trigger_condition: {},
+          query_condition: { type: "promql", promql: "s" },
         };
       },
     }),
@@ -244,6 +250,74 @@ describe("useStarterPacks", () => {
       faults: [],
       calls: [],
       tagSearchLag: 0,
+      parseFails: 0,
+    });
+  });
+
+  describe("stream repairs", () => {
+    const repairs = [{ from: "s", to: "renamed" }];
+
+    it("rewrites the alert before create and records the repair", async () => {
+      const record = await packs().installPack(PACK, { repairs });
+      expect(fake.state.alerts[0].stream_name).toBe("renamed");
+      expect(fake.state.alerts[0].query_condition.promql).toBe("renamed");
+      expect(record.repairs).toEqual(repairs);
+    });
+
+    it("skips an alert the rewrite cannot check and finishes the rest", async () => {
+      fake.state.parseFails = 400;
+      const record = await packs().installPack(PACK, { repairs });
+      expect(fake.state.alerts).toHaveLength(0);
+      expect(record.items.filter(({ status }) => status === "skipped")).toHaveLength(2);
+      expect(record.status).toBe("complete");
+    });
+  });
+
+  it("keeps editing the other alerts after one recorded alert was deleted", async () => {
+    const api = packs();
+    const record = await api.installPack(PACK);
+    const [gone, kept] = record.items.filter(({ kind }) => kind === "alert");
+    fake.state.alerts = fake.state.alerts.filter((alert) => alert.id !== gone.id);
+    const work = vi.fn(async () => "done");
+    expect(await api.trackAlertEdit(PACK, [gone.id!, kept.id!], work)).toBe("done");
+  });
+
+  it("marks an alert failed, not skipped, when the check is down", async () => {
+    fake.state.parseFails = 503;
+    const record = await packs().installPack(PACK, { repairs: [{ from: "s", to: "r" }] });
+    expect(record.items.filter(({ status }) => status === "failed")).toHaveLength(2);
+    expect(record.status).toBe("incomplete");
+  });
+
+  describe("Set up in", () => {
+    it("uses the chosen folder and keeps it on the record", async () => {
+      const record = await packs().installPack(PACK, { folderName: "Platform" });
+      expect(fake.state.folders.alerts[0].name).toBe("Platform");
+      expect(record.folderName).toBe("Platform");
+    });
+  });
+
+  describe("trackAlertEdit", () => {
+    it("lets Undo remove an alert the pack itself changed", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      await api.trackAlertEdit(PACK, [fake.state.alerts[0].id], async () => {
+        fake.state.alerts[0].enabled = true;
+      });
+      const { kept } = await api.undoPack(PACK, record.installId);
+      expect(kept).toEqual([]);
+      expect(fake.state.alerts).toHaveLength(0);
+    });
+
+    it("still detects an edit the user made first", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      fake.state.alerts[0].description = "mine";
+      await api.trackAlertEdit(PACK, [fake.state.alerts[0].id], async () => {
+        fake.state.alerts[0].enabled = true;
+      });
+      const { kept } = await api.undoPack(PACK, record.installId);
+      expect(kept.map(({ reason }) => reason)).toContain("changed");
     });
   });
 

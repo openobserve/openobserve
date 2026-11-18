@@ -40,6 +40,7 @@ const CLOCK_TICK_MS = 60_000;
 export type PackPreviewState = "idle" | "loading" | "ready" | "error";
 
 const countsAsItem = (item: PackRecordItem) => item.kind !== "folder";
+const notSkipped = (item: PackRecordItem) => item.status !== "skipped";
 
 const newestRecord = (rows: PackInstallRecord[]): PackInstallRecord | null => {
   const live = rows.filter((row) => row.status !== "removed");
@@ -52,7 +53,15 @@ const newestRecord = (rows: PackInstallRecord[]): PackInstallRecord | null => {
 export function useStarterPackFlow(org: string, pack: StarterPack) {
   const store = useStore();
   const router = useRouter();
-  const { installPack, previewPack, undoPack, removePack, listInstalls } = useStarterPacks(org);
+  const {
+    installPack,
+    previewPack,
+    undoPack,
+    removePack,
+    listInstalls,
+    trackAlertEdit,
+    writeRecord,
+  } = useStarterPacks(org);
 
   const record = shallowRef<PackInstallRecord | null>(null);
   const loaded = ref(false);
@@ -84,13 +93,19 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const items = computed(() => (record.value?.items ?? []).filter(countsAsItem));
   const made = computed(() => items.value.filter(({ status }) => status === "created"));
   const failed = computed(() => items.value.filter(({ status }) => status === "failed"));
-  const toCreate = computed(() => items.value.filter(({ status }) => status !== "existing"));
+  const skipped = computed(() => items.value.filter(({ status }) => status === "skipped"));
+  const toCreate = computed(() =>
+    items.value.filter((item) => item.status !== "existing" && notSkipped(item)),
+  );
   const interrupted = computed(
     () => !running.value && !!record.value && record.value.status !== "complete",
   );
   const installed = computed(() => record.value?.status === "complete");
   const alertsTotal = computed(
     () => items.value.filter(({ kind, status }) => kind === "alert" && status === "created").length,
+  );
+  const remindAlerts = computed(
+    () => alertsTotal.value > 0 && alertsOn.value === 0 && !record.value?.keptOff,
   );
   const alertsOff = computed(() => Math.max(0, alertsTotal.value - alertsOn.value));
   const undoLeftUs = computed(() => {
@@ -106,6 +121,19 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const readAlertsOn = async () => {
     const rows = await readQuery(alertsByTagsQuery(org, [`pack:${pack.id}`]), true);
     alertsOn.value = rows.filter((row) => row.enabled).length;
+  };
+
+  /** The address a colleague opens, so it must survive leaving this browser. */
+  const packLink = () => {
+    const { href } = router.resolve(packRoute.value);
+    return new URL(href, window.location.origin).href;
+  };
+
+  const keepOff = async () => {
+    if (!record.value) return;
+    const next = { ...record.value, keptOff: true };
+    await writeRecord(next);
+    record.value = next;
   };
 
   const load = async () => {
@@ -150,6 +178,12 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     },
   }));
 
+  const packRoute = computed(() => ({
+    name: "starterPack",
+    params: { pack: pack.id },
+    query: { org_identifier: org },
+  }));
+
   const isOpenable = ({ kind, id }: PackRecordItem) => kind === "dashboard" && !!id;
   // With nothing left to create there is no record, only the dashboard the preview found.
   const dashboardItem = computed(
@@ -170,15 +204,18 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     await router.push({ name: "viewDashboard", query }).catch(() => {});
   };
 
-  const install = async (): Promise<boolean> => {
+  const install = async (folderName?: string): Promise<boolean> => {
     if (running.value) return false;
     running.value = true;
     installFailed.value = false;
     forbidden.value = false;
     try {
-      const exclude = leftOutIds(preview.value ?? (await previewPack(pack)));
+      const plan = preview.value ?? (await previewPack(pack));
+      const exclude = leftOutIds(plan);
       const done = await installPack(pack, {
         exclude,
+        repairs: plan.repairs,
+        folderName,
         onProgress: (next) => (record.value = { ...next, items: [...next.items] }),
       });
       record.value = { ...done, items: [...done.items] };
@@ -235,6 +272,7 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     installed,
     interrupted,
     isAdmin,
+    keepOff,
     items,
     land,
     licensed,
@@ -245,14 +283,19 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     made,
     nameOf,
     pack,
+    packLink,
+    packRoute,
     preview,
     previewState,
     record,
+    remindAlerts,
     remove,
     removal,
     removalFailed,
     running,
+    skipped,
     toCreate,
+    trackAlertEdit,
     undo,
     undoLeftUs,
     viewCount,

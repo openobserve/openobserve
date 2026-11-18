@@ -29,7 +29,7 @@ const render = async () => {
     props: { org: "org" },
     global: {
       plugins: [i18n],
-      stubs: { StarterPackDrawer: true, StarterPackUndoDialog: true },
+      stubs: { StarterPackDrawer: true, StarterPackUndoDialog: true, TurnOnAlertsDrawer: true },
     },
   });
   fake.flow.record.value = { status: "complete" };
@@ -52,7 +52,10 @@ describe("StarterPackLandingRow", () => {
   it("shows nothing and spends nothing without an install", async () => {
     const wrapper = mount(StarterPackLandingRow, {
       props: { org: "org" },
-      global: { plugins: [i18n], stubs: { StarterPackDrawer: true, StarterPackUndoDialog: true } },
+      global: {
+        plugins: [i18n],
+        stubs: { StarterPackDrawer: true, StarterPackUndoDialog: true, TurnOnAlertsDrawer: true },
+      },
     });
     await flushPromises();
     expect(has(wrapper, "kubernetes-pack-undo-row")).toBe(false);
@@ -75,8 +78,9 @@ describe("StarterPackLandingRow", () => {
     expect(wrapper.get('[data-test="kubernetes-pack-undo-left"]').text()).toBe("available for 5 h");
     expect(has(wrapper, "kubernetes-pack-view-btn")).toBe(true);
     expect(wrapper.get('[data-test="kubernetes-pack-scope"]').text()).toContain("c1");
-    await wrapper.get('[data-test="kubernetes-pack-turn-on-btn"]').trigger("click");
-    expect(fake.push).toHaveBeenCalled();
+    await wrapper.get('[data-test="kubernetes-pack-view-btn"]').trigger("click");
+    expect(fake.push).toHaveBeenCalledWith(expect.objectContaining({ name: "starterPack" }));
+    expect(has(wrapper, "kubernetes-pack-turn-on-btn")).toBe(true);
   });
 
   it("names the items that need attention with See which", async () => {
