@@ -344,7 +344,7 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
-import { isRequiredCondition } from "@/utils/traces/filterUtils";
+import { isRequiredCondition, mergeFilterTerm } from "@/utils/traces/filterUtils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -1979,11 +1979,15 @@ const onMetricsEditorFilterRun = (text: string) => {
 // Handler for Error Only toggle — only adds/removes span_status condition,
 // leaving all other filters (field sidebar, duration, etc.) intact.
 const onErrorOnlyToggled = (value: boolean) => {
-  if (value) {
-    searchBarRef.value?.applyFilters(["span_status = 'ERROR'"]);
-  } else {
+  if (!value) {
     searchBarRef.value?.removeFilterByField("span_status");
+    return;
   }
+  // ANDed onto the whole filter, so it holds for every row even when the filter has a top-level OR.
+  const text = mergeFilterTerm("span_status = 'ERROR'", searchObj.data.editorValue ?? "");
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
 // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)

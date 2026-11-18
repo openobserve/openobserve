@@ -2325,14 +2325,28 @@ describe("Index.vue (Main Traces Page)", () => {
       });
     });
 
-    it("should call applyFilters with error condition when error only toggle is turned on", async () => {
+    it.each([
+      [
+        "one with a top-level OR",
+        "service_name='a' OR span_status='ERROR'",
+        "(service_name='a' OR span_status='ERROR') and span_status = 'ERROR'",
+      ],
+      [
+        "a bracketed OR",
+        "(service_name='a' OR span_status='ERROR')",
+        "(service_name='a' OR span_status='ERROR') and span_status = 'ERROR'",
+      ],
+      ["a plain AND filter", "service_name='a'", "service_name='a' and span_status = 'ERROR'"],
+    ])("turning errors-only on ANDs the condition onto %s", async (_name, filter, expected) => {
+      mockSearchObj.data.editorValue = filter;
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
       wrapper.vm.onErrorOnlyToggled(true);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"]);
+      expect(mockSearchObj.data.editorValue).toBe(expected);
+      expect(mockSetEditorValue).toHaveBeenLastCalledWith(expected);
     });
 
     it("should call removeFilterByField when error only toggle is turned off", async () => {
