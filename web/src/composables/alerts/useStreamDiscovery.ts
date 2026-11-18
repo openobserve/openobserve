@@ -427,7 +427,7 @@ function unseenValues(
 }
 
 const andLeaves = (group: FilterGroup): FilterCondition[] | null => {
-  if (group.negate || group.items.slice(1).some((item) => item.connector !== "and")) return null;
+  if (group.negate || group.items.slice(1).some((item) => item.connector !== "AND")) return null;
   const leaves: FilterCondition[] = [];
   for (const item of group.items) {
     const inner = item.kind === "group" ? andLeaves(item) : item.kind === "condition" ? [item] : [];
@@ -448,9 +448,11 @@ export function filterNotSeenText(
   t: TranslateFn,
 ): I18nText | undefined {
   const day = (ctx.windowUs ?? DAY_US) === DAY_US;
-  for (const leaf of andLeaves(tree) ?? []) {
-    if (!EXACT_OPS.has(leaf.operator) || !leaf.values.length) continue;
-    probe(ctx, leaf.field, "");
+  const leaves = (andLeaves(tree) ?? []).filter(
+    (leaf) => EXACT_OPS.has(leaf.operator) && leaf.values.length,
+  );
+  leaves.forEach((leaf) => probe(ctx, leaf.field, ""));
+  for (const leaf of leaves) {
     const found = unseenValues(ctx, leaf.field, leaf.values, leaf.operator);
     if (found === undefined || (found !== "empty" && found.pending)) return undefined;
     if (found === "empty")

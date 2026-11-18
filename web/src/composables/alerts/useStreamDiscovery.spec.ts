@@ -271,7 +271,7 @@ describe("filterNotSeenText", () => {
     stream.mockReset();
     clearValueCounts();
   });
-  const leaf = (field: string, values: string[], connector: "and" | "or" = "and") => ({
+  const leaf = (field: string, values: string[], connector: "AND" | "OR" = "AND") => ({
     kind: "condition" as const,
     id: field,
     connector,
@@ -282,7 +282,7 @@ describe("filterNotSeenText", () => {
   const tree = (...items: ReturnType<typeof leaf>[]) => ({
     kind: "group" as const,
     id: "root",
-    connector: "and" as const,
+    connector: "AND" as const,
     items,
   });
   const halfHour = { ...ctx, windowUs: HOUR_US / 2 };
@@ -291,7 +291,7 @@ describe("filterNotSeenText", () => {
     [
       "the range's value counts",
       halfHour,
-      tree(leaf("severity", ["Warning"])),
+      tree(leaf("level", ["WARN"]), leaf("severity", ["Warning"])),
       'severity="Warning"',
       "30 minutes",
     ],
@@ -306,7 +306,7 @@ describe("filterNotSeenText", () => {
     [
       "nothing when an or joins the filters",
       halfHour,
-      tree(leaf("k8s", ["a"]), leaf("severity", ["Warning"], "or")),
+      tree(leaf("k8s", ["a"]), leaf("severity", ["Warning"], "OR")),
       undefined,
       undefined,
     ],
