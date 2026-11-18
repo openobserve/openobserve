@@ -123,7 +123,10 @@ const showsSummary = (item: SectionNavItem): boolean =>
             </span>
             <span
               v-if="showsSummary(item) || item.tag"
-              class="text-text-secondary flex min-w-0 gap-1.5 text-xs max-lg:sr-only"
+              :class="[
+                'flex min-w-0 gap-1.5 text-xs max-lg:sr-only',
+                isActive(item) ? 'text-text-body' : 'text-text-secondary',
+              ]"
             >
               <span
                 v-if="item.tag"

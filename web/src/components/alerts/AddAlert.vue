@@ -254,14 +254,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-h-0 min-w-0 shrink grow basis-5xl flex-col max-lg:flex-none lg:max-w-5xl"
         >
           <div
-            class="border-border-default flex shrink-0 items-center justify-end border-b px-4 py-2"
+            class="border-border-default flex shrink-0 items-center justify-end border-b px-4 py-1"
             data-test="add-alert-show-all-bar"
           >
             <OSwitch
               :model-value="showAll"
               :label="t('alerts.form.showAll')"
-              size="sm"
+              label-position="left"
               off-tone="neutral"
+              state-text
+              class="min-h-6"
               data-test="add-alert-show-all"
               @update:model-value="setShowAll(Boolean($event))"
             />

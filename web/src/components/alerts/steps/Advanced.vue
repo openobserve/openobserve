@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="tierShows('rowTemplate')"
                 :label="t('alerts.plain.rowTemplate')"
                 :class="denseRow"
-                :info="t('alerts.sections.rows.rowTemplate')"
+                :description="t('alerts.sections.rows.rowTemplate')"
                 fill
               >
                 <div class="flex flex-col gap-1">
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="priorityOptions"
                 :searchable="false"
                 clearable
-                width="xs"
+                width="sm"
                 :placeholder="
                   oncallEnabled ? t('alerts.priorityUnsetPagesAs') : t('alerts.priorityUnset')
                 "

@@ -139,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSwitch
             :model-value="!config.alert_enabled"
             off-tone="neutral"
+            state-text
             :aria-label="t('alerts.tiers.names.anomalyRecordOnly')"
             data-test="anomaly-alert-enabled"
             @update:model-value="setRecordOnly(Boolean($event))"

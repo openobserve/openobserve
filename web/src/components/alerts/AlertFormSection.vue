@@ -86,7 +86,7 @@ provide(SETTING_ROW_BARE_KEY, true);
         class="bg-surface-subtle border-border-default rounded-t-surface sticky top-0 z-30 flex items-start gap-3 border-b px-4 py-2 max-lg:static max-lg:z-auto"
       >
         <div class="flex min-w-0 flex-1 flex-col">
-          <span class="text-text-secondary text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
+          <span class="text-text-body text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
             {{
               def?.optional
                 ? t("alerts.sections.eyebrowOptional", { n: index, total })
@@ -101,10 +101,7 @@ provide(SETTING_ROW_BARE_KEY, true);
           >
             {{ title }}
           </h2>
-          <p
-            class="text-text-secondary text-compact m-0"
-            :data-test="`add-alert-section-${id}-help`"
-          >
+          <p class="text-text-body text-compact m-0" :data-test="`add-alert-section-${id}-help`">
             {{ help }}
           </p>
         </div>

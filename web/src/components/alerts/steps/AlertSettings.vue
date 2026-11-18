@@ -175,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :locked-target-names="formData?._ui?.lockedTargetNames"
             :target-required="destinationRequired"
             show-status
+            tooltip=""
             :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
@@ -184,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             ref="silenceFieldRef"
             :label="t('alerts.form.remind.label')"
-            :info="t('alerts.form.remind.help')"
+            :description="t('alerts.form.remind.help')"
             :class="denseRow"
             fill
           >
@@ -259,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSwitch
                 name="creates_incident"
                 off-tone="neutral"
+                state-text
                 :aria-label="t('alerts.alertSettings.createsIncident')"
                 data-test="alert-creates-incident-toggle"
               />
@@ -322,10 +324,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSettingRow
               v-if="tierShows('recovery')"
               :label="t('alerts.plain.notifyOnRecovery')"
-              :info="
-                notifiesNobody
-                  ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
-                  : t('alerts.alertSettings.notifyOnRecoveryTooltip')
+              :description="
+                notifiesNobody ? undefined : t('alerts.alertSettings.notifyOnRecoveryTooltip')
               "
               :class="denseRow"
               fill
@@ -336,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormSwitch
                   name="notify_on_recovery"
                   off-tone="neutral"
+                  state-text
                   :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
                   :disabled="notifiesNobody && !formData?.notify_on_recovery"
                   data-test="alert-notify-on-recovery-toggle"
@@ -388,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="tierShows('keepFiring')"
               ref="keepFiringForFieldRef"
               :label="t('alerts.form.keepFiring.label')"
-              :info="t('alerts.alertSettings.keepFiringForTooltip')"
+              :description="t('alerts.alertSettings.keepFiringForTooltip')"
               :class="denseRow"
               fill
             >
@@ -447,6 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSwitch
                 name="suppress_repeats"
                 off-tone="neutral"
+                state-text
                 :aria-label="t('alerts.alertSettings.suppressRepeats')"
                 data-test="alert-suppress-repeats-toggle"
               />

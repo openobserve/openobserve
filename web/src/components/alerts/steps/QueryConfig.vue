@@ -411,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
                       data-test="alert-group-by-row"
                       :label="t('alerts.plain.groupedBy')"
-                      :info="t('alerts.queryConfig.groupByTooltip')"
+                      :description="t('alerts.queryConfig.groupByTooltip')"
                       fill
                     >
                       <div class="flex flex-wrap items-center gap-2">
@@ -747,7 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tierShows('groupBy')
                       "
                       :label="t('alerts.plain.groupedBy')"
-                      :info="t('alerts.queryConfig.groupByTooltip')"
+                      :description="t('alerts.queryConfig.groupByTooltip')"
                       fill
                     >
                       <div class="flex flex-wrap items-center gap-2">
@@ -1221,6 +1221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormSwitch
                       name="query_condition.promql_rule_mode"
                       off-tone="neutral"
+                      state-text
                       :label="t('alerts.promRuleMode')"
                       data-test="alert-prom-rule-mode"
                       @update:model-value="onPromRuleModeChange"
@@ -1384,7 +1385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   name="query_condition.aggregation.having.column"
                                   :options="sqlAggColumnOptions"
                                   searchable
-                                  class="w-22!"
+                                  class="w-36!"
                                   :disabled="groupAnswer === 'one'"
                                   data-test="alert-sql-agg-column-select"
                                   :placeholder="t('alerts.placeholders.selectColumn')"
@@ -1405,7 +1406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     :aria-label="t('common.value')"
                                     name="query_condition.aggregation.having.value"
                                     type="number"
-                                    class="w-16!"
+                                    class="w-20!"
                                     :disabled="groupAnswer === 'one'"
                                     data-test="alert-sql-agg-value-input"
                                     :placeholder="t('alerts.placeholders.value')"
@@ -2286,7 +2287,7 @@ export default defineComponent({
       return "sql-status-bar--idle";
     });
 
-    const inlineStatusBarClass = "bg-surface-subtle text-text-secondary cursor-default";
+    const inlineStatusBarClass = "bg-surface-subtle text-text-body cursor-default";
 
     const columnNames = computed(() =>
       (props.columns as any[])
