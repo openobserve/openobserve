@@ -1754,15 +1754,12 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.vm.conditionHelp).toBe(i18n.global.t(key));
     });
 
-    it("describes the whole alert in one line in the rail once a stream is picked", async () => {
+    it("keeps the rail to the chart and verdict; the alert reads back in section 5 only", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-rail-sentence"]').exists()).toBe(false);
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
       await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-rail-sentence"]').text()).toBe(
-        "Won't notify anyone yet. Fires when 1+ events turn up in 10 minutes, checked every 10 min, at most once every 10 minutes.",
-      );
+      expect(wrapper.find('[data-test="add-alert-rail-sentence"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="add-alert-read-back"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="alerts-alert-summary"]').exists()).toBe(false);
     });
@@ -2088,24 +2085,6 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-rail-verdict"]').text()).toBe(
         "Checked as each event arrives, so there is no count to judge yet. The graph shows recent matching events.",
-      );
-    });
-
-    it("describes a composite alert in one line in the rail", async () => {
-      wrapper = mountAlert();
-      await flushPromises();
-      const form = wrapper.vm.form;
-      form.setFieldValue("is_real_time", "composite");
-      form.setFieldValue("destinations", ["pager"]);
-      form.setFieldValue("trigger_condition", { silence: 15 });
-      form.setFieldValue("composite_condition", { expression: "{id-a} && {id-b}" });
-      form.setFieldValue("children", [
-        { alert_id: "id-a", name: "errors_high", accessible: true },
-        { alert_id: "id-b", name: "latency_high", accessible: true },
-      ]);
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-rail-sentence"]').text()).toBe(
-        "Alerts pager when its alerts match errors_high AND latency_high, at most once every 15 minutes.",
       );
     });
   });

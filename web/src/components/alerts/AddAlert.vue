@@ -971,13 +971,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <span>{{ railVerdict.text }}</span>
               </p>
-              <p
-                v-if="alertSentence"
-                class="text-text-body m-0 text-sm"
-                data-test="add-alert-rail-sentence"
-              >
-                {{ alertSentence }}
-              </p>
               <AlertRecentRuns
                 v-if="isEditingAlert && editAlertId"
                 :alert-id="editAlertId"
@@ -1260,11 +1253,7 @@ import {
 } from "./alertSuggestions";
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
-import {
-  describeAlertInPlainWords,
-  describeCompositeInPlainWords,
-  previewVerdictSentence,
-} from "@/utils/alerts/alertReadBack";
+import { previewVerdictSentence } from "@/utils/alerts/alertReadBack";
 import config from "@/aws-exports";
 import { getUUID } from "@/utils/zincutils";
 import {
@@ -2014,19 +2003,6 @@ export default defineComponent({
       else goToSection("condition");
     };
 
-    const alertSentence = computed(() => {
-      if (alertForm.isAnomalyMode.value) return "";
-      if (isCompositeMode.value) {
-        return describeCompositeInPlainWords(alertForm.formData.value, alertForm.t, {
-          incidentsEnabled: incidentsEnabled.value,
-        });
-      }
-      return describeAlertInPlainWords(alertForm.formData.value, alertForm.t, {
-        aggregationEnabled: alertForm.isAggregationEnabled.value,
-        incidentsEnabled: incidentsEnabled.value,
-      });
-    });
-
     // A real-time alert has no window to count, so the preview offers no verdict to restate.
     const railVerdict = computed<{ text: string; tone: "fires" | "quiet" | "note" } | null>(() => {
       const status = activeEvaluationStatus.value;
@@ -2353,7 +2329,6 @@ export default defineComponent({
       editHeader,
       unsavedChanges: unsaved.changes,
       discardChanges,
-      alertSentence,
       railVerdict,
       RAIL_VERDICT_ICONS,
       tiers,
