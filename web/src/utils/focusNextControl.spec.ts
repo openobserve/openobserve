@@ -1,7 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { escapeEditor, focusControlAfter, focusFirstControl } from "./focusNextControl";
+import {
+  createTabOut,
+  escapeEditor,
+  focusControlAfter,
+  focusFirstControl,
+} from "./focusNextControl";
 
 const page = (html: string) => {
   document.body.innerHTML = html;
@@ -85,5 +90,35 @@ describe("escapeEditor", () => {
     escapeEditor(editor);
     document.removeEventListener("keydown", decline);
     expect(document.activeElement?.id).toBe("after");
+  });
+});
+
+describe("createTabOut", () => {
+  const keys = (editor: HTMLElement, presses: [string, boolean?][]) => {
+    const tabOut = createTabOut(() => editor);
+    tabOut.arm();
+    return presses.map(([key, shift]) => tabOut.onKey(key, !!shift));
+  };
+
+  it.each([
+    ["Tab leaves forward", [["Tab"]], [true], "after"],
+    [
+      "Shift+Tab leaves backward",
+      [
+        ["Shift", true],
+        ["Tab", true],
+      ],
+      [false, true],
+      "before",
+    ],
+    ["any other key disarms it", [["a"], ["Tab"]], [false, false], "inner"],
+    ["a repeated Escape keeps it armed", [["Escape"], ["Tab"]], [false, true], "after"],
+  ] as const)("after Escape, %s", (_, presses, handled, focused) => {
+    const editor = page(
+      '<button id="before"></button><div id="editor"><textarea id="inner"></textarea></div><button id="after"></button>',
+    );
+    (document.getElementById("inner") as HTMLElement).focus();
+    expect(keys(editor, presses as unknown as [string, boolean?][])).toEqual(handled);
+    expect(document.activeElement?.id).toBe(focused);
   });
 });

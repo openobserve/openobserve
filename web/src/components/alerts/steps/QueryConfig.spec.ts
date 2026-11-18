@@ -2681,7 +2681,13 @@ describe("QueryConfig.vue", () => {
     const inlineEditorStub = {
       name: "UnifiedQueryEditor",
       template: '<div class="stub-inline-editor" />',
-      props: ["query", "keywords", "suggestions", "dataTestPrefix"],
+      props: {
+        query: null,
+        keywords: null,
+        suggestions: null,
+        dataTestPrefix: null,
+        escapeThenTab: Boolean,
+      },
       emits: ["update:query", "focus", "blur"],
       methods: {
         // handleInlineQueryUpdate reads these off the ref.
@@ -2736,6 +2742,17 @@ describe("QueryConfig.vue", () => {
     // that end to end against the real composable. What IS provable here, and
     // what N1 actually is, is WHICH list the template binds. The mock returns
     // distinct arrays for the base and context-aware views.
+
+    it("leaves the editor on Esc then Tab, hinting it only while the editor has focus", async () => {
+      const hint = () => host.find('[data-test="alert-query-editor-tab-out-hint"]').exists();
+      expect(editorStub.props("escapeThenTab")).toBe(true);
+      expect(hint()).toBe(false);
+      await editorStub.vm.$emit("focus");
+      expect(hint()).toBe(true);
+      await editorStub.vm.$emit("blur");
+      await flushPromises();
+      expect(hint()).toBe(false);
+    });
 
     it("binds the context-aware keyword view, not the base list", () => {
       const delivered = editorStub.props("keywords") as any[];

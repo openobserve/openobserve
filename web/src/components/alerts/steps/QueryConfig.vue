@@ -976,18 +976,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : t("alerts.promqlEditor")
                       }}</span>
                     </div>
-                    <OSwitch
-                      v-if="localTab === 'sql' && !showVrl && tierShows('vrl')"
-                      :model-value="false"
-                      :label="t('alerts.queryConfig.vrlToggle')"
-                      label-position="left"
-                      off-tone="neutral"
-                      :aria-label="t('alerts.queryConfig.showVrlEditor')"
-                      data-test="alert-vrl-toggle"
-                      @update:model-value="onVrlSwitch"
-                    >
-                      <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
-                    </OSwitch>
+                    <div class="flex min-w-0 items-center gap-3">
+                      <span
+                        v-if="inlineEditorFocused"
+                        aria-hidden="true"
+                        class="text-text-secondary text-xs whitespace-nowrap max-md:hidden"
+                        data-test="alert-query-editor-tab-out-hint"
+                        >{{ t("alerts.form.editor.tabOutHint") }}</span
+                      >
+                      <OSwitch
+                        v-if="localTab === 'sql' && !showVrl && tierShows('vrl')"
+                        :model-value="false"
+                        :label="t('alerts.queryConfig.vrlToggle')"
+                        label-position="left"
+                        off-tone="neutral"
+                        :aria-label="t('alerts.queryConfig.showVrlEditor')"
+                        data-test="alert-vrl-toggle"
+                        @update:model-value="onVrlSwitch"
+                      >
+                        <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" />
+                      </OSwitch>
+                    </div>
                   </div>
                   <div class="relative min-h-0 flex-1">
                     <div class="absolute inset-0">
@@ -998,6 +1007,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :default-language="localTab === 'promql' ? 'promql' : 'sql'"
                         :query="localTab === 'sql' ? localSqlQuery : editorPromqlQuery"
                         editor-height="100%"
+                        escape-then-tab
                         :disable-ai="!streamName"
                         :keywords="effectiveKeywords"
                         :suggestions="effectiveSuggestions"
@@ -2211,7 +2221,9 @@ export default defineComponent({
       externalErrors: alertSqlErrorRanges,
     });
 
+    const inlineEditorFocused = ref(false);
     const onQueryEditorFocus = () => {
+      inlineEditorFocused.value = true;
       queryEditorPlaceholderFlag.value = false;
       if (foldedLines.value > EDITOR_FOLD_LINES) editorUnfolded.value = true;
       _sqlOnFocus();
@@ -2378,6 +2390,7 @@ export default defineComponent({
     };
 
     const onBlurInlineSqlEditor = async () => {
+      inlineEditorFocused.value = false;
       queryEditorPlaceholderFlag.value =
         localTab.value === "sql" ? localSqlQuery.value === "" : editorPromqlQuery.value === "";
       if (localTab.value === "sql") {
@@ -4426,6 +4439,7 @@ export default defineComponent({
       emitTriggerUpdate,
       getImageURL,
       queryEditorPlaceholderFlag,
+      inlineEditorFocused,
       vrlEditorPlaceholderFlag,
       vrlPlaceholder,
       onQueryEditorFocus,

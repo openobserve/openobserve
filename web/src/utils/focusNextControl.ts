@@ -4,15 +4,19 @@ const TABBABLE =
   "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]";
 const ESCAPE_OWNER = '[role="dialog"], [data-fullscreen="true"]';
 
-/** Moves focus to the first visible tabbable control that follows `container` in document order. */
-export function focusControlAfter(container: HTMLElement) {
-  const next = Array.from(document.querySelectorAll<HTMLElement>(TABBABLE)).find(
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta"]);
+
+/** Moves focus to the nearest visible tabbable control after (or before) `container` in document order. */
+export function focusControlAfter(container: HTMLElement, backward = false) {
+  const position = backward ? Node.DOCUMENT_POSITION_PRECEDING : Node.DOCUMENT_POSITION_FOLLOWING;
+  const candidates = Array.from(document.querySelectorAll<HTMLElement>(TABBABLE)).filter(
     (el) =>
       el.getAttribute("tabindex") !== "-1" &&
       !container.contains(el) &&
       el.getClientRects().length > 0 &&
-      container.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING,
+      container.compareDocumentPosition(el) & position,
   );
+  const next = backward ? candidates.at(-1) : candidates[0];
   (next ?? (document.activeElement as HTMLElement | null))?.focus();
 }
 
@@ -39,4 +43,22 @@ export function escapeEditor(container: HTMLElement) {
   const escape = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
   (container.parentElement ?? document.body).dispatchEvent(escape);
   if (escape.defaultPrevented) focusControlAfter(container);
+}
+
+/** Escape arms it; the next Tab or Shift+Tab then leaves the editor instead of indenting, and any other key disarms it. */
+export function createTabOut(container: () => HTMLElement | null) {
+  let armed = false;
+  return {
+    arm: () => (armed = true),
+    disarm: () => (armed = false),
+    /** True when the key moved focus out, so the editor must not handle it. */
+    onKey(key: string, shift: boolean): boolean {
+      if (!armed || key === "Escape" || MODIFIER_KEYS.has(key)) return false;
+      armed = false;
+      const host = container();
+      if (key !== "Tab" || !host) return false;
+      focusControlAfter(host, shift);
+      return true;
+    },
+  };
 }

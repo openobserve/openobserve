@@ -92,6 +92,7 @@
         :read-only="readOnly"
         :text-preview="textPreview"
         :release-wheel-to-page="releaseWheelToPage"
+        :escape-then-tab="escapeThenTab"
         :show-auto-complete="showAutoComplete"
         :keywords="keywords"
         :suggestions="suggestions"
@@ -186,6 +187,7 @@ interface Props {
   textPreview?: boolean; // Draw the query as plain text until Monaco has painted
   showAutoComplete?: boolean;
   releaseWheelToPage?: boolean; // default true: let the page scroll when editor has nothing left to scroll
+  escapeThenTab?: boolean; // Escape then Tab leaves the editor, instead of Escape alone
 
   // Editor autocomplete (forwarded to CodeQueryEditor)
   keywords?: any[]; // Autocomplete keywords for Monaco
@@ -224,6 +226,7 @@ const props = withDefaults(defineProps<Props>(), {
   showAutoComplete: true,
   releaseWheelToPage: true,
   fullTextSearch: true,
+  escapeThenTab: false,
   keywords: () => [],
   suggestions: () => [],
   debounceTime: 500,
