@@ -1806,8 +1806,6 @@ const onMetricsEditorFilterRun = (text: string) => {
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
-// Handler for Error Only toggle — only adds/removes span_status condition,
-// leaving all other filters (field sidebar, duration, etc.) intact.
 const onErrorOnlyToggled = (value: boolean) => {
   const filter = searchObj.data.editorValue ?? "";
   // On ANDs onto the whole filter, so it holds under a top-level OR; off cuts only that condition, not the user's own.
