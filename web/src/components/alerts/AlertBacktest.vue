@@ -29,6 +29,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
+import { formatNumber } from "@/utils/alerts/alertCopy";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
 import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
 import {
@@ -36,6 +37,9 @@ import {
   backtestHintKey,
   backtestWindows,
   cronCheckTimes,
+  dailyVolume,
+  emptyDayHintKey,
+  realtimeDay,
   windowedCountSql,
 } from "@/utils/alerts/alertBacktest";
 
@@ -55,10 +59,13 @@ const props = defineProps<{
     timezone?: string;
     silence: number;
   };
+  /** Real time: every matching event notifies, so the day is counted by the hour. */
+  realTime?: boolean;
 }>();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOURS = 24;
+const REALTIME_BUCKET_MINUTES = 60;
 // Typing in a filter re-runs the query, so wait for a pause.
 const DEBOUNCE_MS = 700;
 // A day of a busy stream can scan for minutes; past this the answer is no longer worth the wait.
@@ -81,6 +88,7 @@ const cronTimes = (endMs: number) =>
   );
 
 const sql = computed(() => {
+  if (props.realTime) return windowedCountSql(props.query, REALTIME_BUCKET_MINUTES);
   if (isCron.value && !cronTimes(Date.now())?.length) return null;
   const bucket = backtestBucketMinutes({
     period: props.period,
@@ -114,15 +122,17 @@ const start = () => {
   if (!sql.value) return;
   const endMs = Date.now();
   startMs = endMs - DAY_MS;
-  checkTimesMs.value = isCron.value ? (cronTimes(endMs) ?? []) : undefined;
+  checkTimesMs.value = isCron.value && !props.realTime ? (cronTimes(endMs) ?? []) : undefined;
   // The oldest check looks back one period before the day starts.
-  const queryStartMs = startMs - props.period * 60_000;
+  const queryStartMs = props.realTime ? startMs : startMs - props.period * 60_000;
   const bucketMs =
-    backtestBucketMinutes({
-      period: props.period,
-      frequency: frequency.value,
-      checkTimesMs: checkTimesMs.value,
-    }) * 60_000;
+    (props.realTime
+      ? REALTIME_BUCKET_MINUTES
+      : backtestBucketMinutes({
+          period: props.period,
+          frequency: frequency.value,
+          checkTimesMs: checkTimesMs.value,
+        })) * 60_000;
   timedOut.value = false;
   ranKey.value = runKey.value;
   search.run({
@@ -176,7 +186,7 @@ onBeforeUnmount(() => {
 });
 
 const status = computed<"fixLimit" | "loading" | "slow" | "failed" | "ready">(() => {
-  if (!isCountLimit(props.threshold)) return "fixLimit";
+  if (!props.realTime && !isCountLimit(props.threshold)) return "fixLimit";
   if (runKey.value !== ranKey.value) return "loading";
   if (timedOut.value) return "slow";
   if (search.state.value === "failed") return "failed";
@@ -208,7 +218,7 @@ watchEffect(() => {
   if (!signal) return;
   const r = result.value;
   signal.value =
-    sql.value && status.value === "ready"
+    sql.value && status.value === "ready" && !props.realTime
       ? {
           checks: r.total,
           alerts: r.alerts,
@@ -219,8 +229,27 @@ watchEffect(() => {
       : null;
 });
 
-const resultText = computed(() =>
-  isCron.value
+// Without a WHERE, an empty day means the stream itself was quiet, not the filters.
+const filtered = computed(() => /\bWHERE\b/i.test(props.query));
+
+const day = computed(() =>
+  props.realTime ? realtimeDay(search.hits.value, { startMs, hours: HOURS }) : result.value,
+);
+const volume = computed(() =>
+  dailyVolume(
+    props.realTime ? { ...day.value, fired: 0, alerts: 0 } : result.value,
+    !!props.realTime,
+  ),
+);
+const volumeText = computed(() =>
+  volume.value
+    ? t("alerts.guard.volume", { count: formatNumber(volume.value.count) }, volume.value.count)
+    : null,
+);
+
+const resultText = computed(() => {
+  if (props.realTime) return volumeText.value ?? t(emptyDayHintKey(filtered.value));
+  return isCron.value
     ? t("alerts.sections.backtest.cronResult", {
         count: result.value.alerts,
         total: result.value.total,
@@ -229,11 +258,15 @@ const resultText = computed(() =>
         count: result.value.alerts,
         total: result.value.total,
         frequency: frequency.value,
-      }),
-);
+      });
+});
 
 const hint = computed(() => {
-  const key = backtestHintKey(result.value.alerts, result.value.total, props.operator);
+  if (props.realTime) return null;
+  const key = backtestHintKey(result.value.alerts, result.value.total, props.operator, {
+    events: result.value.events,
+    filtered: filtered.value,
+  });
   return key ? t(key) : null;
 });
 </script>
@@ -271,12 +304,16 @@ const hint = computed(() => {
       </OButton>
     </p>
     <template v-else>
-      <p class="text-text-body m-0 text-sm" data-test="add-alert-backtest-result">
+      <p
+        class="m-0 text-sm"
+        :class="realTime && volume?.noisy ? 'text-status-warning-text' : 'text-text-body'"
+        data-test="add-alert-backtest-result"
+      >
         {{ resultText }}
       </p>
       <div class="mt-2 grid grid-cols-24 gap-0.5" aria-hidden="true">
         <span
-          v-for="(fired, hour) in result.hours"
+          v-for="(fired, hour) in day.hours"
           :key="hour"
           class="rounded-default h-4"
           :class="fired ? 'bg-accent' : 'bg-surface-subtle'"
@@ -287,6 +324,14 @@ const hint = computed(() => {
         <span>{{ t("alerts.sections.backtest.dayAgo") }}</span>
         <span>{{ t("alerts.sections.timeline.now") }}</span>
       </div>
+      <p
+        v-if="!realTime && volumeText"
+        class="m-0 mt-2 text-xs"
+        :class="volume?.noisy ? 'text-status-warning-text' : 'text-text-secondary'"
+        data-test="add-alert-backtest-volume"
+      >
+        {{ volumeText }}
+      </p>
       <p
         v-if="hint"
         class="text-text-secondary m-0 mt-2 text-xs"

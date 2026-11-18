@@ -56,6 +56,8 @@ export interface BacktestResult {
   total: number;
   /** One flag per hour, oldest first: some check in that hour would have fired. */
   hours: boolean[];
+  /** Matching events in the day's rows. */
+  events: number;
 }
 
 export interface BacktestReplay extends BacktestResult {
@@ -145,11 +147,14 @@ export function backtestWindows(
     options.checkTimesMs ?? frequencyCheckTimes(options.startMs, endMs, options.frequency);
   const bucketMs = backtestBucketMinutes(options) * MINUTE_MS;
   const counts = new Map<number, number>();
+  let events = 0;
   for (const row of rows) {
     const at = keyToMs(row.zo_sql_key);
     if (at === null) continue;
     const bucket = Math.floor(at / bucketMs);
-    counts.set(bucket, (counts.get(bucket) ?? 0) + Number(row.zo_sql_val ?? 0));
+    const value = Number(row.zo_sql_val ?? 0);
+    events += value;
+    counts.set(bucket, (counts.get(bucket) ?? 0) + value);
   }
   const periodBuckets = Math.round((wholeMinutes(options.period) * MINUTE_MS) / bucketMs);
   // Windows with no events never come back as rows, yet a "fewer than" limit fires on them.
@@ -159,7 +164,42 @@ export function backtestWindows(
     for (let b = last - periodBuckets + 1; b <= last; b++) sum += counts.get(b) ?? 0;
     return compare(sum, options.threshold);
   });
-  return replayChecks(checks, firing, options);
+  return { ...replayChecks(checks, firing, options), events };
+}
+
+/** A real-time alert's day: every matching event notifies, so only the events and their hours count. */
+export function realtimeDay(
+  rows: Record<string, unknown>[],
+  options: Pick<BacktestOptions, "startMs" | "hours">,
+): Pick<BacktestResult, "events" | "hours"> {
+  const hours = Array.from({ length: options.hours }, () => false);
+  let events = 0;
+  for (const row of rows) {
+    const at = keyToMs(row.zo_sql_key);
+    const value = Number(row.zo_sql_val ?? 0);
+    if (at === null || !(value > 0)) continue;
+    events += value;
+    const hour = Math.floor((at - options.startMs) / HOUR_MS);
+    hours[Math.min(options.hours - 1, Math.max(0, hour))] = true;
+  }
+  return { events, hours };
+}
+
+// Two significant figures: the count stands in for a typical day, not this exact one.
+const aboutCount = (count: number) => {
+  if (count < 1000) return count;
+  const step = 10 ** (Math.floor(Math.log10(count)) - 1);
+  return Math.round(count / step) * step;
+};
+
+/** Notifications a day before Notify at most every, or null when the replay line already says it. */
+export function dailyVolume(
+  day: Pick<BacktestReplay, "events" | "fired" | "alerts">,
+  realTime: boolean,
+): { count: number; noisy: boolean } | null {
+  const count = realTime ? day.events : day.fired;
+  if (count === 0 || (!realTime && count === day.alerts)) return null;
+  return { count: aboutCount(count), noisy: count > NOISY_SHARE * MAX_CHECKS };
 }
 
 function replayChecks(
@@ -186,12 +226,23 @@ function replayChecks(
     lastAlertMs = checks[i];
     if (!firing[i - 1] && i + 1 < firing.length && !firing[i + 1]) singleCheckSpikes += 1;
   });
-  return { fired, total: checks.length, hours, alerts, singleCheckSpikes, refires };
+  return { fired, total: checks.length, hours, alerts, singleCheckSpikes, refires, events: 0 };
 }
 
-/** The advice under a day's replay: never alerted, or alerted often enough to be ignored. */
-export function backtestHintKey(alerts: number, total: number, operator: string): I18nKey | null {
+/** What a day without a single matching event says: the filters or the stream had nothing. */
+export const emptyDayHintKey = (filtered: boolean): I18nKey =>
+  filtered ? "alerts.guard.matchedNothing" : "alerts.discovery.noData24h";
+
+/** The advice under a day's replay: matched nothing, never alerted, or alerted often enough to be ignored. */
+export function backtestHintKey(
+  alerts: number,
+  total: number,
+  operator: string,
+  day: { events?: number; filtered?: boolean } = {},
+): I18nKey | null {
   if (total === 0) return null;
+  // No event to count means the threshold is not what kept it quiet (or noisy).
+  if (day.events === 0) return emptyDayHintKey(day.filtered !== false);
   const direction = [">=", ">"].includes(operator)
     ? "up"
     : ["<=", "<"].includes(operator)

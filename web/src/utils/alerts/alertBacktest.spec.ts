@@ -6,6 +6,8 @@ import {
   backtestHintKey,
   backtestWindows,
   cronCheckTimes,
+  dailyVolume,
+  realtimeDay,
   windowedCountSql,
 } from "./alertBacktest";
 
@@ -113,6 +115,10 @@ describe("backtestWindows", () => {
     expect(result.hours.filter(Boolean)).toHaveLength(2);
   });
 
+  it("adds up the events the day's rows hold", () => {
+    expect(backtestWindows([at("03:00", 6), at("09:10", 4)], options).events).toBe(10);
+  });
+
   it("reads microsecond keys", () => {
     const result = backtestWindows(
       [{ zo_sql_key: (START + 3_600_000) * 1000, zo_sql_val: 9 }],
@@ -168,5 +174,83 @@ describe("backtestHintKey", () => {
     [0, 0, ">=", null],
   ])("%s of %s checks with %s advises %s", (alerts, total, operator, key) => {
     expect(backtestHintKey(alerts, total, operator)).toBe(key);
+  });
+
+  it.each([
+    {
+      name: "a filter that matched nothing",
+      day: { events: 0 },
+      key: "alerts.guard.matchedNothing",
+    },
+    {
+      name: "a fewer-than limit over no events",
+      day: { events: 0 },
+      alerts: 288,
+      operator: "<",
+      key: "alerts.guard.matchedNothing",
+    },
+    {
+      name: "no filter and no events",
+      day: { events: 0, filtered: false },
+      key: "alerts.discovery.noData24h",
+    },
+    {
+      name: "events that never reach the limit",
+      day: { events: 40 },
+      key: "alerts.sections.backtest.never",
+    },
+  ])("$name advises $key", ({ day, alerts = 0, operator = ">=", key }) => {
+    expect(backtestHintKey(alerts, 288, operator, day)).toBe(key);
+  });
+});
+
+describe("realtimeDay", () => {
+  it("counts every event and marks the hours that hold one", () => {
+    const rows = [
+      { zo_sql_key: "2026-11-05T00:00:00", zo_sql_val: 30 },
+      { zo_sql_key: "2026-11-05T05:00:00", zo_sql_val: 12 },
+    ];
+    const day = realtimeDay(rows, { startMs: START, hours: 24 });
+    expect(day.events).toBe(42);
+    expect(day.hours[0]).toBe(true);
+    expect(day.hours[5]).toBe(true);
+    expect(day.hours.filter(Boolean)).toHaveLength(2);
+  });
+});
+
+describe("dailyVolume", () => {
+  it.each([
+    {
+      name: "real-time: every event",
+      day: { events: 53_932, fired: 0, alerts: 0 },
+      realTime: true,
+      expected: { count: 54_000, noisy: true },
+    },
+    {
+      name: "real-time: a quiet day",
+      day: { events: 12, fired: 0, alerts: 0 },
+      realTime: true,
+      expected: { count: 12, noisy: false },
+    },
+    {
+      name: "real-time: nothing matched",
+      day: { events: 0, fired: 0, alerts: 0 },
+      realTime: true,
+      expected: null,
+    },
+    {
+      name: "scheduled: firing checks the throttle held",
+      day: { events: 900, fired: 1_440, alerts: 48 },
+      realTime: false,
+      expected: { count: 1_400, noisy: true },
+    },
+    {
+      name: "scheduled: every firing check notified",
+      day: { events: 900, fired: 3, alerts: 3 },
+      realTime: false,
+      expected: null,
+    },
+  ])("$name", ({ day, realTime, expected }) => {
+    expect(dailyVolume(day, realTime)).toEqual(expected);
   });
 });

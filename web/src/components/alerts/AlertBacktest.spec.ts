@@ -60,6 +60,7 @@ const TRIGGER = { frequency: 5, frequency_type: "minutes", silence: 0 };
 const mountBacktest = (
   query = SQL("default"),
   signal: Ref<BacktestSignal | null> = ref(null),
+  extra: Record<string, unknown> = {},
 ): VueWrapper =>
   mount(AlertBacktest, {
     props: {
@@ -69,6 +70,7 @@ const mountBacktest = (
       operator: ">=",
       threshold: 5,
       triggerCondition: TRIGGER,
+      ...extra,
     },
     global: { plugins: [i18n], provide: { [ALERT_BACKTEST_SIGNAL_KEY]: signal } },
   });
@@ -118,6 +120,37 @@ describe("AlertBacktest", () => {
       refires: 0,
       frequencyMinutes: 5,
     });
+    wrapper.unmount();
+  });
+
+  it("says the filters matched nothing instead of advising a threshold", async () => {
+    const wrapper = mountBacktest(
+      SQL("default").replace("GROUP BY", "WHERE k8s_reason = 'OOMKilled' GROUP BY"),
+    );
+    await vi.advanceTimersByTimeAsync(700);
+    respond(calls[0], []);
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-alert-backtest-hint"]').text()).toBe(
+      i18n.global.t("alerts.guard.matchedNothing"),
+    );
+    wrapper.unmount();
+  });
+
+  it("real-time: counts the day's events by the hour and states the volume in amber", async () => {
+    const signal = ref<BacktestSignal | null>(null);
+    const wrapper = mountBacktest(SQL("k8s_events"), signal, { realTime: true, threshold: 0 });
+    await vi.advanceTimersByTimeAsync(700);
+    const { sql, start_time, end_time } = calls[0].request.queryReq.query;
+    expect(b64DecodeUnicode(sql)).toContain("histogram(_timestamp, '60 minute')");
+    expect(end_time - start_time).toBe(24 * 60 * 60 * 1000 * 1000);
+
+    respond(calls[0], [{ zo_sql_key: (NOW - 3_600_000) * 1000, zo_sql_val: 53_932 }]);
+    await flushPromises();
+    const result = wrapper.find('[data-test="add-alert-backtest-result"]');
+    expect(result.text()).toBe(i18n.global.t("alerts.guard.volume", { count: "54,000" }, 54_000));
+    expect(result.classes()).toContain("text-status-warning-text");
+    expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
+    expect(signal.value).toBeNull();
     wrapper.unmount();
   });
 
