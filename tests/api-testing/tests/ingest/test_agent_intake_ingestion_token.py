@@ -25,6 +25,16 @@ def ingestion_token(client: OpenObserveClient) -> str:
     return token
 
 
+@pytest.fixture(scope="module")
+def other_org(client: OpenObserveClient) -> str:
+    # orgs have no working DELETE yet (#15241), so one per module keeps the leftovers to one
+    resp = client.post("api/organizations", json={"name": unique_name("pytintakeorg")}, prefix="")
+    assert resp.status_code == 200, f"org create failed: {resp.status_code} {resp.text}"
+    identifier = resp.json().get("identifier")
+    assert identifier, resp.text
+    return identifier
+
+
 def _intake(client: OpenObserveClient, method: str, path: str, headers: dict[str, str], **kwargs) -> requests.Response:
     # no basic auth, so only the intake's own key can let the request in
     url = f"{client.base_url.rstrip('/')}/datadog/{path}"
@@ -39,21 +49,32 @@ def test_validate_accepts_the_orgs_ingestion_token(client: OpenObserveClient, in
 
 
 @pytest.mark.parametrize(
-    ("case", "org_suffix", "key"),
+    ("case", "key"),
     [
-        pytest.param("other-org", "_other", None, id="token-of-another-org"),
-        pytest.param("not-o2oi", "", os.environ.get("ZO_ROOT_USER_PASSWORD", "x"), id="not-an-ingestion-token"),
-        pytest.param("unknown", "", "o2oi_doesnotexist0000", id="unknown-token"),
-        pytest.param("missing", "", "", id="missing-key"),
+        pytest.param("not-o2oi", os.environ.get("ZO_ROOT_USER_PASSWORD", "x"), id="not-an-ingestion-token"),
+        pytest.param("unknown", "o2oi_doesnotexist0000", id="unknown-token"),
+        pytest.param("missing", "", id="missing-key"),
     ],
 )
-def test_validate_refuses_any_other_key(
-    client: OpenObserveClient, ingestion_token: str, case: str, org_suffix: str, key: str | None
-):
+def test_validate_refuses_any_other_key(client: OpenObserveClient, case: str, key: str):
     """openobserve#16596: a key that is not this org's ingestion token must be a 403, which the agent does not retry."""
-    headers = {} if key == "" else {KEY_HEADER: ingestion_token if key is None else key}
-    resp = _intake(client, "GET", f"{client.org}{org_suffix}/api/v1/validate", headers)
+    headers = {} if key == "" else {KEY_HEADER: key}
+    resp = _intake(client, "GET", f"{client.org}/api/v1/validate", headers)
     assert resp.status_code == 403, f"{case}: {resp.status_code} {resp.text}"
+
+
+def test_validate_refuses_a_token_of_another_existing_org(
+    client: OpenObserveClient, ingestion_token: str, other_org: str
+):
+    """openobserve#16596: a token is bound to its org, so another org that exists and has its own token must refuse it."""
+    resp = client.post(
+        "ingestion-tokens", json={"name": unique_name("pyt_intake_other"), "description": ""}, org=other_org
+    )
+    assert resp.status_code in (200, 201), f"token create in {other_org} failed: {resp.status_code} {resp.text}"
+    own = _intake(client, "GET", f"{other_org}/api/v1/validate", {KEY_HEADER: resp.json()["data"]["token"]})
+    assert own.status_code == 200, f"the other org must accept its own token first: {own.status_code} {own.text}"
+    resp = _intake(client, "GET", f"{other_org}/api/v1/validate", {KEY_HEADER: ingestion_token})
+    assert resp.status_code == 403, f"{resp.status_code} {resp.text}"
 
 
 def test_the_intake_key_does_not_authenticate_other_routes(client: OpenObserveClient, ingestion_token: str):
