@@ -236,26 +236,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div :key="draftFormKey" class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <aside
-          class="border-border-default max-lg:bg-surface-base flex w-53 shrink-0 flex-col gap-3 overflow-y-auto border-e px-2 py-3 max-lg:sticky max-lg:top-0 max-lg:z-1 max-lg:w-auto max-lg:gap-2 max-lg:border-e-0 max-lg:border-b max-lg:px-3 max-lg:py-2"
+          class="border-border-default max-lg:bg-surface-base flex shrink-0 flex-col gap-3 overflow-y-auto border-e px-2 py-3 max-lg:sticky max-lg:top-0 max-lg:z-1 max-lg:w-auto max-lg:gap-2 max-lg:border-e-0 max-lg:border-b max-lg:px-3 max-lg:py-2"
+          :class="compactRail ? 'w-14' : 'w-53'"
           data-test="add-alert-section-nav"
         >
-          <OCommandSearch
-            v-model="settingFind.query.value"
-            :items="settingFind.items.value"
-            :label="t('alerts.find.label')"
-            :placeholder="t('alerts.find.placeholder')"
-            :count-text="settingFind.countText.value"
-            :empty-text="settingFind.emptyText.value"
-            shortcut-id="sectionedFormFind"
-            data-test="add-alert-find-setting"
-            @select="settingFind.select"
-          >
-            <template #footer>{{ t("alerts.find.hint") }}</template>
-          </OCommandSearch>
+          <!-- Below xl the rail keeps only the step markers, so the find field moves to the bar above the form. -->
+          <Teleport :to="findSlotRef" :disabled="!findInBar">
+            <OCommandSearch
+              v-model="settingFind.query.value"
+              :items="settingFind.items.value"
+              :label="t('alerts.find.label')"
+              :placeholder="t('alerts.find.placeholder')"
+              :count-text="settingFind.countText.value"
+              :empty-text="settingFind.emptyText.value"
+              shortcut-id="sectionedFormFind"
+              data-test="add-alert-find-setting"
+              @select="settingFind.select"
+            >
+              <template #footer>{{ t("alerts.find.hint") }}</template>
+            </OCommandSearch>
+          </Teleport>
           <OSectionNav
             :items="sectionItems"
             :active="activeSection"
             :label="t('alerts.sections.navLabel')"
+            :compact="compactRail"
             @select="goToSection"
           />
         </aside>
@@ -264,9 +269,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-h-0 min-w-0 shrink grow basis-5xl flex-col max-lg:flex-none lg:max-w-5xl"
         >
           <div
-            class="border-border-default flex shrink-0 items-center justify-end border-b px-4 py-1"
+            class="border-border-default flex shrink-0 items-center justify-end gap-4 border-b px-4 py-1"
             data-test="add-alert-show-all-bar"
           >
+            <div v-if="compactRail" ref="findSlotRef" class="me-auto w-60 min-w-0" />
             <OSwitch
               :model-value="showAll"
               :label="t('alerts.form.showAll')"
@@ -1839,7 +1845,7 @@ export default defineComponent({
       }
     };
 
-    const { lgUp } = useBreakpoint();
+    const { lgUp, xlUp } = useBreakpoint();
     const activeSection = ref<AlertSectionId>("watch");
     const visitedSections = ref<ReadonlySet<AlertSectionId>>(new Set());
     const leftWatch = ref(false);
@@ -2287,6 +2293,9 @@ export default defineComponent({
     );
 
     const railInCondition = computed(() => !lgUp.value && !!sectionTargets.narrowPreview);
+    const compactRail = computed(() => lgUp.value && !xlUp.value);
+    const findSlotRef = ref<HTMLElement | null>(null);
+    const findInBar = computed(() => compactRail.value && !!findSlotRef.value);
 
     const conditionHelp = computed(() => {
       if (isCompositeMode.value) return alertForm.t("alerts.sections.condition.helpComposite");
@@ -2660,6 +2669,9 @@ export default defineComponent({
       issueSections,
       goToSaveReason,
       lgUp,
+      compactRail,
+      findSlotRef,
+      findInBar,
       snapScrollRef,
       activeSection,
       goToSection,

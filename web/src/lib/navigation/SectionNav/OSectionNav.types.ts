@@ -35,6 +35,8 @@ export interface OSectionNavProps {
   active?: string;
   /** Accessible name of the navigation landmark. */
   label: I18nText;
+  /** Markers only, each title in a tooltip and kept for screen readers: for a narrow rail. */
+  compact?: boolean;
 }
 
 export interface OSectionNavEmits {

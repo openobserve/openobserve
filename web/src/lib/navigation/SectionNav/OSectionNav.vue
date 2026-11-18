@@ -6,10 +6,12 @@ import type { OSectionNavEmits, OSectionNavProps, SectionNavItem } from "./OSect
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
 const props = withDefaults(defineProps<OSectionNavProps>(), {
   active: undefined,
+  compact: false,
 });
 
 const emit = defineEmits<OSectionNavEmits>();
@@ -93,7 +95,7 @@ const showsSummary = (item: SectionNavItem): boolean =>
             <template v-else-if="item.state === 'error'">{{ errorMark }}</template>
             <template v-else>{{ index + 1 }}</template>
           </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span class="flex min-w-0 flex-1 flex-col gap-0.5" :class="compact && 'sr-only'">
             <span
               :class="[
                 'text-sm font-medium max-lg:whitespace-nowrap',
@@ -144,6 +146,7 @@ const showsSummary = (item: SectionNavItem): boolean =>
             </span>
           </span>
         </button>
+        <OTooltip v-if="compact" side="right" :content="item.title" />
       </li>
     </ol>
   </nav>

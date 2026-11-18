@@ -63,11 +63,14 @@ describe("useBreakpoint", () => {
     expect(bp.isDesktop.value).toBe(true);
   });
 
-  it("should expose mdUp and lgUp booleans matching the tier", async () => {
-    mockMatchMedia(768);
+  it.each([
+    [768, true, false, false],
+    [1100, true, true, false],
+    [1280, true, true, true],
+  ])("should expose mdUp, lgUp and xlUp matching the tier at %ipx", async (w, md, lg, xl) => {
+    mockMatchMedia(w);
     const bp = (await load())();
-    expect(bp.mdUp.value).toBe(true);
-    expect(bp.lgUp.value).toBe(false);
+    expect([bp.mdUp.value, bp.lgUp.value, bp.xlUp.value]).toEqual([md, lg, xl]);
   });
 
   it("should not throw when matchMedia() returns a falsy value", async () => {

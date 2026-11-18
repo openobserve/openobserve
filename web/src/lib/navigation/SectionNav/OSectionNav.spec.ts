@@ -3,6 +3,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import OSectionNav from "./OSectionNav.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 import type { SectionNavItem } from "./OSectionNav.types";
 
@@ -116,6 +117,19 @@ describe("OSectionNav", () => {
     expect(wrapper.find('[data-test="o-section-nav-state-icon-changed"]').classes()).toContain(
       "text-accent",
     );
+  });
+  it.each([
+    [true, ["First", "Second", "Third", "Fourth"]],
+    [false, []],
+  ])("names each step in a tooltip only when compact (%s)", (compact, tips) => {
+    const wrapper = mount(OSectionNav, { props: { items, label: raw("Sections"), compact } });
+    expect(
+      wrapper
+        .findAllComponents(OTooltip)
+        .map((tip) => tip.props("content"))
+        .filter(Boolean),
+    ).toEqual(tips);
+    expect(wrapper.get('[data-test="o-section-nav-item-b"]').text()).toContain("Needs a value");
   });
   it("scrolls the chip row so the current section's chip is in view", async () => {
     const wrapper = mount(OSectionNav, {
