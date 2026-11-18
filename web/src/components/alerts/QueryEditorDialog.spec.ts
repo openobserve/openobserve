@@ -710,4 +710,40 @@ describe("QueryEditorDialog - Run query over the streaming search", () => {
     expect(vm.localSqlQueryErrorMsg).toBe(expected.error);
     expect(vm.queryHitCount).toBe(expected.count);
   });
+
+  it.each([
+    [
+      "a refused PromQL query shows the server's reason",
+      (h: Handlers) => h.error({}, { content: { error: "unknown function: rat" } }),
+      {
+        state: "sql-status-bar--error",
+        error: "The query failed: unknown function: rat",
+        count: 0,
+      },
+    ],
+    [
+      "PromQL points are counted across every chunk",
+      (h: Handlers) => {
+        const series = (values: unknown[]) => ({
+          type: "promql_response",
+          content: { results: { resultType: "matrix", result: [{ metric: { a: "1" }, values }] } },
+        });
+        h.data({}, series([[1, "1"]]));
+        h.data({}, series([[2, "2"]]));
+        h.complete({});
+      },
+      { state: "sql-status-bar--success", error: "", count: 2 },
+    ],
+  ])("%s", async (_name, respond, expected) => {
+    streamFetch.mockReset();
+    streamFetch.mockImplementation((_request: unknown, handlers: Handlers) => respond(handlers));
+    const wrapper = await mountComp({ tab: "promql", promqlQuery: "rate(up[5m])" });
+    const vm = wrapper.vm as any;
+    await vm.runPromqlQuery();
+    await flushPromises();
+    expect(streamFetch.mock.calls[0][0]).toMatchObject({ type: "promql" });
+    expect(vm.sqlStatusState).toBe(expected.state);
+    expect(vm.runPromqlError).toBe(expected.error);
+    expect(vm.queryHitCount).toBe(expected.count);
+  });
 });

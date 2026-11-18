@@ -220,7 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
                         <OIcon name="error-outline" size="xs" class="shrink-0" />
                         <OTruncatedText class="flex-1">{{
-                          localSqlQueryErrorMsg || sqlQueryErrorMsg
+                          localTab === "promql"
+                            ? runPromqlError
+                            : localSqlQueryErrorMsg || sqlQueryErrorMsg
                         }}</OTruncatedText>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
@@ -534,7 +536,7 @@ import { debounce } from "lodash-es";
 import { b64EncodeUnicode, generateTraceContext, getImageURL } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import searchService from "@/services/search";
+import { createPromQLChunkProcessor } from "@/composables/dashboard/promqlChunkProcessor";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
@@ -627,9 +629,11 @@ const suppressPropError = ref(false);
 
 const sqlStatusState = computed(() => {
   const hasError =
-    (localSqlQueryErrorMsg.value ||
-      (!suppressPropError.value && (props as any).sqlQueryErrorMsg)) &&
-    localTab.value === "sql";
+    localTab.value === "promql"
+      ? !!runPromqlError.value
+      : (localSqlQueryErrorMsg.value ||
+          (!suppressPropError.value && (props as any).sqlQueryErrorMsg)) &&
+        localTab.value === "sql";
   if (hasError) return "sql-status-bar--error";
   if (runQueryLoading.value) return "sql-status-bar--loading";
   const currentQuery = localTab.value === "sql" ? localSqlQuery.value : localPromqlQuery.value;
@@ -979,6 +983,47 @@ const streamRun = (queryReq: any): Promise<StreamedRun> =>
     );
   });
 
+/** One PromQL range run over the streaming query_range endpoint; resolves to every series. */
+const streamPromqlRun = (queryReq: {
+  query: string;
+  start_time: number;
+  end_time: number;
+  step: string;
+}): Promise<any[]> =>
+  new Promise((resolve, reject) => {
+    stopRun();
+    const traceId = generateTraceContext().traceId;
+    runTraceId = traceId;
+    // The editor shows the raw result, so no series is dropped.
+    const chunks = createPromQLChunkProcessor({
+      maxSeries: Number.POSITIVE_INFINITY,
+      enableLogging: false,
+    });
+    let merged: any = null;
+    fetchQueryDataWithHttpStream(
+      {
+        queryReq,
+        type: "promql",
+        traceId,
+        org_id: store.state.selectedOrganization.identifier,
+      },
+      {
+        data: (_payload: unknown, response: any) => {
+          if (response?.type !== "promql_response") return;
+          merged = chunks.processChunk(merged, response?.content?.results);
+        },
+        error: (_payload: unknown, response: any) => {
+          if (runTraceId === traceId) runTraceId = "";
+          reject(response?.content ?? {});
+        },
+        complete: () => {
+          if (runTraceId === traceId) runTraceId = "";
+          resolve(merged?.result ?? []);
+        },
+      },
+    );
+  });
+
 onBeforeUnmount(stopRun);
 watch(
   () => props.modelValue,
@@ -1111,15 +1156,12 @@ const triggerPromqlQuery = async () => {
   queryReq.query = localPromqlQuery.value;
 
   try {
-    const res = await searchService.metrics_query_range({
-      org_identifier: store.state.selectedOrganization.identifier,
+    const result = await streamPromqlRun({
       query: queryReq.query,
       start_time: startTime,
       end_time: endTime,
       step: "0",
     });
-
-    const result = res?.data?.data?.result;
     if (result?.length > 0) {
       outputEvents.value = JSON.stringify(result, null, 2);
       // Count total data points across all series so the status bar shows a meaningful number
@@ -1129,8 +1171,8 @@ const triggerPromqlQuery = async () => {
         0,
       );
     }
-  } catch (err: any) {
-    runPromqlError.value = err.response?.data?.error ?? t("search.somethingWentWrong");
+  } catch (body: unknown) {
+    runPromqlError.value = runFailedText(body);
   }
 };
 
