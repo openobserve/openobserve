@@ -905,12 +905,53 @@ export default class DashboardactionPage {
     return { min: bounds.min ?? null, max: bounds.max ?? null, series: chart.series };
   }
 
-  // Legend and axes are canvas-painted, so read the live option via `_vnode` (`__vueParentComponent` is dev-only).
-  async getChartOptionSnapshots(scopeSelector = '[data-test="chart-renderer"]') {
-    return this.page.evaluate((scopeSel) => {
+  // page.evaluate cannot share code, so the Vue-tree chart lookup lives in one page-side function handed to each reader.
+  // Walks `_vnode` because `__vueParentComponent` is dev-only; returns [{ chart, host }] for charts inside the scope.
+  async _withLiveCharts(scopeSelector, reader) {
+    const finder = await this.page.evaluateHandle(() => (scopeSel) => {
       const scopes = Array.from(document.querySelectorAll(scopeSel));
-      const charts = [];
+      const found = [];
       const visited = new Set();
+      const walk = (node, depth) => {
+        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          const state = comp.setupState || {};
+          let chart = null;
+          try {
+            chart = "chart" in state ? state.chart : null;
+          } catch {
+            chart = null;
+          }
+          const host = state.chartRef;
+          if (
+            chart &&
+            typeof chart.getOption === "function" &&
+            host instanceof Element &&
+            scopes.some((scope) => scope.contains(host))
+          ) {
+            found.push({ chart, host });
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      return found;
+    });
+    try {
+      return await finder.evaluate(reader, { scopeSel: scopeSelector });
+    } finally {
+      await finder.dispose();
+    }
+  }
+
+  // Legend and axes are canvas-painted, so read the live option off each ECharts instance.
+  async getChartOptionSnapshots(scopeSelector = '[data-test="chart-renderer"]') {
+    return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
+      const charts = [];
       const numberOrNull = (value) => (typeof value === "number" ? value : null);
       const axesOf = (axis) =>
         (Array.isArray(axis) ? axis : axis ? [axis] : []).map((a) => ({
@@ -944,62 +985,38 @@ export default class DashboardactionPage {
           };
         });
       };
-      const walk = (node, depth) => {
-        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
-        visited.add(node);
-        const comp = node.component;
-        if (comp) {
-          const state = comp.setupState || {};
-          let chart = null;
-          try {
-            chart = "chart" in state ? state.chart : null;
-          } catch {
-            chart = null;
-          }
-          const host = state.chartRef;
-          if (
-            chart &&
-            typeof chart.getOption === "function" &&
-            host instanceof Element &&
-            scopes.some((scope) => scope.contains(host))
-          ) {
-            try {
-              const option = chart.getOption() ?? {};
-              charts.push({
-                width: chart.getWidth(),
-                height: chart.getHeight(),
-                hostWidth: host.clientWidth,
-                hostHeight: host.clientHeight,
-                xAxis: axesOf(option.xAxis),
-                yAxis: axesOf(option.yAxis),
-                series: (option.series ?? []).map((s) => ({
-                  name: s?.name ? String(s.name) : "",
-                  type: s?.type ?? null,
-                  silent: s?.silent === true,
-                  stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
-                  radius: s?.radius ?? null,
-                  center: Array.isArray(s?.center) ? s.center.map(String) : null,
-                  min: numberOrNull(s?.min),
-                  max: numberOrNull(s?.max),
-                  points: (s?.data ?? []).map(pointOf),
-                  pointNames: (s?.data ?? []).map((point) =>
-                    point !== null && typeof point === "object" && !Array.isArray(point) ? String(point.name ?? "") : "",
-                  ),
-                })),
-                legendEntries: legendEntriesOf(option),
-              });
-            } catch {
-              // A disposed instance throws; it draws nothing anyway.
-            }
-          }
-          walk(comp.subTree, depth + 1);
+      for (const { chart, host } of findCharts(scopeSel)) {
+        try {
+          const option = chart.getOption() ?? {};
+          charts.push({
+            width: chart.getWidth(),
+            height: chart.getHeight(),
+            hostWidth: host.clientWidth,
+            hostHeight: host.clientHeight,
+            xAxis: axesOf(option.xAxis),
+            yAxis: axesOf(option.yAxis),
+            series: (option.series ?? []).map((s) => ({
+              name: s?.name ? String(s.name) : "",
+              type: s?.type ?? null,
+              silent: s?.silent === true,
+              stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+              radius: s?.radius ?? null,
+              center: Array.isArray(s?.center) ? s.center.map(String) : null,
+              min: numberOrNull(s?.min),
+              max: numberOrNull(s?.max),
+              points: (s?.data ?? []).map(pointOf),
+              pointNames: (s?.data ?? []).map((point) =>
+                point !== null && typeof point === "object" && !Array.isArray(point) ? String(point.name ?? "") : "",
+              ),
+            })),
+            legendEntries: legendEntriesOf(option),
+          });
+        } catch {
+          // A disposed instance throws; it draws nothing anyway.
         }
-        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
-        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
-      };
-      walk(document.querySelector("#app")?._vnode, 0);
+      }
       return charts;
-    }, scopeSelector);
+    });
   }
 
   // Segments are [start, end, rowIndex, styleIndex] with styleIndex -1 for "no data" (dropped here);
@@ -1054,50 +1071,19 @@ export default class DashboardactionPage {
     }
   }
 
-  /**
-   * Live state of the first rendered sunburst, read from its ECharts instance (the chart is canvas-painted).
-   *
-   * Returns null when no sunburst is drawn. `slices` lists every sector ECharts drew, with its ring depth
-   * (1 = innermost ring) and the page coordinates of its centre, so a test can click a real slice.
-   * `viewRoot` is the slice the chart is re-rooted to ("" for the whole tree).
-   *
-   * @param {string} scopeSelector
-   * @returns {Promise<null | {
-   *   depth: number, rootNames: string[], labelsShown: boolean, nodeClick: string|boolean|null,
-   *   viewRoot: string, slices: Array<{name: string, depth: number, value: number, x: number, y: number}>
-   * }>}
-   */
+  // A sunburst is canvas-painted, so its rings, view root and slice positions are read off the live ECharts
+  // instance; ECharts can still hand back a sector it detached on re-root, hence the `el.parent` check.
   async getSunburstState(scopeSelector = this.chartRendererSelector) {
-    return this.page.evaluate((scopeSel) => {
-      const scopes = Array.from(document.querySelectorAll(scopeSel));
-      const visited = new Set();
-      let found = null;
-      const walk = (node, depth) => {
-        if (found || !node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
-        visited.add(node);
-        const comp = node.component;
-        if (comp) {
-          let chart = null;
+    return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
+      const found = findCharts(scopeSel)
+        .map(({ chart }) => chart)
+        .find((chart) => {
           try {
-            chart = "chart" in (comp.setupState || {}) ? comp.setupState.chart : null;
+            return chart.getOption()?.series?.[0]?.type === "sunburst";
           } catch {
-            chart = null;
+            return false; // A disposed instance throws.
           }
-          const host = comp.setupState?.chartRef;
-          if (chart?.getOption && host instanceof Element && scopes.some((scope) => scope.contains(host))) {
-            try {
-              const series = chart.getOption()?.series?.[0];
-              if (series?.type === "sunburst") found = chart;
-            } catch {
-              // A disposed instance throws; keep looking.
-            }
-          }
-          walk(comp.subTree, depth + 1);
-        }
-        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
-        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
-      };
-      walk(document.querySelector("#app")?._vnode, 0);
+        });
       if (!found) return null;
 
       const series = found.getOption().series[0];
@@ -1110,7 +1096,6 @@ export default class DashboardactionPage {
       for (let i = 0; i < data.count(); i++) {
         const el = data.getItemGraphicEl(i);
         const treeNode = data.tree.getNodeByDataIndex(i);
-        // A sector ECharts removed after a re-root can still be returned here; it has left the scene graph.
         if (!el?.shape || !el.parent || el.invisible || el.ignore || !treeNode || treeNode.depth < 1) continue;
         const { cx, cy, r0, r, startAngle, endAngle } = el.shape;
         const angle = (startAngle + endAngle) / 2;
@@ -1131,7 +1116,7 @@ export default class DashboardactionPage {
         viewRoot: String(seriesModel.getViewRoot?.()?.name ?? ""),
         slices,
       };
-    }, scopeSelector);
+    });
   }
 
   /** Poll until a sunburst is drawn, and return its state. */
@@ -1146,11 +1131,7 @@ export default class DashboardactionPage {
     return state;
   }
 
-  /**
-   * Click the largest drawn slice on the given ring (1 = innermost) with a real mouse click
-   * at the slice centre, and return the slice that was clicked.
-   * @param {number} ringDepth
-   */
+  // The largest slice is the easiest real click target; ring 1 is the innermost ring.
   async clickLargestSunburstSlice(ringDepth = 1) {
     const state = await this.waitForSunburst();
     const ring = state.slices.filter((slice) => slice.depth === ringDepth);

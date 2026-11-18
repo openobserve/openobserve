@@ -355,11 +355,8 @@ export async function setupDistributionPanelWithConfig(page, pm, dashboardName, 
   testLogger.info("Distribution panel with config ready", { dashboardName, panelName, yField, breakdownField });
 }
 
-/**
- * Sunburst panel — config sidebar opened and ready.
- * Each group field adds a ring (innermost first); the optional sub-group is the outer ring.
- * Size keeps the auto-seeded count, which is what a sunburst defaults to.
- */
+// Sunburst panel with the config sidebar open; Size keeps the seeded count. The editor opens as a bar and
+// seeds histogram(_timestamp) on X, which the switch to sunburst keeps, so it is removed first.
 export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {
   panelName = "Test Panel",
   groupFields = ["kubernetes_namespace_name"],
@@ -370,8 +367,6 @@ export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {
   await pm.chartTypeSelector.selectChartType("sunburst");
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream("e2e_automate");
-  // The editor opens as a bar and seeds histogram(_timestamp) on X; the switch to sunburst keeps it,
-  // which would add a time ring the test did not ask for.
   await pm.chartTypeSelector.removeFieldIfPresent("x_axis_1", "x");
   for (const field of groupFields) {
     await pm.chartTypeSelector.searchAndAddField(field, "x");

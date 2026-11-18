@@ -549,14 +549,8 @@ export default class ChartTypeSelector {
     await removeButton.click();
   }
 
-  /**
-   * Remove a field if it is (or shortly becomes) present, e.g. the histogram(_timestamp) X field the
-   * editor seeds while it is still a bar chart, which a later chart-type switch carries over.
-   * @param {string} alias - e.g. "x_axis_1"
-   * @param {"x"|"y"|"b"} target
-   * @param {number} timeout - how long to wait for an asynchronously seeded field
-   * @returns {Promise<boolean>} whether a field was removed
-   */
+  // Seeded fields land asynchronously, so wait briefly before deciding there is nothing to remove.
+  // Returns whether a field was removed.
   async removeFieldIfPresent(alias, target, timeout = 5000) {
     const baseTestIds = { x: "dashboard-x-item", y: "dashboard-y-item", b: "dashboard-b-item" };
     if (!baseTestIds[target]) throw new Error(`Invalid target type: ${target}`);
@@ -1078,20 +1072,14 @@ export default class ChartTypeSelector {
     if (b) await expect(this.axisLayoutName(this.breakdownLayout)).toContainText(b);
   }
 
-  /**
-   * Assert whether a field's add-to-axis button (+X, +B, ...) is enabled.
-   * The buttons are CSS-hidden until the row is hovered, so hover first; the search is cleared afterwards.
-   * @param {string} fieldName
-   * @param {"x"|"y"|"b"} target
-   * @param {boolean} enabled
-   */
+  // The add buttons are CSS-hidden until the row is hovered, and a field-list re-render after the
+  // search drops :hover, so the hover is retried inside the poll.
   async expectAddFieldButtonEnabled(fieldName, target, enabled) {
     if (!["x", "y", "b"].includes(target)) throw new Error(`Invalid target type: ${target}`);
     await this.searchField(fieldName);
     const row = this.fieldListRow(fieldName);
     const button = this.fieldAddButton(fieldName, target);
     await row.waitFor({ state: "visible", timeout: 10000 });
-    // Re-hover inside the poll: a field-list re-render after the search drops :hover.
     await expect(async () => {
       await row.hover({ timeout: 2000 });
       if (enabled) await expect(button).toBeEnabled({ timeout: 1000 });

@@ -14,9 +14,8 @@ import {
 } from "./utils/configPanelHelpers.js";
 const testLogger = require("../utils/test-logger.js");
 
-// Feature: sunburst panel type (PR #15923) — rings up to 5 levels deep, one per Group field plus an
-// optional Sub-group outer ring, sized by count/sum; clicking a slice re-roots the chart; a
-// "Show labels" option; drilldown passes the clicked slice's own name.
+// Sunburst panel type (PR #15923): one ring per Group field plus an optional Sub-group, up to 5, sized by
+// count/sum. Clicking a slice re-roots the chart, unless a drilldown is set.
 
 // Low-cardinality columns of the e2e_automate fixture, innermost ring first.
 const NAMESPACE = "kubernetes_namespace_name";
