@@ -750,6 +750,33 @@ describe("setValuesTimeRange — values follow the caller's time range", () => {
     const asked = vi.mocked(requestFieldValues).mock.calls.map((call) => call[2]?.timeRange);
     expect(asked).toEqual([range, moved, undefined]);
   });
+
+  it("keeps one window for a lookup, even when the clock passes a minute while it waits", async () => {
+    const next = { startTime: range.startTime + 60_000_000, endTime: range.endTime + 60_000_000 };
+    let reads = 0;
+    const c = makeComposable();
+    c.setValuesTimeRange(() => (reads++ === 0 ? range : next));
+    await c.resolveFieldValues("level");
+    const asked = vi.mocked(requestFieldValues).mock.calls.map((call) => call[2]?.timeRange);
+    expect(asked).toEqual([range]);
+  });
+
+  it("starts again when a page sets a different window function while a lookup waits", async () => {
+    const later = { startTime: range.startTime - 1, endTime: range.endTime };
+    let finishOld!: (values: string[]) => void;
+    vi.mocked(requestFieldValues).mockImplementation((_ctx, _field, options: any) =>
+      options?.timeRange?.startTime === range.startTime
+        ? new Promise<string[]>((resolve) => (finishOld = resolve))
+        : Promise.resolve(["later-window"]),
+    );
+    const c = makeComposable();
+    c.setValuesTimeRange(() => range);
+    const pending = c.resolveFieldValues("level");
+    await Promise.resolve();
+    c.setValuesTimeRange(() => later);
+    finishOld(["old-window"]);
+    await expect(pending).resolves.toEqual(["later-window"]);
+  });
 });
 
 // ─── a typed prefix reaches past the top ten ──────────────────────────────────
