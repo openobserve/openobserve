@@ -17,6 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { annotationService } from "./dashboard_annotations";
 import { annotationKeys } from "./dashboard_annotations.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { defaultQueryRetry } from "@/composables/query/queryClient";
 
 export const dashboardAnnotationsQuery = (org: string, dashboardId: string, params: unknown) =>
   queryOptions({
@@ -24,6 +25,11 @@ export const dashboardAnnotationsQuery = (org: string, dashboardId: string, para
     queryFn: async () =>
       (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ?? null,
     staleTime: NORMAL_STALE_TIME,
+    // A 503 means the permission service is overloaded. Annotations are an
+    // optional overlay, so a retry would only add load and the panel draws
+    // without them.
+    retry: (failureCount: number, err: any) =>
+      err?.response?.status !== 503 && defaultQueryRetry(failureCount, err),
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

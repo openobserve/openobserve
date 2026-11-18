@@ -78,6 +78,14 @@ const serverMessage = (err: any): I18nText =>
     err?.response?.data?.message ?? err?.response?.data?.error ?? err?.message ?? "Request failed",
   );
 
+// 4xx are the caller's fault; 501 is a disabled feature — both permanent.
+export const defaultQueryRetry = (failureCount: number, err: any): boolean => {
+  const status = err?.response?.status;
+  if (status === 400 || status === 401 || status === 403 || status === 404 || status === 501)
+    return false;
+  return failureCount < 2;
+};
+
 export const queryClient = new QueryClient({
   /**
    * Declarative invalidation, applied to every mutation that opts in by
@@ -116,13 +124,7 @@ export const queryClient = new QueryClient({
       // Every declaration names its tier; this is the safety net for one that forgets — see cachePolicy.ts.
       staleTime: LIVE_STALE_TIME,
       gcTime: GC_TIME,
-      retry: (failureCount: number, err: any) => {
-        const status = err?.response?.status;
-        // 4xx are the caller's fault; 501 is a disabled feature — both permanent.
-        if (status === 400 || status === 401 || status === 403 || status === 404 || status === 501)
-          return false;
-        return failureCount < 2;
-      },
+      retry: defaultQueryRetry,
       // Off everywhere: this console is often left open on a wall display and several endpoints are expensive.
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,

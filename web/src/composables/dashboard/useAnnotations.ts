@@ -30,6 +30,12 @@ function isAbort(error: unknown) {
   return name === "CanceledError" || name === "AbortError" || name === "CancelledError";
 }
 
+// The server's panel filter: an annotation shows on its panels, and one with no panels shows on all.
+function forPanel(annotation: { panels?: string[] | null }, panelId: string) {
+  const panels = annotation?.panels;
+  return !Array.isArray(panels) || panels.length === 0 || panels.includes(panelId);
+}
+
 export const useAnnotations = (
   organization: string,
   dashboardId: string,
@@ -41,16 +47,14 @@ export const useAnnotations = (
     if (!enableAnnotations) return null;
     if (!panelId || !dashboardId) return undefined;
     try {
-      // Cached per dashboard + window: every panel on a dashboard asks for its
-      // own annotations over the same range, so this collapses N requests to one
-      // per distinct window.
-      return await queryClient.fetchQuery(
-        dashboardAnnotationsQuery(organization, dashboardId, {
-          panels: [panelId],
-          start_time,
-          end_time,
-        }),
+      // One request per dashboard and window: the key has no panel id, so every
+      // panel joins the same in-flight request and reads the same cache entry.
+      // Each panel then keeps the annotations the server would have returned
+      // for it alone: its own and the dashboard-wide ones (no panels).
+      const all = await queryClient.fetchQuery(
+        dashboardAnnotationsQuery(organization, dashboardId, { start_time, end_time }),
       );
+      return Array.isArray(all) ? all.filter((a: any) => forPanel(a, panelId)) : all;
     } catch (err: any) {
       console.error("Error fetching annotations:", err);
       return null;
