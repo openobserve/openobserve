@@ -24,6 +24,7 @@ import {
   groupLevel,
   insertNode,
   makeCondition,
+  nestLeftToRight,
   newFilterId,
   OPERATORS,
   removeNode,
@@ -483,10 +484,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
             id: editingId.value,
           });
     } else {
-      next = place(
-        tree.value,
-        makeCondition(current.field, current.operator, filled, nextConnector.value),
-      );
+      const condition = makeCondition(current.field, current.operator, filled, nextConnector.value);
+      next = nestMixed(place(tree.value, condition), targetGroup.value.id);
     }
     const wasEditing = Boolean(editingId.value);
     pendingConnector.value = "AND";
@@ -614,6 +613,21 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return insertNode(moved, { ...node, connector: first.connector }, group.id, 0);
   }
 
+  // A per-item group never mixes AND and OR, so the chips read left to right exactly as the SQL runs.
+  function nestMixed(base: FilterGroup, groupId: string): FilterGroup {
+    if (config.value.connectors !== "per-item") return base;
+    const group = groupId === base.id ? base : findNode(base, groupId);
+    if (group?.kind !== "group") return base;
+    const items = nestLeftToRight(group.items);
+    if (items === group.items) return base;
+    const next =
+      group.id === base.id ? { ...base, items } : replaceNode(base, group.id, { ...group, items });
+    // The chip after the caret may now sit in the new group; the caret goes with it.
+    const holder = caretBeforeId.value ? findParent(next, caretBeforeId.value) : undefined;
+    if (holder) openGroupId.value = holder.id === next.id ? null : holder.id;
+    return next;
+  }
+
   /** Drops the empty group the caret leaves, and any parent that empties with it, but never `keepId`. */
   function dropAbandoned(base: FilterGroup, fromId: string, keepId: string): FilterGroup {
     let id: string | undefined = fromId;
@@ -667,7 +681,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       connector: advanced.value ? (groupConnector(siblings) ?? pendingConnector.value) : "AND",
       items: [],
     };
-    next = place(next, group);
+    next = nestMixed(place(next, group), siblings.id);
     pendingConnector.value = "AND";
     text.value = "";
     openGroupId.value = group.id;
@@ -737,11 +751,11 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const node = findNode(tree.value, id);
     if (!node) return;
     const next: FilterConnector = node.connector === "AND" ? "OR" : "AND";
-    if (config.value.connectors === "per-group") {
-      const parent = findParent(tree.value, id);
-      if (parent) return options.commit(setGroupConnector(tree.value, parent.id, next));
-    }
-    options.commit(replaceNode(tree.value, id, { ...node, connector: next }));
+    const parent = findParent(tree.value, id);
+    if (config.value.connectors === "per-group" && parent)
+      return options.commit(setGroupConnector(tree.value, parent.id, next));
+    const flipped = replaceNode(tree.value, id, { ...node, connector: next });
+    options.commit(parent ? nestMixed(flipped, parent.id) : flipped);
   }
 
   function toggleNegate(id: string) {
@@ -895,7 +909,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   /** Only offered where dropping the brackets leaves the filter meaning the same. */
   function canUngroup(id: string): boolean {
     if (config.value.connectors === "any-of-groups") return false;
-    return canUngroupNode(tree.value, id, perGroup.value);
+    return canUngroupNode(tree.value, id);
   }
 
   function ungroup(id: string) {

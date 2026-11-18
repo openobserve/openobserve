@@ -58,7 +58,7 @@ describe("parseSqlFilter", () => {
 
   it("accepts hand-typed lowercase keywords and <> / ==", () => {
     expect(roundTrip("level='error' and status<>200 or ok==true")).toBe(
-      "level = 'error' AND status != 200 OR ok = true",
+      "(level = 'error' AND status != 200) OR ok = true",
     );
   });
 
@@ -107,6 +107,23 @@ describe("parseSqlFilter", () => {
   it("keeps the connector of each node", () => {
     const tree = parseSqlFilter("level = 'a' OR level = 'b'")!;
     expect(tree.items.map((item) => item.connector)).toEqual(["AND", "OR"]);
+  });
+
+  it("draws SQL's AND-before-OR as groups, so the chips read the way the query runs", () => {
+    const tree = parseSqlFilter("level = 'a' OR level = 'b' AND status = 1")!;
+    expect(tree.items.map((item) => [item.kind, item.connector])).toEqual([
+      ["condition", "AND"],
+      ["group", "OR"],
+    ]);
+    expect(roundTrip("level = 'a' OR level = 'b' AND status = 1")).toBe(
+      "level = 'a' OR (level = 'b' AND status = 1)",
+    );
+    expect(roundTrip("level = 'a' AND status = 1 OR ok = true AND level = 'b'")).toBe(
+      "(level = 'a' AND status = 1) OR (ok = true AND level = 'b')",
+    );
+    expect(roundTrip("(level = 'a' OR level = 'b' AND ok = true) AND status = 1")).toBe(
+      "(level = 'a' OR (level = 'b' AND ok = true)) AND status = 1",
+    );
   });
 
   it("reads backslash-escaped LIKE wildcards back as the literal value", () => {

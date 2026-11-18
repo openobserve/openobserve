@@ -15,6 +15,7 @@
 
 import {
   emptyFilterGroup,
+  groupAndRuns,
   newFilterId,
   type FilterCondition,
   type FilterConnector,
@@ -131,7 +132,7 @@ class Parser {
         connector = this.tokens[this.pos++].text.toUpperCase() as FilterConnector;
         continue;
       }
-      return items;
+      return groupAndRuns(items);
     }
   }
 
