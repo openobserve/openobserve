@@ -14,15 +14,6 @@ import {
   reopenPanelConfig,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
-const {
-  NAMESPACE_FIELD,
-  STREAM,
-  ORG,
-  namespaceTablePanel,
-  createDashboard,
-  deleteCreatedDashboards,
-  decodeUrlSafeBase64,
-} = require('../utils/dashboard-auto-run-fixtures.js');
 
 test.describe.configure({ mode: "parallel" });
 test.describe.configure({ retries: 1 });
@@ -536,38 +527,5 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     // Still on main dashboard view — clean up both dashboards
     await cleanupTestDashboard(page, pm, mainDashName);
     await deleteDashboard(page, destinationDashName);
-  });
-});
-
-test.describe("Panel Go To Logs (#16395)", { tag: ['@dashboards', '@goToLogs', '@P1'] }, () => {
-  test.afterAll(async () => {
-    await deleteCreatedDashboards();
-  });
-
-  test("Go To Logs on an aggregate table panel opens its WHERE as log lines, not the panel's counts", async ({ page }, testInfo) => {
-    testLogger.testStart(testInfo.title, testInfo.file);
-    await navigateToBase(page);
-    await ingestion(page);
-    const pm = new PageManager(page);
-    const where = `${NAMESPACE_FIELD} = 'ziox'`;
-    const dashboardId = await createDashboard(`go_to_logs_${Date.now()}_${Math.floor(Math.random() * 1e4)}`, {
-      panels: [namespaceTablePanel('p_gtl', 'gtl', where)],
-    });
-    await pm.dashboardAutoRun.openDashboard(ORG(), dashboardId, ['p_gtl']);
-    await pm.dashboardAutoRun.expectPanelRows('p_gtl', { shows: ['ziox'], hides: ['velero'] });
-
-    const logsTab = await pm.dashboardPanelEdit.goToLogsInNewTab('p_gtl');
-    const params = new URL(logsTab.url()).searchParams;
-    expect(decodeUrlSafeBase64(params.get('query')), 'Logs gets the log lines behind the panel, filtered by its WHERE').toBe(
-      `SELECT * FROM "${STREAM}" WHERE ${where} ORDER BY _timestamp DESC`,
-    );
-    expect(params.get('show_histogram')).toBe('true');
-
-    const logs = new PageManager(logsTab).logsPage;
-    await logs.expectLogTableColumnSourceToContainText('ziox');
-    for (const row of await logs.getResultRowTexts()) {
-      expect(row).toContain('ziox');
-    }
-    await logsTab.close();
   });
 });

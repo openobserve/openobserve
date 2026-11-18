@@ -70,7 +70,9 @@
       "dashboard-cache-browser-refresh.spec.js",
       "dashboard-save-validation-message-11283.spec.js",
       "dashboard-14479-variable-name-prefix.spec.js",
-      "dashboard-3127-shortcut-behind-drawer.spec.js"
+      "dashboard-3127-shortcut-behind-drawer.spec.js",
+      "dashboard-16395-go-to-logs-aggregate-where.spec.js",
+      "dashboard-16808-org-switch-by-id.spec.js"
     ],
     "disabled": []
   },
