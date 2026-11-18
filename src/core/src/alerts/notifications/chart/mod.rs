@@ -926,6 +926,12 @@ mod tests {
 
     use super::*;
 
+    const B: i64 = 300_000_000;
+    const T0: i64 = 1_700_000_000_000_000;
+
+    /// The permit tests share the node semaphore, and a fair queue would deadlock two of them.
+    static PERMIT_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
     #[test]
     fn only_a_stream_without_actual_value_skips_the_chart() {
         let with = Schema::new(vec![Field::new("actual_value", DataType::Float64, true)]);
@@ -934,9 +940,6 @@ mod tests {
         let failed = Err(infra::errors::Error::Message("db down".to_string()));
         assert!(may_hold_values("org1", failed));
     }
-
-    const B: i64 = 300_000_000;
-    const T0: i64 = 1_700_000_000_000_000;
 
     fn pt(i: i64, value: f64) -> AnomalySeriesPoint {
         AnomalySeriesPoint {
@@ -1165,9 +1168,6 @@ mod tests {
         assert_eq!(band[2], None);
         assert_eq!(band[3], Some((90.0, 110.0)));
     }
-
-    /// The permit tests share the node semaphore, and a fair queue would deadlock two of them.
-    static PERMIT_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
     #[tokio::test]
     async fn an_anomaly_send_waits_for_a_render_permit_and_a_scheduled_one_does_not() {
