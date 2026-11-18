@@ -1,9 +1,3 @@
-/**
- * SDK-shaped RUM error events whose stacks point at the committed sourcemaps
- * fixture bundle (fixtures/sourcemaps), plus an ingest-and-wait helper that
- * can target any org.
- */
-
 const path = require('path');
 const { expect } = require('@playwright/test');
 const { waitForStreamRows } = require('./rum-stream-verify.js');

@@ -1,5 +1,3 @@
-// Page object for Infrastructure > Kubernetes (web/src/views/Infrastructure/kubernetes2).
-
 import { expect } from '@playwright/test';
 
 export class KubernetesPage {

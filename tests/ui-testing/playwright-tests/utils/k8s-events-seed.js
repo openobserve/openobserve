@@ -1,5 +1,3 @@
-// Seeds Kubernetes events into an org's k8s_events stream for the Infrastructure > Kubernetes specs.
-
 const { expect } = require('@playwright/test');
 const { getAuthHeaders } = require('./cloud-auth.js');
 const { ingestBase } = require('./ingest-url.js');
