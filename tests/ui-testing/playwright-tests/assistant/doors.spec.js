@@ -212,9 +212,9 @@ test.describe("assistant doors", () => {
     await focusRowToolbar(page);
     await tabTo(page, ROW_ADD);
     await page.keyboard.press("Enter");
-    // The composer hides its chips while an answer runs; they show again once it stops.
+    // A door chip staged into a chat that just answered shows as the thread offer, which takes the strip from the chips.
     await assistant.stop();
-    await expect(assistant.allChips()).toHaveCount(1);
+    await expect(assistant.container().locator('[data-test="assistant-composer-notice"][data-notice="thread"]')).toBeVisible();
     expect(await streamRequests(page)).toBe(1);
   });
 
