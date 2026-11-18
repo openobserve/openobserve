@@ -15890,7 +15890,9 @@
       "matchedNothing": "Your filters matched nothing in 24 hours. Check the filter values.",
       "firesOnSave": "Fires as soon as it is saved",
       "anomalyDelay": "Checks every {every}, so a spike can wait up to {duration} to alert.",
-      "seenWithout": "without {label} ({count})"
+      "seenWithout": "without {label} ({count})",
+      "valueNotSeenIn": "{value} hasn't appeared in the last {window}. Seen: {seen}.",
+      "fieldEmptyIn": "{field} has no values in the last {window}."
     },
     "discovery": {
       "lastEvent": "Last event {ago} ago · {rate}/h",
@@ -15961,11 +15963,17 @@
         "group": "Group by",
         "measure": "Measured field",
         "label": "Label",
-        "factor": "Times last week"
+        "factor": "Times last week",
+        "fieldPrompt": "pick a field",
+        "labelPrompt": "pick a label",
+        "groupPrompt": "pick a group",
+        "valuePrompt": "pick values"
       },
       "noGroup": "No grouping",
       "addGroup": "Add a group",
-      "cardWhy": "{fit} · {detail}"
+      "cardWhy": "{fit} · {detail}",
+      "needsChoice": "Needs a choice",
+      "previewWaits": "Pick what the sentence leaves empty to see a preview"
     },
     "librarySuggest": {
       "suggestedStarter": "Suggested starter",
