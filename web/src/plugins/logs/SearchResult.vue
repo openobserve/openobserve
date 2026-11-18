@@ -2544,7 +2544,7 @@ export default defineComponent({
 
     const addSearchTerm = (
       field: string | number,
-      field_value: string | number | boolean,
+      field_value: string | number | boolean | null,
       action: string,
     ) => {
       const searchExpression = getFilterExpressionByFieldType(field, field_value, action);
@@ -2970,11 +2970,11 @@ export default defineComponent({
       () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
     );
 
-    const toSearchTermValue = (value: unknown): string | number | boolean => {
+    const toSearchTermValue = (value: unknown): string | number | boolean | null => {
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
         return value;
       }
-      if (value === null || value === undefined) return "null";
+      if (value === null || value === undefined) return null;
       return JSON.stringify(value);
     };
 

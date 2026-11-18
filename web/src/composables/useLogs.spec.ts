@@ -1397,6 +1397,20 @@ describe("Use Logs Composable", () => {
         wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "exclude"),
       ).toBe("op != 'notificationHandling''s'");
     });
+
+    it.each([
+      ["", "include", "k = ''"],
+      ["", "exclude", "k != ''"],
+      ["null", "include", "k = 'null'"],
+      ["null", "exclude", "k != 'null'"],
+      [null, "include", "k is null"],
+      [undefined, "exclude", "k is not null"],
+    ])("only a real null becomes a null check: %j %s", (value, action, expression) => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("k", "Utf8");
+
+      expect(wrapper.vm.getFilterExpressionByFieldType("k", value, action)).toBe(expression);
+    });
   });
 });
 
