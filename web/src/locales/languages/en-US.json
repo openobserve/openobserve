@@ -15327,7 +15327,7 @@
     "tiers": {
       "showFewer": "Show fewer",
       "names": {
-        "holdFor": "Must last at least",
+        "holdFor": "Must last",
         "groupBy": "Group by",
         "compareWithPast": "Compare with the past",
         "recovery": "Tell them when it recovers",
@@ -15601,6 +15601,7 @@
         "series": "series"
       },
       "editor": {
+        "promql": "PromQL",
         "savedFunction": "Saved function",
         "vrl": "VRL",
         "sql": "SQL",

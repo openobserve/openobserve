@@ -874,7 +874,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ? t("alerts.form.editor.sql")
                             : isForecastMode
                               ? t("alerts.forecast.expression")
-                              : t("alerts.promqlEditor")
+                              : t("alerts.form.editor.promql")
                         }}</span>
                       </div>
                       <div class="flex min-w-0 items-center gap-3">
