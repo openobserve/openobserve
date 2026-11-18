@@ -53,6 +53,10 @@ describe("alertIntents", () => {
     expect(intentsFor(type, { anomaly })).toEqual(ids);
   });
 
+  it("does not offer a per-event intent once When unusual is picked", () => {
+    expect(intentsFor("logs", { anomaly: true, howItChecks: "anomaly" })).not.toContain("anyEvent");
+  });
+
   it.each([
     ["Utf8", "string"],
     ["Int64", "number"],

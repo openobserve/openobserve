@@ -123,10 +123,18 @@ const MEASURE_MIN_COVERAGE = 0.5;
 const HEAVY_TAIL_RATIO = 5;
 const MIN_WORD_SHARE = 0.8;
 
-/** Intents offered for a stream type; the "unusual" ones only where anomaly detection is usable. */
-export function intentsFor(streamType: string, opts: { anomaly: boolean }): IntentId[] {
+/**
+ * Intents offered for a stream type; the "unusual" ones only where anomaly detection is usable, and no
+ * per-event one under When unusual, which cannot check each event.
+ */
+export function intentsFor(
+  streamType: string,
+  opts: { anomaly: boolean; howItChecks?: string },
+): IntentId[] {
   const all = streamType === "metrics" ? METRIC_INTENTS : EVENT_INTENTS;
-  return all.filter((id) => opts.anomaly || !ANOMALY_INTENTS.has(id));
+  return all
+    .filter((id) => opts.anomaly || !ANOMALY_INTENTS.has(id))
+    .filter((id) => opts.howItChecks !== "anomaly" || id !== "anyEvent");
 }
 
 export function fieldKind(type: string | undefined): FieldKind {

@@ -342,6 +342,8 @@ const props = defineProps<{
   showLibrary: boolean;
   /** The intent the form was last filled from; null once the user starts from scratch. */
   active: IntentId | null;
+  /** The type picked above the chips (`is_real_time`): "false", "true" or "anomaly". */
+  howItChecks?: string;
 }>();
 
 const emit = defineEmits<{
@@ -371,7 +373,13 @@ const NO_GROUP = "__none__";
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const isMetrics = computed(() => props.streamType === "metrics");
-const intents = computed(() => intentsFor(props.streamType, { anomaly: props.anomalyAvailable }));
+// A type a chip set does not narrow the chips, so the row never loses the chip beside the one clicked.
+const intents = computed(() =>
+  intentsFor(props.streamType, {
+    anomaly: props.anomalyAvailable,
+    howItChecks: props.active ? undefined : props.howItChecks,
+  }),
+);
 const noun = computed(() => dataNoun(props.streamType, "custom", 2, t));
 const nounOne = computed(() => dataNoun(props.streamType, "custom", 1, t));
 const questionText = computed(() => t("alerts.intent.question", { stream: raw(props.streamName) }));
