@@ -137,7 +137,7 @@ describe("AlertGroupChart — threshold visibility", () => {
     const config = panelConfig(wrapper);
     expect(config.mark_line).toHaveLength(2);
     expect(config.y_axis_max).toBeGreaterThan(500);
-    expect(config.y_axis_min).toBeLessThan(200);
+    expect(config.y_axis_min).toBeUndefined();
   });
 
   it("does the same on the PromQL path", async () => {
