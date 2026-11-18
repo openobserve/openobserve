@@ -298,6 +298,16 @@ export function freeTextDecorations(
   return ranges.length ? { ranges, hover } : null;
 }
 
+/** False only once every selected stream's schema shows no full-text field, where match_all is refused. */
+export function allowsMatchAll(
+  searchObj: FreeTextSearchObj,
+  zoConfig: FreeTextZoConfig | null | undefined,
+): boolean {
+  const ctx = buildFilterContext(searchObj, zoConfig, { ignoreFailures: true });
+  const targets = Object.values(ctx.targets);
+  return !ctx.textEnabled || !targets.length || targets.some((target) => target.mode === "fts");
+}
+
 export function noFtsStreams(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,

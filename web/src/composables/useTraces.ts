@@ -195,6 +195,8 @@ const defaultObject = {
       streamLists: [],
       selectedStream: { label: "", value: "" },
       selectedStreamFields: [],
+      /** Null until the stream's settings load; match_all is refused on a stream without these fields. */
+      hasFullTextFields: null as boolean | null,
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
@@ -308,6 +310,7 @@ const useTraces = () => {
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];
+    searchObj.data.stream.hasFullTextFields = null;
     searchObj.data.queryResults = {};
     searchObj.data.sortedQueryResults = [];
     searchObj.data.histogram = {

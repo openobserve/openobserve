@@ -1312,9 +1312,6 @@
     "clearAll": "Clear all filters",
     "toggleConnector": "Switch between AND and OR",
     "selectedCount": "No values selected | {count} value selected | {count} values selected",
-    "query": "Query",
-    "builderTooltip": "Build filters by picking fields, conditions and values",
-    "queryTooltip": "Write the query yourself",
     "hints": {
       "search": {
         "eq": "Exact value, case-sensitive. The fastest filter on indexed fields.",
@@ -1433,8 +1430,6 @@
         "isNotNull": "The attribute is set to a value that isn't blank."
       }
     },
-    "queryNotParsableShort": "The builder can't show this query:",
-    "clearAndBuild": "Clear and build",
     "where": "Where",
     "addCondition": "Add condition",
     "addGroup": "Add group",

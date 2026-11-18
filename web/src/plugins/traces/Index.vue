@@ -340,6 +340,7 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import { streamTextTarget } from "@/utils/query/freeTextFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -1360,6 +1361,7 @@ async function extractFields() {
     if (owner !== fieldsOwner) {
       fieldsOwner = "";
       searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.stream.hasFullTextFields = null;
       selectedStreamStats.value = null;
     }
 
@@ -1385,6 +1387,13 @@ async function extractFields() {
 
       const stream = await getStream(searchObj.data.stream.selectedStream.value, "traces", true);
       if (superseded()) return;
+      searchObj.data.stream.hasFullTextFields = stream
+        ? streamTextTarget(
+            stream,
+            store.state.zoConfig.default_fts_keys ?? [],
+            store.state.zoConfig.quick_mode_num_fields,
+          ).mode === "fts"
+        : null;
       // Mirror the real stats (doc_time_min/max) into streamResults so that
       // TracesNoEventsState can compute streamDocTimeRange correctly.
       const streamResultEntry = searchObj.data.streamResults.list?.find(
@@ -2715,13 +2724,7 @@ const tracesShortcuts = [
   },
   {
     id: "tracesFocusQuery",
-    handler: () => {
-      // The traces query editor is Monaco — focus its inner textarea.
-      const el = document.querySelector<HTMLElement>(
-        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
-      );
-      el?.focus();
-    },
+    handler: () => searchBarRef.value?.focusQuery?.(),
   },
   {
     id: "tracesCopyUrl",

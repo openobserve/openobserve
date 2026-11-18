@@ -65,14 +65,15 @@ describe("logs recent searches with the filter builder on", () => {
     return vm;
   };
 
+  // A click only places the caret; ArrowDown opens the list without typing.
   const openPicker = async () => {
     caret().click();
+    caret().dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     await flushPromises();
     await vi.waitFor(() => expect(row("extra-recent-a")).not.toBeNull());
   };
 
   beforeEach(() => {
-    localStorage.setItem("o2.logs.queryInput", "builder");
     store.state.zoConfig.query_history_enabled = true;
     queryClient.clear();
     api.list.mockResolvedValue({ data: [entry] });
@@ -80,7 +81,6 @@ describe("logs recent searches with the filter builder on", () => {
   });
 
   afterEach(() => {
-    localStorage.removeItem("o2.logs.queryInput");
     wrapper?.unmount();
     wrapper = null;
     delete store.state.zoConfig.query_history_enabled;
@@ -99,13 +99,17 @@ describe("logs recent searches with the filter builder on", () => {
     expect(row("extra-recent-view-all")).not.toBeNull();
   });
 
-  it("opens the bar from a press on the blank query area below the chips", async () => {
+  it("a press on the blank query area below the chips focuses the caret, and the list waits for typing", async () => {
     await mountBar();
     const area = wrapper!.findComponent(SqlFilterBuilder).element.parentElement!;
     area.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
     await flushPromises();
     expect(document.activeElement).toBe(caret());
-    await vi.waitFor(() => expect(row("extra-recent-a")).not.toBeNull());
+    expect(document.body.querySelector(`[data-test^="${DT}-suggest-item-"]`)).toBeNull();
+    caret().value = "lev";
+    caret().dispatchEvent(new Event("input"));
+    await flushPromises();
+    expect(document.body.querySelector(`[data-test^="${DT}-suggest-item-"]`)).not.toBeNull();
   });
 
   it("restores the picked row and closes the list", async () => {

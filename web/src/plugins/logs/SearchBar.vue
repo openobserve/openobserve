@@ -1297,31 +1297,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 'fn-editor-open': showFunctionEditor,
               }"
             >
-              <OButton
-                v-if="
-                  !searchObj.meta.sqlMode &&
-                  !searchObj.meta.nlpMode &&
-                  searchObj.meta.logsVisualizeToggle === 'logs'
-                "
-                :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
-                data-test="logs-search-bar-filter-builder-toggle"
-                :aria-pressed="filterBuilderOn"
-                variant="ghost"
-                size="icon-toolbar"
-                @click="toggleFilterBuilder"
-                class="rounded-default border-card-glass-border! absolute! top-0.75 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
-                :style="{ right: filterBuilderToggleRight }"
-              >
-                <OTooltip
-                  :content="
-                    filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')
-                  "
-                />
-              </OButton>
               <div
                 v-if="showFilterBuilder"
                 class="h-full overflow-y-auto py-0.75 ps-1.5"
-                :class="aiButtonShown ? 'pe-26.5' : 'pe-18'"
+                :class="aiButtonShown ? 'pe-18' : 'pe-9.5'"
                 @pointerdown.self.prevent="activateFilterBuilder"
               >
                 <SqlFilterBuilder
@@ -1330,12 +1309,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :fields="filterBuilderFields"
                   :load-values="loadFilterBuilderValues"
                   :fields-loading="searchObj.loadingStream"
+                  :free-text="filterBuilderFreeText"
                   :extra-suggestions="recentFilterSection"
                   :max-rows="isFocused ? 0 : 3"
                   data-test="logs-search-bar-filter-builder"
                   @update:query="onFilterBuilderQuery"
                   @submit="handleRunQueryFn()"
-                  @exit="toggleFilterBuilder"
                   @focus="onFilterBuilderFocus"
                   @extra-select="pickRecentFilterRow"
                 />
@@ -1861,7 +1840,6 @@ const EDITOR_POINTER_FOCUS_MS = 1000;
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
-import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
 import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -1897,7 +1875,11 @@ import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
 import { applyDownloadRange, downloadRangeWindow, sqlLimitOf } from "@/utils/logs/downloadRange";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
-import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
+import {
+  allowsMatchAll,
+  buildFilterContext,
+  isFilterHeld,
+} from "@/composables/useLogs/freeTextSearch";
 import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { setFieldTypeOf } from "@/utils/query/sqlDiagnostics";
@@ -2337,8 +2319,6 @@ export default defineComponent({
     const recentDrawerRef = ref<InstanceType<typeof RecentSearchesDrawer> | null>(null);
     const recentFocusOpen = ref(false);
 
-    const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
-      useFilterBuilderPreference("o2.logs.queryInput");
     const filterBuilderRef = ref<InstanceType<typeof SqlFilterBuilder> | null>(null);
     // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
     const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
@@ -2347,10 +2327,9 @@ export default defineComponent({
     watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
       immediate: true,
     });
-    // SQL mode and the visualize/build views keep the editor: the builder writes filter-mode WHERE text only.
+    // Filter mode is always the chip bar; SQL mode and the visualize/build views keep the editor.
     const showFilterBuilder = computed(
       () =>
-        filterBuilderOn.value &&
         !searchObj.meta.sqlMode &&
         !searchObj.meta.nlpMode &&
         searchObj.meta.logsVisualizeToggle === "logs",
@@ -2365,10 +2344,6 @@ export default defineComponent({
     const aiButtonRight = computed(() =>
       searchObj.meta.showTransformEditor ? "0.25rem" : "2.375rem",
     );
-    const filterBuilderToggleRight = computed(() => {
-      const corner = searchObj.meta.showTransformEditor ? 0.25 : 2.375;
-      return `${aiButtonShown.value ? corner + 2.125 : corner}rem`;
-    });
     const aiIcon = computed(() =>
       getImageURL(
         isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
@@ -2418,6 +2393,8 @@ export default defineComponent({
     };
 
     const focusEditor = () => queryEditorRef.value?.focus?.();
+    const focusQuery = () => (showFilterBuilder.value ? activateFilterBuilder() : focusEditor());
+    const filterBuilderFreeText = computed(() => allowsMatchAll(searchObj, store.state.zoConfig));
 
     // Escape in the list hands focus back to the editor, and that focus must not reopen the list.
     let recentFocusDismissed = false;
@@ -5313,6 +5290,8 @@ export default defineComponent({
       searchObj,
       queryEditorRef,
       focusEditor,
+      focusQuery,
+      filterBuilderFreeText,
       dismissRecentFocus,
       syntaxGuideRef,
       confirmDialogVisible,
@@ -5366,15 +5345,12 @@ export default defineComponent({
       effectiveKeywords,
       resolveFieldValues,
       effectiveSuggestions,
-      filterBuilderOn,
-      toggleFilterBuilder,
       showFilterBuilder,
       aiAccess,
       aiButtonShown,
       aiButtonRight,
       aiIcon,
       openAiFromBuilder,
-      filterBuilderToggleRight,
       filterBuilderFields,
       filterBuilderRef,
       activateFilterBuilder,

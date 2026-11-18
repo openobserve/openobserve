@@ -619,25 +619,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="relative flex h-full w-full flex-col overflow-hidden"
         @keydown.capture="onRecentEditorKeydown"
       >
-        <OButton
-          v-if="!searchObj.meta.sqlMode && !nlpMode"
-          :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
-          data-test="traces-search-bar-filter-builder-toggle"
-          :aria-pressed="filterBuilderOn"
-          variant="ghost"
-          size="icon-xs-sq"
-          class="absolute! top-0.75 z-51"
-          :style="{ right: filterBuilderToggleRight }"
-          @click="toggleFilterBuilder"
-        >
-          <OTooltip
-            :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
-          />
-        </OButton>
         <div
           v-if="showFilterBuilder"
           class="h-full overflow-y-auto py-0.75 ps-1.5"
-          :class="isAiEnabled ? 'pe-18' : 'pe-10'"
+          :class="isAiEnabled ? 'pe-10' : 'pe-1.5'"
           @pointerdown.self.prevent="activateFilterBuilder"
         >
           <SqlFilterBuilder
@@ -646,11 +631,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fields="filterBuilderFields"
             :load-values="loadFilterBuilderValues"
             :fields-loading="searchObj.loadingStream"
+            :free-text="searchObj.data.stream.hasFullTextFields !== false"
             :extra-suggestions="recentFilterSection"
             data-test="traces-search-bar-filter-builder"
             @update:query="(sql: string) => onFilterBuilderQuery(sql) && searchData()"
             @submit="searchData"
-            @exit="toggleFilterBuilder"
             @focus="onFilterBuilderFocus"
             @extra-select="pickRecentFilterRow"
           />
@@ -820,7 +805,6 @@ import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
-import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
 import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -1054,8 +1038,6 @@ export default defineComponent({
       resolveFieldValues,
     } = useSqlSuggestions();
 
-    const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
-      useFilterBuilderPreference("o2.traces.queryInput");
     const filterBuilderRef = ref<InstanceType<typeof SqlFilterBuilder> | null>(null);
     // The query pane grows with the builder's lines (it caps itself at three), so nothing in it is cut.
     const filterBuilderGrowth = useFilterBarGrowth(filterBuilderRef);
@@ -1064,11 +1046,9 @@ export default defineComponent({
     watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
       immediate: true,
     });
-    const showFilterBuilder = computed(
-      () => filterBuilderOn.value && !searchObj.meta.sqlMode && !nlpMode.value,
-    );
-    // The AI button holds the corner slot in both modes: QueryEditor's own, or the builder's copy.
-    const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.375rem" : "0.25rem"));
+    // Filter mode is always the chip bar; SQL mode keeps the editor.
+    const showFilterBuilder = computed(() => !searchObj.meta.sqlMode && !nlpMode.value);
+    const focusQuery = () => (showFilterBuilder.value ? activateFilterBuilder() : focusEditor());
     const { isDark } = useTheme();
     const aiIcon = computed(() =>
       getImageURL(
@@ -1783,6 +1763,7 @@ export default defineComponent({
       openRecentSearches,
       applyRecentExample,
       focusEditor,
+      focusQuery,
       emit,
       updateQueryValue,
       updateDateTime,
@@ -1800,10 +1781,7 @@ export default defineComponent({
       autoCompleteKeywords,
       effectiveKeywords,
       resolveFieldValues,
-      filterBuilderOn,
-      toggleFilterBuilder,
       showFilterBuilder,
-      filterBuilderToggleRight,
       aiIcon,
       openAiFromBuilder,
       filterBuilderFields,
