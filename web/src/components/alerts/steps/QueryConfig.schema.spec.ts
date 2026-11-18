@@ -689,6 +689,34 @@ describe("QueryConfig.schema — conditions tree", () => {
         expect(paths(r)).toContain("trigger_condition.warning_threshold");
       });
 
+      it.each([
+        [">=", 250000000000, "alerts.validation.warnBeforeLower", { limit: "2,500,000,000" }],
+        [">", 2500000000, "alerts.validation.warnBeforeLower", { limit: "2,500,000,000" }],
+        ["<=", 2000000000, "alerts.validation.warnBeforeHigher", { limit: "2,500,000,000" }],
+        ["<", 2500000000, "alerts.validation.warnBeforeHigher", { limit: "2,500,000,000" }],
+        [
+          "=",
+          3,
+          "alerts.validation.warnNotWith",
+          { comparison: t("alerts.sections.operators.eq") },
+        ],
+        [
+          "!=",
+          3,
+          "alerts.validation.warnNotWith",
+          { comparison: t("alerts.sections.operators.ne") },
+        ],
+      ])("a warning out of order for '%s' says how to fix it", (operator, warning, key, named) => {
+        const r = parse({
+          _meta: { tab: "sql" },
+          trigger_condition: { operator, threshold: 2500000000, warning_threshold: warning },
+        });
+        const issue = issuesOf(r).find(
+          (i: any) => i.path.join(".") === "trigger_condition.warning_threshold",
+        );
+        expect(issue.message).toBe(t(key, named));
+      });
+
       it("count family: warning below critical passes (strings included)", () => {
         expect(
           parse({

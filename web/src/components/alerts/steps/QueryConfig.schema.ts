@@ -16,6 +16,7 @@ import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import { modesWithContent } from "@/utils/alerts/alertCondition";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
+import { getIntlLocale } from "@/locales";
 import {
   FORECAST_MAX_DAYS,
   FORECAST_MIN_DAYS,
@@ -455,13 +456,17 @@ export const makeQueryConfigSchema = (t: Translator) =>
         const cn = Number(c);
         if (Number.isNaN(wn) || Number.isNaN(cn)) return null;
         if (op === "=" || op === "!=") {
-          return t("alerts.warnOperatorUnordered", { operator: op });
+          const comparison = t(`alerts.sections.operators.${op === "=" ? "eq" : "ne"}`);
+          return t("alerts.validation.warnNotWith", { comparison });
         }
+        const limit = new Intl.NumberFormat(getIntlLocale(), { maximumFractionDigits: 20 }).format(
+          cn,
+        );
         if ((op === ">" || op === ">=") && !(wn < cn)) {
-          return t("alerts.warnMustBeLower", { warning: wn, critical: cn, operator: op });
+          return t("alerts.validation.warnBeforeLower", { limit });
         }
         if ((op === "<" || op === "<=") && !(wn > cn)) {
-          return t("alerts.warnMustBeHigher", { warning: wn, critical: cn, operator: op });
+          return t("alerts.validation.warnBeforeHigher", { limit });
         }
         return null;
       };
