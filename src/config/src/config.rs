@@ -2661,6 +2661,18 @@ pub struct Common {
         help = "Interval in seconds for syncing built-in model pricing from GitHub. Default: 6 hours (21600)."
     )]
     pub model_pricing_sync_interval_secs: u64,
+    #[env_config(
+        name = "ZO_ALERT_LIBRARY_URL",
+        default = "https://openobserve-datasources-bucket.s3.amazonaws.com/alerts/",
+        help = "Base URL of the published Alert Library (manifest.json and the alert files). Point it at an internal mirror of the same files on an air-gapped install."
+    )]
+    pub alert_library_url: String,
+    #[env_config(
+        name = "ZO_ALERT_LIBRARY_SYNC_INTERVAL_SECS",
+        default = 21600,
+        help = "How often each node re-checks the Alert Library manifest ETag. Default: 6 hours (21600)."
+    )]
+    pub alert_library_sync_interval_secs: u64,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
     #[env_config(

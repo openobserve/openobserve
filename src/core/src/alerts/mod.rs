@@ -60,6 +60,7 @@ pub mod incident_title;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
 pub mod leases;
+pub mod library;
 pub mod lifecycle;
 #[cfg(feature = "enterprise")]
 pub mod membership_provider;
