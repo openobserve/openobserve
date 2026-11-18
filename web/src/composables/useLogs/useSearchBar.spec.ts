@@ -488,6 +488,20 @@ describe("useSearchBar Composable", () => {
       expect(listSpy).toHaveBeenCalledTimes(2);
     });
 
+    it("does not wait for a background refetch that is still in flight", async () => {
+      await (wrapper.vm as any).getQueryData(false);
+      listSpy.mockReturnValue(new Promise(() => {}));
+      vi.spyOn(Date, "now").mockReturnValue(Date.now() + CATALOG_RETRY_INTERVAL + 1);
+      void (wrapper.vm as any).getQueryData(false);
+      await flushPromises();
+      expect(listSpy).toHaveBeenCalledTimes(2);
+      mockGetDataThroughStream.mockClear();
+
+      void (wrapper.vm as any).getQueryData(false);
+      expect(mockGetDataThroughStream).toHaveBeenCalledTimes(1);
+      expect(listSpy).toHaveBeenCalledTimes(2);
+    });
+
     it("uses the catalog from the next search once a background refetch succeeds", async () => {
       await (wrapper.vm as any).getQueryData(false);
       const catalog = [{ name: "approx_distinct", kind: "aggregate" }];

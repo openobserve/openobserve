@@ -491,14 +491,15 @@ export const useSearchBar = (t: TranslateFn) => {
   };
 
   // hasAggregation reads aggregate names from the function catalog, so SQL runs wait for it once.
-  // After a failure no run waits; a later run refetches it in the background instead.
+  // A refetch puts a data-less query back to pending, so failure history, not status, ends the wait.
   const pendingQueryFunctions = (): Promise<unknown> | null => {
     if (!searchObj.meta.sqlMode) return null;
     const catalog = queryFunctionsQuery(store.state.selectedOrganization.identifier);
     const state = queryClient.getQueryState(catalog.queryKey);
     if (state?.data) return null;
-    if (state?.status === "error") {
-      if (Date.now() - state.errorUpdatedAt > CATALOG_RETRY_INTERVAL)
+    if (state?.errorUpdateCount) {
+      const retryDue = Date.now() - state.errorUpdatedAt > CATALOG_RETRY_INTERVAL;
+      if (state.fetchStatus === "idle" && retryDue)
         void queryClient.prefetchQuery({ ...catalog, retry: false });
       return null;
     }
