@@ -68,10 +68,10 @@
       "category": "api_integration_tests"
     },
     {
-      "label": "ingest_window_48h",
-      "_comment": "Seeds rows up to 47 h old; OSS runs with this window already, but ENT's workflow env allows only 5 h.",
+      "label": "ingest_window_wide",
+      "_comment": "openobserve#16422 seeds rows either side of the latest 30-day grid edges, up to 30 days + 4 h old; the workflow envs allow 48 h (OSS) and 5 h (ENT).",
       "target": "tests/regression/test_result_cache_histogram_reuse.py tests/regression/test_histogram_origin_grid_partitions.py",
-      "server_env": "ZO_INGEST_ALLOWED_UPTO=48",
+      "server_env": "ZO_INGEST_ALLOWED_UPTO=768",
       "category": "api_integration_tests"
     },
     {
