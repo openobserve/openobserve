@@ -282,5 +282,16 @@
     "synthetics_enabled": "true",
     "workers": 2,
     "_comment": "Own shard because the synthetics routes exist only when the server starts with ZO_SYNTHETICS_ENABLED=true. Workers 2: each test writes up to 14 checks/locations, and more concurrent writers trip SQLite's 'database is locked'."
+  },
+  {
+    "testfolder": "Infra-Regression",
+    "actual_folder": "RegressionSet/Infra",
+    "browser": "chrome",
+    "run_files": [
+      "k8s-16300-events-flatten-level.spec.js",
+      "k8s-16778-cluster-picker-and-presets.spec.js"
+    ],
+    "disabled": [],
+    "_comment": "Infrastructure bug-fix regressions (Kubernetes explorer). Each spec seeds k8s_events in its own org, because the stream name is fixed per org."
   }
 ]

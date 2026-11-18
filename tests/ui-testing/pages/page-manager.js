@@ -93,6 +93,7 @@ import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
 import { ServiceVersionsPage } from "./tracesPages/serviceVersionsPage.js";
 import { ProfilesPage } from "./profilesPages/profilesPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
+import { KubernetesPage } from "./infraPages/kubernetesPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
 import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
@@ -316,6 +317,7 @@ class PageManager {
     this.serviceVersionsPage = new ServiceVersionsPage(page);
     this.profilesPage = new ProfilesPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
+    this.kubernetesPage = new KubernetesPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);
