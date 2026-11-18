@@ -3986,8 +3986,8 @@ fn metrics_link_pairs(req: &ExploreLinkRequest<'_>, rung: LinkRung) -> Option<Ru
             return Some((pairs, false));
         }
         LinkRung::Filtered => metrics_chart(t, true)?,
-        // Custom SQL keeps its own WHERE; without a filter the unfiltered query is the same one.
-        LinkRung::Unfiltered if t.custom_sql.is_none() && detector_filter(t).is_some() => {
+        // Custom SQL with no WHERE has no unfiltered rung; metrics_chart then gives None.
+        LinkRung::Unfiltered if t.custom_sql.is_some() || detector_filter(t).is_some() => {
             metrics_chart(t, false)?
         }
         LinkRung::Unfiltered => return None,
@@ -4017,11 +4017,16 @@ fn metrics_chart(
             .map(str::to_string)
     };
     if let Some(sql) = nonempty(&t.custom_sql) {
+        let sql = if with_filter {
+            sql
+        } else {
+            custom_sql_without_where(&sql)?
+        };
         return Some(MetricsChart {
             sql,
             x: nonempty(&t.x_alias)?,
             y: nonempty(&t.y_alias)?,
-            filter_applied: true,
+            filter_applied: with_filter,
         });
     }
     let aggregate = nonempty(&t.aggregate)?;
@@ -4043,6 +4048,23 @@ fn metrics_chart(
         y: "y_axis_1".to_string(),
         filter_applied: with_filter && !t.filter_dropped,
     })
+}
+
+/// Custom SQL with its WHERE removed; None when it has no WHERE or does not parse as one SELECT.
+#[cfg(feature = "enterprise")]
+fn custom_sql_without_where(sql: &str) -> Option<String> {
+    use sqlparser::ast::{SetExpr, Statement};
+    let mut statements =
+        sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
+            .ok()?;
+    let [Statement::Query(query)] = statements.as_mut_slice() else {
+        return None;
+    };
+    let SetExpr::Select(select) = query.body.as_mut() else {
+        return None;
+    };
+    select.selection.take()?;
+    Some(query.to_string())
 }
 
 /// The `metrics_data` blob (v1) that Visualize decodes; `query` alone leaves the axes empty.
@@ -9042,13 +9064,43 @@ mod tests {
         }
 
         #[test]
-        fn an_over_long_metrics_link_ends_at_the_stream_and_time() {
+        fn an_over_long_custom_sql_metrics_link_drops_its_where_and_keeps_the_axes() {
             let mut c = explore_ctx("metrics", None, false);
             let t = c.explore.as_mut().unwrap();
             t.aggregate = None;
             t.custom_sql = Some(format!(
                 "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
                  \"app_logs\" WHERE a = '{}' GROUP BY time_bucket",
+                "x".repeat(1500)
+            ));
+            t.x_alias = Some("time_bucket".to_string());
+            t.y_alias = Some("value".to_string());
+            let link = link_with(&c, None);
+            let (_, p) = pairs(&link.url);
+            assert!(link.url.len() <= 3000, "{}", link.url.len());
+            assert!(!link.filter_applied);
+            assert_eq!(link.label, UNFILTERED);
+            let sql = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
+                       \"app_logs\" GROUP BY time_bucket";
+            assert_eq!(decoded_query(&p), sql);
+            assert_eq!(
+                panel_seed(&p),
+                (
+                    sql.to_string(),
+                    "time_bucket".to_string(),
+                    "value".to_string()
+                )
+            );
+        }
+
+        #[test]
+        fn an_over_long_metrics_link_ends_at_the_stream_and_time() {
+            let mut c = explore_ctx("metrics", None, false);
+            let t = c.explore.as_mut().unwrap();
+            t.aggregate = None;
+            t.custom_sql = Some(format!(
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value, '{}' AS \
+                 pad FROM \"app_logs\" WHERE a = 1 GROUP BY time_bucket",
                 "x".repeat(1500)
             ));
             t.x_alias = Some("time_bucket".to_string());
