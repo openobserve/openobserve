@@ -1918,5 +1918,28 @@ describe("Logs Index", async () => {
 
       await router.replace({ path: router.currentRoute.value.path, query: {} });
     });
+
+    it.each(["bogus", "patterns"])(
+      "opens Search for a %s tab the build cannot show",
+      async (toggle) => {
+        wrapper.unmount();
+        (store.state as any).logs.isInitialized = false;
+        await router.replace({
+          path: router.currentRoute.value.path,
+          query: { logs_visualize_toggle: toggle },
+        });
+        loaderCalls.length = 0;
+
+        wrapper = mount(Index, {
+          attachTo: "#app",
+          global: { provide: { store }, plugins: [i18n, router] },
+        });
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+
+        await router.replace({ path: router.currentRoute.value.path, query: {} });
+      },
+    );
   });
 });

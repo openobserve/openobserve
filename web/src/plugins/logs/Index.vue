@@ -699,6 +699,8 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { cachedSearchMatchesRoute } from "@/composables/useLogs/logsRouteCache";
+import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
 import { inheritedRetentionDays } from "@/utils/dataRetention";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -1501,7 +1503,10 @@ export default defineComponent({
     // Main method for handling before mount logic
     async function handleBeforeMount() {
       if (Object.hasOwn(router.currentRoute.value?.query, "logs_visualize_toggle")) {
-        const urlToggle = router.currentRoute.value.query.logs_visualize_toggle;
+        const urlToggle = resolveUrlViewToggle(
+          router.currentRoute.value.query.logs_visualize_toggle,
+          checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)).allowed,
+        );
         // Restoring directly onto the Timechart tab: setupLogsTab() will run the
         // visualization once fields are ready, so tell the toggle watcher to skip
         // the page-load fire it is about to receive from the assignment below.
