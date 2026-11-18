@@ -928,6 +928,22 @@ export const buildOperatorLane = ({
 
 const TERM_SEARCH_FUNCTIONS = ["match_all"];
 const FIELD_SEARCH_FUNCTIONS = ["str_match", "str_match_ignore_case", "re_match", "re_not_match"];
+// The server rejects these on a stream with no full-text search field; the raw ones are rewritten to match_all first.
+const FULL_TEXT_FUNCTIONS = new Set([
+  "match_all",
+  "match_all_raw",
+  "match_all_raw_ignore_case",
+  "fuzzy_match_all",
+  "match_all_hash",
+]);
+
+/** The catalog without the full-text search functions, for streams that have no field they can search. */
+export const withoutFullTextFunctions = <T>(entries: T[]): T[] =>
+  entries.filter((raw) => {
+    const entry = raw as LooseEntry | string | null;
+    if (!entry || typeof entry === "string" || entry.kind !== "Function") return true;
+    return !FULL_TEXT_FUNCTIONS.has(String(entryName(entry)).toLowerCase());
+  });
 
 const sqlQuoted = (value: string): string => `'${value.replace(/'/g, "''")}'`;
 const snippetLiteral = (text: string): string => text.replace(/[\\$}]/g, "\\$&");
@@ -949,11 +965,7 @@ const filledRow = (entry: LooseEntry, labelDetail: string): LooseEntry => ({
 });
 
 /** Search functions with a bare typed word as their value; the field-taking ones open the field menu at the field. */
-export const buildFilledWordEntries = (
-  word: string,
-  catalog: LooseEntry[],
-  { fullTextSearch }: { fullTextSearch: boolean },
-): LooseEntry[] => {
+export const buildFilledWordEntries = (word: string, catalog: LooseEntry[]): LooseEntry[] => {
   if (!word) return [];
   const literal = sqlQuoted(word);
   // A prefix filter word ties with the catalog's prefix matches, which then sort first; an exact one would be boosted above them.
@@ -961,9 +973,7 @@ export const buildFilledWordEntries = (
     filterText: `${word.toLowerCase()}\u0001`,
     sortText: `${SORT_LANE.clause}\uffff`,
   };
-  // The server rejects match_all on a stream with no full-text search field.
-  const termFunctions = fullTextSearch ? catalogFunctions(catalog, TERM_SEARCH_FUNCTIONS) : [];
-  const term = termFunctions.map((entry) => ({
+  const term = catalogFunctions(catalog, TERM_SEARCH_FUNCTIONS).map((entry) => ({
     ...filledRow(entry, `(${literal})`),
     ...shared,
     insertText: `${entryName(entry)}(${literal})`,

@@ -2391,6 +2391,49 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
       expect(inserts).not.toContain("match_all('alp')");
       expect(inserts).toContain("str_match(${1}, 'alp')");
     });
+
+    const FULL_TEXT = ["match_all", "match_all_raw", "match_all_raw_ignore_case"];
+    const menuNames = async (editorId: string, props: any, before: string, after = "") => {
+      const { editor, model, provide } = await mountWith(editorId, props);
+      placeCaret(editor, model, before, after);
+      const word = /\w*$/.exec(before)![0];
+      model.getWordUntilPosition.mockReturnValue({
+        word,
+        startColumn: before.length + 1 - word.length,
+        endColumn: before.length + 1,
+      });
+      const result = await provide(model, { lineNumber: 1, column: before.length + 1 }, {}, {});
+      return rowsOf(result).map(nameOf);
+    };
+
+    it(
+      "keeps the full-text functions out of the function list too, without full-text fields",
+      { timeout: 30000 },
+      async () => {
+        const props = { fullTextSearch: false };
+        const typed = await menuNames("fts-list-word", props, "SELECT * FROM logs WHERE mat");
+        const slot = await menuNames(
+          "fts-list-slot",
+          props,
+          "SELECT * FROM logs WHERE str_match(",
+          ", 'alp')",
+        );
+        for (const names of [typed, slot]) {
+          expect(names).toContain("str_match");
+          expect(names.filter((name: string) => FULL_TEXT.includes(name))).toEqual([]);
+        }
+      },
+    );
+
+    it("lists match_all where the streams have full-text fields", { timeout: 30000 }, async () => {
+      const slot = await menuNames(
+        "fts-list-default",
+        {},
+        "SELECT * FROM logs WHERE str_match(",
+        ", 'alp')",
+      );
+      expect(slot).toContain("match_all");
+    });
   });
 
   describe("a matching recent search in the typed-word menu", () => {

@@ -151,7 +151,6 @@ interface EditorConfig {
   valuesTimeRange: () => FieldValuesWindow | null;
   /** The user's recent queries, offered as clock rows that replace the editor text. */
   recents: () => string[];
-  fullTextSearch: () => boolean;
 }
 
 interface ChainState {
@@ -328,6 +327,7 @@ import {
   buildOperatorLane,
   buildFilledValueEntries,
   buildFilledWordEntries,
+  withoutFullTextFunctions,
   fieldEntriesOf,
   findCatalogEntry,
   findFunctionEntry,
@@ -507,7 +507,7 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    /** False when a selected stream has no full-text search field, so a typed word is not offered as match_all. */
+    /** False when a selected stream has no full-text search field, so no menu offers match_all or its kin. */
     fullTextSearch: {
       type: Boolean,
       default: true,
@@ -631,6 +631,12 @@ export default defineComponent({
     const keywords = computed(() => resolveKeywords(props.language, props.keywords as any[]));
     const suggestions = computed(() =>
       resolveSuggestions(props.language, props.suggestions as any[] | null),
+    );
+    const offeredKeywords = computed(() =>
+      props.fullTextSearch ? keywords.value : withoutFullTextFunctions(keywords.value),
+    );
+    const offeredSuggestions = computed(() =>
+      props.fullTextSearch ? suggestions.value : withoutFullTextFunctions(suggestions.value),
     );
 
     /**
@@ -870,8 +876,8 @@ export default defineComponent({
       // change as the stream schema and server catalog arrive.
       editorConfigs.set(key, {
         enabled: () => props.showAutoComplete,
-        keywords: () => keywords.value as any[],
-        suggestions: () => suggestions.value as any[],
+        keywords: () => offeredKeywords.value as any[],
+        suggestions: () => offeredSuggestions.value as any[],
         resolveFieldValues: () => (props.fieldValueResolver as any) ?? null,
         editor: () => editorObj,
         escapeCount: () => escapeCount,
@@ -883,7 +889,6 @@ export default defineComponent({
         showHint,
         valuesTimeRange: () => props.valuesTimeRange ?? null,
         recents: () => props.recentQueries,
-        fullTextSearch: () => props.fullTextSearch,
       });
     };
 
@@ -1906,9 +1911,7 @@ export default defineComponent({
         const textBeforeWord = textUntilPosition.slice(0, textUntilPosition.length - word.length);
         const filled =
           groupsMenus(config) && isPredicatePosition(textBeforeWord, config.filterMode())
-            ? buildFilledWordEntries(word, catalog.map(objectEntry), {
-                fullTextSearch: config.fullTextSearch(),
-              })
+            ? buildFilledWordEntries(word, catalog.map(objectEntry))
             : [];
         const entries = [...catalog, ...filled];
         const canChain = chainsHere(config, model, position);
