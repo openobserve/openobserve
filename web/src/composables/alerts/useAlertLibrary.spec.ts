@@ -61,6 +61,9 @@ import {
   SUPPORTED_MANIFEST_MAJOR,
   alertFileUrl,
 } from "@/constants/alertLibrary";
+import suggestionsLogs from "@/test/fixtures/alerts/suggestions-logs.json";
+import suggestionsUnavailable from "@/test/fixtures/alerts/suggestions-unavailable.json";
+import type { LibrarySuggestResponse } from "@/utils/alerts/librarySuggest.types";
 
 // The composable memoises its in-flight request at module scope (that is what
 // makes concurrent callers share one GET), so each test needs a fresh module
@@ -921,5 +924,44 @@ describe("useAlertLibrary — isReady", () => {
       expect((error as { code?: string }).code).toBe("malformed");
       expect(fetchMock).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("suggestionArea", () => {
+  const logs = suggestionsLogs as unknown as LibrarySuggestResponse;
+  const unavailable = suggestionsUnavailable as unknown as LibrarySuggestResponse;
+  const notFound = { response: { status: 404 } };
+
+  it.each([
+    [
+      "a server without the endpoint",
+      { pending: false, error: notFound, data: undefined },
+      "absent",
+      0,
+    ],
+    [
+      "any other failure",
+      { pending: false, error: { response: { status: 500 } }, data: undefined },
+      "failed",
+      0,
+    ],
+    ["a pending call", { pending: true, error: null, data: undefined }, "loading", 0],
+    [
+      "an unreachable library",
+      { pending: false, error: null, data: unavailable },
+      "unavailable",
+      0,
+    ],
+    [
+      "library matches, starters left to the chips",
+      { pending: false, error: null, data: logs },
+      "ready",
+      3,
+    ],
+  ])("reads %s", async (_name, input, state, cards) => {
+    const { suggestionArea } = await import("./useAlertLibrary");
+    const area = suggestionArea(input, "enabled");
+    expect(area.state).toBe(state);
+    expect(area.cards.map((c) => c.kind)).toEqual(Array(cards).fill("library"));
   });
 });

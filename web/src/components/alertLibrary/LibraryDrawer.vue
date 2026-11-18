@@ -63,6 +63,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <p class="text-text-body text-sm" data-test="alert-library-drawer-description">
           {{ entry.description || t("alert_library.drawer.noDescription") }}
         </p>
+        <p
+          v-if="streamSwap"
+          class="text-text-secondary pt-1 text-xs"
+          data-test="alert-library-drawer-swap"
+        >
+          {{
+            t("alerts.librarySuggest.swap", {
+              from: raw(streamSwap.written_for),
+              to: raw(streamSwap.will_use),
+            })
+          }}
+        </p>
       </section>
 
       <!-- Stated before the query, not after: an alert that cannot fire is the
@@ -205,7 +217,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer>
-      <div class="flex w-full justify-end gap-2">
+      <div v-if="mode === 'form'" class="flex w-full justify-end gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="alert-library-drawer-back"
+          @click="emit('update:open', false)"
+        >
+          {{ t("common.back") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="!file"
+          data-test="alert-library-drawer-use"
+          @click="useInForm"
+        >
+          {{ t("alerts.librarySuggest.use") }}
+        </OButton>
+      </div>
+      <div v-else class="flex w-full justify-end gap-2">
         <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
           v-if="!isAnomaly"
@@ -272,12 +303,20 @@ const props = defineProps<{
   dataState?: StreamDataState;
   /** Microsecond epoch of their oldest last-ingest, when they have one. */
   lastIngestedMicros?: number | null;
+  /** `form`: opened from the alert form, whose footer fills the form instead of installing. */
+  mode?: "page" | "form";
+  /** The form's stream replaces the one the entry was written for. */
+  streamSwap?: { written_for: string; will_use: string } | null;
+  /** The alert as the server already shaped it for this stream; nothing is fetched. */
+  presetFile?: AlertLibraryFile | null;
 }>();
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void;
   /** The wizard owns install; this hands it the file the drawer fetched. */
   (e: "install", payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }): void;
+  /** Form mode: fill the open alert form from this entry. */
+  (e: "use", payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -307,7 +346,7 @@ const load = async (entry: AlertLibraryEntry) => {
   reset();
   isLoading.value = true;
   try {
-    const loaded = await loadAlertFile(entry);
+    const loaded = props.presetFile ?? (await loadAlertFile(entry));
     if (token !== loadToken) return;
     file.value = loaded;
   } catch {
@@ -345,7 +384,9 @@ const drawerTitle = computed(() => raw(props.entry?.title ?? ""));
 const drawerSubtitle = computed(() => {
   const entry = props.entry;
   if (!entry) return raw("");
-  return raw(`${entry.id} · ${categoryLabel(entry.category)} · ${packLabel(entry.pack)}`);
+  return raw(
+    [entry.id, categoryLabel(entry.category), packLabel(entry.pack)].filter(Boolean).join(" · "),
+  );
 });
 
 const severityValue = computed(() => severityBadgeValue(props.entry?.severity ?? ""));
@@ -554,5 +595,11 @@ const customize = async () => {
 const install = () => {
   if (!props.entry || !file.value) return;
   emit("install", { entry: props.entry, file: fileForInstall(props.entry, file.value) });
+};
+
+const useInForm = () => {
+  if (!props.entry || !file.value) return;
+  emit("use", { entry: props.entry, file: file.value });
+  emit("update:open", false);
 };
 </script>

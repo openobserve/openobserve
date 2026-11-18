@@ -35,6 +35,7 @@ import {
 } from "@/ts/interfaces/alertPrefill";
 import { MAX_PERIOD_MINUTES, clampPeriodMinutes, warn } from "../alertPrefill";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
+import type { LibrarySuggestion } from "../librarySuggest.types";
 
 export interface LibraryPrefillInput {
   /** The manifest row — provenance, and the fallback for stream/query type. */
@@ -128,3 +129,32 @@ export const buildPrefillFromLibrary = (input: LibraryPrefillInput): AlertPrefil
     },
   };
 };
+
+/** The manifest row a suggestion stands for, so the drawer and the prefill read it like any library entry. */
+export const entryFromSuggestion = (suggestion: LibrarySuggestion): AlertLibraryEntry => {
+  const name = suggestion.id.split("/").pop() ?? suggestion.id;
+  return {
+    id: suggestion.id,
+    name,
+    pack: suggestion.library?.pack ?? "",
+    category: "",
+    title: suggestion.title ?? name,
+    severity: suggestion.severity ?? "info",
+    description: suggestion.sentence ?? "",
+    stream: suggestion.stream_swap?.written_for ?? asText(suggestion.prefill.stream_name) ?? "",
+    stream_type: asText(suggestion.prefill.stream_type) ?? "",
+    query_type: suggestion.query_type === "promql" ? "promql" : "sql",
+    alert_type: suggestion.alert_type,
+    required_streams: [],
+    path: suggestion.library?.path ?? "",
+    content_hash: suggestion.library?.content_hash ?? "",
+    ...(suggestion.library?.docs_url ? { docs_url: suggestion.library.docs_url } : {}),
+  };
+};
+
+/** A suggestion's prefill already carries the stream swap the card shows, so it is the file to seed from. */
+export const buildPrefillFromSuggestion = (suggestion: LibrarySuggestion): AlertPrefill =>
+  buildPrefillFromLibrary({
+    entry: entryFromSuggestion(suggestion),
+    file: suggestion.prefill as unknown as AlertLibraryFile,
+  });

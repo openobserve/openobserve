@@ -15,7 +15,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildPrefillFromLibrary } from "./fromLibrary";
+import { buildPrefillFromLibrary, buildPrefillFromSuggestion } from "./fromLibrary";
+import suggestionsLogs from "@/test/fixtures/alerts/suggestions-logs.json";
+import type { LibrarySuggestion } from "../librarySuggest.types";
 import { ALERT_PREFILL_VERSION } from "@/ts/interfaces/alertPrefill";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 
@@ -180,5 +182,21 @@ describe("buildPrefillFromLibrary", () => {
   it("is pure — the same input yields an equal, independent object", () => {
     const input = { entry: entry(), file: promqlFile() };
     expect(buildPrefillFromLibrary(input)).toEqual(buildPrefillFromLibrary(input));
+  });
+
+  it("seeds a suggestion from its server-swapped query, with the entry's provenance", () => {
+    const suggestion = suggestionsLogs.suggestions[0] as unknown as LibrarySuggestion;
+    const prefill = buildPrefillFromSuggestion(suggestion);
+    expect(prefill).toMatchObject({
+      source: "library",
+      sourceLabel: "OOM killing events",
+      name: "oom_killing_events",
+      streamName: "app_logs",
+      queryType: "sql",
+      sql: suggestion.prefill.query_condition?.sql,
+      periodMinutes: 5,
+      silenceMinutes: 30,
+      meta: { libraryId: "k8s/oom_killing_events", contentHash: "3f2a9c1d", pack: "k8s" },
+    });
   });
 });

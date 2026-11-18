@@ -305,6 +305,16 @@ describe("LibraryDrawer", () => {
     expect(payload.file.name).toBe("go_gc_pause_high");
   });
 
+  it("in the alert form, fills the form from the file and closes, offering no install", async () => {
+    const wrapper = await mountDrawer({ mode: "form" });
+    expect(wrapper.find('[data-test="alert-library-drawer-install"]').exists()).toBe(false);
+    await wrapper.find('[data-test="alert-library-drawer-use"]').trigger("click");
+
+    const payload = wrapper.emitted("use")?.[0]?.[0] as { file: AlertLibraryFile };
+    expect(payload.file.name).toBe("go_gc_pause_high");
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+  });
+
   // A published file may carry zeros, or no trigger_condition at all —
   // assertAlertFile only checks it is an object. Raw, that installs an alert
   // evaluating over a zero-length window that fires on every evaluation, and
