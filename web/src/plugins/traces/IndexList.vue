@@ -115,6 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="flex-1 pe-1 text-right text-xs">
                         {{ formatPercentile(durationPercentiles[p.key]) }}
                       </span>
+                      <!-- Filters use the raw microseconds: a bound cut to the label's two decimals drops the slowest span. -->
                       <div class="flex w-12">
                         <OButton
                           v-if="p.key !== 'max'"
@@ -125,11 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               value: formatPercentile(durationPercentiles[p.key]),
                             })
                           "
-                          @click.stop="
-                            addSearchTerm(
-                              `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
-                            )
-                          "
+                          @click.stop="addSearchTerm(`duration>=${durationPercentiles[p.key]}`)"
                           class="o2-custom-button-hover border-card-glass-border! ms-1! border!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
@@ -142,11 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               value: formatPercentile(durationPercentiles[p.key]),
                             })
                           "
-                          @click.stop="
-                            addSearchTerm(
-                              `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
-                            )
-                          "
+                          @click.stop="addSearchTerm(`duration<=${durationPercentiles[p.key]}`)"
                           class="o2-custom-button-hover border-card-glass-border! ms-auto! me-2.5! border!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />

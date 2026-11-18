@@ -276,7 +276,8 @@ function mountIndexList(props: Record<string, unknown> = {}) {
           ],
         },
         FieldExpansion: {
-          template: '<div data-test="field-expansion">Field Expansion<slot name="caption" /></div>',
+          template:
+            '<div data-test="field-expansion">Field Expansion<slot name="caption" /><slot name="body" /></div>',
           methods: { reset: fieldExpansionReset },
           props: [
             "field",
@@ -831,6 +832,38 @@ describe("IndexList Component", () => {
   });
 
   // ─── handleAddSearchTerm / handleAddMultipleSearchTerms quote escaping ────
+
+  describe("duration percentile filters", () => {
+    it("filters on the exact microseconds while the label stays rounded", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({
+        fieldList: [{ name: "duration", label: "Duration", showValues: true, ftsKey: false }],
+      });
+      await flushPromises();
+      (wrapper.vm as any).durationPercentiles = {
+        p25: 1000,
+        p50: 2000,
+        p75: 3000,
+        p95: 4000,
+        p99: 5000,
+        max: 1234567,
+      };
+      await flushPromises();
+
+      const atMost = wrapper
+        .findAll("button")
+        .find((b) => b.attributes("title") === "duration <= 1.23s");
+      expect(atMost, "the Max row's ≤ button keeps its rounded label").toBeTruthy();
+      await atMost!.trigger("click");
+      expect((wrapper.vm as any).searchObj.data.stream.addToFilter).toBe("duration<=1234567");
+
+      const atLeast = wrapper
+        .findAll("button")
+        .find((b) => b.attributes("title") === "duration >= 5.00ms");
+      await atLeast!.trigger("click");
+      expect((wrapper.vm as any).searchObj.data.stream.addToFilter).toBe("duration>=5000");
+    });
+  });
 
   describe("handleAddSearchTerm value escaping", () => {
     it("escapes an embedded single quote when including a value", () => {
