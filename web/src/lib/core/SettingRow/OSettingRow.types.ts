@@ -28,6 +28,10 @@ export interface SettingRowProps {
   error?: I18nText;
   /** `"end"` pins a fixed control column to the row's end and lets the label grow. Default `"label"`. */
   controlAt?: "label" | "end";
+  /** Fixed label, control and actions columns shared by every row of a card; defaults to the provided `SETTING_ROW_GRID_KEY`. */
+  grid?: boolean;
+  /** Grid mode: the control also takes the actions column, for editors and other full-width controls. */
+  wide?: boolean;
 }
 
 export interface SettingRowSlots {
@@ -35,7 +39,14 @@ export interface SettingRowSlots {
   default?: (_props: { describedBy: string | undefined }) => unknown;
   /** Rich help in place of the `description` text; an error still takes its place. */
   description?: () => unknown;
+  /** A short note under the control, in the control column. */
+  note?: () => unknown;
+  /** Remove / Change for the row; grid mode pins them to the fixed column at the row's end. */
+  actions?: () => unknown;
 }
 
 /** Provided by a form that sets rows directly on the page; a row inside one drops its rule and side padding. */
 export const SETTING_ROW_BARE_KEY: InjectionKey<true> = Symbol("SettingRowBare");
+
+/** Provided by a card whose rows share one grid, so every control starts at the same x. */
+export const SETTING_ROW_GRID_KEY: InjectionKey<true> = Symbol("SettingRowGrid");

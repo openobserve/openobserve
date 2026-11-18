@@ -10,7 +10,7 @@ import OFormInput from "../../forms/Input/OFormInput.vue";
 
 import { raw } from "@/types/i18n";
 
-import { SETTING_ROW_BARE_KEY } from "./OSettingRow.types";
+import { SETTING_ROW_BARE_KEY, SETTING_ROW_GRID_KEY } from "./OSettingRow.types";
 import OSettingRow from "./OSettingRow.vue";
 
 const HELP = "Shortest password accepted";
@@ -204,5 +204,54 @@ describe("OSettingRow", () => {
     expect(wrapper.find('[data-test="control"]').element.parentElement?.className).toContain(
       "flex-1",
     );
+  });
+  it("grid mode puts actions in their own end column and the note under the control", () => {
+    const slots = {
+      default: '<button data-test="control">pick</button>',
+      note: '<span data-test="note">Needs a destination first</span>',
+      actions: '<button data-test="remove">Remove</button>',
+    };
+    const at = (props: Record<string, unknown>, provide = {}) =>
+      mount(OSettingRow, {
+        props: { label: raw("Must last"), ...props },
+        slots,
+        global: { provide },
+      });
+    const cases = [
+      { name: "grid prop", wrapper: at({ grid: true }), columns: 3, actionsBeside: true },
+      {
+        name: "provided by the card",
+        wrapper: at({}, { [SETTING_ROW_GRID_KEY as symbol]: true }),
+        columns: 3,
+        actionsBeside: true,
+      },
+      {
+        name: "prop opts out of the card's grid",
+        wrapper: at({ grid: false }, { [SETTING_ROW_GRID_KEY as symbol]: true }),
+        columns: 2,
+        actionsBeside: false,
+      },
+      { name: "wide control", wrapper: at({ grid: true, wide: true }), columns: 2 },
+      { name: "no grid", wrapper: at({}), columns: 2, actionsBeside: false },
+    ];
+
+    for (const c of cases) {
+      const columns = c.wrapper.element.children;
+      const control = c.wrapper.find("[data-o-setting-row-control]").element;
+      const note = c.wrapper.find('[data-test="note"]').element;
+      const remove = c.wrapper.find('[data-test="remove"]');
+      expect(columns.length, c.name).toBe(c.columns);
+      expect(control.contains(note), c.name).toBe(true);
+      expect(
+        control.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_CONTAINED_BY &&
+          c.wrapper.find('[data-test="control"]').element.compareDocumentPosition(note) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+        c.name,
+      ).toBeTruthy();
+      if (c.actionsBeside === undefined) continue;
+      expect(remove.exists(), c.name).toBe(true);
+      expect(columns[2]?.contains(remove.element) ?? false, c.name).toBe(c.actionsBeside);
+      expect(control.contains(remove.element), c.name).toBe(!c.actionsBeside);
+    }
   });
 });
