@@ -3546,6 +3546,7 @@ export function useAlertForm(
   });
 
   onUnmounted(() => {
+    debouncedGenerateSql.cancel();
     contextRegistry.unregister("alerts");
     contextRegistry.setActive("");
     focusManager.clear();
