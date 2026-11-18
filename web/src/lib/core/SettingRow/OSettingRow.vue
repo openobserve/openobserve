@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     :class="[
       grid
-        ? 'grid grid-cols-[10rem_minmax(0,1fr)_4.5rem] items-start gap-x-6 max-md:flex max-md:flex-col max-md:items-stretch max-md:gap-2'
+        ? '@container/setting-row grid grid-cols-[10rem_minmax(0,1fr)_4.5rem] items-start gap-x-6 gap-y-1 max-md:flex max-md:flex-col max-md:items-stretch max-md:gap-2'
         : atEnd
           ? '@container flex flex-wrap items-center gap-x-6 gap-y-2'
           : 'flex gap-6 max-md:flex-col max-md:items-stretch max-md:gap-2',
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="min-w-0 max-md:pt-0"
       :class="[
         grid
-          ? 'max-md:w-full'
+          ? 'max-md:w-full @max-[34rem]/setting-row:col-span-full'
           : atEnd
             ? 'flex-1 @max-2xl:basis-full'
             : 'w-[22.5%] shrink-0 max-md:w-full',
@@ -44,7 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ]"
       data-o-setting-row-label
     >
-      <div class="text-text-heading text-sm font-medium" :class="grid && 'md:leading-8.5'">
+      <div
+        class="text-text-heading text-sm font-medium"
+        :class="grid && 'md:leading-8.5 @max-[34rem]/setting-row:leading-normal'"
+      >
         {{ label }}<span v-if="required" class="text-text-body">{{ requiredMark }}</span>
         <span
           v-if="info"
@@ -70,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else-if="description || $slots.description"
         class="text-text-secondary text-xs"
-        :class="grid ? 'mt-0.5 md:-mt-1.5' : 'mt-0.5'"
+        :class="grid ? 'mt-0.5 md:-mt-1.5 @max-[34rem]/setting-row:mt-0.5' : 'mt-0.5'"
       >
         <slot name="description">{{ description }}</slot>
       </div>
@@ -80,7 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       :class="
         grid
-          ? ['flex min-h-8.5 min-w-0 flex-col justify-center', wide && 'col-span-2']
+          ? [
+              'flex min-h-8.5 min-w-0 flex-col justify-center @max-[34rem]/setting-row:col-span-full',
+              wide && 'col-span-2',
+            ]
           : fill
             ? 'min-w-0 flex-1 max-md:w-full'
             : [
@@ -116,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="grid && !wide"
-      class="flex min-h-8.5 flex-wrap items-center justify-end gap-x-1 max-md:justify-start max-md:empty:hidden"
+      class="flex min-h-8.5 flex-wrap items-center justify-end gap-x-1 max-md:justify-start max-md:empty:hidden @max-[34rem]/setting-row:col-span-full @max-[34rem]/setting-row:justify-start @max-[34rem]/setting-row:empty:hidden"
       data-o-setting-row-actions
     >
       <slot name="actions" />
