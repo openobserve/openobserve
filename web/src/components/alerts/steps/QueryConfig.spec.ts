@@ -2314,6 +2314,20 @@ describe("QueryConfig.vue", () => {
     };
     const formConditions = () => hostForm().state.values.query_condition.conditions;
 
+    it("the condition's window is the look back, edited in place", async () => {
+      vi.useFakeTimers();
+      try {
+        remount({ ...sectioned, triggerCondition: { period: 10 } });
+        const input = host.find('[data-test="alert-condition-window-input"] input');
+        expect((input.element as HTMLInputElement).value).toBe("10");
+        await input.setValue("5");
+        vi.advanceTimersByTime(300);
+        expect(wrapper.emitted("update:period")?.at(-1)).toEqual([5]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("filters read as a sentence and Change opens the builder", async () => {
       remount({
         ...sectioned,

@@ -30,7 +30,8 @@ import {
   rankMeasure,
   rankMetricCategory,
   rankMetricGroup,
-  rareValue,
+  pickedValues,
+  starterValue,
   readFieldShapes,
   shapeQuerySql,
   slotFields,
@@ -210,20 +211,20 @@ describe("alertIntents", () => {
     expect(rankMeasure(["status"], shapes).fit).toEqual([]);
   });
 
-  it("picks the rarest value under 5 %, else a minority, and adds the case variants of a picked value", () => {
+  it("starts from the largest minority value seen recently, never a spelling of the majority", () => {
     const seen = [
-      { value: "INFO", count: 9000 },
-      { value: "ERROR", count: 300 },
+      { value: "INFO", count: 75172 },
+      { value: "Information", count: 3565 },
+      { value: "ERROR", count: 1455 },
       { value: "error", count: 40 },
-      { value: "WARN", count: 700 },
+      { value: "WARN", count: 1448 },
+      { value: "info", count: 604 },
+      { value: "Warning", count: 2 },
     ];
-    expect(rareValue(seen)).toBe("error");
-    expect(
-      rareValue([
-        { value: "a", count: 2 },
-        { value: "b", count: 8 },
-      ]),
-    ).toBe("a");
+    const recent = seen.filter((v) => v.value !== "ERROR");
+    expect(starterValue(seen)).toBe("ERROR");
+    expect(starterValue(seen, recent)).toBe("WARN");
+    expect(starterValue(seen, [])).toBe("ERROR");
     for (const none of [
       [
         { value: "a", count: 5 },
@@ -232,8 +233,16 @@ describe("alertIntents", () => {
       [{ value: "200", count: 9 }],
       [],
     ])
-      expect(rareValue(none)).toBeUndefined();
+      expect(starterValue(none)).toBeUndefined();
     expect(withCaseVariants(["ERROR"], seen)).toEqual(["ERROR", "error"]);
+  });
+
+  it.each([
+    ["a first pick replaces the suggestion", ["WARN", "ERROR"], ["WARN"], ["ERROR"]],
+    ["unticking keeps the rest", [], ["WARN"], []],
+    ["a pick after the user's own joins it", ["WARN", "ERROR"], [], ["WARN", "ERROR"]],
+  ])("value picker: %s", (_, picked, seeded, want) => {
+    expect(pickedValues(picked, ["WARN"], seeded)).toEqual(want);
   });
 
   it.each([

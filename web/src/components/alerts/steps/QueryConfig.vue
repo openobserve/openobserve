@@ -223,12 +223,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ thresholdError }}
                               </div>
                             </div>
-                            <span
+                            <AlertWindowPhrase
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                              >{{
-                                t("alerts.plain.inTheLast", { n: periodMinutes }, periodMinutes)
-                              }}</span
-                            >
+                              :minutes="periodMinutes"
+                              @update:minutes="emit('update:period', $event)"
+                            />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
@@ -307,12 +306,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="alert-duration-unit-select"
                               @update:model-value="onDurationUnitChange"
                             />
-                            <span
+                            <AlertWindowPhrase
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                              >{{
-                                t("alerts.plain.inTheLast", { n: periodMinutes }, periodMinutes)
-                              }}</span
-                            >
+                              :minutes="periodMinutes"
+                              @update:minutes="emit('update:period', $event)"
+                            />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
@@ -556,12 +554,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ thresholdError }}
                               </div>
                             </div>
-                            <span
+                            <AlertWindowPhrase
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                              >{{
-                                t("alerts.plain.inTheLast", { n: periodMinutes }, periodMinutes)
-                              }}</span
-                            >
+                              :minutes="periodMinutes"
+                              @update:minutes="emit('update:period', $event)"
+                            />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
@@ -617,12 +614,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="alert-threshold-unit"
                               >{{ thresholdUnit }}</span
                             >
-                            <span
+                            <AlertWindowPhrase
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                              >{{
-                                t("alerts.plain.inTheLast", { n: periodMinutes }, periodMinutes)
-                              }}</span
-                            >
+                              :minutes="periodMinutes"
+                              @update:minutes="emit('update:period', $event)"
+                            />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
@@ -1891,6 +1887,7 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import AlertWarningRow from "@/components/alerts/AlertWarningRow.vue";
+import AlertWindowPhrase from "@/components/alerts/AlertWindowPhrase.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -1957,6 +1954,7 @@ export default defineComponent({
   name: "Step2QueryConfig",
   components: {
     AlertWarningRow,
+    AlertWindowPhrase,
     OTag,
     ORadio,
     ORadioGroup,
@@ -2096,6 +2094,7 @@ export default defineComponent({
     "update:aggregation",
     "update:promqlCondition",
     "update:triggerCondition",
+    "update:period",
   ],
   setup(props, { emit }) {
     const { t, locale } = useI18nTyped();
@@ -4450,6 +4449,7 @@ export default defineComponent({
     // re-homed in useAlertForm.runImperativeQueryChecks (same messages).
 
     return {
+      emit,
       syncMeasureFromForm,
       thresholdPlural,
       shownGroupLabels,

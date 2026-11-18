@@ -121,7 +121,6 @@ const FIXED_BY_GROUP = 0.75;
 export const SHAPE_TOP_VALUES = 10;
 const MEASURE_MIN_COVERAGE = 0.5;
 const HEAVY_TAIL_RATIO = 5;
-const RARE_SHARE = 0.05;
 const MIN_WORD_SHARE = 0.8;
 
 /** Intents offered for a stream type; the "unusual" ones only where anomaly detection is usable. */
@@ -388,15 +387,36 @@ export const rankMeasure = (candidates: string[], shapes: readonly FieldShape[])
     (a, b) => tailRatio(b) - tailRatio(a),
   );
 
-/** The rarest value under 5 % of the counted events, else the least frequent one if it is a minority
- * (the other side of a 60 % majority); one value everywhere has no minority to suggest. */
-export function rareValue(values: readonly ValueCount[]): string | undefined {
+const spellingOf = (a: string, b: string) => {
+  const [x, y] = [a.toLowerCase(), b.toLowerCase()];
+  return x.startsWith(y) || y.startsWith(x);
+};
+
+/** The largest minority (the other side of a 60 % majority) that is not a spelling of the majority,
+ * preferring values seen in `recent` so the preview has something to show. */
+export function starterValue(
+  values: readonly ValueCount[],
+  recent: readonly ValueCount[] = [],
+): string | undefined {
   const seen = values.filter((v) => v.value !== "" && v.count > 0);
   const total = seen.reduce((sum, v) => sum + v.count, 0);
   if (seen.length < 2 || !total) return undefined;
-  const ascending = [...seen].sort((a, b) => a.count - b.count);
-  const rare = ascending.find((v) => v.count / total < RARE_SHARE) ?? ascending[0];
-  return rare.count / total <= 1 - MAJORITY_SHARE ? rare.value : undefined;
+  const [top, ...rest] = [...seen].sort((a, b) => b.count - a.count);
+  const minority = rest.filter(
+    (v) => v.count / total <= 1 - MAJORITY_SHARE && !spellingOf(v.value, top.value),
+  );
+  const present = minority.filter((v) => recent.some((r) => r.value === v.value && r.count > 0));
+  return (present[0] ?? minority[0])?.value;
+}
+
+/** A picker's new values: a first pick beside a suggestion replaces the suggestion. */
+export function pickedValues(
+  picked: readonly string[],
+  previous: readonly string[],
+  seeded: readonly string[],
+): string[] {
+  const added = picked.some((v) => !previous.includes(v));
+  return picked.filter((v) => !added || !seeded.includes(v));
 }
 
 /** The picked values plus every seen value that differs from one only in case. */

@@ -136,11 +136,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #factor>
-          <span class="inline-flex w-16 align-middle">
+          <span class="inline-flex align-middle">
             <OInput
               :model-value="slots.factor ?? DEFAULT_FACTOR"
               type="number"
-              size="sm"
+              size="xs"
+              fit-content
               :min="1"
               :aria-label="t('alerts.intent.slots.factor')"
               data-test="add-alert-intent-slot-factor"
@@ -152,6 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="font-mono">{{ raw(streamName) }}</span>
         </template>
         <template #bucket>{{ bucketWords }}</template>
+        <template #window>
+          <AlertWindowPhrase
+            :minutes="periodMinutes"
+            size="xs"
+            data-test="add-alert-intent-slot-window"
+            @update:minutes="setWindow"
+          />
+        </template>
       </i18n-t>
       <OButton
         v-if="offersGroup && slots.group === undefined && groupCandidates.all.length"
@@ -252,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -262,6 +271,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import LibraryDrawer from "@/components/alertLibrary/LibraryDrawer.vue";
 import AlertSuggestionCard from "./AlertSuggestionCard.vue";
+import AlertWindowPhrase from "./AlertWindowPhrase.vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { librarySuggestionsQuery } from "@/services/alert_library.queries";
@@ -300,7 +310,8 @@ import {
   rankMeasure,
   rankMetricCategory,
   rankMetricGroup,
-  rareValue,
+  pickedValues,
+  starterValue,
   readFieldShapes,
   shapeQuerySql,
   slotFields,
@@ -340,6 +351,8 @@ const emit = defineEmits<{
   (e: "scratch"): void;
   (e: "open-alert", alert: AlreadySetUp): void;
   (e: "browse-library"): void;
+  /** The sentence's window is the alert's look back. */
+  (e: "update:period", minutes: number | ""): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -361,6 +374,8 @@ const questionText = computed(() => t("alerts.intent.question", { stream: raw(pr
 const bucketWords = computed(() => durationWords(ANOMALY_BUCKET_MINUTES, t));
 
 const slots = reactive<IntentSlots>({});
+// The values a starter suggested; the user's first pick replaces them instead of joining them.
+let seeded: string[] = [];
 // The chip pressed while its slots are still being ranked and seeded.
 const choosing = ref<IntentId | null>(null);
 
@@ -538,6 +553,7 @@ watch(
   async () => {
     choosing.value = null;
     for (const key of Object.keys(slots) as (keyof IntentSlots)[]) delete slots[key];
+    seeded = [];
     if (isMetrics.value && props.streamName) await loadSeries(props.streamName);
   },
   { immediate: true },
@@ -655,20 +671,28 @@ const seedSlots = (id: IntentId) => {
   else slots.field ??= categoriesFor(id).fit[0];
 };
 
-/** The value slot waits for the field's counts, then suggests its rarest value and that value's case variants. */
+// The preview's default range (3 look-back windows, at least 5 min), so its value counts are shared.
+const previewWindowUs = () => Math.max(3 * props.periodMinutes, 5) * 60_000_000;
+
+/** The value slot waits for the field's counts, then suggests the largest minority seen recently. */
 const seedValues = async (id: IntentId) => {
   if (!wantsValue(id) || slots.values?.length) return;
   if (isMetrics.value) {
-    const rare = rareValue(labelValues.value);
-    slots.values = rare ? [rare] : [];
+    const value = starterValue(labelValues.value);
+    slots.values = value ? [value] : [];
+    seeded = [...slots.values];
     return;
   }
   const field = slots.field;
   if (!field) return;
-  const entry = await loadValueCounts(valueContext.value, field);
+  const [day, recent] = await Promise.all([
+    loadValueCounts(valueContext.value, field),
+    loadValueCounts({ ...valueContext.value, windowUs: previewWindowUs() }, field),
+  ]);
   if (slots.field !== field || slots.values?.length) return;
-  const rare = rareValue(entry.values);
-  slots.values = rare ? withCaseVariants([rare], entry.values) : [];
+  const value = starterValue(day.values, recent.values);
+  slots.values = value ? withCaseVariants([value], day.values) : [];
+  seeded = [...slots.values];
 };
 
 const choose = async (id: IntentId) => {
@@ -708,15 +732,27 @@ const addGroup = () => {
 /** A newly picked value brings its case variants, so ERROR also counts error; the form follows on close. */
 const setValues = (value: SelectModelValue) => {
   const picked = (Array.isArray(value) ? value : [value]).map(asText).filter(Boolean);
-  const added = picked.filter((v) => !(slots.values ?? []).includes(v));
+  const previous = slots.values ?? [];
+  const added = picked.filter((v) => !previous.includes(v));
   const variants = isMetrics.value ? [] : withCaseVariants(added, fieldValues.value);
-  slots.values = [...new Set([...picked, ...variants])];
+  slots.values = [...new Set([...pickedValues(picked, previous, seeded), ...variants])];
+  seeded = [];
 };
 
 const addValue = (value: string) => {
   const text = value.trim();
   if (!text) return;
-  slots.values = [...new Set([...(slots.values ?? []), text])];
+  const previous = slots.values ?? [];
+  slots.values = [...new Set(pickedValues([...previous, text], previous, seeded))];
+  seeded = [];
+};
+
+// The share's rate window is written into its query, so the query follows a new window.
+const setWindow = async (minutes: number | "") => {
+  emit("update:period", minutes);
+  if (props.active !== "ratio" || !(Number(minutes) > 0)) return;
+  await nextTick();
+  reapply();
 };
 
 const setFactor = (value: unknown) => {
