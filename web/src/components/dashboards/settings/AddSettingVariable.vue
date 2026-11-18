@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-query-mode-auto"
                 >
                   <template #icon-left><OIcon name="build" size="xs" class="shrink-0" /></template>
-                  {{ t("dashboard.auto") }}
+                  {{ t("panel.builder") }}
                 </OToggleGroupItem>
                 <OToggleGroupItem
                   value="custom"
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-variable-query-mode-custom"
                 >
                   <template #icon-left><OIcon name="code" size="xs" class="shrink-0" /></template>
-                  {{ t("dashboard.custom") }}
+                  {{ t("panel.custom") }}
                 </OToggleGroupItem>
               </OToggleGroup>
               <div v-if="variableData.type == 'custom' && variableData.multiSelect"></div>
@@ -180,7 +180,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="!isCustomQuery" class="mt-4 flex">
                 <OFormSelect
                   name="query_data.stream"
-                  :label="t('dashboard.selectIndex')"
+                  :label="
+                    queryLanguage === 'promql'
+                      ? t('dashboard.queryVariable.metric')
+                      : t('dashboard.selectIndex')
+                  "
                   required
                   :options="mergedStreamOptionsWithLabel"
                   labelKey="_displayLabel"
@@ -193,7 +197,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #tooltip>
                     <OTooltip max-width="15.625rem">
                       <template #content>
-                        {{ t("dashboard.streamSelectTooltip") }}
+                        {{
+                          queryLanguage === "promql"
+                            ? t("dashboard.queryVariable.metricSelectTooltip")
+                            : t("dashboard.streamSelectTooltip")
+                        }}
                       </template>
                     </OTooltip>
                   </template>
@@ -216,7 +224,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div v-if="!isCustomQuery" class="mt-4 flex">
                 <OFormSelect
                   name="query_data.field"
-                  :label="t('dashboard.selectField')"
+                  :label="
+                    queryLanguage === 'promql'
+                      ? t('dashboard.queryVariable.label')
+                      : t('dashboard.selectField')
+                  "
                   required
                   :options="mergedFieldOptionsWithLabel"
                   labelKey="_displayLabel"
@@ -228,7 +240,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #tooltip>
                     <OTooltip max-width="15.625rem">
                       <template #content>
-                        {{ t("dashboard.fieldSelectTooltip") }}
+                        {{
+                          queryLanguage === "promql"
+                            ? t("dashboard.queryVariable.labelSelectTooltip")
+                            : t("dashboard.fieldSelectTooltip")
+                        }}
                       </template>
                     </OTooltip>
                   </template>

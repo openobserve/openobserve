@@ -126,6 +126,35 @@ describe("AddSettingVariable with the real query editor", () => {
     wrapper.unmount();
   });
 
+  it("labels the Builder pickers Metric and Label for PromQL, and Stream and Field for SQL", async () => {
+    const wrapper = await mountForm();
+    const pickerLabel = (name: string) =>
+      wrapper
+        .findAllComponents({ name: "OFormSelect" })
+        .find((select: any) => select.props("name") === name)
+        ?.props("label");
+    expect([pickerLabel("query_data.stream"), pickerLabel("query_data.field")]).toEqual([
+      "Metric",
+      "Label",
+    ]);
+
+    await click(wrapper, "dashboard-variable-query-language-sql");
+    expect([pickerLabel("query_data.stream"), pickerLabel("query_data.field")]).toEqual([
+      "Stream",
+      "Field",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("names the modes Builder and Custom like the panel editor, apart from the Custom values default", async () => {
+    const wrapper = await mountForm();
+    const text = (dataTest: string) => wrapper.find(`[data-test="${dataTest}"]`).text();
+    expect(text("dashboard-variable-query-mode-auto")).toBe("Builder");
+    expect(text("dashboard-variable-query-mode-custom")).toBe("Custom");
+    expect(text("dashboard-multi-select-default-value-toggle-custom")).toBe("Custom values");
+    wrapper.unmount();
+  });
+
   it("opens a saved query as custom SQL and saves it back without a mode or language key", async () => {
     const customSql = {
       name: "svc",
