@@ -698,6 +698,9 @@ fn issue_incident(
         }),
         cohort,
         budget_spent_by,
+        paged_at: record
+            .filter(|_| page.outcome == PageOutcome::Paged)
+            .map(|r| r.opened_at),
     }
 }
 
