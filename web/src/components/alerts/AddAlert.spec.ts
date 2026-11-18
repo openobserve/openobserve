@@ -1751,9 +1751,30 @@ describe("AddAlert (OForm owner)", () => {
       await wrapper.find('[data-test="add-alert-section-4-next"]').trigger("click");
       await flushPromises();
       expect(scrollToSection).toHaveBeenCalledWith("details");
-      expect(document.activeElement).toBe(
-        wrapper.find('[data-test="add-alert-details-name-input"] input').element,
+      const name = wrapper.find('[data-test="add-alert-details-name-input"] input').element;
+      // Focus waits for the glide to land, so a control scrolling itself into view cannot stop it.
+      expect(document.activeElement).not.toBe(name);
+      await vi.waitFor(() => expect(document.activeElement).toBe(name));
+      // Back to a section whose step 1 is folded skips the summary line's Change link.
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      wrapper.vm.activeSection = "condition";
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="add-alert-watch-summary"]').exists()).toBe(true),
       );
+      await wrapper.find('[data-test="add-alert-section-3-back"]').trigger("click");
+      await vi.waitFor(() =>
+        expect(
+          (document.activeElement?.closest("[data-snap-section]") as HTMLElement)?.dataset
+            .snapSection,
+        ).toBe("condition"),
+      );
+      expect(
+        wrapper
+          .get('[data-test="add-alert-section-condition-card"]')
+          .element.contains(document.activeElement),
+      ).toBe(true);
       rects.mockRestore();
     });
 
@@ -2247,6 +2268,41 @@ describe("AddAlert (OForm owner)", () => {
       }
       expect(scrollToSection.mock.calls).toEqual(jump ? [["schedule"]] : []);
       if (!jump) expect(document.activeElement).toBe(control);
+    });
+
+    it("a fold while the view rests on section 2 lands on its start, above its new summary line", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.activeSection = "watch";
+      await flushPromises();
+      const scroller = wrapper.get('[data-test="add-alert-sections"]').element as HTMLElement;
+      scroller.style.overflowY = "auto";
+      let top = 638;
+      Object.defineProperty(scroller, "scrollTop", {
+        configurable: true,
+        get: () => top,
+        set: (value: number) => {
+          top = value;
+        },
+      });
+      const control = wrapper.get('[data-test="add-alert-section-condition-next"]').element;
+      const section = wrapper.get('[data-snap-section="condition"]').element;
+      // Folding removes 638 px above the view and adds a 36 px summary line atop section 2.
+      const rects = vi
+        .spyOn(Element.prototype, "getBoundingClientRect")
+        .mockImplementation(function (this: Element) {
+          const open = !!document.querySelector('[data-snap-section="watch"]');
+          const y =
+            this === section ? (open ? 0 : -638) : this === control ? (open ? 100 : -502) : 0;
+          return new DOMRect(0, y, 10, 10);
+        });
+      (control as HTMLElement).focus();
+      wrapper.vm.activeSection = "condition";
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(false);
+      expect(top).toBe(0);
+      rects.mockRestore();
     });
 
     it("saving an untouched edit sends the loaded trigger values", async () => {

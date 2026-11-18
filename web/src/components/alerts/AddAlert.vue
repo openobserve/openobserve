@@ -1380,21 +1380,19 @@ export default defineComponent({
     const goToSection = (requested: string) => {
       // A step this alert type drops says its one sentence in step 2.
       const id = formSections.value.some((s) => s.id === requested) ? requested : "condition";
+      startJump();
       if (id === "watch" && watchCollapsed.value) {
         if (isEditing.value) snapScrollRef.value?.scrollToSection("condition");
         else expandWatch();
         return;
       }
-      if (!watchCollapsed.value) startJump();
       snapScrollRef.value?.scrollToSection(id);
     };
     // The footer's Back and Next hand the Tab start to the section's first control, past its header arrows.
+    // Focus waits for the landing: a control that scrolls itself into view on focus would stop the glide.
     const stepToSection = (id: AlertSectionId) => {
+      focusOnLanding = id;
       goToSection(id);
-      void nextTick(() => {
-        const section = document.querySelector<HTMLElement>(`[data-snap-section="${id}"]`);
-        if (section) focusFirstControl(section, "[data-snap-sticky]");
-      });
     };
     // A centred error leaves the previous card's band stuck over its tail; the snap scroller rests on a section stop.
     const alertForm = useAlertForm(props, formEmit, {
@@ -1748,9 +1746,20 @@ export default defineComponent({
         leftWatch.value = true;
       }
     };
+    let focusOnLanding: AlertSectionId | null = null;
     const endJump = () => {
       jumping.value = false;
       foldWhenDue();
+      const id = focusOnLanding;
+      focusOnLanding = null;
+      if (!id) return;
+      // The card, not the folded summary line above it, holds the section's first field.
+      void nextTick(() => {
+        const card = document.querySelector<HTMLElement>(
+          `[data-test="add-alert-section-${id}-card"]`,
+        );
+        if (card) focusFirstControl(card, "[data-snap-sticky]");
+      });
     };
     const onJumpScroll = () => {
       if (!jumping.value) return;
@@ -1794,15 +1803,21 @@ export default defineComponent({
       void nextTick(() => snapScrollRef.value?.scrollToSection("watch"));
     };
     // Folding removes content above the view; scrolling back by the shift holds the view and focus still.
+    // A view resting on a section's start stays on it, since the summary line lands atop that section.
     watch(watchCollapsed, (folded) => {
       if (!folded || isEditing.value) return;
       const anchor = foldAnchor(activeSection.value);
       if (!anchor) return;
-      const before = anchor.getBoundingClientRect().top;
+      const section = anchor.closest<HTMLElement>("[data-snap-section]") ?? anchor;
+      const scroller = scrollParent(section);
+      if (!scroller) return;
+      const viewTop = () => scroller.getBoundingClientRect().top;
+      const atStart = Math.abs(section.getBoundingClientRect().top - viewTop()) <= 2;
+      const held = atStart ? section : anchor;
+      const before = held.getBoundingClientRect().top;
       void nextTick(() => {
-        const shift = anchor.getBoundingClientRect().top - before;
-        const scroller = scrollParent(anchor.closest<HTMLElement>("[data-snap-section]") ?? anchor);
-        if (shift && scroller) scroller.scrollTop += shift;
+        const shift = held.getBoundingClientRect().top - before;
+        if (shift) scroller.scrollTop += shift;
       });
     });
     const watchSummary = computed(() => {
