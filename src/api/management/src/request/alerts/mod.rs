@@ -986,11 +986,8 @@ fn composite_error_response(
         CompositeServiceError::ChildNotEligible(_) => {
             composite_machine_error(StatusCode::BAD_REQUEST, "child_not_eligible", error)
         }
-        CompositeServiceError::Cycle => {
-            composite_machine_error(StatusCode::CONFLICT, "composite_cycle", error)
-        }
-        CompositeServiceError::TooDeep => {
-            composite_machine_error(StatusCode::CONFLICT, "composite_too_deep", error)
+        CompositeServiceError::ChildIsComposite(_) => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "child_is_composite", error)
         }
         CompositeServiceError::NotFound => {
             composite_machine_error(StatusCode::NOT_FOUND, "composite_not_found", error)
@@ -1009,11 +1006,6 @@ fn composite_error_response(
         CompositeServiceError::WritesDisabled => composite_machine_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "composite_writes_disabled",
-            error,
-        ),
-        CompositeServiceError::SuperClusterUnsupported => composite_machine_error(
-            StatusCode::CONFLICT,
-            "composite_super_cluster_unsupported",
             error,
         ),
         CompositeServiceError::PermissionDenied => {
@@ -1179,15 +1171,12 @@ pub async fn validate_composite_alert(
                     format!("child alert {id} is not eligible for composite evaluation"),
                 );
             }
-            Some(infra::table::alert_composites::Resolution::Composite(composite)) => {
-                children.push(serde_json::json!({
-                    "alert_id": id,
-                    "accessible": true,
-                    "name": composite.name.clone(),
-                    "alert_type": "composite",
-                    "folder_id": composite.folder_id.clone(),
-                    "enabled": composite.enabled,
-                }));
+            Some(infra::table::alert_composites::Resolution::Composite(_)) => {
+                return composite_error_response(
+                    openobserve_core::alerts::composite::CompositeServiceError::ChildIsComposite(
+                        id,
+                    ),
+                );
             }
             _ => inaccessible.push(id),
         }
@@ -5164,6 +5153,21 @@ mod tests {
         let parsed: GetAlertResponseBody = serde_json::from_value(named).unwrap();
         assert_eq!(parsed.locked_target_names["wf"], "Restart pods");
         assert_eq!(parsed.alert.name, body.alert.name);
+    }
+
+    #[tokio::test]
+    async fn a_composite_child_answers_400_with_a_stable_code() {
+        use openobserve_core::alerts::composite::CompositeServiceError;
+
+        let response = super::composite_error_response(CompositeServiceError::ChildIsComposite(
+            "c1".to_string(),
+        ));
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "child_is_composite");
     }
 
     // 400 Bad Request

@@ -6,10 +6,11 @@ use std::collections::HashMap;
 use sea_orm::{
     ActiveModelTrait, ActiveValue,
     ActiveValue::Set,
-    ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Statement, TransactionTrait,
+    ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Statement, TransactionTrait, UpdateMany,
     sea_query::{Expr, LockType},
 };
+use serde::{Deserialize, Serialize};
 
 use super::entity::{alert_composite_children, alert_composites, alerts};
 use crate::errors::{DbError, Error};
@@ -21,7 +22,7 @@ pub enum ChildKind {
     Composite = 1,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompositeWithChildren {
     pub definition: alert_composites::Model,
     pub children: Vec<alert_composite_children::Model>,
@@ -38,6 +39,21 @@ pub enum Resolution {
     DuplicateId,
 }
 
+/// Which replicated message carried a definition.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReplicatedKind {
+    Create,
+    Update,
+}
+
+/// What a replicated definition does to this region's row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReplicaWrite {
+    Insert,
+    Replace { evaluation_generation: i64 },
+    Skip,
+}
+
 pub async fn create_with_children<C>(
     conn: &C,
     definition: alert_composites::ActiveModel,
@@ -50,23 +66,14 @@ where
     validate_child_ownership(&children, &id)?;
 
     let txn = conn.begin().await?;
-    let definition = definition.insert(&txn).await?;
-    if !children.is_empty() {
-        alert_composite_children::Entity::insert_many(children)
-            .exec(&txn)
-            .await?;
-    }
-    let children = children_for(&txn, &definition.id).await?;
+    let saved = insert_in(&txn, definition, children).await?;
     txn.commit().await?;
-    Ok(CompositeWithChildren {
-        definition,
-        children,
-    })
+    Ok(saved)
 }
 
 pub async fn update_with_children<C>(
     conn: &C,
-    mut replacement: alert_composites::ActiveModel,
+    replacement: alert_composites::ActiveModel,
     children: Vec<alert_composite_children::ActiveModel>,
 ) -> Result<CompositeWithChildren, sea_orm::DbErr>
 where
@@ -77,36 +84,199 @@ where
     validate_child_ownership(&children, &id)?;
 
     let txn = conn.begin().await?;
-    let mut current_query =
-        alert_composites::Entity::find_by_id(&id).filter(alert_composites::Column::Org.eq(&org));
-    if txn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
-        current_query = current_query.lock(LockType::Update);
-    }
-    let current = current_query
-        .one(&txn)
+    let current = lock_current(&txn, &org, &id)
         .await?
         .ok_or_else(|| sea_orm::DbErr::RecordNotFound(id.clone()))?;
-
-    replacement.evaluation_generation = Set(current
+    let evaluation_generation = current
         .evaluation_generation
         .checked_add(1)
-        .ok_or_else(|| sea_orm::DbErr::Custom("evaluation generation overflow".into()))?);
-    let definition = replacement.update(&txn).await?;
-    alert_composite_children::Entity::delete_many()
-        .filter(alert_composite_children::Column::CompositeId.eq(&id))
-        .exec(&txn)
-        .await?;
+        .ok_or_else(|| sea_orm::DbErr::Custom("evaluation generation overflow".into()))?;
+    let saved = replace_in(&txn, replacement, evaluation_generation, children).await?;
+    txn.commit().await?;
+    Ok(saved)
+}
+
+/// Decides a replicated definition against the local row; a missing `updated_at` is the oldest.
+/// [pure]
+pub fn replica_write(
+    kind: ReplicatedKind,
+    local: Option<&alert_composites::Model>,
+    incoming: &alert_composites::Model,
+) -> ReplicaWrite {
+    match (kind, local) {
+        (ReplicatedKind::Create, None) => ReplicaWrite::Insert,
+        (ReplicatedKind::Update, None) => ReplicaWrite::Skip,
+        (ReplicatedKind::Create | ReplicatedKind::Update, Some(local)) => {
+            if incoming.updated_at > local.updated_at {
+                ReplicaWrite::Replace {
+                    evaluation_generation: local.evaluation_generation.saturating_add(1),
+                }
+            } else {
+                ReplicaWrite::Skip
+            }
+        }
+    }
+}
+
+/// Applies a definition another region wrote and returns what [`replica_write`] decided. [strong]
+pub async fn apply_replicated<C>(
+    conn: &C,
+    kind: ReplicatedKind,
+    incoming: CompositeWithChildren,
+) -> Result<ReplicaWrite, sea_orm::DbErr>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let CompositeWithChildren {
+        definition,
+        children,
+    } = incoming;
+    let children = children
+        .into_iter()
+        .map(IntoActiveModel::into_active_model)
+        .collect::<Vec<_>>();
+    validate_child_ownership(&children, &definition.id)?;
+
+    let txn = conn.begin().await?;
+    let current = lock_current(&txn, &definition.org, &definition.id).await?;
+    let write = replica_write(kind, current.as_ref(), &definition);
+    // `reset_all` marks every column set, so the update writes the whole incoming row.
+    let mut row = definition.into_active_model().reset_all();
+    match write {
+        ReplicaWrite::Insert => {
+            row.evaluation_generation = Set(0);
+            insert_in(&txn, row, children).await?;
+        }
+        ReplicaWrite::Replace {
+            evaluation_generation,
+        } => {
+            replace_in(&txn, row, evaluation_generation, children).await?;
+        }
+        ReplicaWrite::Skip => {}
+    }
+    txn.commit().await?;
+    Ok(write)
+}
+
+/// Flips `enabled` with a new `updated_at` and generation; `None` when the id is absent.
+pub async fn set_enabled<C>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    enabled: bool,
+    updated_at: i64,
+) -> Result<Option<CompositeWithChildren>, sea_orm::DbErr>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let change = alert_composites::Entity::update_many()
+        .col_expr(alert_composites::Column::Enabled, Expr::value(enabled));
+    stamp_and_reload(conn, org, id, change, updated_at).await
+}
+
+/// Moves a composite to `folder_id` with a new `updated_at` and generation; `None` when absent.
+pub async fn move_to_folder<C>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    folder_id: &str,
+    editor: &str,
+    updated_at: i64,
+) -> Result<Option<CompositeWithChildren>, sea_orm::DbErr>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let change = alert_composites::Entity::update_many()
+        .col_expr(alert_composites::Column::FolderId, Expr::value(folder_id))
+        .col_expr(alert_composites::Column::LastEditedBy, Expr::value(editor));
+    stamp_and_reload(conn, org, id, change, updated_at).await
+}
+
+async fn insert_in<C: ConnectionTrait>(
+    txn: &C,
+    definition: alert_composites::ActiveModel,
+    children: Vec<alert_composite_children::ActiveModel>,
+) -> Result<CompositeWithChildren, sea_orm::DbErr> {
+    let definition = definition.insert(txn).await?;
     if !children.is_empty() {
         alert_composite_children::Entity::insert_many(children)
-            .exec(&txn)
+            .exec(txn)
             .await?;
     }
-    let children = children_for(&txn, &id).await?;
-    txn.commit().await?;
+    let children = children_for(txn, &definition.id).await?;
     Ok(CompositeWithChildren {
         definition,
         children,
     })
+}
+
+/// Reads the row to replace; PostgreSQL holds its lock until the caller's transaction ends.
+async fn lock_current<C: ConnectionTrait>(
+    txn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<alert_composites::Model>, sea_orm::DbErr> {
+    let mut current =
+        alert_composites::Entity::find_by_id(id).filter(alert_composites::Column::Org.eq(org));
+    if txn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+        current = current.lock(LockType::Update);
+    }
+    current.one(txn).await
+}
+
+async fn replace_in<C: ConnectionTrait>(
+    txn: &C,
+    mut replacement: alert_composites::ActiveModel,
+    evaluation_generation: i64,
+    children: Vec<alert_composite_children::ActiveModel>,
+) -> Result<CompositeWithChildren, sea_orm::DbErr> {
+    let id = active_string(&replacement.id, "composite id")?;
+    replacement.evaluation_generation = Set(evaluation_generation);
+    let definition = replacement.update(txn).await?;
+    alert_composite_children::Entity::delete_many()
+        .filter(alert_composite_children::Column::CompositeId.eq(&id))
+        .exec(txn)
+        .await?;
+    if !children.is_empty() {
+        alert_composite_children::Entity::insert_many(children)
+            .exec(txn)
+            .await?;
+    }
+    let children = children_for(txn, &id).await?;
+    Ok(CompositeWithChildren {
+        definition,
+        children,
+    })
+}
+
+async fn stamp_and_reload<C>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    change: UpdateMany<alert_composites::Entity>,
+    updated_at: i64,
+) -> Result<Option<CompositeWithChildren>, sea_orm::DbErr>
+where
+    C: ConnectionTrait + TransactionTrait,
+{
+    let txn = conn.begin().await?;
+    let result = change
+        .col_expr(alert_composites::Column::UpdatedAt, Expr::value(updated_at))
+        .col_expr(
+            alert_composites::Column::EvaluationGeneration,
+            Expr::col(alert_composites::Column::EvaluationGeneration).add(1),
+        )
+        .filter(alert_composites::Column::Org.eq(org))
+        .filter(alert_composites::Column::Id.eq(id))
+        .exec(&txn)
+        .await?;
+    let saved = if result.rows_affected == 0 {
+        None
+    } else {
+        get_by_id(&txn, org, id).await?
+    };
+    txn.commit().await?;
+    Ok(saved)
 }
 
 fn validate_child_ownership(
@@ -231,12 +401,6 @@ pub async fn templates_in_use<C: ConnectionTrait>(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
-/// Total composite definitions across every org — the super-cluster startup
-/// preflight fails closed when this is non-zero.
-pub async fn count_all<C: ConnectionTrait>(conn: &C) -> Result<u64, sea_orm::DbErr> {
-    alert_composites::Entity::find().count(conn).await
-}
-
 pub async fn list_parents<C: ConnectionTrait>(
     conn: &C,
     org: &str,
@@ -315,37 +479,6 @@ pub async fn children_count_for_many<C: ConnectionTrait>(
         *counts.entry(child.composite_id).or_default() += 1;
     }
     Ok(counts)
-}
-
-pub async fn load_graph<C: ConnectionTrait>(
-    conn: &C,
-    org: &str,
-) -> Result<HashMap<String, Vec<String>>, sea_orm::DbErr> {
-    let definitions = list_by_org(conn, org).await?;
-    let ids = definitions
-        .into_iter()
-        .map(|definition| definition.id)
-        .collect::<Vec<_>>();
-    let mut graph = ids
-        .iter()
-        .cloned()
-        .map(|id| (id, Vec::new()))
-        .collect::<HashMap<_, _>>();
-    if ids.is_empty() {
-        return Ok(graph);
-    }
-    let children = alert_composite_children::Entity::find()
-        .filter(alert_composite_children::Column::CompositeId.is_in(ids))
-        .filter(alert_composite_children::Column::ChildKind.eq(ChildKind::Composite as i16))
-        .order_by_asc(alert_composite_children::Column::DisplayOrder)
-        .all(conn)
-        .await?;
-    for child in children {
-        if let Some(parent_children) = graph.get_mut(&child.composite_id) {
-            parent_children.push(child.child_alert_id);
-        }
-    }
-    Ok(graph)
 }
 
 pub async fn current_generation<C: ConnectionTrait>(
