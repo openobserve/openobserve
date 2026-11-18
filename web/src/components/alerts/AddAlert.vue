@@ -482,12 +482,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <p
                   v-if="formData.is_real_time === 'true'"
                   class="text-text-secondary m-0 py-3 text-sm"
-                  data-test="add-alert-realtime-condition-note"
+                  data-test="add-alert-schedule-note"
                 >
-                  {{ t("alerts.summary.plainEnglish.realTime") }}
-                  <span class="block" data-test="add-alert-schedule-note">{{
-                    t("alerts.form.schedule.realtime")
-                  }}</span>
+                  {{ t("alerts.form.schedule.realtime") }}
                 </p>
                 <div
                   v-if="!beingUpdated"
