@@ -485,6 +485,7 @@ lettre = { version = "0.11", default-features = false, features = [
     "tokio1-rustls-tls",
     "aws-lc-rs",
 ] }
+llm-prices = { version = "1.8", default-features = false }
 log = "0.4"
 md5 = "0.8.0"
 memchr = "2.7"

@@ -30,7 +30,7 @@ use std::{
 
 use config::meta::model_pricing::{
     BUILT_IN_ORG, META_ORG, MatchKind, ModelPricingDefinition, PricingContext, PricingSource,
-    PricingTierDefinition, windows_match,
+    PricingTierDefinition, TierCondition, TierOperator, windows_match,
 };
 use dashmap::DashMap;
 use infra::table;
@@ -44,6 +44,9 @@ const WATCHER_PREFIX: &str = "/model_pricing/";
 /// accommodating Unicode-aware patterns like `(?i)\d{4}` which expand
 /// significantly due to Unicode digit/case-folding tables.
 pub const REGEX_SIZE_LIMIT: usize = 256 * 1024; // 256 KB
+
+/// Span model names are client-controlled, so the llm-prices lookup memo is bounded.
+const LLM_PRICES_LOOKUPS_CAP: usize = 4096;
 
 /// One shared source for every org without its own entries, so `Arc::ptr_eq` keeps its merge a hit.
 static NO_ORG_ENTRIES: LazyLock<Arc<Vec<CachedModelPricing>>> = LazyLock::new(Arc::default);
@@ -63,6 +66,18 @@ static CACHE: LazyLock<DashMap<String, Arc<Vec<CachedModelPricing>>>> = LazyLock
 /// Valid as long as the source `Arc` pointers haven't changed (checked via `Arc::ptr_eq`).
 /// This avoids re-merging on every span — the merge only happens once after a pricing change.
 static MERGED: LazyLock<DashMap<String, MergedEntry>> = LazyLock::new(DashMap::new);
+
+/// The bundled llm-prices table in `llm_prices::all()` order; `None` for a row with no token price.
+static LLM_PRICES: LazyLock<Vec<Option<ModelPricingDefinition>>> = LazyLock::new(|| {
+    llm_prices::all()
+        .iter()
+        .map(llm_prices_definition)
+        .collect()
+});
+
+/// Model name -> (llm-prices row index, whether the id is the row's own); a miss scans the table.
+static LLM_PRICES_LOOKUPS: LazyLock<DashMap<String, Option<(usize, bool)>>> =
+    LazyLock::new(DashMap::new);
 
 /// A cached merge of org + meta + built-in entries, valid while the source `Arc`s are unchanged.
 struct MergedEntry {
@@ -243,6 +258,117 @@ fn source_priority(source: &PricingSource) -> u8 {
     }
 }
 
+/// Bedrock bills Claude above Anthropic's list price, so its exact id beats an approximate
+/// built-in match on the Anthropic name; any other llm-prices row only fills a missing price.
+fn llm_prices_match(model_name: &str, built_in_approximate: bool) -> Option<DefinitionMatch> {
+    let (index, exact) = llm_prices_row(model_name)?;
+    let definition = LLM_PRICES.get(index)?.as_ref()?;
+    if built_in_approximate && !(exact && definition.provider == "bedrock") {
+        return None;
+    }
+    Some(DefinitionMatch {
+        definition: definition.clone(),
+        match_kind: if exact {
+            MatchKind::Exact
+        } else {
+            MatchKind::Approximate
+        },
+    })
+}
+
+fn llm_prices_row(model_name: &str) -> Option<(usize, bool)> {
+    if let Some(row) = LLM_PRICES_LOOKUPS.get(model_name) {
+        return *row;
+    }
+    let row = llm_prices::lookup(model_name).and_then(|price| {
+        let index = llm_prices::all()
+            .iter()
+            .position(|p| std::ptr::eq(p, price))?;
+        let exact = std::iter::once(price.model)
+            .chain(price.aliases.iter().copied())
+            .any(|id| id.eq_ignore_ascii_case(model_name.trim()));
+        Some((index, exact))
+    });
+    if LLM_PRICES_LOOKUPS.len() >= LLM_PRICES_LOOKUPS_CAP {
+        LLM_PRICES_LOOKUPS.clear();
+    }
+    LLM_PRICES_LOOKUPS.insert(model_name.to_string(), row);
+    row
+}
+
+fn llm_prices_definition(price: &llm_prices::Price) -> Option<ModelPricingDefinition> {
+    if price.input.is_none() && price.output.is_none() {
+        return None;
+    }
+    let mut tiers = vec![PricingTierDefinition {
+        name: "Default".to_string(),
+        prices: per_token_prices(
+            price.input,
+            price.output,
+            price.cache_read,
+            price.cache_write,
+        ),
+        ..Default::default()
+    }];
+    if let Some(long) = price.long_context {
+        tiers.push(PricingTierDefinition {
+            name: format!("Long Context ({}+)", long.threshold_tokens),
+            condition: Some(TierCondition {
+                usage_key: "input".to_string(),
+                operator: TierOperator::Gt,
+                value: long.threshold_tokens as f64,
+            }),
+            prices: per_token_prices(
+                long.input.or(price.input),
+                long.output.or(price.output),
+                long.cache_read.or(price.cache_read),
+                if long.cache_write.is_empty() {
+                    price.cache_write
+                } else {
+                    long.cache_write
+                },
+            ),
+            ..Default::default()
+        });
+    }
+    let mut definition = ModelPricingDefinition {
+        name: format!("{} (llm-prices)", price.model),
+        match_pattern: format!("(?i)^{}$", regex::escape(price.model)),
+        enabled: true,
+        tiers,
+        source: PricingSource::BuiltIn,
+        provider: price.provider.to_string(),
+        description: format!(
+            "llm-prices, checked {}: {}",
+            price.checked, price.source_url
+        ),
+        ..Default::default()
+    };
+    definition.prepare();
+    Some(definition)
+}
+
+/// USD per 1M tokens to USD per token; the first cache lifetime is the provider's default write.
+fn per_token_prices(
+    input: Option<f64>,
+    output: Option<f64>,
+    cache_read: Option<f64>,
+    cache_write: &[(&str, f64)],
+) -> HashMap<String, f64> {
+    [
+        ("input", input),
+        ("output", output),
+        ("cache_read_input_tokens", cache_read),
+        (
+            "cache_creation_input_tokens",
+            cache_write.first().map(|(_, usd)| *usd),
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(key, usd_per_million)| Some((key.to_string(), usd_per_million? / 1e6)))
+    .collect()
+}
+
 /// A pricing definition selected for a model name, with how its pattern matched.
 #[derive(Clone, Debug)]
 pub struct DefinitionMatch {
@@ -263,6 +389,8 @@ pub struct DefinitionMatch {
 ///   3. Then the greatest `valid_from` (most recent) wins.
 ///   4. Otherwise the merge-order position (sort_order then name) is the final tiebreaker — earlier
 ///      in the list wins.
+///   5. With no match, or only an approximate built-in one, the bundled llm-prices table may price
+///      it (see `llm_prices_match`).
 pub fn find_pricing_sync_at(
     entries: &[CachedModelPricing],
     model_name: &str,
@@ -296,10 +424,22 @@ pub fn find_pricing_sync_at(
         }
     }
 
-    best.map(|(entry, match_kind)| DefinitionMatch {
-        definition: entry.definition.clone(),
-        match_kind,
-    })
+    match best {
+        Some((entry, kind))
+            if kind == MatchKind::Exact || entry.definition.source != PricingSource::BuiltIn =>
+        {
+            Some(DefinitionMatch {
+                definition: entry.definition.clone(),
+                match_kind: kind,
+            })
+        }
+        found => llm_prices_match(model_name, found.is_some()).or_else(|| {
+            found.map(|(entry, match_kind)| DefinitionMatch {
+                definition: entry.definition.clone(),
+                match_kind,
+            })
+        }),
+    }
 }
 
 /// Result of a cost calculation, including the selected tier name for logging.
@@ -980,12 +1120,12 @@ mod tests {
             compiled_regex: Regex::new("(?i)^gpt-4o").unwrap(),
         }];
 
-        assert!(find_pricing_sync_at(&entries, "claude-sonnet-4-6", None).is_none());
+        assert!(find_pricing_sync_at(&entries, "acme-chat-1", None).is_none());
     }
 
     #[test]
     fn test_find_pricing_sync_empty_entries() {
-        assert!(find_pricing_sync_at(&[], "gpt-4o", None).is_none());
+        assert!(find_pricing_sync_at(&[], "acme-chat-1", None).is_none());
     }
 
     #[test]
@@ -1066,7 +1206,7 @@ mod tests {
 
         // Span at ts=500k → neither valid
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(500_000));
-        assert!(result.is_none());
+        assert!(result.is_none_or(|r| r.definition.source == PricingSource::BuiltIn));
     }
 
     #[test]
@@ -2098,6 +2238,91 @@ mod tests {
         assert_eq!(
             entries[0].definition.rule_attribute_keys().as_ref(),
             ["openairequestservicetier", "openairesponseservicetier"]
+        );
+    }
+
+    fn default_input_price(m: &DefinitionMatch) -> f64 {
+        m.definition.tiers[0].prices["input"]
+    }
+
+    #[test]
+    fn test_llm_prices_prices_models_missing_from_the_catalogue() {
+        for model in [
+            "claude-fable-5-2",
+            "gpt-6.2-sol",
+            "gpt-6.2-astra",
+            "gemini-4-carbon",
+            "gemini-4-hydrogen",
+        ] {
+            let found = find_pricing_sync_at(&[], model, None).expect(model);
+            let row = llm_prices::lookup(model).unwrap();
+            assert_eq!(found.match_kind, MatchKind::Exact, "{model}");
+            assert_eq!(found.definition.source, PricingSource::BuiltIn);
+            assert!((default_input_price(&found) - row.input.unwrap() / 1e6).abs() < 1e-15);
+            found.definition.validate_tiers(false).unwrap();
+        }
+
+        let sol = find_pricing_sync_at(&[], "gpt-6.2-sol", None).unwrap();
+        let usage = HashMap::from([("input".to_string(), 300_000i64)]);
+        let long = calculate_cost_from_definition(
+            &sol.definition,
+            &usage,
+            None,
+            &PricingContext::default(),
+        );
+        assert!(long.tier_name.starts_with("Long Context"));
+    }
+
+    #[test]
+    fn test_bedrock_claude_ids_take_bedrock_prices() {
+        let entries = vec![CachedModelPricing {
+            definition: ModelPricingDefinition {
+                name: "Claude Sonnet 4.5".to_string(),
+                match_pattern: "(?i)claude-sonnet-4-5".to_string(),
+                source: PricingSource::BuiltIn,
+                tiers: vec![PricingTierDefinition {
+                    name: "Default".to_string(),
+                    prices: HashMap::from([("input".to_string(), 3e-6)]),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            compiled_regex: Regex::new("(?i)claude-sonnet-4-5").unwrap(),
+        }];
+
+        let regional = "us.anthropic.claude-sonnet-4-5-20250929-v1:0";
+        let found = find_pricing_sync_at(&entries, regional, None).unwrap();
+        let row = llm_prices::lookup(regional).unwrap();
+        assert_eq!(row.provider, "bedrock");
+        assert_eq!(found.match_kind, MatchKind::Exact);
+        assert!((default_input_price(&found) - row.input.unwrap() / 1e6).abs() < 1e-15);
+        assert!(
+            default_input_price(&found) > 3e-6,
+            "regional is above list price"
+        );
+
+        // A direct Anthropic id keeps the built-in row.
+        let direct = find_pricing_sync_at(&entries, "claude-sonnet-4-5-20250929", None).unwrap();
+        assert_eq!(direct.definition.name, "Claude Sonnet 4.5");
+        assert_eq!(direct.match_kind, MatchKind::Approximate);
+    }
+
+    #[test]
+    fn test_llm_prices_never_overrides_org_or_exact_built_in_rows() {
+        let regional = "eu.anthropic.claude-opus-4-5-20251101-v1:0";
+        let org = pattern_entry("org-opus", "(?i)claude-opus-4-5", PricingSource::Org);
+        assert_eq!(
+            best(&[org], regional),
+            ("org-opus".to_string(), MatchKind::Approximate)
+        );
+        let exact = pattern_entry(
+            "Bedrock Opus 4.5",
+            r"(?i)^eu\.anthropic\.claude-opus-4-5.*$",
+            PricingSource::BuiltIn,
+        );
+        assert_eq!(
+            best(&[exact], regional),
+            ("Bedrock Opus 4.5".to_string(), MatchKind::Exact)
         );
     }
 

@@ -34,6 +34,7 @@ hashlink.workspace = true
 infra.workspace = true
 ingester.workspace = true
 itertools.workspace = true
+llm-prices.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
