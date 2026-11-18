@@ -178,11 +178,15 @@ const destination = {
   // `test()` above (which only exercises raw URL/webhook connectivity), this
   // reaches the destination's actual endpoint and requires destination write
   // permission.
-  testSend: ({ org_identifier, destination_name, data }: any) => {
+  testSend: (
+    { org_identifier, destination_name, data }: any,
+    options?: { silentForbidden?: boolean },
+  ) => {
     return http()
       .post(
         `/api/${org_identifier}/alerts/destinations/${encodeURIComponent(destination_name)}/test_send`,
         data,
+        options,
       )
       .then((res) => {
         analytics.track("alert_template_test_sent");

@@ -402,6 +402,27 @@ describe("alert_destination service", () => {
     });
   });
 
+  describe("testSend", () => {
+    it.each([
+      ["no options", undefined],
+      ["the caller's own 403 handling", { silentForbidden: true }],
+    ])("posts the test message with %s", async (_label, options) => {
+      const data = { kind: "alert" };
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+
+      await destination.testSend(
+        { org_identifier: "org1", destination_name: "a b", data },
+        options,
+      );
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/org1/alerts/destinations/a%20b/test_send",
+        data,
+        options,
+      );
+    });
+  });
+
   describe("Slack OAuth", () => {
     it("starts OAuth for the selected organization", async () => {
       mockHttpInstance.post.mockResolvedValue({ data: { authorizationUrl: "https://slack.com" } });
