@@ -51,7 +51,10 @@ vi.mock("./packMatchData", () => ({
 }));
 
 import { packById } from "./usePackCatalog";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
+
+loadCatalogFixture();
 
 const HOSTS_PACK = packById("hosts")!;
 const KUBERNETES_PACK = packById("kubernetes")!;

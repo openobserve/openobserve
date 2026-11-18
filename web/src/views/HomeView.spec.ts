@@ -151,6 +151,9 @@ import analytics from "@/services/product_analytics";
 import settings from "@/services/settings";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { raw } from "@/types/i18n";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const mountHome = () =>
   mount(HomeView, {

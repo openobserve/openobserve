@@ -6,12 +6,15 @@ import { EVENTS_STREAM } from "@/views/Infrastructure/kubernetes2/kubernetesQuer
 
 import type { StarterPack } from "./types";
 import { packById } from "./usePackCatalog";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 import {
   MATCH_PARTIAL_AFTER_MS,
   MATCH_POLL_MS,
   fitStreams,
   useStarterPackMatcher,
 } from "./useStarterPackMatcher";
+
+loadCatalogFixture();
 
 const fake = vi.hoisted(() => ({
   metrics: [] as string[],

@@ -6,6 +6,9 @@ import i18n from "@/locales";
 
 import StarterPackBannerSlot from "./StarterPackBannerSlot.vue";
 import { fakeFlow } from "./starterPackTestFlow";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const fake = vi.hoisted(() => ({ flow: null as any, matcher: null as any }));
 vi.mock("@/composables/starterPacks/useStarterPackFlow", () => ({

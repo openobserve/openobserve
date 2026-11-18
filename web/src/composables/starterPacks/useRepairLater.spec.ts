@@ -87,6 +87,9 @@ import { panelHash } from "./repairLater";
 import { alertBody, dashboardBody } from "./useStarterPacks";
 import { contentHash } from "./useInstallRecords";
 import { useRepairLater } from "./useRepairLater";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const panel = (id: string, stream: string, title = id) => ({
   id,

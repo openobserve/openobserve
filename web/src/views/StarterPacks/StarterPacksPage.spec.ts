@@ -85,6 +85,9 @@ import {
   useBrowserMatches,
 } from "@/composables/starterPacks/useBrowserMatches";
 import StarterPacksPage from "./StarterPacksPage.vue";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const FindMore = defineComponent({
   props: { org: { type: String, required: true }, dailyToggle: Boolean },

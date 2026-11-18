@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, useTemplateRef } from "vue";
 import { useStore } from "vuex";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
 import StarterPackFindMore from "@/components/starterPacks/StarterPackFindMore.vue";
 import StarterPackLibraryTab from "@/components/starterPacks/StarterPackLibraryTab.vue";
 import StarterPackMatchCheck from "@/components/starterPacks/StarterPackMatchCheck.vue";
@@ -41,9 +42,13 @@ const refreshList = () => void list.value?.refresh();
     data-test="starter-packs-page"
   >
     <template #actions>
-      <StarterPackMatchCheck v-if="org" :key="org" :org="org" @checked="refreshList" />
-      <StarterPackFindMore :key="org" :org="org" daily-toggle @changed="refreshList" />
+      <StarterPackCatalogGate v-if="org" :org="org">
+        <StarterPackMatchCheck :key="org" :org="org" @checked="refreshList" />
+        <StarterPackFindMore :key="org" :org="org" daily-toggle @changed="refreshList" />
+      </StarterPackCatalogGate>
     </template>
-    <StarterPackLibraryTab v-if="org" ref="list" :key="org" :org="org" />
+    <StarterPackCatalogGate v-if="org" :org="org" notice>
+      <StarterPackLibraryTab ref="list" :key="org" :org="org" />
+    </StarterPackCatalogGate>
   </OPageLayout>
 </template>

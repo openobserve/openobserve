@@ -66,6 +66,9 @@ vi.mock("@/composables/query/readQuery", () => ({
 
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
 import StarterPackCoverageLine from "./StarterPackCoverageLine.vue";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const flow = useStarterPackFlow("org", {} as never);
 

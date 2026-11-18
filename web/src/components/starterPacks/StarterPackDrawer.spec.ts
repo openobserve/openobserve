@@ -27,6 +27,9 @@ vi.mock("@/composables/starterPacks/useEmailMeDestination", () => ({
 
 import StarterPackDrawer from "./StarterPackDrawer.vue";
 import { fakeFlow, PACK } from "./starterPackTestFlow";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const SLACK = { name: "oncall", type: "http", destination_type_name: "slack" };
 

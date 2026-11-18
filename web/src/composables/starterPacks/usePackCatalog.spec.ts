@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import raw from "@/assets/starterPacks/catalog.mock.json";
+import raw from "@/test/unit/fixtures/starterPacksCatalog.json";
 import i18n from "@/locales";
 import en from "@/locales/languages/en-US.json";
 import { S3_BASE, S3_PREFIX } from "@/composables/useDashboardGallery";
@@ -23,9 +23,13 @@ import { HOST_METRICS_DASHBOARD_TITLE } from "@/composables/useHostMetricsDashbo
 
 import bundledKubernetesAlerts from "./bundledKubernetesAlerts.json";
 import type { StarterPack } from "./types";
-import { catalogVersion, packById, packs, toStarterPack } from "./usePackCatalog";
+import { catalogVersion, packById, packs, setPackCatalog, toStarterPack } from "./usePackCatalog";
+
+const service = vi.hoisted(() => ({ catalog: vi.fn() }));
+vi.mock("@/services/starter_packs", () => ({ default: service }));
 
 const catalog = raw as any;
+setPackCatalog(catalog);
 const rawPack = (id: string) => catalog.packs.find((pack: { id: string }) => pack.id === id);
 const lookup = (key: string) =>
   key.split(".").reduce<any>((node, part) => (node == null ? node : node[part]), en);
@@ -281,6 +285,86 @@ describe("usePackCatalog", () => {
       const doc = await packById("hosts")!.dashboards[0].load();
       expect(Array.isArray(doc.tabs)).toBe(true);
       expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("loading from the server", () => {
+    // A fresh module per test, so each one starts with nothing loaded.
+    const freshCatalog = async () => {
+      vi.resetModules();
+      return import("./usePackCatalog");
+    };
+    const served = { catalog_version: "2026.11.18", source: "remote", packs: catalog.packs };
+
+    beforeEach(() => service.catalog.mockReset());
+
+    it("reads nothing before the load and every pack after it", async () => {
+      service.catalog.mockResolvedValue({ data: served });
+      const fresh = await freshCatalog();
+      expect(fresh.packCatalogState.value).toBe("idle");
+      expect(fresh.packs()).toEqual([]);
+      expect(fresh.packById("kubernetes")).toBeUndefined();
+      expect(fresh.catalogVersion()).toBe("");
+
+      expect(await fresh.loadPackCatalog("default")).toBe(true);
+      expect(fresh.packCatalogState.value).toBe("ready");
+      expect(fresh.packs().map(({ id }) => id)).toEqual(catalog.packs.map(({ id }: any) => id));
+      expect(fresh.packById("kubernetes")?.id).toBe("kubernetes");
+      expect(fresh.catalogVersion()).toBe("2026.11.18");
+      expect(service.catalog).toHaveBeenCalledWith("default");
+    });
+
+    it("sends one request for concurrent and later loads", async () => {
+      let answerWith: (value: unknown) => void = () => {};
+      service.catalog.mockReturnValue(new Promise((resolve) => (answerWith = resolve)));
+      const fresh = await freshCatalog();
+      const first = fresh.loadPackCatalog("default");
+      const second = fresh.loadPackCatalog("other");
+      expect(fresh.packCatalogState.value).toBe("loading");
+      answerWith({ data: served });
+      expect(await Promise.all([first, second])).toEqual([true, true]);
+      expect(await fresh.loadPackCatalog("default")).toBe(true);
+      expect(service.catalog).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves out a pack this build cannot build and keeps the nine it knows", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const unknownMap = {
+        ...rawPack("kubernetes"),
+        id: "kubernetes",
+        dashboards: [{ id: "x", title: "X", bundled: "redis_overview" }],
+      };
+      const noText = { ...rawPack("hosts"), id: "redis" };
+      const noAlerts = { ...rawPack("hosts"), alerts: undefined };
+      service.catalog.mockResolvedValue({
+        data: { ...served, packs: [unknownMap, ...catalog.packs, noText, noAlerts] },
+      });
+      const fresh = await freshCatalog();
+      expect(await fresh.loadPackCatalog("default")).toBe(true);
+      expect(fresh.packCatalogState.value).toBe("ready");
+      expect(fresh.packs().map(({ id }) => id)).toEqual(catalog.packs.map(({ id }: any) => id));
+      expect(warn).toHaveBeenCalledTimes(3);
+      warn.mockRestore();
+    });
+
+    it("marks a response with no pack list unavailable", async () => {
+      service.catalog.mockResolvedValue({ data: { catalog_version: "v1" } });
+      const fresh = await freshCatalog();
+      expect(await fresh.loadPackCatalog("default")).toBe(false);
+      expect(fresh.packCatalogState.value).toBe("error");
+    });
+
+    it("marks a refused load unavailable, keeps the readers empty and retries on the next call", async () => {
+      service.catalog.mockRejectedValueOnce({ response: { status: 403 } });
+      const fresh = await freshCatalog();
+      expect(await fresh.loadPackCatalog("default")).toBe(false);
+      expect(fresh.packCatalogState.value).toBe("error");
+      expect(fresh.packs()).toEqual([]);
+      await expect(fresh.ensurePackCatalog("default")).rejects.toThrow();
+
+      service.catalog.mockResolvedValue({ data: served });
+      expect(await fresh.loadPackCatalog("default")).toBe(true);
+      expect(fresh.packs()).toHaveLength(9);
     });
   });
 });

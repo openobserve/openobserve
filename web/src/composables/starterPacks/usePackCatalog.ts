@@ -13,12 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import catalogFile from "@/assets/starterPacks/catalog.mock.json";
+import { readonly, ref, shallowRef } from "vue";
+
 import { S3_BASE, S3_PREFIX } from "@/composables/useDashboardGallery";
 import {
   findHostMetricsDashboard,
   importHostMetricsDashboard,
 } from "@/composables/useHostMetricsDashboard";
+import i18n from "@/locales";
+import starterPacksService from "@/services/starter_packs";
 import type { I18nKey } from "@/types/i18n";
 
 import bundledKubernetesAlerts from "./bundledKubernetesAlerts.json";
@@ -62,10 +65,16 @@ interface RawPack {
 }
 
 interface RawCatalog {
-  format_version: string;
   catalog_version: string;
   packs: RawPack[];
 }
+
+interface LoadedCatalog {
+  version: string;
+  packs: StarterPack[];
+}
+
+export type PackCatalogState = "idle" | "loading" | "ready" | "error";
 
 const GALLERY_TIMEOUT_MS = 10_000;
 
@@ -105,7 +114,9 @@ const DETECTORS: Record<string, NonNullable<StarterPack["detector"]>> = {
   kubernetes: "kubernetes",
 };
 
-let built: StarterPack[] | null = null;
+const loaded = shallowRef<LoadedCatalog | null>(null);
+const state = ref<PackCatalogState>("idle");
+let pending: Promise<boolean> | null = null;
 
 const known = <T>(map: Record<string, T>, key: string, what: string): T => {
   if (!Object.prototype.hasOwnProperty.call(map, key)) {
@@ -154,6 +165,17 @@ const toDashboard = (raw: RawDashboard): PackDashboard => {
 };
 
 const textKey = (id: string, path: string) => `starterPacks.packs.${id}.${path}` as I18nKey;
+
+// A pack published after this build may name code maps or text this build lacks.
+const buildPack = (raw: RawPack): StarterPack | null => {
+  try {
+    if (!i18n.global.te(textKey(raw.id, "title"), "en-us")) throw new Error("no title text");
+    return toStarterPack(raw);
+  } catch (error) {
+    console.warn(`starter pack "${raw?.id}" left out of the catalog`, error);
+    return null;
+  }
+};
 
 /** Maps one catalog entry onto the pack shape; an unknown code-map key throws. */
 export const toStarterPack = (raw: RawPack): StarterPack => {
@@ -205,14 +227,48 @@ export const toStarterPack = (raw: RawPack): StarterPack => {
   };
 };
 
-/** Every starter pack, in catalog order; built once, since setup code reads it synchronously. */
-export const packs = (): StarterPack[] => {
-  built ??= (catalogFile as unknown as RawCatalog).packs.map(toStarterPack);
-  return built;
+/** Where the one catalog load stands; readers return nothing until it is `ready`. */
+export const packCatalogState = readonly(state);
+
+/** Builds the packs this web build understands; one it cannot build is left out, not the whole catalog. */
+export const setPackCatalog = (raw: RawCatalog) => {
+  if (!Array.isArray(raw?.packs)) throw new Error("starter packs catalog has no pack list");
+  const built = raw.packs.map(buildPack).filter((pack): pack is StarterPack => pack !== null);
+  loaded.value = { version: raw.catalog_version, packs: built };
+  state.value = "ready";
 };
+
+/** Loads the catalog once per page; concurrent callers share one request and a failure can be retried. */
+export const loadPackCatalog = (org: string): Promise<boolean> => {
+  if (loaded.value) return Promise.resolve(true);
+  if (pending) return pending;
+  state.value = "loading";
+  pending = starterPacksService
+    .catalog(org)
+    .then((response) => {
+      setPackCatalog(response.data);
+      return true;
+    })
+    .catch(() => {
+      state.value = "error";
+      return false;
+    })
+    .finally(() => {
+      pending = null;
+    });
+  return pending;
+};
+
+/** For background checks: an unloaded catalog would make every pack read as absent. */
+export const ensurePackCatalog = async (org: string): Promise<void> => {
+  if (!(await loadPackCatalog(org))) throw new Error("starter packs catalog unavailable");
+};
+
+/** Every starter pack, in catalog order; synchronous because setup code builds per-pack state from it. */
+export const packs = (): StarterPack[] => loaded.value?.packs ?? [];
 
 export const packById = (id: string): StarterPack | undefined =>
   packs().find((pack) => pack.id === id);
 
 /** Saved on an install record so a later catalog can tell what the install came from. */
-export const catalogVersion = (): string => (catalogFile as unknown as RawCatalog).catalog_version;
+export const catalogVersion = (): string => loaded.value?.version ?? "";

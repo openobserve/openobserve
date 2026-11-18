@@ -50,10 +50,10 @@ interface OrgState {
 export const matchesKey = (org: string) => `o2.starterPacks.browserMatches.${org}`;
 export const notNowKey = (org: string) => `o2.starterPacks.notNow.${org}`;
 
-const BUILT_IN_IDS = new Set(packs().map(({ id }) => id));
+const isBuiltIn = (packId: string) => packs().some(({ id }) => id === packId);
 
 const builtInOnly = (sources: FindMoreSource[]) =>
-  sources.filter(({ packId }) => !!packId && BUILT_IN_IDS.has(packId));
+  sources.filter(({ packId }) => !!packId && isBuiltIn(packId));
 
 // Shared by every caller in the tab, so a save on Home updates the header at once.
 const orgs = new Map<string, OrgState>();
@@ -185,7 +185,7 @@ export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
   const markInstalled = (sourceId: string, packId?: string) => {
     const current = copy.value;
     if (!current) return;
-    const builtIn = !!packId && BUILT_IN_IDS.has(packId);
+    const builtIn = !!packId && isBuiltIn(packId);
     setCopy({
       ...current,
       sources: current.sources.filter(({ id }) => id !== sourceId),

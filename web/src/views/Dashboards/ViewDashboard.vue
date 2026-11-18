@@ -537,12 +537,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </template>
 
-        <StarterPackLandingRow
+        <StarterPackCatalogGate
           v-if="packLanding"
-          :key="`${store.state.selectedOrganization?.identifier}/${packLandingId}`"
           :org="store.state.selectedOrganization?.identifier"
-          :pack-id="packLandingId"
-        />
+          :requires="[packLandingId, 'kubernetes']"
+        >
+          <StarterPackLandingRow
+            :key="`${store.state.selectedOrganization?.identifier}/${packLandingId}`"
+            :org="store.state.selectedOrganization?.identifier"
+            :pack-id="packLandingId"
+          />
+        </StarterPackCatalogGate>
         <KioskStrip
           v-if="kioskMode && !playlistEmbed"
           :title="currentDashboardData.data?.title"
@@ -752,6 +757,7 @@ import {
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
 import StarterPackLandingRow from "@/components/starterPacks/StarterPackLandingRow.vue";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import useNotifications from "@/composables/useNotifications";
@@ -881,6 +887,7 @@ export default defineComponent({
     DashboardSettings,
     RenderDashboardCharts,
     DeployMarkersUnavailable,
+    StarterPackCatalogGate,
     StarterPackLandingRow,
     ScheduledDashboards,
     PanelLayoutSettings,

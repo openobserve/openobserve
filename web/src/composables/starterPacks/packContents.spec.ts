@@ -18,6 +18,9 @@ import { describe, expect, it } from "vitest";
 import { buildContentRows, type ContentSources } from "./packContents";
 import type { PackPreview } from "./types";
 import { packById } from "./usePackCatalog";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const KUBERNETES_PACK = packById("kubernetes")!;
 

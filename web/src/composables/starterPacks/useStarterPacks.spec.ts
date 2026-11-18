@@ -25,6 +25,7 @@ import { HOST_METRICS_DASHBOARD_TITLE } from "@/composables/useHostMetricsDashbo
 import type { PackStreamRole, StarterPack } from "./types";
 import { leftOutIds, StarterPackPermissionError } from "./types";
 import { catalogVersion, packById } from "./usePackCatalog";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 
 const library = vi.hoisted(() => ({
   down: false,
@@ -225,6 +226,8 @@ vi.mock("@/composables/alerts/useAlertLibrary", async () => {
 });
 
 import { useStarterPacks } from "./useStarterPacks";
+
+loadCatalogFixture();
 
 const PACK: StarterPack = {
   id: "kubernetes",

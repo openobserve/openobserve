@@ -107,12 +107,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open="firstDataNotice.open"
           @dismiss="firstDataNotice.dismiss"
         />
-        <StarterPackHomeSection
+        <StarterPackCatalogGate
           v-if="packsEnabled && activeHomeTab === 'overview'"
-          :key="store.state.selectedOrganization?.identifier"
           :org="store.state.selectedOrganization?.identifier"
-          @ready="homePacks = $event"
-        />
+        >
+          <StarterPackHomeSection
+            :key="store.state.selectedOrganization?.identifier"
+            :org="store.state.selectedOrganization?.identifier"
+            @ready="homePacks = $event"
+          />
+        </StarterPackCatalogGate>
         <div
           v-if="hideOverviewPanel && activeHomeTab === 'overview' && streamTotals"
           class="bg-surface-panel border-border-default rounded-surface mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 border px-3.5 py-2 text-sm"
@@ -330,6 +334,7 @@ import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import analytics from "@/services/product_analytics";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
 import StarterPackHomeSection from "@/components/starterPacks/StarterPackHomeSection.vue";
 import { HOME_PACKS, type HomePacks } from "@/composables/starterPacks/useHomePacks";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
@@ -734,6 +739,7 @@ export default defineComponent({
     };
   },
   components: {
+    StarterPackCatalogGate,
     StarterPackHomeSection,
     OverviewTab,
     UsageTab,

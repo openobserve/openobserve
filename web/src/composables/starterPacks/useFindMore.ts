@@ -36,7 +36,7 @@ import {
   type FindMoreResult,
   type FindMoreSource,
 } from "./findMore";
-import { packs as allPacks } from "./usePackCatalog";
+import { ensurePackCatalog, packs as allPacks } from "./usePackCatalog";
 import { matchAlerts, matchPack, readOrgStreams } from "./packMatchData";
 import type { StarterPack } from "./types";
 import { useInstallRecords } from "./useInstallRecords";
@@ -129,6 +129,7 @@ export function useFindMoreCheck(org: string) {
   };
 
   const check = async (): Promise<FindMoreResult> => {
+    await ensurePackCatalog(org);
     const [streams, manifest, dismissals] = await Promise.all([
       readOrgStreams(org),
       loadManifest(),

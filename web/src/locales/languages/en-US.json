@@ -15189,6 +15189,7 @@
     "countAlerts": "{count} alert | {count} alerts",
     "countViews": "{count} saved view | {count} saved views",
     "offline": "Using the pack built into this version.",
+    "unavailable": "Starter Packs are unavailable right now.",
     "scope": "Alert scope: {value}",
     "scopeAll": "All clusters",
     "scopeSeen": "All clusters · {count} seen so far: {clusters}",

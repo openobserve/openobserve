@@ -18,6 +18,9 @@ import { describe, expect, it } from "vitest";
 import { packStreams } from "./packStreams";
 import type { StarterPack } from "./types";
 import { packById } from "./usePackCatalog";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const HOSTS_PACK = packById("hosts")!;
 const KUBERNETES_PACK = packById("kubernetes")!;

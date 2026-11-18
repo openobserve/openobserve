@@ -47,8 +47,8 @@ use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
     query_history, rum_analytics, sample_data, security, service_accounts, service_identity,
-    service_streams, service_versions, short_url, slack, slos, sourcemaps, status, status_pages,
-    stream, synthetics, users,
+    service_streams, service_versions, short_url, slack, slos, sourcemaps, starter_packs, status,
+    status_pages, stream, synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -1621,7 +1621,9 @@ fn service_route_table() -> Router {
 
         // Semantic field groups, under their historical path
         .route("/{org_id}/alerts/deduplication/semantic-groups", get(alerts::deduplication::get_semantic_groups).put(alerts::deduplication::save_semantic_groups))
-        .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff));
+        .route("/{org_id}/alerts/deduplication/semantic-groups/preview-diff", post(alerts::deduplication::preview_semantic_groups_diff))
+
+        .route("/{org_id}/starter_packs/catalog", get(starter_packs::get_catalog));
 
     #[cfg(feature = "enterprise")]
     {

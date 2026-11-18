@@ -21,9 +21,12 @@ import i18n from "@/locales";
 
 import type { HomePacks } from "@/composables/starterPacks/useHomePacks";
 import { packById } from "@/composables/starterPacks/usePackCatalog";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 
 import StarterPackHomeSection from "./StarterPackHomeSection.vue";
 import { fakeFlow } from "./starterPackTestFlow";
+
+loadCatalogFixture();
 
 const HOSTS_PACK = packById("hosts")!;
 const KUBERNETES_PACK = packById("kubernetes")!;

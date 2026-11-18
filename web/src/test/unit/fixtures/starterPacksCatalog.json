@@ -47,12 +47,7 @@
       },
       "bundled_alerts": "kubernetes",
       "aliases": [
-        [
-          "k8s_cluster",
-          "k8s_cluster_name",
-          "cluster",
-          "cluster_name"
-        ],
+        ["k8s_cluster", "k8s_cluster_name", "cluster", "cluster_name"],
         [
           "k8s_namespace_name",
           "k8s_namespace",
@@ -60,20 +55,8 @@
           "body_k8s_namespace_name",
           "body_namespace"
         ],
-        [
-          "k8s_pod_name",
-          "k8s_pod",
-          "pod",
-          "body_k8s_pod_name",
-          "body_pod"
-        ],
-        [
-          "k8s_node_name",
-          "k8s_node",
-          "node",
-          "body_k8s_node_name",
-          "body_node"
-        ],
+        ["k8s_pod_name", "k8s_pod", "pod", "body_k8s_pod_name", "body_pod"],
+        ["k8s_node_name", "k8s_node", "node", "body_k8s_node_name", "body_node"],
         [
           "k8s_container_name",
           "k8s_container",
@@ -81,19 +64,9 @@
           "body_k8s_container_name",
           "body_container"
         ],
-        [
-          "kind",
-          "body_kind"
-        ],
-        [
-          "reason",
-          "body_reason"
-        ],
-        [
-          "message",
-          "body_message",
-          "body_note"
-        ]
+        ["kind", "body_kind"],
+        ["reason", "body_reason"],
+        ["message", "body_message", "body_note"]
       ],
       "alias_titles": {
         "k8s_cluster": "Cluster name",
@@ -110,12 +83,7 @@
           "id": "events",
           "title": "Kubernetes events",
           "stream": "k8s_events",
-          "fields": [
-            "kind",
-            "reason",
-            "message",
-            "k8s_namespace_name"
-          ],
+          "fields": ["kind", "reason", "message", "k8s_namespace_name"],
           "identity": [
             {
               "field": "instrumentation_library_name",
@@ -136,32 +104,19 @@
         {
           "id": "opentelemetry",
           "title": "OpenTelemetry",
-          "detect": [
-            "k8s_pod_phase",
-            "k8s_node_allocatable_cpu",
-            "k8s_container_cpu_request"
-          ],
+          "detect": ["k8s_pod_phase", "k8s_node_allocatable_cpu", "k8s_container_cpu_request"],
           "alerts": {
             "k8s/cluster_cpu_capacity_high": {
               "promql": "clamp_max(floor(sum by(k8s_cluster)(k8s_container_cpu_request) / on(k8s_cluster) sum by(k8s_cluster)(k8s_node_allocatable_cpu) * 10000) / 100, 100)",
-              "streams": [
-                "k8s_container_cpu_request",
-                "k8s_node_allocatable_cpu"
-              ]
+              "streams": ["k8s_container_cpu_request", "k8s_node_allocatable_cpu"]
             },
             "k8s/cluster_memory_capacity_high": {
               "promql": "clamp_max(floor(sum by(k8s_cluster)(k8s_container_memory_request) / on(k8s_cluster) sum by(k8s_cluster)(k8s_node_allocatable_memory) * 10000) / 100, 100)",
-              "streams": [
-                "k8s_container_memory_request",
-                "k8s_node_allocatable_memory"
-              ]
+              "streams": ["k8s_container_memory_request", "k8s_node_allocatable_memory"]
             },
             "k8s/cluster_pod_count_high": {
               "promql": "floor(count by(k8s_cluster) (k8s_pod_phase) / sum by(k8s_cluster) (k8s_node_allocatable_pods) * 10000) / 100",
-              "streams": [
-                "k8s_pod_phase",
-                "k8s_node_allocatable_pods"
-              ]
+              "streams": ["k8s_pod_phase", "k8s_node_allocatable_pods"]
             }
           }
         }
@@ -175,9 +130,7 @@
             "data": {
               "stream": {
                 "streamType": "logs",
-                "selectedStream": [
-                  "k8s_events"
-                ]
+                "selectedStream": ["k8s_events"]
               },
               "query": ""
             }
@@ -198,18 +151,9 @@
       },
       "detect": {
         "metric_names": [
-          [
-            "system_cpu_time",
-            "node_cpu_seconds_total"
-          ],
-          [
-            "system_memory_usage",
-            "node_memory_MemAvailable_bytes"
-          ],
-          [
-            "system_filesystem_usage",
-            "node_filesystem_avail_bytes"
-          ]
+          ["system_cpu_time", "node_cpu_seconds_total"],
+          ["system_memory_usage", "node_memory_MemAvailable_bytes"],
+          ["system_filesystem_usage", "node_filesystem_avail_bytes"]
         ]
       },
       "dashboards": [
@@ -265,9 +209,7 @@
           "apm/traces_service_p95_latency_high",
           "apm/traces_dependency_error_rate_high"
         ],
-        "more": [
-          "apm/traces_operation_error_burst"
-        ]
+        "more": ["apm/traces_operation_error_burst"]
       },
       "saved_views": [],
       "paused_impact": "a service's error rate or latency climbs, or a dependency starts failing"
@@ -284,17 +226,7 @@
         "description": "Installed by the PostgreSQL starter pack"
       },
       "detect": {
-        "metric_names": [
-          [
-            "postgresql_backends"
-          ],
-          [
-            "postgresql_commits"
-          ],
-          [
-            "postgresql_db_size"
-          ]
-        ]
+        "metric_names": [["postgresql_backends"], ["postgresql_commits"], ["postgresql_db_size"]]
       },
       "dashboards": [
         {
@@ -310,9 +242,7 @@
           "opentelemetry/postgresql_low_cache_hit_rate_otel",
           "opentelemetry/postgresql_high_rollback_rate_otel"
         ],
-        "more": [
-          "opentelemetry/postgresql_replication_lag_otel"
-        ]
+        "more": ["opentelemetry/postgresql_replication_lag_otel"]
       },
       "saved_views": [],
       "paused_impact": "PostgreSQL goes down, runs out of connections or slows down"
@@ -328,14 +258,7 @@
         "description": "Installed by the Docker starter pack"
       },
       "detect": {
-        "metric_names": [
-          [
-            "container_memory_percent"
-          ],
-          [
-            "container_cpu_usage_total"
-          ]
-        ]
+        "metric_names": [["container_memory_percent"], ["container_cpu_usage_total"]]
       },
       "dashboards": [
         {
@@ -350,9 +273,7 @@
           "opentelemetry/container_memory_near_limit_otel",
           "opentelemetry/docker_stopped_reporting"
         ],
-        "more": [
-          "opentelemetry/container_absent_otel"
-        ]
+        "more": ["opentelemetry/container_absent_otel"]
       },
       "saved_views": [],
       "paused_impact": "a container runs out of memory or container metrics stop arriving"
@@ -392,16 +313,21 @@
           "opentelemetry/aws_lambda_high_error_rate_otel",
           "opentelemetry/aws_sqs_old_messages"
         ],
-        "more": [
-          "opentelemetry/aws_cloudwatch_metric_stream_stopped"
-        ]
+        "more": ["opentelemetry/aws_cloudwatch_metric_stream_stopped"]
       },
       "roles": [
         {
           "id": "metrics",
           "title": "CloudWatch metrics",
           "stream": "cloudwatch_metrics",
-          "fields": ["namespace", "metric_name", "account_id", "region", "value_sum", "value_count"],
+          "fields": [
+            "namespace",
+            "metric_name",
+            "account_id",
+            "region",
+            "value_sum",
+            "value_count"
+          ],
           "identity": [
             {
               "field": "namespace",
@@ -426,9 +352,7 @@
         "streams": [
           {
             "type": "traces",
-            "fields": [
-              "gen_ai_operation_name"
-            ]
+            "fields": ["gen_ai_operation_name"]
           }
         ]
       },
@@ -440,15 +364,8 @@
         }
       ],
       "alerts": {
-        "core": [
-          "ai/llm_error_rate_high",
-          "ai/llm_p95_latency_high",
-          "ai/llm_hourly_spend_high"
-        ],
-        "more": [
-          "ai/llm_token_burn_high",
-          "ai/llm_tool_agent_failures"
-        ]
+        "core": ["ai/llm_error_rate_high", "ai/llm_p95_latency_high", "ai/llm_hourly_spend_high"],
+        "more": ["ai/llm_token_burn_high", "ai/llm_tool_agent_failures"]
       },
       "saved_views": [],
       "paused_impact": "LLM calls fail, slow down or cost more than expected"
@@ -514,14 +431,7 @@
         "description": "Installed by the Argo CD starter pack"
       },
       "detect": {
-        "metric_names": [
-          [
-            "argocd_app_info"
-          ],
-          [
-            "argocd_app_sync_total"
-          ]
-        ]
+        "metric_names": [["argocd_app_info"], ["argocd_app_sync_total"]]
       },
       "dashboards": [
         {
@@ -538,9 +448,7 @@
           "ci-cd/argocd_git_fetch_failures",
           "ci-cd/argocd_cluster_connection_error"
         ],
-        "more": [
-          "ci-cd/argocd_application_controller_slow_reconciliation"
-        ]
+        "more": ["ci-cd/argocd_application_controller_slow_reconciliation"]
       },
       "saved_views": []
     }

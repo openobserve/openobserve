@@ -6,6 +6,9 @@ import i18n from "@/locales";
 
 import StarterPackLandingRow from "./StarterPackLandingRow.vue";
 import { fakeFlow } from "./starterPackTestFlow";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const fake = vi.hoisted(() => ({
   flow: null as any,

@@ -18,6 +18,9 @@ import { ref } from "vue";
 
 import type { FindMoreSource } from "./findMore";
 import { matchesKey, notNowKey, resetBrowserMatches, useBrowserMatches } from "./useBrowserMatches";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const source = (id: string, packId?: string): FindMoreSource => ({
   id,

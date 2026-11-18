@@ -70,6 +70,7 @@ vi.mock("@/composables/alerts/useAlertLibrary", () => ({
   }),
 }));
 vi.mock("./usePackCatalog", () => ({
+  ensurePackCatalog: async () => {},
   packs: () => [
     {
       id: "kubernetes",

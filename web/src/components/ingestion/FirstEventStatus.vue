@@ -43,6 +43,7 @@ import {
   type StreamSignal,
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
 import StarterPackBannerSlot from "@/components/starterPacks/StarterPackBannerSlot.vue";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
@@ -768,12 +769,17 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
       </template>
     </OBanner>
 
-    <StarterPackBannerSlot
+    <StarterPackCatalogGate
       v-if="packGuide && state === 'received' && kind === 'standard' && !hostShowsSuccess"
       :org="org"
-      :cluster-name="clusterName"
-      @offered="(offered) => (packOffered = offered)"
-    />
+      requires="kubernetes"
+    >
+      <StarterPackBannerSlot
+        :org="org"
+        :cluster-name="clusterName"
+        @offered="(offered) => (packOffered = offered)"
+      />
+    </StarterPackCatalogGate>
 
     <div
       v-if="state === 'received' && result?.firstRecord"

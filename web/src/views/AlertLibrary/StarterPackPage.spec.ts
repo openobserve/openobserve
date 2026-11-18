@@ -23,6 +23,9 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 import StarterPackPage from "./StarterPackPage.vue";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const fake = vi.hoisted(() => ({
   flow: null as any,

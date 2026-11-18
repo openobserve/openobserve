@@ -110,7 +110,10 @@ vi.mock("@/composables/starterPacks/useInstallRecords", () => ({
 }));
 
 import { useStarterPackFlow } from "@/composables/starterPacks/useStarterPackFlow";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 import StarterPackLibraryTab from "./StarterPackLibraryTab.vue";
+
+loadCatalogFixture();
 
 const flow = useStarterPackFlow("org", {} as never);
 

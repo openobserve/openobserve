@@ -24,7 +24,7 @@ import { dashboardDetailQuery } from "@/services/dashboards.queries";
 import { streamNameListQuery } from "@/services/stream.queries";
 
 import { dashboardStreams, queryNeeds } from "./dashboardFit";
-import { packs as allPacks } from "./usePackCatalog";
+import { ensurePackCatalog, packs as allPacks } from "./usePackCatalog";
 import { readSchemaColumns } from "./packMatchData";
 import {
   panelHash,
@@ -108,6 +108,7 @@ export function useRepairLater(org: string) {
   const failed = ref(false);
 
   const installs = async ({ packId, dashboardId }: RepairScope): Promise<InstallRef[]> => {
+    await ensurePackCatalog(org);
     const packs = allPacks().filter((pack) => !packId || pack.id === packId);
     const lists = await Promise.all(
       packs.map(async (pack) =>

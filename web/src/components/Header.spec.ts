@@ -22,6 +22,9 @@ import Header from "@/components/Header.vue";
 import StarterPackHeaderChip from "@/components/starterPacks/StarterPackHeaderChip.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const breakpoint = vi.hoisted(() => ({ lgUp: true }));
 vi.mock("@/composables/useBreakpoint", () => ({
@@ -70,7 +73,7 @@ describe("Header Component", () => {
     afterEach(() => (starterPacks.enabled = true));
 
     it("mounts the chip for the selected org when starter packs are on", () => {
-      const header = createWrapper();
+      const header = createWrapper({ stubsOverrides: { StarterPackCatalogGate: false } });
       expect(header.findComponent(StarterPackHeaderChip).exists()).toBe(true);
     });
 

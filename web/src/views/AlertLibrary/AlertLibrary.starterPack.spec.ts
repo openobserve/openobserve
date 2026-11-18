@@ -71,6 +71,9 @@ vi.mock("@/composables/alerts/useAlertLibrary", async (importOriginal) => ({
 }));
 
 import AlertLibrary from "./AlertLibrary.vue";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const router = createRouter({
   history: createWebHistory(),

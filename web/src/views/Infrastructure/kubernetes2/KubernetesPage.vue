@@ -50,6 +50,7 @@ import {
   toggleMaximized,
   toggleMinimized,
 } from "./dockState";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
 import StarterPackLandingRow from "@/components/starterPacks/StarterPackLandingRow.vue";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import K8sResourceTree from "./K8sResourceTree.vue";
@@ -562,7 +563,9 @@ k8s.loadStreams();
         @cluster="onCluster"
       />
       <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col" data-k8s2-body data-test="k8s2-body">
-        <StarterPackLandingRow v-if="STARTER_PACKS_ENABLED" :key="orgId" :org="orgId" />
+        <StarterPackCatalogGate v-if="STARTER_PACKS_ENABLED" :org="orgId" requires="kubernetes">
+          <StarterPackLandingRow :key="orgId" :org="orgId" />
+        </StarterPackCatalogGate>
         <OBanner
           v-if="lastKnown && !offline"
           variant="info"

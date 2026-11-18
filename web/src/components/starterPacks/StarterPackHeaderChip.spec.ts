@@ -102,6 +102,9 @@ vi.mock("./StarterPackDrawer.vue", async () => {
 });
 
 import StarterPackHeaderChip from "./StarterPackHeaderChip.vue";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 // Render the popover and menus inline instead of inside closed reka-ui layers.
 const SlotStub = defineComponent({

@@ -7,6 +7,9 @@ import { createStore } from "vuex";
 import i18n from "@/locales";
 
 import FirstEventStatus from "./FirstEventStatus.vue";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: true }));
 vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
