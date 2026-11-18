@@ -899,6 +899,11 @@ describe("isRequiredCondition — a condition every returned row meets", () => {
     ["alone", "span_status = 'ERROR'", true],
     ["ANDed with another condition", "service_name='a' AND span_status='ERROR'", true],
     ["inside an ANDed group", "(a = '1' and span_status = 'ERROR') and b = 2", true],
+    [
+      "ANDed after an OR it was merged onto",
+      "(service_name='a' OR span_status='ERROR') and span_status = 'ERROR'",
+      true,
+    ],
     ["one branch of an OR", "service_name='a' OR span_status='ERROR'", false],
     ["one branch of a bracketed OR", "(service_name='a' OR span_status='ERROR')", false],
     ["inside an OR that is ANDed", "service_name='c' AND (h='500' OR span_status='ERROR')", false],
