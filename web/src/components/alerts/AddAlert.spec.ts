@@ -2239,6 +2239,36 @@ describe("AddAlert (OForm owner)", () => {
       });
     });
 
+    it("a ready-made alert saves with its pack tag, and starting from scratch takes it back off", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "k8s_events");
+      await flushPromises();
+      await wrapper.vm.applySuggestion({
+        kind: "library",
+        id: "k8s/oom-killed",
+        title: "OOM",
+        sentence: null,
+        severity: "high",
+        alert_type: "scheduled",
+        query_type: "sql",
+        fit: "fits",
+        matched_fields: [],
+        missing: [],
+        stream_swap: null,
+        already_set_up: [],
+        enterprise: false,
+        library: { pack: "k8s", path: "k8s/oom.json", content_hash: "h1", docs_url: null },
+        starter: null,
+        prefill: { stream_type: "logs", stream_name: "k8s_events" },
+      });
+      await flushPromises();
+      expect(wrapper.vm.form.getFieldValue("tags")).toEqual(["pack:k8s"]);
+      wrapper.vm.startFromScratch();
+      await flushPromises();
+      expect(wrapper.vm.form.getFieldValue("tags")).toEqual([]);
+    });
+
     it.each([
       ["a new alert", {}, {}, true, true],
       ["a new alert on a phone", {}, {}, false, false],

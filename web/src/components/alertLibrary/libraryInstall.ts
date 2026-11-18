@@ -149,7 +149,7 @@ const stringValuedOnly = (record: Record<string, unknown>): Record<string, strin
   return kept;
 };
 
-const withPackTag = (tags: unknown, pack: string): unknown[] => {
+export const withPackTag = (tags: unknown, pack: string): unknown[] => {
   const packTag = `pack:${pack}`;
   const list = Array.isArray(tags) ? (tags as unknown[]) : [];
   return list.includes(packTag) ? list : [...list, packTag];

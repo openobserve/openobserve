@@ -1290,6 +1290,7 @@ import AlertIntentStart from "./AlertIntentStart.vue";
 import type { IntentFill } from "@/utils/alerts/alertIntents";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 import { buildPrefillFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
+import { withPackTag } from "@/components/alertLibrary/libraryInstall";
 import AlertMetricLabels from "./AlertMetricLabels.vue";
 import {
   insertLabelIntoPromql,
@@ -2579,6 +2580,7 @@ export default defineComponent({
           ? [{ id: getUUID(), key: "library_hash", value: suggestion.library.content_hash }]
           : []),
       ];
+      if (suggestion.library?.pack) data.tags = withPackTag(data.tags, suggestion.library.pack);
       alertForm.resetForm(data);
       if (seeded.aggregation) alertForm.isAggregationEnabled.value = true;
       if (seeded.vrl) alertForm.showVrlFunction.value = true;
