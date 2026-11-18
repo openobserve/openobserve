@@ -1336,6 +1336,34 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.findComponent({ name: "PreviewAlert" }).exists()).toBe(true);
       expect(wrapper.findComponent({ name: "AnomalyDataPreview" }).exists()).toBe(false);
     });
+
+    it("drops builder SQL that lands after a switch to PromQL", async () => {
+      let answer: (v: unknown) => void = () => {};
+      vi.mocked(alertsService.generate_sql).mockImplementationOnce(
+        () => new Promise((resolve) => (answer = resolve)) as any,
+      );
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      form.setFieldValue("stream_type", "metrics");
+      form.setFieldValue("stream_name", "cpu");
+      form.setFieldValue("query_condition.type", "custom");
+      form.setFieldValue("query_condition.conditions", {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [{ filterType: "condition", column: "host", operator: "=", value: "a" }],
+      });
+      await vi.waitFor(() => expect(alertsService.generate_sql).toHaveBeenCalled(), {
+        timeout: 3000,
+      });
+
+      form.setFieldValue("query_condition.type", "promql");
+      await flushPromises();
+      answer({ data: { sql: 'SELECT avg("value") FROM "cpu"' } });
+      await flushPromises();
+
+      expect(wrapper.vm.previewQuery).toBe("");
+    });
   });
 
   describe("anomaly save path", () => {

@@ -2985,6 +2985,8 @@ export function useAlertForm(
   watch(
     () => formData.value.query_condition?.type,
     (newType) => {
+      // Builder SQL still in flight would land in the new mode's preview.
+      if (newType !== "custom") generateRequestId.value++;
       if (newType === "sql") {
         previewQuery.value = formData.value.query_condition?.sql
           ? formData.value.query_condition.sql.trim()
