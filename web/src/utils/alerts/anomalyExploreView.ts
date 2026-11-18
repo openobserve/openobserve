@@ -96,10 +96,11 @@ export function anomalyStripView(
     summary: null,
   };
   if (!config.enabled) return { ...base, state: "paused" };
+  // Rule 10: while untrained the strip says Learning, whatever the run freshness.
+  if (!config.isTrained) return { ...base, state: "learning" };
   if (res.state === "ongoing") return { ...base, state: "ongoing", summary };
   if (noRecentRuns) return { ...base, state: "no_recent_runs" };
   if (noNewData) return { ...base, state: "no_new_data" };
-  if (!config.isTrained) return { ...base, state: "learning" };
   // A peer cluster sends no run time, and there the strip shows no stale state.
   if (res.state === "no_runs" && res.last_detection_run !== null) {
     return { ...base, state: "no_recent_runs" };

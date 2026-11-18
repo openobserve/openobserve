@@ -151,6 +151,17 @@ describe("anomalyStripView", () => {
     expect(anomalyStripView(peer, CONFIG, NOW).state).toBe("none");
   });
 
+  it("shows Learning over stale run freshness while untrained", () => {
+    const untrained = { ...CONFIG, isTrained: false };
+    const stale = response({
+      last_detection_run: NOW - 60 * MIN,
+      no_new_data_since_us: NOW - 120 * MIN,
+    });
+    expect(anomalyStripView(stale, untrained, NOW).state).toBe("learning");
+    const staleCursor = response({ no_new_data_since_us: NOW - 120 * MIN });
+    expect(anomalyStripView(staleCursor, untrained, NOW).state).toBe("learning");
+  });
+
   it("shows Back in range with since and duration", () => {
     const view = anomalyStripView(
       response({
