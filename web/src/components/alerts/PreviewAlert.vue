@@ -664,7 +664,10 @@ const handleChartDataUpdate = (resultMetaData: any) => {
   // stale promql_condition around after the user switches modes.
   // (This makes the `selectedTab === "promql"` arm of the chain below dead code.)
   if (props.selectedTab === "promql") return;
-  if (props.selectedTab === "sql" && previewMinutes() > alertWindowMinutes()) {
+  if (
+    (props.selectedTab === "sql" && previewMinutes() > alertWindowMinutes()) ||
+    bucketsCoarserThanWindow(resultMetaData)
+  ) {
     evaluationStatus.value = null;
     return;
   }
@@ -1374,6 +1377,19 @@ const refreshRulePreview = async (at: number) => {
 let lastRunKey = "";
 // The chart may cover several checks, but the verdict judges the latest window only.
 let verdictWindowStartMs = 0;
+// A wide range draws wide buckets; one wider than the window cannot say what the latest window held.
+const bucketsCoarserThanWindow = (resultMetaData: any): boolean => {
+  const times = (Array.isArray(resultMetaData?.[0]) ? resultMetaData[0] : [])
+    .flatMap((partition: any) => (Array.isArray(partition?.hits) ? partition.hits : []))
+    .map((hit: any) => keyToMs(hit?.zo_sql_key))
+    .filter((at: number | null): at is number => at !== null)
+    .sort((a: number, b: number) => a - b);
+  let bucketMs = Infinity;
+  for (let i = 1; i < times.length; i++) {
+    if (times[i] > times[i - 1]) bucketMs = Math.min(bucketMs, times[i] - times[i - 1]);
+  }
+  return Number.isFinite(bucketMs) && bucketMs > alertWindowMinutes() * 60_000;
+};
 const inVerdictWindow = (hit: { zo_sql_key?: unknown }): boolean => {
   const at = keyToMs(hit?.zo_sql_key);
   return at === null || at >= verdictWindowStartMs;

@@ -2937,12 +2937,26 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
         {
           hits: [
             { zo_sql_key: at(600), zo_sql_num: 90 },
+            { zo_sql_key: at(12), zo_sql_num: 40 },
+            { zo_sql_key: at(6), zo_sql_num: 2 },
             { zo_sql_key: at(4), zo_sql_num: 3 },
           ],
         },
       ],
     ]);
-    expect(w.vm.evaluationStatus?.count).toBe(3);
+    expect(w.vm.evaluationStatus?.count).toBe(5);
+    // Buckets coarser than the window cannot say what the latest window held.
+    await emitResultMetadata(w, [
+      [
+        {
+          hits: [
+            { zo_sql_key: at(64), zo_sql_num: 9 },
+            { zo_sql_key: at(34), zo_sql_num: 4 },
+          ],
+        },
+      ],
+    ]);
+    expect(w.vm.evaluationStatus).toBeNull();
     w.unmount();
   });
 
