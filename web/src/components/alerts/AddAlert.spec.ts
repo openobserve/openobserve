@@ -1685,6 +1685,28 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find('[data-test="add-alert-tab-advanced"]').exists()).toBe(false);
     });
 
+    it.each(["true", "composite"])(
+      "a %s alert has no schedule step: four steps, its one sentence in step 2",
+      async (type) => {
+        wrapper = mountAlert();
+        await flushPromises();
+        wrapper.vm.onAlertTypeChange(type);
+        await flushPromises();
+        const ids = wrapper
+          .findAll("[data-snap-section]")
+          .map((el) => el.attributes("data-snap-section"));
+        expect(ids).toEqual(["watch", "condition", "notify", "details"]);
+        expect(wrapper.findAll('[data-test^="o-section-nav-item-"]')).toHaveLength(4);
+        const condition = wrapper.get('[data-test="add-alert-section-condition"]');
+        expect(condition.find('[data-test="add-alert-schedule-note"]').exists()).toBe(true);
+        const scrollToSection = vi.fn();
+        wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+        await wrapper.get('[data-test="add-alert-section-notify-next"]').trigger("click");
+        await wrapper.get('[data-test="add-alert-review-schedule"]').trigger("click");
+        expect(scrollToSection.mock.calls).toEqual([["details"], ["condition"]]);
+      },
+    );
+
     it("asks the alert type first, because it decides the fields that follow", async () => {
       wrapper = mountAlert();
       await flushPromises();

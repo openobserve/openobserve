@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!watchCollapsed"
               id="watch"
               :current="activeSection === 'watch'"
-              :index="1"
+              :sections="formSections"
               :title="t('alerts.sections.watch.title')"
               :help="t('alerts.sections.watch.help')"
               @go="goToSection"
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AlertFormSection
               id="condition"
               :current="activeSection === 'condition'"
-              :index="2"
+              :sections="formSections"
               :can-go-back="!isEditing"
               :title="t('alerts.sections.condition.title')"
               :help="conditionHelp"
@@ -481,6 +481,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-realtime-condition-note"
                 >
                   {{ t("alerts.summary.plainEnglish.realTime") }}
+                  <span class="block" data-test="add-alert-schedule-note">{{
+                    t("alerts.form.schedule.realtime")
+                  }}</span>
                 </p>
                 <div
                   v-if="!beingUpdated"
@@ -505,6 +508,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
+                <p
+                  v-if="isCompositeMode"
+                  class="text-text-secondary m-0 py-3 text-sm"
+                  data-test="add-alert-schedule-note"
+                >
+                  {{ t("alerts.form.schedule.composite") }}
+                </p>
                 <div
                   v-show="isAnomalyMode"
                   :ref="(el) => setSectionTarget('anomalyCondition', el)"
@@ -568,7 +578,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AlertFormSection
               id="notify"
               :current="activeSection === 'notify'"
-              :index="3"
+              :sections="formSections"
               :title="t('alerts.sections.notify.title')"
               :help="t('alerts.sections.notify.help')"
               @go="goToSection"
@@ -620,9 +630,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </AlertFormSection>
 
             <AlertFormSection
+              v-if="hasScheduleStep"
               id="schedule"
               :current="activeSection === 'schedule'"
-              :index="4"
+              :sections="formSections"
               :title="t('alerts.sections.schedule.title')"
               :help="t('alerts.sections.schedule.help')"
               @go="goToSection"
@@ -661,17 +672,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
-                <p
-                  v-if="formData.is_real_time === 'true' || isCompositeMode"
-                  class="text-text-secondary m-0 py-3 text-sm"
-                  data-test="add-alert-schedule-note"
-                >
-                  {{
-                    isCompositeMode
-                      ? t("alerts.form.schedule.composite")
-                      : t("alerts.form.schedule.realtime")
-                  }}
-                </p>
                 <AlertCheckTimeline
                   v-if="showsCheckTimeline"
                   :frequency="Number(formData.trigger_condition.frequency)"
@@ -683,7 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AlertFormSection
               id="details"
               :current="activeSection === 'details'"
-              :index="5"
+              :sections="formSections"
               :title="t('alerts.sections.details.title')"
               :help="
                 beingUpdated || anomalyEditMode
@@ -1373,7 +1373,9 @@ export default defineComponent({
     }) as AlertFormEmit;
     const snapScrollRef = ref<OSnapScrollExpose | null>(null);
     // A folded section 1 lives on section 2's summary line, which is where a jump to it lands.
-    const goToSection = (id: string) => {
+    const goToSection = (requested: string) => {
+      // A step this alert type drops says its one sentence in step 2.
+      const id = formSections.value.some((s) => s.id === requested) ? requested : "condition";
       if (id === "watch" && watchCollapsed.value) {
         if (isEditing.value) snapScrollRef.value?.scrollToSection("condition");
         else expandWatch();
@@ -1898,6 +1900,7 @@ export default defineComponent({
         store.state.zoConfig?.incidents_enabled === true,
     );
     const {
+      sections: formSections,
       items: sectionItems,
       errorCounts,
       review: reviewLines,
@@ -2273,6 +2276,8 @@ export default defineComponent({
       sectionTargets,
       setSectionTarget,
       sectionItems,
+      formSections,
+      hasScheduleStep: computed(() => formSections.value.some((s) => s.id === "schedule")),
       isEditingAlert,
       editAlertId,
       editFolderId,

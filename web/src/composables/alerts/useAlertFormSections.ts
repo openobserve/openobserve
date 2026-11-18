@@ -22,6 +22,7 @@ import type {
 import {
   ALERT_SECTIONS,
   sectionOfField,
+  type AlertSectionDef,
   type AlertSectionId,
 } from "@/components/alerts/alertFormSections";
 import { operatorsToWords } from "@/components/alerts/composite/expression";
@@ -161,6 +162,8 @@ const lettersForAlertIds = (expression: string, childIds: string[]): string => {
 };
 
 export function useAlertFormSections(input: AlertFormSectionsInput): {
+  /** The steps this alert type has; real-time and composite alerts have no schedule to set. */
+  sections: ComputedRef<readonly AlertSectionDef[]>;
   items: ComputedRef<SectionNavItem[]>;
   errorCounts: ComputedRef<Record<AlertSectionId, number>>;
   review: ComputedRef<AlertReviewLine[]>;
@@ -169,6 +172,11 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   const { fieldMeta } = input;
 
   const mode = computed(() => String(input.formData.value?.is_real_time ?? "false"));
+  const sections = computed(() =>
+    mode.value === "true" || mode.value === "composite"
+      ? ALERT_SECTIONS.filter((section) => section.id !== "schedule")
+      : ALERT_SECTIONS,
+  );
 
   const errorCounts = computed(() => {
     const counts: Record<AlertSectionId, number> = {
@@ -350,7 +358,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
 
   const items = computed<SectionNavItem[]>(() => {
     const fd = input.formData.value ?? {};
-    return ALERT_SECTIONS.map(({ id, navKey }) => {
+    return sections.value.map(({ id, navKey }) => {
       const facts = sectionFacts(id, fd);
       const errors = errorCounts.value[id];
       const seen = input.isEditing.value || (input.visited?.value.has(id) ?? true);
@@ -487,5 +495,5 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     ];
   });
 
-  return { items, errorCounts, review };
+  return { sections, items, errorCounts, review };
 }

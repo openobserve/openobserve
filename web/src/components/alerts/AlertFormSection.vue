@@ -20,13 +20,13 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { SETTING_ROW_BARE_KEY } from "@/lib/core/SettingRow/OSettingRow.types";
-import { ALERT_SECTIONS, type AlertSectionId } from "./alertFormSections";
+import { ALERT_SECTIONS, type AlertSectionDef, type AlertSectionId } from "./alertFormSections";
 
 const props = withDefaults(
   defineProps<{
     id: AlertSectionId;
-    /** 1-based position among the editor's sections. */
-    index: number;
+    /** The steps this alert type has, in order; numbering and Back/Next follow it. */
+    sections?: readonly AlertSectionDef[];
     title: I18nText;
     /** One sentence under the title. */
     help: I18nText;
@@ -35,7 +35,7 @@ const props = withDefaults(
     /** False when the previous section cannot be opened from here, as section 1 of an edit. */
     canGoBack?: boolean;
   }>(),
-  { current: undefined, canGoBack: true },
+  { sections: () => ALERT_SECTIONS, current: undefined, canGoBack: true },
 );
 
 const emit = defineEmits<{
@@ -46,10 +46,11 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const total = ALERT_SECTIONS.length;
-const def = computed(() => ALERT_SECTIONS.find((section) => section.id === props.id));
-const previous = computed(() => ALERT_SECTIONS[props.index - 2]);
-const next = computed(() => ALERT_SECTIONS[props.index]);
+const total = computed(() => props.sections.length);
+const index = computed(() => props.sections.findIndex((section) => section.id === props.id) + 1);
+const def = computed(() => props.sections[index.value - 1]);
+const previous = computed(() => props.sections[index.value - 2]);
+const next = computed(() => props.sections[index.value]);
 const previousLabel = computed(() =>
   previous.value
     ? t("alerts.sections.back", { title: t(previous.value.navKey) })

@@ -90,15 +90,15 @@ describe("useAlertFormSections", () => {
     expect(byId(items.value, "schedule").state).toBe("error");
   });
 
-  it("lists the five sections with their questions in order", () => {
-    const { items } = setup(scheduled());
-    expect(items.value.map((i) => i.id)).toEqual([
-      "watch",
-      "condition",
-      "notify",
-      "schedule",
-      "details",
-    ]);
+  it.each([
+    ["false", ["watch", "condition", "notify", "schedule", "details"]],
+    ["anomaly", ["watch", "condition", "notify", "schedule", "details"]],
+    ["true", ["watch", "condition", "notify", "details"]],
+    ["composite", ["watch", "condition", "notify", "details"]],
+  ])("lists the sections a %s alert has, in order", (type, ids) => {
+    const { items, sections } = setup(scheduled({ is_real_time: type }));
+    expect(items.value.map((i) => i.id)).toEqual(ids);
+    expect(sections.value.map((s) => s.id)).toEqual(ids);
     expect(items.value[0].title).toBe("Alert type and data");
   });
 

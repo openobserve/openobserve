@@ -12,7 +12,7 @@ const OUT_OF_TAB_ORDER = /(^|:)(hidden|invisible)$/;
 describe("AlertFormSection", () => {
   it("keeps a non-current section's step buttons in the Tab order", () => {
     const wrapper = mount(AlertFormSection, {
-      props: { id: "condition", index: 2, title: raw("T"), help: raw("H"), current: false },
+      props: { id: "condition", title: raw("T"), help: raw("H"), current: false },
       global: { plugins: [i18n] },
       attachTo: document.body,
     });
@@ -30,26 +30,25 @@ describe("AlertFormSection", () => {
     wrapper.unmount();
   });
 
+  const fourSteps = ALERT_SECTIONS.filter((section) => section.id !== "schedule");
   it.each([
-    [1, true, null, "condition"],
-    [2, true, "watch", "notify"],
-    [2, false, null, "notify"],
-    [5, true, "schedule", null],
+    [5, "watch", true, null, "condition"],
+    [5, "condition", true, "watch", "notify"],
+    [5, "condition", false, null, "notify"],
+    [5, "details", true, "schedule", null],
+    [4, "notify", true, "condition", "details"],
+    [4, "details", true, "notify", null],
   ] as const)(
-    "section %i's footer (back allowed: %s) steps to its neighbours by name",
-    async (index, canGoBack, back, next) => {
+    "in %i steps, %s's footer (back allowed: %s) steps to its neighbours by name",
+    async (steps, id, canGoBack, back, next) => {
+      const sections = steps === 5 ? ALERT_SECTIONS : fourSteps;
+      const index = sections.findIndex((section) => section.id === id) + 1;
       const wrapper = mount(AlertFormSection, {
-        props: {
-          id: ALERT_SECTIONS[index - 1].id,
-          index,
-          title: raw("T"),
-          help: raw("H"),
-          canGoBack,
-        },
+        props: { id, sections, title: raw("T"), help: raw("H"), canGoBack },
         global: { plugins: [i18n] },
       });
-      const nav = (id: AlertSectionId) =>
-        i18n.global.t(ALERT_SECTIONS.find((section) => section.id === id)!.navKey);
+      const nav = (target: AlertSectionId) =>
+        i18n.global.t(ALERT_SECTIONS.find((section) => section.id === target)!.navKey);
       for (const [dir, target] of [
         ["back", back],
         ["next", next],
