@@ -606,8 +606,16 @@ fn single_key_offender(group_by: &GroupByExpr) -> Option<GroupByOffender> {
         GroupByExpr::Expressions(_, modifiers) if !modifiers.is_empty() => {
             Some(GroupByOffender::Key(modifiers[0].to_string()))
         }
+        // One ROLLUP, CUBE or GROUPING SETS item groups by several keys.
         GroupByExpr::Expressions(exprs, _) => exprs
-            .get(1)
+            .iter()
+            .find(|expr| {
+                matches!(
+                    unnested(expr),
+                    Expr::Rollup(_) | Expr::Cube(_) | Expr::GroupingSets(_)
+                )
+            })
+            .or_else(|| exprs.get(1))
             .map(|expr| GroupByOffender::Key(expr.to_string())),
     }
 }
@@ -642,6 +650,7 @@ fn save_time_bucket(select: &Select) -> Option<CustomBucket<'_>> {
                 SelectItem::UnnamedExpr(expr) => (expr, String::new()),
                 _ => return None,
             };
+            let expr = unnested(expr);
             let Expr::Function(function) = expr else {
                 return None;
             };
@@ -1017,8 +1026,17 @@ fn is_bucket_key(
         }
         Expr::Identifier(_) => false,
         Expr::Value(v) => matches!(&v.value, Value::Number(n, false) if *n == ordinal),
-        other => other.to_string() == bucket.expr.to_string(),
+        Expr::Nested(_) => is_bucket_key(unnested(expr), bucket, stream_fields)?,
+        other => other.to_string() == unnested(bucket.expr).to_string(),
     })
+}
+
+/// `(histogram(...))` is the call itself, so parentheses never hide a key from the guard.
+fn unnested(mut expr: &Expr) -> &Expr {
+    while let Expr::Nested(inner) = expr {
+        expr = inner.as_ref();
+    }
+    expr
 }
 
 /// The engine binds a GROUP BY name to a stream field before a projection alias of that name.

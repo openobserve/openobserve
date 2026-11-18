@@ -10786,6 +10786,51 @@ mod tests {
         }
 
         #[test]
+        fn rollup_cube_and_grouping_sets_are_rejected_also_with_a_parenthesized_bucket() {
+            let check = |projection: &str, group_by: &str| {
+                let sql = format!("SELECT {projection}, count(*) AS value FROM logs {group_by}");
+                validate_custom_sql_grid(&sql, "5m", Some(&fields(&["service"])))
+            };
+            for projection in [
+                "(histogram(_timestamp, '5m')) AS time_bucket",
+                "histogram(_timestamp, '5m') AS time_bucket",
+            ] {
+                for group_by in [
+                    "GROUP BY ROLLUP((histogram(_timestamp, '5m')), service)",
+                    "GROUP BY CUBE(time_bucket, service)",
+                    "GROUP BY GROUPING SETS ((time_bucket), (time_bucket, service))",
+                    "GROUP BY ROLLUP(time_bucket)",
+                ] {
+                    assert!(
+                        check(projection, group_by).is_err(),
+                        "{projection} {group_by}"
+                    );
+                }
+                assert!(
+                    check(projection, "GROUP BY time_bucket").is_ok(),
+                    "{projection}"
+                );
+                assert!(
+                    check(projection, "GROUP BY (histogram(_timestamp, '5m'))").is_ok(),
+                    "{projection}"
+                );
+            }
+            let mut stored =
+                custom_sql_grid_rules_stored(&format!("{SELECT} GROUP BY time_bucket"));
+            stored.histogram_interval = "5m".to_string();
+            let rollup = "SELECT (histogram(_timestamp, '5m')) AS time_bucket, count(*) AS value FROM \
+                          logs GROUP BY ROLLUP((histogram(_timestamp, '5m')), service)";
+            let edit = UpdateAnomalyConfigRequest {
+                custom_sql: Some(rollup.to_string()),
+                ..Default::default()
+            };
+            let (sql, histogram) = custom_sql_to_validate(&edit, &stored).unwrap();
+            assert!(
+                validate_custom_sql_grid(sql, &histogram, Some(&fields(&["service"]))).is_err()
+            );
+        }
+
+        #[test]
         fn a_second_group_by_key_in_a_from_subquery_is_rejected() {
             let inner = "SELECT histogram(_timestamp, '5m') AS time_bucket, service, count(*) AS \
                          value FROM logs";
