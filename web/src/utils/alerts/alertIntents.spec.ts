@@ -18,6 +18,7 @@ import {
   buildEventFill,
   buildMetricFill,
   cardsFolded,
+  compareFactor,
   compareFunction,
   fieldKind,
   fieldsBySamplePresence,
@@ -304,6 +305,11 @@ describe("alertIntents", () => {
     expect(fill.values["query_condition.vrl_function"]).toBe(compareFunction(3));
     expect(compareFunction(3).startsWith("#ResultArray#\n")).toBe(true);
     expect(compareFunction(3)).toContain("previous * 3.0");
+    // Saved as shown: the server appends no `.` line, and the factor reads back from either form.
+    expect(compareFunction(3).endsWith("\n.")).toBe(true);
+    expect(compareFactor(compareFunction(2.5))).toBe(2.5);
+    expect(compareFactor(compareFunction(3).replace(/\n\.$/, ""))).toBe(3);
+    expect(compareFactor(compareFunction(3).replace("current > 0.0 && ", ""))).toBeUndefined();
   });
 
   it("covers every naming generation of a metric, each with its own label, in one share", () => {

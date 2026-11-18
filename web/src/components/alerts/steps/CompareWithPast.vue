@@ -62,6 +62,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
       </i18n-t>
+      <i18n-t
+        v-if="index === 0 && factor"
+        keypath="alerts.form.compare.factorLine"
+        tag="p"
+        scope="global"
+        class="text-text-body m-0 mt-2 text-sm leading-8.5"
+        data-test="add-alert-compare-factor"
+      >
+        <template #factor>
+          <span class="mx-1 inline-flex align-middle">
+            <OInput
+              type="number"
+              min="1"
+              fit-content
+              :model-value="factor"
+              :debounce="300"
+              :aria-label="t('alerts.form.compare.factor')"
+              data-test="add-alert-compare-factor-input"
+              @update:model-value="setFactor"
+            />
+          </span>
+        </template>
+      </i18n-t>
       <p
         v-if="index === 0 && !hasFunction"
         class="text-status-warning-text m-0 mt-1 text-xs"
@@ -130,6 +153,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { compareFactor, compareFunction } from "@/utils/alerts/alertIntents";
 
 interface TimeShiftPicker {
   offSet: string;
@@ -269,10 +293,23 @@ export default defineComponent({
       commit();
     };
 
+    // A comparison function the intent wrote keeps its factor editable here, without reading VRL.
+    const vrlStore = injectedForm?.useStore?.(
+      (state: { values?: { query_condition?: { vrl_function?: string | null } } }) =>
+        state.values?.query_condition?.vrl_function,
+    );
+    const factor = computed(() => compareFactor(vrlStore?.value));
+    const setFactor = (value: unknown) => {
+      const n = Number(value);
+      if (n > 0) injectedForm?.setFieldValue("query_condition.vrl_function", compareFunction(n));
+    };
+
     return {
       raw,
       t,
       store,
+      factor,
+      setFactor,
       multiWindowContainerRef,
       localMultiTimeRange,
       addTimeShift,

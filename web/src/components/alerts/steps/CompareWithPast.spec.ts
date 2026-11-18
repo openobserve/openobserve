@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { z } from "zod";
+import { compareFunction } from "@/utils/alerts/alertIntents";
 import CompareWithPast from "./CompareWithPast.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -456,13 +457,13 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     commit: vi.fn(),
   });
 
-  function makeHost(initialRows: any[] = []) {
+  function makeHost(initialRows: any[] = [], vrl: string | null = null) {
     return defineComponent({
       components: { OForm, CompareWithPast },
       setup() {
         const form = useOForm({
           defaultValues: {
-            query_condition: { multi_time_range: initialRows },
+            query_condition: { multi_time_range: initialRows, vrl_function: vrl },
           },
           schema: z.looseObject({
             query_condition: z.looseObject({}).optional(),
@@ -487,8 +488,8 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     });
   }
 
-  function mountHost(initialRows: any[] = []) {
-    return mount(makeHost(initialRows), {
+  function mountHost(initialRows: any[] = [], vrl: string | null = null) {
+    return mount(makeHost(initialRows, vrl), {
       global: {
         mocks: { $store: dtStore() },
         provide: { store: dtStore() },
@@ -509,6 +510,24 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
     expect(parentForm.state.values.query_condition.multi_time_range[0].offSet).toBe("1d");
     // form-owned in descendant mode → the bare-mode emit does NOT fire
     expect(host.findComponent(CompareWithPast).emitted("update:multiTimeRange")).toBeFalsy();
+  });
+
+  it("a generated comparison's factor edits in the row and rewrites its function", async () => {
+    vi.useFakeTimers();
+    try {
+      const host = mountHost([{ offSet: "1w", uuid: "u1" }], compareFunction(2));
+      const input = host.find('[data-test="add-alert-compare-factor-input"] input');
+      expect((input.element as HTMLInputElement).value).toBe("2");
+      await input.setValue("3");
+      vi.advanceTimersByTime(300);
+      expect((host.vm as any).form.state.values.query_condition.vrl_function).toBe(
+        compareFunction(3),
+      );
+      const typed = mountHost([{ offSet: "1w", uuid: "u1" }], ".x = 1");
+      expect(typed.find('[data-test="add-alert-compare-factor"]').exists()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("deleting a NON-last window leaves the PARENT form + rendered pickers correct", async () => {

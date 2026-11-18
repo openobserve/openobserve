@@ -561,16 +561,32 @@ export function compareSql(stream: string, slots: IntentSlots): string {
   return `SELECT count(*) AS ${COMPARE_ALIAS} FROM ${quoteId(stream)}${where}`;
 }
 
+const factorText = (f: number) => (Number.isInteger(f) ? f.toFixed(1) : String(f));
+
 /** `#ResultArray#` gets one result array per window, now first; the alert fires on the rows it
- * returns, so it returns one only when now beats the past by the factor. */
+ * returns, so it returns one only when now beats the past by the factor. Ends on `.` as saved. */
 export function compareFunction(factor: number): string {
   const f = Number.isFinite(factor) && factor > 0 ? factor : DEFAULT_FACTOR;
   return [
     "#ResultArray#",
     `current = to_float(get(., [0, 0, "${COMPARE_ALIAS}"]) ?? 0) ?? 0.0`,
     `previous = to_float(get(., [1, 0, "${COMPARE_ALIAS}"]) ?? 0) ?? 0.0`,
-    `. = if current > 0.0 && current > previous * ${f.toFixed(1)} { [[{"${COMPARE_ALIAS}": current, "previous": previous}]] } else { [[]] }`,
+    `. = if current > 0.0 && current > previous * ${factorText(f)} { [[{"${COMPARE_ALIAS}": current, "previous": previous}]] } else { [[]] }`,
+    ".",
   ].join("\n");
+}
+
+/** The factor of a function `compareFunction` wrote, with or without the `.` the server appends;
+ * undefined for any other function. */
+export function compareFactor(vrl: string | null | undefined): number | undefined {
+  const bare = (text: string) =>
+    text
+      .trim()
+      .replace(/\n\s*\.$/, "")
+      .trim();
+  const factor = Number(/previous \* ([\d.]+) \{/.exec(vrl ?? "")?.[1]);
+  if (!(factor > 0)) return undefined;
+  return bare(vrl ?? "") === bare(compareFunction(factor)) ? factor : undefined;
 }
 
 /** A metric intent as the values it writes. */

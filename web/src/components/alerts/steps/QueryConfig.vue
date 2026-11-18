@@ -815,7 +815,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ thresholdError }}
                             </div>
                           </div>
-                          <span class="leading-8.5">{{ t("alerts.form.group.rows") }}</span>
+                          <span class="leading-8.5">{{ rowsNoun }}</span>
                         </template>
                         <template v-else>
                           <span class="leading-8.5">{{ t("alerts.form.group.whenAtLeast") }}</span>
@@ -1339,7 +1339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ thresholdError }}
                             </div>
                           </div>
-                          <span class="leading-8.5">{{ t("alerts.form.group.rows") }}</span>
+                          <span class="leading-8.5">{{ rowsNoun }}</span>
                         </span>
                         <template v-else>
                           <ORadioGroup
@@ -1413,9 +1413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   </div>
                                 </div>
                                 <span class="leading-8.5">{{
-                                  localTab === "promql"
-                                    ? t("alerts.form.group.series")
-                                    : t("alerts.form.group.rows")
+                                  localTab === "promql" ? t("alerts.form.group.series") : rowsNoun
                                 }}</span>
                               </template>
                               <template v-else>
@@ -3113,6 +3111,9 @@ export default defineComponent({
     );
     // "1 group crosses", "2 groups cross": the sentence follows the count typed beside it.
     const thresholdPlural = computed(() => (Number(triggerThreshold.value) === 1 ? 1 : 2));
+    const rowsNoun = computed(() =>
+      thresholdPlural.value === 1 ? t("alerts.form.group.row") : t("alerts.form.group.rows"),
+    );
     const shownGroupLabels = (labels: string[]): string[] =>
       labels.map((label) => (label === "__hash__" ? t("alerts.form.group.series") : label));
     const groupByOptions = computed(() =>
@@ -4452,6 +4453,7 @@ export default defineComponent({
       emit,
       syncMeasureFromForm,
       thresholdPlural,
+      rowsNoun,
       shownGroupLabels,
       groupByOptions,
       raw,

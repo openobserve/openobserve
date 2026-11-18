@@ -16,6 +16,7 @@ import {
   sectionOfField,
 } from "@/components/alerts/alertFormSections";
 import config from "@/aws-exports";
+import { compareFunction } from "@/utils/alerts/alertIntents";
 
 const t = i18n.global.t as unknown as TranslateFn;
 const SQL = "SELECT count(*) FROM default";
@@ -742,6 +743,26 @@ describe("useAlertFormSections", () => {
         "1+ rows · Keep firing for 10 min · Warning 2 · Compare with 1 week · Function",
         "O2K8SAlerts, StandardAlert, oncall-mail, and 2 more",
       ],
+    },
+    {
+      scenario: "CMP: a generated comparison reads its factor back",
+      form: {
+        stream_name: "error_logs",
+        query_condition: {
+          type: "sql",
+          sql: "SELECT count(*) AS events FROM error_logs",
+          multi_time_range: [{ offSet: "1w" }],
+          vrl_function: compareFunction(2.5),
+        },
+        trigger_condition: every(60),
+      },
+      card: [
+        "Watches Logs in error_logs, on a schedule.",
+        "Fires when the count in the last 1 hour is more than 2.5 times the same window 1 week earlier.",
+        "Tells no one yet.",
+        "Checks every hour, looking at the last 1 hour.",
+      ],
+      nav: ["More than 2.5× the same window 1 week earlier", "No one yet"],
     },
   ])("reads back $scenario", ({ form, card, nav, anomaly, aggregation }) => {
     const { review, items } = setup(

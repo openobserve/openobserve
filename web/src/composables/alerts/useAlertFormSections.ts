@@ -40,6 +40,7 @@ import {
   joinListMore,
 } from "@/utils/alerts/alertCopy";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
+import { compareFactor } from "@/utils/alerts/alertIntents";
 import {
   CONDITION_GAP_KEYS,
   conditionGap,
@@ -407,6 +408,16 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   };
   const hasFunction = (fd: AlertSectionsFormData): boolean =>
     hasValue(fd.query_condition?.vrl_function);
+  // A comparison the intent wrote reads as its factor, not as rows through a function.
+  const pastComparison = (fd: AlertSectionsFormData) => {
+    const offsets = compareOffsets(fd);
+    const factor = compareFactor(fd.query_condition?.vrl_function);
+    const tc = fd.trigger_condition ?? {};
+    const onAnyRow = (tc.operator ?? ">=") === ">=" && Number(tc.threshold ?? 1) === 1;
+    return offsets.length && factor && onAnyRow
+      ? { factor: formatNumber(factor), offsets: joinList(offsets) }
+      : null;
+  };
 
   // PromQL's one-alert answer counts the series past the value limit.
   const promqlPhrase = (fd: AlertSectionsFormData): I18nText => {
@@ -520,6 +531,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         ),
       );
     }
+    if (pastComparison(fd)) return facts;
     const offsets = compareOffsets(fd);
     if (offsets.length)
       facts.push(fact(t("alerts.tiers.names.compareWithPast"), joinList(offsets)));
@@ -651,7 +663,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         const { kind, text } = conditionPhrase(fd);
         const gap = kind in CONDITION_GAP_KEYS;
         const facts = gap || mode.value === "composite" ? [] : conditionFacts(fd);
-        const summary = facts.length ? raw([text, ...facts].join(NAV_SEPARATOR)) : text;
+        const past = gap ? null : pastComparison(fd);
+        const head = past ? t("alerts.sections.condition.compareShort", past) : text;
+        const summary = facts.length ? raw([head, ...facts].join(NAV_SEPARATOR)) : head;
         return { missing: gap && !incomplete, empty: incomplete, summary };
       }
       case "notify": {
@@ -895,6 +909,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       });
     }
     const offsets = compareOffsets(fd);
+    if (pastComparison(fd)) return extras;
     if (offsets.length) {
       extras.push({
         keypath: hasFunction(fd)
@@ -911,6 +926,13 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   const conditionSentence = (fd: AlertSectionsFormData): ReviewSentence => {
     const { kind, text } = conditionPhrase(fd);
     const window = plain(durationPart(Number(fd.trigger_condition?.period ?? 0)));
+    const past = kind === "rows" ? pastComparison(fd) : null;
+    if (past) {
+      return {
+        keypath: "alerts.sections.review.firesCompare",
+        parts: { window, factor: strong(past.factor), offsets: strong(past.offsets) },
+      };
+    }
     const grouped = kind === "value" ? groupedSentence(fd, window) : null;
     if (grouped) return grouped;
     const promql = kind === "value" ? promqlKind(fd) : null;
