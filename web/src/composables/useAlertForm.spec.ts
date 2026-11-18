@@ -19,6 +19,7 @@ import {
   applyPromqlPrefill,
   defaultAlertValue,
   formForecastOf,
+  streamNamesUserFirst,
 } from "@/composables/useAlertForm";
 import { getAlertPayload } from "@/utils/alerts/alertPayload";
 import {
@@ -186,5 +187,24 @@ describe("saving in Forecast mode", () => {
   it("keeps it in Threshold mode", () => {
     const payload = getAlertPayload(withWarning(null), context);
     expect(payload.query_condition.promql_warning_value).toBe(14);
+  });
+});
+
+describe("streamNamesUserFirst", () => {
+  it("lists the user's streams before system ones, each group in server order", () => {
+    const names = streamNamesUserFirst([
+      { name: "_anomalies" },
+      { name: "app_logs" },
+      { name: "_o2_alert_calibration_digests" },
+      { name: "usage", is_internal: true },
+      { name: "k8s_events" },
+    ]);
+    expect(names).toEqual([
+      "app_logs",
+      "k8s_events",
+      "_anomalies",
+      "_o2_alert_calibration_digests",
+      "usage",
+    ]);
   });
 });

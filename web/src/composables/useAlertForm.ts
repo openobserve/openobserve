@@ -414,6 +414,13 @@ export const formForecastOf = (alert: any): ForecastAlert | null =>
     ? parseForecastAlertPromql(alert.query_condition.promql, alert.query_condition.promql_condition)
     : null;
 
+/** Stream names for the picker: the user's streams first, then system ones (server-flagged or `_`-named). */
+export const streamNamesUserFirst = (list: { name: string; is_internal?: boolean }[]): string[] => {
+  const isSystem = (s: { name: string; is_internal?: boolean }) =>
+    s.is_internal === true || s.name.startsWith("_");
+  return [...list.filter((s) => !isSystem(s)), ...list.filter(isSystem)].map((s) => s.name);
+};
+
 /** Copies a source's description and destinations from `meta`, since AlertPrefill has no field for either. */
 export const applyMetaSettings = (data: any, meta: AlertPrefill["meta"]): any => {
   if (typeof meta?.description === "string" && meta.description)
@@ -674,7 +681,7 @@ export function useAlertForm(
   /** Reset the whole form (edit-prefill / post-save reset) to a complete alert
    *  object, re-seeding the form-only extras (logGroupBy / _meta). */
   const resetForm = (obj: any): void => form.reset(withFormExtras(obj));
-  const indexOptions = ref([]);
+  const indexOptions = ref<string[]>([]);
   const schemaList = ref([]);
   const streams: any = ref({});
   const editorRef: any = ref(null);
@@ -1228,9 +1235,7 @@ export function useAlertForm(
     const streamName = form.state.values.stream_name;
     if (streams.value[streamType]) {
       schemaList.value = streams.value[streamType];
-      indexOptions.value = streams.value[streamType].map((data: any) => {
-        return data.name;
-      });
+      indexOptions.value = streamNamesUserFirst(streams.value[streamType]);
       return;
     }
 
@@ -1243,9 +1248,7 @@ export function useAlertForm(
         // A slower reply for a type the user already switched away from must not replace the current list.
         if (form.state.values.stream_type !== streamType) return Promise.resolve();
         schemaList.value = res.list;
-        indexOptions.value = res.list.map((data: any) => {
-          return data.name;
-        });
+        indexOptions.value = streamNamesUserFirst(res.list);
 
         if (streamName) await updateStreamFields(streamName);
         return Promise.resolve();
