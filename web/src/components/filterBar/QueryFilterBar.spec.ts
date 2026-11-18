@@ -636,8 +636,7 @@ describe("QueryFilterBar", () => {
     it("inserts at the front, where the old first chip takes the typed connector", async () => {
       const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
       await openBar();
-      await press("ArrowLeft");
-      await press("ArrowLeft");
+      await press("Home");
       await type("or ");
       await type("level=c");
       await press("Enter");
@@ -706,7 +705,21 @@ describe("QueryFilterBar", () => {
     it("keeps the caret where it is on Escape", async () => {
       const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
       await openBar();
-      await press("ArrowLeft");
+      input()!.focus();
+      // The arrows walk b's parts and the AND before the caret reaches the gap ahead of b.
+      const walkLeft = async () => {
+        const at = document.activeElement as HTMLElement;
+        at.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+        await flushPromises();
+        await nextTick();
+      };
+      for (let i = 0; i < 10; i++) {
+        if (document.activeElement?.getAttribute("data-test") === "query-filter-bar-connector-1")
+          break;
+        await walkLeft();
+      }
+      await walkLeft();
+      expect(document.activeElement).toBe(input());
       await press("Escape");
       await type("level=c");
       await press("Enter");
