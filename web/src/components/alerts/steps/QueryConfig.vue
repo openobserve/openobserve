@@ -129,6 +129,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="alert-if-row-logs"
                       wide
                       :label="t('alerts.plain.notifyMeWhen')"
+                      :description="
+                        isSpanDuration
+                          ? t('alerts.units.storedAs', { unit: t('alerts.units.options.us') })
+                          : undefined
+                      "
                       fill
                     >
                       <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
@@ -255,6 +260,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <!-- Message hangs under the value field it describes. -->
                             <div class="flex flex-col gap-1">
                               <OFormInput
+                                v-if="isSpanDuration"
+                                :aria-label="t('alerts.alertIfNoOfEvents')"
+                                name="_ui.durationValue"
+                                type="number"
+                                fit-content
+                                class="max-w-32! min-w-16"
+                                :placeholder="t('alerts.placeholders.value')"
+                                data-test="alert-duration-value-input"
+                                @update:model-value="onDurationValueChange($event)"
+                                @blur="revealDurationError"
+                              >
+                                <template #error />
+                              </OFormInput>
+                              <OFormInput
+                                v-else
                                 :aria-label="t('alerts.alertIfNoOfEvents')"
                                 name="query_condition.aggregation.having.value"
                                 type="number"
@@ -274,6 +294,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ havingValueError }}
                               </div>
                             </div>
+                            <OSelect
+                              v-if="isSpanDuration"
+                              :aria-label="
+                                t('common.unitFor', { label: t('alerts.alertIfNoOfEvents') })
+                              "
+                              class="w-20!"
+                              :model-value="durationUnit"
+                              :options="durationUnitOptions"
+                              labelKey="label"
+                              valueKey="value"
+                              :searchable="false"
+                              data-test="alert-duration-unit-select"
+                              @update:model-value="onDurationUnitChange"
+                            />
                             <span
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
                               >{{
@@ -322,6 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <AlertSentenceRow
                         v-if="groupBySettled"
                         :label="t('alerts.tiers.names.groupBy')"
+                        :description="switchedToCountNote"
                         data-test="add-alert-group-by-sentence"
                         changeable
                         removable
@@ -373,6 +408,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OIcon name="add" size="sm" />
                             <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                           </OButton>
+                        </div>
+                      </OSettingRow>
+                      <OSettingRow
+                        v-else-if="selectedFunction === 'total_events' && tierShows('groupBy')"
+                        data-test="alert-group-by-row"
+                        :label="t('alerts.plain.groupedBy')"
+                        :description="
+                          streamType === 'metrics'
+                            ? t('alerts.queryConfig.groupByHelpLabels')
+                            : t('alerts.queryConfig.groupByTooltip')
+                        "
+                        fill
+                      >
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="text-text-secondary text-compact whitespace-nowrap">{{
+                            t("alerts.form.group.totalPer", { noun: countedNoun })
+                          }}</span>
+                          <OSelect
+                            :aria-label="t('alerts.groupBy')"
+                            :model-value="null"
+                            :options="groupByOptions"
+                            searchable
+                            :placeholder="t('alerts.placeholders.selectColumn')"
+                            class="w-50!"
+                            data-test="alert-group-by-select-0"
+                            @update:model-value="groupTotalBy"
+                          />
                         </div>
                       </OSettingRow>
                     </AlertTierPlace>
@@ -551,6 +613,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </div>
                             </div>
                             <span
+                              v-if="thresholdUnit"
+                              class="text-text-secondary text-compact leading-8.5"
+                              data-test="alert-threshold-unit"
+                              >{{ thresholdUnit }}</span
+                            >
+                            <span
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
                               >{{
                                 t("alerts.plain.inTheLast", { n: periodMinutes }, periodMinutes)
@@ -598,6 +666,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <AlertSentenceRow
                         v-if="groupBySettled"
                         :label="t('alerts.tiers.names.groupBy')"
+                        :description="switchedToCountNote"
                         data-test="add-alert-group-by-sentence"
                         changeable
                         removable
@@ -651,6 +720,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OIcon name="add" size="sm" />
                             <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
                           </OButton>
+                        </div>
+                      </OSettingRow>
+                      <OSettingRow
+                        v-else-if="selectedFunction === 'total_events' && tierShows('groupBy')"
+                        data-test="alert-group-by-row"
+                        :label="t('alerts.plain.groupedBy')"
+                        :description="
+                          streamType === 'metrics'
+                            ? t('alerts.queryConfig.groupByHelpLabels')
+                            : t('alerts.queryConfig.groupByTooltip')
+                        "
+                        fill
+                      >
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="text-text-secondary text-compact whitespace-nowrap">{{
+                            t("alerts.form.group.totalPer", { noun: countedNoun })
+                          }}</span>
+                          <OSelect
+                            :aria-label="t('alerts.groupBy')"
+                            :model-value="null"
+                            :options="groupByOptions"
+                            searchable
+                            :placeholder="t('alerts.placeholders.selectColumn')"
+                            class="w-50!"
+                            data-test="alert-group-by-select-0"
+                            @update:model-value="groupTotalBy"
+                          />
                         </div>
                       </OSettingRow>
                     </AlertTierPlace>
@@ -846,7 +942,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template v-if="sectionTargets" #description>
-              <span class="block">{{ whichEventsHelp }}</span>
+              <span
+                v-if="promqlLabelIssue"
+                role="alert"
+                class="text-status-error-text flex items-start gap-1"
+                data-test="add-alert-query-label-guard"
+              >
+                <OIcon name="error-outline" size="xs" class="mt-0.5 shrink-0" />
+                <span class="min-w-0">{{ promqlLabelIssue }}</span>
+              </span>
+              <span
+                v-else-if="sqlOneRowWarning"
+                role="status"
+                class="text-status-warning-text flex items-start gap-1"
+                data-test="add-alert-query-one-row-guard"
+              >
+                <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" />
+                <span class="min-w-0">{{ sqlOneRowWarning }}</span>
+              </span>
+              <span v-else class="block">{{ whichEventsHelp }}</span>
               <OButton
                 data-test="step2-view-editor-btn"
                 variant="link"
@@ -1167,7 +1281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')
                         "
                         :label="t('alerts.promRuleMode')"
-                        :description="t('alerts.promRuleModeDescription')"
+                        :description="keptThresholdText || t('alerts.promRuleModeDescription')"
                         fill
                         data-test="add-alert-rule-mode-row"
                       >
@@ -1520,6 +1634,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ promqlValueError }}
                               </div>
                             </div>
+                            <span
+                              v-if="thresholdUnit"
+                              class="text-text-secondary text-compact leading-8.5"
+                              data-test="alert-threshold-unit"
+                              >{{ thresholdUnit }}</span
+                            >
                           </div>
                           <!-- Optional WARNING on the PromQL VALUE (alerts_2.md Feature 1).
                          PromQL bakes the threshold into the query itself, so severity
@@ -1720,7 +1840,7 @@ import {
   type Ref,
 } from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import {
   convertMinutesToCron,
@@ -1789,7 +1909,10 @@ import {
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
-import { dataNoun } from "@/utils/alerts/alertCopy";
+import { dataNoun, formatNumber, joinListMore } from "@/utils/alerts/alertCopy";
+import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
+import { missingByLabel, promqlByLabels, promqlMetricNames } from "@/utils/alerts/promqlLabels";
+import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
 import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
 
 /** Group labels as prose in the reader's language ("service, region and pod"). */
@@ -1835,17 +1958,36 @@ function sqlGroupByLabels(sql: string): string[] {
   return [...new Set(labels)];
 }
 
-/** Every label a PromQL query aggregates `by`, across all its `by (...)` clauses. */
-function promqlByLabels(query: string): string[] {
-  const labels = new Set<string>();
-  for (const match of query.matchAll(/\bby\s*\(([^)]*)\)/gi)) {
-    match[1]
-      .split(",")
-      .map((label) => label.trim())
-      .filter(Boolean)
-      .forEach((label) => labels.add(label));
-  }
-  return [...labels];
+// Span duration is microseconds by the traces contract, whatever unit the user types it in.
+const TRACE_DURATION_FIELD = "duration";
+const MICROS_PER: Record<string, number> = { ns: 0.001, us: 1, ms: 1000, s: 1_000_000 };
+// Functions whose result keeps the measured field's unit.
+const UNIT_KEEPING_FUNCTIONS = new Set([
+  "avg",
+  "min",
+  "max",
+  "sum",
+  "median",
+  "p50",
+  "p75",
+  "p90",
+  "p95",
+  "p99",
+]);
+// A PromQL query that rates, counts or does arithmetic no longer reads in its metric's unit.
+const PROMQL_UNIT_CHANGERS =
+  /\b(?:rate|irate|increase|delta|idelta|deriv|predict_linear|count|count_over_time|changes|resets|absent|absent_over_time|stddev|stdvar|histogram_quantile|time|timestamp|scalar|vector)\s*\(|[-*/+%^]/i;
+
+/** Where a promql_condition operator sits in PromQL, which spells equality "==". */
+const PROMQL_OPERATOR: Record<string, string> = { "=": "==" };
+
+/** True when the query already compares at its top level, so it filters series by itself. */
+function promqlCompares(query: string): boolean {
+  const bare = query
+    .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "")
+    .replace(/\{[^}]*\}/g, "")
+    .replace(/\[[^\]]*\]/g, "");
+  return /==|!=|>=|<=|>|</.test(bare);
 }
 
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
@@ -2440,16 +2582,56 @@ export default defineComponent({
       set: (v) => setFV("query_condition.aggregation.having.value", v),
     });
 
-    // Pre-migration, `conditionValue` was a plain ref seeded ONCE at setup from
-    // trigger_condition.threshold for logs/traces (metrics seeded from having.value).
-    // That snapshot is why the measure row opens on the threshold default of 3 rather
-    // than having.value's own default of 1. having.value is form-owned now, so carry
-    // the seed explicitly. Snapshot the threshold HERE: onLogFunctionChange resets the
-    // live threshold to 1 before it writes having.value, so it can't be read at switch
-    // time. One-shot, and only when no saved aggregation is being loaded — a saved
-    // measure alert must keep its own having.value.
-    const initialThresholdSeed = fv("trigger_condition.threshold");
+    // A new alert's first measure opens with no value: the event-count default is no value threshold.
     let measureSeedPending = isEventBasedInit && !props.isAggregationEnabled;
+
+    const isSpanDuration = computed(
+      () =>
+        props.streamType === "traces" &&
+        selectedFunction.value !== "total_events" &&
+        UNIT_KEEPING_FUNCTIONS.has(selectedFunction.value) &&
+        logMeasureColumn.value === TRACE_DURATION_FIELD,
+    );
+    const durationUnit = ref("ms");
+    const durationUnitOptions = computed(() =>
+      (["ns", "us", "ms", "s"] as const).map((unit) => ({
+        label: t(`alerts.units.options.${unit}`),
+        value: unit,
+      })),
+    );
+    const storeDuration = (shown: unknown) => {
+      const n = shown === "" || shown === null || shown === undefined ? NaN : Number(shown);
+      conditionValue.value = Number.isFinite(n)
+        ? Math.round(n * MICROS_PER[durationUnit.value] * 1e6) / 1e6
+        : "";
+      emitAggregationUpdate();
+    };
+    const onDurationValueChange = (shown: unknown) => storeDuration(shown);
+    const onDurationUnitChange = (unit: SelectModelValue) => {
+      if (typeof unit !== "string" || !(unit in MICROS_PER)) return;
+      durationUnit.value = unit;
+      storeDuration(fv("_ui.durationValue"));
+    };
+    const revealDurationError = () => {
+      if (form) revealFieldErrors(form, ["query_condition.aggregation.having.value"]);
+    };
+    // A loaded value shows in the largest unit that keeps it whole.
+    watch(
+      isSpanDuration,
+      (on) => {
+        if (!on) return;
+        const stored = conditionValue.value;
+        const micros = stored === "" || stored === null ? NaN : Number(stored);
+        if (!Number.isFinite(micros)) {
+          setFV("_ui.durationValue", "");
+          return;
+        }
+        durationUnit.value =
+          micros % MICROS_PER.s === 0 ? "s" : micros % MICROS_PER.ms === 0 ? "ms" : "us";
+        setFV("_ui.durationValue", micros / MICROS_PER[durationUnit.value]);
+      },
+      { immediate: true },
+    );
 
     // Watch stream type changes to restore saved state or set new-alert defaults.
     // Fires when stream type prop changes (e.g. async load on edit, or user switching stream type).
@@ -2508,6 +2690,7 @@ export default defineComponent({
           emit("update:isAggregationEnabled", true);
           writeAggregation((agg) => {
             agg.function = "avg";
+            agg.having.value = "";
             if (!agg.having.column) {
               const hasValueField = props.columns.some(
                 (c: any) => (typeof c === "string" ? c : c.value) === "value",
@@ -2660,8 +2843,35 @@ export default defineComponent({
       onPromRuleModeChange(true);
     });
     onBeforeUnmount(() => stopRuleSuggestion?.());
+    // The threshold Rule mode moved into the query, so turning it off can move it back.
+    const keptThreshold = ref<{
+      query: string;
+      original: string;
+      expression: string;
+      condition: any;
+    } | null>(null);
+    const keptThresholdText = computed(() =>
+      keptThreshold.value
+        ? t("alerts.form.ruleMode.keptThreshold", {
+            expression: raw(keptThreshold.value.expression),
+          })
+        : "",
+    );
+    const keepThresholdInQuery = () => {
+      const pc = fv("query_condition.promql_condition");
+      const query = (localPromqlQuery.value ?? "").trim();
+      const value = pc?.value;
+      if (!query || value === "" || value == null || promqlCompares(query)) return;
+      const operator = PROMQL_OPERATOR[pc.operator] ?? pc.operator ?? ">=";
+      const base = /\b(?:and|or|unless)\b/i.test(query) ? `(${query})` : query;
+      const expression = `${operator} ${value}`;
+      const next = `${base} ${expression}`;
+      keptThreshold.value = { query: next, original: query, expression, condition: { ...pc } };
+      updatePromqlQuery(next);
+    };
     const onPromRuleModeChange = (enabled: unknown) => {
       if (enabled) {
+        keepThresholdInQuery();
         setFV("query_condition.promql_condition", null);
         setFV("query_condition.promql_warning_value", null);
         setFV("trigger_condition.warning_threshold", null);
@@ -2669,6 +2879,13 @@ export default defineComponent({
         setFV("trigger_condition.operator", ">=");
         setFV("trigger_condition.threshold", 1);
       } else {
+        const kept = keptThreshold.value;
+        keptThreshold.value = null;
+        if (kept && localPromqlQuery.value === kept.query) {
+          updatePromqlQuery(kept.original);
+          setFV("query_condition.promql_condition", kept.condition);
+          return;
+        }
         setFV("query_condition.promql_condition", { column: "value", operator: ">=", value: "" });
       }
     };
@@ -2682,6 +2899,79 @@ export default defineComponent({
     const editorPromqlQuery = computed(() =>
       isForecastMode.value ? forecastExpression.value : localPromqlQuery.value,
     );
+    // Labels and unit per metric the condition reads; null while loading or when the stream has no schema.
+    const metricInfo = ref<Record<string, { labels: string[]; unit: string } | null>>({});
+    const conditionMetrics = computed(() => {
+      if (props.streamType !== "metrics") return [];
+      const names =
+        localTab.value === "promql" ? promqlMetricNames(editorPromqlQuery.value ?? "") : [];
+      return [...new Set([props.streamName, ...names].filter(Boolean))].slice(0, 5);
+    });
+    watch(
+      () => conditionMetrics.value.join("\n"),
+      async () => {
+        for (const name of conditionMetrics.value) {
+          if (name in metricInfo.value) continue;
+          metricInfo.value = { ...metricInfo.value, [name]: null };
+          try {
+            const stream: any = await getStream(name, "metrics", true);
+            if (!stream?.schema?.length) continue;
+            metricInfo.value = {
+              ...metricInfo.value,
+              [name]: {
+                labels: stream.schema.map((f: any) => String(f.name)),
+                unit: stream.metrics_meta?.unit ?? "",
+              },
+            };
+          } catch {
+            // An unknown metric gets no label check; the preview says it matched nothing.
+          }
+        }
+      },
+      { immediate: true },
+    );
+    const promqlLabelIssue = computed(() => {
+      if (localTab.value !== "promql" || isForecastMode.value) return "";
+      const issue = missingByLabel(
+        editorPromqlQuery.value ?? "",
+        (metric) => metricInfo.value[metric]?.labels,
+      );
+      if (!issue) return "";
+      const names = { label: raw(issue.label), metric: raw(issue.metric) };
+      return issue.labels.length
+        ? t("alerts.guard.labelMissing", { ...names, labels: joinListMore(issue.labels, t) })
+        : t("alerts.guard.labelMissingNone", names);
+    });
+    const unitSuffix = (metric: string | undefined) => {
+      const unit = normalizeDeclaredUnit(metric ? metricInfo.value[metric]?.unit : undefined);
+      const suffixes: Record<string, I18nText> = {
+        percent: raw("%"),
+        seconds: t("alerts.units.options.s"),
+        milliseconds: t("alerts.units.options.ms"),
+        microseconds: t("alerts.units.options.us"),
+        nanoseconds: t("alerts.units.options.ns"),
+        bytes: raw("B"),
+      };
+      return (unit && suffixes[unit]) || "";
+    };
+    // The builder's value and a bare PromQL selector read in the metric's own unit.
+    const thresholdUnit = computed(() => {
+      if (props.streamType !== "metrics") return "";
+      if (localTab.value === "custom") {
+        return UNIT_KEEPING_FUNCTIONS.has(selectedFunction.value) &&
+          logMeasureColumn.value === "value"
+          ? unitSuffix(props.streamName)
+          : "";
+      }
+      if (localTab.value !== "promql") return "";
+      const query = editorPromqlQuery.value ?? "";
+      const bare = query
+        .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "")
+        .replace(/\{[^}]*\}/g, "")
+        .replace(/\[[^\]]*\]/g, "");
+      const metrics = promqlMetricNames(query);
+      return metrics.length === 1 && !PROMQL_UNIT_CHANGERS.test(bare) ? unitSuffix(metrics[0]) : "";
+    });
 
     // A loaded query longer than the fold reads as its first lines; typing or focusing opens it.
     const foldedLines = computed(
@@ -2951,6 +3241,17 @@ export default defineComponent({
         ? "each"
         : "one",
     );
+    // A function may drop the one row, so only a query without one is certain to fire every check.
+    const sqlOneRowWarning = computed(() =>
+      localTab.value === "sql" &&
+      props.isRealTime === "false" &&
+      !showVrl.value &&
+      groupAnswer.value === "one" &&
+      alwaysOneRow(localSqlQuery.value ?? "") &&
+      oneRowMeetsLimit(triggerOperator.value, triggerThreshold.value)
+        ? t("alerts.guard.alwaysOneRow")
+        : "",
+    );
     const countTestIds = computed(() =>
       localTab.value === "sql"
         ? { operator: "alert-trigger-operator-select", threshold: "alert-trigger-threshold-input" }
@@ -2999,7 +3300,51 @@ export default defineComponent({
       emitTriggerUpdate();
     };
 
+    // The field a Group by pick switched "total events" to "count" for; its note says so.
+    const switchedToCount = ref("");
+    const switchedToCountNote = computed(() =>
+      switchedToCount.value && selectedFunction.value === "count"
+        ? t("alerts.form.group.switchedToCount", {
+            noun: countedNoun.value,
+            field: raw(switchedToCount.value),
+          })
+        : undefined,
+    );
+    // Grouping needs a measure, so a total becomes a count of the field per field, keeping its limit.
+    const groupTotalBy = (picked: SelectModelValue) => {
+      const field = typeof picked === "string" ? picked : "";
+      if (!field) return;
+      const operator = triggerOperator.value || ">=";
+      const limit = triggerThreshold.value;
+      selectedFunction.value = "count";
+      if (isEventBased.value) {
+        setFV("logGroupBy", [field]);
+        logMeasureColumn.value = field;
+        onLogFunctionChange("count");
+      } else {
+        onMetricFunctionChange("count");
+      }
+      writeAggregation((agg) => {
+        agg.having.column = field;
+        agg.having.operator = operator;
+        agg.having.value = limit;
+        agg.group_by = [field];
+      });
+      emitAggregationUpdate();
+      switchedToCount.value = field;
+      groupByEditing.value = false;
+    };
     const clearGroupBy = () => {
+      // Removing a Group by that made the count goes back to the total it came from.
+      const back =
+        switchedToCount.value && selectedFunction.value === "count"
+          ? (fv("query_condition.aggregation.having") ?? {})
+          : null;
+      if (back) {
+        selectedFunction.value = "total_events";
+        if (isEventBased.value) onLogFunctionChange("total_events");
+        else onMetricFunctionChange("total_events");
+      }
       if (isEventBased.value) setFV("logGroupBy", []);
       if (fv("query_condition.aggregation")) {
         writeAggregation((agg) => {
@@ -3008,8 +3353,8 @@ export default defineComponent({
         });
         emitAggregationUpdate();
       }
-      triggerThreshold.value = 1;
-      triggerOperator.value = ">=";
+      triggerThreshold.value = back ? back.value : 1;
+      triggerOperator.value = back?.operator || ">=";
       groupByEditing.value = false;
       tiers?.conceal("groupBy");
     };
@@ -3613,6 +3958,7 @@ export default defineComponent({
     const onMetricFunctionChange = (modelValue: SelectModelValue) => {
       // Single-select of function names: value is a string at runtime.
       const value = typeof modelValue === "string" ? modelValue : "";
+      switchedToCount.value = "";
       if (value === "total_events") {
         // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline
         localIsAggregationEnabled.value = false;
@@ -3648,6 +3994,7 @@ export default defineComponent({
     const onLogFunctionChange = (modelValue: SelectModelValue) => {
       // Single-select of function names: value is a string at runtime.
       const value = typeof modelValue === "string" ? modelValue : "";
+      switchedToCount.value = "";
       if (value === "total_events") {
         // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline.
         // threshold/operator are form-backed computeds (also drive the name= inputs).
@@ -3663,19 +4010,12 @@ export default defineComponent({
         triggerThreshold.value = 1;
         triggerOperator.value = ">=";
         emit("update:isAggregationEnabled", true);
-        // First entry into measure mode opens on the loaded threshold (3 for a new
-        // alert), matching the pre-migration setup seed; afterwards having.value
-        // holds real loaded/user state and wins.
-        const seedThisSwitch =
-          measureSeedPending &&
-          initialThresholdSeed !== undefined &&
-          initialThresholdSeed !== null &&
-          initialThresholdSeed !== "";
+        const firstMeasure = measureSeedPending;
         measureSeedPending = false;
         writeAggregation((agg) => {
           agg.function = value;
           agg.having.operator = conditionOperator.value || ">=";
-          agg.having.value = seedThisSwitch ? initialThresholdSeed : (conditionValue.value ?? "");
+          agg.having.value = firstMeasure ? "" : (conditionValue.value ?? "");
           agg.having.column = logMeasureColumn.value || "";
           agg.group_by = logGroupBy.value.length ? [...logGroupBy.value] : [];
         });
@@ -4143,6 +4483,19 @@ export default defineComponent({
       localTab,
       tabOptions,
       whichEventsHelp,
+      promqlLabelIssue,
+      sqlOneRowWarning,
+      thresholdUnit,
+      keptThresholdText,
+      switchedToCountNote,
+      groupTotalBy,
+      countedNoun,
+      isSpanDuration,
+      durationUnit,
+      durationUnitOptions,
+      onDurationValueChange,
+      onDurationUnitChange,
+      revealDurationError,
       shouldShowTabs,
       updateTab,
       conditionsBuilderRef,

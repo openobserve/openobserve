@@ -137,6 +137,15 @@ vi.mock("vuex", async () => {
 // Module-level store reference updated in beforeEach
 let mockStoreInstance: any;
 
+// Streams by name, as getStream answers them; a test fills it before mounting.
+const { streamFixtures } = vi.hoisted(() => ({ streamFixtures: {} as Record<string, any> }));
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStream: vi.fn(async (name: string) => streamFixtures[name] ?? null),
+    getStreams: vi.fn(async () => ({ list: [] })),
+  }),
+}));
+
 // Mock useSuggestions composable
 vi.mock("@/composables/useSuggestions", async () => {
   // Real refs, so the template unwraps them exactly as it does in production.
@@ -2170,24 +2179,12 @@ describe("QueryConfig.vue", () => {
         "query_condition.aggregation.having.value",
       );
 
-    it("logs: first switch to a measure fn opens on the threshold (3), not 1", async () => {
+    it("logs: a new alert's first measure opens with no value, not the event count", async () => {
       const { h } = mountHost();
-      await flushPromises();
-      h.findComponent(QueryConfig).vm.onLogFunctionChange("count");
-      await flushPromises();
-      expect(havingValue(h)).toBe(3);
-      h.unmount();
-    });
-
-    it("logs: seeds from the LOADED threshold, not the hardcoded default", async () => {
-      const { h } = mountHost(
-        {},
-        { trigger_condition: { ...hostDefaults().trigger_condition, threshold: 7 } },
-      );
       await flushPromises();
       h.findComponent(QueryConfig).vm.onLogFunctionChange("min");
       await flushPromises();
-      expect(havingValue(h)).toBe(7);
+      expect(havingValue(h)).toBe("");
       h.unmount();
     });
 
@@ -2746,6 +2743,147 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([
         "SELECT *\nFROM t\nWHERE service = 'a'",
       ]);
+    });
+
+    const metricPromqlForm = (
+      promql: string,
+      condition: any = { column: "value", operator: ">", value: 0.85 },
+    ) => ({
+      stream_type: "metrics",
+      stream_name: "node_cpu_seconds_total",
+      query_condition: {
+        ...hostDefaults().query_condition,
+        type: "promql",
+        promql,
+        promql_condition: condition,
+      },
+      _meta: defaultAddAlertMeta({ tab: "promql" }),
+    });
+    const promqlProps = (promql: string) => ({
+      ...sectioned,
+      tab: "promql",
+      streamType: "metrics",
+      streamName: "node_cpu_seconds_total",
+      promqlQuery: promql,
+      promqlCondition: { column: "value", operator: ">", value: 0.85 },
+    });
+
+    it("a PromQL by-label the metric lacks reads red, listing the metric's labels", async () => {
+      streamFixtures.node_cpu_seconds_total = {
+        schema: ["_timestamp", "k8s_node_name", "cpu", "mode", "value"].map((name) => ({ name })),
+        metrics_meta: { unit: "s" },
+      };
+      const query = "avg by (instance) (rate(node_cpu_seconds_total[5m]))";
+      remount(promqlProps(query), metricPromqlForm(query));
+      await flushPromises();
+      const guard = host.find('[data-test="add-alert-query-label-guard"]');
+      expect(guard.attributes("role")).toBe("alert");
+      expect(guard.text()).toBe(
+        "instance isn't a label of node_cpu_seconds_total. Its labels: k8s_node_name, cpu, and mode.",
+      );
+    });
+
+    it.each([
+      ["a bare selector shows the metric's unit", "node_cpu_seconds_total", "s"],
+      ["a rate changes the unit, so none shows", "rate(node_cpu_seconds_total[5m])", ""],
+    ])("%s", async (_name, query, unit) => {
+      streamFixtures.node_cpu_seconds_total = {
+        schema: [{ name: "value" }],
+        metrics_meta: { unit: "seconds" },
+      };
+      remount(promqlProps(query), metricPromqlForm(query));
+      await flushPromises();
+      const shown = host.find('[data-test="alert-threshold-unit"]');
+      expect(shown.exists() ? shown.text() : "").toBe(unit);
+    });
+
+    it("Rule mode moves a typed threshold into the query, and back when turned off", async () => {
+      const query = "max by (pod) (mem)";
+      remount(promqlProps(query), metricPromqlForm(query));
+      await flushPromises();
+      wrapper.vm.onPromRuleModeChange(true);
+      expect(wrapper.emitted("update:promqlQuery")?.at(-1)).toEqual([`${query} > 0.85`]);
+      expect(wrapper.vm.keptThresholdText).toBe("Kept your threshold in the query: > 0.85");
+      wrapper.vm.onPromRuleModeChange(false);
+      expect(wrapper.emitted("update:promqlQuery")?.at(-1)).toEqual([query]);
+      expect(hostForm().getFieldValue("query_condition.promql_condition")).toMatchObject({
+        operator: ">",
+        value: 0.85,
+      });
+    });
+
+    it.each([
+      ["SELECT count(*) AS errors FROM t", true],
+      ["SELECT service, count(*) FROM t GROUP BY service", false],
+    ])("SQL %s warns amber that one row always fires: %s", async (sql, warns) => {
+      remount(
+        { ...sectioned, tab: "sql", sqlQuery: sql },
+        {
+          query_condition: { ...hostDefaults().query_condition, type: "sql", sql },
+          trigger_condition: { ...hostDefaults().trigger_condition, threshold: 1 },
+          _meta: defaultAddAlertMeta({ tab: "sql" }),
+        },
+      );
+      await flushPromises();
+      expect(host.find('[data-test="add-alert-query-one-row-guard"]').exists()).toBe(warns);
+    });
+
+    it("Group by on total events counts the field per field, keeps the limit, and says so", async () => {
+      remount(
+        { ...sectioned, columns },
+        {
+          trigger_condition: { ...hostDefaults().trigger_condition, operator: ">", threshold: 50 },
+        },
+        tiersWith(["groupBy"]),
+      );
+      await flushPromises();
+      expect(host.find('[data-test="alert-group-by-select-0"]').exists()).toBe(true);
+      wrapper.vm.groupTotalBy("service");
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.aggregation")).toMatchObject({
+        function: "count",
+        group_by: ["service"],
+        having: { column: "service", operator: ">", value: 50 },
+      });
+      expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(1);
+      expect(host.find('[data-test="add-alert-group-by-sentence"]').text()).toContain(
+        "Switched to count, so it counts events per service",
+      );
+      wrapper.vm.clearGroupBy();
+      await flushPromises();
+      expect(wrapper.vm.selectedFunction).toBe("total_events");
+      expect(hostForm().getFieldValue("trigger_condition")).toMatchObject({
+        operator: ">",
+        threshold: 50,
+      });
+    });
+
+    it("a span duration typed in ms is stored in microseconds; a loaded one shows whole", async () => {
+      const agg = (value: unknown) => ({
+        group_by: [],
+        function: "p95",
+        having: { column: "duration", operator: ">", value },
+      });
+      remount(
+        {
+          ...sectioned,
+          streamType: "traces",
+          isAggregationEnabled: true,
+          inputData: { ...mockInputData, aggregation: agg(1500000) },
+        },
+        {
+          stream_type: "traces",
+          query_condition: { ...hostDefaults().query_condition, aggregation: agg(1500000) },
+        },
+      );
+      await flushPromises();
+      expect(wrapper.vm.durationUnit).toBe("ms");
+      expect(hostForm().getFieldValue("_ui.durationValue")).toBe(1500);
+      wrapper.vm.onDurationValueChange("500");
+      expect(hostForm().getFieldValue("query_condition.aggregation.having.value")).toBe(500000);
+      hostForm().setFieldValue("_ui.durationValue", "500");
+      wrapper.vm.onDurationUnitChange("s");
+      expect(hostForm().getFieldValue("query_condition.aggregation.having.value")).toBe(500000000);
     });
   });
 
