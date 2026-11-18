@@ -3715,6 +3715,19 @@ describe("Schema Component Tests", () => {
         expect(await search("bloom")).toEqual(["bloom_hits", "message"]);
       });
 
+      it("matches built-in index fields set by the server defaults", async () => {
+        const zoConfig = wrapper.vm.store.state.zoConfig;
+        const saved = [zoConfig.default_fts_keys, zoConfig.default_secondary_index_fields];
+        zoConfig.default_fts_keys = ["bloom_hits"];
+        zoConfig.default_secondary_index_fields = ["host"];
+        try {
+          expect(await search("full text")).toEqual(["bloom_hits", "body", "message"]);
+          expect(await search("secondary")).toEqual(["host", "namespace"]);
+        } finally {
+          [zoConfig.default_fts_keys, zoConfig.default_secondary_index_fields] = saved;
+        }
+      });
+
       it("matches the label in the current locale", async () => {
         // A separate i18n instance: switching the shared one re-renders every mounted wrapper.
         const zhI18n = createI18n({

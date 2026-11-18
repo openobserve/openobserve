@@ -1137,7 +1137,7 @@ export default defineComponent({
         }
         if (!searchTerm) return true;
         if (row.name.toLowerCase().includes(searchTerm)) return true;
-        return indexTypeMatches(row.index_type, searchTerm);
+        return indexTypeMatches(row, searchTerm);
       });
     });
 
@@ -1265,9 +1265,18 @@ export default defineComponent({
     ];
     const indexTypeLabels = new Map(streamIndexType.map(({ label, value }) => [value, label]));
 
+    // Built-in (env default) FTS and secondary index fields are not stored in index_type.
+    const displayedIndexTypes = (row: SchemaField): string[] => {
+      const types = new Set(row.index_type || []);
+      if (store.state.zoConfig.default_fts_keys?.includes(row.name)) types.add("fullTextSearchKey");
+      if (store.state.zoConfig.default_secondary_index_fields?.includes(row.name))
+        types.add("secondaryIndexKey");
+      return [...types];
+    };
+
     // Matches the label shown in the select (current locale) or the stored value.
-    const indexTypeMatches = (indexTypes: string[] | undefined, searchTerm: string) =>
-      (indexTypes || []).some(
+    const indexTypeMatches = (row: SchemaField, searchTerm: string) =>
+      displayedIndexTypes(row).some(
         (value) =>
           value.toLowerCase().includes(searchTerm) ||
           !!indexTypeLabels.get(value)?.toLowerCase().includes(searchTerm),
@@ -1913,7 +1922,7 @@ export default defineComponent({
                 match = true;
               }
               // Match by index_type
-              else if (indexTypeMatches(row.index_type, searchTerm)) {
+              else if (indexTypeMatches(row, searchTerm)) {
                 match = true;
               }
             }
@@ -1927,7 +1936,7 @@ export default defineComponent({
               match = true;
             }
             // Match by index_type
-            else if (indexTypeMatches(row.index_type, searchTerm)) {
+            else if (indexTypeMatches(row, searchTerm)) {
               match = true;
             }
           }
@@ -2462,21 +2471,8 @@ export default defineComponent({
     //this is used to compute the index_type value based on the env
     //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
     //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
-    const computedIndexType = (props: { row: SchemaField }) => {
-      return computed(() => {
-        let keysToBeDisplayed = props.row.index_type || [];
-        // return the actual index_type value from the row
-        //merge env fts and secondary index keys
-        //check for the props.row.name is in the env fts and secondary index keys
-        if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1) {
-          keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
-        }
-        if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1) {
-          keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
-        }
-        return keysToBeDisplayed || [];
-      });
-    };
+    const computedIndexType = (props: { row: SchemaField }) =>
+      computed(() => displayedIndexTypes(props.row));
     //this function is used to check if the option is present in the default env
     //if present then we will return true else false
     //this is used to show the tooltip in the select for disabled options
