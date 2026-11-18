@@ -15,7 +15,7 @@
 
 //! Service versions deployed or rolled back in the window that feed an issue stream.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use infra::table::{
     entity::service_version_deploys::Model, service_version_deploys, service_version_verdicts,
@@ -26,11 +26,12 @@ use o2_enterprise::enterprise::autoobserve::{
     names::{dims, kinds},
     ports::OssSource,
 };
+use sea_orm::ConnectionTrait;
 
 use super::{failed, issue_streams, link};
 
+/// Also bounds the verdicts read, one batch for every listed deploy.
 const ROWS: u64 = 50;
-const VERDICT_READS: usize = 3;
 /// Subject dims holding the evidence streams the viewer must read, as `source_streams` stores them.
 pub const EVIDENCE: &str = "evidence_streams";
 pub const EVIDENCE_OVERFLOW: &str = "evidence_overflow";
@@ -40,7 +41,8 @@ pub async fn read(ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
     if streams.is_empty() {
         return (Checked::Ok, Vec::new());
     }
-    match deploys(ask, &streams).await {
+    let conn = infra::db::get_orm_client_ro().await;
+    match deploys(conn, ask, &streams).await {
         Ok(answer) => answer,
         Err(e) => failed(OssSource::Deploys, &ask.org, e),
     }
@@ -71,45 +73,58 @@ pub fn scoped(service: &str, evidence: &[(&str, bool)]) -> EntityRef {
     subject
 }
 
-async fn deploys(
+async fn deploys<C: ConnectionTrait>(
+    conn: &C,
     ask: &ChangeAsk,
     streams: &BTreeSet<EntityRef>,
 ) -> anyhow::Result<(Checked, Vec<ChangeRecord>)> {
-    let conn = infra::db::get_orm_client_ro().await;
     let rows = service_version_deploys::in_window(conn, &ask.org, (ask.from, ask.to), ROWS).await?;
     let state = if rows.len() as u64 >= ROWS {
         Checked::Partial
     } else {
         Checked::Ok
     };
-    let mut records = Vec::new();
-    let mut reads = 0;
-    for row in rows {
-        let Some(mut record) = record(&row, streams) else {
-            continue;
-        };
-        if let Some(key) = row.verdict_key.as_deref()
-            && reads < VERDICT_READS
-        {
-            reads += 1;
-            // The deploy is the cause; a verdict that cannot be read only leaves it unjudged.
-            match service_version_verdicts::get(conn, &ask.org, key).await {
-                Ok(Some(v)) => {
-                    record.subject = scoped(
-                        &row.service_name,
-                        &[
-                            (row.source_streams.as_str(), row.source_streams_overflow),
-                            (v.source_streams.as_str(), v.source_streams_overflow),
-                        ],
-                    );
-                    record.facts.insert("verdict".to_string(), v.verdict);
-                }
-                Ok(None) => {}
-                Err(e) => log::warn!("[autoobserve] org {}: verdict {key}: {e}", ask.org),
+    let rows: Vec<(Model, ChangeRecord)> = rows
+        .into_iter()
+        .filter_map(|row| record(&row, streams).map(|record| (row, record)))
+        .collect();
+    let keys: Vec<String> = rows
+        .iter()
+        .filter_map(|(row, _)| row.verdict_key.clone())
+        .collect();
+    // The deploy is the cause; verdicts that cannot be read only leave it unjudged.
+    let verdicts: HashMap<String, _> =
+        match service_version_verdicts::get_by_keys(conn, &ask.org, &keys).await {
+            Ok(verdicts) => verdicts
+                .into_iter()
+                .map(|v| (v.verdict_key.clone(), v))
+                .collect(),
+            Err(e) => {
+                log::warn!(
+                    "[autoobserve] org {}: reading deploy verdicts: {e}",
+                    ask.org
+                );
+                HashMap::new()
             }
-        }
-        records.push(record);
-    }
+        };
+    let records = rows
+        .into_iter()
+        .map(|(row, mut record)| {
+            if let Some(v) = row.verdict_key.as_ref().and_then(|key| verdicts.get(key)) {
+                record.subject = scoped(
+                    &row.service_name,
+                    &[
+                        (row.source_streams.as_str(), row.source_streams_overflow),
+                        (v.source_streams.as_str(), v.source_streams_overflow),
+                    ],
+                );
+                record
+                    .facts
+                    .insert("verdict".to_string(), v.verdict.clone());
+            }
+            record
+        })
+        .collect();
     Ok((state, records))
 }
 
@@ -166,4 +181,83 @@ fn record(row: &Model, streams: &BTreeSet<EntityRef>) -> Option<ChangeRecord> {
             ],
         ),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::StreamType;
+    use infra::table::{
+        entity::service_version_verdicts::Model as Verdict,
+        service_versions::{create_tables_for_tests, sqlite_and_postgres_for_tests},
+    };
+    use sha2::{Digest, Sha256};
+
+    use super::{
+        super::{stream_ref, tests::ask},
+        *,
+    };
+
+    #[tokio::test]
+    async fn every_listed_deploy_carries_its_verdict() {
+        let deploy = |n: i64| {
+            let (version, at) = (format!("v{n}"), 100 + n);
+            let key = serde_json::json!(["org", "svc", "where", "region", version, at]);
+            Model {
+                deploy_key: format!("{:x}", Sha256::digest(key.to_string())),
+                org_id: "org".into(),
+                service_name: "svc".into(),
+                where_key: "where".into(),
+                scope_key: "scope".into(),
+                cluster: "region".into(),
+                to_version: version.clone(),
+                to_version_key: version.clone(),
+                kind: "deploy".into(),
+                entry_source: "traffic".into(),
+                at,
+                updated_at: at,
+                source_streams: r#"["logs/app"]"#.into(),
+                serving_versions: "[]".into(),
+                full_serving: "[]".into(),
+                verdict_key: Some(version),
+                ..Default::default()
+            }
+        };
+        let verdict = |key: &str| Verdict {
+            verdict_key: key.into(),
+            org_id: "org".into(),
+            deploy_kind: "deploy".into(),
+            state: "evaluating".into(),
+            verdict: "watch".into(),
+            reason_code: "debounce_pending".into(),
+            signal: "traces".into(),
+            baseline_rule: "previous".into(),
+            baseline_rule_initial: "previous".into(),
+            source_streams: "[]".into(),
+            updated_at: 100,
+            last_evaluated_at: 100,
+            ..Default::default()
+        };
+        let ask = ask("org", &[("logs", "app")], (0, 1_000));
+        let streams = BTreeSet::from([stream_ref(StreamType::Logs, "app")]);
+        for conn in sqlite_and_postgres_for_tests("autoobserve_deploy_verdicts").await {
+            create_tables_for_tests(&conn).await.unwrap();
+            for n in 0..4 {
+                let row = deploy(n);
+                let key = row.verdict_key.clone().unwrap();
+                assert!(service_version_deploys::put(&conn, row).await.unwrap());
+                assert!(
+                    service_version_verdicts::put(&conn, verdict(&key), Vec::new())
+                        .await
+                        .unwrap()
+                );
+            }
+            let (state, records) = deploys(&conn, &ask, &streams).await.unwrap();
+            assert_eq!(state, Checked::Ok);
+            let judged: Vec<_> = records
+                .iter()
+                .map(|r| r.facts.get("verdict").map(String::as_str))
+                .collect();
+            assert_eq!(judged, [Some("watch"); 4]);
+        }
+    }
 }
