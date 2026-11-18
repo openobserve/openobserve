@@ -2456,13 +2456,13 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
       const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
-      // The Spans view adds its 36px scope row under the query.
+      // The Spans view adds its 40px scope row under the query.
       bar.vm.$emit("filterBuilderGrowth", 54);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 36 + 54);
+      expect(wrapper.vm.splitterModel).toBe(90 + 40 + 54);
       bar.vm.$emit("filterBuilderGrowth", null);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 36);
+      expect(wrapper.vm.splitterModel).toBe(90 + 40);
     });
 
     it("should drop only the scope row when the builder changes in the same tick as leaving the Spans view", async () => {
@@ -2471,7 +2471,7 @@ describe("Index.vue (Main Traces Page)", () => {
       const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
       bar.vm.$emit("filterBuilderGrowth", 0);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 36);
+      expect(wrapper.vm.splitterModel).toBe(90 + 40);
       bar.vm.$emit("filterBuilderGrowth", 18);
       mockSearchObj.meta.searchMode = "traces";
       await flushPromises();
@@ -2481,7 +2481,7 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.splitterModel).toBe(90);
       mockSearchObj.meta.searchMode = "spans";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 36);
+      expect(wrapper.vm.splitterModel).toBe(90 + 40);
     });
 
     it("should render the drill-down target in the search tab", async () => {
@@ -2663,8 +2663,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      // 90px for the search bar, plus 36px for the Scope row of the default Spans view.
-      expect(wrapper.vm.splitterModel).toBe(126);
+      // 90px for the search bar, plus 40px for the Scope row of the default Spans view.
+      expect(wrapper.vm.splitterModel).toBe(130);
     });
 
     it("should render the second-level container with full-height class", async () => {
@@ -5716,7 +5716,6 @@ describe("Index.vue (Main Traces Page)", () => {
       for (const splitter of wrapper.findAllComponents(OSplitter)) splitter.vm.$forceUpdate();
       await nextTick();
     };
-    const keptLine = () => wrapper.find('[data-test="traces-sql-kept-line"]');
     const statementCard = () => wrapper.find('[data-test="traces-statement-in-traces"]');
 
     // Spans SQL run with `sql`, over the filter `filter`, then the view switch to Traces.
@@ -5820,70 +5819,20 @@ describe("Index.vue (Main Traces Page)", () => {
     });
 
     describe("leaving Spans SQL for the Traces view", () => {
-      it("runs the shared filter with no dialog, keeps the SQL text and says so in a line", async () => {
+      it("runs the shared filter with no dialog and keeps the SQL text", async () => {
         const request = await leaveForTraces(grouped);
         expect(mockSearchObj.meta.searchMode).toBe("traces");
         expect(mockSearchObj.meta.sqlMode).toBe(false);
         expect(mockSearchObj.data.editorValue).toBe("duration > 1");
         expect(request.type).toBe("traces");
         expect(request.queryReq.filter).toContain("duration > 1");
-        expect(keptLine().text()).toContain(
-          "SQL stays in Spans. This filter is not from your SQL.",
-        );
-      });
-
-      it("says every trace shows when no filter is set", async () => {
-        await leaveForTraces(big, "");
-        expect(keptLine().text()).toContain(
-          "SQL stays in Spans. No filter is set, so this shows every trace in the range.",
-        );
-      });
-
-      it("names the stream when the SQL reads another one", async () => {
-        await leaveForTraces(`SELECT * FROM "other" WHERE a = 1`);
-        expect(keptLine().text()).toContain("Your SQL reads other");
-      });
-
-      it("Use WHERE from SQL replaces the filter with the top-level WHERE and runs it", async () => {
-        await leaveForTraces(grouped);
-        // The stubbed result list has no charts to reload.
-        wrapper.vm.searchResultRef = { getDashboardData: vi.fn() };
-        await keptLine().find('[data-test="traces-sql-kept-line-use-where-btn"]').trigger("click");
-        await redraw();
-        expect(mockSearchObj.data.editorValue).toBe("a = 1");
-        const [request] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
-        expect(request.type).toBe("traces");
-        expect(request.queryReq.filter).toContain("a = 1");
-        expect(keptLine().text()).toContain(
-          "Using the WHERE from your SQL. It replaced your filter. GROUP BY and HAVING are not applied.",
-        );
         expect(mockSqlTexts().sqlTexts.sql).toBe(grouped);
-
-        mockSearchObj.data.editorValue = "a = 2";
-        await redraw();
-        expect(keptLine().text()).toContain("This filter is not from your SQL.");
       });
 
-      it.each([
-        [big, "Your SQL has no WHERE that the Traces view can run."],
-        [
-          `SELECT * FROM "default" d WHERE d.a = 1`,
-          "Your SQL has no WHERE that the Traces view can run.",
-        ],
-        [`SELECT * FROM "default" WHERE (a = 1`, "Your SQL can't be read. Fix it in Spans first."],
-      ])("shows Use WHERE from SQL disabled for %s, with its reason", async (sql, reason) => {
-        await leaveForTraces(sql);
-        const button = keptLine().find('[data-test="traces-sql-kept-line-use-where-btn"]');
-        expect(button.attributes("aria-disabled")).toBe("true");
-        expect(button.text()).toContain(reason);
-        await button.trigger("click");
-        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
-      });
-
-      it("Back to SQL opens Spans with SQL on and the stored text, and runs nothing until Run", async () => {
+      it("the SQL switch opens Spans with SQL on and the stored text, and runs nothing until Run", async () => {
         await leaveForTraces(grouped);
         mockSearchObj.data.editorValue = "span_status = 'ERROR'";
-        keptLine().find('[data-test="traces-sql-kept-line-back-to-sql-btn"]').trigger("click");
+        wrapper.vm.onOpenSpansSql();
         await redraw();
         expect(mockSearchObj.meta.searchMode).toBe("spans");
         expect(mockSearchObj.meta.sqlMode).toBe(true);
@@ -5891,14 +5840,13 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockSqlTexts().sqlTexts.filter).toBe("span_status = 'ERROR'");
         expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
         expect(wrapper.find('[data-test="traces-sql-awaiting-run"]').exists()).toBe(true);
-        expect(keptLine().exists()).toBe(false);
       });
 
-      it("Back to SQL brings the stored SQL, never a SELECT typed in the Traces filter", async () => {
+      it("the SQL switch brings the stored SQL, never a SELECT typed in the Traces filter", async () => {
         await leaveForTraces(grouped);
         const typed = `SELECT trace_id FROM "default"`;
         mockSearchObj.data.editorValue = typed;
-        keptLine().find('[data-test="traces-sql-kept-line-back-to-sql-btn"]').trigger("click");
+        wrapper.vm.onOpenSpansSql();
         await redraw();
         expect(mockSearchObj.meta.sqlMode).toBe(true);
         expect(mockSearchObj.data.editorValue).toBe(grouped);
@@ -5906,16 +5854,16 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockSqlTexts().sqlTexts.filter).toBe(typed);
       });
 
-      it("Back to SQL waits with the chart frames and a run prompt, not a full-page state", async () => {
+      it("the SQL switch waits with the chart frames and a run prompt, not a full-page state", async () => {
         await leaveForTraces(grouped);
-        keptLine().find('[data-test="traces-sql-kept-line-back-to-sql-btn"]').trigger("click");
+        wrapper.vm.onOpenSpansSql();
         await redraw();
         const waiting = wrapper.find('[data-test="traces-sql-awaiting-run"]');
         expect(waiting.find('[data-test="traces-sql-awaiting-run-charts"]').exists()).toBe(true);
         expect(waiting.text()).toContain("Run the query to see results");
       });
 
-      it("a plain click back on Spans does the same as Back to SQL", async () => {
+      it("a plain click back on Spans also opens the stored SQL", async () => {
         await leaveForTraces(grouped);
         wrapper.vm.onSearchModeChange("spans");
         await redraw();
@@ -5924,12 +5872,11 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
       });
 
-      it("a handoff clears the SQL text, so the line goes", async () => {
+      it("a handoff clears the SQL text", async () => {
         await leaveForTraces(grouped);
         wrapper.vm.handleServiceGraphViewTraces({ mode: "traces", serviceName: "checkout" });
         await redraw();
         expect(mockSqlTexts().sqlTexts.sql).toBe("");
-        expect(keptLine().exists()).toBe(false);
       });
     });
 
@@ -5957,8 +5904,6 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockSearchObj.meta.sqlMode).toBe(false);
         expect(mockSearchObj.data.editorValue).toBe("service_name = 'api'");
         expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
-        // The pre-fill was never edited or run, so nothing is kept and no line shows.
-        expect(keptLine().exists()).toBe(false);
       });
     });
 
@@ -5972,18 +5917,22 @@ describe("Index.vue (Main Traces Page)", () => {
         mockSearchObj.meta.sqlMode = sqlMode;
         await flushPromises();
       };
-      // The Spans view's Scope row adds its 36px under the editor.
+      // The Spans view's Scope row adds its 40px under the editor.
       await showSql("a = 1\nAND b = 2\nAND c = 3", false);
-      expect(wrapper.vm.splitterModel).toBe(126);
+      expect(wrapper.vm.splitterModel).toBe(130);
 
+      // SQL hides the Scope row, so its 40px holds the third and fourth lines.
       await showSql(`SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`);
+      expect(wrapper.vm.splitterModel).toBe(130);
+
+      await showSql(Array.from({ length: 5 }, (_, i) => `-- ${i}`).join("\n"));
       expect(wrapper.vm.splitterModel).toBe(144);
 
       await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
-      expect(wrapper.vm.splitterModel).toBe(198);
+      expect(wrapper.vm.splitterModel).toBe(162);
 
       await showSql("SELECT 1");
-      expect(wrapper.vm.splitterModel).toBe(126);
+      expect(wrapper.vm.splitterModel).toBe(130);
     });
 
     it("shrinks the query bar back after multi-line SQL, unless the reader dragged it", async () => {
@@ -5996,9 +5945,9 @@ describe("Index.vue (Main Traces Page)", () => {
         await flushPromises();
       };
       await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
-      expect(wrapper.vm.splitterModel).toBe(198);
+      expect(wrapper.vm.splitterModel).toBe(162);
       await showSql("a = 1", false);
-      expect(wrapper.vm.splitterModel).toBe(126);
+      expect(wrapper.vm.splitterModel).toBe(130);
       await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
       // Leaving the Spans view turns SQL off first, then drops the Scope row: one shrink, not two.
       mockSearchObj.meta.sqlMode = false;
@@ -6007,12 +5956,32 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.splitterModel).toBe(90);
       mockSearchObj.meta.searchMode = "spans";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(126);
+      expect(wrapper.vm.splitterModel).toBe(130);
 
       await showSql(Array.from({ length: 9 }, (_, i) => `-- ${i}`).join("\n"));
       wrapper.vm.splitterModel = 250;
       await showSql("SELECT 1");
       expect(wrapper.vm.splitterModel).toBe(250);
+    });
+
+    it("keeps the pane height when SQL turns on and off, giving the Scope row's space to the editor", async () => {
+      await mountSql();
+      mockSearchObj.data.editorValue = "SELECT 1";
+      expect(wrapper.vm.splitterModel).toBe(130);
+      mockSearchObj.meta.sqlMode = true;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(130);
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(130);
+
+      wrapper.vm.splitterModel = 220;
+      mockSearchObj.meta.sqlMode = true;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(220);
+      mockSearchObj.meta.sqlMode = false;
+      await flushPromises();
+      expect(wrapper.vm.splitterModel).toBe(220);
     });
 
     it("in the spans view, unrun SQL shows a Run prompt instead of results, until Run", async () => {
@@ -6506,13 +6475,13 @@ describe("Index.vue (Main Traces Page)", () => {
 
       it("makes room for the Scope row in the Spans view only", async () => {
         await mountSql();
-        expect(wrapper.vm.splitterModel).toBe(126);
+        expect(wrapper.vm.splitterModel).toBe(130);
         mockSearchObj.meta.searchMode = "traces";
         await flushPromises();
         expect(wrapper.vm.splitterModel).toBe(90);
         mockSearchObj.meta.searchMode = "spans";
         await flushPromises();
-        expect(wrapper.vm.splitterModel).toBe(126);
+        expect(wrapper.vm.splitterModel).toBe(130);
       });
 
       it("reads whether the stream records reference_parent_span_id", async () => {

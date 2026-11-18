@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTable
       class="h-auto!"
       :wrap="wrap"
-      :columns="columns"
+      :columns="displayColumns"
       :data="hits"
       :loading="loading"
       sorting="none"
@@ -89,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -96,6 +97,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { TracesSqlShape } from "@/utils/traces/tracesSql";
+import { resultColumnFormat } from "@/plugins/traces/composables/useTracesTableColumns";
 
 const props = withDefaults(
   defineProps<{
@@ -130,6 +132,16 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
+
+// Display-only: the cell value stays numeric, so the raw number is what a sort would compare.
+const displayColumns = computed(() => {
+  const timezone = store?.state?.timezone ?? "UTC";
+  return props.columns.map((col) => {
+    const format = resultColumnFormat(String(col.id), timezone);
+    return format ? { ...col, meta: { ...col.meta, format } } : col;
+  });
+});
 
 // Rows without a trace get no listener, so OTable keeps their cursor plain.
 const rowListeners = computed(() =>

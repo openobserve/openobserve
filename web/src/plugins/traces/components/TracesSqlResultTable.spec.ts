@@ -19,6 +19,10 @@ import i18n from "@/locales";
 import TracesSqlResultTable from "./TracesSqlResultTable.vue";
 import { buildResultColumns } from "@/plugins/traces/composables/useTracesTableColumns";
 
+vi.mock("vuex", () => ({
+  useStore: () => ({ state: { timezone: "UTC" } }),
+}));
+
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
@@ -172,5 +176,19 @@ describe("TracesSqlResultTable", () => {
     const wrapper = mountTable({ offerAddTraceId: true });
     await wrapper.find('[data-test="traces-sql-add-trace-id-btn"]').trigger("click");
     expect(wrapper.emitted("add-trace-id")).toHaveLength(1);
+  });
+
+  it("formats duration and time columns for display, keeping the raw value on the row", () => {
+    const row = { first_seen: 1795024510361017, trace_duration: 854178798, spans: 12 };
+    const wrapper = mountTable({
+      hits: [row],
+      columns: buildResultColumns(["first_seen", "trace_duration", "spans"]),
+    });
+    const columns = wrapper.findComponent({ name: "OTable" }).props("columns");
+    const shown = columns.map((c: any) =>
+      c.meta.format ? c.meta.format(row[c.id], row) : row[c.id],
+    );
+    expect(shown).toEqual(["2026-11-18 17:55:10.361", "14.24m", 12]);
+    expect(columns.map((c: any) => c.accessorFn(row))).toEqual([1795024510361017, 854178798, 12]);
   });
 });

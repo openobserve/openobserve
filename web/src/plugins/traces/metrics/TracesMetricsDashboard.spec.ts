@@ -69,7 +69,7 @@ vi.mock("./TracesLatencyHeatmap.vue", () => ({
   default: {
     name: "TracesLatencyHeatmap",
     template: '<div data-test="traces-latency-heatmap"></div>',
-    props: ["request", "selection", "aiEnabled", "sqlMode"],
+    props: ["request", "selection", "aiEnabled", "sqlMode", "caption"],
     emits: [
       "select",
       "filter",
@@ -1880,7 +1880,20 @@ ORDER BY start_time DESC`;
     };
 
     const sentSql = (index = -1) => atob(stream.calls.at(index)!.payload.queryReq.query.sql);
-    const caption = () => wrapper.find('[data-test="traces-red-caption"]');
+    // Rate, Errors and Duration share one caption; the stubbed heatmap's prop is the readable copy.
+    const captionInfo = (name: "rate" | "errors") =>
+      wrapper.find(`[data-test="traces-red-caption-info-${name}"]`);
+    const caption = () => {
+      const lines: string[] =
+        wrapper.findComponent({ name: "TracesLatencyHeatmap" }).props("caption") ?? [];
+      const text = lines.join(" · ");
+      const shown = captionInfo("rate").exists() && captionInfo("errors").exists();
+      expect(shown).toBe(lines.length > 0);
+      for (const p of wrapper.findAllComponents({ name: "TracesRedSqlPanel" })) {
+        expect(p.props("caption")).toEqual(lines);
+      }
+      return { text: () => text, exists: () => lines.length > 0 };
+    };
     const panel = (name: "rate" | "errors") =>
       wrapper.find(`[data-test="traces-red-sql-panel-${name}"]`);
     const panelHits = (name: "rate" | "errors") =>

@@ -19,9 +19,6 @@ import type { ParsedSQLResult } from "@/ts/interfaces";
 
 export type TracesSqlShape = "spans" | "traces" | "rows";
 
-/** Why Use WHERE from SQL is off: the text does not parse, or it has no WHERE the Traces view can run. */
-export type SqlWhereProblem = "unreadable" | "noWhere";
-
 export interface TracesSqlInfo {
   isStatement: boolean;
   /** Top-level WHERE condition sliced from the original text, comments removed. */
@@ -377,31 +374,6 @@ export function insertTraceIdColumn(sql: string): string | null {
       ? next
       : top[selectIdx];
   return `${sql.slice(0, anchor.end)} trace_id,${sql.slice(anchor.end)}`;
-}
-
-/** The top-level WHERE of SQL text as a Traces filter, sliced as typed, or why there is none to run. */
-export function tracesFilterFromSql(
-  sql: string,
-  parser: any,
-): { filter: string; problem: SqlWhereProblem | null } {
-  const none = (problem: SqlWhereProblem) => ({ filter: "", problem });
-  const info = analyzeTracesSql(sql, parser);
-  if (!info.isStatement || parseTracesSql(sql, parser).type !== "select") return none("unreadable");
-  if (!info.where || info.with || info.union || info.join || info.fromSubquery) {
-    return none("noWhere");
-  }
-  // A subquery would run once per partition on the trace list, and a qualified name means nothing on one stream.
-  const tokens = tokenize(info.where);
-  const subquery = tokens.some((tok) => tok.kind === "word" && tok.text.toLowerCase() === "select");
-  const qualified = tokens.some(
-    (tok, i) =>
-      tok.kind === "punct" &&
-      tok.text === "." &&
-      tokens[i - 1]?.end === tok.start &&
-      tokens[i + 1]?.start === tok.end,
-  );
-  if (subquery || qualified) return none("noWhere");
-  return { filter: info.where, problem: null };
 }
 
 /** Result shape from the returned columns: span rows open a span, trace rows open a trace. */

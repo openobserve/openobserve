@@ -29,7 +29,7 @@ const mountSelect = (props: Record<string, unknown> = {}) =>
       stubs: {
         OSelect: {
           name: "OSelect",
-          props: ["modelValue", "disabled", "label", "options", "searchable"],
+          props: ["modelValue", "disabled", "options", "searchable"],
           template: '<div><slot name="trigger" /></div>',
         },
         OTooltip: { name: "OTooltip", props: ["content"], template: "<span />" },
@@ -39,8 +39,10 @@ const mountSelect = (props: Record<string, unknown> = {}) =>
 
 describe("TracesGroupBySelect", () => {
   it("is labelled Group by and offers None first, then the stream's fields", () => {
-    const select = mountSelect().findComponent(OSelect);
-    expect(select.props("label")).toBe("Group by");
+    const wrapper = mountSelect();
+    expect(wrapper.get('[data-test="traces-group-by-select-wrap"] > span').text()).toBe("Group by");
+    const select = wrapper.findComponent(OSelect);
+    expect(select.attributes("aria-label")).toBe("Group by");
     expect(select.props("searchable")).toBe(true);
     expect(select.props("options")).toEqual([
       { label: "None", value: null },

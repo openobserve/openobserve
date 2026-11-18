@@ -147,19 +147,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="me-1 flex min-w-0 items-center @max-[58rem]/results:flex-1 @max-[58rem]/results:justify-end @min-[58rem]/results:min-w-33"
+          class="me-1 flex min-w-0 items-center justify-end @max-[58rem]/results:flex-1 @min-[58rem]/results:min-w-33"
           data-test="traces-search-result-data-age"
         >
-          <ORefreshButton
-            layout="inline"
-            age-format="clock"
-            :last-run-at="searchObj.meta.lastRunAt"
-            :failed-at="searchObj.meta.refreshFailedAt"
-            :loading="regionBusy"
-            :spinner="false"
-            data-test="traces-search-result-refresh"
-            @click="$emit('run-query')"
-          />
+          <div
+            class="border-card-glass-border rounded-default inline-flex h-6 min-w-0 items-center border px-1"
+          >
+            <ORefreshButton
+              size="inset"
+              :last-run-at="searchObj.meta.lastRunAt"
+              :failed-at="searchObj.meta.refreshFailedAt"
+              :loading="regionBusy"
+              :spinner="false"
+              data-test="traces-search-result-refresh"
+              @click="$emit('run-query')"
+            />
+          </div>
         </div>
         <!-- Same affordance as the logs table: a long operation name is often
              the widest thing on a row, and clipping it hides the part that
@@ -174,14 +177,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="wrap-text" size="sm" />
           <OTooltip :content="t('search.messageWrapContent')" />
         </OButton>
-        <!-- The toggle's root renders no DOM node, so a class on it would be dropped. -->
-        <div v-if="!matchAllFix && sqlShape === 'spans'" class="ms-1 inline-flex shrink-0">
-          <OTableColumnToggle
-            :columns="groupsShown ? groupsColumns : searchObj.data.resultGrid.columns"
-            :column-visibility="columnVisibility"
-            @update:column-visibility="setColumnVisibility"
-          />
-        </div>
         <div
           v-if="pagerShown && !groupsShown"
           class="flex items-center transition-opacity"
@@ -302,7 +297,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :request="searchObj.data.groupsRequest!"
           :sort="searchObj.meta.groupsSort"
           :columns="groupsColumns"
-          :column-visibility="columnVisibility"
           :wrap="searchObj.meta.resultGrid.wrapCells"
           @update:sort="(sort) => (searchObj.meta.groupsSort = sort)"
           @open-group="(term: string) => $emit('open-group', term)"
@@ -312,7 +306,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="searchResultListRef"
           :hits="hits"
           :wrap="searchObj.meta.resultGrid.wrapCells"
-          :column-visibility="columnVisibility"
           :scroll-el="scrollContainerRef"
           :loading="searchObj.loading || pending"
           :search-performed="searchPerformed"
@@ -401,8 +394,6 @@ import { resultText, type RegionNoun } from "@/lib/feedback/RegionStatus/regionT
 import { useSettledValue } from "@/composables/useSettledValue";
 import { formatRefreshFailed } from "@/utils/formatters";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
-import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import { allNullColumns } from "@/utils/traces/tracesSqlErrors";
 import { useExemplarTraceLookup } from "@/composables/dashboard/useExemplarTraceLookup";
@@ -426,7 +417,6 @@ export default defineComponent({
     TracesGroupsTable,
     OEmptyState,
     EmptyStateActionCard,
-    OTableColumnToggle,
     TracesMetricsPlaceholder,
     TracesMetricsDashboard: defineAsyncComponent({
       // Its charts load as chunks of their own, so they load with it and the placeholder stays until they can draw.
@@ -785,25 +775,12 @@ export default defineComponent({
         !searchObj.meta.sqlMode,
     );
 
-    // Each view's list keeps its own hidden columns, as each OTable keeps its own.
-    const columnToggles = {
-      spans: useExternalColumnToggle("traces-spans-list"),
-      traces: useExternalColumnToggle("traces-traces-list"),
-      groups: useExternalColumnToggle("traces-groups-list"),
-    };
     const groupsColumns = computed(() => {
       if (!groupsShown.value) return [];
       const cols = buildGroupsColumns(searchObj.data.groupsRequest?.key ?? "", t);
-      fillLastColumn(cols, "", columnToggles.groups.columnVisibility.value);
+      fillLastColumn(cols, "");
       return cols;
     });
-    const listColumnToggle = computed(() => {
-      if (groupsShown.value) return columnToggles.groups;
-      return searchObj.meta.searchMode === "spans" ? columnToggles.spans : columnToggles.traces;
-    });
-    const columnVisibility = computed(() => listColumnToggle.value.columnVisibility.value);
-    const setColumnVisibility = (visibility: Record<string, boolean>) =>
-      listColumnToggle.value.setColumnVisibility(visibility);
 
     // The count runs after the rows, so until it answers there is no total to show.
     const countPending = computed(() => searchObj.data.queryResults?.countPending === true);
@@ -988,8 +965,6 @@ export default defineComponent({
       changeRowsPerPage,
       changeSortBy,
       rowsPerPageOptions,
-      columnVisibility,
-      setColumnVisibility,
       groupsShown,
       groupsColumns,
       totalPages,

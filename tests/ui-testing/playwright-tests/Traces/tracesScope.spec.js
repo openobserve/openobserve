@@ -75,7 +75,7 @@ test.describe("Traces scope select testcases", () => {
     await expect(page).not.toHaveURL(/[?&]scope=/, { timeout: 10000 });
   });
 
-  test("P2: Turning SQL mode on writes the scope into the WHERE and disables the select", {
+  test("P2: Turning SQL mode on writes the scope into the WHERE and hides the select", {
     tag: ['@tracesScope', '@tracesSqlMode', '@traces', '@query', '@P2', '@all']
   }, async () => {
     await pm.tracesPage.setQueryEditorValue('');
@@ -88,23 +88,6 @@ test.describe("Traces scope select testcases", () => {
     await pm.tracesPage.expectQueryEditorValue(
       `SELECT * FROM "default" WHERE ${ROOT} ORDER BY start_time DESC`,
     );
-    await expect(pm.tracesPage.getScopeSelect()).toBeDisabled();
-  });
-
-  test("P2: The Columns button hides a list column and counts it", {
-    tag: ['@tracesScope', '@traces', '@P2', '@all']
-  }, async () => {
-    await pm.tracesPage.setTimeRange('15m');
-    await pm.tracesPage.runSearch();
-    await expect(pm.tracesPage.getListHeaderCell('service_name')).toBeVisible({ timeout: 20000 });
-
-    await pm.tracesPage.toggleListColumn('service_name');
-
-    await expect(pm.tracesPage.getListHeaderCell('service_name')).toHaveCount(0);
-    await expect(pm.tracesPage.getColumnsHiddenBadge()).toHaveText('1');
-
-    await pm.tracesPage.toggleListColumn('service_name');
-    await expect(pm.tracesPage.getListHeaderCell('service_name')).toBeVisible();
-    await expect(pm.tracesPage.getColumnsHiddenBadge()).toHaveCount(0);
+    await expect(pm.tracesPage.getScopeSelect()).toHaveCount(0);
   });
 });

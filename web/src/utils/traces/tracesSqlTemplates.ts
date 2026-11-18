@@ -48,11 +48,12 @@ const PLACEHOLDER_SERVICES = ["service-a", "service-b"];
 const TOKENS_BY_MODEL_FIELDS = ["gen_ai_request_model", "gen_ai_usage_input_tokens"];
 
 // No start_time or end_time columns: their ns values pass 2^53 and lose precision in the browser.
+// Durations are µs (span `duration` unit) under a unit-free name so the result table formats them.
 const TRACE_SUMMARY_COLUMNS =
   "SELECT trace_id, min(_timestamp) AS first_seen,\n" +
   "  count(*) AS spans,\n" +
   "  sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errors,\n" +
-  "  (max(end_time) - min(start_time)) / 1000000 AS duration_ms";
+  "  (max(end_time) - min(start_time)) / 1000 AS trace_duration";
 
 /** The Spans SQL templates: Trace questions, one summary row per trace, then Span summaries. */
 export function tracesSqlTemplates(
@@ -74,7 +75,10 @@ function traceQuestions(from: string, services: string[]): TracesSqlTemplate[] {
     names: string[] = [],
   ): TracesSqlTemplate => ({ id, group: "traceQuestions", sql, services: names });
   return [
-    question("slowTraces", perTrace("max(end_time) - min(start_time) > 2000000000", "duration_ms")),
+    question(
+      "slowTraces",
+      perTrace("max(end_time) - min(start_time) > 2000000000", "trace_duration"),
+    ),
     question("bigTraces", perTrace("count(*) > 200", "spans")),
     question(
       "errorsInTwoServices",

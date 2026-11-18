@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="h-auto!"
                 :wrap="wrap"
                 :columns="tableColumns"
-                :column-visibility="columnVisibility"
                 :data="hits"
                 :loading="loading"
                 :get-row-status-color="traceRowStatusColor"
@@ -356,8 +355,6 @@ interface Props {
   showCellActions?: boolean;
   /** Wrap long cell content instead of clipping it. Default: false. */
   wrap?: boolean;
-  /** Columns the results toolbar's Columns button hid, keyed by column id. */
-  columnVisibility?: Record<string, boolean>;
   /** Whether the AI copilot is enabled — gates the "Ask AI" empty-state button. */
   aiEnabled?: boolean;
   /** Authoritative stream doc time range (µs) for the empty-state jump card. */
@@ -389,7 +386,6 @@ const props = withDefaults(defineProps<Props>(), {
   searchMode: "traces",
   showCellActions: true,
   wrap: false,
-  columnVisibility: undefined,
   aiEnabled: false,
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
@@ -567,7 +563,7 @@ const injectsVersionColumn = computed(
       (column: { id: string }) => column.id === VERSION_COLUMN_ID,
     ),
 );
-const withVersionColumn = computed(() => {
+const tableColumns = computed(() => {
   const columns = searchObj.data.resultGrid.columns;
   if (!injectsVersionColumn.value) return columns;
   const at = columns.findIndex((column: { id: string }) => column.id === "service_name");
@@ -582,17 +578,6 @@ const withVersionColumn = computed(() => {
   return at === -1
     ? [...columns, version]
     : [...columns.slice(0, at + 1), version, ...columns.slice(at + 1)];
-});
-
-// A filler hidden by the Columns button would leave no column absorbing the leftover width.
-const tableColumns = computed(() => {
-  const cols = withVersionColumn.value;
-  const visibility = props.columnVisibility ?? {};
-  const filler = cols.find((col: any) => col.meta?.fillRemaining);
-  if (!filler || visibility[filler.id] !== false) return cols;
-  const copies = cols.map((col: any) => ({ ...col }));
-  fillLastColumn(copies, timestampCol.value, visibility);
-  return copies;
 });
 
 const sortFieldMap = computed<Record<string, string>>(() => ({

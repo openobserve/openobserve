@@ -24,7 +24,7 @@ const HEAD =
   "SELECT trace_id, min(_timestamp) AS first_seen,\n" +
   "  count(*) AS spans,\n" +
   "  sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS errors,\n" +
-  "  (max(end_time) - min(start_time)) / 1000000 AS duration_ms";
+  "  (max(end_time) - min(start_time)) / 1000 AS trace_duration";
 
 describe("tracesSqlTemplates: Trace questions", () => {
   const list = tracesSqlTemplates("otel_demo", {
@@ -53,7 +53,7 @@ describe("tracesSqlTemplates: Trace questions", () => {
 
   it("returns one summary row per trace, sorted, capped at 100", () => {
     expect(byId(list, "slowTraces").sql).toBe(
-      `${HEAD}\nFROM "otel_demo"\nGROUP BY trace_id\nHAVING max(end_time) - min(start_time) > 2000000000\nORDER BY duration_ms DESC\nLIMIT 100`,
+      `${HEAD}\nFROM "otel_demo"\nGROUP BY trace_id\nHAVING max(end_time) - min(start_time) > 2000000000\nORDER BY trace_duration DESC\nLIMIT 100`,
     );
     expect(byId(list, "bigTraces").sql).toBe(
       `${HEAD}\nFROM "otel_demo"\nGROUP BY trace_id\nHAVING count(*) > 200\nORDER BY spans DESC\nLIMIT 100`,

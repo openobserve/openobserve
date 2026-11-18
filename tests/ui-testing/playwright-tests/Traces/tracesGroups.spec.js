@@ -94,7 +94,7 @@ test.describe("Traces Groups view testcases", () => {
     await expect(pm.tracesPage.getGroupsTable()).toBeVisible();
   });
 
-  test("P2: Turning SQL mode on sets Group by back to None and disables it", {
+  test("P2: Turning SQL mode on sets Group by back to None and hides it", {
     tag: ['@tracesGroups', '@tracesSqlMode', '@traces', '@P2', '@all']
   }, async () => {
     await pm.tracesPage.pickGroupBy('service_name');
@@ -103,7 +103,12 @@ test.describe("Traces Groups view testcases", () => {
     await pm.tracesPage.toggleSqlModeFromToolbar();
 
     await pm.tracesPage.expectSqlMode(true);
+    await expect(pm.tracesPage.getGroupsTable()).toHaveCount(0);
+    await expect(pm.tracesPage.getGroupBySelect()).toHaveCount(0);
+
+    await pm.tracesPage.toggleSqlModeFromToolbar();
+
+    await pm.tracesPage.expectSqlMode(false);
     await expect(pm.tracesPage.getGroupByValue()).toHaveText('None');
-    await expect(pm.tracesPage.getGroupBySelect()).toBeDisabled();
   });
 });

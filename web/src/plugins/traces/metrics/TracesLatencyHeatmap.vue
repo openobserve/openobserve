@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default bg-surface-base rounded-default flex h-full min-h-0 flex-col overflow-hidden border"
   >
     <PanelBar class="w-full justify-between gap-2" data-test="traces-latency-heatmap-title">
-      <span class="truncate">{{ t("traces.latencyHeatmap.title") }}</span>
+      <span class="flex min-w-0 items-center">
+        <span class="truncate">{{ t("traces.latencyHeatmap.title") }}</span>
+        <TracesRedCaptionInfo v-if="caption?.length" panel="duration" :lines="caption" />
+      </span>
       <LatencyHeatmapColorToggle v-model="colorBy" />
       <ODropdown v-if="!sqlMode" side="bottom" align="end">
         <template #trigger>
@@ -218,6 +221,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import TracesRedCaptionInfo from "./TracesRedCaptionInfo.vue";
 import LatencyHeatmapColorToggle, {
   type LatencyHeatmapColorBy,
 } from "./LatencyHeatmapColorToggle.vue";
@@ -271,6 +275,8 @@ const props = defineProps<{
   source?: string;
   /** Typed SQL takes no inserted conditions, so the box offers no filter or drill down. */
   sqlMode?: boolean;
+  /** Which spans the SQL-mode charts cover; empty hides the info icon. */
+  caption?: string[];
 }>();
 
 const emit = defineEmits<{

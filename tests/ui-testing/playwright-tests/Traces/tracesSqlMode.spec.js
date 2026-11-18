@@ -73,7 +73,8 @@ test.describe("Traces SQL mode testcases", () => {
     await expect(table).toContainText('service_name');
     await expect(table).toContainText('spans');
     await expect(pm.tracesPage.getRedMetricsDashboard()).toBeVisible();
-    await expect(pm.tracesPage.getRedCaption()).toContainText('GROUP BY not applied', { timeout: 20000 });
+    const caption = await pm.tracesPage.openRedRateCaption();
+    await expect(caption).toContainText('GROUP BY not applied', { timeout: 20000 });
   });
 
   test("P1: Turning SQL mode off shows and runs the filter with no dialog, and keeps the SQL", {
@@ -117,11 +118,9 @@ test.describe("Traces SQL mode testcases", () => {
 
     await pm.tracesPage.expectSqlMode(false);
     await pm.tracesPage.expectQueryEditorValue(FILTER);
-    // The pre-fill was never edited or run, so nothing is kept for Spans.
-    await expect(pm.tracesPage.getSqlKeptLine()).toHaveCount(0);
   });
 
-  test("P1: Leaving Spans SQL for Traces keeps the SQL, and Use WHERE from SQL runs its WHERE", {
+  test("P1: Leaving Spans SQL for Traces keeps the SQL, and the SQL switch brings it back", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
   }, async () => {
     await pm.tracesPage.setQueryEditorValue('');
@@ -132,20 +131,9 @@ test.describe("Traces SQL mode testcases", () => {
     await expect(pm.tracesPage.getSqlResultTable()).toBeVisible({ timeout: 20000 });
 
     await pm.tracesPage.switchToTracesMode();
-
     await pm.tracesPage.expectSqlMode(false);
-    await expect(pm.tracesPage.getSqlKeptLine()).toContainText(
-      'No filter is set, so this shows every trace in the range.',
-      { timeout: 10000 },
-    );
 
-    await pm.tracesPage.getUseWhereFromSqlButton().click();
-
-    await pm.tracesPage.expectQueryEditorValue(FILTER);
-    await expect(pm.tracesPage.getSqlKeptLine()).toContainText('Using the WHERE from your SQL.');
-    await expect(pm.tracesPage.getTraceResultRows().first()).toBeVisible({ timeout: 20000 });
-
-    await pm.tracesPage.backToSql();
+    await pm.tracesPage.toggleSqlModeFromToolbar();
 
     await pm.tracesPage.expectSqlMode(true);
     await pm.tracesPage.expectQueryEditorValue(GROUPED_WHERE);
@@ -265,7 +253,7 @@ test.describe("Traces SQL mode testcases", () => {
 
     const table = pm.tracesPage.getSqlResultTable();
     await expect(table).toBeVisible({ timeout: 20000 });
-    for (const column of ['trace_id', 'first_seen', 'spans', 'errors', 'duration_ms']) {
+    for (const column of ['trace_id', 'first_seen', 'spans', 'errors', 'trace_duration']) {
       await expect(table).toContainText(column);
     }
 

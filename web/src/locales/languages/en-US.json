@@ -17361,6 +17361,7 @@
     "sqlMode": {
       "indicator": "SQL",
       "actionUnavailable": "Not available in SQL mode yet",
+      "drillDownDisabled": "Drill down is not available in SQL mode",
       "putConditionInWhere": "In SQL mode, put the condition in your WHERE clause",
       "rowsCount": "{count} row | {count} rows",
       "histogramLossWarning": "This query shape can lose spans across time partitions",
@@ -17372,17 +17373,6 @@
         "title": "The Traces view takes a filter, not a SELECT",
         "subqueryTitle": "The Traces view cannot run a subquery",
         "description": "SQL runs in the Spans view."
-      },
-      "keptLine": {
-        "noFilter": "SQL stays in Spans. No filter is set, so this shows every trace in the range.",
-        "otherFilter": "SQL stays in Spans. This filter is not from your SQL.",
-        "fromSql": "Using the WHERE from your SQL. It replaced your filter.",
-        "groupingNotApplied": "GROUP BY and HAVING are not applied.",
-        "otherStream": "Your SQL reads {stream}; this list uses the stream picker.",
-        "useWhere": "Use WHERE from SQL",
-        "backToSql": "Back to SQL",
-        "noWhere": "Your SQL has no WHERE that the Traces view can run.",
-        "unreadable": "Your SQL can't be read. Fix it in Spans first."
       },
       "examples": "Examples",
       "gallery": {
@@ -17487,6 +17477,7 @@
       }
     },
     "redCaption": {
+      "about": "About this chart",
       "matched": "Charts: all matched spans",
       "matchedCount": "Charts: {count} matched span | Charts: all {count} matched spans",
       "noneMatched": "Charts: 0 spans matched",

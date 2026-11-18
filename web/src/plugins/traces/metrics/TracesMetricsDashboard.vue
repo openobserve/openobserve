@@ -19,24 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Charts Section -->
     <div v-if="show" class="flex flex-col will-change-[transform,opacity]">
       <div
-        v-if="sqlSpanSet"
-        class="flex min-w-0 items-center px-1 pt-1"
-        data-test="traces-red-caption-row"
-      >
-        <OTag
-          v-if="captionText"
-          :variant="
-            sqlSpanSet.kind === 'set' && sqlSpanSet.subject === 'stream'
-              ? 'warning-soft'
-              : 'default-soft'
-          "
-          class="max-w-full min-w-0"
-          data-test="traces-red-caption"
-        >
-          <OTruncatedText>{{ captionText }}</OTruncatedText>
-        </OTag>
-      </div>
-      <div
         v-if="sqlSpanSet?.kind === 'none'"
         class="border-border-default bg-surface-base rounded-default m-1 flex min-h-[8.5rem] items-center justify-center border md:h-[9.5625rem]"
         data-test="traces-red-frame"
@@ -71,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :hits="panel.hits"
               :selected-time-obj="currentTimeObj.__global"
               :run-key="redRunKey"
+              :caption="captionLines"
               @retry="runCombinedRed"
               @data-zoom="onDataZoom"
             />
@@ -104,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selection="heatmapSelection"
             :ai-enabled="aiEnabled"
             :sql-mode="!!searchObj.meta.sqlMode"
+            :caption="captionLines"
             @select="onHeatmapSelect"
             @filter="heatmapSelection && onHeatmapFilter(heatmapSelection)"
             @drill-down="onHeatmapDrillDown"
@@ -191,8 +175,6 @@ import {
 import { useTracesRedStream } from "./useTracesRedStream";
 import { tracesEditorIsStaged } from "@/plugins/traces/tracesSearchBar.utils";
 import TracesRedSqlPanel from "./TracesRedSqlPanel.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
@@ -602,11 +584,11 @@ const subjectCaption = (set: SpanSet, count: number | null): string => {
 };
 
 // Which spans, how many, each clause not applied and the scope, in that order.
-const captionText = computed(() => {
+const captionLines = computed((): string[] => {
   const set = sqlSpanSet.value;
-  if (set?.kind !== "set") return "";
+  if (set?.kind !== "set") return [];
   const count = redStatus.value === "ready" ? redSpans.value : null;
-  if (set.subject === "stream") return subjectCaption(set, count);
+  if (set.subject === "stream") return [subjectCaption(set, count)];
   const parts = [subjectCaption(set, count)];
   if (set.subject !== "matched" && count !== null) {
     parts.push(t("traces.redCaption.count", { count: count.toLocaleString() }, count));
@@ -616,7 +598,7 @@ const captionText = computed(() => {
     parts.push(t("traces.redCaption.notApplied", { clauses }));
   }
   parts.push(t("traces.redCaption.scope"));
-  return parts.join(" · ");
+  return parts;
 });
 
 const frameReason = computed(() => {

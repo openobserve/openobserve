@@ -78,24 +78,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
 
-          <OButton
-            v-if="showDrillDown"
-            data-test="insights-button"
-            variant="outline"
-            size="xs"
-            :disabled="
-              searchObj.loading ||
-              !(searchObj.data.queryResults?.total || searchObj.data.queryResults?.hits?.length)
-            "
-            focusable-unavailable
-            @click="$emit('drill-down')"
-          >
-            <template #icon-left>
-              <OIcon name="timeline" size="sm" class="shrink-0" />
-            </template>
-            <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
-            <OTooltip :content="t('volumeInsights.analyzeTooltipTraces')" />
-          </OButton>
+          <span v-if="showDrillDown" class="inline-flex" data-test="insights-button-wrap">
+            <!-- First child, so the tooltip binds to the wrapper: the disabled button takes no pointer events. -->
+            <OTooltip
+              v-if="searchObj.meta.sqlMode"
+              :content="t('traces.sqlMode.drillDownDisabled')"
+            />
+            <OButton
+              data-test="insights-button"
+              variant="outline"
+              size="sm-toolbar"
+              :disabled="
+                searchObj.loading ||
+                !!searchObj.meta.sqlMode ||
+                !(searchObj.data.queryResults?.total || searchObj.data.queryResults?.hits?.length)
+              "
+              :class="{ 'pointer-events-none': searchObj.meta.sqlMode }"
+              :focusable-unavailable="!searchObj.meta.sqlMode"
+              @click="$emit('drill-down')"
+            >
+              <template #icon-left>
+                <OIcon name="timeline" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!shouldHideToolbarButtonText">{{ t("traces.drillDown") }}</span>
+              <OTooltip
+                v-if="!searchObj.meta.sqlMode"
+                :content="t('volumeInsights.analyzeTooltipTraces')"
+              />
+            </OButton>
+          </span>
           <span
             v-else-if="drillDownSlot"
             class="invisible inline-flex"
@@ -103,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inert
             data-test="insights-button-placeholder"
           >
-            <OButton variant="outline" size="xs" tabindex="-1">
+            <OButton variant="outline" size="sm-toolbar" tabindex="-1">
               <template #icon-left>
                 <OIcon name="timeline" size="sm" class="shrink-0" />
               </template>
@@ -802,7 +813,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
-        <div v-if="showSqlExamples" class="absolute end-2 top-1 z-2">
+        <!-- Clears the editor's floating AI button, which sits at the top-right corner. -->
+        <div
+          v-if="showSqlExamples"
+          class="absolute top-1 z-2"
+          :class="isAiEnabled && !nlpMode ? 'end-9' : 'end-2'"
+          data-test="traces-sql-examples-wrap"
+        >
           <ODropdown
             side="bottom"
             align="end"
@@ -839,7 +856,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div
-      v-if="searchObj.meta.searchMode === 'spans' && searchObj.meta.showQuery"
+      v-if="
+        searchObj.meta.searchMode === 'spans' && searchObj.meta.showQuery && !searchObj.meta.sqlMode
+      "
       class="border-border-default flex h-10 shrink-0 items-center gap-2 border-b px-1.5"
       data-test="traces-search-bar-scope-row"
     >
@@ -2068,8 +2087,7 @@ export default defineComponent({
         searchObj.data.stream.streamLists.length > 0 &&
         !!searchObj.data.stream.selectedStream?.value &&
         !searchObj.data.errorMsg?.trim()?.length &&
-        !!searchObj.searchApplied &&
-        !searchObj.meta.sqlMode,
+        !!searchObj.searchApplied,
     );
     const drillDownSlot = computed(
       () =>

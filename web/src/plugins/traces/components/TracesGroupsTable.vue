@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTable
             class="h-auto!"
             :columns="columns"
-            :column-visibility="columnVisibility"
             :data="rows"
             :loading="loading"
             :wrap="wrap"
@@ -47,6 +46,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @sort-change="onSortChange"
             @cell-contextmenu="(params: { row: GroupRow }) => (contextRow = params.row)"
           >
+            <template #cell-hover-actions="{ row, column, active }">
+              <CellActions
+                v-if="active && !contextRow && column.id === 'value'"
+                :column="{ id: request.key }"
+                :row="row"
+                :value="row.value"
+                :selected-stream-fields="groupKeyFields"
+                :hide-ai="true"
+                @copy="copyValue(row.value)"
+                @add-search-term="
+                  (_field: string, _value: GroupValue, action: 'include' | 'exclude') =>
+                    apply(row.value, action, false)
+                "
+              />
+            </template>
             <template #cell-value="{ row }">
               <span
                 v-if="isNoValue(row.value)"
@@ -142,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import useTraces from "@/composables/useTraces";
@@ -156,6 +170,8 @@ import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparat
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
+import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber, formatTimeWithSuffix } from "@/utils/zincutils";
@@ -181,10 +197,9 @@ const props = withDefaults(
     request: TracesGroupsRequest;
     sort: GroupsSort;
     columns: OTableColumnDef<GroupRow>[];
-    columnVisibility?: Record<string, boolean>;
     wrap?: boolean;
   }>(),
-  { columnVisibility: undefined, wrap: false },
+  { wrap: false },
 );
 
 const emit = defineEmits<{
@@ -298,6 +313,12 @@ const apply = (value: GroupValue, action: "include" | "exclude", toList: boolean
   if (toList) emit("open-group", term);
   else searchObj.data.stream.addToFilter = term;
 };
+
+// The group key is filterable by construction, so Include/Exclude show as the context menu does, whatever the schema list holds.
+const groupKeyFields = computed(() => [{ name: props.request.key, isSchemaField: true }]);
+
+const copyValue = (value: GroupValue) =>
+  copyToClipboard(isNoValue(value) ? "" : String(displayValue(value)), t);
 
 // OTable's server sort cycles asc, desc, then cleared; the Groups table is never unsorted, so cleared flips the order.
 const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {

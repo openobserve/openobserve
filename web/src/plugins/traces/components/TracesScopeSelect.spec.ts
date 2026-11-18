@@ -30,7 +30,7 @@ const mountSelect = (props: Record<string, unknown> = {}) =>
       stubs: {
         OSelect: {
           name: "OSelect",
-          props: ["modelValue", "disabled", "label"],
+          props: ["modelValue", "disabled"],
           template: '<div><slot name="trigger" /><slot /></div>',
         },
         OSelectItem: {
@@ -59,7 +59,8 @@ const tooltips = (wrapper: ReturnType<typeof mountSelect>) =>
 describe("TracesScopeSelect", () => {
   it("is labelled Scope and offers the three scopes, each with a one-line description", () => {
     const wrapper = mountSelect();
-    expect(wrapper.findComponent(OSelect).props("label")).toBe("Scope");
+    expect(wrapper.get('[data-test="traces-scope-select-wrap"] > span').text()).toBe("Scope");
+    expect(wrapper.findComponent(OSelect).attributes("aria-label")).toBe("Scope");
     expect(items(wrapper)).toEqual([
       { value: "all", disabled: false, text: "All spansEvery span that matches the filter" },
       {

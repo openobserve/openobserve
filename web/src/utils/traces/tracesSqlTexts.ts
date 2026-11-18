@@ -64,8 +64,6 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     prefill: null as string | null,
     /** The scope the pre-fill folded into its WHERE, given back if the pre-fill is dropped untouched. */
     scopeBeforePrefill: null as unknown,
-    /** The WHERE that Use WHERE from SQL wrote into the filter. */
-    filterFromSql: null as string | null,
     /** The filter as it was before a statement was typed over it. */
     filterBeforeStatement: "",
   });
@@ -89,7 +87,6 @@ export function createTracesSqlTexts(host: TracesSqlTextsHost, parser: { value: 
     sqlTexts.sql = "";
     sqlTexts.prefill = null;
     sqlTexts.scopeBeforePrefill = null;
-    sqlTexts.filterFromSql = null;
   };
 
   /** Everything, for a new org. */

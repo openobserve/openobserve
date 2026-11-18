@@ -53,7 +53,7 @@ describe("TracesSqlTemplateGallery", () => {
     expect(trace[0].text()).toContain("Slow traces");
     expect(trace[0].text()).toContain("Whole trace longer than 2 s");
     expect(trace[0].find('[data-test="traces-sql-template-sql"]').text()).toContain(
-      "ORDER BY duration_ms DESC",
+      "ORDER BY trace_duration DESC",
     );
     expect(groupCards(wrapper, "spanSummaries")).toHaveLength(4);
   });

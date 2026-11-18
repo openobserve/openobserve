@@ -168,21 +168,13 @@ const globalOptions = {
     TracesSearchResultList: {
       name: "TracesSearchResultList",
       template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',
-      props: [
-        "hits",
-        "loading",
-        "searchPerformed",
-        "showHeader",
-        "wrap",
-        "showPagination",
-        "columnVisibility",
-      ],
+      props: ["hits", "loading", "searchPerformed", "showHeader", "wrap", "showPagination"],
       emits: ["row-click", "load-more"],
     },
     TracesGroupsTable: {
       name: "TracesGroupsTable",
       template: '<div data-test="traces-groups-stub"></div>',
-      props: ["request", "sort", "columns", "columnVisibility", "wrap"],
+      props: ["request", "sort", "columns", "wrap"],
       emits: ["update:sort"],
     },
     TracesSqlResultTable: {
@@ -248,22 +240,16 @@ describe("SearchResult", () => {
     vi.clearAllMocks();
   });
 
-  describe("Columns button", () => {
-    const columns = [
-      { id: "_timestamp", header: "Timestamp" },
-      { id: "service_name", header: "Service", hideable: true },
-      { id: "duration", header: "Duration", hideable: true },
-    ];
-    const toggle = () => wrapper.findComponent({ name: "OTableColumnToggle" });
-    const badge = () => wrapper.find('[data-test="o2-table-column-toggle-hidden-badge"]');
+  describe("Column visibility", () => {
+    const seedVisibility = (tableId: string, visibility: Record<string, boolean>) =>
+      localStorage.setItem(
+        "o2-tables-column-state-v1",
+        JSON.stringify({ [tableId]: { visibility } }),
+      );
 
-    beforeEach(async () => {
+    beforeEach(() => {
       localStorage.clear();
       mockSearchObj.meta.searchMode = "spans";
-      mockSearchObj.data.resultGrid.columns = columns as any;
-      wrapper.unmount();
-      wrapper = mount(SearchResult, { global: globalOptions });
-      await flushPromises();
     });
 
     afterEach(() => {
@@ -271,34 +257,23 @@ describe("SearchResult", () => {
       localStorage.clear();
     });
 
-    it("sits after Wrap and lists the table's columns", () => {
-      const wrap = wrapper.find('[data-test="traces-search-result-wrap-btn"]').element;
-      const button = wrapper.find('[data-test="o2-table-column-toggle-btn"]').element;
-      expect(wrap.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect(toggle().props("columns")).toEqual(columns);
-    });
-
-    it("hides a column in the list and counts it on the badge", async () => {
-      expect(badge().exists()).toBe(false);
-      toggle().vm.$emit("update:columnVisibility", { service_name: false });
-      await flushPromises();
-      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
-      expect(list.props("columnVisibility")).toEqual({ service_name: false });
-      expect(badge().text()).toBe("1");
-    });
-
-    it("keeps each view's hidden columns apart, and across a remount", async () => {
-      toggle().vm.$emit("update:columnVisibility", { service_name: false });
-      await flushPromises();
-      mockSearchObj.meta.searchMode = "traces";
-      await flushPromises();
-      expect(toggle().props("columnVisibility")).toEqual({});
-
-      mockSearchObj.meta.searchMode = "spans";
+    it("has no Columns button in the results toolbar", async () => {
       wrapper.unmount();
       wrapper = mount(SearchResult, { global: globalOptions });
       await flushPromises();
-      expect(toggle().props("columnVisibility")).toEqual({ service_name: false });
+      expect(wrapper.findComponent({ name: "OTableColumnToggle" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="o2-table-column-toggle-btn"]').exists()).toBe(false);
+    });
+
+    it("shows every column, ignoring hidden columns saved before, and leaves them saved", async () => {
+      seedVisibility("traces-spans-list", { service_name: false });
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+      expect(
+        wrapper.findComponent({ name: "TracesSearchResultList" }).attributes("column-visibility"),
+      ).toBeUndefined();
+      expect(localStorage.getItem("o2-tables-column-state-v1")).toContain("service_name");
     });
   });
 
@@ -313,7 +288,6 @@ describe("SearchResult", () => {
       runId: 1,
     };
     const groups = () => wrapper.findComponent({ name: "TracesGroupsTable" });
-    const toggle = () => wrapper.findComponent({ name: "OTableColumnToggle" });
 
     beforeEach(async () => {
       localStorage.clear();
@@ -347,30 +321,28 @@ describe("SearchResult", () => {
       expect(wrapper.findComponent({ name: "OPagination" }).exists()).toBe(false);
     });
 
-    it("lets the Columns button hide Groups columns, apart from the list's", async () => {
+    it("passes the Groups columns with every one shown, even with hidden columns saved before", async () => {
+      localStorage.setItem(
+        "o2-tables-column-state-v1",
+        JSON.stringify({ "traces-groups-list": { visibility: { p50: false, rate: false } } }),
+      );
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
       expect(
-        toggle()
+        groups()
           .props("columns")
           .map((c: any) => c.id),
       ).toEqual(["value", "spans", "errors", "error_pct", "p50", "p95", "p99", "rate"]);
-      toggle().vm.$emit("update:columnVisibility", { p50: false });
-      await flushPromises();
-      expect(groups().props("columnVisibility")).toEqual({ p50: false });
-      (mockSearchObj.data as any).groupsRequest = null;
-      await flushPromises();
-      expect(toggle().props("columnVisibility")).toEqual({});
+      expect(groups().attributes("column-visibility")).toBeUndefined();
     });
 
-    it("lets the last shown Groups column take the leftover width, as the span list does", async () => {
-      const fill = () =>
-        groups()
-          .props("columns")
-          .filter((c: any) => c.meta?.autoWidth && c.meta?.fillRemaining)
-          .map((c: any) => c.id);
-      expect(fill()).toEqual(["rate"]);
-      toggle().vm.$emit("update:columnVisibility", { rate: false });
-      await flushPromises();
-      expect(fill()).toEqual(["p99"]);
+    it("lets the last Groups column take the leftover width, as the span list does", () => {
+      const fill = groups()
+        .props("columns")
+        .filter((c: any) => c.meta?.autoWidth && c.meta?.fillRemaining)
+        .map((c: any) => c.id);
+      expect(fill).toEqual(["rate"]);
     });
 
     it("keeps the picked sort for the next run and the URL", async () => {
@@ -1386,7 +1358,32 @@ describe("SearchResult header through a re-run (T-3)", () => {
     const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
     expect(dataAge.exists()).toBe(true);
     expect(dataAge.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
-    expect(dataAge.text()).toContain("Updated");
+    expect(dataAge.text()).toMatch(/ago$/);
+  });
+
+  it("shows refresh as the Logs page does: a bordered pill with the status dot and relative age", async () => {
+    (mockSearchObj.meta as any).lastRunAt = Date.UTC(2026, 10, 1, 10, 42);
+    wrapper = mount(SearchResult, { global: globalOptions });
+    await flushPromises();
+
+    const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+    expect(refresh.props()).toMatchObject({
+      size: "inset",
+      layout: "split",
+      ageFormat: "relative",
+    });
+    const pill = wrapper.find('[data-test="traces-search-result-data-age"] > div');
+    expect(pill.find('[data-test="traces-search-result-refresh"]').exists()).toBe(true);
+    expect(pill.classes()).toEqual(
+      expect.arrayContaining([
+        "border",
+        "border-card-glass-border",
+        "rounded-default",
+        "h-6",
+        "px-1",
+      ]),
+    );
+    expect(pill.find(".rounded-full").exists()).toBe(true);
   });
 
   it("keeps the data age readable and the control focusable through a run, with no spinner of its own", async () => {
@@ -1404,7 +1401,7 @@ describe("SearchResult header through a re-run (T-3)", () => {
     expect(document.activeElement).toBe(control().element);
     expect(control().find(".animate-spin").exists()).toBe(false);
     expect(control().find(".text-transparent").exists()).toBe(false);
-    expect(wrapper.find('[data-test="traces-search-result-data-age"]').text()).toContain("Updated");
+    expect(wrapper.find('[data-test="traces-search-result-data-age"]').text()).toMatch(/ago$/);
   });
 
   it("dims the kept values with the auto-run toggle on, as the rows do", async () => {

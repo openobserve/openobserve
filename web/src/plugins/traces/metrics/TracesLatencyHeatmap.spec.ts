@@ -506,6 +506,23 @@ describe("TracesLatencyHeatmap", () => {
       expect(btn.attributes("aria-label")).toBe(i18n.global.t("traces.redActions.durationActions"));
     });
 
+    it("puts the SQL caption behind a labelled info icon after the title, one line per part", async () => {
+      const tooltip = { OTooltip: { template: "<div><slot name='content' /></div>" } };
+      wrapper = await mountHeatmap(
+        { request: request(), caption: ["Charts: a", "Scope: b"] },
+        tooltip,
+      );
+      const info = wrapper.find('[data-test="traces-red-caption-info-duration"]');
+      expect(info.attributes("aria-label")).toBe(i18n.global.t("traces.redCaption.about"));
+      const lines = wrapper.findAll('[data-test="traces-red-caption-duration"] span');
+      expect(lines.map((l: any) => l.text())).toEqual(["Charts: a", "Scope: b"]);
+    });
+
+    it("shows no caption icon without a caption", async () => {
+      wrapper = await mountHeatmap({ request: request(), caption: [] });
+      expect(wrapper.find('[data-test="traces-red-caption-info-duration"]').exists()).toBe(false);
+    });
+
     it("emits create-alert from Create alert", async () => {
       wrapper = await mountHeatmap(undefined, inlineMenu);
       await wrapper.find('[data-test="traces-duration-create-alert"]').trigger("click");

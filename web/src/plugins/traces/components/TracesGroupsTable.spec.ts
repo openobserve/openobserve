@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ref } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -21,9 +22,10 @@ import { gt } from "@/types/i18n";
 import { buildGroupsColumns } from "@/plugins/traces/composables/tracesGroupsColumns";
 import TracesGroupsTable from "./TracesGroupsTable.vue";
 
-const { mockSearch, mockCancelAll, sharedSearchObj } = vi.hoisted(() => ({
+const { mockSearch, mockCancelAll, mockCopy, sharedSearchObj } = vi.hoisted(() => ({
   mockSearch: vi.fn(),
   mockCancelAll: vi.fn(),
+  mockCopy: vi.fn(),
   sharedSearchObj: {
     meta: { groupBy: "service_name" },
     data: { stream: { addToFilter: "" } },
@@ -33,6 +35,8 @@ const { mockSearch, mockCancelAll, sharedSearchObj } = vi.hoisted(() => ({
 vi.mock("@/plugins/traces/composables/useLLMStreamQuery", () => ({
   useLLMStreamQuery: () => ({ executeQuery: mockSearch, cancelAll: mockCancelAll }),
 }));
+
+vi.mock("@/utils/clipboard", () => ({ copyToClipboard: mockCopy }));
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({ searchObj: sharedSearchObj }),
@@ -61,14 +65,21 @@ const hit = (value: string | null, spans: number, errors: number) => ({
   p99: 3_000_000,
 });
 
+// The column whose cells the stub shows hover actions for, as OTable does for the hovered cell.
+const hoveredColumn = ref<string | null>(null);
+
 const OTableStub = {
   name: "OTable",
-  props: ["data", "columns", "sortBy", "sortOrder", "loading", "columnVisibility"],
+  props: ["data", "columns", "sortBy", "sortOrder", "loading"],
   emits: ["row-click", "sort-change", "cell-contextmenu"],
+  setup: () => ({ hoveredColumn }),
   template: `<div>
-    <div v-for="(row, i) in data" :key="i" data-test="row">
+    <div v-for="(row, i) in data" :key="i" data-test="row" @click="$emit('row-click', row)">
       <span v-for="col in columns" :key="col.id" :data-test="'cell-' + col.id">
         <slot :name="'cell-' + col.id" :row="row" />
+        <span v-if="hoveredColumn === col.id" :data-test="'hover-' + col.id">
+          <slot name="cell-hover-actions" :row="row" :column="col" :active="true" />
+        </span>
       </span>
     </div>
     <slot v-if="!data.length" name="empty" />
@@ -90,7 +101,6 @@ const mountTable = async (props: Record<string, unknown> = {}) => {
       request: request(),
       sort: { by: "errors", order: "desc" },
       columns: buildGroupsColumns("service_name", gt),
-      columnVisibility: {},
       ...props,
     },
     global: {
@@ -123,6 +133,7 @@ describe("TracesGroupsTable", () => {
     mockSearch.mockReset();
     sharedSearchObj.meta.groupBy = "service_name";
     sharedSearchObj.data.stream.addToFilter = "";
+    hoveredColumn.value = null;
   });
 
   afterEach(() => {
@@ -343,5 +354,58 @@ describe("TracesGroupsTable", () => {
       "Exclude Term",
       "Open traces",
     ]);
+  });
+
+  describe("cell hover actions", () => {
+    const hoverOn = async (column: string, value: string | null, key = "service_name") => {
+      respond([hit(value, 200, 10)], []);
+      const wrapper = await mountTable({ request: request({ key }) });
+      hoveredColumn.value = column;
+      await flushPromises();
+      return wrapper;
+    };
+    const actions = (wrapper: any, column = "value") =>
+      wrapper.find(`[data-test="hover-${column}"]`);
+
+    it("offers Copy, Include and Exclude on the grouped field's cell", async () => {
+      const wrapper = await hoverOn("value", "cart");
+      const cell = actions(wrapper);
+      expect(cell.find('[data-test="logs-cell-actions-copy-btn"]').exists()).toBe(true);
+      expect(cell.find('[data-test="log-details-include-field-cart"]').exists()).toBe(true);
+      expect(cell.find('[data-test="log-details-exclude-field-cart"]').exists()).toBe(true);
+    });
+
+    it.each(["spans", "errors", "p50", "p95", "p99"])("offers none on the %s column", async (c) => {
+      const wrapper = await hoverOn(c, "cart");
+      expect(actions(wrapper, c).exists()).toBe(true);
+      expect(actions(wrapper, c).find('[data-test="logs-cell-actions-copy-btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("Include adds the context menu's filter and opens no traces", async () => {
+      const wrapper = await hoverOn("value", "it's");
+      await actions(wrapper)
+        .find("[data-test='log-details-include-field-it\\'s']")
+        .trigger("click");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe("service_name = 'it''s'");
+      expect(wrapper.emitted("open-group")).toBeUndefined();
+    });
+
+    it("Exclude on (no value) filters out both null and empty, as the context menu does", async () => {
+      const wrapper = await hoverOn("value", null);
+      await actions(wrapper).find('[data-test^="log-details-exclude-field-"]').trigger("click");
+      expect(sharedSearchObj.data.stream.addToFilter).toBe(
+        "(service_name IS NOT NULL AND service_name != '')",
+      );
+      expect(wrapper.emitted("open-group")).toBeUndefined();
+    });
+
+    it("Copy copies the shown value without opening traces", async () => {
+      const wrapper = await hoverOn("value", "2", "span_kind");
+      await actions(wrapper).find('[data-test="logs-cell-actions-copy-btn"]').trigger("click");
+      expect(mockCopy).toHaveBeenCalledWith("Server", expect.any(Function));
+      expect(wrapper.emitted("open-group")).toBeUndefined();
+    });
   });
 });

@@ -75,7 +75,6 @@ describe("TracesGroupsTable over a multi-partition streaming aggregate", () => {
         },
         sort: { by: "errors", order: "desc" },
         columns: buildGroupsColumns("service_name", gt),
-        columnVisibility: {},
       },
       global: {
         plugins: [i18n, store],

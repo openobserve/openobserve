@@ -154,186 +154,172 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #after>
-                  <div class="flex h-full flex-col pb-2.5">
-                    <TracesSqlKeptLine
-                      v-if="showSqlKeptLine"
-                      class="shrink-0"
-                      :sql="sqlTexts.sql"
-                      :filter="String(searchObj.data.editorValue ?? '')"
-                      :filter-from-sql="sqlTexts.filterFromSql"
-                      :stream="searchObj.data.stream.selectedStream.value"
-                      @use-where="onUseWhereFromSql"
-                      @back-to-sql="onBackToSql"
+                  <div class="h-full pb-2.5">
+                    <!-- No trace streams in org yet -->
+                    <FirstDataPanel
+                      v-if="
+                        !searchObj.loadingStream &&
+                        searchObj.data.stream.streamLists.length === 0 &&
+                        !searchObj.loading
+                      "
+                      v-slot="{ layout, statusLine }"
+                      signal="traces"
+                      variant="full"
+                      status-in-slot
+                      @detected="onFirstDataDetected"
+                    >
+                      <TracesNoDataState
+                        :ai-enabled="isAiEnabled"
+                        :alternatives-only="layout === 'panel'"
+                        data-test="traces-no-streams-in-org-text"
+                        @ask-ai="onAskAiSetupTracing"
+                      >
+                        <template v-if="layout === 'status'" #status>
+                          <component :is="statusLine" />
+                        </template>
+                      </TracesNoDataState>
+                    </FirstDataPanel>
+                    <TracesSqlTemplateGallery
+                      v-else-if="!searchObj.loadingStream && sqlEditorEmpty && isStreamSelected"
+                      :templates="sqlTemplates"
+                      @use="onUseSqlTemplate"
                     />
-                    <div class="min-h-0 flex-1">
-                      <!-- No trace streams in org yet -->
-                      <FirstDataPanel
-                        v-if="
-                          !searchObj.loadingStream &&
-                          searchObj.data.stream.streamLists.length === 0 &&
-                          !searchObj.loading
-                        "
-                        v-slot="{ layout, statusLine }"
-                        signal="traces"
-                        variant="full"
-                        status-in-slot
-                        @detected="onFirstDataDetected"
-                      >
-                        <TracesNoDataState
-                          :ai-enabled="isAiEnabled"
-                          :alternatives-only="layout === 'panel'"
-                          data-test="traces-no-streams-in-org-text"
-                          @ask-ai="onAskAiSetupTracing"
-                        >
-                          <template v-if="layout === 'status'" #status>
-                            <component :is="statusLine" />
-                          </template>
-                        </TracesNoDataState>
-                      </FirstDataPanel>
-                      <TracesSqlTemplateGallery
-                        v-else-if="!searchObj.loadingStream && sqlEditorEmpty && isStreamSelected"
-                        :templates="sqlTemplates"
-                        @use="onUseSqlTemplate"
+                    <div
+                      v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
+                      data-test="traces-search-error-message"
+                      class="bg-card-glass-bg flex h-full flex-col"
+                    >
+                      <!-- The RED strip keeps its place above a failed query, each panel with its own state. -->
+                      <TracesMetricsDashboard
+                        v-if="searchObj.meta.sqlMode && searchObj.meta.searchMode === 'spans'"
+                        v-show="searchObj.meta.showHistogram"
+                        class="shrink-0"
+                        :stream-name="searchObj.data.stream.selectedStream.value"
+                        :show="true"
+                        :ai-enabled="isAiEnabled"
+                        @time-range-selected="setHistogramDate"
+                        @editor-filter-set="onMetricsEditorFilterSet"
+                        @editor-filter-run="onMetricsEditorFilterRun"
+                        @send-to-ai-chat="sendToAiChat"
                       />
-                      <div
-                        v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
-                        data-test="traces-search-error-message"
-                        class="bg-card-glass-bg flex h-full flex-col"
-                      >
-                        <!-- The RED strip keeps its place above a failed query, each panel with its own state. -->
-                        <TracesMetricsDashboard
-                          v-if="searchObj.meta.sqlMode && searchObj.meta.searchMode === 'spans'"
-                          v-show="searchObj.meta.showHistogram"
-                          class="shrink-0"
-                          :stream-name="searchObj.data.stream.selectedStream.value"
-                          :show="true"
-                          :ai-enabled="isAiEnabled"
-                          @time-range-selected="setHistogramDate"
-                          @editor-filter-set="onMetricsEditorFilterSet"
-                          @editor-filter-run="onMetricsEditorFilterRun"
-                          @send-to-ai-chat="sendToAiChat"
-                        />
-                        <TracesSqlErrorState
-                          v-if="searchObj.meta.sqlMode"
-                          class="min-h-0 flex-1"
-                          :error-code="searchObj.data.errorCode"
-                          :error-msg="searchObj.data.errorMsg"
-                          :error-detail="searchObj.data.errorDetail"
-                          :ai-enabled="isAiEnabled"
-                          :stream-name="searchObj.data.stream.selectedStream.value"
-                          :query="String(searchObj.data.editorValue ?? '')"
-                          :suggestions="sqlErrorSuggestions"
-                          :fields="
-                            searchObj.data.stream.selectedStreamFields.map((f: any) => f.name)
-                          "
-                          :range-us="
-                            searchObj.data.datetime.endTime - searchObj.data.datetime.startTime
-                          "
-                          @ask-ai="onAskAiTracing"
-                          @run-sql="onSqlRewriteRun"
-                          @use-last-hour="onSqlUseLastHour"
-                          @configure-resource="onConfigureTracesStream"
-                        />
-                        <QueryErrorState
-                          v-else
-                          :error-code="tracesErrorCode"
-                          :error-msg="searchObj.data.errorMsg"
-                          :error-detail="searchObj.data.errorDetail"
-                          :ai-enabled="isAiEnabled"
-                          :resource-name="searchObj.data.stream.selectedStream.value"
-                          size="hero"
-                          @ask-ai="onAskAiTracing"
-                          @configure-resource="onConfigureTracesStream"
-                        />
-                      </div>
-                      <div
-                        v-else-if="!searchObj.loadingStream && !isStreamSelected"
-                        class="max-lg:h-full"
-                      >
-                        <TracesNoStreamState
-                          :org-id="store.state.selectedOrganization?.identifier"
-                          data-test="traces-no-stream-selected-text"
-                          @select-stream="onSelectTracesStream"
-                          @pick-stream="onPickTracesStream"
-                        />
-                      </div>
-                      <div
-                        v-else-if="
-                          !searchObj.loadingStream &&
-                          statementInTraces &&
-                          searchObj.meta.searchMode === 'traces'
+                      <TracesSqlErrorState
+                        v-if="searchObj.meta.sqlMode"
+                        class="min-h-0 flex-1"
+                        :error-code="searchObj.data.errorCode"
+                        :error-msg="searchObj.data.errorMsg"
+                        :error-detail="searchObj.data.errorDetail"
+                        :ai-enabled="isAiEnabled"
+                        :stream-name="searchObj.data.stream.selectedStream.value"
+                        :query="String(searchObj.data.editorValue ?? '')"
+                        :suggestions="sqlErrorSuggestions"
+                        :fields="searchObj.data.stream.selectedStreamFields.map((f: any) => f.name)"
+                        :range-us="
+                          searchObj.data.datetime.endTime - searchObj.data.datetime.startTime
                         "
-                        class="bg-card-glass-bg h-full"
-                        data-test="traces-statement-in-traces"
-                      >
-                        <OEmptyState
-                          illustration="query"
-                          variant="neutral"
-                          size="hero"
-                          :title="
-                            subqueryInTraces
-                              ? t('traces.sqlMode.statementInTraces.subqueryTitle')
-                              : t('traces.sqlMode.statementInTraces.title')
-                          "
-                          :description="t('traces.sqlMode.statementInTraces.description')"
-                          :action-label="t('traces.sqlMode.openInSpans')"
-                          @action="onOpenStatementInSpans"
-                        />
-                      </div>
-                      <TracesSqlAwaitingRun
-                        v-else-if="!searchObj.loadingStream && sqlAwaitingRun"
-                        :show-charts="!!searchObj.meta.showHistogram"
-                        @run="() => searchData()"
+                        @ask-ai="onAskAiTracing"
+                        @run-sql="onSqlRewriteRun"
+                        @use-last-hour="onSqlUseLastHour"
+                        @configure-resource="onConfigureTracesStream"
                       />
-                      <div
-                        v-else-if="
-                          !searchObj.loadingStream &&
-                          isStreamSelected &&
-                          !searchObj.searchApplied &&
-                          !searchObj.data.queryResults?.hits?.length
+                      <QueryErrorState
+                        v-else
+                        :error-code="tracesErrorCode"
+                        :error-msg="searchObj.data.errorMsg"
+                        :error-detail="searchObj.data.errorDetail"
+                        :ai-enabled="isAiEnabled"
+                        :resource-name="searchObj.data.stream.selectedStream.value"
+                        size="hero"
+                        @ask-ai="onAskAiTracing"
+                        @configure-resource="onConfigureTracesStream"
+                      />
+                    </div>
+                    <div
+                      v-else-if="!searchObj.loadingStream && !isStreamSelected"
+                      class="max-lg:h-full"
+                    >
+                      <TracesNoStreamState
+                        :org-id="store.state.selectedOrganization?.identifier"
+                        data-test="traces-no-stream-selected-text"
+                        @select-stream="onSelectTracesStream"
+                        @pick-stream="onPickTracesStream"
+                      />
+                    </div>
+                    <div
+                      v-else-if="
+                        !searchObj.loadingStream &&
+                        statementInTraces &&
+                        searchObj.meta.searchMode === 'traces'
+                      "
+                      class="bg-card-glass-bg h-full"
+                      data-test="traces-statement-in-traces"
+                    >
+                      <OEmptyState
+                        illustration="query"
+                        variant="neutral"
+                        size="hero"
+                        :title="
+                          subqueryInTraces
+                            ? t('traces.sqlMode.statementInTraces.subqueryTitle')
+                            : t('traces.sqlMode.statementInTraces.title')
                         "
-                      >
-                        <OEmptyState
-                          preset="no-query-applied"
-                          size="hero"
-                          data-test="traces-search-not-started-text"
-                          @action="() => searchData()"
-                        />
-                      </div>
-                      <div v-else-if="searchCancelled && !searchObj.loading">
-                        <OEmptyState
-                          preset="search-cancelled"
-                          size="hero"
-                          data-test="traces-search-cancelled-state"
-                          @action="() => searchData()"
-                        />
-                      </div>
-                      <div v-else data-test="logs-search-search-result" class="h-full!">
-                        <SearchResult
-                          ref="searchResultRef"
-                          :pending="searchObj.loadingStream"
-                          :show-error-only="showErrorOnly"
-                          :ai-enabled="isAiEnabled"
-                          :stream-doc-time-range="streamDocTimeRange"
-                          :query-window-us="queryWindowUs"
-                          @update:datetime="setHistogramDate"
-                          @update:scroll="getMoreData"
-                          @update:sort="runQueryOnSort"
-                          @shareLink="(range: any) => copyTracesUrl(t, range)"
-                          @metrics:editor-filter-set="onMetricsEditorFilterSet"
-                          @metrics:editor-filter-run="onMetricsEditorFilterRun"
-                          @run-query="searchData()"
-                          @remove-filter="onRemoveTracesFilter"
-                          @jump-to-stream-data="onJumpToTracesStreamData"
-                          @error-only-toggled="onErrorOnlyToggled"
-                          @ask-ai="onAskAiTracing"
-                          @send-to-ai-chat="sendToAiChat"
-                          @open-mobile-fields="mobileFieldsOpen = true"
-                          @add-trace-id="onSqlAddTraceId"
-                          @run-sql="onSqlRewriteRun"
-                          @open-group="onOpenGroup"
-                        />
-                      </div>
+                        :description="t('traces.sqlMode.statementInTraces.description')"
+                        :action-label="t('traces.sqlMode.openInSpans')"
+                        @action="onOpenStatementInSpans"
+                      />
+                    </div>
+                    <TracesSqlAwaitingRun
+                      v-else-if="!searchObj.loadingStream && sqlAwaitingRun"
+                      :show-charts="!!searchObj.meta.showHistogram"
+                      @run="() => searchData()"
+                    />
+                    <div
+                      v-else-if="
+                        !searchObj.loadingStream &&
+                        isStreamSelected &&
+                        !searchObj.searchApplied &&
+                        !searchObj.data.queryResults?.hits?.length
+                      "
+                    >
+                      <OEmptyState
+                        preset="no-query-applied"
+                        size="hero"
+                        data-test="traces-search-not-started-text"
+                        @action="() => searchData()"
+                      />
+                    </div>
+                    <div v-else-if="searchCancelled && !searchObj.loading">
+                      <OEmptyState
+                        preset="search-cancelled"
+                        size="hero"
+                        data-test="traces-search-cancelled-state"
+                        @action="() => searchData()"
+                      />
+                    </div>
+                    <div v-else data-test="logs-search-search-result" class="h-full!">
+                      <SearchResult
+                        ref="searchResultRef"
+                        :pending="searchObj.loadingStream"
+                        :show-error-only="showErrorOnly"
+                        :ai-enabled="isAiEnabled"
+                        :stream-doc-time-range="streamDocTimeRange"
+                        :query-window-us="queryWindowUs"
+                        @update:datetime="setHistogramDate"
+                        @update:scroll="getMoreData"
+                        @update:sort="runQueryOnSort"
+                        @shareLink="(range: any) => copyTracesUrl(t, range)"
+                        @metrics:editor-filter-set="onMetricsEditorFilterSet"
+                        @metrics:editor-filter-run="onMetricsEditorFilterRun"
+                        @run-query="searchData()"
+                        @remove-filter="onRemoveTracesFilter"
+                        @jump-to-stream-data="onJumpToTracesStreamData"
+                        @error-only-toggled="onErrorOnlyToggled"
+                        @ask-ai="onAskAiTracing"
+                        @send-to-ai-chat="sendToAiChat"
+                        @open-mobile-fields="mobileFieldsOpen = true"
+                        @add-trace-id="onSqlAddTraceId"
+                        @run-sql="onSqlRewriteRun"
+                        @open-group="onOpenGroup"
+                      />
                     </div>
                   </div>
                 </template>
@@ -455,13 +441,11 @@ import {
   isRowQuery,
   mergesAcrossPartitions,
   sqlPaging,
-  tracesFilterFromSql,
 } from "@/utils/traces/tracesSql";
 import { useTracesSqlTemplates } from "./composables/useTracesSqlTemplates";
 import { createStreamingHits } from "@/utils/traces/streamingHits";
 import { fieldsStoredInAll } from "@/utils/traces/tracesAllFields";
 import TracesSqlTemplateGallery from "./components/TracesSqlTemplateGallery.vue";
-import TracesSqlKeptLine from "./components/TracesSqlKeptLine.vue";
 import TracesSqlAwaitingRun from "./components/TracesSqlAwaitingRun.vue";
 import TracesSqlErrorState from "./components/TracesSqlErrorState.vue";
 import { ONE_HOUR_US } from "@/utils/traces/tracesSqlErrors";
@@ -594,10 +578,11 @@ const activeHealthView = computed(() =>
       ? servicesCatalogRef.value
       : null,
 );
-const SCOPE_ROW_PX = 36;
-const scopeRowPx = () =>
+const SCOPE_ROW_PX = 40;
+// The pane keeps the Scope row's height in SQL mode too, so toggling SQL gives it to the editor and back.
+const scopeRowSlotPx = () =>
   searchObj.meta.searchMode === "spans" && searchObj.meta.showQuery ? SCOPE_ROW_PX : 0;
-const splitterModel = ref(90 + scopeRowPx());
+const splitterModel = ref(90 + scopeRowSlotPx());
 const fieldValues = ref({});
 
 const { isMobile, isTablet } = useBreakpoint();
@@ -607,12 +592,12 @@ watch(
   (mobile, wasMobile) => {
     if (mobile) {
       searchObj.config.splitterModel = 0;
-      splitterModel.value = 150 + scopeRowPx();
+      splitterModel.value = 150 + scopeRowSlotPx();
     } else if (wasMobile) {
       if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
         searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
       }
-      splitterModel.value = 90 + scopeRowPx();
+      splitterModel.value = 90 + scopeRowSlotPx();
     }
   },
   { immediate: true },
@@ -622,7 +607,7 @@ const filterBuilderGrowth = ref<number | null>(null);
 let autoSplitterHeight = 0;
 // The query pane grows with the builder and shrinks back, but never overrides a larger user-set height.
 watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
-  const base = (mobile ? 150 : 90) + scopeRowPx();
+  const base = (mobile ? 150 : 90) + scopeRowSlotPx();
   const target = base + (growth ?? 0);
   if (splitterModel.value < target || splitterModel.value <= Math.max(base, autoSplitterHeight)) {
     splitterModel.value = target;
@@ -633,7 +618,7 @@ watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
 let sqlBarGrownTo: number | null = null;
 // Sync: the builder and SQL-line watchers read the new Scope row, so the heights they compare must already include it.
 watch(
-  scopeRowPx,
+  scopeRowSlotPx,
   (px, was) => {
     splitterModel.value += px - was;
     if (sqlBarGrownTo !== null) sqlBarGrownTo += px - was;
@@ -647,8 +632,10 @@ const EDITOR_LINE_PX = 18;
 watch(
   () => (searchObj.meta.sqlMode ? String(searchObj.data.editorValue ?? "").split("\n").length : 0),
   (lines) => {
-    const base = 90 + scopeRowPx();
-    const fit = base + (Math.min(Math.max(lines, 2), SQL_BAR_MAX_LINES) - 2) * EDITOR_LINE_PX;
+    const base = 90 + scopeRowSlotPx();
+    // The hidden Scope row's height is editor space, so SQL grows the pane only past it.
+    const need = 90 + (Math.min(Math.max(lines, 2), SQL_BAR_MAX_LINES) - 2) * EDITOR_LINE_PX;
+    const fit = Math.max(base, need);
     if (splitterModel.value < fit) {
       splitterModel.value = fit;
       sqlBarGrownTo = fit;
@@ -2422,7 +2409,7 @@ const showViewResults = (run: boolean) => {
   if (run) getQueryData();
 };
 
-// The SQL switch in the Traces view: Spans with SQL on, nothing runs, and a way back; with SQL stored it is Back to SQL.
+// SQL runs over spans only, so the switch in the Traces view moves to Spans without running and offers a way back.
 const onOpenSpansSql = () => {
   normalizeTracesView("spans", { kind: "sql", stored: true });
   showViewResults(false);
@@ -2436,12 +2423,6 @@ const onOpenSpansSql = () => {
   });
 };
 
-// Back to SQL from the kept line: the stored SQL text, waiting for Run; a SELECT typed in the filter stays there.
-const onBackToSql = () => {
-  normalizeTracesView("spans", { kind: "sql", stored: true });
-  showViewResults(false);
-};
-
 // Open in Spans view from the statement card: the typed text, or a SELECT around a subquery filter, becomes the SQL text, not run.
 const onOpenStatementInSpans = () => {
   const typed = String(searchObj.data.editorValue ?? "");
@@ -2453,16 +2434,6 @@ const onOpenStatementInSpans = () => {
   subqueryInTraces.value = false;
   normalizeTracesView("spans", { kind: "sql", text });
   showViewResults(false);
-};
-
-// Use WHERE from SQL replaces the filter with the SQL's top-level WHERE and runs it.
-const onUseWhereFromSql = () => {
-  const { filter, problem } = tracesFilterFromSql(sqlTexts.sql, tracesParser.value);
-  if (problem) return;
-  sqlTexts.filterFromSql = filter;
-  searchObj.data.editorValue = filter;
-  searchBarRef.value?.setEditorValue?.(filter);
-  runQueryFn();
 };
 
 // Like the view switch, a new scope runs at once and starts from page 1.
@@ -2562,15 +2533,6 @@ watch(
     searchObj.data.queryResults = {};
     searchObj.data.sortedQueryResults = [];
   },
-);
-
-// The Traces view says where its filter came from while Spans keeps SQL text.
-const showSqlKeptLine = computed(
-  () =>
-    searchObj.meta.searchMode === "traces" &&
-    !!sqlTexts.sql.trim() &&
-    isStreamSelected.value &&
-    !searchObj.loadingStream,
 );
 
 const onRemoveTracesFilter = () => {

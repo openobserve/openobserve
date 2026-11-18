@@ -27,9 +27,10 @@ vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
 
 import TracesRedSqlPanel from "./TracesRedSqlPanel.vue";
 
-const mountPanel = (hits: Record<string, unknown>[]) =>
+const mountPanel = (hits: Record<string, unknown>[], caption?: string[]) =>
   mount(TracesRedSqlPanel, {
     props: {
+      caption,
       name: "rate",
       panelSchema: { title: "Rate", queries: [{ query: "SELECT [WHERE_CLAUSE]" }], config: {} },
       status: "ready",
@@ -37,7 +38,10 @@ const mountPanel = (hits: Record<string, unknown>[]) =>
       selectedTimeObj: { start_time: new Date(0), end_time: new Date(1) },
       runKey: 1,
     },
-    global: { plugins: [i18n] },
+    global: {
+      plugins: [i18n],
+      stubs: { OTooltip: { template: "<div><slot name='content' /></div>" } },
+    },
   });
 
 describe("TracesRedSqlPanel", () => {
@@ -62,5 +66,15 @@ describe("TracesRedSqlPanel", () => {
         .find('[data-test="traces-red-sql-panel-rate-no-data"]')
         .exists(),
     ).toBe(false);
+  });
+
+  it("shows the caption behind an info icon after the title, and no icon without one", () => {
+    const wrapper = mountPanel([], ["Charts: a", "Scope: b"]);
+    const title = wrapper.find("[data-test='traces-red-sql-panel-rate']").element
+      .firstElementChild!;
+    expect(title.querySelector("[data-test='traces-red-caption-info-rate']")).not.toBeNull();
+    const lines = wrapper.findAll("[data-test='traces-red-caption-rate'] span");
+    expect(lines.map((l) => l.text())).toEqual(["Charts: a", "Scope: b"]);
+    expect(mountPanel([]).find("[data-test='traces-red-caption-info-rate']").exists()).toBe(false);
   });
 });

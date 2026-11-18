@@ -40,7 +40,6 @@ import {
   resultKeys,
   resultShape,
   sqlPaging,
-  tracesFilterFromSql,
 } from "./tracesSql";
 
 let parser: unknown;
@@ -728,54 +727,6 @@ describe("withFieldUnits", () => {
       { name: "end_time", type: "ns" },
       { name: "service_name", dataType: "Utf8" },
     ]);
-  });
-});
-
-describe("tracesFilterFromSql", () => {
-  const from = (sql: string) => tracesFilterFromSql(sql, parser);
-
-  it("copies the top-level WHERE as typed, without its comments", () => {
-    expect(
-      from(`SELECT service_name, count(*) FROM "default"
-WHERE duration > 500000 -- slow
-  AND service_name = 'a''b'
-GROUP BY service_name HAVING count(*) > 3`),
-    ).toEqual({ filter: "duration > 500000  \n  AND service_name = 'a''b'", problem: null });
-  });
-
-  it("skips a WHERE inside FILTER (...)", () => {
-    expect(
-      from(`SELECT count(*) FILTER (WHERE span_status = 'ERROR') FROM "default" WHERE a = 1`),
-    ).toEqual({ filter: "a = 1", problem: null });
-  });
-
-  it("has no usable WHERE without one, or with a subquery, CTE, FROM subquery, UNION, JOIN or alias", () => {
-    for (const sql of [
-      `SELECT trace_id, count(*) FROM "default" GROUP BY trace_id HAVING count(*) > 450`,
-      `SELECT * FROM "default" WHERE trace_id IN (SELECT trace_id FROM "default" WHERE a = 1)`,
-      `WITH t AS (SELECT * FROM "default" WHERE a = 1) SELECT * FROM t WHERE b = 2`,
-      `SELECT * FROM (SELECT * FROM "default" WHERE a = 1) WHERE b = 2`,
-      `SELECT * FROM "default" WHERE a = 1 UNION SELECT * FROM "default" WHERE b = 2`,
-      `SELECT * FROM "default" c JOIN "default" p ON c.parent = p.span_id WHERE c.a = 1`,
-      `SELECT * FROM "default" d WHERE d.service_name = 'api'`,
-    ]) {
-      expect(from(sql), sql).toEqual({ filter: "", problem: "noWhere" });
-    }
-  });
-
-  it("cannot read text the parser rejects, or text that is not a statement", () => {
-    expect(from(`SELECT * FROM "default" WHERE (a = 1`)).toEqual({
-      filter: "",
-      problem: "unreadable",
-    });
-    expect(from("service_name = 'api'")).toEqual({ filter: "", problem: "unreadable" });
-  });
-
-  it("keeps a decimal number and a string with a dot", () => {
-    expect(from(`SELECT * FROM "default" WHERE a > 1.5 AND b = 'x.y'`)).toEqual({
-      filter: "a > 1.5 AND b = 'x.y'",
-      problem: null,
-    });
   });
 });
 

@@ -47,6 +47,7 @@ vi.mock("@/utils/traces/constants", () => ({
 
 import {
   buildResultColumns,
+  resultColumnFormat,
   useTracesTableColumns,
   fillLastColumn,
   LLM_COLUMN_IDS,
@@ -635,19 +636,6 @@ describe("useTracesTableColumns", () => {
       expect(cols[0].minSize).toBeUndefined();
       expect((cols[0].meta as Record<string, unknown>).autoWidth).toBeUndefined();
     });
-
-    it("gives the fill to the last shown column, skipping hidden ones", () => {
-      const cols = [
-        { id: "service_name", size: 160, meta: {} },
-        { id: "duration", size: 120, meta: {} },
-        { id: "method", size: 160, minSize: 160, meta: { autoWidth: true, fillRemaining: true } },
-      ];
-      fillLastColumn(cols, "_timestamp", { method: false });
-
-      expect(fillIds(cols)).toEqual(["duration"]);
-      expect(cols[1].minSize).toBe(120);
-      expect(cols[2].minSize).toBeUndefined();
-    });
   });
 
   describe("buildResultColumns — typed SQL results", () => {
@@ -677,6 +665,36 @@ describe("useTracesTableColumns", () => {
     it("lets the last column fill the row", () => {
       const cols = buildResultColumns(["a", "b"]);
       expect((cols[1].meta as Record<string, unknown>).fillRemaining).toBe(true);
+    });
+  });
+
+  describe("resultColumnFormat — typed SQL cell display", () => {
+    it("shows µs durations with a unit for duration and percentile names", () => {
+      for (const key of ["duration", "trace_duration", "p95", "p99_duration"])
+        expect(resultColumnFormat(key, "UTC")?.(854178798)).toBe("14.24m");
+      expect(resultColumnFormat("p95", "UTC")?.(2500)).toBe("2.50ms");
+    });
+
+    it("shows µs epoch timestamps as a date in the given timezone", () => {
+      for (const key of ["_timestamp", "first_seen", "last_seen"])
+        expect(resultColumnFormat(key, "Asia/Kolkata")?.(1795024510361017)).toBe(
+          "formatted:1795024510361.017",
+        );
+    });
+
+    it("leaves other names, and non-numeric values, as they are", () => {
+      for (const key of [
+        "spans",
+        "errors",
+        "p95_ms",
+        "durations",
+        "avg_duration",
+        "t",
+        "service_name",
+      ])
+        expect(resultColumnFormat(key, "UTC")).toBeUndefined();
+      expect(resultColumnFormat("trace_duration", "UTC")?.(null)).toBeNull();
+      expect(resultColumnFormat("first_seen", "UTC")?.("2026-01-01")).toBe("2026-01-01");
     });
   });
 });

@@ -1132,7 +1132,9 @@ describe("SearchBar", () => {
           !(wrapper.vm as any).shouldHideToolbarButtonText,
         );
         const toggleGroup = wrapper.find(".o-toggle-group-stub").element;
-        expect(toggleGroup.nextElementSibling).toBe(btn.element);
+        expect(toggleGroup.nextElementSibling).toBe(
+          wrapper.find('[data-test="insights-button-wrap"]').element,
+        );
       },
     );
 
@@ -1239,6 +1241,25 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(wrapper.find('[data-test="insights-button"]').exists()).toBe(false);
+    });
+
+    it("shows disabled in SQL mode, with the reason on its wrapper", async () => {
+      applySearch();
+      searchObjInstance.meta.sqlMode = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const btn = wrapper.find('[data-test="insights-button"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeDefined();
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toBeUndefined();
+      expect(wrapper.find('[data-test="insights-button-placeholder"]').exists()).toBe(false);
+      const wrap = wrapper.find('[data-test="insights-button-wrap"]');
+      const tooltip = wrap.findComponent({ name: "OTooltip" });
+      expect(tooltip.props("content")).toBe("traces.sqlMode.drillDownDisabled");
+      expect(wrap.element.firstElementChild).not.toBe(btn.element);
+      searchObjInstance.meta.sqlMode = false;
     });
 
     it("should emit drill-down when clicked", async () => {
@@ -3637,14 +3658,23 @@ describe("SearchBar", () => {
       expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it("passes SQL mode and the stream's parent column to the select", async () => {
+    it("passes the stream's parent column to the select", async () => {
       searchObjInstance.meta.searchMode = "spans";
-      searchObjInstance.meta.sqlMode = true;
       searchObjInstance.data.stream.hasParentColumn = true;
       wrapper = mountSearchBar();
       await flushPromises();
-      expect(select().props()).toMatchObject({ sqlMode: true, hasParentColumn: true });
+      expect(select().props()).toMatchObject({ sqlMode: false, hasParentColumn: true });
+    });
+
+    it("hides the row in SQL mode and shows it again when SQL turns off", async () => {
+      searchObjInstance.meta.searchMode = "spans";
+      searchObjInstance.meta.sqlMode = true;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      expect(row().exists()).toBe(false);
       searchObjInstance.meta.sqlMode = false;
+      await flushPromises();
+      expect(row().exists()).toBe(true);
     });
 
     it("holds the Group by select after Scope, listing the stream's fields", async () => {
@@ -3945,6 +3975,25 @@ describe("SearchBar", () => {
       expect(searchObjInstance.data.editorValue).toBe(templates[1].sql);
       expect(searchObjInstance.meta.sqlMode).toBe(true);
       expect(wrapper.emitted("searchdata")).toBeUndefined();
+    });
+
+    it("moves Examples left of the editor's AI button only while that button shows", async () => {
+      const wrap = () => wrapper.find('[data-test="traces-sql-examples-wrap"]');
+      searchObjInstance.meta.sqlMode = true;
+      searchObjInstance.data.editorValue = `SELECT trace_id FROM "default"`;
+      store.state.zoConfig.ai_enabled = true;
+      wrapper = mountSearchBar({
+        sqlTemplates: [
+          { id: "bigTraces", group: "traceQuestions", sql: "SELECT trace_id FROM x", services: [] },
+        ],
+      });
+      await flushPromises();
+      expect(wrap().classes()).toContain("end-9");
+
+      store.state.zoConfig.ai_enabled = false;
+      await flushPromises();
+      expect(wrap().classes()).toContain("end-2");
+      delete store.state.zoConfig.ai_enabled;
     });
 
     it("shows no Examples outside SQL mode", async () => {
