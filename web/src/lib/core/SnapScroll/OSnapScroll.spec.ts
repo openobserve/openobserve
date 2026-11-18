@@ -89,6 +89,21 @@ describe("OSnapScroll", () => {
       });
     });
 
+    it.each([
+      ["moves", 442, [{ top: 442, behavior: "smooth" }]],
+      ["stays put", 400, []],
+    ])("a jump whose section %s during the glide lands on its start", (_, moved, retarget) => {
+      wrapper = mountScroll();
+      const { root, scrollTo } = layOut(wrapper);
+      (wrapper.vm as unknown as { scrollToSection: (id: string) => void }).scrollToSection("two");
+      expect(scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: "smooth" });
+      scrollTo.mockClear();
+      root.querySelector<HTMLElement>("#two")!.getBoundingClientRect = () =>
+        rect(moved - root.scrollTop);
+      stopAt(root, 400, false);
+      expect(scrollTo.mock.calls.map(([options]) => options)).toEqual(retarget);
+    });
+
     it("stays anywhere inside a section taller than the view", () => {
       withTops({ one: 0, two: 1000, three: 1400 }, () => {
         wrapper = mountScroll();

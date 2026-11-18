@@ -32,6 +32,8 @@ const MIN_STOP = 0.1;
 const REVEAL_BEHAVIOR: ScrollBehavior = "instant";
 // Without `scrollend`, a scroll counts as finished after this long without a scroll event.
 const SETTLE_MS = 150;
+// A jump re-aims this many times at most when content above its section keeps growing.
+const MAX_RETARGETS = 2;
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
 const BUTTON_LIKE =
@@ -178,7 +180,12 @@ const padForStickyHeader = (): void => {
   scroller.style.scrollPaddingTop = height ? `${height}px` : "";
 };
 
+// Content that grows during a glide (a check that finishes loading) moves the section, so the jump re-aims on landing.
+let jumpTarget: HTMLElement | null = null;
+let retargets = 0;
+
 const go = (direction: 1 | -1, sectionsOnly: boolean): void => {
+  jumpTarget = null;
   markStops();
   const target = targetFor(direction, sectionsOnly);
   if (target === null || !root.value) return;
@@ -193,6 +200,8 @@ const scrollToSection = (id: string): void => {
   const section = sections().find((el) => el.dataset.snapSection === id);
   if (!section) return;
   if (props.snap && root.value) {
+    jumpTarget = section;
+    retargets = 0;
     root.value.scrollTo({ top: offsetOf(section), behavior: motionBehavior() });
   } else {
     section.scrollIntoView({ behavior: motionBehavior(), block: "start" });
@@ -204,6 +213,7 @@ const scrollToSection = (id: string): void => {
 const revealElement = (el: HTMLElement): void => {
   const scroller = root.value;
   if (!scroller || !scroller.contains(el)) return;
+  jumpTarget = null;
   if (!props.snap) {
     el.scrollIntoView({ behavior: REVEAL_BEHAVIOR, block: "center" });
     return;
@@ -260,9 +270,21 @@ const onAnyScroll = (): void => {
 let driven = false;
 const onDrive = (): void => {
   driven = true;
+  jumpTarget = null;
 };
 const onPress = (e: PointerEvent): void => {
   driven = e.target === root.value;
+  jumpTarget = null;
+};
+
+const landJump = (scroller: HTMLElement): boolean => {
+  const section = jumpTarget;
+  if (!section || !section.isConnected || retargets >= MAX_RETARGETS) return false;
+  const want = Math.min(offsetOf(section), scroller.scrollHeight - scroller.clientHeight);
+  if (Math.abs(want - scroller.scrollTop) <= EDGE) return false;
+  retargets += 1;
+  scroller.scrollTo({ top: want, behavior: motionBehavior() });
+  return true;
 };
 
 // The wheel is never intercepted: only once a scroll has stopped does it glide on to a whole section.
@@ -273,6 +295,8 @@ const settle = (): void => {
   const top = scroller.scrollTop;
   const from = restTop;
   restTop = top;
+  if (landJump(scroller)) return;
+  jumpTarget = null;
   const wanted = driven;
   driven = false;
   if (!wanted || reducedMotion()) return;
