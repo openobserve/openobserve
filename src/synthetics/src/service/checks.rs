@@ -167,6 +167,15 @@ pub async fn environments_of(org_id: &str, id: &str) -> anyhow::Result<Option<Ve
         .map(|check| check.environments))
 }
 
+/// A check's stored template override, read without decrypting its secrets; `None` when absent.
+pub async fn template_of(org_id: &str, id: &str) -> anyhow::Result<Option<String>> {
+    let conn = get_orm_client_ro().await;
+    Ok(synthetics_checks::get(conn, org_id, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .and_then(|check| check.template))
+}
+
 /// Updates a synthetic. Recomputes `next_run_at` if the frequency changed so the
 /// scheduler fires on the correct schedule without waiting for the old window.
 pub async fn update_synthetic(
