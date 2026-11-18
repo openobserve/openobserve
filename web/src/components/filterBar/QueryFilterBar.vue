@@ -325,13 +325,13 @@ function onEdit(id: string, part: FilterTokenPart, element: HTMLElement) {
   emit("focus");
 }
 
-// Removed from the keyboard, a chip leaves the caret where it stood, so the next condition can go there.
+// Removed from the chip layout's keyboard, a chip leaves the caret where it stood, for the next condition.
 function onRemove(id: string) {
   const fromKeys = activeIn("[data-filter-chip]", "filterChip") === id;
   const parent = findParent(props.modelValue, id);
   const after = parent?.items[parent.items.findIndex((item) => item.id === id) + 1]?.id ?? null;
   editor.removeCondition(id);
-  if (fromKeys && parent) placeCaret(parent.id, after);
+  if (fromKeys && parent && !vertical.value) placeCaret(parent.id, after);
   focus();
 }
 
@@ -431,13 +431,13 @@ function onAddOrGroup() {
   onAddGroup(props.modelValue.id);
 }
 
-// Ungrouped from the keyboard, the caret takes the place the opening bracket had.
+// Ungrouped from the chip layout's keyboard, the caret takes the place the opening bracket had.
 function onUngroup(id: string) {
   const group = findNode(props.modelValue, id);
   const parent = findParent(props.modelValue, id);
   const fromKeys = activeIn("[data-filter-group]", "filterGroup") === id;
   editor.ungroup(id);
-  if (!fromKeys || group?.kind !== "group" || !parent) return;
+  if (!fromKeys || vertical.value || group?.kind !== "group" || !parent) return;
   placeCaret(parent.id, group.items[0]?.id ?? null);
   nextTick(focus);
 }
