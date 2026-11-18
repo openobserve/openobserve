@@ -120,7 +120,6 @@ pub async fn check_cache(
     trace_id: &str,
     org_id: &str,
     req: &mut config::meta::search::Request,
-    origin_sql: &mut str,
     file_path: &str,
     is_aggregate: bool,
     sql: &Sql,
@@ -132,27 +131,9 @@ pub async fn check_cache(
 
     let order_by = &sql.order_by;
 
-    if req.query.track_total_hits || result_ts_col.is_empty() {
-        return MultiCachedQueryResponse {
-            order_by: order_by.clone(),
-            ..Default::default()
-        };
-    }
-
     let mut histogram_interval = -1;
     if is_aggregate && let Some(interval) = sql.histogram_interval {
-        // The query must run the SQL prepare_cache_response normalized and hashed.
-        req.query.sql = origin_sql.to_owned();
         histogram_interval = interval * 1000 * 1000; // in microseconds
-    }
-
-    if sql.histogram_offset != Some(0) {
-        return MultiCachedQueryResponse {
-            ts_column: result_ts_col.to_string(),
-            is_descending,
-            order_by: order_by.clone(),
-            ..Default::default()
-        };
     }
 
     let mut multi_resp = MultiCachedQueryResponse {
@@ -1391,7 +1372,6 @@ mod tests {
             local_mode: None,
             agent_options: None,
         };
-        let mut origin_sql = req.query.sql.clone();
         let file_path = "test_org/logs/test_stream".to_string();
         let is_aggregate = false;
         let mut should_exec_query = true;
@@ -1408,7 +1388,6 @@ mod tests {
             trace_id,
             org_id,
             &mut req,
-            &mut origin_sql,
             &file_path,
             is_aggregate,
             &sql,
