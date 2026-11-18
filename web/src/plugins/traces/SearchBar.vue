@@ -731,12 +731,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { pageValuesWindow } from "@/composables/fieldValueStore";
 import useStreams from "@/composables/useStreams";
-import {
-  applyFilterTerm,
-  replaceExistingFieldCondition,
-  removeFieldCondition,
-  dropDanglingConnectors,
-} from "@/utils/traces/filterUtils";
+import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
   tracesQueryNotRun,
@@ -1206,21 +1201,6 @@ export default defineComponent({
       }
     };
 
-    // Remove all conditions for a given field from the editor value.
-    // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
-    const removeFilterByField = (fieldName: string) => {
-      // The whole editor value is the where clause — never split it on "|", the
-      // split is quote-unaware and would corrupt match_all('text | error').
-      const value = searchObj.data.editorValue as string;
-      const cut = replaceExistingFieldCondition(value, fieldName, "");
-      const newValue = cut === null ? value : dropDanglingConnectors(cut);
-      searchObj.data.editorValue = newValue;
-      if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
-        emit("searchdata");
-      }
-    };
-
     const downloadLogs = () => {
       const hits = searchObj.data.queryResults.hits;
       if (!hits?.length) return;
@@ -1663,7 +1643,6 @@ export default defineComponent({
       shareReason,
       config,
       applyFilters,
-      removeFilterByField,
       serviceGraphVisualizationTabs,
       serviceGraphLayoutOptions,
       onServiceGraphVisualizationChange,
