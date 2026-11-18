@@ -9025,7 +9025,8 @@ mod tests {
 
         #[test]
         fn an_over_long_link_falls_back_to_the_unfiltered_stream() {
-            let long = "x".repeat(2500);
+            // Traces sends the filter as plain text, so it needs more than the base64 SQL of logs.
+            let long = "x".repeat(3200);
             for stream_type in ["logs", "traces", "metrics"] {
                 let c = explore_ctx(stream_type, Some(&long), false);
                 let link = link_with(&c, Some(&snapshot()));
