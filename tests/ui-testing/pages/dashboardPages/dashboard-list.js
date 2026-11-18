@@ -27,6 +27,16 @@ export default class DashboardListPage {
     await expect(this.dashboardTable).toBeVisible({ timeout: 20000 });
   }
 
+  /** Resolves when the org's dashboard list response arrives; start it before the action that loads the list. */
+  waitForListResponse(orgId) {
+    return this.page.waitForResponse(
+      (res) =>
+        res.request().method() === "GET" &&
+        new URL(res.url()).pathname === `/api/${orgId}/dashboards`,
+      { timeout: 30000 },
+    );
+  }
+
   async expectNoDashboardNotFoundToast() {
     await expect(this.dashboardNotFoundToast).toHaveCount(0);
   }

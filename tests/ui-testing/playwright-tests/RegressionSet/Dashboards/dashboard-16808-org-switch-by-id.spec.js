@@ -32,9 +32,12 @@ test.describe('Change Organisation on a dashboard opened by id (#16808)', {
     });
 
     await pm.dashboardAutoRun.openDashboard(ORG(), dashboardId, ['p_org']);
+    const newOrgList = pm.dashboardList.waitForListResponse(newOrgId);
     await pm.homePage.selectOrgByIdentifier(orgName, newOrgId);
 
     await pm.dashboardList.expectListInOrg(newOrgId);
+    // The switch reloads the current route before it lands on the list, so any old-id load is already sent once the list has answered.
+    await newOrgList;
     expect(oldIdInNewOrg, 'the old dashboard id must not be loaded in the new org').toEqual([]);
     await pm.dashboardList.expectNoDashboardNotFoundToast();
 
