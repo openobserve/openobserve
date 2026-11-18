@@ -74,7 +74,8 @@ def test_tool_search_matches_verb_and_plural_forms(client: OpenObserveClient, qu
     body = _call(client, "tool_search", {"query": query})
     assert body["result"].get("isError") is not True, body
     names = [t["name"] for t in json.loads(body["result"]["content"][0]["text"])["tools"]]
-    assert tool in names[:3], f"{query!r}: {tool} not in the top 3 of {names}"
+    # Top 10, not 3: the enterprise build ranks more tools, and the old matcher left these outside the top 20.
+    assert tool in names[:10], f"{query!r}: {tool} not in the top 10 of {names}"
 
 
 def test_a_tool_result_over_one_mib_is_refused_with_a_hint(client: OpenObserveClient, temp_stream_name: str):

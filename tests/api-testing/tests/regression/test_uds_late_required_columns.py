@@ -1,10 +1,4 @@
-"""User-defined schemas keep columns the product needs when they first arrive after the schema was saved (#16307).
-
-#16675: a metrics UDS saved before any histogram sample left `le` out, so later bucket samples packed `le`
-into `_all` and `WHERE le = ...` matched nothing. #16771: a UDS saved without an enabled partition key packed
-that key into `_all` too, so new rows partitioned as null. Both need ZO_ALLOW_USER_DEFINED_SCHEMAS=true, which
-only the `uds_enabled` regression shard sets.
-"""
+"""User-defined schemas keep required columns that first arrive after the schema is saved (#16307; needs the uds_enabled shard)."""
 
 from __future__ import annotations
 
@@ -29,7 +23,9 @@ def created_streams(client: OpenObserveClient) -> Generator[list[tuple[str, str]
 
 def _hits(client: OpenObserveClient, sql: str, stream_type: str) -> list[dict[str, Any]]:
     start, end = time_window(minutes=30)
-    resp = client.post("_search", params={"type": stream_type}, json=search_payload(sql, start_time=start, end_time=end))
+    resp = client.post(
+        "_search", params={"type": stream_type}, json=search_payload(sql, start_time=start, end_time=end)
+    )
     return resp.json().get("hits", []) if resp.status_code == 200 else []
 
 
@@ -58,13 +54,17 @@ def test_metrics_uds_saved_before_histogram_samples_keeps_le_queryable(
     metric = unique_name("pytest_uds_le")
     created_streams.append((metric, "metrics"))
     now_ms = int(time.time() * 1000)
-    resp = client.post("ingest/metrics/_json", json=[{"__name__": metric, "job": "uds", "_timestamp": now_ms - 120_000, "value": 1}])
+    resp = client.post(
+        "ingest/metrics/_json", json=[{"__name__": metric, "job": "uds", "_timestamp": now_ms - 120_000, "value": 1}]
+    )
     assert resp.status_code == 200, resp.text
     wait_until(lambda: _has_schema(client, metric, "metrics"), timeout=30, msg=f"{metric} was never created")
     _save_uds(client, metric, "metrics", ["job"])
 
     buckets = [("0.5", 3), ("1", 5), ("+Inf", 7)]
-    rows = [{"__name__": metric, "job": "uds", "le": le, "_timestamp": now_ms - 60_000, "value": v} for le, v in buckets]
+    rows = [
+        {"__name__": metric, "job": "uds", "le": le, "_timestamp": now_ms - 60_000, "value": v} for le, v in buckets
+    ]
     resp = client.post("ingest/metrics/_json", json=rows)
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"][0]["successful"] == len(rows), resp.text

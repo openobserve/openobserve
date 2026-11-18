@@ -1,9 +1,4 @@
-"""A traces stream with a user-defined schema keeps the service identity columns (#16861).
-
-Before the fix the traces UDS kept the derived `infer_*` and `gen_ai` columns but not `o2_service_where/env/version/image`,
-so spans on such a stream stored them as NULL and the version signals read from the stream never resolved. Stamping is enterprise-only
-(the test skips on OSS) and a UDS needs ZO_ALLOW_USER_DEFINED_SCHEMAS=true, which the `uds_enabled` regression shard sets.
-"""
+"""A traces UDS keeps the o2_service_* identity columns; enterprise-only stamping, so it skips on OSS (#16861)."""
 
 from __future__ import annotations
 
@@ -39,7 +34,12 @@ def uds_stream(client: OpenObserveClient) -> Generator[dict[str, Any], None, Non
     wait_until(lambda: _schema(client, stream), timeout=60, msg=f"{stream} was never created")
     resp = client.streams.update_settings(stream, type_="traces", defined_schema_fields={"add": ["http_route"]})
     assert resp.status_code == 200, f"saving the UDS failed (is ZO_ALLOW_USER_DEFINED_SCHEMAS on?): {resp.text}"
-    saved = client.get(f"streams/{stream}/schema", params={"type": "traces"}).json()["settings"].get("defined_schema_fields") or []
+    saved = (
+        client.get(f"streams/{stream}/schema", params={"type": "traces"})
+        .json()["settings"]
+        .get("defined_schema_fields")
+        or []
+    )
     assert "http_route" in saved, f"the UDS was not saved: {saved}"
     _ingest(client, stream, service, UDS_VERSION, namespace)
     yield {"stream": stream, "service": service, "namespace": namespace, "uds": set(saved)}
@@ -68,6 +68,7 @@ def _uds_rows(client: OpenObserveClient, stream: str) -> list[dict[str, Any]]:
 
 
 def test_spans_after_the_uds_save_keep_every_identity_column(client: OpenObserveClient, uds_stream):
+    """#16861: spans on a traces UDS stored the service where/env/version/image columns as NULL."""
     stream = uds_stream["stream"]
 
     rows = wait_until(
@@ -77,8 +78,11 @@ def test_spans_after_the_uds_save_keep_every_identity_column(client: OpenObserve
     )
 
     where = f"k8s:{CLUSTER}/{uds_stream['namespace']}"
-    assert [(r["o2_service_where"], r["o2_service_env"], r["o2_service_image"]) for r in rows] == [(where, "prod", IMAGE)] * 3, rows
+    assert [(r["o2_service_where"], r["o2_service_env"], r["o2_service_image"]) for r in rows] == [
+        (where, "prod", IMAGE)
+    ] * 3, rows
 
 
 def test_the_saved_uds_lists_the_identity_columns(uds_stream):
+    """#16861: the saved traces UDS left the service identity columns out."""
     assert set(IDENTITY_COLUMNS) <= uds_stream["uds"], sorted(uds_stream["uds"])
