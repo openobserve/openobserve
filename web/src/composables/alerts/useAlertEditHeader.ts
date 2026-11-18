@@ -23,9 +23,12 @@ import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import {
   alertDetailQuery,
+  alertHistoryQuery,
   alertsListQuery,
   toggleAlertStateMutation,
 } from "@/services/alerts.queries";
+import { historyStatusOf, isAckEventRow } from "@/utils/alerts/ackState";
+import { newestRuns, recentRunsParams } from "@/utils/alerts/recentRuns";
 import alertsService from "@/services/alerts";
 import type { ActiveDowntime } from "@/services/downtimes";
 import type { EnableAlertResponseBody, TriggerAlertResponseBody } from "@/ts/interfaces/alert";
@@ -115,6 +118,19 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
   );
   watch(row, (r) => (rowFound.value = !!r), { immediate: true });
 
+  // A real-time alert records no outcome on its row, so the header reads the checks Recent checks lists.
+  const historyEnd = Date.now() * 1000;
+  const historyQuery = useQuery(() =>
+    Object.assign(alertHistoryQuery(orgId.value, recentRunsParams(input.alertId(), historyEnd)), {
+      enabled:
+        !!orgId.value && !!input.alertId() && listQuery.isSuccess.value && !row.value?.last_outcome,
+    }),
+  );
+  const newestCheck = computed(() => {
+    const run = newestRuns(historyQuery.data.value).find((r) => !isAckEventRow(r));
+    return run ? String(historyStatusOf(run) ?? "") : "";
+  });
+
   // undefined = the list row decides; an action here holds only until a list read started after it lands.
   const localMute = ref<AlertMuteRef | null | undefined>(undefined);
   const localEnabled = ref<boolean | undefined>(undefined);
@@ -182,7 +198,7 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
 
   const state = computed<AlertEditState>(() => {
     if (!enabled.value) return { kind: "disabled" };
-    const outcome = row.value?.last_outcome;
+    const outcome = row.value?.last_outcome || newestCheck.value;
     return outcome ? { kind: "outcome", value: outcome } : { kind: "notRun" };
   });
 

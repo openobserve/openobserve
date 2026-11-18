@@ -57,17 +57,41 @@ describe("AlertRecentRuns", () => {
     expect(query.end_time - query.start_time).toBe(24 * 60 * 60 * 1_000_000);
   });
 
+  // Now is Oct 30, 12:00 UTC; savedAt is in seconds, as the alert GET sends it.
+  const savedMinutesAgo = (m: number) => Date.UTC(2026, 9, 30, 12, 0) / 1000 - m * 60;
   it.each([
-    [undefined, "No checks in the last 24 hours."],
-    [1, "No checks in the last 24 hours. It should check every minute: see Alert history."],
-  ])("says so when there are no checks (expected every %s min)", async (every, text) => {
-    getHistory.mockResolvedValue({ hits: [] });
-    const wrapper = mount(AlertRecentRuns, {
-      props: { alertId: "a1", expectedEveryMinutes: every },
-    });
-    await flushPromises();
-    expect(wrapper.find('[data-test="add-alert-recent-runs-empty"]').text()).toBe(text);
-  });
+    [undefined, undefined, "No checks in the last 24 hours."],
+    [
+      1,
+      undefined,
+      "No checks in the last 24 hours. It should check every minute: see Alert history.",
+    ],
+    [5, savedMinutesAgo(1), "No checks yet. The first is due by 12:06."],
+    [5, savedMinutesAgo(6), "No checks yet. The first is due by 12:01."],
+    [
+      5,
+      savedMinutesAgo(30),
+      "No checks since it was saved at 11:30. It should check every 5 minutes: see Alert history.",
+    ],
+    [
+      5,
+      savedMinutesAgo(2 * 24 * 60),
+      "No checks in the last 24 hours. It should check every 5 minutes: see Alert history.",
+    ],
+  ])(
+    "says so when there are no checks (every %s min, saved at %s)",
+    async (every, savedAt, text) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.UTC(2026, 9, 30, 12, 0));
+      getHistory.mockResolvedValue({ hits: [] });
+      const wrapper = mount(AlertRecentRuns, {
+        props: { alertId: "a1", expectedEveryMinutes: every, savedAt },
+      });
+      await flushPromises();
+      vi.useRealTimers();
+      expect(wrapper.find('[data-test="add-alert-recent-runs-empty"]').text()).toBe(text);
+    },
+  );
 
   it("says so when the history cannot be read", async () => {
     getHistory.mockRejectedValue(new Error("boom"));

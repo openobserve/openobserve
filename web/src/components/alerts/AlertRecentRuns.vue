@@ -27,14 +27,12 @@ import { historyStatusOf } from "@/utils/alerts/ackState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { everyWords } from "@/utils/alerts/alertCopy";
-
-interface HistoryRow {
-  timestamp?: number;
-  status?: string;
-  error?: string | null;
-  acked_by?: string | null;
-  ack_action?: string | null;
-}
+import {
+  newestRuns,
+  noChecksNotice,
+  recentRunsParams,
+  RECENT_RUNS_LIMIT,
+} from "@/utils/alerts/recentRuns";
 
 const props = withDefaults(
   defineProps<{
@@ -44,8 +42,15 @@ const props = withDefaults(
     limit?: number;
     /** Minutes between checks of an enabled alert that should have checked in the last day. */
     expectedEveryMinutes?: number;
+    /** The alert's `updated_at` in seconds, so a just-saved alert is not warned about. */
+    savedAt?: number;
   }>(),
-  { folderId: undefined, limit: 5, expectedEveryMinutes: undefined },
+  {
+    folderId: undefined,
+    limit: RECENT_RUNS_LIMIT,
+    expectedEveryMinutes: undefined,
+    savedAt: undefined,
+  },
 );
 
 const { t } = useI18nTyped();
@@ -53,34 +58,52 @@ const router = useRouter();
 const orgId = useOrgId();
 const zone = useViewerTimezone();
 
-const DAY_MICROS = 24 * 60 * 60 * 1_000_000;
-const endTime = Date.now() * 1000;
+const nowMs = Date.now();
 
 const historyQuery = useQuery(() =>
   Object.assign(
-    alertHistoryQuery(orgId.value, {
-      alert_id: props.alertId,
-      start_time: endTime - DAY_MICROS,
-      end_time: endTime,
-      from: 0,
-      size: props.limit,
-    }),
+    alertHistoryQuery(orgId.value, recentRunsParams(props.alertId, nowMs * 1000, props.limit)),
     { enabled: !!orgId.value && !!props.alertId },
   ),
 );
 
-// The endpoint pages but promises no order.
-const runs = computed(() =>
-  [
-    ...(((historyQuery.data.value as { hits?: HistoryRow[] } | undefined)?.hits ??
-      []) as HistoryRow[]),
-  ]
-    .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0))
-    .slice(0, props.limit),
-);
+const runs = computed(() => newestRuns(historyQuery.data.value, props.limit));
 
 const timeText = (micros?: number) =>
   raw(micros ? formatInTimeZone(new Date(micros / 1000), zone.value, "MMM d, HH:mm") : "—");
+
+const clockText = (ms: number) =>
+  raw(
+    formatInTimeZone(
+      new Date(ms),
+      zone.value,
+      formatInTimeZone(new Date(ms), zone.value, "yyyyMMdd") ===
+        formatInTimeZone(new Date(nowMs), zone.value, "yyyyMMdd")
+        ? "HH:mm"
+        : "MMM d, HH:mm",
+    ),
+  );
+
+const emptyNotice = computed(() => {
+  const notice = noChecksNotice({
+    everyMinutes: props.expectedEveryMinutes,
+    savedAtSec: props.savedAt,
+    nowMs,
+  });
+  if (notice.kind === "none") return { warn: false, text: t("alerts.editMode.recentRuns.empty") };
+  if (notice.kind === "firstDue")
+    return {
+      warn: false,
+      text: t("alerts.editMode.recentRuns.firstDue", { time: clockText(notice.byMs) }),
+    };
+  const every = everyWords(props.expectedEveryMinutes ?? 0, t);
+  return {
+    warn: true,
+    text: notice.savedMs
+      ? t("alerts.editMode.recentRuns.emptySinceSave", { time: clockText(notice.savedMs), every })
+      : t("alerts.editMode.recentRuns.emptyExpected", { every }),
+  };
+});
 
 const openRun = () =>
   router.push({
@@ -108,16 +131,10 @@ const openRun = () =>
     <p
       v-else-if="!historyQuery.isLoading.value && runs.length === 0"
       class="m-0 px-3 py-2 text-sm"
-      :class="expectedEveryMinutes ? 'text-status-warning-text' : 'text-text-secondary'"
+      :class="emptyNotice.warn ? 'text-status-warning-text' : 'text-text-secondary'"
       data-test="add-alert-recent-runs-empty"
     >
-      {{
-        expectedEveryMinutes
-          ? t("alerts.editMode.recentRuns.emptyExpected", {
-              every: everyWords(expectedEveryMinutes, t),
-            })
-          : t("alerts.editMode.recentRuns.empty")
-      }}
+      {{ emptyNotice.text }}
     </p>
     <ol v-else class="m-0 flex list-none flex-col p-0">
       <li

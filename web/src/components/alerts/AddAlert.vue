@@ -1043,6 +1043,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :alert-id="editAlertId"
                 :folder-id="editFolderId"
                 :expected-every-minutes="recentChecksExpectedEvery"
+                :saved-at="modelValue?.updated_at"
               />
             </div>
           </Teleport>

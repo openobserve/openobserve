@@ -10,6 +10,7 @@ const endMute = vi.fn();
 const downtimesEnabled = ref(true);
 let listRows: Record<string, unknown>[] = [];
 let detail: Record<string, unknown> | undefined;
+let historyHits: Record<string, unknown>[] = [];
 const trigger = vi.fn();
 const toastSpy = vi.fn();
 
@@ -31,6 +32,10 @@ vi.mock("@/services/alerts.queries", () => ({
   alertDetailQuery: (org: string, id: string) => ({
     queryKey: ["alert-detail-test", org, id],
     queryFn: async () => detail ?? {},
+  }),
+  alertHistoryQuery: (org: string, query: Record<string, unknown>) => ({
+    queryKey: ["alert-history-test", org, query.alert_id],
+    queryFn: async () => ({ hits: historyHits }),
   }),
   toggleAlertStateMutation: () => ({
     mutationFn: async (vars: { enabled: boolean }) => ({ data: { enabled: vars.enabled } }),
@@ -71,6 +76,7 @@ describe("useAlertEditHeader", () => {
     downtimesEnabled.value = true;
     listRows = [];
     detail = undefined;
+    historyHits = [];
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(ENDS_AT / 1000 - 3_600_000);
   });
@@ -151,6 +157,23 @@ describe("useAlertEditHeader", () => {
     await flushPromises();
     expect(api().muted.value).toEqual({ id: "dt9", ends_at: ENDS_AT, version: 2 });
     expect(api().state.value).toEqual({ kind: "outcome", value: "firing" });
+  });
+
+  it.each([
+    [[], { kind: "notRun" }],
+    [
+      [
+        { timestamp: 1, status: "normal" },
+        { timestamp: 2, status: "firing" },
+      ],
+      { kind: "outcome", value: "firing" },
+    ],
+  ])("without a recorded outcome, chips the newest check in history (%j)", async (hits, state) => {
+    listRows = [{ alert_id: "a1", enabled: true }];
+    historyHits = hits;
+    const api = host();
+    await flushPromises();
+    expect(api().state.value).toEqual(state);
   });
 
   it("does not treat a group mute as muting the whole alert", async () => {
