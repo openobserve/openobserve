@@ -427,7 +427,7 @@ describe("LibraryDrawer", () => {
       const wrapper = await mountDrawer({ entry: anomalyEntry });
       expect(wrapper.findComponent(AlertQueryPreview).props("query")).toContain("histogram");
       expect(wrapper.find('[data-test="alert-library-drawer-detection"]').text()).toBe(
-        "avg(error_ratio) · 5m · Above only",
+        "avg(error_ratio) · 5m · Spikes only",
       );
       expect(wrapper.find('[data-test="alert-library-drawer-threshold"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="preview-alert"]').exists()).toBe(false);
