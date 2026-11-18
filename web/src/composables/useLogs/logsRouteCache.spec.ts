@@ -68,6 +68,17 @@ describe("cachedSearchMatchesRoute", () => {
     expect(matches({ stream_type: "traces" })).toBe(false);
   });
 
+  it("drops a traces cache for a logs link to the stream of the same name", () => {
+    const traces = { ...cached, url: { ...cached.url, stream_type: "traces" } };
+    expect(matches({ stream_type: "logs" }, traces)).toBe(false);
+  });
+
+  it("treats a link without stream_type as logs, not as whatever is cached", () => {
+    const traces = { ...cached, url: { ...cached.url, stream_type: "traces" } };
+    expect(matches({}, traces)).toBe(false);
+    expect(matches({}, { ...cached, url: { ...cached.url, stream_type: undefined } })).toBe(true);
+  });
+
   it("drops the cache when sql_mode or the visualize toggle differs", () => {
     expect(matches({ sql_mode: "false" })).toBe(false);
     expect(matches({ logs_visualize_toggle: "visualize" })).toBe(false);

@@ -13,15 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-const IDENTITY_PARAMS = [
-  "stream_type",
-  "query",
-  "sql_mode",
-  "period",
-  "from",
-  "to",
-  "logs_visualize_toggle",
-];
+const IDENTITY_PARAMS = ["query", "sql_mode", "period", "from", "to", "logs_visualize_toggle"];
 
 const sameStreams = (a: string[], b: string[]) =>
   a.length === b.length && [...a].sort().join(",") === [...b].sort().join(",");
@@ -38,6 +30,8 @@ export const cachedSearchMatchesRoute = (
     .split(",")
     .filter(Boolean);
   if (!sameStreams(routeStreams, cachedStreams)) return false;
+  const streamType = (query: Record<string, unknown>) => String(query.stream_type || "logs");
+  if (streamType(routeQuery) !== streamType(cachedUrlQuery)) return false;
   return IDENTITY_PARAMS.every(
     (key) => !(key in routeQuery) || String(routeQuery[key]) === String(cachedUrlQuery[key] ?? ""),
   );
