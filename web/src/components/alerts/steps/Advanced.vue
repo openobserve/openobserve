@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="formattedTemplates"
                     clearable
                     :placeholder="t('alerts.advanced.selectTemplate')"
-                    class="w-75"
+                    class="w-75!"
                     data-test="advanced-template-override-select"
                   >
                     <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>

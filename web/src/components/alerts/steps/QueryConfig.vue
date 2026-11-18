@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :options="numericColumns"
                               searchable
                               :placeholder="t('alerts.placeholders.selectColumn')"
-                              class="w-50"
+                              class="w-50!"
                               @update:model-value="onLogMeasureColumnChange($event)"
                             />
                           </template>
@@ -618,7 +618,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :options="columns"
                               searchable
                               :placeholder="t('alerts.placeholders.selectColumn')"
-                              class="w-50"
+                              class="w-50!"
                               @update:model-value="syncMetricGroupByToProps"
                             />
                             <OButton
@@ -1597,7 +1597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="timezoneSelectOptions"
                     searchable
                     :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
-                    class="w-75"
+                    class="w-75!"
                     @update:model-value="onCronTimezoneChange"
                   />
                   <OTooltip v-if="cronTimezone" :content="raw(cronTimezone)" side="bottom" />
