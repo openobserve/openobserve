@@ -542,6 +542,15 @@ describe("TemplatePreviewPanel", () => {
     expect(w.find('[data-test="template-preview-panel-test-send-btn"]').exists()).toBe(true);
   });
 
+  it("says beside Send test that a test send uses a fixed sample, not the chosen severity", async () => {
+    vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
+    const w = await mountPanel();
+
+    expect(w.find('[data-test="template-preview-panel-test-send-note"]').text()).toBe(
+      "Test sends use a fixed sample.",
+    );
+  });
+
   it("opens on Alert when the template applies to every kind and reports each Kind change", async () => {
     vi.spyOn(templateService, "preview").mockResolvedValue(makePreviewResponse() as any);
     const w = await mountPanel();

@@ -14453,6 +14453,7 @@
     "testSendGroupLabel": "Wyślij prawdziwą wiadomość testową",
     "testSend": "Wyślij test",
     "testSendDestinationLabel": "Miejsce docelowe",
+    "testSendFixedSample": "Wiadomości testowe używają stałej próbki.",
     "testSendConfirmTitle": "Wysłać prawdziwą wiadomość testową?",
     "testSendConfirm": "To wyśle prawdziwą wiadomość do wybranego kanału, oznaczoną jako [TEST].",
     "testSendSuccess": "Wiadomość testowa wysłana",

@@ -14453,6 +14453,7 @@
     "testSendGroupLabel": "実際のテストメッセージを送信",
     "testSend": "テスト送信",
     "testSendDestinationLabel": "宛先",
+    "testSendFixedSample": "テスト送信は固定のサンプルを使用します。",
     "testSendConfirmTitle": "実際のテストメッセージを送信しますか？",
     "testSendConfirm": "これにより、選択したチャネルに [TEST] とマークされた実際のメッセージが投稿されます。",
     "testSendSuccess": "テストメッセージを送信しました",
