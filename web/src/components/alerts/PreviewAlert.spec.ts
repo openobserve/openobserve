@@ -414,6 +414,22 @@ describe("PreviewAlert - refreshData method", () => {
     w.unmount();
   });
 
+  it.each([
+    ["a new limit", { threshold: 8 }, {}, [expect.objectContaining({ value: "8" })]],
+    ["a limit that needs fixing", { threshold: -5 }, {}, []],
+    ["a real-time alert", {}, { is_real_time: "true" }, []],
+  ])("redraws the limit line at once for %s", async (_, tc, top, lines) => {
+    const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "custom" });
+    await flushPromises();
+    const next = baseFormData();
+    await w.setProps({
+      formData: { ...next, ...top, trigger_condition: { ...next.trigger_condition, ...tc } },
+    });
+    await nextTick();
+    expect(w.vm.chartData.config.mark_line).toEqual(lines);
+    w.unmount();
+  });
+
   it("widens the y-axis for the PromQL threshold too", async () => {
     const formData = baseFormData() as any;
     formData.query_condition.promql_condition = { column: "value", operator: "=", value: 2 };

@@ -56,6 +56,7 @@ import {
 } from "vue";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
+import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import {
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
@@ -123,6 +124,29 @@ const clearFieldLabels = (data: any) => {
   });
 };
 
+const hasLimitValue = (v: unknown): boolean => v !== undefined && v !== null && v !== "";
+
+/** The limits the current mode draws; a count limit that needs fixing draws none. */
+// Warning comes from the critical's family (aggregate value or count), or it lands on the wrong scale.
+const currentLimits = (): [unknown, unknown] => {
+  // A real-time alert fires per event, so it has no count to draw a limit for.
+  if (props.formData.is_real_time === "true") return [undefined, undefined];
+  const qc = props.formData.query_condition;
+  const tc = props.formData.trigger_condition;
+  if (props.selectedTab === "promql") {
+    return [qc?.promql_condition?.value, qc?.promql_warning_value];
+  }
+  const aggregation = qc?.aggregation;
+  if (
+    props.selectedTab === "custom" &&
+    props.isAggregationEnabled &&
+    hasLimitValue(aggregation?.having?.value)
+  ) {
+    return [aggregation.having.value, aggregation.warning_value];
+  }
+  return [isCountLimit(tc?.threshold) ? tc.threshold : undefined, tc?.warning_threshold];
+};
+
 /**
  * Draw the threshold lines AND make room for them.
  *
@@ -138,7 +162,8 @@ const clearFieldLabels = (data: any) => {
  * drop the headroom it asked for, or the chart keeps scaling to a line it is no
  * longer drawing.
  */
-const applyThresholds = (critical: unknown, warning: unknown): void => {
+const applyThresholds = (): void => {
+  const [critical, warning] = currentLimits();
   const markLines = buildThresholdMarkLines(
     critical,
     warning,
@@ -374,21 +399,6 @@ const fetchQuerySchema = async () => {
         label: field,
       }));
 
-      const aggregationCfg = props.formData.query_condition?.aggregation;
-      const hasHavingValue =
-        aggregationCfg?.having?.value !== undefined &&
-        aggregationCfg?.having?.value !== null &&
-        aggregationCfg?.having?.value !== "";
-      const thresholdValue = hasHavingValue
-        ? aggregationCfg.having.value
-        : props.formData.trigger_condition?.threshold;
-      // Warning must come from the same threshold family as the critical value
-      // (aggregate value vs row count) — mixing the two would draw a line on
-      // the wrong scale.
-      const warningValue = hasHavingValue
-        ? aggregationCfg?.warning_value
-        : props.formData.trigger_condition?.warning_threshold;
-
       dashboardPanelData.data.type = "line";
       dashboardPanelData.data.queryType = "sql";
       dashboardPanelData.data.queries[0].customQuery = true;
@@ -423,7 +433,7 @@ const fetchQuerySchema = async () => {
       ];
       dashboardPanelData.data.queries[0].fields.z = [];
       dashboardPanelData.data.queries[0].fields.breakdown = breakdown;
-      applyThresholds(thresholdValue, warningValue);
+      applyThresholds();
 
       if (
         !dashboardPanelData.data.queries[0].fields.filter ||
@@ -504,10 +514,7 @@ const fetchQuerySchema = async () => {
     dashboardPanelData.data.queryType = "sql";
     // Critical + optional Warning marklines (alerts_2.md Feature 1). Both are
     // drawn so the two bands are visible on the preview, matching the mock.
-    applyThresholds(
-      props.formData.trigger_condition?.threshold,
-      props.formData.trigger_condition?.warning_threshold,
-    );
+    applyThresholds();
 
     // Set the fields from schema
     dashboardPanelData.data.queries[0].fields.x = fields.x;
@@ -1394,10 +1401,7 @@ const refreshData = () => {
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 
     // Add threshold mark line from promql_condition
-    applyThresholds(
-      props.formData.query_condition?.promql_condition?.value,
-      props.formData.query_condition?.promql_warning_value,
-    );
+    applyThresholds();
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1445,10 +1449,7 @@ const refreshData = () => {
     dashboardPanelData.data.queries[0].fields.stream_type = props.formData.stream_type;
     dashboardPanelData.data.queryType = "sql";
     dashboardPanelData.data.type = "line"; // Line chart for histogram
-    applyThresholds(
-      props.formData.trigger_condition?.threshold,
-      props.formData.trigger_condition?.warning_threshold,
-    );
+    applyThresholds();
 
     // Update both refs together to prevent double watcher triggers
     const newChartData = cloneDeep(dashboardPanelData.data);
@@ -1567,6 +1568,21 @@ watch(
 );
 
 onBeforeUnmount(() => debouncedRefreshFromProps.cancel());
+
+// The lines follow the limit at once; the re-query a limit change starts may be throttled or slow.
+watch(
+  () => JSON.stringify(currentLimits()),
+  () => {
+    const config = (chartData.value as any)?.config;
+    if (!dashboardPanelData || !config) return;
+    applyThresholds();
+    const { mark_line, y_axis_min, y_axis_max } = dashboardPanelData.data.config;
+    chartData.value = {
+      ...chartData.value,
+      config: { ...config, mark_line, y_axis_min, y_axis_max },
+    };
+  },
+);
 
 // Refresh data on mount if we already have a query
 onMounted(() => {
