@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type { AlertSectionId } from "./alertFormSections";
 import type { AlertSectionTierView, AlertSettingId } from "./alertSettingTiers";
 
@@ -48,14 +47,16 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
     class="flex flex-col"
     :data-test="`add-alert-section-${section}-tiers`"
   >
-    <OSettingRow
+    <div
       v-if="messageLinks.length"
-      :label="t('alerts.form.messageRow')"
-      :description="t('alerts.form.messageRowHelp')"
-      fill
+      class="flex flex-col gap-0.5 py-1"
       :data-test="`add-alert-section-${section}-row-message`"
     >
-      <div class="flex flex-wrap items-center gap-1">
+      <p class="m-0 flex flex-wrap items-baseline gap-x-2">
+        <span class="text-text-heading text-sm font-medium">{{ t("alerts.form.messageRow") }}</span>
+        <span class="text-text-secondary text-xs">{{ t("alerts.form.messageRowHelp") }}</span>
+      </p>
+      <div class="flex flex-wrap items-center gap-x-1 gap-y-0.5">
         <OButton
           v-for="item in messageLinks"
           :key="item.id"
@@ -68,7 +69,7 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
           {{ t(item.nameKey) }}
         </OButton>
       </div>
-    </OSettingRow>
+    </div>
     <div
       v-if="ownLinks.length || view.more.length"
       class="flex flex-wrap items-center gap-x-1 gap-y-0.5 py-1"
