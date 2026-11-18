@@ -1849,9 +1849,9 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert();
       await flushPromises();
       const more = () => wrapper.find('[data-test="add-alert-section-condition-more"]');
+      // No stream yet, so no generated SQL to list.
       expect(wrapper.vm.tiers.view("condition").more.map((d: { id: string }) => d.id)).toEqual([
         "holdFor",
-        "generatedSql",
       ]);
       expect(wrapper.find('[data-test="add-alert-section-condition-more-names"]').exists()).toBe(
         true,
@@ -1873,9 +1873,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.form.setFieldValue("pending_period_sec", 5);
       await flushPromises();
       expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(true);
-      expect(wrapper.vm.tiers.view("condition").more.map((d: { id: string }) => d.id)).toEqual([
-        "generatedSql",
-      ]);
+      expect(wrapper.vm.tiers.view("condition").more).toEqual([]);
     });
 
     it("keeps the message settings one click away and names tags and priority on the line", async () => {

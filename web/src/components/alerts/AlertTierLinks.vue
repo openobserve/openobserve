@@ -15,12 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import type { AlertSectionId } from "./alertFormSections";
 import type { AlertSectionTierView, AlertSettingId } from "./alertSettingTiers";
+import { ALERT_SETTING_TIERS_KEY } from "@/composables/alerts/useAlertSettingTiers";
 
 const props = defineProps<{
   section: AlertSectionId;
@@ -33,6 +34,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
+const placement = computed(() => tiers?.placementOrder(props.section) ?? []);
 const SEP = raw(" · ");
 // Only the anomaly window hint has values, and a listed setting always holds its default.
 
@@ -113,4 +116,11 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
       </template>
     </OSettingRow>
   </div>
+  <div
+    v-for="id in placement"
+    :key="id"
+    :ref="(el) => tiers?.setSlot(id, el as Element | null)"
+    class="[&_[data-o-setting-row]]:border-border-default empty:hidden [&_[data-o-setting-row]]:border-t [&_[data-o-setting-row]]:py-2"
+    :data-test="`add-alert-tier-slot-${id}`"
+  />
 </template>

@@ -6,6 +6,7 @@ import { computed, inject, ref, watch } from "vue";
 import CompositeAlertPreview from "./CompositeAlertPreview.vue";
 import CompositeChildSelector from "./CompositeChildSelector.vue";
 import CompositeExpressionBuilder from "./CompositeExpressionBuilder.vue";
+import AlertTierPlace from "../AlertTierPlace.vue";
 import alertsService from "@/services/alerts";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -219,45 +220,49 @@ watch(
           />
         </OSettingRow>
 
-        <OSettingRow
-          v-if="tierShows('compositeWarningCounts')"
-          :label="t('alerts.tiers.names.compositeWarningCounts')"
-          fill
-          data-test="alerts-composite-warning-row"
-        >
-          <OSwitch
-            :model-value="draft.composite_condition.warning_counts_as_firing"
-            off-tone="neutral"
-            state-text
-            :aria-label="t('alerts.composite.warningCountsAsFiring')"
-            data-test="alerts-composite-warning-counts-as-firing"
-            @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
-          />
-        </OSettingRow>
-
-        <OSettingRow
-          v-if="tierShows('compositeStalePolicy')"
-          :label="t('alerts.tiers.names.compositeStalePolicy')"
-          fill
-          data-test="alerts-composite-stale-policy-row"
-        >
-          <template #description>
-            <span data-test="alerts-composite-stale-policy-help">{{ stalePolicyHelp }}</span>
-          </template>
-          <div class="w-50 max-md:w-full">
-            <OSelect
-              :model-value="draft.composite_condition.stale_child_policy"
-              :options="stalePolicyOptions"
-              :aria-label="t('alerts.composite.stalePolicy')"
-              :searchable="false"
-              data-test="alerts-composite-stale-policy"
-              :data-value="draft.composite_condition.stale_child_policy"
-              @update:model-value="
-                updateCondition({ stale_child_policy: $event as StaleChildPolicy })
-              "
+        <AlertTierPlace id="compositeWarningCounts">
+          <OSettingRow
+            v-if="tierShows('compositeWarningCounts')"
+            :label="t('alerts.tiers.names.compositeWarningCounts')"
+            fill
+            data-test="alerts-composite-warning-row"
+          >
+            <OSwitch
+              :model-value="draft.composite_condition.warning_counts_as_firing"
+              off-tone="neutral"
+              state-text
+              :aria-label="t('alerts.composite.warningCountsAsFiring')"
+              data-test="alerts-composite-warning-counts-as-firing"
+              @update:model-value="updateCondition({ warning_counts_as_firing: Boolean($event) })"
             />
-          </div>
-        </OSettingRow>
+          </OSettingRow>
+        </AlertTierPlace>
+
+        <AlertTierPlace id="compositeStalePolicy">
+          <OSettingRow
+            v-if="tierShows('compositeStalePolicy')"
+            :label="t('alerts.tiers.names.compositeStalePolicy')"
+            fill
+            data-test="alerts-composite-stale-policy-row"
+          >
+            <template #description>
+              <span data-test="alerts-composite-stale-policy-help">{{ stalePolicyHelp }}</span>
+            </template>
+            <div class="w-50 max-md:w-full">
+              <OSelect
+                :model-value="draft.composite_condition.stale_child_policy"
+                :options="stalePolicyOptions"
+                :aria-label="t('alerts.composite.stalePolicy')"
+                :searchable="false"
+                data-test="alerts-composite-stale-policy"
+                :data-value="draft.composite_condition.stale_child_policy"
+                @update:model-value="
+                  updateCondition({ stale_child_policy: $event as StaleChildPolicy })
+                "
+              />
+            </div>
+          </OSettingRow>
+        </AlertTierPlace>
       </Teleport>
     </div>
 

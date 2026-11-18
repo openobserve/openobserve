@@ -93,4 +93,33 @@ describe("useAlertSettingTiers", () => {
     expect(api().isVisible("warning")).toBe(false);
     expect(api().isVisible("recovery")).toBe(false);
   });
+
+  it("places only the rows the user brings in below the line, and keeps them there", async () => {
+    const set = reactive<Partial<Record<AlertSettingId, boolean>>>({ priority: true });
+    const showAll = ref(false);
+    const tiers = useAlertSettingTiers({
+      available: () => true,
+      isSet: (id) => set[id] === true,
+      showAll,
+    });
+    const below = () =>
+      (["holdFor", "keepFiring", "priority", "tags", "description"] as AlertSettingId[]).filter(
+        tiers.placedBelow,
+      );
+    expect(below()).toEqual([]);
+    tiers.toggle("details");
+    expect(below()).toEqual(["tags"]);
+    set.tags = true;
+    await nextTick();
+    tiers.toggle("details");
+    tiers.bring("description");
+    expect(below()).toEqual(["tags", "description"]);
+    showAll.value = true;
+    expect(below()).toEqual([]);
+    showAll.value = false;
+    set.tags = false;
+    tiers.conceal("tags");
+    expect(below()).toEqual(["description"]);
+    expect(tiers.view("details").more.map((d) => d.id)).toContain("tags");
+  });
 });

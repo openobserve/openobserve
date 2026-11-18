@@ -590,25 +590,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </Teleport>
 
         <!-- SQL preview — in custom_sql mode the user's own editor is already on this form -->
-        <OSettingRow
-          v-if="queryMode !== 'custom_sql' && tierShows('anomalySqlPreview')"
-          :label="t('alerts.tiers.names.generatedSql')"
-          wide
-          fill
-          data-test="anomaly-sql-preview-row"
-        >
-          <div class="border-border-default rounded-default h-32 overflow-hidden border">
-            <QueryEditor
-              data-test-prefix="anomaly-sql-preview"
-              :read-only="true"
-              :show-auto-complete="false"
-              :hide-nl-toggle="true"
-              :query="previewSql"
-              editor-height="100%"
-              data-test="anomaly-sql-preview"
-            />
-          </div>
-        </OSettingRow>
+        <AlertTierPlace id="anomalySqlPreview">
+          <OSettingRow
+            v-if="queryMode !== 'custom_sql' && tierShows('anomalySqlPreview')"
+            :label="t('alerts.tiers.names.generatedSql')"
+            wide
+            fill
+            data-test="anomaly-sql-preview-row"
+          >
+            <div class="border-border-default rounded-default h-32 overflow-hidden border">
+              <QueryEditor
+                data-test-prefix="anomaly-sql-preview"
+                :read-only="true"
+                :show-auto-complete="false"
+                :hide-nl-toggle="true"
+                :query="previewSql"
+                editor-height="100%"
+                data-test="anomaly-sql-preview"
+              />
+            </div>
+          </OSettingRow>
+        </AlertTierPlace>
       </OForm>
     </div>
   </div>
@@ -643,6 +645,7 @@ import {
 import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
@@ -668,6 +671,7 @@ export default defineComponent({
   components: {
     FilterBuilder,
     QueryEditor,
+    AlertTierPlace,
     OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,

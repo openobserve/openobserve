@@ -72,6 +72,8 @@ export interface AlertTierContext {
   incidentsEnabled: boolean;
   oncallEnabled: boolean;
   suppressRepeatsEnabled: boolean;
+  /** False until a stream gives the builder a query to show. */
+  generatedSql?: boolean;
 }
 
 /** The form fields the tier rules read; structural, so the loosely typed form fits. */
@@ -185,6 +187,13 @@ const COMPOSITE_MORE_ORDER: readonly AlertSettingId[] = [
   "compositeStalePolicy",
   "holdFor",
 ];
+// A setting with no row while another one is set: forecast replaces the query, custom SQL the generated one,
+// record only the message.
+const REPLACED_BY: Partial<Record<AlertSettingId, AlertSettingId>> = {
+  ruleExpression: "forecast",
+  anomalySqlPreview: "anomalySql",
+  anomalyTemplate: "anomalyRecordOnly",
+};
 // Matches `defaultAnomalyConfig().retrain_interval_days`; imported by value it would pull in the whole form.
 const ANOMALY_DEFAULT_RETRAIN_DAYS = 7;
 
@@ -216,6 +225,7 @@ export function alertTierContext(input: {
   incidentsEnabled: boolean;
   oncallEnabled: boolean;
   suppressRepeatsEnabled: boolean;
+  generatedSql?: boolean;
 }): AlertTierContext {
   const { isRealTime, queryType, ...flags } = input;
   const kind: AlertKind =
@@ -235,7 +245,7 @@ export function tierAvailable(id: AlertSettingId, ctx: AlertTierContext): boolea
   const scheduled = ctx.kind === "scheduled";
   switch (id) {
     case "generatedSql":
-      return scheduled && ctx.shape === "filters";
+      return scheduled && ctx.shape === "filters" && ctx.generatedSql !== false;
     case "groupBy":
       return scheduled && ctx.shape === "filters" && ctx.aggregate;
     case "vrl":
@@ -274,6 +284,16 @@ export function tierAvailable(id: AlertSettingId, ctx: AlertTierContext): boolea
     default:
       return ctx.kind !== "anomaly";
   }
+}
+
+/** Availability for this alert as filled in: the one rule both the line and the rows read. */
+export function tierApplies(
+  id: AlertSettingId,
+  ctx: AlertTierContext,
+  values: AlertTierValues,
+): boolean {
+  const replacedBy = REPLACED_BY[id];
+  return tierAvailable(id, ctx) && !(replacedBy && tierIsSet(replacedBy, values));
 }
 
 function anomalyIsSet(id: AlertSettingId, a: AnomalyTierForm): boolean {
@@ -386,10 +406,35 @@ export function sectionTierView(
       !state.isSet(d.id) &&
       !state.revealed.has(d.id),
   );
-  const more = own.filter((d) => d.tier !== "add");
-  if (state.available("compositeExpression")) {
-    const rank = (d: AlertSettingTierDef) => COMPOSITE_MORE_ORDER.indexOf(d.id);
-    more.sort((a, b) => rank(a) - rank(b));
-  }
+  const more = inMoreOrder(
+    own.filter((d) => d.tier !== "add"),
+    state,
+  );
   return { addLinks: own.filter((d) => d.tier === "add"), more, expanded };
+}
+
+/** Where rows the user brings in render, below the section's line: More options order, then the "+ add" rows. */
+export function sectionPlacementOrder(
+  section: AlertSectionId,
+  state: Pick<AlertTierState, "available">,
+): AlertSettingId[] {
+  const own = ALERT_SETTING_TIERS.filter(
+    (d) => d.section === section && !d.inline && state.available(d.id),
+  );
+  return [
+    ...inMoreOrder(
+      own.filter((d) => d.tier !== "add"),
+      state,
+    ),
+    ...own.filter((d) => d.tier === "add"),
+  ].map((d) => d.id);
+}
+
+function inMoreOrder(
+  defs: AlertSettingTierDef[],
+  state: Pick<AlertTierState, "available">,
+): AlertSettingTierDef[] {
+  if (!state.available("compositeExpression")) return defs;
+  const rank = (d: AlertSettingTierDef) => COMPOSITE_MORE_ORDER.indexOf(d.id);
+  return [...defs].sort((a, b) => rank(a) - rank(b));
 }

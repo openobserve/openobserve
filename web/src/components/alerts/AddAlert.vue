@@ -543,22 +543,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
-                <div
-                  v-if="formData.is_real_time === 'false' && tiers.isVisible('compareWithPast')"
-                  data-snap-stop
-                >
-                  <CompareWithPast
-                    ref="step3Ref"
-                    :multiTimeRange="formData.query_condition.multi_time_range"
-                    :period="formData.trigger_condition.period"
-                    :frequency="formData.trigger_condition.frequency"
-                    :frequencyType="formData.trigger_condition.frequency_type"
-                    :cron="formData.trigger_condition.cron"
-                    :selectedTab="formData.query_condition.type || 'custom'"
-                    :has-function="!!formData.query_condition.vrl_function?.trim()"
-                    @update:multiTimeRange="updateMultiTimeRange"
-                  />
-                </div>
+                <AlertTierPlace id="compareWithPast">
+                  <div
+                    v-if="formData.is_real_time === 'false' && tiers.isVisible('compareWithPast')"
+                    data-snap-stop
+                  >
+                    <CompareWithPast
+                      ref="step3Ref"
+                      :multiTimeRange="formData.query_condition.multi_time_range"
+                      :period="formData.trigger_condition.period"
+                      :frequency="formData.trigger_condition.frequency"
+                      :frequencyType="formData.trigger_condition.frequency_type"
+                      :cron="formData.trigger_condition.cron"
+                      :selectedTab="formData.query_condition.type || 'custom'"
+                      :has-function="!!formData.query_condition.vrl_function?.trim()"
+                      @update:multiTimeRange="updateMultiTimeRange"
+                    />
+                  </div>
+                </AlertTierPlace>
                 <AlertSuggestionLine section="condition" anchor="end" />
                 <div
                   :ref="(el) => setSectionTarget('narrowPreview', el)"
@@ -1228,11 +1230,12 @@ import { useAlertSettingFind } from "@/composables/alerts/useAlertSettingFind";
 import AlertFormSection from "./AlertFormSection.vue";
 import { focusFirstControl } from "@/utils/focusNextControl";
 import AlertTierLinks from "./AlertTierLinks.vue";
+import AlertTierPlace from "./AlertTierPlace.vue";
 import AlertSuggestionLine from "./AlertSuggestionLine.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import {
   alertTierContext,
-  tierAvailable as tierAvailableIn,
+  tierApplies as tierAppliesIn,
   tierIsSet as tierIsSetIn,
   type AlertSettingId,
 } from "./alertSettingTiers";
@@ -1376,6 +1379,7 @@ export default defineComponent({
     OCommandSearch,
     AlertFormSection,
     AlertTierLinks,
+    AlertTierPlace,
     AlertSuggestionLine,
     OSwitch,
     AlertEditStatus,
@@ -2047,14 +2051,16 @@ export default defineComponent({
         incidentsEnabled: incidentsEnabled.value,
         oncallEnabled: store.state.zoConfig?.oncall_enabled === true,
         suppressRepeatsEnabled: config.isEnterprise === "true" || config.isCloud === "true",
+        generatedSql: !!alertForm.generatedSqlQuery.value,
       }),
     );
-    const tierAvailable = (id: AlertSettingId) => tierAvailableIn(id, tierContext.value);
-    const tierIsSet = (id: AlertSettingId) =>
-      tierIsSetIn(id, {
-        form: alertForm.formData.value,
-        anomaly: alertForm.isAnomalyMode.value ? alertForm.anomalyConfig.value : null,
-      });
+    const tierValues = () => ({
+      form: alertForm.formData.value,
+      anomaly: alertForm.isAnomalyMode.value ? alertForm.anomalyConfig.value : null,
+    });
+    const tierAvailable = (id: AlertSettingId) =>
+      tierAppliesIn(id, tierContext.value, tierValues());
+    const tierIsSet = (id: AlertSettingId) => tierIsSetIn(id, tierValues());
     const { showAll, setShowAll } = useShowAllSettings(() => ({
       user: store.state.userInfo?.email ?? "",
       org: store.state.selectedOrganization?.identifier ?? "",
@@ -2195,12 +2201,21 @@ export default defineComponent({
     });
 
     // A one-click link adds the setting itself, so the click is never only a reveal.
-    const onTierAdd = (id: AlertSettingId) => {
-      tiers.reveal(id);
+    const onTierAdd = async (id: AlertSettingId) => {
+      tiers.bring(id);
       if (id === "createsIncident") alertForm.setF("creates_incident", true);
       if (id === "variables" && !(alertForm.formData.value.context_attributes ?? []).length) {
         alertForm.setF("context_attributes", [{ id: getUUID(), key: "", value: "" }]);
       }
+      // The clicked link is gone, so focus moves to the row it added rather than dropping to the page.
+      await nextTick();
+      await nextTick();
+      tiers
+        .slotFor(id)
+        ?.querySelector<HTMLElement>(
+          "input:not([disabled]), textarea, button:not([disabled]), [tabindex='0']",
+        )
+        ?.focus();
     };
 
     // ── Save-mode dialog copy ────────────────────────────────────────────────

@@ -318,62 +318,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
 
                     <!-- group by row (hidden for count mode) -->
-                    <AlertSentenceRow
-                      v-if="groupBySettled"
-                      :label="t('alerts.tiers.names.groupBy')"
-                      data-test="add-alert-group-by-sentence"
-                      changeable
-                      removable
-                      @change="groupByEditing = true"
-                      @remove="clearGroupBy"
-                    >
-                      {{ raw(groupLabelsText(shownGroupLabels(groupByLabels), locale)) }}
-                    </AlertSentenceRow>
-                    <OSettingRow
-                      v-else-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
-                      data-test="alert-group-by-row"
-                      :label="t('alerts.plain.groupedBy')"
-                      :description="
-                        streamType === 'metrics'
-                          ? t('alerts.queryConfig.groupByHelpLabels')
-                          : t('alerts.queryConfig.groupByTooltip')
-                      "
-                      fill
-                    >
-                      <div class="flex flex-wrap items-center gap-2">
-                        <template v-for="(group, index) in logGroupByRows" :key="index">
-                          <div class="flex items-center gap-1">
-                            <OFormSelect
-                              :aria-label="t('alerts.groupBy')"
-                              :name="`logGroupBy[${index}]`"
-                              :options="groupByOptions"
-                              searchable
-                              :placeholder="t('alerts.placeholders.selectColumn')"
-                              :data-test="`alert-group-by-select-${index}`"
-                              @update:model-value="onLogGroupByChange"
-                            />
-                            <OButton
-                              :aria-label="t('common.remove')"
-                              variant="ghost"
-                              size="icon-circle-sm"
-                              class="text-icon-color hover:text-status-error-text"
-                              @click="deleteLogGroupByColumn(index)"
-                            >
-                              <OIcon name="close" size="sm" />
-                            </OButton>
-                          </div>
-                        </template>
-                        <OButton
-                          variant="ghost-primary"
-                          size="icon-circle-sm"
-                          data-test="alert-group-by-add-btn"
-                          @click="addLogGroupByColumn"
-                        >
-                          <OIcon name="add" size="sm" />
-                          <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
-                        </OButton>
-                      </div>
-                    </OSettingRow>
+                    <AlertTierPlace id="groupBy">
+                      <AlertSentenceRow
+                        v-if="groupBySettled"
+                        :label="t('alerts.tiers.names.groupBy')"
+                        data-test="add-alert-group-by-sentence"
+                        changeable
+                        removable
+                        @change="groupByEditing = true"
+                        @remove="clearGroupBy"
+                      >
+                        {{ raw(groupLabelsText(shownGroupLabels(groupByLabels), locale)) }}
+                      </AlertSentenceRow>
+                      <OSettingRow
+                        v-else-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
+                        data-test="alert-group-by-row"
+                        :label="t('alerts.plain.groupedBy')"
+                        :description="
+                          streamType === 'metrics'
+                            ? t('alerts.queryConfig.groupByHelpLabels')
+                            : t('alerts.queryConfig.groupByTooltip')
+                        "
+                        fill
+                      >
+                        <div class="flex flex-wrap items-center gap-2">
+                          <template v-for="(group, index) in logGroupByRows" :key="index">
+                            <div class="flex items-center gap-1">
+                              <OFormSelect
+                                :aria-label="t('alerts.groupBy')"
+                                :name="`logGroupBy[${index}]`"
+                                :options="groupByOptions"
+                                searchable
+                                :placeholder="t('alerts.placeholders.selectColumn')"
+                                :data-test="`alert-group-by-select-${index}`"
+                                @update:model-value="onLogGroupByChange"
+                              />
+                              <OButton
+                                :aria-label="t('common.remove')"
+                                variant="ghost"
+                                size="icon-circle-sm"
+                                class="text-icon-color hover:text-status-error-text"
+                                @click="deleteLogGroupByColumn(index)"
+                              >
+                                <OIcon name="close" size="sm" />
+                              </OButton>
+                            </div>
+                          </template>
+                          <OButton
+                            variant="ghost-primary"
+                            size="icon-circle-sm"
+                            data-test="alert-group-by-add-btn"
+                            @click="addLogGroupByColumn"
+                          >
+                            <OIcon name="add" size="sm" />
+                            <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
+                          </OButton>
+                        </div>
+                      </OSettingRow>
+                    </AlertTierPlace>
                   </template>
 
                   <!-- METRICS -->
@@ -592,64 +594,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
 
                     <!-- group by row — hidden for count mode -->
-                    <AlertSentenceRow
-                      v-if="groupBySettled"
-                      :label="t('alerts.tiers.names.groupBy')"
-                      data-test="add-alert-group-by-sentence"
-                      changeable
-                      removable
-                      @change="groupByEditing = true"
-                      @remove="clearGroupBy"
-                    >
-                      {{ raw(groupLabelsText(shownGroupLabels(groupByLabels), locale)) }}
-                    </AlertSentenceRow>
-                    <OSettingRow
-                      v-else-if="
-                        inputData.aggregation &&
-                        selectedFunction !== 'total_events' &&
-                        tierShows('groupBy')
-                      "
-                      :label="t('alerts.plain.groupedBy')"
-                      :description="
-                        streamType === 'metrics'
-                          ? t('alerts.queryConfig.groupByHelpLabels')
-                          : t('alerts.queryConfig.groupByTooltip')
-                      "
-                      fill
-                    >
-                      <div class="flex flex-wrap items-center gap-2">
-                        <template v-for="(group, index) in metricGroupByRows" :key="index">
-                          <div class="flex items-center gap-1">
-                            <OFormSelect
-                              :aria-label="t('alerts.groupBy')"
-                              :name="`query_condition.aggregation.group_by[${index}]`"
-                              :options="groupByOptions"
-                              searchable
-                              :placeholder="t('alerts.placeholders.selectColumn')"
-                              class="w-50!"
-                              @update:model-value="syncMetricGroupByToProps"
-                            />
-                            <OButton
-                              :aria-label="t('common.remove')"
-                              variant="ghost"
-                              size="icon-circle-sm"
-                              class="text-icon-color hover:text-status-error-text"
-                              @click="deleteGroupByColumn(index)"
-                            >
-                              <OIcon name="close" size="sm" />
-                            </OButton>
-                          </div>
-                        </template>
-                        <OButton
-                          variant="ghost-primary"
-                          size="icon-circle-sm"
-                          @click="addGroupByColumn"
-                        >
-                          <OIcon name="add" size="sm" />
-                          <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
-                        </OButton>
-                      </div>
-                    </OSettingRow>
+                    <AlertTierPlace id="groupBy">
+                      <AlertSentenceRow
+                        v-if="groupBySettled"
+                        :label="t('alerts.tiers.names.groupBy')"
+                        data-test="add-alert-group-by-sentence"
+                        changeable
+                        removable
+                        @change="groupByEditing = true"
+                        @remove="clearGroupBy"
+                      >
+                        {{ raw(groupLabelsText(shownGroupLabels(groupByLabels), locale)) }}
+                      </AlertSentenceRow>
+                      <OSettingRow
+                        v-else-if="
+                          inputData.aggregation &&
+                          selectedFunction !== 'total_events' &&
+                          tierShows('groupBy')
+                        "
+                        :label="t('alerts.plain.groupedBy')"
+                        :description="
+                          streamType === 'metrics'
+                            ? t('alerts.queryConfig.groupByHelpLabels')
+                            : t('alerts.queryConfig.groupByTooltip')
+                        "
+                        fill
+                      >
+                        <div class="flex flex-wrap items-center gap-2">
+                          <template v-for="(group, index) in metricGroupByRows" :key="index">
+                            <div class="flex items-center gap-1">
+                              <OFormSelect
+                                :aria-label="t('alerts.groupBy')"
+                                :name="`query_condition.aggregation.group_by[${index}]`"
+                                :options="groupByOptions"
+                                searchable
+                                :placeholder="t('alerts.placeholders.selectColumn')"
+                                class="w-50!"
+                                @update:model-value="syncMetricGroupByToProps"
+                              />
+                              <OButton
+                                :aria-label="t('common.remove')"
+                                variant="ghost"
+                                size="icon-circle-sm"
+                                class="text-icon-color hover:text-status-error-text"
+                                @click="deleteGroupByColumn(index)"
+                              >
+                                <OIcon name="close" size="sm" />
+                              </OButton>
+                            </div>
+                          </template>
+                          <OButton
+                            variant="ghost-primary"
+                            size="icon-circle-sm"
+                            @click="addGroupByColumn"
+                          >
+                            <OIcon name="add" size="sm" />
+                            <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
+                          </OButton>
+                        </div>
+                      </OSettingRow>
+                    </AlertTierPlace>
                   </template>
                   <OSettingRow
                     v-if="groupQuestion.offered"
@@ -812,15 +816,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </component>
-              <AlertSentenceRow
-                v-if="showsGeneratedSql"
-                :label="t('alerts.tiers.names.generatedSql')"
-                data-test="add-alert-generated-sql"
-                removable
-                @remove="hideGeneratedSql"
-              >
-                <AlertQueryPreview :query="generatedSqlQuery" />
-              </AlertSentenceRow>
+              <AlertTierPlace id="generatedSql">
+                <AlertSentenceRow
+                  v-if="showsGeneratedSql"
+                  :label="t('alerts.tiers.names.generatedSql')"
+                  data-test="add-alert-generated-sql"
+                  removable
+                  @remove="hideGeneratedSql"
+                >
+                  <AlertQueryPreview :query="generatedSqlQuery" />
+                </AlertSentenceRow>
+              </AlertTierPlace>
             </div>
           </div>
         </template>
@@ -897,18 +903,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="alert-query-editor-tab-out-hint"
                           >{{ t("alerts.form.editor.tabOutHint") }}</span
                         >
-                        <OSwitch
+                        <AlertTierPlace
                           v-if="localTab === 'sql' && !showVrl && tierShows('vrl')"
-                          :model-value="false"
-                          :label="t('alerts.queryConfig.vrlToggle')"
-                          label-position="left"
-                          off-tone="neutral"
-                          :aria-label="t('alerts.queryConfig.showVrlEditor')"
-                          data-test="alert-vrl-toggle"
-                          @update:model-value="onVrlSwitch"
+                          id="vrl"
+                          :row-label="t('alerts.tiers.names.vrl')"
                         >
-                          <OTooltip :content="t('alerts.form.editor.vrlHelp')" />
-                        </OSwitch>
+                          <OSwitch
+                            :model-value="false"
+                            :label="t('alerts.queryConfig.vrlToggle')"
+                            label-position="left"
+                            off-tone="neutral"
+                            :aria-label="t('alerts.queryConfig.showVrlEditor')"
+                            data-test="alert-vrl-toggle"
+                            @update:model-value="onVrlSwitch"
+                          >
+                            <OTooltip :content="t('alerts.form.editor.vrlHelp')" />
+                          </OSwitch>
+                        </AlertTierPlace>
                       </div>
                     </div>
                     <div class="relative min-h-0 flex-1">
@@ -1147,22 +1158,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :to="sectionTargets?.queryCondition"
                   :disabled="!sectionTargets?.queryCondition"
                   ><div class="flex flex-col gap-0">
-                    <div
-                      v-if="localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')"
-                      class="flex flex-col gap-1 px-3 py-2"
-                    >
-                      <OFormSwitch
-                        name="query_condition.promql_rule_mode"
-                        off-tone="neutral"
-                        state-text
-                        :label="t('alerts.promRuleMode')"
-                        data-test="alert-prom-rule-mode"
-                        @update:model-value="onPromRuleModeChange"
-                      />
-                      <p class="text-text-secondary text-xs">
-                        {{ t("alerts.promRuleModeDescription") }}
-                      </p>
-                    </div>
+                    <AlertTierPlace id="ruleExpression">
+                      <div
+                        v-if="
+                          localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')
+                        "
+                        class="flex flex-col gap-1 px-3 py-2"
+                      >
+                        <OFormSwitch
+                          name="query_condition.promql_rule_mode"
+                          off-tone="neutral"
+                          state-text
+                          :label="t('alerts.promRuleMode')"
+                          data-test="alert-prom-rule-mode"
+                          @update:model-value="onPromRuleModeChange"
+                        />
+                        <p class="text-text-secondary text-xs">
+                          {{ t("alerts.promRuleModeDescription") }}
+                        </p>
+                      </div>
+                    </AlertTierPlace>
                     <OSettingRow
                       v-if="
                         sqlPlainLimit ||
@@ -1723,6 +1738,7 @@ import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
 import AlertFilterSentence from "@/components/alerts/AlertFilterSentence.vue";
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
+import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import { streamValuesLoader } from "@/components/filterBar/streamValues";
 import {
   findNode,
@@ -1842,6 +1858,7 @@ export default defineComponent({
     AlertQueryPreview,
     AlertFilterSentence,
     AlertSentenceRow,
+    AlertTierPlace,
     FilterBuilder,
     QueryEditorDialog,
     CustomConfirmDialog,

@@ -98,67 +98,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :to="sectionTargets?.settingsHold"
           :disabled="!sectionTargets?.settingsHold"
         >
-          <AlertSentenceRow
-            v-if="tierShows('holdFor')"
-            ref="pendingPeriodFieldRef"
-            :label="t('alerts.form.holdFor.label')"
-            :description="t('alerts.form.holdFor.help')"
-            data-test="add-alert-hold-for-row"
-            removable
-            @remove="removeHoldFor"
-          >
-            <div class="flex flex-col gap-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span>{{ t("alerts.form.holdFor.sentence") }}</span>
-                <div class="flex items-center gap-2">
-                  <component :is="formField" v-if="formField" name="_ui.pendingPeriod">
-                    <template #default="{ field }">
-                      <OInput
-                        :aria-label="t('alerts.plain.forAtLeast')"
-                        type="number"
-                        min="0"
-                        fit-content
-                        class="max-w-32! min-w-16"
-                        :model-value="holdAmount(field.state.value)"
-                        :placeholder="t('common.off')"
-                        :error="fieldInvalid(field)"
-                        data-test="alert-settings-pending-period-input"
-                        @update:model-value="(v: unknown) => onHoldAmount(v, field)"
-                        @blur="field.handleBlur"
-                      />
-                    </template>
-                  </component>
-                  <OSelect
-                    :aria-label="t('common.unitFor', { label: t('alerts.plain.forAtLeast') })"
-                    class="w-32!"
-                    :model-value="pendingPeriodUnit"
-                    :options="pendingPeriodUnitOptions"
-                    labelKey="label"
-                    valueKey="value"
-                    :searchable="false"
-                    data-test="alert-settings-pending-period-unit"
-                    @update:model-value="onPendingPeriodUnitChange"
-                  />
+          <AlertTierPlace id="holdFor">
+            <AlertSentenceRow
+              v-if="tierShows('holdFor')"
+              ref="pendingPeriodFieldRef"
+              :label="t('alerts.form.holdFor.label')"
+              :description="t('alerts.form.holdFor.help')"
+              data-test="add-alert-hold-for-row"
+              removable
+              @remove="removeHoldFor"
+            >
+              <div class="flex flex-col gap-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span>{{ t("alerts.form.holdFor.sentence") }}</span>
+                  <div class="flex items-center gap-2">
+                    <component :is="formField" v-if="formField" name="_ui.pendingPeriod">
+                      <template #default="{ field }">
+                        <OInput
+                          :aria-label="t('alerts.plain.forAtLeast')"
+                          type="number"
+                          min="0"
+                          fit-content
+                          class="max-w-32! min-w-16"
+                          :model-value="holdAmount(field.state.value)"
+                          :placeholder="t('common.off')"
+                          :error="fieldInvalid(field)"
+                          data-test="alert-settings-pending-period-input"
+                          @update:model-value="(v: unknown) => onHoldAmount(v, field)"
+                          @blur="field.handleBlur"
+                        />
+                      </template>
+                    </component>
+                    <OSelect
+                      :aria-label="t('common.unitFor', { label: t('alerts.plain.forAtLeast') })"
+                      class="w-32!"
+                      :model-value="pendingPeriodUnit"
+                      :options="pendingPeriodUnitOptions"
+                      labelKey="label"
+                      valueKey="value"
+                      :searchable="false"
+                      data-test="alert-settings-pending-period-unit"
+                      @update:model-value="onPendingPeriodUnitChange"
+                    />
+                  </div>
+                </div>
+                <div
+                  v-if="pendingPeriodError"
+                  class="text-input-error-text w-0 min-w-full text-xs"
+                  data-test="alert-settings-pending-period-error"
+                  role="alert"
+                >
+                  {{ pendingPeriodError }}
+                </div>
+                <div
+                  v-if="!pendingPeriodError && pendingPeriodWarning"
+                  class="text-status-warning-text w-0 min-w-full text-xs"
+                  data-test="alert-settings-pending-period-warning"
+                  role="alert"
+                >
+                  {{ pendingPeriodWarning }}
                 </div>
               </div>
-              <div
-                v-if="pendingPeriodError"
-                class="text-input-error-text w-0 min-w-full text-xs"
-                data-test="alert-settings-pending-period-error"
-                role="alert"
-              >
-                {{ pendingPeriodError }}
-              </div>
-              <div
-                v-if="!pendingPeriodError && pendingPeriodWarning"
-                class="text-status-warning-text w-0 min-w-full text-xs"
-                data-test="alert-settings-pending-period-warning"
-                role="alert"
-              >
-                {{ pendingPeriodWarning }}
-              </div>
-            </div>
-          </AlertSentenceRow>
+            </AlertSentenceRow>
+          </AlertTierPlace>
         </Teleport>
 
         <Teleport :to="sectionTargets?.settingsNotify" :disabled="!sectionTargets?.settingsNotify">
@@ -243,217 +245,227 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="!sectionTargets?.settingsNotifyMore"
         >
           <!-- Creates Incident — all alert types, enterprise/cloud with Incidents on -->
-          <template v-if="incidentsEnabled && tierShows('createsIncident')">
-            <AlertSentenceRow
-              v-if="createsIncident && !incidentSwitchOpen"
-              :label="t('alerts.form.incident.label')"
-              data-test="add-alert-incident-row"
-              changeable
-              removable
-              @change="incidentSwitchOpen = true"
-              @remove="removeIncident"
-            >
-              {{ t("alerts.form.incident.on") }}
-            </AlertSentenceRow>
-            <OSettingRow
-              v-else
-              :label="t('alerts.plain.openIncident')"
-              :description="t('alerts.alertSettings.createsIncidentHelp')"
-              fill
-            >
-              <OFormSwitch
-                name="creates_incident"
-                off-tone="neutral"
-                state-text
-                :aria-label="t('alerts.alertSettings.createsIncident')"
-                data-test="alert-creates-incident-toggle"
-              />
-            </OSettingRow>
-
-            <template v-if="createsIncident">
+          <AlertTierPlace id="createsIncident">
+            <template v-if="incidentsEnabled && tierShows('createsIncident')">
               <AlertSentenceRow
-                v-if="!incidentTitleOpen"
-                data-test="add-alert-incident-title-row"
+                v-if="createsIncident && !incidentSwitchOpen"
+                :label="t('alerts.form.incident.label')"
+                data-test="add-alert-incident-row"
                 changeable
-                @change="openIncidentTitle"
+                removable
+                @change="incidentSwitchOpen = true"
+                @remove="removeIncident"
               >
-                {{ t("alerts.form.incident.titleLabel") }}{{ " "
-                }}<strong class="text-text-heading font-semibold">{{
-                  incidentTitleTemplate || t("alerts.form.incident.titleDefault")
-                }}</strong
-                ><template v-if="!incidentTitleTemplate"
-                  >{{ " "
-                  }}<span class="text-text-secondary">{{
-                    t("alerts.form.incident.defaultTag")
-                  }}</span></template
-                >
+                {{ t("alerts.form.incident.on") }}
               </AlertSentenceRow>
               <OSettingRow
                 v-else
-                ref="incidentTitleRowRef"
-                :label="t('alerts.alertSettings.incidentTitleTemplate')"
-                :info="t('alerts.alertSettings.incidentTitleTemplateTooltip')"
+                :label="t('alerts.plain.openIncident')"
+                :description="t('alerts.alertSettings.createsIncidentHelp')"
                 fill
               >
-                <div class="flex w-100 flex-col gap-1 max-md:w-full">
-                  <OFormInput
-                    name="incident_title_template"
-                    :placeholder="t('alerts.alertSettings.incidentTitleTemplatePlaceholder')"
-                    :debounce="300"
-                    data-test="alert-incident-title-template-input"
-                  />
-                  <div
-                    v-if="incidentTitlePreview.length"
-                    class="text-xs break-words"
-                    data-test="alert-incident-title-preview"
-                  >
-                    <span class="text-text-secondary me-1"
-                      >{{ t("alerts.alertSettings.incidentTitlePreview") }}:</span
-                    ><template v-for="(s, i) in incidentTitlePreview" :key="i"
-                      ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
-                    >
-                  </div>
-                  <div v-if="incidentTitlePreview.length" class="text-text-secondary text-xs">
-                    {{ t("alerts.alertSettings.incidentTitlePreviewHint") }}
-                  </div>
-                </div>
+                <OFormSwitch
+                  name="creates_incident"
+                  off-tone="neutral"
+                  state-text
+                  :aria-label="t('alerts.alertSettings.createsIncident')"
+                  data-test="alert-creates-incident-toggle"
+                />
               </OSettingRow>
+
+              <template v-if="createsIncident">
+                <AlertSentenceRow
+                  v-if="!incidentTitleOpen"
+                  data-test="add-alert-incident-title-row"
+                  changeable
+                  @change="openIncidentTitle"
+                >
+                  {{ t("alerts.form.incident.titleLabel") }}{{ " "
+                  }}<strong class="text-text-heading font-semibold">{{
+                    incidentTitleTemplate || t("alerts.form.incident.titleDefault")
+                  }}</strong
+                  ><template v-if="!incidentTitleTemplate"
+                    >{{ " "
+                    }}<span class="text-text-secondary">{{
+                      t("alerts.form.incident.defaultTag")
+                    }}</span></template
+                  >
+                </AlertSentenceRow>
+                <OSettingRow
+                  v-else
+                  ref="incidentTitleRowRef"
+                  :label="t('alerts.alertSettings.incidentTitleTemplate')"
+                  :info="t('alerts.alertSettings.incidentTitleTemplateTooltip')"
+                  fill
+                >
+                  <div class="flex w-100 flex-col gap-1 max-md:w-full">
+                    <OFormInput
+                      name="incident_title_template"
+                      :placeholder="t('alerts.alertSettings.incidentTitleTemplatePlaceholder')"
+                      :debounce="300"
+                      data-test="alert-incident-title-template-input"
+                    />
+                    <div
+                      v-if="incidentTitlePreview.length"
+                      class="text-xs break-words"
+                      data-test="alert-incident-title-preview"
+                    >
+                      <span class="text-text-secondary me-1"
+                        >{{ t("alerts.alertSettings.incidentTitlePreview") }}:</span
+                      ><template v-for="(s, i) in incidentTitlePreview" :key="i"
+                        ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
+                      >
+                    </div>
+                    <div v-if="incidentTitlePreview.length" class="text-text-secondary text-xs">
+                      {{ t("alerts.alertSettings.incidentTitlePreviewHint") }}
+                    </div>
+                  </div>
+                </OSettingRow>
+              </template>
             </template>
-          </template>
+          </AlertTierPlace>
 
           <!-- Scheduled only: realtime, composite and anomaly alerts keep no episode, so neither field can act. -->
           <template v-if="isScheduled">
-            <OSettingRow
-              v-if="tierShows('recovery')"
-              :label="t('alerts.plain.notifyOnRecovery')"
-              :description="
-                notifiesNobody ? undefined : t('alerts.alertSettings.notifyOnRecoveryTooltip')
-              "
-              fill
-            >
-              <div class="flex flex-col gap-1">
-                <!-- A recovery closes what a firing delivered; with no target nothing is
+            <AlertTierPlace id="recovery">
+              <OSettingRow
+                v-if="tierShows('recovery')"
+                :label="t('alerts.plain.notifyOnRecovery')"
+                :description="
+                  notifiesNobody ? undefined : t('alerts.alertSettings.notifyOnRecoveryTooltip')
+                "
+                fill
+              >
+                <div class="flex flex-col gap-1">
+                  <!-- A recovery closes what a firing delivered; with no target nothing is
                    delivered, so it cannot be turned on. It can still be turned off. -->
-                <OFormSwitch
-                  name="notify_on_recovery"
-                  off-tone="neutral"
-                  state-text
-                  :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
-                  :disabled="notifiesNobody && !formData?.notify_on_recovery"
-                  data-test="alert-notify-on-recovery-toggle"
-                />
-                <span
-                  v-if="notifiesNobody && !formData?.notify_on_recovery"
-                  class="text-text-secondary text-xs"
-                  data-test="alert-notify-on-recovery-disabled-reason"
-                >
-                  {{ t("alerts.alertSettings.notifyOnRecoveryNeedsDestination") }}
-                </span>
-                <template v-if="formData?.notify_on_recovery && !notifiesNobody">
-                  <div
-                    v-for="row in recoveryPlan"
-                    :key="row.name"
+                  <OFormSwitch
+                    name="notify_on_recovery"
+                    off-tone="neutral"
+                    state-text
+                    :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
+                    :disabled="notifiesNobody && !formData?.notify_on_recovery"
+                    data-test="alert-notify-on-recovery-toggle"
+                  />
+                  <span
+                    v-if="notifiesNobody && !formData?.notify_on_recovery"
                     class="text-text-secondary text-xs"
-                    :data-test="`alert-notify-on-recovery-plan-${row.name}`"
+                    data-test="alert-notify-on-recovery-disabled-reason"
                   >
-                    {{ row.name }} — {{ row.action }}
-                  </div>
-                  <div
-                    v-if="hasChatRecovery"
-                    class="text-text-secondary text-xs"
-                    data-test="alert-notify-on-recovery-hint"
-                  >
-                    {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
-                  </div>
-                </template>
-              </div>
-            </OSettingRow>
+                    {{ t("alerts.alertSettings.notifyOnRecoveryNeedsDestination") }}
+                  </span>
+                  <template v-if="formData?.notify_on_recovery && !notifiesNobody">
+                    <div
+                      v-for="row in recoveryPlan"
+                      :key="row.name"
+                      class="text-text-secondary text-xs"
+                      :data-test="`alert-notify-on-recovery-plan-${row.name}`"
+                    >
+                      {{ row.name }} — {{ row.action }}
+                    </div>
+                    <div
+                      v-if="hasChatRecovery"
+                      class="text-text-secondary text-xs"
+                      data-test="alert-notify-on-recovery-hint"
+                    >
+                      {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
+                    </div>
+                  </template>
+                </div>
+              </OSettingRow>
+            </AlertTierPlace>
 
-            <AlertDestinationsField
-              :wrap="!!sectionTargets"
-              :setting-row="!!sectionTargets"
-              v-if="formData?.notify_on_recovery && !notifiesNobody && tierShows('recovery')"
-              :class="sectionTargets ? '' : 'me-2 mb-4!'"
-              data-test="alert-settings-recovery-destinations"
-              :destinations="recoveryDestinations"
-              :workflows="[]"
-              :destination-options="formattedDestinations"
-              :label="t('alerts.alertSettings.recoveryDestinations')"
-              :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
-              :supports-workflows="false"
-              @update:destinations="$emit('update:recoveryDestinations', $event)"
-              @refresh="$emit('refresh:destinations')"
-            />
+            <AlertTierPlace id="recovery">
+              <AlertDestinationsField
+                :wrap="!!sectionTargets"
+                :setting-row="!!sectionTargets"
+                v-if="formData?.notify_on_recovery && !notifiesNobody && tierShows('recovery')"
+                :class="sectionTargets ? '' : 'me-2 mb-4!'"
+                data-test="alert-settings-recovery-destinations"
+                :destinations="recoveryDestinations"
+                :workflows="[]"
+                :destination-options="formattedDestinations"
+                :label="t('alerts.alertSettings.recoveryDestinations')"
+                :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
+                :supports-workflows="false"
+                @update:destinations="$emit('update:recoveryDestinations', $event)"
+                @refresh="$emit('refresh:destinations')"
+              />
+            </AlertTierPlace>
 
             <!-- The hold delays on-call and incident closure too, not only the message. -->
-            <OSettingRow
-              v-if="tierShows('keepFiring')"
-              ref="keepFiringForFieldRef"
-              :label="t('alerts.form.keepFiring.label')"
-              :description="t('alerts.form.keepFiring.help')"
-              fill
-            >
-              <div class="flex flex-col gap-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <div>
-                    <component :is="formField" v-if="formField" name="keep_firing_for">
-                      <template #default="{ field }">
-                        <OInput
-                          :aria-label="t('alerts.alertSettings.keepFiringFor')"
-                          type="number"
-                          fit-content
-                          class="max-w-32! min-w-16"
-                          min="0"
-                          :debounce="300"
-                          :model-value="keepFiring.amount"
-                          :placeholder="t('common.off')"
-                          :error="fieldInvalid(field)"
-                          data-test="alert-settings-keep-firing-for-input"
-                          @update:model-value="(v: unknown) => keepFiring.onAmount(v, field)"
-                          @blur="field.handleBlur"
-                        />
-                      </template>
-                    </component>
+            <AlertTierPlace id="keepFiring">
+              <OSettingRow
+                v-if="tierShows('keepFiring')"
+                ref="keepFiringForFieldRef"
+                :label="t('alerts.form.keepFiring.label')"
+                :description="t('alerts.form.keepFiring.help')"
+                fill
+              >
+                <div class="flex flex-col gap-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div>
+                      <component :is="formField" v-if="formField" name="keep_firing_for">
+                        <template #default="{ field }">
+                          <OInput
+                            :aria-label="t('alerts.alertSettings.keepFiringFor')"
+                            type="number"
+                            fit-content
+                            class="max-w-32! min-w-16"
+                            min="0"
+                            :debounce="300"
+                            :model-value="keepFiring.amount"
+                            :placeholder="t('common.off')"
+                            :error="fieldInvalid(field)"
+                            data-test="alert-settings-keep-firing-for-input"
+                            @update:model-value="(v: unknown) => keepFiring.onAmount(v, field)"
+                            @blur="field.handleBlur"
+                          />
+                        </template>
+                      </component>
+                    </div>
+                    <OSelect
+                      :aria-label="
+                        t('common.unitFor', { label: t('alerts.alertSettings.keepFiringFor') })
+                      "
+                      class="w-32!"
+                      :model-value="keepFiring.unit"
+                      :options="keepFiring.options"
+                      labelKey="label"
+                      valueKey="value"
+                      :searchable="false"
+                      data-test="alert-settings-keep-firing-unit-select"
+                      @update:model-value="keepFiring.onUnit"
+                    />
                   </div>
-                  <OSelect
-                    :aria-label="
-                      t('common.unitFor', { label: t('alerts.alertSettings.keepFiringFor') })
-                    "
-                    class="w-32!"
-                    :model-value="keepFiring.unit"
-                    :options="keepFiring.options"
-                    labelKey="label"
-                    valueKey="value"
-                    :searchable="false"
-                    data-test="alert-settings-keep-firing-unit-select"
-                    @update:model-value="keepFiring.onUnit"
-                  />
+                  <div
+                    v-if="keepFiringError"
+                    class="text-input-error-text w-0 min-w-full text-xs"
+                    data-test="alert-settings-keep-firing-error"
+                    role="alert"
+                  >
+                    {{ keepFiringError }}
+                  </div>
                 </div>
-                <div
-                  v-if="keepFiringError"
-                  class="text-input-error-text w-0 min-w-full text-xs"
-                  data-test="alert-settings-keep-firing-error"
-                  role="alert"
-                >
-                  {{ keepFiringError }}
-                </div>
-              </div>
-            </OSettingRow>
+              </OSettingRow>
+            </AlertTierPlace>
 
-            <OSettingRow
-              v-if="repeatSuppressionAvailable && tierShows('suppressRepeats')"
-              :label="t('alerts.alertSettings.suppressRepeats')"
-              :info="t('alerts.alertSettings.suppressRepeatsTooltip')"
-              fill
-            >
-              <OFormSwitch
-                name="suppress_repeats"
-                off-tone="neutral"
-                state-text
-                :aria-label="t('alerts.alertSettings.suppressRepeats')"
-                data-test="alert-suppress-repeats-toggle"
-              />
-            </OSettingRow>
+            <AlertTierPlace id="suppressRepeats">
+              <OSettingRow
+                v-if="repeatSuppressionAvailable && tierShows('suppressRepeats')"
+                :label="t('alerts.alertSettings.suppressRepeats')"
+                :info="t('alerts.alertSettings.suppressRepeatsTooltip')"
+                fill
+              >
+                <OFormSwitch
+                  name="suppress_repeats"
+                  off-tone="neutral"
+                  state-text
+                  :aria-label="t('alerts.alertSettings.suppressRepeats')"
+                  data-test="alert-suppress-repeats-toggle"
+                />
+              </OSettingRow>
+            </AlertTierPlace>
           </template>
         </Teleport>
       </div>
@@ -484,6 +496,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
+import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import {
@@ -509,6 +522,7 @@ export default defineComponent({
     OSettingRow,
     AlertDestinationsField,
     AlertSentenceRow,
+    AlertTierPlace,
   },
   props: {
     // Opt-in: the sectioned alert editor renders each slice of these settings in its own section.

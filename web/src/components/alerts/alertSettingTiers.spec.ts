@@ -4,12 +4,20 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { defineComponent, h, nextTick, provide, ref } from "vue";
 import AlertTierLinks from "./AlertTierLinks.vue";
+import AlertTierPlace from "./AlertTierPlace.vue";
+import {
+  ALERT_SETTING_TIERS_KEY,
+  useAlertSettingTiers,
+} from "@/composables/alerts/useAlertSettingTiers";
 import {
   ALERT_SETTING_TIERS,
   alertTierContext,
   isTierVisible,
+  sectionPlacementOrder,
   sectionTierView,
+  tierApplies,
   tierAvailable,
   tierIsSet,
   type AlertSettingId,
@@ -128,6 +136,47 @@ describe("AlertTierLinks: the More options line names every unset rare setting",
   });
 });
 
+describe("AlertTierLinks: rows open below the line", () => {
+  it("More options renders exactly the listed rows, in order, after the toggle", async () => {
+    const c = ctx({ shape: "promql" });
+    const Host = defineComponent({
+      setup() {
+        const tiers = useAlertSettingTiers({
+          available: (id) => tierAvailable(id, c),
+          isSet: () => false,
+          showAll: ref(false),
+        });
+        provide(ALERT_SETTING_TIERS_KEY, tiers);
+        // Rows sit above the line at home, in the opposite order to the line.
+        return () =>
+          h("div", [
+            ...(["ruleExpression", "holdFor"] as AlertSettingId[]).map((id) =>
+              h(AlertTierPlace, { id }, () =>
+                tiers.isVisible(id) ? [h("div", { "data-row": id })] : [],
+              ),
+            ),
+            h(AlertTierLinks, {
+              section: "condition",
+              view: tiers.view("condition"),
+              onToggle: () => tiers.toggle("condition"),
+            }),
+          ]);
+      },
+    });
+    const wrapper = mount(Host, { global: { plugins: [i18n] }, attachTo: document.body });
+    const listed = sectionTierView("condition", state(c)).more.map((d) => d.id);
+    await wrapper.get('[data-test="add-alert-section-condition-more"]').trigger("click");
+    await nextTick();
+    const toggle = wrapper.get('[data-test="add-alert-section-condition-more"]').element;
+    const rows = [...wrapper.element.querySelectorAll("[data-row]")];
+    expect(rows.map((r) => r.getAttribute("data-row"))).toEqual(listed);
+    for (const row of rows) {
+      expect(toggle.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    wrapper.unmount();
+  });
+});
+
 describe("tier rules", () => {
   it("offers Show generated SQL only for Filters", () => {
     for (const shape of ["sql", "promql", "anomaly", "composite"] as const) {
@@ -172,6 +221,51 @@ describe("tier rules", () => {
     expect(isTierVisible("warning", s)).toBe(false);
     expect(sectionTierView("condition", s).addLinks.map((d) => d.id)).toContain("warning");
   });
+
+  it.each<[AlertSettingId, Partial<AlertTierContext>, AlertTierValues]>([
+    [
+      "ruleExpression",
+      { shape: "promql" },
+      { form: { _ui: { forecast: { U: "up" } } }, anomaly: null },
+    ],
+    [
+      "anomalySqlPreview",
+      { kind: "anomaly", shape: "anomaly" },
+      { form: {}, anomaly: { query_mode: "custom_sql" } },
+    ],
+    [
+      "anomalyTemplate",
+      { kind: "anomaly", shape: "anomaly" },
+      { form: {}, anomaly: { alert_enabled: false } },
+    ],
+  ])("%s leaves the line while the setting that replaces its row is set", (id, over, values) => {
+    const c = ctx(over);
+    expect(tierApplies(id, c, { form: {}, anomaly: values.anomaly && {} })).toBe(true);
+    expect(tierApplies(id, c, values)).toBe(false);
+  });
+
+  it("lists Generated SQL only once the builder has a query to show", () => {
+    expect(tierAvailable("generatedSql", ctx({ generatedSql: false }))).toBe(false);
+  });
+
+  it.each<[string, Partial<AlertTierContext>, AlertSectionId]>([
+    ["filters", { aggregate: true }, "condition"],
+    ["composite", { kind: "composite", shape: "composite" }, "condition"],
+    ["notify", ALL_ON, "notify"],
+  ])(
+    "rows brought below the %s line take the More options order, then the + rows",
+    (_n, over, section) => {
+      const s = state(ctx({ ...over, ...ALL_ON }));
+      const more = sectionTierView(section, s).more.map((d) => d.id);
+      const order = sectionPlacementOrder(section, s);
+      expect(order.slice(0, more.length)).toEqual(more);
+      expect(
+        order
+          .slice(more.length)
+          .every((id) => ALERT_SETTING_TIERS.find((d) => d.id === id)?.tier === "add"),
+      ).toBe(true);
+    },
+  );
 
   it("every smart setting has a name for the More options line", () => {
     for (const d of ALERT_SETTING_TIERS.filter((x) => x.tier === "smart")) {
