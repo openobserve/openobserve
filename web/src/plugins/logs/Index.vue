@@ -987,8 +987,13 @@ export default defineComponent({
       patchUrlViewState,
       addTraceId,
     } = logsUtils();
-    const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
-      useSearchStream(t);
+    const {
+      getHistogramData,
+      buildWebSocketPayload,
+      buildSearch,
+      initializeSearchConnection,
+      validateFilterForMultiStream,
+    } = useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
     const { extractPatterns, patternsState, cancelPatterns, clearPatterns } = usePatterns(t);
@@ -1063,7 +1068,8 @@ export default defineComponent({
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
-    const { showErrorNotification, showAliasErrorForVisualization } = useNotifications();
+    const { showErrorNotification, showAliasErrorForVisualization, showInfoNotification } =
+      useNotifications();
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
@@ -1948,10 +1954,19 @@ export default defineComponent({
 
             searchObj.data.query = "";
             const streams = searchObj.data.stream.selectedStream;
+            // Normal mode skips a stream that lacks a filter field, so its SQL leaves that arm out too.
+            const missing =
+              streams.length > 1 && validateFilterForMultiStream(currentQuery)
+                ? searchObj.data.stream.missingStreamMultiStreamFilter
+                : [];
+            const skipped = missing.length < streams.length ? missing : [];
+            if (skipped.length) showInfoNotification(searchObj.data.missingStreamMessage);
+            let arms = 0;
 
             streams.forEach((stream: string, index: number) => {
+              if (skipped.includes(stream)) return;
               // BY NAME merges differing columns; ALL keeps events duplicated across streams.
-              if (index > 0) {
+              if (arms++ > 0) {
                 // A -- comment runs to the end of the line, so the next arm must start a new one.
                 searchObj.data.query += hasLineComment(searchObj.data.query)
                   ? "\nUNION ALL BY NAME "

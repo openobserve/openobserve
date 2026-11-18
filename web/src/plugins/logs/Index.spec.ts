@@ -223,6 +223,7 @@ vi.mock("@/composables/useLogs", async () => {
 });
 
 const errorToasts = vi.hoisted(() => [] as unknown[]);
+const infoToasts = vi.hoisted(() => [] as unknown[]);
 vi.mock("@/composables/useNotifications", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
@@ -233,6 +234,10 @@ vi.mock("@/composables/useNotifications", async (importOriginal) => {
         showErrorNotification: (message: unknown, options?: unknown) => {
           errorToasts.push(message);
           return api.showErrorNotification(message, options);
+        },
+        showInfoNotification: (message: unknown, options?: unknown) => {
+          infoToasts.push(message);
+          return api.showInfoNotification(message, options);
         },
       };
     },
@@ -606,6 +611,31 @@ describe("Logs Index", async () => {
       });
       wrapper.vm.searchObj.data.query = "level='x'";
       expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "level='x'", freeText: false });
+    });
+  });
+
+  describe("SQL toggle with a filter field only one stream has", () => {
+    const hasK = { name: "has_k", schema: [{ name: "k", type: "Utf8" }], settings: {} };
+    const noK = { name: "no_k", schema: [{ name: "other", type: "Utf8" }], settings: {} };
+
+    it("leaves out the stream normal mode skips, with the same notice", async () => {
+      const { searchObj } = wrapper.vm;
+      searchObj.data.streamResults = { list: [hasK, noK] };
+      searchObj.data.stream.selectedStream = ["has_k", "no_k"];
+      searchObj.data.stream.selectedStreamFields = [
+        { name: "k", streams: ["has_k"] },
+        { name: "other", streams: ["no_k"] },
+      ];
+      searchObj.data.stream.interestingFieldList = [];
+      searchObj.meta.quickMode = false;
+      searchObj.data.query = "k='x'";
+
+      await wrapper.vm.setQuery(true);
+
+      expect(searchObj.data.query).toBe(`SELECT * FROM "has_k" WHERE k = 'x'`);
+      expect(searchObj.data.missingStreamMessage).toContain('"no_k"');
+      // The SQL run clears the banner, so the toggle also says it once in a toast.
+      expect(infoToasts).toContain(searchObj.data.missingStreamMessage);
     });
   });
 
