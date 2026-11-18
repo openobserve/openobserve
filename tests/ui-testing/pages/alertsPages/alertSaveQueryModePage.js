@@ -196,7 +196,10 @@ export class AlertSaveQueryModePage {
     // lands on the signature-help popup the fill opens, so close it and blur directly.
     await this.page.keyboard.press('Escape');
     await input.evaluate((el) => el.blur());
-    await expect(this.page.locator(this.locators.streamTrigger)).toHaveAttribute('data-test-selected-value', table, {
+    // Edit locks section 1, so there is no stream select to follow the FROM table.
+    const trigger = this.page.locator(this.locators.streamTrigger);
+    if (!(await trigger.count())) return;
+    await expect(trigger).toHaveAttribute('data-test-selected-value', table, {
       timeout: 15000,
     });
   }
