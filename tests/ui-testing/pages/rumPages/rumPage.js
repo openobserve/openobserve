@@ -277,6 +277,17 @@ export class RumPage {
         await this.page.waitForSelector(this.errorViewerContainer, { timeout: 30000 });
     }
 
+    /** The error viewer's breadcrumb trail lists a row whose description is exactly `text`. */
+    async expectBreadcrumbDescription(text) {
+        const description = this.page.locator('[data-test="error-events-timeline"] [data-test="error-event-description-default"]');
+        await expect(description.filter({ hasText: new RegExp(`^\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`) }).first()).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectNoBreadcrumbDescriptionContaining(text) {
+        const description = this.page.locator('[data-test="error-events-timeline"] [data-test="error-event-description-default"]');
+        await expect(description.filter({ hasText: text })).toHaveCount(0);
+    }
+
     /** Records the status of every backend-trace search the Distributed Trace card sends; returns the live list. */
     watchTraceSearches() {
         const statuses = [];

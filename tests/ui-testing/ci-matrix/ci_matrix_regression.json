@@ -129,7 +129,9 @@
       "traces-11145-row-date.spec.js",
       "traces-12213-cross-linking-tab.spec.js",
       "traces-ent1272-share-link-stream.spec.js",
-      "traces-ent1740-dag-label-overflow.spec.js"
+      "traces-ent1740-dag-label-overflow.spec.js",
+      "traces-16288-rum-span-error-tab.spec.js",
+      "traces-16529-leave-mid-load.spec.js"
     ],
     "disabled": []
   },
@@ -256,7 +258,8 @@
       "rum-3072-performance-deep-links.spec.js",
       "rum-2811-widen-range-picker-label.spec.js",
       "rum-2924-overview-cards-narrow-viewport.spec.js",
-      "rum-16460-pretty-mobile-sourcemaps.spec.js"
+      "rum-16460-pretty-mobile-sourcemaps.spec.js",
+      "rum-16331-breadcrumb-click-targets.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",
