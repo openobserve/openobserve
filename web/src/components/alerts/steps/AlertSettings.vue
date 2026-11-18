@@ -89,8 +89,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("alerts.form.schedule.cron", { period: fv("trigger_condition.period") }) }}
               </div>
+              <AlertLinkNote
+                v-if="!periodInline && scheduleNote"
+                :text="scheduleNote.text"
+                :action="scheduleNote.action"
+                :separated="scheduleNote.separated"
+                data-test="alert-settings-check-every-link"
+                @action="scheduleNote.run"
+              />
             </div>
           </component>
+          <template v-if="periodInline">
+            <AlertLinkNote
+              v-if="scheduleNote"
+              class="basis-full"
+              :text="scheduleNote.text"
+              :action="scheduleNote.action"
+              :separated="scheduleNote.separated"
+              data-test="alert-settings-check-every-link"
+              @action="scheduleNote.run"
+            />
+            <p v-else class="m-0 min-h-4 basis-full" aria-hidden="true" />
+          </template>
         </Teleport>
 
         <Teleport
@@ -184,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             show-status
             tooltip=""
             :placeholder="t('alerts.summary.noDestination')"
+            :destination-details="destinationDetails"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"
@@ -192,7 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             ref="silenceFieldRef"
             :label="t('alerts.form.remind.label')"
-            :description="t('alerts.form.remind.help')"
+            :description="
+              isRealTime === 'true'
+                ? t('alerts.form.remind.realtimeHelp')
+                : t('alerts.form.remind.help')
+            "
             fill
           >
             <div class="me-2 flex w-fit flex-col gap-1">
@@ -236,6 +261,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ silenceError }}
               </div>
+              <template v-else-if="isScheduled">
+                <AlertLinkNote
+                  v-if="silenceNote"
+                  :text="silenceNote.text"
+                  :action="silenceNote.action"
+                  :separated="silenceNote.separated"
+                  data-test="alert-settings-silence-link"
+                  @action="silenceNote.run"
+                />
+                <p v-else class="m-0 min-h-4" aria-hidden="true" />
+              </template>
             </div>
           </OSettingRow>
         </Teleport>
@@ -388,6 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('alerts.alertSettings.recoveryDestinations')"
                 :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
                 :supports-workflows="false"
+                :destination-details="destinationDetails"
                 @update:destinations="$emit('update:recoveryDestinations', $event)"
                 @refresh="$emit('refresh:destinations')"
               />
@@ -485,7 +522,7 @@ import {
   watch,
   type PropType,
 } from "vue";
-import { useI18nTyped, type I18nKey } from "@/types/i18n";
+import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -497,6 +534,9 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
+import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
+import { describeDestinations } from "@/utils/alerts/destinationDescription";
+import { durationWords, everyWords, joinList } from "@/utils/alerts/alertCopy";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import {
@@ -510,7 +550,8 @@ import { renderTemplate, segmentClass } from "@/composables/alerts/useTemplatePr
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { visibleFieldError } from "@/lib/forms/Form/fieldError";
 import { shownFieldError } from "@/composables/alerts/shownFieldError";
-import { convertMinutesToCron, getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
+import { getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
+import { useLookBackLink, type LinkedField } from "@/composables/alerts/useLookBackLink";
 
 export default defineComponent({
   name: "Step3AlertConditions",
@@ -523,6 +564,7 @@ export default defineComponent({
     AlertDestinationsField,
     AlertSentenceRow,
     AlertTierPlace,
+    AlertLinkNote,
   },
   props: {
     // Opt-in: the sectioned alert editor renders each slice of these settings in its own section.
@@ -633,6 +675,7 @@ export default defineComponent({
           oncall_team: props.formData?.oncall_team,
         }),
     );
+    const destinationDetails = computed(() => describeDestinations(props.destinationObjects, t));
     const pendingPeriodError = fieldError("_ui.pendingPeriod");
     // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
     const isForecastMode = form
@@ -744,6 +787,9 @@ export default defineComponent({
 
       const freqMinutes = frequencyMinutes();
       if (!Number.isFinite(freqMinutes) || freqMinutes <= 0) return "";
+      // The scheduler fires on the next check after Pending, so a span of one interval is never sampled in between.
+      if (pendingMinutes <= freqMinutes)
+        return t("alerts.guard.mustLastOneCheck", { every: everyWords(freqMinutes, t) });
 
       // Float-safe "is a multiple of" — see QueryConfig's original comment:
       // a cron interval can be fractional minutes, where exact `%` comparisons
@@ -756,74 +802,60 @@ export default defineComponent({
       });
     });
 
-    // ── Workflows (enterprise/cloud only) ────────────────────────────────────
-    const getBrowserTimezone = (): string => {
-      try {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-      } catch {
-        return "UTC";
-      }
+    const minFrequency = () =>
+      Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
+    // Spread the FRESH form value, not `props.formData.trigger_condition`: the prop refreshes
+    // only on the next render, and the parent writes back the whole trigger object.
+    const lookBack = useLookBackLink({
+      trigger: () => fv("trigger_condition") ?? props.formData?.trigger_condition ?? {},
+      period: () => props.formData?.trigger_condition?.period,
+      minFrequency,
+      emit: (trigger) => emit("update:trigger", trigger),
+    });
+    const { handlePeriodChange } = lookBack;
+    const LINKED_LABEL: Record<LinkedField, I18nKey> = {
+      frequency: "alerts.queryConfig.checkEvery",
+      silence: "alerts.form.remind.label",
     };
-
-    // Baseline the linked fields are measured against; re-taken whenever the period changes from outside the handler.
-    let baselinePeriod = Number(props.formData?.trigger_condition?.period);
-    let lastHandledPeriod: unknown;
-    let followedFrequency: number | null = null;
-    let followedSilence: number | null = null;
-    // Runs after the handler (pre-flush), so a user edit is recognised by lastHandledPeriod and kept as ours.
-    watch(
-      () => props.formData?.trigger_condition?.period,
-      (period) => {
-        if (String(period) === String(lastHandledPeriod)) return;
-        baselinePeriod = Number(period);
-        followedFrequency = null;
-        followedSilence = null;
-      },
-    );
-    // A baseline taken while the period was unset is not finite and leaves nothing to compare, so the field still follows.
-    const isLinked = (value: unknown, followed: number) =>
-      !Number.isFinite(followed) ||
-      value === undefined ||
-      value === null ||
-      value === "" ||
-      Number(value) === followed;
-
-    // Check every / Quiet after alerting follow the period only while still linked, so user-set and saved values survive.
-    const handlePeriodChange = (val: unknown) => {
-      const periodValue = Number(val);
-      // Spread the FRESH form value, not `props.formData.trigger_condition`.
-      // The prop is a `form.useStore` read-view that only refreshes on the next
-      // render, and the parent's @update:trigger handler is a WHOLE-OBJECT
-      // `setFieldValue("trigger_condition", …)` — so spreading the stale prop
-      // round-trips a pre-write snapshot and silently clobbers any field written
-      // earlier in the same tick.
-      const currentTrigger =
-        form?.getFieldValue?.("trigger_condition") ?? props.formData.trigger_condition;
-      const nextTrigger: Record<string, any> = {
-        ...currentTrigger,
-        period: val,
+    interface LinkNote {
+      text: I18nText | null;
+      action: I18nText;
+      separated: boolean;
+      run: () => void;
+    }
+    // Null while the look back is empty: there is nothing to follow yet.
+    const linkNote = (field: LinkedField): LinkNote | null => {
+      const period = Number(fv("trigger_condition.period"));
+      if (!(period > 0)) return null;
+      if (!lookBack.isLinked(field))
+        return {
+          text: null,
+          action: t("alerts.form.link.relink"),
+          separated: false,
+          run: () => lookBack.relink(field),
+        };
+      return {
+        text: t("alerts.form.link.follows", { duration: durationWords(period, t) }),
+        action: t("alerts.form.link.unlink"),
+        separated: true,
+        run: () => lookBack.unlink(field),
       };
-      lastHandledPeriod = val;
-      const minFrequency = Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60) || 10;
-      // A new alert's default frequency is raised to the refresh floor, so that raised value is still linked.
-      followedFrequency ??= Math.max(baselinePeriod, minFrequency);
-      followedSilence ??= baselinePeriod;
-      if (periodValue && periodValue > 0) {
-        if (periodValue >= minFrequency && isLinked(nextTrigger.frequency, followedFrequency)) {
-          nextTrigger.frequency = periodValue;
-          followedFrequency = periodValue;
-        }
-        // A cron schedule the user wrote is what runs the alert, so the period must not replace it.
-        if (nextTrigger.frequency_type !== "cron")
-          nextTrigger.cron = convertMinutesToCron(periodValue);
-        if (!nextTrigger.timezone) nextTrigger.timezone = getBrowserTimezone();
-        if (isLinked(nextTrigger.silence, followedSilence)) {
-          nextTrigger.silence = periodValue;
-          followedSilence = periodValue;
-        }
-      }
-      emit("update:trigger", nextTrigger);
     };
+    const scheduleNote = computed<LinkNote | null>(() => {
+      const move = lookBack.lastMove.value;
+      if (move)
+        return {
+          text: t("alerts.form.link.alsoSet", {
+            fields: joinList(move.fields.map((field) => t(LINKED_LABEL[field]))),
+            duration: durationWords(move.period, t),
+          }),
+          action: t("alerts.form.link.undo"),
+          separated: false,
+          run: lookBack.undo,
+        };
+      return isCron.value ? null : linkNote("frequency");
+    });
+    const silenceNote = computed(() => linkNote("silence"));
 
     // ── Recovery ────────────────────────────────────────────────────────────
     // Platform destinations are resolved by the server itself (it closes the
@@ -1079,6 +1111,9 @@ export default defineComponent({
       incidentsEnabled,
       repeatSuppressionAvailable,
       handlePeriodChange,
+      scheduleNote,
+      silenceNote,
+      destinationDetails,
       // Field refs for the parent focus manager
       periodFieldRef,
       silenceFieldRef,

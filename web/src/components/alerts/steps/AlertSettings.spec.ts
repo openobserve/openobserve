@@ -38,6 +38,7 @@ import {
   useAlertSettingTiers,
 } from "@/composables/alerts/useAlertSettingTiers";
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
+import { durationWords, everyWords, joinList } from "@/utils/alerts/alertCopy";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   makeAlertSettingsShape,
@@ -452,6 +453,48 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       expect(trigger).toMatchObject({ frequency: 20, silence: 20 });
     });
 
+    const note = (host: VueWrapper, dataTest: string) => host.find(`[data-test="${dataTest}"]`);
+    const click = async (host: VueWrapper, dataTest: string) => {
+      await note(host, `${dataTest}-action`).trigger("click");
+      await flushPromises();
+      return liveForm(host).state.values.trigger_condition;
+    };
+    const follows = (minutes: number) =>
+      t("alerts.form.link.follows", { duration: durationWords(minutes, i18n.global.t as any) });
+    const alsoSet = (fields: string[], minutes: number) =>
+      t("alerts.form.link.alsoSet", {
+        fields: joinList(fields.map((key) => t(key))),
+        duration: durationWords(minutes, i18n.global.t as any),
+      });
+
+    it("a look-back edit that moves linked settings says so, and Undo puts them back", async () => {
+      const host = mountLive();
+      expect(note(host, "alert-settings-silence-link-text").text()).toBe(follows(10));
+
+      await typePeriod(host, "5");
+      expect(note(host, "alert-settings-check-every-link-text").text()).toBe(
+        alsoSet(["alerts.queryConfig.checkEvery", "alerts.form.remind.label"], 5),
+      );
+      expect(note(host, "alert-settings-silence-link-text").text()).toBe(follows(5));
+
+      const trigger = await click(host, "alert-settings-check-every-link");
+      expect(trigger).toMatchObject({ period: "5", frequency: 10, silence: 10 });
+      expect(note(host, "alert-settings-silence-link").text()).toBe(t("alerts.form.link.relink"));
+    });
+
+    it("Unlink keeps Notify at most every through look-back edits; Follow Look back re-links it", async () => {
+      const host = mountLive();
+      await click(host, "alert-settings-silence-link");
+
+      const trigger = await typePeriod(host, "20");
+      expect(trigger).toMatchObject({ frequency: 20, silence: 10 });
+      expect(note(host, "alert-settings-check-every-link-text").text()).toBe(
+        alsoSet(["alerts.queryConfig.checkEvery"], 20),
+      );
+
+      expect(await click(host, "alert-settings-silence-link")).toMatchObject({ silence: 20 });
+    });
+
     it("a form re-seeded without remount re-links fields that match its new period", async () => {
       const host = mountLive();
       await typePeriod(host, "20");
@@ -832,6 +875,25 @@ describe("AlertSettings — combined destinations + workflows target control", (
     expect(targets.props("destinationOptions")).toEqual(["dest-a", "dest-b"]);
   });
 
+  it("describes each destination to the picker from the org's destination objects", () => {
+    const host = mount(
+      defineComponent({
+        components: { OForm, AlertSettings },
+        setup: () => ({ schema: parentSchema, formData: makeFormData() }),
+        template: `
+          <OForm :schema="schema" :default-values="{ trigger_condition: { silence: 10, period: 10 } }">
+            <AlertSettings :form-data="formData" is-real-time="false" :formatted-destinations="['ops']"
+              :destination-objects="[{ name: 'ops', type: 'http', url: 'https://hooks.example.com/x' }]" />
+          </OForm>
+        `,
+      }),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+    expect(findTargets(host).props("describe")).toEqual({
+      ops: { type: t("components.badge.destinationType.webhook"), target: "hooks.example.com" },
+    });
+  });
+
   it("re-emits the child's update:workflows so the ancestor can setFieldValue", async () => {
     const host = mountDescendant();
     const step = host.findComponent(AlertSettings);
@@ -1087,6 +1149,36 @@ describe("AlertSettings — notify and timing in their sections", () => {
     expect(values().pending_period_sec).toBe(0);
     expect(inSlot("settingsHold", "add-alert-hold-for-row")).toBe(false);
     expect(tiers.view("condition").more.map((d) => d.id)).toContain("holdFor");
+  });
+
+  it.each([
+    [10, 10, "alerts.guard.mustLastOneCheck"],
+    [10, 5, "alerts.guard.mustLastOneCheck"],
+    [10, 15, "alerts.validation.pendingPeriodNotMultiple"],
+    [1, 10, null],
+  ])("checks every %i min with Must last %i min warns %s", (frequency, pending, key) => {
+    const { targets } = mountSectioned(
+      "false",
+      {
+        trigger_condition: { silence: 10, period: 10, frequency, frequency_type: "minutes" },
+        pending_period_sec: pending,
+        _ui: { pendingPeriod: pending },
+      },
+      { reveal: ["holdFor"] },
+    );
+    const warning = targets.settingsHold.querySelector(
+      '[data-test="alert-settings-pending-period-warning"]',
+    );
+    const every = everyWords(frequency, i18n.global.t as any);
+    expect(warning?.textContent?.trim() ?? null).toBe(key && t(key, { every, minutes: frequency }));
+  });
+
+  it.each([
+    ["true", "alerts.form.remind.realtimeHelp"],
+    ["false", "alerts.form.remind.help"],
+  ])("Notify at most every explains itself for is_real_time %s", (kind, key) => {
+    const { targets } = mountSectioned(kind);
+    expect(targets.settingsNotify.textContent).toContain(t(key));
   });
 
   it("composite Must last lives in the condition section", () => {
