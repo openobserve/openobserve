@@ -59,7 +59,8 @@
       "alerts-clone-dialog.spec.js",
       "alerts-save-query-mode.spec.js",
       "alerts-evaluation-chart.spec.js",
-      "list-quick-filter-cards.spec.js"
+      "list-quick-filter-cards.spec.js",
+      "alerts-list-opens-on-firing.spec.js"
     ],
     "disabled": []
   },

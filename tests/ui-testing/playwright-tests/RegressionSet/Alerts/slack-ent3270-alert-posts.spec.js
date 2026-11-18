@@ -5,7 +5,7 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../../pages/page-manager.js');
 const testLogger = require('../../utils/test-logger.js');
-const { api } = require('../../../pages/slackPages/index.js');
+const { SlackPages, api } = require('../../../pages/slackPages/index.js');
 const { uniq, compositeAlert, firstRunFiringAlert } = require('../../utils/alerts-api-helpers.js');
 
 const CHANNEL = { id: 'C0PWREG3270', name: 'sre-prod' };
@@ -84,6 +84,30 @@ test.describe(
       await new PageManager(page).alertsPage.expectRowsFiring(fx.org, name, [name]);
       const posts = await api.channelPostsNaming(fx.request, fx.channelId, name);
       expect(posts.length, 'one message for the firing').toBe(1);
+    });
+
+    test('ENT#3272 a post Slack refuses shows on Settings › Slack with its reason and destination', async ({
+      page,
+    }, testInfo) => {
+      testLogger.testStart(testInfo.title, testInfo.file);
+      const name = uniq('slack_reg_refused').toLowerCase();
+      const firing = { stream: fx.stream, destinations: [fx.destination], silence: SILENCE_MINUTES };
+      expect(await api.refusedPosts(fx.request, fx.org), 'the fixture org starts with no refused post').toBeNull();
+      await api.refuseAllPosts(fx.request, 'is_archived');
+      try {
+        await api.createFixtureAlert(fx, firstRunFiringAlert(name, firing));
+        await expect
+          .poll(() => api.refusedPosts(fx.request, fx.org), { timeout: FIRST_POST_WAIT_MS, intervals: [3000] })
+          .toMatchObject({ count: 1, last_reason: 'is_archived', last_destination: fx.destination });
+      } finally {
+        await api.acceptPostsAgain(fx.request);
+      }
+      await navigateToBase(page);
+      const slack = new SlackPages(page);
+      await slack.settings.goto(fx.org);
+      await slack.card.waitLoaded();
+      await expect(slack.card.refused).toContainText('1 alert post failed in the last 24 h');
+      await expect(slack.card.refused).toContainText(`is_archived on ${fx.destination}`);
     });
   },
 );
