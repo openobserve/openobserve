@@ -419,6 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AlertSentenceRow
             v-if="formContext"
             :label="t('alerts.groups.schedule')"
+            :description="scheduleDelayNote"
             data-test="anomaly-schedule-line"
             changeable
             @change="formContext.goToSection('schedule')"
@@ -624,7 +625,7 @@ import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
-import { dataNoun, everyWords } from "@/utils/alerts/alertCopy";
+import { dataNoun, durationText, everyDuration, everyWords } from "@/utils/alerts/alertCopy";
 import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1294,6 +1295,18 @@ export default defineComponent({
         t,
       ),
     );
+    // Detection runs only on a check, so an hourly check can hold a spike back for up to an hour.
+    const scheduleDelayNote = computed(() => {
+      const secs = anomalyIntervalSeconds(
+        Number(scheduleIntervalValue.value),
+        String(scheduleIntervalUnit.value),
+      );
+      if (secs === null || secs < 3600) return undefined;
+      return t("alerts.guard.anomalyDelay", {
+        every: everyDuration(secs, t),
+        duration: durationText(secs, t),
+      });
+    });
     const scheduleWindow = computed(() =>
       intervalText(detectionWindowValue.value, detectionWindowUnit.value),
     );
@@ -1376,6 +1389,7 @@ export default defineComponent({
       openFilters,
       scheduleEvery,
       scheduleWindow,
+      scheduleDelayNote,
     };
   },
 });

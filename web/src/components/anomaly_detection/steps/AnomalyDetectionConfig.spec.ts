@@ -1637,6 +1637,17 @@ describe("AnomalyDetectionConfig — section 2 in the sectioned editor (E1)", ()
     expect(goToSection).toHaveBeenCalledWith("schedule");
   });
 
+  it.each([
+    [1, "h", "Checks every hour, so a spike can wait up to 1 hour to alert."],
+    [10, "m", ""],
+  ])("a check every %s %s says how long a spike can wait: %j", async (value, unit, note) => {
+    const { w } = mountSectioned({ schedule_interval_value: value, schedule_interval_unit: unit });
+    await flushPromises();
+    const line = w.find('[data-test="anomaly-schedule-line"]');
+    expect(line.text().includes("so a spike can wait")).toBe(!!note);
+    if (note) expect(line.text()).toContain(note);
+  });
+
   it("offers the Builder / SQL toggle from the start, and SQL switches to custom SQL", async () => {
     const { w, config } = mountSectioned();
     await flushPromises();
