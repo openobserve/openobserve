@@ -325,9 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <LogsNoEventsState
                         class="min-h-0 flex-1"
-                        :sql-mode="searchObj.meta.sqlMode"
-                        :query="searchObj.data.query"
-                        :editor-value="searchObj.data.editorValue"
+                        :sql-mode="shownResultsQuery.sqlMode"
+                        :query="shownResultsQuery.query"
                         :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
                         :date-type="searchObj.data.datetime.type || 'relative'"
                         :ai-enabled="isAiEnabled"
@@ -573,9 +572,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <LogsNoEventsState
               v-else-if="searchObj.meta.searchApplied == true"
               data-test="logs-drill-down-no-events-found-text"
-              :sql-mode="searchObj.meta.sqlMode"
-              :query="searchObj.data.query"
-              :editor-value="searchObj.data.editorValue"
+              :sql-mode="shownResultsQuery.sqlMode"
+              :query="shownResultsQuery.query"
               :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
               :date-type="searchObj.data.datetime.type || 'relative'"
               :ai-enabled="isAiEnabled"
@@ -2139,6 +2137,14 @@ export default defineComponent({
       searchObj.data.datetime.type = "relative";
       autoRun.engine.requestRun("run");
     };
+
+    // The empty state describes the results on screen, so an unrun edit must not change its copy.
+    // A result set no recorded run produced (a search job) has only the live query to go by.
+    const shownResultsQuery = computed(() => {
+      const ran = searchObj.meta.executed?.signature;
+      if (ran) return { sqlMode: ran.sqlMode, query: ran.query };
+      return { sqlMode: !!searchObj.meta.sqlMode, query: String(searchObj.data.query ?? "") };
+    });
 
     // Microsecond bounds of the selected streams' data (union across all selected streams).
     // undefined when no stream is selected or stats are unavailable.
@@ -4236,6 +4242,7 @@ export default defineComponent({
       onAskAiFixQuery,
       streamDocTimeRange,
       queryWindowUs,
+      shownResultsQuery,
       onJumpToStreamData,
       onFixQuery,
       onConfigureStream,
