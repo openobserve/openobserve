@@ -15,38 +15,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="inline-flex w-48 shrink-0" data-test="traces-scope-select-wrap">
+  <div class="inline-flex shrink-0 items-center gap-2" data-test="traces-scope-select-wrap">
     <!-- First child, so the tooltip binds to the wrapper, not to the select that takes no pointer events. -->
     <OTooltip v-if="sqlMode" :content="t('traces.scope.sqlModeDisabled')" />
-    <OSelect
-      :model-value="shown"
-      :label="t('traces.scope.label')"
-      label-position="inside"
-      size="sm"
-      :searchable="false"
-      :disabled="sqlMode"
-      :class="{ 'pointer-events-none': sqlMode }"
-      data-test="traces-scope-select"
-      @update:model-value="pick"
-    >
-      <template #trigger>
-        <span data-test="traces-scope-select-value">{{ optionLabel(shown) }}</span>
-      </template>
-      <div v-for="option in options" :key="option.value">
-        <!-- A disabled item takes no pointer events, so its wrapper carries the reason. -->
-        <OTooltip
-          v-if="option.disabled"
-          :content="t('traces.scope.rootUnavailable')"
-          side="right"
-        />
-        <OSelectItem :value="option.value" :label="option.label" :disabled="option.disabled">
-          <span class="flex min-w-0 flex-col">
-            <span>{{ option.label }}</span>
-            <span class="text-text-secondary text-xs">{{ option.description }}</span>
-          </span>
-        </OSelectItem>
-      </div>
-    </OSelect>
+    <span class="text-text-secondary text-xs whitespace-nowrap">{{ t("traces.scope.label") }}</span>
+    <div class="w-36">
+      <OSelect
+        :model-value="shown"
+        :aria-label="t('traces.scope.label')"
+        size="xs"
+        :searchable="false"
+        :disabled="sqlMode"
+        :class="{ 'pointer-events-none': sqlMode }"
+        data-test="traces-scope-select"
+        @update:model-value="pick"
+      >
+        <template #trigger>
+          <span class="truncate text-xs" data-test="traces-scope-select-value">{{
+            optionLabel(shown)
+          }}</span>
+        </template>
+        <div v-for="option in options" :key="option.value">
+          <!-- A disabled item takes no pointer events, so its wrapper carries the reason. -->
+          <OTooltip
+            v-if="option.disabled"
+            :content="t('traces.scope.rootUnavailable')"
+            side="right"
+          />
+          <OSelectItem :value="option.value" :label="option.label" :disabled="option.disabled">
+            <span class="flex min-w-0 flex-col">
+              <span>{{ option.label }}</span>
+              <span class="text-text-secondary text-xs">{{ option.description }}</span>
+            </span>
+          </OSelectItem>
+        </div>
+      </OSelect>
+    </div>
   </div>
 </template>
 
