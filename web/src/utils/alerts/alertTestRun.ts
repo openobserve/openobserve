@@ -111,9 +111,18 @@ export function checkTimeText(micros: number, timeZone: string | undefined, nowM
   );
 }
 
-const groupLabel = (labels: Record<string, string>, key: string) => {
-  const values = Object.values(labels ?? {});
-  return raw(values.length ? values.join(" · ") : key);
+// A label every series shares names none of them, so only the labels that differ are shown.
+const differingKeys = (all: Record<string, string>[]): string[] => {
+  const keys = [...new Set(all.flatMap((labels) => Object.keys(labels ?? {})))];
+  return keys.filter((k) => new Set(all.map((labels) => labels?.[k])).size > 1);
+};
+const groupLabel = (labels: Record<string, string>, key: string, keys?: string[]) => {
+  const shown = keys?.length ? keys : Object.keys(labels ?? {});
+  const values = [
+    ...new Set(shown.map((k) => labels?.[k]).filter((v) => v !== undefined && v !== "")),
+  ];
+  // Labels that differ together (pod, its uid, its start time) repeat one identity; two name it.
+  return raw(values.length ? values.slice(0, keys?.length ? 2 : undefined).join(" · ") : key);
 };
 
 const listWithMore = (items: I18nText[], total: number, t: TranslateFn): I18nText => {
@@ -165,25 +174,26 @@ function summaryLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
 function closestLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
   const side = thresholdSide(r.checks[0]?.operator);
   if (side !== "above" && side !== "below") return null;
-  let best: { value: number; series: string | null; time: number } | null = null;
-  for (const check of r.checks) {
-    if (check.state !== "pending") continue;
+  const pending = r.checks.filter((check) => check.state === "pending");
+  const keys = differingKeys(pending.flatMap((check) => (check.groups ?? []).map((g) => g.labels)));
+  let best: { value: number; labels: Record<string, string> | null; time: number } | null = null;
+  for (const check of pending) {
     const group = check.groups?.[0];
     const value = group?.value ?? check.value;
     if (value === null || value === undefined) continue;
     if (best && (side === "above" ? value <= best.value : value >= best.value)) continue;
-    const labels = Object.values(group?.labels ?? {});
-    best = { value, series: labels.length ? labels.join(" · ") : null, time: check.time };
+    best = { value, labels: group?.labels ?? null, time: check.time };
   }
   if (!best) return null;
+  const series = best.labels && keys.length ? String(groupLabel(best.labels, "", keys)) : "";
   const params = {
     value: testValueText(best.value, null, o.t),
     time: checkTimeText(best.time, o.timeZone, o.nowMs),
   };
   return {
     id: "closest",
-    text: best.series
-      ? o.t("alerts.testRun.closest", { ...params, series: raw(best.series) })
+    text: series
+      ? o.t("alerts.testRun.closest", { ...params, series: raw(series) })
       : o.t("alerts.testRun.closestValue", params),
     tone: "secondary",
   };
@@ -264,8 +274,9 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
       tone: "warning",
     });
   const groupChecks = GROUP_CHECKS_KEYS[thresholdSide(r.checks[0]?.operator) ?? "none"];
+  const keys = differingKeys(s.groups_fired.map((g) => g.labels));
   const groups = s.groups_fired.slice(0, SHOWN_GROUPS).map((g) => ({
-    label: groupLabel(g.labels, g.key),
+    label: groupLabel(g.labels, g.key, keys),
     text: t(groupChecks, { count: formatNumber(g.checks) }, g.checks),
   }));
   const groupsMore = Math.max(

@@ -86,7 +86,18 @@ describe("testRunReport", () => {
     ["<", "below the threshold"],
     ["=", "matched the condition"],
   ])("lists every group that fired with its checks, for %s", (operator, side) => {
-    const r = { ...grouped, checks: grouped.checks.map((c) => ({ ...c, operator })) };
+    // A label every group shares names none of them, so only the one that differs is shown.
+    const r = {
+      ...grouped,
+      checks: grouped.checks.map((c) => ({ ...c, operator })),
+      summary: {
+        ...grouped.summary,
+        groups_fired: grouped.summary.groups_fired.map((g) => ({
+          ...g,
+          labels: { env: "prod", ...g.labels },
+        })),
+      },
+    };
     const { groups, groupsMore } = report(r);
     expect(groups.map((g) => `${g.label}: ${g.text}`)).toEqual([
       `checkout: ${side} in 2 checks`,
@@ -149,7 +160,7 @@ describe("testRunReport", () => {
     const r = {
       ...errorsTruncated,
       checks: [
-        { ...check, groups: [{ key: "node=a", labels: { node: "a" }, value: 0.93 }] },
+        { ...check, groups: [{ key: "node=a", labels: { job: "x", node: "a" }, value: 0.93 }] },
         {
           ...check,
           time: check.time + 60_000_000,
