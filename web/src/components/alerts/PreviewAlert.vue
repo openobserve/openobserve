@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="alert-preview-key"
     >
       <span
-        v-for="limit in limitKeys"
+        v-for="limit in testOpen ? [] : limitKeys"
         :key="limit.level"
         class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap"
         :data-test="
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <span class="ms-auto flex min-w-0 items-center gap-3">
         <OTruncatedText
-          v-if="seriesCountText"
+          v-if="seriesCountText && !testOpen"
           class="min-w-0"
           data-test="alert-preview-series-count"
         >
@@ -468,6 +468,10 @@ watch(
   },
   { immediate: true },
 );
+// Once the preview is gone (anomaly, composite), no answer stands for the alert any more.
+onBeforeUnmount(() => {
+  testRun.currentKey.value = null;
+});
 const testOpen = ref(false);
 const testRunPanel = ref<{ run: () => void } | null>(null);
 const onTestIt = () => {
@@ -2134,8 +2138,12 @@ const refreshFromProps = () => {
     return;
   }
 
-  // Check if aggregation is enabled but required fields are missing
-  if (props.isAggregationEnabled && props.formData.query_condition?.aggregation) {
+  // A builder value alert waits for its value; the SQL and PromQL tabs keep the builder's flag but not its query.
+  if (
+    props.selectedTab === "custom" &&
+    props.isAggregationEnabled &&
+    props.formData.query_condition?.aggregation
+  ) {
     const hasColumn =
       props.formData.query_condition.aggregation.having?.column &&
       props.formData.query_condition.aggregation.having.column.trim() !== "";

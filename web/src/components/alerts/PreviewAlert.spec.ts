@@ -3491,6 +3491,20 @@ describe("PreviewAlert - value alerts without a value, span durations and Test i
     w.unmount();
   });
 
+  it("runs a PromQL preview while the builder's value threshold is blank", async () => {
+    const w = await mountComp({
+      query: "up",
+      selectedTab: "promql",
+      isAggregationEnabled: true,
+      formData: valueAlert({ value: "" }),
+    });
+    await w.setProps({ query: "sum(up)" });
+    await vi.waitFor(() => expect(w.vm.chartData?.queries?.[0]?.query).toBe("sum(up)"), {
+      timeout: 2000,
+    });
+    w.unmount();
+  });
+
   it("reads a span duration threshold in ms and draws the axis from microseconds", async () => {
     const w = await mountComp({
       query: "SELECT 1",
