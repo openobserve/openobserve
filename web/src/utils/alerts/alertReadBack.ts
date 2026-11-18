@@ -82,10 +82,11 @@ const OPERATOR_SYMBOLS: Record<string, string> = {
 };
 
 /** Why a scheduled alert's condition cannot be read back as a rule yet. */
-export type ConditionGap = "noQuery" | "fixLimit";
+export type ConditionGap = "noQuery" | "fixQuery" | "fixLimit";
 
 export const CONDITION_GAP_KEYS: Record<ConditionGap, I18nKey> = {
   noQuery: "alerts.saveModeDialog.noQuery",
+  fixQuery: "alerts.sections.condition.fixQuery",
   fixLimit: "alerts.sections.condition.fixLimit",
 };
 
@@ -115,9 +116,11 @@ export const isCountLimit = (value: unknown): boolean =>
 /** A scheduled alert's condition gap; an absent limit falls back to the default, so only a typed one can be bad. */
 export function conditionGap(
   alert: Pick<ReadBackAlert, "query_condition" | "trigger_condition">,
+  opts: { queryFailed?: boolean } = {},
 ): ConditionGap | null {
   const qc = alert.query_condition;
   if (qc?.type === "sql" && !qc.sql?.trim()) return "noQuery";
+  if (opts.queryFailed) return "fixQuery";
   const threshold = alert.trigger_condition?.threshold;
   return threshold !== undefined && !isCountLimit(threshold) ? "fixLimit" : null;
 }

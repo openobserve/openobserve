@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is_ui_histogram="shouldUseHistogram"
         @result-metadata-update="handleChartDataUpdate"
         @series-data-update="handleSeriesDataUpdate"
+        @error="previewError = $event"
       />
     </div>
   </div>
@@ -235,6 +236,12 @@ const evaluationStatus = ref<{
   grouped?: boolean;
 } | null>(null);
 const { t } = useI18nTyped();
+// The renderer's last run outcome; an empty message means it answered. Results it emits after
+// an error are not this query's, so the handlers skip them.
+const previewError = ref<{ message?: string; code?: string | number } | null>(null);
+watch(previewError, (error) => {
+  if (error?.message) evaluationStatus.value = null;
+});
 
 const store = useStore();
 
@@ -650,6 +657,7 @@ const fetchQuerySchema = async () => {
 // Handle chart data updates from PanelSchemaRenderer
 // This receives the resultMetaData which contains the streaming response metadata
 const handleChartDataUpdate = (resultMetaData: any) => {
+  if (previewError.value?.message) return;
   // Safety check: ensure trigger_condition exists
   if (!props.formData.trigger_condition) {
     console.warn("[PreviewAlert] No trigger_condition found, skipping evaluation");
@@ -1312,6 +1320,7 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
 // Handle series data update event (PromQL only — every other mode is evaluated
 // from partition metadata in handleChartDataUpdate)
 const handleSeriesDataUpdate = (seriesData: any) => {
+  if (previewError.value?.message) return;
   if (!props.formData.trigger_condition) return;
   if (props.selectedTab !== "promql") return;
 
@@ -1723,9 +1732,18 @@ const shownEvaluationStatus = computed(() => {
   return threshold !== undefined && !isPreviewCountLimit(threshold) ? null : evaluationStatus.value;
 });
 
+// Only a 4xx is the query's fault; a server or network failure says nothing about it.
+const queryFailed = computed(
+  () =>
+    !!props.query &&
+    !!previewError.value?.message &&
+    String(previewError.value.code ?? "").startsWith("4"),
+);
+
 defineExpose({
   refreshData: refreshDataFromParent,
   resizeChart,
   evaluationStatus: shownEvaluationStatus,
+  queryFailed,
 });
 </script>

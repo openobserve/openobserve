@@ -33,7 +33,7 @@ vi.mock("../dashboards/PanelSchemaRenderer.vue", () => ({
       "searchType",
       "is_ui_histogram",
     ],
-    emits: ["result-metadata-update", "series-data-update"],
+    emits: ["result-metadata-update", "series-data-update", "error"],
   },
 }));
 
@@ -681,6 +681,45 @@ describe("PreviewAlert - watcher behavior", () => {
     await w.setProps({ query: `SELECT count(*) AS zo_sql_num FROM "logs" WHERE a=1` });
     await emitResultMetadata(w, [[{ total: 2 }]]);
     expect(w.vm.evaluationStatus?.wouldTrigger).toBe(false);
+    w.unmount();
+  });
+
+  it("shows no verdict while the query fails, even a stale one emitted after the error", async () => {
+    const w = await mountComp({
+      query: `SELECT count(*) AS zo_sql_num FROM "logs"`,
+      selectedTab: "sql",
+      formData: { ...baseFormData(), is_real_time: false },
+    });
+    await flushPromises();
+    const exposed = w.vm.$.exposed as any;
+    const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
+    await emitResultMetadata(w, [[{ total: 1000 }]]);
+    expect(exposed.evaluationStatus.value?.wouldTrigger).toBe(true);
+
+    renderer.vm.$emit("error", { message: "Search field not found", code: 400 });
+    await nextTick();
+    await emitResultMetadata(w, [[{ total: 1000 }]]);
+    expect(exposed.evaluationStatus.value).toBeNull();
+    expect(exposed.queryFailed.value).toBe(true);
+
+    renderer.vm.$emit("error", { message: "", code: "" });
+    await nextTick();
+    expect(exposed.evaluationStatus.value).toBeNull();
+    await emitResultMetadata(w, [[{ total: 2 }]]);
+    expect(exposed.evaluationStatus.value?.wouldTrigger).toBe(false);
+    expect(exposed.queryFailed.value).toBe(false);
+    w.unmount();
+  });
+
+  it("blames the query only for a 4xx, not for a server or network failure", async () => {
+    const w = await mountComp({ query: "up", selectedTab: "promql" });
+    const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
+    renderer.vm.$emit("error", { message: "boom", code: 503 });
+    await nextTick();
+    expect((w.vm.$.exposed as any).queryFailed.value).toBe(false);
+    renderer.vm.$emit("error", { message: "parse error", code: "400" });
+    await nextTick();
+    expect((w.vm.$.exposed as any).queryFailed.value).toBe(true);
     w.unmount();
   });
 

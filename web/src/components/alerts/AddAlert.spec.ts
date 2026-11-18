@@ -20,6 +20,7 @@
 // composed schema still validates from the seeded form values + default `_meta`.
 
 import { flushPromises, mount } from "@vue/test-utils";
+import { computed, defineComponent, h, ref } from "vue";
 import { describe, it, expect, vi, afterEach, beforeEach, onTestFinished } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
@@ -1347,6 +1348,48 @@ describe("AddAlert (OForm owner)", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+    it.each([
+      ["the SQL check fails", true, false],
+      ["the preview run fails", false, true],
+    ])("says the query needs fixing and gives no verdict when %s", async (_, check, run) => {
+      const queryFailed = ref(false);
+      const PreviewAlert = defineComponent({
+        name: "PreviewAlert",
+        setup(_props, { expose }) {
+          // As the real preview, a failed run withdraws its own verdict.
+          const evaluationStatus = computed(() =>
+            queryFailed.value ? null : { wouldTrigger: true, reason: "", count: 1000 },
+          );
+          expose({ evaluationStatus, queryFailed });
+          return () => h("div");
+        },
+      });
+      wrapper = mountAlert(
+        {},
+        {
+          global: {
+            provide: { store },
+            plugins: [i18n, router],
+            stubs: { ...stubs, PreviewAlert },
+          },
+        },
+      );
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      wrapper.vm.form.setFieldValue("query_condition.type", "sql");
+      wrapper.vm.form.setFieldValue("query_condition.sql", 'SELECT nosuchcol FROM "app_logs"');
+      await flushPromises();
+      const verdict = () => wrapper.find('[data-test="add-alert-rail-verdict"]');
+      const navItem = () => wrapper.find('[data-test="o-section-nav-item-condition"]');
+      expect(verdict().exists()).toBe(true);
+
+      if (check) wrapper.vm.sqlQueryErrorMsg = "Search field not found";
+      queryFailed.value = run;
+      await flushPromises();
+
+      expect(verdict().exists()).toBe(false);
+      expect(navItem().text()).toContain(i18n.global.t("alerts.sections.condition.fixQuery"));
     });
   });
 

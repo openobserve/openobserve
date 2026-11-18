@@ -19,6 +19,7 @@ import config from "@/aws-exports";
 
 const t = i18n.global.t as unknown as TranslateFn;
 const SQL = "SELECT count(*) FROM default";
+const FIX_QUERY = "alerts.sections.condition.fixQuery";
 
 const scheduled = (over: Record<string, unknown> = {}) => ({
   name: "",
@@ -50,6 +51,7 @@ const setup = (
   meta: FieldMetaMap = {},
   editing = false,
   incidentsEnabled = true,
+  queryFailed = false,
 ) =>
   useAlertFormSections({
     fieldMeta: ref(meta),
@@ -59,6 +61,7 @@ const setup = (
     isAggregationEnabled: ref(false),
     isEditing: ref(editing),
     incidentsEnabled: ref(incidentsEnabled),
+    queryFailed: ref(queryFailed),
     t,
   });
 
@@ -360,20 +363,26 @@ describe("useAlertFormSections", () => {
     ["a negative limit", { type: "custom" }, -5, "alerts.sections.condition.fixLimit"],
     ["a fractional limit", { type: "custom" }, 2.5, "alerts.sections.condition.fixLimit"],
     ["an emptied limit", { type: "sql", sql: SQL }, "", "alerts.sections.condition.fixLimit"],
-  ] as const)("flags %s in the list and the read-back", (_, query_condition, threshold, key) => {
-    const fd = {
-      ...base,
-      query_condition,
-      trigger_condition: { ...base.trigger_condition, threshold },
-    };
-    const { items, review } = setup(fd);
-    expect(byId(items.value, "condition")).toMatchObject({
-      state: "attention",
-      stateLabel: t(key),
-      summary: t(key),
-    });
-    expect(reviewLineText(byId(review.value, "condition") as never, t)).toBe(t(key));
-  });
+    ["a SQL query that fails", { type: "sql", sql: SQL }, 3, FIX_QUERY, true],
+    ["a PromQL query that fails", { type: "promql", promql: "up" }, 3, FIX_QUERY, true],
+    ["a builder query whose SQL fails", { type: "custom" }, 3, FIX_QUERY, true],
+  ] as const)(
+    "flags %s in the list and the read-back",
+    (_, query_condition, threshold, key, failed = false) => {
+      const fd = {
+        ...base,
+        query_condition,
+        trigger_condition: { ...base.trigger_condition, threshold },
+      };
+      const { items, review } = setup(fd, {}, false, true, failed);
+      expect(byId(items.value, "condition")).toMatchObject({
+        state: "attention",
+        stateLabel: t(key),
+        summary: t(key),
+      });
+      expect(reviewLineText(byId(review.value, "condition") as never, t)).toBe(t(key));
+    },
+  );
 
   it("names the stream and its type in the watch summary", () => {
     const { items } = setup(scheduled({ stream_name: "default", stream_type: "logs" }));

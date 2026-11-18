@@ -1965,6 +1965,9 @@ export default defineComponent({
       incidentsEnabled,
       changedSections: unsaved.sections,
       visited: visitedSections,
+      queryFailed: computed(
+        () => sqlCheckFailed.value || alertForm.previewAlertRef.value?.queryFailed === true,
+      ),
       t: alertForm.t,
     });
 
@@ -2010,7 +2013,8 @@ export default defineComponent({
       if (alertForm.isAnomalyMode.value || !fd.stream_name) return null;
       if (fd.is_real_time === "true")
         return { text: alertForm.t("alerts.verdict.realtime"), tone: "note" };
-      if (!status || fd.is_real_time !== "false") return null;
+      // The save check is stricter than the preview run, so its error also leaves nothing to judge.
+      if (!status || fd.is_real_time !== "false" || sqlCheckFailed.value) return null;
       return {
         text: previewVerdictSentence(status, fd, alertForm.t, {
           countsEvents:

@@ -88,6 +88,8 @@ export interface AlertFormSectionsInput {
   extraErrors?: Readonly<Ref<Partial<Record<AlertSectionId, number>>>>;
   /** Sections that cannot save as they stand, even with no field error shown yet. */
   invalid?: ComputedRef<Partial<Record<AlertSectionId, boolean>>>;
+  /** The server rejected the query (SQL check or preview run), so no rule can be read from it. */
+  queryFailed?: Readonly<Ref<boolean>>;
   t: TranslateFn;
 }
 
@@ -230,7 +232,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
           }
         : { kind: "unset", text: t("alerts.sections.condition.composite") };
     }
-    const gap = conditionGap(fd);
+    const gap = conditionGap(fd, { queryFailed: input.queryFailed?.value === true });
     if (gap) return { kind: gap, text: t(CONDITION_GAP_KEYS[gap]) };
     const qc = fd.query_condition ?? {};
     if (qc.type === "promql") return { kind: "value", text: promqlPhrase(fd) };
@@ -334,7 +336,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
           mode.value !== "composite" &&
           (!hasValue(fd.stream_name) || (mode.value === "anomaly" && anomalyConditionMissing()));
         const { kind, text } = conditionPhrase(fd);
-        const gap = kind === "noQuery" || kind === "fixLimit";
+        const gap = kind in CONDITION_GAP_KEYS;
         return { missing: gap && !incomplete, empty: incomplete, summary: text };
       }
       case "notify": {
