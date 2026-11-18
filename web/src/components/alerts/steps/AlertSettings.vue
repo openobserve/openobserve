@@ -989,11 +989,22 @@ export default defineComponent({
       tiers?.conceal("holdFor");
     };
 
-    // Suggestions name two checks' worth of time, so their Add writes the same span.
-    const twoChecksMinutes = () => {
+    const checkMinutes = () => {
       const minutes = frequencyMinutes();
-      return Number.isFinite(minutes) && minutes > 0 ? 2 * minutes : 0;
+      return Number.isFinite(minutes) && minutes > 0 ? minutes : 0;
     };
+    // Suggestions name two checks' worth of time, so their Add writes the same span.
+    const twoChecksMinutes = () => 2 * checkMinutes();
+    // An added row starts at one check: 0 would read as a value, yet it means the setting is off.
+    watch(
+      () => [tiers?.isRevealed("holdFor"), tiers?.isRevealed("keepFiring")] as const,
+      ([hold, keep], [heldBefore, keptBefore]) => {
+        if (hold && !heldBefore && !(Number(fv("pending_period_sec")) > 0))
+          setPendingPeriodMinutes(checkMinutes());
+        if (keep && !keptBefore && !(Number(fv("keep_firing_for")) > 0))
+          setFV("keep_firing_for", checkMinutes() * 60);
+      },
+    );
     const unregister = suggestions
       ? [
           suggestions.onApply("recovery", () => setFV("notify_on_recovery", true)),

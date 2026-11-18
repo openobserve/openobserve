@@ -1048,6 +1048,17 @@ describe("AlertSettings — notify and timing in their sections", () => {
     expect(values().pending_period_sec).toBe(10);
   });
 
+  it.each([
+    ["holdFor", "pending_period_sec", {}, 5],
+    ["keepFiring", "keep_firing_for", {}, 300],
+    ["holdFor", "pending_period_sec", { pending_period_sec: 7, _ui: { pendingPeriod: 7 } }, 7],
+  ] as const)("an added %s row starts at one check, never 0", async (id, field, set, expected) => {
+    const { tiers, values } = mountSectioned("false", set);
+    tiers.reveal(id);
+    await flushPromises();
+    expect(values()[field]).toBe(expected);
+  });
+
   it("Must last shows as a sentence once set and Remove clears it", async () => {
     const { tiers, values, inSlot } = mountSectioned(
       "false",

@@ -27,6 +27,8 @@ import {
 export interface AlertSettingTiers {
   isVisible: (id: AlertSettingId) => boolean;
   view: (section: AlertSectionId) => AlertSectionTierView;
+  /** Added by the user or shown for its value; Show all alone does not reveal. */
+  isRevealed: (id: AlertSettingId) => boolean;
   reveal: (id: AlertSettingId) => void;
   conceal: (id: AlertSettingId) => void;
   toggle: (section: AlertSectionId) => void;
@@ -60,6 +62,7 @@ export function useAlertSettingTiers(opts: {
   return {
     isVisible: (id) => isTierVisible(id, state),
     view: (section) => sectionTierView(section, state),
+    isRevealed: (id) => revealed.has(id),
     reveal: (id) => {
       revealed.add(id);
     },
