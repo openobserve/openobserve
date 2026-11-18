@@ -12,8 +12,6 @@ import pytest
 from support.client import OpenObserveClient
 from support.wait import wait_until
 
-
-
 HOUR = 3_600_000_000
 MINUTE = 60_000_000
 
@@ -71,7 +69,7 @@ def _expected_buckets(stamps: list[int], start: int, end: int, step: int, offset
 def test_cached_non_utc_day_histogram_keeps_local_bucket_edges(
     client: OpenObserveClient, temp_stream_name: str, histogram_tz: str | None, request_tz: str | None
 ):
-    """#16539 / #16641: a non-UTC '1 day' histogram served with use_cache must match the uncached zone-aligned buckets, newest first."""
+    """#16539 / #16641: a non-UTC '1 day' histogram bypasses the result cache and keeps zone-aligned buckets, newest first."""
     now = int(time.time()) * 1_000_000
     stamps = [now - 40 * HOUR + k * 30 * MINUTE for k in range(80)]
     _seed(client, temp_stream_name, stamps)
@@ -83,9 +81,15 @@ def test_cached_non_utc_day_histogram_keeps_local_bucket_edges(
 
     inner = (now - 41 * HOUR, now - 20 * HOUR)
     outer = (now - 41 * HOUR, now - 10 * MINUTE)
-    for _ in range(2):
-        hits, _ = _search(client, sql, *inner, True, **extra)
-        assert hits == _expected_buckets(stamps, *inner, day, ist), f"cached inner window: {hits}"
+    hits, _ = _search(client, sql, *inner, True, **extra)
+    assert hits == _expected_buckets(stamps, *inner, day, ist), f"inner window: {hits}"
+    # Once a later UTC query is served from the cache, the writer has had its chance to store the non-UTC run too.
+    utc_sql = f"SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM \"{temp_stream_name}\" GROUP BY ts ORDER BY ts DESC"
+    _search(client, utc_sql, *inner, True)
+    _wait_cached(client, utc_sql, *inner)
+    hits, ratio = _search(client, sql, *inner, True, **extra)
+    assert ratio == 0, f"a non-UTC histogram must bypass the result cache, got result_cache_ratio={ratio}"
+    assert hits == _expected_buckets(stamps, *inner, day, ist), f"repeated inner window: {hits}"
     cached, _ = _search(client, sql, *outer, True, **extra)
     uncached, _ = _search(client, sql, *outer, False, **extra)
     assert uncached == _expected_buckets(stamps, *outer, day, ist), f"uncached outer window: {uncached}"
