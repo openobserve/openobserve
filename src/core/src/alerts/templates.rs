@@ -88,7 +88,7 @@ pub(crate) fn check_body_size(
         return Ok(());
     }
     if let Some(stored) = existing
-        && (stored == body || (content && same_spec(stored, body)))
+        && (stored == body || (content && reformatted(stored, body)))
     {
         return Ok(());
     }
@@ -98,14 +98,22 @@ pub(crate) fn check_body_size(
     })
 }
 
-/// Both bodies parse as content specs and hold the same values, whatever their JSON formatting.
-fn same_spec(a: &str, b: &str) -> bool {
-    let value = |body: &str| {
-        ContentSpec::parse(body)
-            .ok()
-            .and_then(|spec| serde_json::to_value(spec).ok())
+/// `body` is a stored oversized content spec saved again with other JSON formatting: the same
+/// values, and no longer than the stored row or the spec printed with two-space indents. The size
+/// bound stops unknown fields, which the parse drops, from growing the row.
+fn reformatted(stored: &str, body: &str) -> bool {
+    if stored.len() <= BODY_MAX_BYTES {
+        return false;
+    }
+    let (Ok(old), Ok(new)) = (ContentSpec::parse(stored), ContentSpec::parse(body)) else {
+        return false;
     };
-    matches!((value(a), value(b)), (Some(a), Some(b)) if a == b)
+    let (Ok(old_value), Ok(new_value)) = (serde_json::to_value(&old), serde_json::to_value(&new))
+    else {
+        return false;
+    };
+    let pretty = serde_json::to_string_pretty(&new).map_or(0, |s| s.len());
+    old_value == new_value && body.len() <= stored.len().max(pretty)
 }
 
 /// The body limit on a draft spec, measured as the JSON a save of the spec stores.
@@ -1519,6 +1527,19 @@ mod tests {
         })
         .unwrap();
         assert!(check_body_size(&edited, Some(&compact), true).is_err());
+        // Unknown fields, which the parse drops, cannot grow a row past the limit.
+        let padded = format!(
+            "{{\"title\":\"t\",\"body\":\"b\",\"junk\":\"{}\"}}",
+            "j".repeat(2 * BODY_MAX_BYTES)
+        );
+        assert!(check_body_size(&padded, Some(r#"{"title":"t","body":"b"}"#), true).is_err());
+        let padded_large = format!(
+            "{}, \"junk\": \"{}\"}}",
+            pretty.trim_end_matches('}').trim_end(),
+            "j".repeat(BODY_MAX_BYTES)
+        );
+        assert!(ContentSpec::parse(&padded_large).is_ok());
+        assert!(check_body_size(&padded_large, Some(&compact), true).is_err());
     }
 
     #[test]
