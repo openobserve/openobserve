@@ -30,6 +30,7 @@ vi.mock("@/services/incidents", async (importOriginal) => {
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
+import en from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import IncidentTimeline from "@/components/alerts/IncidentTimeline.vue";
 import incidentsService from "@/services/incidents";
@@ -465,7 +466,7 @@ describe("IncidentTimeline - a moved alert's own incident", () => {
     await flushPromises();
     const entry = w.find('[data-test="incident-timeline-split-from"]');
     expect(entry.text()).toContain("Cache latency was found unrelated to Checkout errors");
-    expect(entry.text()).toContain("Inferred by AI SRE");
+    expect(entry.text()).toContain(`Inferred by ${en.brand.autobot}`);
     const link = w.find('[data-test="incident-timeline-split-from-link"]');
     expect(link.attributes("href")).toContain("/incidents/inc-0");
     const vm = w.vm as any;

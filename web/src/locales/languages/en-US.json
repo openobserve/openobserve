@@ -15510,7 +15510,7 @@
         "severityLoweredWithReason": "Severity lowered from {from} to {to} - {reason}",
         "splitFrom": "{alert} was found unrelated to {incident}",
         "splitFromUntitled": "the incident it joined",
-        "inferredByAi": "Inferred by AI SRE",
+        "inferredByAi": "Inferred by @:{'brand.autobot'}",
         "inferredFromAlertHistory": "Inferred from alert history",
         "inferredFromServiceGraph": "Inferred from service graph",
         "inferredFromWorkload": "Inferred from workload",
