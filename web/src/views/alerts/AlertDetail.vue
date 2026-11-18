@@ -351,7 +351,24 @@
                 :features="['anomaly_detection']"
                 data-test="alerts-alertdetail-anomaly-license-denied"
               />
-              <AnomalyDetectionChart v-else-if="alert" :alert="alert" :anomaly-id="alertId" />
+              <template v-else-if="alert">
+                <!-- The notice text is the server's own message: it carries the dropped row count. -->
+                <OBanner
+                  v-if="alert.notice_class === 'duplicate_rows' && alert.last_error"
+                  variant="warning"
+                  icon="warning"
+                  class="mb-3"
+                  :content="raw(alert.last_error)"
+                  data-test="alerts-alertdetail-anomaly-duplicate-rows"
+                />
+                <AnomalyDetectionChart
+                  :key="alertId"
+                  :alert="alert"
+                  :anomaly-id="alertId"
+                  @reload="fetchAlert"
+                  @ask-ai="emit('sendToAiChat', $event)"
+                />
+              </template>
             </OContent>
           </OTabPanel>
 
@@ -496,6 +513,9 @@ import type {
 } from "@/ts/interfaces/alert";
 
 const { t } = useI18nTyped();
+// A route root, so MainLayout's `@sendToAiChat` binding is on it directly.
+const emit = defineEmits<{ sendToAiChat: [payload: Record<string, unknown>] }>();
+
 const route = useRoute();
 const router = useRouter();
 const store = useStore();

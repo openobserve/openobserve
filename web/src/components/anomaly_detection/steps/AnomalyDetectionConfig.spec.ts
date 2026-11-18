@@ -1540,7 +1540,7 @@ describe("anomalyNoticeBadgeKeys", () => {
   const enText = (key: string) =>
     key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
 
-  it.each(["window_floor", "window_skip", "retrain"])(
+  it.each(["window_floor", "window_skip", "retrain", "duplicate_rows"])(
     "maps %s to a label and tooltip that exist in en-US",
     (noticeClass) => {
       const keys = anomalyNoticeBadgeKeys(noticeClass);

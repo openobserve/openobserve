@@ -349,6 +349,27 @@ describe("anomaly_detection service", () => {
     });
   });
 
+  describe("explore", () => {
+    it("GETs the explore route with no window for the summary", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+      await anomaly_detection.explore("org123", "a1");
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/org123/anomaly_detection/a1/explore",
+        { params: {} },
+      );
+    });
+
+    it("sends one bucket, pad 0 and the point's model for a point link", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+      const query = { start: 1, end: 2, pad: 0 as const, model_version: 7 };
+      await anomaly_detection.explore("org123", "a1", query, { silentForbidden: true });
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/org123/anomaly_detection/a1/explore",
+        { params: query, silentForbidden: true },
+      );
+    });
+  });
+
   describe("getHistory", () => {
     it("should make GET request with default limit of 100", async () => {
       const org_identifier = "org123";
