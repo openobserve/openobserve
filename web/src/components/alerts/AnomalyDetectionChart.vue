@@ -626,16 +626,19 @@ async function openPointBucket() {
   if (!row || !org || !bucketMs || row.modelVersion === null) return;
   pointLoading.value = true;
   try {
-    // Never from cache: the request must reach the server to get its stale-model 409.
-    const res = await queryClient.fetchQuery({
-      ...anomalyExploreQuery(org, props.anomalyId, {
-        start: row.tsMs * 1000,
-        end: (row.tsMs + bucketMs) * 1000,
-        pad: 0,
-        model_version: row.modelVersion,
-      }),
-      staleTime: 0,
+    const options = anomalyExploreQuery(org, props.anomalyId, {
+      start: row.tsMs * 1000,
+      end: (row.tsMs + bucketMs) * 1000,
+      pad: 0,
+      model_version: row.modelVersion,
     });
+    // Never from cache: the request must reach the server to get its stale-model 409.
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+    const res = await queryClient.fetchQuery(options);
     pointOpen.value = false;
     if (res.url) openUrl(res.url);
   } catch (e) {

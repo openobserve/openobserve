@@ -58,6 +58,7 @@ vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
   },
 }));
 
+import { queryClient } from "@/composables/query/queryClient";
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 import anomalyDetection from "@/services/anomaly_detection";
 import { openAppUrl } from "@/utils/alerts/anomalyExploreView";
@@ -720,6 +721,22 @@ describe("AnomalyDetectionChart", () => {
       await popover().vm.$emit("open-bucket");
       await settle();
       expect(wrapper.emitted("reload")).toHaveLength(1);
+    });
+
+    it("forces the point request by invalidating its exact key, not with staleTime 0", async () => {
+      respond([{ ...HIT, model_version: 7 }]);
+      wrapper = await mountChart(TRAINED);
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+      const fetch = vi.spyOn(queryClient, "fetchQuery");
+      await click();
+      await popover().vm.$emit("open-bucket");
+      await settle();
+      expect(invalidate).toHaveBeenCalledWith(
+        expect.objectContaining({ exact: true, refetchType: "none" }),
+      );
+      expect(fetch.mock.calls[0][0]).not.toHaveProperty("staleTime", 0);
+      invalidate.mockRestore();
+      fetch.mockRestore();
     });
 
     it("marks a point of an older model, which has no data button", async () => {
