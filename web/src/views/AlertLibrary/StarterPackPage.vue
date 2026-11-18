@@ -297,6 +297,14 @@ const muteContext = computed(() =>
           data-test="starter-pack-page-folder-select"
         />
         <OButton
+          variant="outline"
+          size="sm-action"
+          data-test="starter-pack-page-details-btn"
+          @click="setupOpen = true"
+        >
+          {{ t("starterPacks.details") }}
+        </OButton>
+        <OButton
           variant="primary"
           size="sm-action"
           data-test="starter-pack-page-setup-btn"

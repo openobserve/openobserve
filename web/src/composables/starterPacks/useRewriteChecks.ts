@@ -21,12 +21,21 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import type { RewriteChecks } from "./streamRewriter";
 
 const CHECK_WINDOW_US = 15 * 60 * 1_000_000;
+const VARIABLE = /\$\{?\w+(?::\w+)?\}?/g;
+const QUOTED_OR_VARIABLE = /'(?:[^']|'')*'|"[^"]*"|\$\{?\w+(?::\w+)?\}?/g;
+
+/** The server only plans a query, so a variable needs a value that is valid where it stands. */
+export const withVariableStandIns = (sql: string) =>
+  sql.replace(QUOTED_OR_VARIABLE, (token) =>
+    token.startsWith("$") ? "'o2var'" : token.replace(VARIABLE, "o2var"),
+  );
 
 /** `result_schema` plans SQL without running it, and `parse_tree` parses PromQL on the server. */
 export function useRewriteChecks(org: string): RewriteChecks {
   const store = useStore();
   return {
-    sql: async (sql, streamType) => {
+    sql: async (text, streamType) => {
+      const sql = withVariableStandIns(text);
       const encoded = !!store.state.zoConfig?.sql_base64_enabled;
       const end = Date.now() * 1000;
       await search.result_schema({

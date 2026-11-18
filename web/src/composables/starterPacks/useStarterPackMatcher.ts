@@ -20,7 +20,7 @@ import { readQuery } from "@/composables/query/readQuery";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { workloadStateFromNames } from "@/composables/useWorkloadDetection";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
-import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
+import { streamNameListQuery } from "@/services/stream.queries";
 import { generateTraceContext } from "@/utils/zincutils";
 import {
   DETECTION_STREAMS,
@@ -28,7 +28,7 @@ import {
 } from "@/views/Infrastructure/kubernetes2/kubernetesQueries";
 
 import { KUBERNETES_PACK } from "./kubernetesPack";
-import { matchPack, readOrgStreams } from "./packMatchData";
+import { matchPack, readOrgStreams, readSchemaColumns } from "./packMatchData";
 
 export type PackMatchState = "checking" | "matched" | "waiting" | "none" | "error";
 
@@ -42,16 +42,6 @@ interface MatchOptions {
   /** Re-checks until the pack matches, for a guide waiting on new data. */
   poll?: boolean;
 }
-
-const hasSchema = async (
-  org: string,
-  name: string,
-  type: string,
-  force: boolean,
-): Promise<string[]> => {
-  const schema = await readQuery(streamSchemaQuery(org, name, type), force);
-  return ((schema?.schema ?? []) as Array<{ name: string }>).map((field) => field.name);
-};
 
 const readNames = async (org: string, type: string): Promise<string[]> =>
   (await readQuery(streamNameListQuery(org, type), true)).map((row) => row.name);
@@ -121,7 +111,7 @@ export function useStarterPackMatcher(org: string, { poll = false }: MatchOption
       : await Promise.all([readNames(org, "metrics"), readNames(org, "logs")]);
     const present = DETECTION_STREAMS.filter((name) => metrics.includes(name));
     const columns = await Promise.all(
-      present.map((name) => hasSchema(org, name, "metrics", !library)),
+      present.map((name) => readSchemaColumns(org, "metrics", name, !library)),
     );
     const anchor = columns.findIndex((fields) => fields.length > 0);
     const found = logs.includes(EVENTS_STREAM) ? [...present, EVENTS_STREAM] : present;

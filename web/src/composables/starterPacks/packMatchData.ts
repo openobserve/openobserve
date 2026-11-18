@@ -31,12 +31,16 @@ import {
   locateStream,
   matchItem,
   schemaKey,
+  type LocatedStream,
   type MatchFacts,
   type MatchItem,
 } from "./packMatch";
+import type { BindingSources } from "./packBinding";
+import { strictRenames } from "./strictRenames";
 import type { PackDashboard, PackRepair, StarterPack } from "./types";
 
 const FILE_READS_AT_ONCE = 8;
+const FORCED_READ_GAP_MS = 30_000;
 const STREAM_TYPES = ["metrics", "logs", "traces"];
 
 interface StreamRow {
@@ -68,6 +72,7 @@ interface AlertItems {
   items: Array<MatchItem | null>;
 }
 
+const lastForced = new Map<string, number>();
 const dashboardDocs = new WeakMap<PackDashboard, Promise<Record<string, any>>>();
 
 const loadDoc = (dashboard: PackDashboard) => {
@@ -90,11 +95,50 @@ const inBatches = async <T, R>(values: T[], read: (value: T) => Promise<R>): Pro
   return results;
 };
 
-// Semantic groups answer 403 on OSS, so there the pack's own alias lists are the only source.
-const readAliases = async (org: string, packs: StarterPack[]): Promise<string[][]> => {
+/** Org groups first, then pack alias lists; groups answer 403 on OSS, so there aliases are all. */
+export const readBindingSources = async (
+  org: string,
+  packs: StarterPack[],
+): Promise<BindingSources & { titles: Record<string, string> }> => {
   const licensed = config.isEnterprise === "true" || config.isCloud === "true";
   const groups = licensed ? await loadSemanticGroups(org) : [];
-  return [...groups.map(({ fields }) => fields), ...packs.flatMap((pack) => pack.aliases ?? [])];
+  return {
+    groups,
+    aliases: packs.flatMap((pack) => pack.aliases ?? []),
+    titles: Object.fromEntries(groups.map(({ id, display }) => [id, display])),
+  };
+};
+
+/** A schema cached while empty must not outlive the data, so an empty answer is read again. */
+export const readSchemaColumns = async (
+  org: string,
+  type: string,
+  name: string,
+  force = false,
+): Promise<string[]> => {
+  const columnsOf = (schema: any) =>
+    ((schema?.schema ?? []) as Array<{ name: string }>).map((column) => column.name);
+  const first = columnsOf(await readQuery(streamSchemaQuery(org, name, type), force));
+  if (first.length || force) return first;
+  return columnsOf(await readQuery(streamSchemaQuery(org, name, type), true));
+};
+
+const readFields = async (
+  org: string,
+  wanted: LocatedStream[],
+  fields: Map<string, Set<string>>,
+  force = false,
+  onRead?: (key: string) => void,
+) => {
+  await inBatches(wanted, async ({ type, name }) => {
+    try {
+      const columns = await readSchemaColumns(org, type, name, force);
+      fields.set(schemaKey(type, name), new Set(columns.map((c) => c.toLowerCase())));
+      onRead?.(schemaKey(type, name));
+    } catch {
+      // Left unknown: matchItem then answers from the stream list alone.
+    }
+  });
 };
 
 const readFacts = async (
@@ -108,16 +152,34 @@ const readFacts = async (
   );
   const wanted = [...new Map(located.map((row) => [schemaKey(row.type, row.name), row])).values()];
   const fields = new Map<string, Set<string>>();
-  await inBatches(wanted, async ({ type, name }) => {
-    try {
-      const schema = await readQuery(streamSchemaQuery(org, name, type));
-      const columns = (schema?.schema ?? []) as Array<{ name: string }>;
-      fields.set(schemaKey(type, name), new Set(columns.map((c) => c.name.toLowerCase())));
-    } catch {
-      // Left unknown: matchItem then answers from the stream list alone.
+  await readFields(org, wanted, fields);
+  const { groups, aliases } = await readBindingSources(org, packs);
+  return {
+    streams,
+    fields,
+    aliases: [...groups.map(({ fields: names }) => names), ...aliases],
+    repairs,
+    nowMs: Date.now(),
+  };
+};
+
+// A cached schema can predate a column, but a poll must not bypass the cache on every tick.
+const refreshMissingFields = async (org: string, items: MatchItem[], facts: MatchFacts) => {
+  const stale = new Map<string, LocatedStream>();
+  for (const item of items) {
+    if (matchItem(item, facts)) continue;
+    const located = item.streams.map((name) => locateStream(name, item.streamType, facts));
+    if (located.some((row) => !row)) continue;
+    for (const row of located as LocatedStream[]) {
+      const key = `${org}/${schemaKey(row.type, row.name)}`;
+      if (facts.nowMs - (lastForced.get(key) ?? 0) < FORCED_READ_GAP_MS) continue;
+      stale.set(schemaKey(row.type, row.name), row);
     }
-  });
-  return { streams, fields, aliases: await readAliases(org, packs), repairs, nowMs: Date.now() };
+  }
+  // Stamped only on success, so a failed read is retried on the next match.
+  await readFields(org, [...stale.values()], facts.fields, true, (key) =>
+    lastForced.set(`${org}/${key}`, facts.nowMs),
+  );
 };
 
 /** Stats stay zero until the first flush, so a just-created stream counts from its creation. */
@@ -197,6 +259,13 @@ const packEntries = async (pack: StarterPack, library: PackLibrary) => {
   });
 };
 
+// The installer fixes these without asking, so readiness must already count them.
+const strictPackRepairs = (entries: AlertLibraryEntry[], streams: StreamsByType): PackRepair[] => {
+  const metrics = new Set(streams.metrics?.keys() ?? []);
+  const found = entries.flatMap((entry) => strictRenames(entry.required_streams ?? [], metrics));
+  return [...new Map(found.map((repair) => [repair.from, repair])).values()];
+};
+
 /** A pack is ready when any item is; items without data are simply left out of it. */
 export const matchPack = async (
   org: string,
@@ -204,19 +273,21 @@ export const matchPack = async (
   streams: StreamsByType,
   library: PackLibrary,
 ): Promise<PackMatch> => {
-  const sources = { loadFile: library.loadAlertFile, packs: [pack] };
-  const [prepared, docs] = await Promise.all([
-    packEntries(pack, library).then((entries) => prepareAlerts(entries, streams, sources)),
+  const [entries, docs] = await Promise.all([
+    packEntries(pack, library),
     // A dashboard that cannot load is not ready; the alert verdicts still stand.
     Promise.all(pack.dashboards.map((dashboard) => loadDoc(dashboard).catch(() => ({})))),
   ]);
+  const sources = {
+    loadFile: library.loadAlertFile,
+    packs: [pack],
+    repairs: strictPackRepairs(entries, streams),
+  };
+  const prepared = await prepareAlerts(entries, streams, sources);
   const panels = docs.map(dashboardItems);
-  const facts = await readFacts(
-    org,
-    [...present(prepared.items), ...panels.flat()],
-    streams,
-    sources,
-  );
+  const items = [...present(prepared.items), ...panels.flat()];
+  const facts = await readFacts(org, items, streams, sources);
+  await refreshMissingFields(org, items, facts);
   const alerts = alertVerdicts(prepared, facts);
   const dashboards = new Map(
     pack.dashboards.map((dashboard, index) => [
