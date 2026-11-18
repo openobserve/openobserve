@@ -34,8 +34,8 @@ const target = computed(() => (tiers?.placedBelow(props.id) ? tiers.slotFor(prop
 <template>
   <Teleport :to="target" :disabled="!target">
     <OSettingRow v-if="target && rowLabel" :label="rowLabel" fill>
-      <slot />
+      <slot :below="true" />
     </OSettingRow>
-    <slot v-else />
+    <slot v-else :below="!!target" />
   </Teleport>
 </template>

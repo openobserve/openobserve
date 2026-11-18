@@ -908,17 +908,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           id="vrl"
                           :row-label="t('alerts.tiers.names.vrl')"
                         >
-                          <OSwitch
-                            :model-value="false"
-                            :label="t('alerts.queryConfig.vrlToggle')"
-                            label-position="left"
-                            off-tone="neutral"
-                            :aria-label="t('alerts.queryConfig.showVrlEditor')"
-                            data-test="alert-vrl-toggle"
-                            @update:model-value="onVrlSwitch"
-                          >
-                            <OTooltip :content="t('alerts.form.editor.vrlHelp')" />
-                          </OSwitch>
+                          <template #default="{ below }">
+                            <OSwitch
+                              :model-value="false"
+                              :label="below ? undefined : t('alerts.queryConfig.vrlToggle')"
+                              :state-text="below"
+                              label-position="left"
+                              off-tone="neutral"
+                              :aria-label="t('alerts.queryConfig.showVrlEditor')"
+                              data-test="alert-vrl-toggle"
+                              @update:model-value="onVrlSwitch"
+                            >
+                              <OTooltip :content="t('alerts.form.editor.vrlHelp')" />
+                            </OSwitch>
+                          </template>
                         </AlertTierPlace>
                       </div>
                     </div>
@@ -1159,24 +1162,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!sectionTargets?.queryCondition"
                   ><div class="flex flex-col gap-0">
                     <AlertTierPlace id="ruleExpression">
-                      <div
+                      <OSettingRow
                         v-if="
                           localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')
                         "
-                        class="flex flex-col gap-1 px-3 py-2"
+                        :label="t('alerts.promRuleMode')"
+                        :description="t('alerts.promRuleModeDescription')"
+                        fill
+                        data-test="add-alert-rule-mode-row"
                       >
                         <OFormSwitch
                           name="query_condition.promql_rule_mode"
                           off-tone="neutral"
                           state-text
-                          :label="t('alerts.promRuleMode')"
+                          :aria-label="t('alerts.promRuleMode')"
                           data-test="alert-prom-rule-mode"
                           @update:model-value="onPromRuleModeChange"
                         />
-                        <p class="text-text-secondary text-xs">
-                          {{ t("alerts.promRuleModeDescription") }}
-                        </p>
-                      </div>
+                      </OSettingRow>
                     </AlertTierPlace>
                     <OSettingRow
                       v-if="
