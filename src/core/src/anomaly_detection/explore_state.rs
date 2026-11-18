@@ -359,9 +359,19 @@ pub fn buckets_sql(anomaly_id: &str, model_version: i64, fields: &HashSet<String
             format!("CAST(NULL AS DOUBLE) AS {alias}")
         }
     };
+    // The drop event row holds the drop's reading and baseline, not the scored row.
+    let drop_order =
+        format!("ORDER BY CASE WHEN {partial} THEN 1 ELSE 0 END{judged}, created_at ASC");
+    let drop_latest = |column: &str, alias: &str| {
+        if has(column) && has("is_partial_drop") {
+            format!("last_value({column} {drop_order}) AS {alias}")
+        } else {
+            format!("CAST(NULL AS DOUBLE) AS {alias}")
+        }
+    };
     let id = anomaly_id.replace('\'', "''");
     format!(
-        "SELECT _timestamp AS ts, max({scored_rank}) AS has_scored, {}, {}, {}, {}, \
+        "SELECT _timestamp AS ts, max({scored_rank}) AS has_scored, {}, {}, {}, {}, {}, {}, \
          last_value(is_anomaly {order}) AS is_anomaly, \
          max(CASE WHEN {absence} THEN 1 ELSE 0 END) AS absence, \
          max(CASE WHEN {partial} THEN 1 ELSE 0 END) AS partial_drop \
@@ -371,6 +381,8 @@ pub fn buckets_sql(anomaly_id: &str, model_version: i64, fields: &HashSet<String
         latest("expected_value", "expected"),
         latest("expected_lower", "lower"),
         latest("expected_upper", "upper"),
+        drop_latest("actual_value", "drop_actual"),
+        drop_latest("expected_value", "drop_expected"),
     )
 }
 
@@ -388,17 +400,22 @@ pub fn parse_buckets(hits: &[serde_json::Value]) -> Vec<ExploreBucket> {
             let ts_us = hit.get("ts").and_then(|v| v.as_i64())?;
             let scored = flag(hit, "has_scored");
             let is_absence = flag(hit, "absence");
+            let is_partial_drop = flag(hit, "partial_drop");
             // An absence event row carries a placeholder 0, not a reading.
-            let value = num(hit, "actual").filter(|_| scored || !is_absence);
+            let mut value = num(hit, "actual").filter(|_| scored || !is_absence);
+            let mut expected = num(hit, "expected");
+            if is_partial_drop && !is_absence && num(hit, "drop_expected").is_some() {
+                (value, expected) = (num(hit, "drop_actual"), num(hit, "drop_expected"));
+            }
             Some(ExploreBucket {
                 ts_us,
                 value,
-                expected: num(hit, "expected"),
+                expected,
                 lower: num(hit, "lower"),
                 upper: num(hit, "upper"),
                 is_anomaly: scored && flag(hit, "is_anomaly"),
                 is_absence,
-                is_partial_drop: flag(hit, "partial_drop"),
+                is_partial_drop,
             })
         })
         .collect();
@@ -724,6 +741,36 @@ mod tests {
         let buckets = parse_buckets(&hits);
         assert_eq!(buckets[0], high(1, 150.0));
         assert_eq!(buckets[1], absent(2));
+    }
+
+    #[test]
+    fn test_a_partial_drop_bucket_reads_the_drop_event_not_the_scored_row() {
+        let hits = vec![serde_json::json!({
+            "ts": B, "has_scored": 1, "actual": 40.0, "expected": 145.833, "lower": 120.0,
+            "upper": 170.0, "is_anomaly": true, "absence": 0, "partial_drop": 1,
+            "drop_actual": 40.0, "drop_expected": 100.0
+        })];
+        let buckets = parse_buckets(&hits);
+        assert_eq!(
+            (buckets[0].value, buckets[0].expected),
+            (Some(40.0), Some(100.0))
+        );
+        let s = run_summary(&buckets);
+        assert_eq!(s.change_percent, Some(-60.0));
+        let mut fields: HashSet<String> = ["actual_value", "expected_value", "is_partial_drop"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let sql = buckets_sql("ad1", 1, &fields);
+        assert!(
+            sql.contains(
+                "last_value(expected_value ORDER BY CASE WHEN is_partial_drop IS TRUE THEN 1 \
+                 ELSE 0 END, created_at ASC) AS drop_expected"
+            ),
+            "{sql}"
+        );
+        fields.remove("is_partial_drop");
+        assert!(buckets_sql("ad1", 1, &fields).contains("CAST(NULL AS DOUBLE) AS drop_expected"));
     }
 
     #[test]
