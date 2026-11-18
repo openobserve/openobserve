@@ -502,16 +502,16 @@ pub async fn render_png_waiting(p: &ChartPayload) -> Option<Vec<u8>> {
     render_send_png(p)
 }
 
-fn render_busy() -> Option<Vec<u8>> {
-    log::warn!("[ALERT_CHART] render busy, sending without chart");
-    chart_event("render_busy");
-    None
-}
-
 pub(crate) fn chart_event(event: &str) {
     config::metrics::ALERT_CHART_EVENTS_TOTAL
         .with_label_values(&[event])
         .inc();
+}
+
+fn render_busy() -> Option<Vec<u8>> {
+    log::warn!("[ALERT_CHART] render busy, sending without chart");
+    chart_event("render_busy");
+    None
 }
 
 fn render_send_png(p: &ChartPayload) -> Option<Vec<u8>> {
