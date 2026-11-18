@@ -75,7 +75,7 @@ function resetToDefault(): void {
     <template #trigger>
       <OButton
         variant="outline"
-        size="icon-sm"
+        size="icon-toolbar"
         class="relative"
         :aria-label="
           hiddenCount > 0

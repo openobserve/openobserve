@@ -73,18 +73,10 @@ const baseClasses = computed<string>(() =>
     // Named group so the grip (and consumer affordances like a rename pencil)
     // can fade in on tab hover without colliding with consumer `group` usage.
     "group/otab",
-    "relative items-center gap-1.5",
-    isVertical.value ? "flex justify-start" : "inline-flex justify-center",
-    // Horizontal inset. A vertical (side-rail) tab is a selectable PILL, so the
-    // rail container insets it (px-1.5) to give the pill breathing room from the
-    // rail edges. With that 6px container inset + the tab's own 2px active border
-    // + this ps-1, the label lands on the page-edge grid line (12px) while the
-    // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
-    // their own padding override.
-    // Reorderable tabs widen the left inset to a gutter wider than the grip, which hosts the
-    // hover-revealed drag grip. The gutter is tied to `reorderable` (not
-    // per-press state), so a tab is pixel-identical at rest, on hover, and
-    // while its label is being edited — the grip only ever changes opacity.
+    "relative items-center",
+    isVertical.value ? "flex justify-start gap-2" : "inline-flex justify-center gap-1.5",
+    // The rail's px-1 plus this px-2 puts a vertical tab's icon on the 12px page-edge grid line.
+    // Reorderable tabs keep a fixed gutter wider than the grip, so hovering or editing never shifts the label.
     isReorderable.value
       ? "ps-4.5 pe-2"
       : isVertical.value

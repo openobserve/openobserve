@@ -137,7 +137,7 @@ test.describe("assistant approval cards", () => {
   test("APPR-04 a permission card states its expiry, declines itself at zero and asks again in place", { tag: ["@mock"] }, async ({ page }) => {
     test.setTimeout(90_000);
     await ask(page, "permission_card", "list the pods");
-    await expect(region()).toContainText("Waiting for your approval: Allow bash. Expires in 2");
+    await expect(region()).toContainText("Waiting for your approval: Allow shell. Expires in 2");
     const countdown = assistant.approval().locator('[data-test="assistant-approval-countdown"]');
     await expect(countdown).toHaveText(/^Expires soon · 0:\d\d$/);
     await expect(countdown).toHaveAttribute("aria-label", /^Expires soon · 0:\d\d$/);
@@ -154,7 +154,7 @@ test.describe("assistant approval cards", () => {
       .toBe(2);
     const resent = (await requests(page))[1].body;
     expect(resent.reply_to_approval).toMatch(/:1$/);
-    expect(resent.messages.at(-1).content).toBe("Ask me again: Allow bash");
+    expect(resent.messages.at(-1).content).toBe("Ask me again: Allow shell");
   });
 
   test("APPR-05 Reply declines with the text and sends it as the next turn naming the card", { tag: ["@mock"] }, async ({ page }) => {

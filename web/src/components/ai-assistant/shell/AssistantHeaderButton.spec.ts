@@ -373,7 +373,7 @@ describe("AssistantHeaderButton light", () => {
     store.state.sessions[a].turn = { state: "responding.writing" };
     await flushPromises();
     expect(button(wrapper).attributes("data-state")).toBe("working");
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, answering");
+    expect(button(wrapper).attributes("aria-label")).toBe(`${brandNames.autobot}, answering`);
     expect(tooltip(wrapper)).toBe("Answering: Checkout 5xx");
     expect(
       wrapper.find('[data-test="assistant-header-status-light"]').attributes("data-shape"),
@@ -390,7 +390,7 @@ describe("AssistantHeaderButton light", () => {
     const unknown = setup("available", {}, remote);
     await flushPromises();
     expect(button(unknown.wrapper).attributes("data-state")).toBe("working");
-    expect(tooltip(unknown.wrapper)).toBe("O2 Assistant, answering");
+    expect(tooltip(unknown.wrapper)).toBe(`${brandNames.autobot}, answering`);
     unknown.wrapper.unmount();
     const known = setup("available", { persistence: false }, remote);
     known.store.setIdentity({ userOrgKey: "k1", org: "default" });
@@ -443,7 +443,9 @@ describe("AssistantHeaderButton light", () => {
     store.state.sessions[b].turn = { state: "awaiting_approval", callId: "c1" };
     await flushPromises();
     expect(button(wrapper).attributes("data-state")).toBe("needs_you");
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, needs you, 1 waiting");
+    expect(button(wrapper).attributes("aria-label")).toBe(
+      `${brandNames.autobot}, needs you, 1 waiting`,
+    );
     expect(tooltip(wrapper)).toBe("Needs you");
     expect(wrapper.find('[data-test="assistant-header-status-light"]').text()).toBe("1");
     expect(
@@ -464,7 +466,7 @@ describe("AssistantHeaderButton light", () => {
     const count = wrapper.get('[data-test="assistant-header-status-light"]').text();
     expect(count).toBe("2");
     expect(button(wrapper).attributes("aria-label")).toBe(
-      `O2 Assistant, needs you, ${count} waiting`,
+      `${brandNames.autobot}, needs you, ${count} waiting`,
     );
   });
 
@@ -482,7 +484,7 @@ describe("AssistantHeaderButton light", () => {
     store.state.sessions[a].turn = { state: "done", saved: "local" };
     store.state.sessions[a].unread = true;
     await flushPromises();
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, answer ready");
+    expect(button(wrapper).attributes("aria-label")).toBe(`${brandNames.autobot}, answer ready`);
     expect(tooltip(wrapper)).toBe("Answer ready: Latency");
     expect(
       wrapper.find('[data-test="assistant-header-status-light"]').attributes("data-shape"),
@@ -492,7 +494,9 @@ describe("AssistantHeaderButton light", () => {
       error: { code: "unknown", phase: "post_admission", retryable: true, action: "retry" },
     };
     await flushPromises();
-    expect(button(wrapper).attributes("aria-label")).toBe("O2 Assistant, last answer failed");
+    expect(button(wrapper).attributes("aria-label")).toBe(
+      `${brandNames.autobot}, last answer failed`,
+    );
     expect(
       wrapper.find('[data-test="assistant-header-status-light"]').attributes("data-shape"),
     ).toBe("glyph");
@@ -511,7 +515,7 @@ describe("AssistantHeaderButton light", () => {
     expect(openAssistant).toHaveBeenCalledWith(expect.objectContaining({ thread: "current" }));
   });
 
-  it("brings a dismissed launcher back when it opens the assistant", async () => {
+  it("brings a dismissed launcher back when it opens the sidebar", async () => {
     const { wrapper, store } = setup();
     setLauncherDismissed(store.state.userOrgKey, true);
     expect(isLauncherDismissed(store.state.userOrgKey)).toBe(true);

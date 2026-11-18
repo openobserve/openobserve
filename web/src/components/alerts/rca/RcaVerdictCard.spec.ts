@@ -447,10 +447,13 @@ describe("RcaVerdictCard", () => {
       expect(byTest(wrapper, "rca-verdict-band").exists()).toBe(false);
     });
 
-    it("in the thread the verdict is one body-size semibold callout, never the page's 24 px heading", () => {
+    it("in the thread an ungraded verdict is one body-size semibold callout, never the page's bold heading", () => {
+      const base = rcaRunSummary();
       const wrapper = mountCard({
         cardState: "analyzed",
-        summary: rcaRunSummary(),
+        summary: rcaRunSummary({
+          card: { ...base.card, outcome: undefined, outcome_reason: undefined },
+        }),
         inThread: true,
       });
 

@@ -681,8 +681,15 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import CorrelationServiceHeader from "@/plugins/correlation/CorrelationServiceHeader.vue";
 import { useCorrelationScope } from "@/plugins/correlation/useCorrelationVersions";
-import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
-import { placeFromDimensions } from "@/plugins/correlation/correlationVersions";
+import { useLocationDimensions } from "@/plugins/correlation/correlationHeader";
+import { enrichStreamsWithOverlap } from "@/utils/streamTimeOverlap";
+import {
+  appliedFilterSql,
+  correlationInstance,
+  placeFromDimensions,
+  rankCorrelatedStreams,
+  semanticRecordDimensions,
+} from "@/plugins/correlation/correlationVersions";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";

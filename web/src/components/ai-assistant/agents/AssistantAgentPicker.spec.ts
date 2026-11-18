@@ -122,7 +122,7 @@ afterEach(() => {
 describe("AssistantAgentPicker", () => {
   it("keeps the agent's name in a narrow composer that still has room for it", () => {
     const { wrapper } = setup(ROSTER, false, false, true);
-    expect(trigger(wrapper).text()).toContain("O2 Assistant");
+    expect(trigger(wrapper).text()).toContain(brandNames.autobot);
     expect(trigger(wrapper).attributes("aria-label")).toBeUndefined();
   });
 

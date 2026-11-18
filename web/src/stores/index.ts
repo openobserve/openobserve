@@ -29,6 +29,7 @@ import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import config from "@/aws-exports";
 import { setOrgTimeZoneSource } from "@/utils/formatters";
+import { setDeployTimeZone } from "@/utils/deployTimeZone";
 
 const pos = window.location.pathname.indexOf("/web/");
 

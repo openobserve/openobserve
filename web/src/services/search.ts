@@ -43,6 +43,7 @@ const search = {
       is_ui_histogram,
       validate,
       signal,
+      security_scope,
     }: {
       org_identifier: string;
       query: any;

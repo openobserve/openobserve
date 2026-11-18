@@ -20,11 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { watch } from "vue";
+import { computed, watch } from "vue";
+import { useStore } from "vuex";
 import AutoObserve from "@/components/autoobserve/mock/views/AutoObserve.vue";
 import AutoObserve2 from "@/components/autoobserve/mock/views/AutoObserve2.vue";
 import { useAutoObserveView } from "@/components/autoobserve/v2/useAutoObserveView";
-import { resetDecisions } from "@/components/autoobserve/mock/v2/useDecisions";
+import { resetDecisions, switchDecisionsOrg } from "@/components/autoobserve/mock/v2/useDecisions";
 import { useScenario } from "@/components/autoobserve/mock/data/useScenario";
 import { useAssistantStore } from "@/composables/assistant";
 

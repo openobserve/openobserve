@@ -78,6 +78,8 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 import { featureState, menuState } from "@/utils/featureGate";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import { PAGE_ACTIONS_SLOT_ID } from "./pageActionsSlot";
+import { SAVE_BAR_SLOT_ID } from "./saveBarSlot";
 
 export default defineComponent({
   name: "AppSettings",

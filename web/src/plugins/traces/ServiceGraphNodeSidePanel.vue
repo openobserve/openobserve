@@ -109,6 +109,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="panel-content bg-surface-base dark:bg-graph-panel-scrim flex-1 overflow-x-hidden overflow-y-auto py-2.5"
     >
+      <!-- Own line, held from first paint: the title can't squeeze the chips, and chips that land later move nothing. -->
+      <div
+        v-if="versionsEnabled && !isInferred"
+        class="px-page-edge flex min-h-8 min-w-0 flex-nowrap items-center gap-2 overflow-hidden pb-2"
+        data-test="svcver-panel-identity"
+      >
+        <OTruncatedText
+          v-if="identityNotReported || identityAbsent"
+          class="text-text-secondary min-w-0 text-xs"
+          data-test="svcver-panel-identity-not-reported"
+          >{{ t("serviceVersions.panel.identityNotReported") }}</OTruncatedText
+        >
+        <template v-else-if="headerIdentity">
+          <span v-if="!placeWithoutSpans" class="flex min-w-0 shrink"
+            ><ServiceEnvChip :identity="headerIdentity" :service="headerIdentity.service_name"
+          /></span>
+          <span class="flex min-w-0 shrink">
+            <ODimensionChip
+              v-if="pickedPlace"
+              dim-key="where"
+              :key-label="t('serviceVersions.compare.whereChip')"
+              :value="whereText(headerIdentity.where_key, headerIdentity.where, t)"
+              :value-tooltip="false"
+              removable
+              :remove-label="t('serviceVersions.panel.clearPlace')"
+              remove-data-test="svcver-panel-place-clear"
+              data-test="svcver-panel-place"
+              @remove="clearPickedPlace" /><ServiceScopeChip
+              v-else
+              facet="where"
+              :where-key="headerIdentity.where_key"
+              :place="headerIdentity.where"
+          /></span>
+          <span v-if="!placeWithoutSpans" class="flex min-w-0 shrink"
+            ><ServiceScopeChip facet="version" :value="headerVersion"
+          /></span>
+        </template>
+        <OSkeleton
+          v-else-if="panelVersions.isLoading.value"
+          type="text"
+          class="h-3.5 w-64!"
+          data-test="svcver-panel-identity-loading"
+        />
+      </div>
       <ul
         v-if="dependencies.length > 0"
         class="px-page-edge border-border-default mb-2 flex flex-col gap-1 border-b pb-2"
@@ -817,6 +861,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import {
+  isOutsideK8s,
+  versionImageLabel,
+  versionPlaces,
+  whereSentence,
+  whereText,
+} from "@/utils/serviceVersionsCopy";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -888,7 +939,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
@@ -1175,7 +1225,6 @@ export default defineComponent({
     OSeparator,
     OSkeleton,
     ODimensionChip,
-    OTruncatedText,
     OEmptyState,
     OTabs,
     OTab,

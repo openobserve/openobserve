@@ -1306,10 +1306,17 @@ export default defineComponent({
         selectedOrg.value = store.state.selectedOrganization;
         return;
       }
-      resetStreams();
-      store.dispatch("logs/resetLogs");
-      store.dispatch("setIsDataIngested", false);
-      const orgIdentifier = selectedOrg.value.identifier;
+      const targetOrg = { ...selectedOrg.value };
+      const keepCurrent = () => {
+        const current = store.state.selectedOrganization;
+        selectedOrg.value =
+          orgOptions.value.find((org) => org.identifier === current?.identifier) ?? current;
+      };
+      // Re-picking the current org switches nothing, so it must not ask to discard the page's edits.
+      if (targetOrg.identifier === store.state.selectedOrganization?.identifier)
+        return keepCurrent();
+      // Asked before anything is committed: the switch unmounts the page, and its edits cannot be brought back.
+      if (!(await confirmLeave())) return keepCurrent();
       const queryParams =
         router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
       const switched = await switchOrganization({ store, router, resetStreams }, targetOrg, {

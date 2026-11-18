@@ -26,6 +26,7 @@ pub const SESSION_CREATED: &str = "session.created.2";
 pub const SESSION_UPDATED: &str = "session.updated.2";
 /// One settled 2.x message, re-recorded whole whenever it changes.
 pub const MESSAGE_UPDATED: &str = "message.updated.2";
+const PART_UPDATED: &str = "message.part.updated";
 /// What the user typed, without o2-ai's preamble.
 const USER_TEXT_KEY: &str = "o2_user_text";
 
@@ -164,23 +165,52 @@ pub fn is_v2_record(event: &DurableEvent) -> bool {
 
 /// The 2.x message a `message.updated.2` record carries.
 pub fn record_message(event: &DurableEvent) -> Option<&Map<String, Value>> {
-    if event.event_type != MESSAGE_UPDATED {
-        return None;
-    }
-    event.data.get("message").and_then(Value::as_object)
+    message_of(&event.event_type, &event.data)
 }
 
-/// The parts one stored event shows: a 1.x part update's part, or a 2.x record's message parts.
-pub(crate) fn event_parts(event: &DurableEvent) -> Vec<Cow<'_, Map<String, Value>>> {
-    if let Some(message) = record_message(event) {
+/// A 1.x durable event type without its numeric version suffix (`message.updated.1`).
+pub fn live_type(event_type: &str) -> &str {
+    match event_type.rsplit_once('.') {
+        Some((base, version))
+            if !version.is_empty() && version.bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            base
+        }
+        _ => event_type,
+    }
+}
+
+/// The tool and text parts a stored record shows, in 1.x shape, for either record generation.
+pub fn record_parts<'a>(event_type: &str, data: &'a Value) -> Vec<Cow<'a, Map<String, Value>>> {
+    if let Some(message) = message_of(event_type, data) {
         return LegacyMessage::of(message, None)
             .map(|legacy| legacy.parts.into_iter().map(Cow::Owned).collect())
             .unwrap_or_default();
     }
-    super::rca_thread::updated_part(event)
+    v1_part(event_type, data)
         .map(Cow::Borrowed)
         .into_iter()
         .collect()
+}
+
+/// [`record_parts`] of a stored event.
+pub fn event_parts(event: &DurableEvent) -> Vec<Cow<'_, Map<String, Value>>> {
+    record_parts(&event.event_type, &event.data)
+}
+
+/// The part a 1.x `message.part.updated` event carries.
+pub(crate) fn v1_part<'a>(event_type: &str, data: &'a Value) -> Option<&'a Map<String, Value>> {
+    if live_type(event_type) != PART_UPDATED {
+        return None;
+    }
+    data.get("part").and_then(Value::as_object)
+}
+
+fn message_of<'a>(event_type: &str, data: &'a Value) -> Option<&'a Map<String, Value>> {
+    if event_type != MESSAGE_UPDATED {
+        return None;
+    }
+    data.get("message").and_then(Value::as_object)
 }
 
 /// A user message's text: `metadata.o2_user_text`, else the whole `text`.

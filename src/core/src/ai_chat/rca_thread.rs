@@ -43,8 +43,6 @@ use super::{
 
 pub(crate) const RECORD_STEP: &str = "record_step";
 pub(crate) const SUBMIT_REPORT: &str = "submit_report";
-/// The durable event type of a part change; stored types carry a `.N` version suffix.
-const PART_UPDATED: &str = "message.part.updated";
 const IMPLICIT_STEP_TITLE: &str = "Investigation";
 
 /// One of the seven stage names, else `None`.
@@ -176,19 +174,6 @@ impl<'a> ToolPart<'a> {
             .unwrap_or_default()
             .to_string()
     }
-}
-
-/// The part a `message.part.updated` event carries.
-pub(crate) fn updated_part(event: &DurableEvent) -> Option<&Map<String, Value>> {
-    let version = event.event_type.strip_prefix(PART_UPDATED)?;
-    let versioned = version.is_empty()
-        || version
-            .strip_prefix('.')
-            .is_some_and(|v| v.bytes().all(|b| b.is_ascii_digit()));
-    if !versioned {
-        return None;
-    }
-    event.data.get("part").and_then(Value::as_object)
 }
 
 pub(crate) fn step_title(title: Option<&Value>, index: usize) -> String {

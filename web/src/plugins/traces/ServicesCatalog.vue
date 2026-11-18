@@ -1070,7 +1070,13 @@ const transientFilter = ref<string | null>(
     (typeof linkedService === "string" && linkedService ? linkedService : null),
 );
 const filterText = ref(transientFilter.value ?? viewState.filterText);
-const typeFilter = ref<TypeFilter>(viewState.typeFilter);
+const typeFilter = ref<TypeFilter>(
+  validType(urlFilters.type) ||
+    (urlFilters.env || urlFilters.verdict ? "service" : viewState.typeFilter),
+);
+function validType(value: string): TypeFilter | "" {
+  return (TYPE_FILTER_ORDER as string[]).includes(value) ? (value as TypeFilter) : "";
+}
 const currentPage = ref(viewState.currentPage);
 const rowsPerPage = ref(viewState.rowsPerPage);
 const rowsPerPageOptions = [10, 25, 50, 100];
@@ -1104,6 +1110,71 @@ function onFilterEdited(): void {
   transientFilter.value = null;
 }
 
+// Back and Forward restore the stream and filters of that history entry; a kept-alive page ignores other routes.
+watch(
+  () => {
+    const route = router.currentRoute.value;
+    if (route?.name !== "traces") return "";
+    const stream = typeof route.query.stream === "string" ? route.query.stream : "";
+    return JSON.stringify({ ...catalogFiltersFromQuery(route.query), stream });
+  },
+  (key, oldKey) => {
+    if (!key) return;
+    const filters = JSON.parse(key) as ReturnType<typeof catalogFiltersFromQuery> & {
+      stream: string;
+    };
+    // Only a move of the URL's own stream counts: a filter-only write keeps whatever URL stream it found.
+    const lastStream = oldKey ? (JSON.parse(oldKey) as { stream: string }).stream : "";
+    if (
+      filters.stream !== lastStream &&
+      filters.stream !== streamFilter.value?.replaceAll('"', "") &&
+      availableStreams.value.includes(filters.stream)
+    ) {
+      streamFilter.value = filters.stream;
+      localStorage.setItem("servicesCatalog_streamFilter", filters.stream);
+    }
+    // A stream push carries the old entry's filters unchanged; the picks made since then win over them.
+    const last = oldKey ? (JSON.parse(oldKey) as typeof filters) : undefined;
+    if (!last || filters.env !== last.env) versionEnv.value = filters.env;
+    if (!last || filters.verdict !== last.verdict)
+      versionVerdict.value = validVerdict(filters.verdict);
+    if (!last || filters.type !== last.type)
+      typeFilter.value = validType(filters.type) || "service";
+  },
+);
+// Filter and range writes each carry the other's keys: two replaces in one tick both start from the old route.
+function withCatalogRange(query: LocationQuery) {
+  return catalogRangeQuery(query, searchObj.data.datetime);
+}
+function withCatalogFilters(query: LocationQuery) {
+  const filters = { env: versionEnv.value, verdict: versionVerdict.value, type: typeFilter.value };
+  return catalogFilterQuery(query, filters, "service");
+}
+watch(
+  [
+    versionEnv,
+    versionVerdict,
+    typeFilter,
+    streamFilter,
+    () => router.currentRoute.value?.query?.stream,
+  ],
+  ([env, verdict, type]) => {
+    const route = router.currentRoute.value;
+    if (route?.name !== "traces") return;
+    // While a stream switch is still navigating, the route holds the old stream; writing it would cancel the switch.
+    const urlStream = route.query.stream;
+    if (
+      typeof urlStream === "string" &&
+      urlStream !== streamFilter.value?.replaceAll('"', "") &&
+      availableStreams.value.includes(urlStream)
+    )
+      return;
+    const next = catalogFilterQuery(route.query, { env, verdict, type }, "service");
+    if (JSON.stringify(next) !== JSON.stringify(route.query))
+      void router.replace({ query: withCatalogRange(next) });
+  },
+  { immediate: true },
+);
 let pageRestored = false;
 watch(isLoading, (loadingNow) => {
   if (loadingNow || pageRestored) return;
@@ -1217,17 +1288,33 @@ watch(
   },
 );
 
-const selectedServiceNode = computed(() =>
-  selectedServiceRow.value
-    ? {
-        id: selectedServiceRow.value.id,
-        name: selectedServiceRow.value.service_name,
-        service_type: selectedServiceRow.value.infer_service_type,
-        service_system: selectedServiceRow.value.infer_service_system,
-        error_rate: selectedServiceRow.value.error_rate,
-      }
-    : null,
-);
+const selectedServiceNode = computed(() => {
+  const selected = selectedServiceRow.value;
+  if (!selected) return null;
+  // The serving-version read can land after the click, so the panel reads the row as it is now.
+  const current = envServices.value.find((row) => row.id === selected.id);
+  const node = {
+    id: selected.id,
+    name: current?.service_name ?? selected.service_name,
+    service_type: selected.infer_service_type,
+  };
+  // A picked place with no row here is scoped by the route, so the kept row's Health would describe another place.
+  const otherPlace =
+    !selected.infer_service_name &&
+    panelRoute.owns(node) &&
+    (selected.where_key || "") !== panelRoute.state.value.where;
+  return {
+    ...node,
+    ...(selected.infer_service_name
+      ? {}
+      : { service_names: catalogSpellings(services.value, selected.service_name) }),
+    service_system: selected.infer_service_system,
+    error_rate: selected.error_rate,
+    health_status: current?.status ?? selected.status,
+    health_withheld: otherPlace || healthWithheld(current ?? selected),
+    where_key: selected.where_key || "",
+  };
+});
 
 const emptyGraphData = { nodes: [], edges: [] };
 
@@ -1793,6 +1880,18 @@ function routedRow(row: ServiceRow) {
 }
 function handleRowClick(row: ServiceRow) {
   preselectPending = false;
+  if (versionsEnabled && routedRow(row)) {
+    void (row.infer_service_name
+      ? panelRoute.open(
+          row.service_name,
+          "",
+          "operations",
+          row.infer_service_type,
+          row.infer_service_system || "",
+        )
+      : panelRoute.open(row.service_name, row.where_key || ""));
+    return;
+  }
   if (selectedServiceRow.value?.id === row.id) {
     showSidePanel.value = false;
     selectedServiceRow.value = null;
@@ -1804,6 +1903,7 @@ function handleRowClick(row: ServiceRow) {
 
 function handleCloseSidePanel() {
   preselectPending = false;
+  if (panelRoute.state.value.open) void panelRoute.close();
   showSidePanel.value = false;
   selectedServiceRow.value = null;
 }

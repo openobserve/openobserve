@@ -15,41 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    :title="t('assistant.settings.pageTitle', name)"
-    :icon="assistantGlyph.assistant"
-    title-data-test="settings-assistant-page-title"
-    data-assistant-surface
-    tabs-below
-    bleed
-  >
-    <template #header-tabs>
-      <OTabs :model-value="activeTab" align="left" data-test="settings-assistant-tabs">
-        <ORouteTab
-          v-for="entry in TABS"
-          :key="entry.id"
-          :name="entry.id"
-          :label="t(entry.labelKey)"
-          :to="{
-            name: 'assistantSettings',
-            params: { tab: entry.id },
-            query: { org_identifier: page.org.value },
-          }"
-          :data-test="`settings-assistant-tab-${entry.id}`"
-        />
-      </OTabs>
-    </template>
-    <template #actions>
-      <ORefreshButton
-        :loading="refreshing"
-        data-test="settings-assistant-refresh"
-        @click="refresh"
-      />
-    </template>
-    <component
-      :is="listTab ? 'div' : ConstrainedPage"
-      v-bind="listTab ? LIST_BODY : FORM_BODY"
-      :data-test="`settings-assistant-panel-${activeTab}`"
+  <FeatureLockBoundary :feature="lockedFeature">
+    <OPageLayout
+      :title="t('assistant.settings.pageTitle', name)"
+      :icon="assistantGlyph.assistant"
+      title-data-test="settings-assistant-page-title"
+      data-assistant-surface
+      tabs-below
+      bleed
     >
       <template #header-tabs>
         <FeatureLockExempt>
@@ -76,46 +49,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="refresh"
         />
       </template>
-      <div
-        v-if="adminHelper || offInDeployment"
-        :class="['flex flex-col gap-4', listTab ? 'px-page-edge pt-3' : 'pb-4']"
+      <component
+        :is="listTab ? 'div' : ConstrainedPage"
+        v-bind="listTab ? LIST_BODY : FORM_BODY"
+        :data-test="`settings-assistant-panel-${activeTab}`"
       >
         <div
-          v-if="adminHelper"
-          class="border-border-default rounded-surface flex flex-wrap items-center gap-3 border p-3"
-          data-test="settings-assistant-admin-only"
+          v-if="adminHelper || offInDeployment"
+          :class="['flex flex-col gap-4', listTab ? 'px-page-edge pt-3' : 'pb-4']"
         >
-          <p class="text-text-body min-w-0 flex-1 text-sm">
-            {{ t("assistant.settings.adminOnly") }}
+          <div
+            v-if="adminHelper"
+            class="border-border-default rounded-surface flex flex-wrap items-center gap-3 border p-3"
+            data-test="settings-assistant-admin-only"
+          >
+            <p class="text-text-body min-w-0 flex-1 text-sm">
+              {{ t("assistant.settings.adminOnly") }}
+            </p>
+            <AssistantAskAdminPopover kind="settings" :org="page.org.value">
+              <template #trigger>
+                <OButton
+                  variant="outline"
+                  size="sm-action"
+                  class="max-md:min-h-11"
+                  data-test="settings-assistant-ask-admin"
+                  >{{ t("assistant.gate.noPermission.askAdmin") }}</OButton
+                >
+              </template>
+            </AssistantAskAdminPopover>
+          </div>
+          <p
+            v-if="offInDeployment"
+            class="text-text-secondary text-sm"
+            data-test="settings-assistant-off-in-deployment"
+          >
+            {{ t("assistant.settings.offInDeployment") }}
           </p>
-          <AssistantAskAdminPopover kind="settings" :org="page.org.value">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="sm-action"
-                class="max-md:min-h-11"
-                data-test="settings-assistant-ask-admin"
-                >{{ t("assistant.gate.noPermission.askAdmin") }}</OButton
-              >
-            </template>
-          </AssistantAskAdminPopover>
         </div>
-        <p
-          v-if="offInDeployment"
-          class="text-text-secondary text-sm"
-          data-test="settings-assistant-off-in-deployment"
-        >
-          {{ t("assistant.settings.offInDeployment") }}
-        </p>
-      </div>
-      <component
-        :is="TAB_COMPONENTS[activeTab]"
-        :key="`${page.org.value}:${activeTab}`"
-        ref="panel"
-        :class="listTab ? 'min-h-0 flex-1' : ''"
-      />
-    </component>
-  </OPageLayout>
+        <component
+          :is="TAB_COMPONENTS[activeTab]"
+          :key="`${page.org.value}:${activeTab}`"
+          ref="panel"
+          :class="listTab ? 'min-h-0 flex-1' : ''"
+        />
+      </component>
+    </OPageLayout>
+  </FeatureLockBoundary>
 </template>
 
 <script lang="ts">
@@ -154,6 +133,8 @@ import { useRouter } from "vue-router";
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
+import FeatureLockBoundary from "@/components/common/FeatureLockBoundary.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
 import { useAssistantName } from "@/composables/assistant";
 import { useLicenseLock } from "@/composables/useFeatureLock";

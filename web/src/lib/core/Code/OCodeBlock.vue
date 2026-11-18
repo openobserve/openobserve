@@ -141,7 +141,7 @@ const highlighted = computed(() => {
 });
 
 const langLabelClass = computed(() =>
-  props.contrast === "aa" ? "text-syntax-text" : "opacity-55",
+  props.contrast === "aa" ? "text-syntax-text" : "text-text-body",
 );
 
 // Wrapping breaks the one-number-per-row assumption a gutter rests on, so the
@@ -222,7 +222,7 @@ const onNativeCopy = () => {
           filename || lang || t("common.plainText")
         }}</span>
       </span>
-      <span v-else class="o2-code-lang text-2xs font-mono" :class="langLabelClass">{{
+      <span v-else class="o2-code-lang font-mono text-xs" :class="langLabelClass">{{
         lang || t("common.plainText")
       }}</span>
       <div class="flex items-center gap-1">

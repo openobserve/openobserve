@@ -188,7 +188,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import type { AssistantSession, GateReason } from "@/composables/assistant";
 import type { I18nText } from "@/types/i18n";
-import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 
 export type HeaderButtonState =
   "loading" | "hidden" | "idle" | "open" | "working" | "needs_you" | "unread" | "locked" | "off";
@@ -467,27 +466,6 @@ function openView(): HeaderView {
     return plain("open", name, name);
   }
   return plain("open", t("assistant.header.nameOpen", p), t("assistant.header.stateOpen", p));
-}
-
-// Another org's chats count in the light; a click lists them, never opens them in place (PO B51).
-function otherOrgView(): HeaderView | null {
-  const rows = runs.otherOrg.value;
-  if (!rows.length) return null;
-  const p = { product };
-  const waiting = rows.filter((row) => row.group === "needs_you").length;
-  if (waiting)
-    return {
-      ...plain(
-        "needs_you",
-        t("assistant.header.needsYouCountName", { ...p, count: waiting }),
-        t("assistant.notice.decision"),
-      ),
-      signal: "attention",
-      count: waiting,
-      otherOrg: true,
-    };
-  const name = t("assistant.header.answeringName", p);
-  return { ...plain("working", name, name), signal: "working", otherOrg: true };
 }
 
 function buttonEl(): HTMLElement | null {

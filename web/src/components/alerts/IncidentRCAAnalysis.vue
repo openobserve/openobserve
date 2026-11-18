@@ -290,6 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :outcome="recordSummary.card.outcome"
           :evidence="recordSummary.evidence"
           :org="orgId"
+          :live="cardState === 'investigating'"
           :can-steer="canSteer"
           :pending="pendingActions"
           :sending="steerSending"
@@ -564,6 +565,14 @@ const props = withDefaults(
     reanalyzeCreditCost?: number | null;
     /** `page` is the incident's Analysis tab; `assistant` is one column inside the assistant. */
     layout?: "page" | "assistant";
+    /** `report`: the Report tab, which shows the shown run's report alone. */
+    view?: "analysis" | "report";
+    /** This incident's own firings (its trigger rows). */
+    firings?: IncidentUnfoldInput["triggers"];
+    /** The live state of the incident's alerts; null while unknown. */
+    alertsNow?: RcaAlertsNow | null;
+    /** The incident's events, for analyses that failed before any run was stored. */
+    incidentEvents?: RcaIncidentEvent[] | null;
   }>(),
   {
     view: "analysis",
@@ -917,6 +926,22 @@ const cancelConfirmOpen = ref(false);
 const requestCancel = () => {
   cancelConfirmOpen.value = true;
 };
+
+// "Open thread" on the Report tab: the thread takes focus once the analysis shows.
+const focusThreadOnShow = ref(false);
+const openThread = () => {
+  focusThreadOnShow.value = true;
+  emit("open-analysis");
+};
+watch(
+  () => props.view,
+  async (view) => {
+    if (view !== "analysis" || !focusThreadOnShow.value) return;
+    focusThreadOnShow.value = false;
+    await nextTick();
+    threadColumn.value?.focusThread();
+  },
+);
 
 // Steering: the rows, the open question and `can_steer` of the thread's run.
 // A sent row and a resumed run arrive on the live stream.

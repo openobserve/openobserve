@@ -775,7 +775,16 @@ export const iconRegistry = {
   "notifications-paused": NotificationsPaused,
   repeat: RepeatIcon,
 
-  // Batch 6: O2 Assistant glyphs (2026-10-16); Material Symbols has no remove-circle-outline, do-not-disturb-on-outline is its glyph.
+  // Batch 6: Folder icon picker (2026-11-06)
+  "bug-report": BugReportIcon,
+  api: ApiIcon,
+  "shopping-cart": ShoppingCartIcon,
+  "deployed-code": DeployedCodeIcon,
+  router: RouterIcon,
+  "support-agent": SupportAgentIcon,
+  "cloud-sync": CloudSyncIcon,
+
+  // Batch 7: O2 Assistant glyphs (2026-10-16); Material Symbols has no remove-circle-outline, do-not-disturb-on-outline is its glyph.
   "add-comment": AddCommentIcon,
   "auto-fix-high": AutoFixHighIcon,
   "remove-circle-outline": RemoveCircleOutlineIcon,

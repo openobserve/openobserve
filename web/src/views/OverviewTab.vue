@@ -22,8 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="pageState !== 'forbidden' && !errorIsForbidden"
       class="flex flex-wrap items-center justify-end gap-2"
     >
-      <OverviewStatusLine v-if="showOverviewCards" :status="status" @select="onHeadlineSelect" />
-      <div class="ms-auto flex items-center gap-2">
+      <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading || overviewState.loading"
@@ -66,17 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OBanner>
 
-    <OverviewHeadlineStrip
-      v-if="showOverviewCards"
-      :overview="overview"
-      :pending="overviewPending"
-      :failed="overviewFailed"
-      :forbidden="overviewForbidden"
-      :incidents-state="incidentsTile"
-      :incidents-total="incidentsTotal"
-      @select="onHeadlineSelect"
-    />
-
     <div
       v-if="showOverviewCards"
       class="grid grid-cols-[1.15fr_1fr] gap-3 max-lg:grid-cols-1"
@@ -91,9 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :incidents-total="incidentsTotal"
         :locked-reason="alertsLocked ? alertsLock.lockedReason.value : undefined"
         @retry="() => loadOverview(true)"
-        @open="goToAlertList"
+        @open="() => openAlertList()"
         @create="goToAddAlert"
-        @select="onHeadlineSelect"
+        @select="onAlertsSelect"
+        @ask-ai="onAskAi"
       />
       <OverviewDataHealthCard
         :overview="overview"
@@ -102,6 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :forbidden="overviewForbidden"
         @retry="() => loadOverview(true)"
         @open="onHealthOpen"
+        @view-all="goToPipelines()"
+        @ask-ai="onAskAi"
       />
     </div>
 
@@ -127,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost-primary"
           size="sm"
           data-test="overview-incidents-view-all"
-          @click="goToIncidentList"
+          @click="goToAllIncidents"
         >
           {{ t("overview.viewAll") }}
         </OButton>
@@ -180,6 +171,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="shrink-0 whitespace-nowrap opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 max-md:opacity-100"
           >
+            <OverviewAskAiButton
+              kind="incident"
+              :item-key="inc.id"
+              :label="inc.title || t('overview.untitledIncident')"
+              @ask="
+                onAskAi({
+                  kind: 'incident',
+                  incident: { ...inc, title: inc.title || t('overview.untitledIncident') },
+                })
+              "
+            />
             <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -642,7 +644,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-primary"
               size="sm"
               data-test="overview-recent-events-view-all"
-              @click="goToAlertList"
+              @click="() => openAlertList()"
             >
               {{ t("overview.viewAll") }}
             </OButton>
@@ -850,6 +852,8 @@ import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDi
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import analytics from "@/services/product_analytics";
 import { chipDimensionKeys, dimensionDisplay } from "@/utils/incidents/findingDimensions";
+import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
+import type { AiChatHandoff } from "@/plugins/traces/utils/traceAiPayload";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -1759,6 +1763,9 @@ const goToAlert = (item: any) => {
   selectedAlertIdForHistory.value = item.alertId ?? "";
   showAlertHistoryDrawer.value = true;
 };
+
+// Gen-AI node names live in gen_ai_* fields, and their streams may lack infer_service_name (a 400).
+const INFER_NAME_SERVICE_TYPES = new Set(["database", "queue", "rpc", "external"]);
 
 const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card

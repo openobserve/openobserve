@@ -918,6 +918,12 @@ fn rca_enabled_for(
 ) -> bool {
     incidents_enabled && rca_enabled && ai_enabled && has_agent_target
 }
+
+/// The search inspector is enterprise-only, so OSS never offers it even to root.
+fn search_inspector_for_edition(permitted: bool) -> bool {
+    cfg!(feature = "enterprise") && permitted
+}
+
 async fn org_admin(org_id: &str, user_id: &str) -> bool {
     is_root_user(user_id)
         || openobserve_core::users::get_user(Some(org_id), user_id)

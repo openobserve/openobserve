@@ -52,6 +52,7 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 vi.mock("@/views/OverviewTab.vue", () => ({
   default: {
     name: "OverviewTab",
+    emits: ["sendToAiChat"],
     template: '<div data-test="overview-tab-stub"><slot name="top" /></div>',
   },
 }));
@@ -112,6 +113,7 @@ vi.mock("@/composables/useHomeDashboard", async (importOriginal) => {
   };
 });
 const homeReads = vi.hoisted(() => ({ count: 0 }));
+const assistantDoor = vi.hoisted(() => ({ open: vi.fn() }));
 vi.mock("@/composables/assistant", async () => {
   const { computed, reactive } = await import("vue");
   const prefs = await import("@/composables/assistant/prefs");

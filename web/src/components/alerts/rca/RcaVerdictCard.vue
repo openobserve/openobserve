@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ unblockedText }}
     </p>
 
-    <h2 data-test="rca-verdict-headline" :class="headlineClass">
+    <h2 v-if="!graded" data-test="rca-verdict-headline" :class="headlineClass">
       <RcaInlineText :text="headline" />
     </h2>
 
@@ -570,10 +570,10 @@ defineEmits<{
 const { t } = useI18nTyped();
 const router = useRouter();
 
-// A narrow thread panel reads the verdict as body text; the page keeps its large heading.
+// A narrow thread panel reads the verdict as body text; the page keeps its bold heading.
 const headlineClass = computed(() => {
   if (!props.inThread) {
-    return "text-text-heading m-0 max-w-215 text-2xl leading-tight font-bold [text-wrap:pretty]";
+    return "text-text-heading m-0 max-w-215 text-base leading-normal font-bold [text-wrap:pretty]";
   }
   const box = props.cardState === "analyzed" ? "rounded-surface bg-status-info-bg px-3 py-2.5" : "";
   return `text-text-heading m-0 text-sm leading-normal font-semibold [text-wrap:pretty] ${box}`;

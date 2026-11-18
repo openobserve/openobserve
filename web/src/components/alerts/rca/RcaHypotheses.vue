@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="section"
     data-test="rca-hypotheses"
     :aria-labelledby="headingId"
-    class="@container flex flex-col"
+    class="flex flex-col"
   >
     <div class="mb-1 flex items-baseline gap-2">
       <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
@@ -54,18 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :open="expanded.has(hypothesis.id)"
         @update:open="setExpanded(hypothesis.id, $event)"
       >
-        <li
-          v-for="hypothesis in group.items"
-          :key="hypothesis.id"
-          data-test="rca-hypothesis"
-          :data-status="hypothesis.status"
-          :data-hypothesis-id="hypothesis.id"
-          tabindex="-1"
-          class="grid grid-cols-1 items-start gap-x-3 gap-y-1.5 px-3.5 py-2.5 transition-colors duration-700 outline-none @xl:grid-cols-[8rem_minmax(0,1fr)_auto] @xl:gap-y-0"
-          :class="{ 'bg-surface-tint-accent': highlighted === hypothesis.id }"
-        >
-          <!-- The status column wraps a long label ("Root cause · not confirmed"). -->
-          <span class="min-w-0 pt-px">
+        <template #lead>
+          <span class="w-32 shrink-0">
             <RcaPill
               data-test="rca-hypothesis-status"
               :tone="RCA_HYPOTHESIS_TONE[hypothesis.status]"
@@ -74,107 +64,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ rcaHypothesisStatusLabel(hypothesis.status, outcome) }}
             </RcaPill>
           </span>
-
-          <div class="min-w-0">
-            <div
-              data-test="rca-hypothesis-statement"
-              class="text-sm font-semibold"
-              :class="
-                hypothesis.status === 'ruled_out' ? 'text-text-secondary' : 'text-text-heading'
-              "
-            >
-              <RcaInlineText :text="hypothesis.statement" />
-            </div>
-            <div
-              v-if="hypothesis.reason"
-              class="text-text-secondary text-compact [text-wrap:pretty]"
-            >
-              <RcaInlineText :text="hypothesis.reason" />
-            </div>
-
-            <template v-if="hypothesis.history.length > 0">
-              <button
-                type="button"
-                data-test="rca-hypothesis-history-toggle"
-                class="text-text-secondary mt-1 flex cursor-pointer items-center gap-1 border-none bg-transparent p-0 text-xs"
-                :aria-expanded="historyOpen.has(hypothesis.id)"
-                :aria-controls="historyId(hypothesis.id)"
-                @click="toggleHistory(hypothesis.id)"
-              >
-                <OIcon
-                  :name="historyOpen.has(hypothesis.id) ? 'expand-less' : 'expand-more'"
-                  size="sm"
-                />
-                {{
-                  t("alerts.incidents.rcaSummary.statusHistory", {
-                    count: hypothesis.history.length,
-                  })
-                }}
-              </button>
-              <ol
-                v-if="historyOpen.has(hypothesis.id)"
-                :id="historyId(hypothesis.id)"
-                data-test="rca-hypothesis-history"
-                class="text-text-secondary m-0 mt-1 flex list-none flex-col gap-0.5 p-0 font-mono text-xs"
-              >
-                <li v-for="(change, idx) in hypothesis.history" :key="idx">
-                  {{ rcaStatusHistoryLine(change) }}
-                </li>
-              </ol>
-            </template>
-
-            <RcaEvidenceCard
-              v-if="open?.hypothesisId === hypothesis.id && openEntry"
-              :id="cardId(hypothesis.id)"
-              class="mt-2"
-              :entry="openEntry"
-              :hypotheses="hypotheses"
-              :hypothesis-id="hypothesis.id"
-              @open-hypothesis="showHypothesis"
-              :org="org"
-              with-header
-            />
-          </div>
-
-          <!-- A narrow panel stacks pill, statement and chips; three columns only fit a wide one -->
-          <div
-            data-test="rca-hypothesis-side"
-            class="flex flex-wrap items-center justify-start gap-1 pt-px @xl:justify-end"
+        </template>
+        <span data-test="rca-hypothesis-statement">
+          <RcaInlineText :text="hypothesis.statement" />
+        </span>
+        <template #meta>
+          <span
+            data-test="rca-hypothesis-evidence-count"
+            class="text-text-secondary shrink-0 text-xs font-normal"
           >
-            <button
-              v-for="number in hypothesis.evidence_numbers"
-              :key="number"
-              type="button"
-              data-test="rca-hypothesis-chip"
-              class="rounded-default text-3xs inline-grid h-5 min-w-5.5 cursor-pointer place-items-center border px-1.5 font-mono font-semibold"
-              :class="
-                isOpen(hypothesis.id, number)
-                  ? 'bg-accent text-text-inverse border-transparent'
-                  : 'border-border-control bg-surface-base text-text-heading hover:bg-surface-subtle-hover'
-              "
-              :aria-expanded="isOpen(hypothesis.id, number)"
-              :aria-controls="isOpen(hypothesis.id, number) ? cardId(hypothesis.id) : undefined"
-              :aria-label="t('alerts.incidents.rcaSummary.openEvidence', { number })"
-              @click="toggle(hypothesis.id, number)"
-            >
-              {{ number }}
-            </button>
-            <span
-              v-for="id in hypothesis.unverified_ids"
-              :key="id"
-              data-test="rca-hypothesis-unverified"
-              class="rounded-default border-status-warning-text text-status-warning-text text-3xs inline-flex h-5 items-center border border-dashed px-1.5 font-mono font-semibold"
-            >
-              {{ t("alerts.incidents.rcaSummary.notVerifiedId", { id }) }}
-            </span>
-            <span
-              v-if="
-                hypothesis.evidence_numbers.length === 0 && hypothesis.unverified_ids.length === 0
-              "
-              class="text-text-muted text-xs"
-            >
-              {{ t("alerts.incidents.rcaSummary.noEvidenceYet") }}
-            </span>
+            {{ evidenceCount(hypothesis) }}
+          </span>
+        </template>
+        <template v-if="canSteer || pending.has(hypothesis.id)" #actions>
+          <span class="flex shrink-0 items-center gap-1">
             <!-- A finished run takes no actions, whatever the steering view still says. -->
             <template v-if="canSteer && live">
               <OButton
@@ -316,12 +219,14 @@ const props = withDefaults(
     org: string;
     /** The run takes messages and the user may send them: rows offer actions. */
     canSteer?: boolean;
+    /** The run is still going; a finished run offers no actions. */
+    live?: boolean;
     /** Hypothesis id → local part of the author of its unread action. */
     pending?: Map<string, string>;
     /** An action is being sent. */
     sending?: boolean;
   }>(),
-  { outcome: undefined, canSteer: false, pending: () => new Map(), sending: false },
+  { outcome: undefined, canSteer: false, live: true, pending: () => new Map(), sending: false },
 );
 
 defineEmits<{

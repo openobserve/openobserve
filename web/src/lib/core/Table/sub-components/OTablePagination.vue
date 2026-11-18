@@ -278,7 +278,7 @@ const selectionLabel = computed(() => {
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"
           :searchable="false"
-          size="sm"
+          size="xs"
           :aria-label="t('components.pagination.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />

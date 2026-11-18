@@ -951,3 +951,13 @@ describe("assistant formatters", () => {
     });
   });
 });
+
+describe("identifierBreaks", () => {
+  it.each([
+    ["VPC_Flow_Rejected__vpc.log", ["VPC_", "Flow_", "Rejected_", "_", "vpc.", "log"]],
+    ["k8s/pod:cpu-high", ["k8s/", "pod:", "cpu-", "high"]],
+    ["plain", ["plain"]],
+  ])("breaks %s only after its separators", (name, parts) => {
+    expect(identifierBreaks(name)).toEqual(parts);
+  });
+});

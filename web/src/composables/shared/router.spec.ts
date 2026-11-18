@@ -27,6 +27,7 @@ import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
 import i18n from "@/locales";
 import { ref } from "vue";
+import { PUBLIC_LINKS_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
 
 const assistantGate = ref("available");
 

@@ -659,7 +659,7 @@ fn user_message_id(event: &DurableEvent) -> Option<&str> {
             .filter(|_| message.get("type").and_then(|t| t.as_str()) == Some("user"))
             .and_then(|id| id.as_str());
     }
-    if !event.event_type.starts_with("message.updated") {
+    if record_v2::live_type(&event.event_type) != "message.updated" {
         return None;
     }
     let info = &event.data["info"];

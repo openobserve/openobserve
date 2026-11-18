@@ -1356,16 +1356,13 @@ describe("AddTemplate - forms QA (B1, B25, B27, B31)", () => {
   });
 
   it("B31: drops group.<label> from the chips and keeps the episode_id and rows notes", async () => {
-    const groups = [
+    // The panel's 300ms debounced mount preview would otherwise overwrite the emitted groups on a slow run.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const w = await mountComp();
+    await w.findComponent({ name: "TemplatePreviewPanel" }).vm.$emit("variable-groups", [
       { name: "common", variables: ["alert_name", "group.<label>"] },
       { name: "alert", variables: ["alert_level"] },
-    ];
-    // The panel's 300ms debounced preview would overwrite the emitted groups on a slow worker.
-    vi.mocked(templateService.preview).mockResolvedValue({
-      data: { variable_groups: groups },
-    } as any);
-    const w = await mountComp();
-    await w.findComponent({ name: "TemplatePreviewPanel" }).vm.$emit("variable-groups", groups);
+    ]);
     (w.vm as any).variableGuideOpen = true;
     await flushPromises();
     const chips = w.findComponent({ name: "ContentTemplateForm" }).props("variables");

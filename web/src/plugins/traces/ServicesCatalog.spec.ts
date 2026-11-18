@@ -351,6 +351,7 @@ function mountServicesCatalog(
     storeOverrides?: Record<string, any>;
     stubs?: Record<string, any>;
     props?: Record<string, any>;
+    attachTo?: HTMLElement;
   } = {},
 ) {
   const mockStore = options.storeOverrides
@@ -359,6 +360,7 @@ function mountServicesCatalog(
 
   return mount(ServicesCatalog, {
     props: options.props ?? {},
+    attachTo: options.attachTo,
     global: {
       plugins: [i18n, mockStore],
       provide: {

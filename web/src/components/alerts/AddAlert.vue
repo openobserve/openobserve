@@ -484,6 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
                   :stored-intervals="anomalyStoredIntervals"
+                  :stored-sql-function="anomalyStoredSqlFunction"
                 />
               </div>
 
@@ -799,6 +800,7 @@ import {
   useAssistantDockToggle,
   useAssistantLeaveGuard,
 } from "@/composables/assistant/pure";
+import { getFoldersListByType } from "@/utils/commons";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({

@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-2xs text-text-label font-semibold max-md:hidden">{{
               t("alerts.stream_name")
             }}</span>
-            <span class="text-2xs text-text-label opacity-30 max-md:hidden">:</span>
+            <span class="text-2xs text-text-label max-md:hidden">:</span>
             <span v-if="streamName" class="text-sql-accent min-w-0 truncate text-xs font-bold">{{
               streamName
             }}</span>

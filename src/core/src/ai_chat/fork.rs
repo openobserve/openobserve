@@ -38,7 +38,7 @@ use super::{
     projection::truthy,
     rca_thread::{RECORD_STEP, SUBMIT_REPORT, ThreadPart, ToolPart, rca_stage, step_title},
     read_committed_events,
-    record_v2::{event_parts, record_message},
+    record_v2::{event_parts, live_type, record_message},
 };
 
 /// An opencode id: 4-letter family, `_`, 12 time-ordered chars and a 14-char base62 tail; others
@@ -250,7 +250,7 @@ fn message_of(event: &DurableEvent) -> Option<&str> {
     if let Some(message) = record_message(event) {
         return message.get("id").and_then(Value::as_str);
     }
-    if event.event_type.starts_with("message.updated") {
+    if live_type(&event.event_type) == "message.updated" {
         return data["info"]["id"].as_str();
     }
     match data.get("part") {

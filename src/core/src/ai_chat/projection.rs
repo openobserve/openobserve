@@ -15,7 +15,10 @@
 
 //! Port of o2-ai's `project_events`; model names are not redacted (unknown here).
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use config::{
     meta::oncall::confidence::strip_call_ref,
@@ -877,7 +880,27 @@ impl Turn {
         }
     }
 
+    fn keep_asked(&mut self, part: &Map<String, Value>) {
+        let Some(meta) = obj(part.get("metadata")) else {
+            return;
+        };
+        if let Some(window) = obj(meta.get(ASKED_WINDOW_KEY))
+            && window.get("from").is_some_and(Value::is_i64)
+            && window.get("to").is_some_and(Value::is_i64)
+        {
+            let mut kept = json!({"from": window["from"], "to": window["to"]});
+            if let Some(relative) = window.get("relative").and_then(Value::as_str) {
+                kept["relative"] = relative.chars().take(16).collect::<String>().into();
+            }
+            self.window = Some(kept);
+        }
+        if let Some(entry) = meta.get(ASKED_ENTRY_KEY).and_then(Value::as_str) {
+            self.entry_kind = Some(entry.chars().take(32).collect());
+        }
+    }
+
     fn collect_v2_user(&mut self, message: &Map<String, Value>) {
+        self.keep_asked(message);
         self.user_parts.push((user_text(message), false));
         let files = message.get("files").and_then(Value::as_array);
         for (index, file) in files.into_iter().flatten().enumerate() {
@@ -910,6 +933,7 @@ impl Turn {
     fn project_v2_message(&mut self, message: &Map<String, Value>) {
         let kind = message.get("type").and_then(Value::as_str);
         if kind == Some("assistant") {
+            self.query_mode |= message.get("agent").and_then(Value::as_str) == Some(QUERY_AGENT);
             let content = message.get("content").and_then(Value::as_array);
             for item in content.into_iter().flatten().filter_map(Value::as_object) {
                 match item.get("type").and_then(Value::as_str) {
@@ -920,7 +944,8 @@ impl Turn {
                             _ => Some(""),
                         };
                         if let Some(text) = text {
-                            self.state.emit_text_delta(text, &mut self.frames);
+                            let shown = self.state.shape_text(text);
+                            self.state.emit_text_delta(&shown, &mut self.frames);
                         }
                         // One text item is one block: never carry its tail into the next.
                         self.state.flush_text_buffer(&mut self.frames);
@@ -2062,17 +2087,6 @@ fn tool_description(tool: &str) -> String {
         .map_or_else(|| format!("Executing {tool}"), |(_, d)| d.to_string())
 }
 
-fn live_type(durable_type: &str) -> &str {
-    match durable_type.rsplit_once('.') {
-        Some((base, version))
-            if !version.is_empty() && version.bytes().all(|b| b.is_ascii_digit()) =>
-        {
-            base
-        }
-        _ => durable_type,
-    }
-}
-
 fn generated_title(title: &Value) -> Option<String> {
     let stripped = py_strip(title.as_str()?);
     if stripped.is_empty()
@@ -2749,10 +2763,210 @@ fn delete_card(items: &[Value]) -> Value {
     {
         card["call_id"] = call_id.into();
     }
-    if let Some(at) = expires_at {
-        frame["expires_at"] = Value::from(at);
+    if !widened.is_empty() {
+        let impact: Vec<String> = widened
+            .iter()
+            .map(|n| format!("Also deletes everything associated with \"{n}\""))
+            .collect();
+        card["impact"] = impact.into();
     }
-    Some(frame)
+    card
+}
+
+/// o2-ai's `delete_batch_id`: the session and the calls, so a reload names the same card.
+fn delete_batch_id(o2_session_id: &str, items: &[Value]) -> String {
+    let keys = items.iter().map(|it| match it["call_id"].as_str() {
+        Some(call) if !call.is_empty() => call.to_string(),
+        _ => format!("{}:{}", py_str(&it["resource_type"]), py_str(&it["id"])),
+    });
+    let material = std::iter::once(o2_session_id.to_string())
+        .chain(keys)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let digest = Sha256::digest(material.as_bytes());
+    let hex: String = digest.iter().map(|b| format!("{b:02x}")).collect();
+    format!("apr_{}", &hex[..20])
+}
+
+/// Whether delete `params` ask for more than the named resource.
+fn widens_delete_scope(params: &Value) -> bool {
+    match params.get("delete_all") {
+        Some(Value::String(v)) => ["1", "true", "yes"].contains(&v.trim().to_lowercase().as_str()),
+        Some(v) => truthy(v),
+        None => false,
+    }
+}
+
+/// o2-ai's `typed_query` of a SQL, PromQL or traces step: `{language, text, stream?, ...}`.
+fn typed_query(tool: &str, args: Option<&Map<String, Value>>) -> Option<Value> {
+    let empty = Map::new();
+    let mut args = args.unwrap_or(&empty);
+    // A `tools_call` step records the wrapper `{tool, args}`; the query is in the inner args.
+    if args.get("tool").is_some_and(Value::is_string)
+        && let Some(inner) = obj(args.get("args"))
+    {
+        args = inner;
+    }
+    let tool = strip_mcp_prefix(tool);
+    let either = |a: &str, b: &str| args.get(a).or_else(|| args.get(b));
+    if SQL_TOOLS.contains(&tool) {
+        let body = obj(args.get("request_body"));
+        let query = body.and_then(|b| obj(b.get("query"))).unwrap_or(&empty);
+        let text = text_arg(query, &["sql"]).or_else(|| text_arg(args, &["sql", "query"]));
+        let text = decoded_sql(text, args, body);
+        let span_of = |key: &str| {
+            if query.contains_key(key) {
+                query.get(key)
+            } else {
+                args.get(key)
+            }
+        };
+        let mut typed = typed(
+            "sql",
+            text,
+            args,
+            None,
+            (span_of("start_time"), span_of("end_time")),
+        )?;
+        if typed.get("stream").is_none()
+            && let Some(found) = SQL_FROM.captures(typed["text"].as_str().unwrap_or_default())
+        {
+            let stream = found
+                .get(1)
+                .or_else(|| found.get(2))
+                .map(|m| m.as_str().to_string());
+            typed["stream"] = stream.into();
+        }
+        return Some(typed);
+    }
+    if PROMQL_TOOLS.contains(&tool) {
+        let text = text_arg(args, &["query", "promql"]);
+        let span = (either("start", "time"), either("end", "time"));
+        return typed("promql", text, args, Some("metrics"), span);
+    }
+    if TRACE_TOOLS.contains(&tool) {
+        let text = text_arg(args, &["filter", "query", "sql"]);
+        let span = (args.get("start_time"), args.get("end_time"));
+        return typed("traces", text, args, Some("traces"), span);
+    }
+    None
+}
+
+fn typed(
+    language: &str,
+    text: Option<String>,
+    args: &Map<String, Value>,
+    default_stream_type: Option<&str>,
+    span: (Option<&Value>, Option<&Value>),
+) -> Option<Value> {
+    let text = text.filter(|t| !t.is_empty())?;
+    let mut typed = json!({"language": language, "text": text});
+    if let Some(stream) = text_arg(args, &STREAM_NAME_KEYS) {
+        typed["stream"] = stream.into();
+    }
+    if let Some(stream_type) =
+        text_arg(args, &STREAM_TYPE_KEYS).or_else(|| default_stream_type.map(str::to_string))
+    {
+        typed["stream_type"] = stream_type.into();
+    }
+    if let (Some(from), Some(to)) = (span.0.and_then(micros), span.1.and_then(micros)) {
+        typed["from"] = from.into();
+        typed["to"] = to.into();
+    }
+    Some(typed)
+}
+
+fn text_arg(source: &Map<String, Value>, keys: &[&str]) -> Option<String> {
+    keys.iter().find_map(|key| {
+        source
+            .get(*key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(str::to_string)
+    })
+}
+
+/// The SQL as it runs: OpenObserve decodes it first when the call says `encoding: base64`.
+fn decoded_sql(
+    sql: Option<String>,
+    args: &Map<String, Value>,
+    body: Option<&Map<String, Value>>,
+) -> Option<String> {
+    use base64::Engine;
+    let encoding = body
+        .and_then(|b| b.get("encoding"))
+        .filter(|v| truthy(v))
+        .or_else(|| args.get("encoding"))
+        .filter(|v| truthy(v))
+        .map(py_str)
+        .unwrap_or_default();
+    let sql = sql?;
+    if !encoding.eq_ignore_ascii_case("base64") {
+        return Some(sql);
+    }
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(&sql)
+        .ok()?;
+    let text = String::from_utf8(decoded).ok()?;
+    let text = text.trim();
+    (!text.is_empty()).then(|| text.to_string())
+}
+
+/// An absolute time in microseconds from seconds, milliseconds, microseconds or RFC 3339.
+fn micros(value: &Value) -> Option<i64> {
+    let number = match value {
+        Value::String(text) => match text.trim().parse::<f64>() {
+            Ok(n) => n,
+            Err(_) => return rfc3339_micros(text),
+        },
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                return positive_micros_int(i);
+            }
+            n.as_f64()?
+        }
+        _ => return None,
+    };
+    if !number.is_finite() || number <= 0.0 {
+        return None;
+    }
+    let scaled = if number < SECONDS_MAX {
+        number * 1_000_000.0
+    } else if number < MILLIS_MAX {
+        number * 1_000.0
+    } else {
+        number
+    };
+    Some(scaled as i64)
+}
+
+fn positive_micros_int(value: i64) -> Option<i64> {
+    if value <= 0 {
+        None
+    } else if (value as f64) < SECONDS_MAX {
+        value.checked_mul(1_000_000)
+    } else if (value as f64) < MILLIS_MAX {
+        value.checked_mul(1_000)
+    } else {
+        Some(value)
+    }
+}
+
+fn rfc3339_micros(text: &str) -> Option<i64> {
+    let text = text.replace('Z', "+00:00");
+    if let Ok(at) = chrono::DateTime::parse_from_rfc3339(&text) {
+        return Some(at.timestamp_micros());
+    }
+    [
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%d %H:%M:%S%.f",
+        "%Y-%m-%dT%H:%M",
+        "%Y-%m-%d %H:%M",
+    ]
+    .iter()
+    .find_map(|format| chrono::NaiveDateTime::parse_from_str(&text, format).ok())
+    .map(|at| at.and_utc().timestamp_micros())
 }
 
 /// A first-party tool's `navigation_action` payload, forwarded verbatim.
@@ -3413,6 +3627,7 @@ mod tests {
         assert_eq!(delete_card(&untimed.pending_deletes)["expires_at"], 0);
     }
 
+    /// A 2.x log names the pending deletes and shows the cards of the 1.x log it records.
     #[test]
     fn a_2x_record_names_the_deletes_its_1x_log_asked_to_confirm() {
         use crate::ai_chat::record_v2::tests::{golden_events, to_v2};

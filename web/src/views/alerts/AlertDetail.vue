@@ -1042,7 +1042,7 @@ contextRegistry.register(
   createAlertDetailContextProvider(
     () => ({
       alertId: alertId.value,
-      alert: notFound.value ? null : alert.value,
+      alert: unavailable.value ? null : alert.value,
       state: assistantAlertState.value,
     }),
     store,
@@ -1055,7 +1055,8 @@ onBeforeUnmount(() => {
   contextRegistry.setActive("");
 });
 
-onMounted(async () => {
+// Mount and Retry share it, so a recovered page loads what the first load skipped.
+const loadPage = async () => {
   await fetchAlert();
   if (unavailable.value) return;
   await fetchSloName();

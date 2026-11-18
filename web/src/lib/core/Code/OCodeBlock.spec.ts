@@ -206,7 +206,7 @@ describe("OCodeBlock", () => {
 
     it("adds copyButtonClass and the aa contrast label only when asked", () => {
       const plain = mountBlock({ code: "x", lang: "sql" });
-      expect(plain.get(".o2-code-lang").classes()).toContain("opacity-55");
+      expect(plain.get(".o2-code-lang").classes()).toContain("text-text-body");
       const aa = mountBlock({
         code: "x",
         lang: "sql",

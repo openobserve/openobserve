@@ -8164,7 +8164,7 @@ dependencies = [
  "infra",
  "ingester",
  "itertools 0.14.0",
- "jsonschema",
+ "jsonschema 0.38.1",
  "lettre",
  "log",
  "mime",

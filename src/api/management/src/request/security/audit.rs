@@ -43,8 +43,6 @@ use crate::{
 
 const DEFAULT_SIZE: i64 = 100;
 const MAX_SIZE: i64 = 500;
-// The search RPC carries the offset as i32, so a larger `from` wraps negative and fails as a 500.
-const MAX_FROM: i64 = i32::MAX as i64 - MAX_SIZE;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct SecurityAuditQuery {
@@ -205,8 +203,12 @@ fn page(query: &SecurityAuditQuery) -> Result<(i64, i64, i64, i64), String> {
     });
     validate_history_range(start_time, end_time)?;
     let from = query.from.unwrap_or(0);
-    if !(0..=MAX_FROM).contains(&from) {
-        return Err("from must be between 0 and 2147483147");
+    if !(0..=MAX_OFFSET).contains(&from) {
+        return Err(format!("from must be between 0 and {MAX_OFFSET}"));
+    }
+    let size = query.size.unwrap_or(DEFAULT_SIZE);
+    if !(1..=MAX_SIZE).contains(&size) {
+        return Err(format!("size must be between 1 and {MAX_SIZE}"));
     }
     Ok((start_time, end_time, from, size))
 }
@@ -216,34 +218,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_page_validates_the_window_and_bounds_the_size() {
-        let query = |start: i64, end: i64, size: Option<i64>| SecurityAuditQuery {
-            start_time: Some(start),
-            end_time: Some(end),
-            from: None,
-            size,
-            include_reads: false,
-        };
-        assert_eq!(page(&query(1, 2, None)), Ok((1, 2, 0, DEFAULT_SIZE)));
-        assert_eq!(page(&query(1, 2, Some(9_999))).unwrap().3, MAX_SIZE);
-        assert_eq!(page(&query(1, 2, Some(-3))).unwrap().3, 1);
-        assert!(page(&query(i64::MIN, 2, None)).is_err());
-        assert!(page(&query(1, i64::MAX, None)).is_err());
-        assert!(page(&query(2, 1, None)).is_err());
-        let negative = SecurityAuditQuery {
-            from: Some(-1),
-            ..query(1, 2, None)
-        };
-        assert!(page(&negative).is_err());
-        let from = |from: i64| SecurityAuditQuery {
-            from: Some(from),
-            ..query(1, 2, None)
-        };
-        assert_eq!(MAX_FROM, 2_147_483_147, "the 400 message names this bound");
-        assert_eq!(page(&from(MAX_FROM)).unwrap().2, MAX_FROM);
-        assert!(page(&from(MAX_FROM + 1)).is_err());
-        assert!(page(&from(8_114_837_566)).is_err());
-        assert!(page(&from(i64::MAX)).is_err());
+    fn test_page_validates_the_window_and_the_page() {
+        let query =
+            |start: i64, end: i64, from: Option<i64>, size: Option<i64>| SecurityAuditQuery {
+                start_time: Some(start),
+                end_time: Some(end),
+                from,
+                size,
+                include_reads: false,
+            };
+        assert_eq!(page(&query(1, 2, None, None)), Ok((1, 2, 0, DEFAULT_SIZE)));
+        assert_eq!(
+            page(&query(1, 2, Some(MAX_OFFSET), Some(MAX_SIZE))),
+            Ok((1, 2, MAX_OFFSET, MAX_SIZE))
+        );
+        assert!(page(&query(i64::MIN, 2, None, None)).is_err());
+        assert!(page(&query(1, i64::MAX, None, None)).is_err());
+        assert!(page(&query(2, 1, None, None)).is_err());
+        // 5582056768315 is the fuzzer input that wrapped to a negative 32-bit OFFSET.
+        for (from, size, param) in [
+            (-1, 10, "from"),
+            (MAX_OFFSET + 1, 10, "from"),
+            (5_582_056_768_315, 10, "from"),
+            (0, 0, "size"),
+            (0, -3, "size"),
+            (0, MAX_SIZE + 1, "size"),
+        ] {
+            let err = page(&query(1, 2, Some(from), Some(size))).unwrap_err();
+            assert!(err.starts_with(param), "{from}/{size}: {err}");
+        }
     }
 
     #[tokio::test]

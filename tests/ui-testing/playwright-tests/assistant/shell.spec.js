@@ -70,7 +70,7 @@ test.describe("assistant shell", () => {
       await expect(assistant.composer()).toBeFocused();
       await expect(
         assistant.sidebar.locator('[data-test="assistant-status-region"]'),
-      ).toHaveText("O2 Assistant opened.");
+      ).toHaveText(`${BRAND.autobot} opened.`);
     },
   );
 
@@ -120,7 +120,7 @@ test.describe("assistant shell", () => {
       );
       await expect(assistant.headerButton).toHaveAttribute(
         "aria-label",
-        "Close O2 Assistant",
+        `Close ${BRAND.autobot}`,
       );
       // The header button's tooltip stays open under a resting pointer and covers the thread header.
       await page.mouse.move(0, 0);
@@ -137,7 +137,7 @@ test.describe("assistant shell", () => {
       await expect(assistant.headerButton).toBeFocused();
       await expect(
         page.locator('[data-test="assistant-container-status"]'),
-      ).toHaveText("O2 Assistant closed.");
+      ).toHaveText(`${BRAND.autobot} closed.`);
       await expect(assistant.headerButton).toHaveAttribute(
         "data-state",
         "idle",
@@ -168,7 +168,7 @@ test.describe("assistant shell", () => {
       );
       await expect(
         assistant.sidebar.locator('[data-test="assistant-shell-close"]'),
-      ).toHaveAttribute("aria-label", "Close O2 Assistant");
+      ).toHaveAttribute("aria-label", `Close ${BRAND.autobot}`);
       const aiRequests = await page.evaluate(
         () => window.__o2mock.requests.length,
       );
@@ -228,7 +228,7 @@ test.describe("assistant shell", () => {
       await expect(assistant.composer()).toBeFocused();
       await expect(
         sheet.locator('[data-test="assistant-status-region"]'),
-      ).toHaveText("O2 Assistant opened.");
+      ).toHaveText(`${BRAND.autobot} opened.`);
       const handle = sheet.locator(
         '[data-test="assistant-shell-sheet-handle"]',
       );
@@ -348,7 +348,7 @@ test.describe("assistant shell", () => {
       await expect(assistant.sidebar).toBeHidden();
       await expect(
         page.locator('[data-test="assistant-container-status"]'),
-      ).toHaveText("O2 Assistant closed. Still answering in the background.");
+      ).toHaveText(`${BRAND.autobot} closed. Still answering in the background.`);
       await expect(assistant.headerButton).toHaveAttribute(
         "data-state",
         "working",

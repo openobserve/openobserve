@@ -234,7 +234,7 @@ export const SCENARIOS = {
       ...chunk("I need to look at the pods in prod.").map(f.delta),
       {
         type: "confirmation_required",
-        tool: "bash",
+        tool: "shell",
         args: { permission_id: "per_e2e", detail: "kubectl get pods -n prod" },
         message: "The assistant wants to run: kubectl get pods -n prod",
       },

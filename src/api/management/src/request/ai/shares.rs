@@ -302,7 +302,11 @@ impl Folded {
         for event in events {
             match record_v2::record_message(event) {
                 Some(message) => folded.apply_v2(message, &mut seen),
-                None => folded.apply(live_type(&event.event_type), &event.data, &mut seen),
+                None => folded.apply(
+                    record_v2::live_type(&event.event_type),
+                    &event.data,
+                    &mut seen,
+                ),
             }
         }
         folded
@@ -2142,14 +2146,6 @@ fn seed_messages(turns: &[Value]) -> Vec<Value> {
     messages
 }
 
-/// A durable event type without opencode's version suffix (`message.updated.1`).
-fn live_type(event_type: &str) -> &str {
-    match event_type.rsplit_once('.') {
-        Some((head, tail)) if !tail.is_empty() && tail.bytes().all(|b| b.is_ascii_digit()) => head,
-        _ => event_type,
-    }
-}
-
 /// Drops o2-ai's preamble from a prompt stored before it became a separate tagged part.
 fn strip_legacy_prefix(text: &str) -> &str {
     let mut text = text;
@@ -2898,8 +2894,11 @@ mod tests {
         );
         assert_eq!(strip_legacy_prefix("[Context]\na: b\n\nreal"), "real");
         assert_eq!(strip_legacy_prefix("plain question"), "plain question");
-        assert_eq!(live_type("message.part.updated.1"), "message.part.updated");
-        assert_eq!(live_type("session.updated"), "session.updated");
+        assert_eq!(
+            record_v2::live_type("message.part.updated.1"),
+            "message.part.updated"
+        );
+        assert_eq!(record_v2::live_type("session.updated"), "session.updated");
     }
 
     #[test]

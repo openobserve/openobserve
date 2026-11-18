@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="columnEl"
     data-test="rca-thread-column"
     :data-variant="variant"
-    class="flex flex-col"
+    tabindex="-1"
+    class="flex flex-col outline-none"
     :class="
       variant === 'inline'
         ? 'flex-none'
@@ -602,6 +603,7 @@ watch(
   () => {
     contextOpen.value = false;
     activityOpen.value = false;
+    promptOpen.value = false;
   },
 );
 
