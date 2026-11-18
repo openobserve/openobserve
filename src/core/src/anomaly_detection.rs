@@ -10218,6 +10218,32 @@ mod tests {
         }
 
         #[test]
+        fn a_second_group_by_key_in_a_from_subquery_is_rejected() {
+            let inner = "SELECT histogram(_timestamp, '5m') AS time_bucket, service, count(*) AS \
+                         value FROM logs";
+            let check = |sql: String| {
+                validate_custom_sql_grid(&sql, "5m", Some(&fields(&["service"])))
+                    .map_err(|e| e.to_string())
+            };
+            let nested = |inner_group_by: &str, outer_group_by: &str| {
+                format!(
+                    "SELECT time_bucket, max(value) AS value FROM ({inner} {inner_group_by}) s \
+                     {outer_group_by}"
+                )
+            };
+            let err = check(nested("GROUP BY time_bucket, service", "")).unwrap_err();
+            assert!(err.contains("Remove 'service'"), "{err}");
+            let err = check(nested(
+                "GROUP BY time_bucket",
+                "GROUP BY time_bucket, service",
+            ))
+            .unwrap_err();
+            assert!(err.contains("Remove 'service'"), "{err}");
+            assert!(check(nested("GROUP BY time_bucket", "GROUP BY time_bucket")).is_ok());
+            assert!(check(nested("GROUP BY 1", "")).is_ok());
+        }
+
+        #[test]
         fn an_alias_that_a_stream_field_shadows_is_not_the_bucket() {
             let err = guard("GROUP BY time_bucket", &["time_bucket"])
                 .unwrap_err()

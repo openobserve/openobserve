@@ -545,8 +545,18 @@ pub(super) fn custom_group_by_offender(
     stream_fields: &HashSet<String>,
 ) -> Option<String> {
     let statement = single_statement(sql).ok()?;
-    let select = statement_select(&statement)?;
-    let bucket = save_time_bucket(select)?;
+    select_group_by_offender(statement_select(&statement)?, stream_fields)
+}
+
+/// A bucket from a FROM subquery is checked there; above it a GROUP BY may hold only one key.
+fn select_group_by_offender(select: &Select, stream_fields: &HashSet<String>) -> Option<String> {
+    let Some(bucket) = save_time_bucket(select) else {
+        if let Some(offender) = single_key_offender(&select.group_by) {
+            return Some(offender);
+        }
+        return derived_select(select)
+            .and_then(|inner| select_group_by_offender(inner, stream_fields));
+    };
     let (exprs, modifiers) = match &select.group_by {
         GroupByExpr::All(_) => return Some("ALL".to_string()),
         GroupByExpr::Expressions(exprs, modifiers) => (exprs, modifiers),
@@ -558,6 +568,31 @@ pub(super) fn custom_group_by_offender(
         .iter()
         .find(|expr| !matches!(is_bucket_key(expr, &bucket, Some(stream_fields)), Ok(true)))
         .map(ToString::to_string)
+}
+
+/// With no bucket in this SELECT, its GROUP BY can be the bucket only when it has one key.
+fn single_key_offender(group_by: &GroupByExpr) -> Option<String> {
+    match group_by {
+        GroupByExpr::All(_) => Some("ALL".to_string()),
+        GroupByExpr::Expressions(_, modifiers) if !modifiers.is_empty() => {
+            Some(modifiers[0].to_string())
+        }
+        GroupByExpr::Expressions(exprs, _) => exprs.get(1).map(ToString::to_string),
+    }
+}
+
+/// The SELECT of a lone `FROM (<subquery>)`.
+fn derived_select(select: &Select) -> Option<&Select> {
+    let [from] = select.from.as_slice() else {
+        return None;
+    };
+    let TableFactor::Derived { subquery, .. } = &from.relation else {
+        return None;
+    };
+    match subquery.body.as_ref() {
+        SetExpr::Select(inner) => Some(inner),
+        _ => None,
+    }
 }
 
 /// The first histogram column whatever its arguments' spelling, such as `"_timestamp"`;
