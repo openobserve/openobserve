@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -25,7 +25,8 @@ defineProps<{
   name: string;
   /** The alert's own comparison, which the warning shares. */
   operator: I18nText;
-  error?: I18nText;
+  /** A field error as the form reports it. */
+  error?: string;
   inputDataTest: string;
   errorDataTest: string;
 }>();
@@ -39,7 +40,7 @@ const { t } = useI18nTyped();
 <template>
   <OSettingRow
     :label="t('alerts.form.warning.label')"
-    :error="error"
+    :error="error ? raw(error) : undefined"
     :error-data-test="errorDataTest"
     data-test="alert-warning-row"
   >

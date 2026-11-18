@@ -64,6 +64,7 @@ const overlap = computed(() => scheduleOverlap(props.period, props.frequency));
   <OSettingRow
     :label="t('alerts.sections.timeline.label')"
     fill
+    wide
     data-test="add-alert-check-timeline"
   >
     <svg :viewBox="`0 0 ${WIDTH} ${HEIGHT}`" class="w-full" aria-hidden="true">

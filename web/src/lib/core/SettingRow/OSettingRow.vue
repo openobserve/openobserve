@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="grid && !wide"
-      class="-me-3.5 flex min-h-8.5 flex-wrap items-center justify-end gap-x-1 max-[85.5rem]:-me-3 max-md:me-0 max-md:justify-start max-md:empty:hidden"
+      class="flex min-h-8.5 flex-wrap items-center justify-end gap-x-1 max-md:justify-start max-md:empty:hidden"
       data-o-setting-row-actions
     >
       <slot name="actions" />

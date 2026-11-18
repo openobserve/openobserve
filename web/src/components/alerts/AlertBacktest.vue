@@ -248,6 +248,7 @@ const hint = computed(() => {
     :label="t('alerts.sections.backtest.label')"
     :description="t('alerts.sections.backtest.help')"
     fill
+    wide
     data-test="add-alert-backtest"
   >
     <p

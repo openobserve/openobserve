@@ -67,7 +67,7 @@ describe("useAlertSettingFind", () => {
     expect(find.items.value[0]?.context).toEqual([
       "Who should hear about it?",
       "More options",
-      "Tell them when it recovers",
+      "Recovery message",
     ]);
     expect(find.countText.value).toMatch(/setting/);
   });

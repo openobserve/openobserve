@@ -319,6 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow
                 :label="t('alerts.sections.howItChecks')"
                 fill
+                wide
                 data-test="add-alert-how-it-checks-row"
               >
                 <OChoiceCards
@@ -341,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-alert-stream-type-select-dropdown"
                       :options="streamTypeOptions"
                       :searchable="false"
-                      class="w-32 max-md:w-full"
+                      class="w-32! max-md:w-full!"
                       :disabled="beingUpdated || anomalyEditMode"
                       @update:model-value="onStreamTypeChange"
                     />
@@ -469,6 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="showsConditionPresets"
                   :label="t('alerts.sections.presets.label')"
                   fill
+                  wide
                   data-test="add-alert-condition-presets"
                 >
                   <OChoiceCards

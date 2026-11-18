@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Alert if row -->
                     <OSettingRow
                       data-test="alert-if-row-logs"
+                      wide
                       :label="t('alerts.plain.notifyMeWhen')"
                       fill
                     >
@@ -374,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- METRICS -->
                   <template v-else>
                     <!-- Alert if row -->
-                    <OSettingRow :label="t('alerts.plain.notifyMeWhen')" fill>
+                    <OSettingRow :label="t('alerts.plain.notifyMeWhen')" fill wide>
                       <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
                         <!-- Measurement sentence: WHAT to measure. Severity rows
                          below say WHEN it fires (mock: multi-alert-form.html). -->
@@ -647,6 +648,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :label="groupQuestionTitle"
                     fill
                     data-test="add-alert-group-question-row"
+                    wide
                   >
                     <div class="flex min-w-0 flex-col gap-1.5">
                       <ORadioGroup
@@ -775,26 +777,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <component
                 :is="sectionTargets ? 'OSettingRow' : 'div'"
                 v-show="!filtersFolded"
-                ref="customPreviewRef"
                 v-bind="sectionTargets ? { label: t('alerts.form.filter.label'), wide: true } : {}"
               >
-                <FilterBuilder
-                  ref="conditionsBuilderRef"
-                  profile="alert"
-                  :model-value="inputData.conditions"
-                  :fields="conditionFields"
-                  :load-values="conditionValueLoader"
-                  data-test="alert-conditions"
-                  @update:model-value="onConditionsChange"
-                  @update:valid="conditionsValid = $event"
-                />
-                <div
-                  v-if="showConditionsError"
-                  class="text-input-error-text mt-1 text-xs"
-                  role="alert"
-                  data-test="alert-conditions-error"
-                >
-                  {{ t("filterBar.validation.incomplete") }}
+                <div ref="customPreviewRef">
+                  <FilterBuilder
+                    ref="conditionsBuilderRef"
+                    profile="alert"
+                    :model-value="inputData.conditions"
+                    :fields="conditionFields"
+                    :load-values="conditionValueLoader"
+                    data-test="alert-conditions"
+                    @update:model-value="onConditionsChange"
+                    @update:valid="conditionsValid = $event"
+                  />
+                  <div
+                    v-if="showConditionsError"
+                    class="text-input-error-text mt-1 text-xs"
+                    role="alert"
+                    data-test="alert-conditions-error"
+                  >
+                    {{ t("filterBar.validation.incomplete") }}
+                  </div>
                 </div>
               </component>
               <AlertSentenceRow
@@ -1157,6 +1160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="sqlPlainLimit ? t('alerts.plain.queryReturns') : groupQuestionTitle"
                       fill
                       data-test="add-alert-group-question-row"
+                      wide
                     >
                       <div class="flex min-w-0 flex-col gap-1.5">
                         <span
@@ -1430,6 +1434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSettingRow
                         v-if="!isPromRuleMode"
                         :label="t('alerts.plain.valueIs')"
+                        wide
                         :info="t('alerts.queryConfig.alertIfValueIsTooltip')"
                         fill
                       >

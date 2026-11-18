@@ -294,7 +294,7 @@ describe("CompareWithPast.vue", () => {
       });
       await flushPromises();
       const row = wrapper.find('[data-test="add-alert-compare-window"]');
-      expect(row.text()).toContain("the same window");
+      expect(row.text()).toContain("earlier");
       expect(row.text()).not.toMatch(/Minute|Running/);
       const amount = row.find('[data-test="multi-time-range-offset-input"] input');
       expect((amount.element as HTMLInputElement).value).toBe("1");

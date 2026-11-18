@@ -107,7 +107,7 @@ describe("searchAlertSettings", () => {
     const found = searchAlertSettings("recov", t, (id) => !isAnomalyOnlyFindId(id));
     expect(found.map((m) => t(m.entry.labelKey)).sort()).toEqual([
       "Recovery destination",
-      "Tell them when it recovers",
+      "Recovery message",
       "What each destination does on recovery",
     ]);
   });
