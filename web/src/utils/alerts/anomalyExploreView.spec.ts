@@ -181,6 +181,12 @@ describe("anomalyStripView", () => {
     const recent = { ...ongoing, window: { ...ongoing.window!, end_us: NOW - 2 * MIN } };
     expect(anomalyStripView(recent, CONFIG, NOW).incomplete).toBe(true);
     expect(anomalyStripView(ongoing, CONFIG, NOW).incomplete).toBe(false);
+    const normal = response({ state: "back_in_range", cursor_us: NOW - 2 * MIN });
+    expect(anomalyStripView(normal, CONFIG, NOW).incomplete).toBe(true);
+    expect(anomalyStripView(response({ cursor_us: NOW - 2 * MIN }), CONFIG, NOW).incomplete).toBe(
+      true,
+    );
+    expect(anomalyStripView(response(), CONFIG, NOW).incomplete).toBe(false);
   });
 });
 

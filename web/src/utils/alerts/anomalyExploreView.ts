@@ -78,6 +78,12 @@ export function anomalyStripView(
   const sinceUs = summary?.since_us ?? null;
   const noRecentRuns = olderThan(res.last_detection_run, config.scheduleMs, nowUs);
   const noNewData = !noRecentRuns && olderThan(res.no_new_data_since_us, config.bucketMs, nowUs);
+  // The cursor is the end of the newest judged bucket; Ongoing has its window end.
+  const newestEndUs = res.state === "ongoing" && win !== null ? win.end_us : res.cursor_us;
+  const incomplete =
+    newestEndUs !== null &&
+    config.scheduleMs !== null &&
+    nowUs - newestEndUs < config.scheduleMs * 1000;
   const base: AnomalyStripView = {
     state: "none",
     startedUs,
@@ -86,15 +92,11 @@ export function anomalyStripView(
     lastedMs: sinceUs !== null && startedUs !== null ? (sinceUs - startedUs) / 1000 : null,
     lastRunUs: res.last_detection_run,
     noNewDataSinceUs: noNewData ? res.no_new_data_since_us : null,
-    incomplete: false,
+    incomplete,
     summary: null,
   };
   if (!config.enabled) return { ...base, state: "paused" };
-  if (res.state === "ongoing") {
-    const incomplete =
-      win !== null && config.scheduleMs !== null && nowUs - win.end_us < config.scheduleMs * 1000;
-    return { ...base, state: "ongoing", incomplete, summary };
-  }
+  if (res.state === "ongoing") return { ...base, state: "ongoing", summary };
   if (noRecentRuns) return { ...base, state: "no_recent_runs" };
   if (noNewData) return { ...base, state: "no_new_data" };
   if (!config.isTrained) return { ...base, state: "learning" };
