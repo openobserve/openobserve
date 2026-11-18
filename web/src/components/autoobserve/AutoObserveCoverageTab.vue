@@ -1127,8 +1127,9 @@ const selectHex = async (key: string) => {
     ?.scrollIntoView?.({ block: "nearest" });
 };
 
-// The hexes past the cap include services Needs action hides, so the table lists them all.
+// The hexes past the cap include services Needs action or a search hides, so the table lists them all.
 const showAllInTable = () => {
+  query.value = "";
   chooseFilter("all");
   view.value = "table";
 };

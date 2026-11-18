@@ -719,7 +719,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(tone(group)).toBe(tone(group.children[1]));
     });
 
-    it("caps the map, says how many more, and Show in table lists every service", async () => {
+    it("caps the map, says how many more, and Show in table lists every service, search or not", async () => {
       routeQuery.cov = "map";
       // One gap among 205: Needs action alone would hide the 204 watched services the cap left out.
       const many = coverage(
@@ -734,6 +734,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(wrapper.find('[data-test="autoobserve-coverage-map-more"]').text()).toContain(
         "and 5 more",
       );
+      await wrapper.find('[data-test="autoobserve-coverage-search"] input').setValue("s0");
       await wrapper.find('[data-test="autoobserve-coverage-map-more-table"]').trigger("click");
       await flushPromises();
       expect(wrapper.findComponent(OTable).props("data")).toHaveLength(205);
