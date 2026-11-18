@@ -13995,7 +13995,7 @@
       "budgetRange": "Enter a number greater than 0",
       "chartsTab": "Charts",
       "checkEvery": "Check every",
-      "checkEveryTooltip": "How often detection runs. It can be longer than the detection resolution, e.g. resolution 5m, checks every 1h.",
+      "checkEveryTooltip": "How often detection runs.",
       "daysUnit": "days",
       "noDestinationNote": "Optional. Anomalies are still detected and recorded, but no destination is notified.",
       "sendsToStatus": "Sends to {targets} each time an anomaly is detected.",

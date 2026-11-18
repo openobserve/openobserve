@@ -2344,6 +2344,9 @@ describe("QueryConfig.vue", () => {
         tiersWith(["generatedSql"]),
       );
       expect(host.find('[data-test="add-alert-generated-sql"]').exists()).toBe(shown);
+      // The theme-aware code block, not a fixed dark one, with its copy button.
+      if (shown)
+        expect(host.find('[data-test="alert-query-preview-copy-btn"]').exists()).toBe(true);
     });
 
     it.each([
