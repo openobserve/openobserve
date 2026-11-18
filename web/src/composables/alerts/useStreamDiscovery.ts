@@ -301,12 +301,24 @@ export function loadValueCounts(
   return request;
 }
 
-const sharedPrefix = (a: string, b: string) => {
-  const x = a.toLowerCase();
-  const y = b.toLowerCase();
-  let i = 0;
-  while (i < x.length && i < y.length && x[i] === y[i]) i++;
-  return i;
+// Longest shared run of letters, ignoring case; a run that starts the seen value counts a little more.
+const likeness = (seen: string, typed: string) => {
+  const a = seen.toLowerCase().slice(0, 64);
+  const b = typed.toLowerCase().slice(0, 64);
+  let best = 0;
+  let bestAtStart = false;
+  let previous = new Array<number>(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) {
+    const row = new Array<number>(b.length + 1).fill(0);
+    for (let j = 1; j <= b.length; j++) {
+      if (a[i - 1] !== b[j - 1]) continue;
+      row[j] = previous[j - 1] + 1;
+      const atStart = i - row[j] === 0;
+      if (row[j] > best || (row[j] === best && atStart)) [best, bestAtStart] = [row[j], atStart];
+    }
+    previous = row;
+  }
+  return best + (bestAtStart ? 0.5 : 0);
 };
 
 const matches = (seen: string, typed: string, operator: FilterOperatorId) => {
@@ -322,7 +334,7 @@ export function seenList(typed: string, values: ValueCount[], t: TranslateFn): I
   const best = new Map<string, number>();
   for (const v of values) if (v.value) best.set(v.value, Math.max(best.get(v.value) ?? 0, v.count));
   const ranked = [...best].sort(
-    ([a, x], [b, y]) => sharedPrefix(b, typed) - sharedPrefix(a, typed) || y - x,
+    ([a, x], [b, y]) => likeness(b, typed) - likeness(a, typed) || y - x,
   );
   return joinListMore(
     ranked.map(([value, count]) =>

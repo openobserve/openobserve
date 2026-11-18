@@ -175,13 +175,14 @@ describe("value counts", () => {
     {
       name: "a typed value never seen names the closest values",
       values: [
+        ["Pulled", 93_000],
         ["Killing", 53_920],
         ["OOMKilling", 412],
         ["Started", 9],
       ] as [string, number][],
       typed: ["OOMKilled"],
       op: "eq",
-      hint: "OOMKilled hasn't appeared in the last 24 hours. Seen: OOMKilling (412), Killing (53,920), and Started (9).",
+      hint: "OOMKilled hasn't appeared in the last 24 hours. Seen: OOMKilling (412), Killing (53,920), Pulled (93,000), and 1 more.",
     },
     {
       name: "the exact value differs only in case",
