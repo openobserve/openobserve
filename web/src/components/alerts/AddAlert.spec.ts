@@ -1775,6 +1775,8 @@ describe("AddAlert (OForm owner)", () => {
           .get('[data-test="add-alert-section-condition-card"]')
           .element.contains(document.activeElement),
       ).toBe(true);
+      // The picked stream plus the focus moves count as edits, so a draft would greet the next test.
+      wrapper.vm.alertDraft.discard();
       rects.mockRestore();
     });
 
