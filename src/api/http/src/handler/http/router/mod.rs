@@ -1623,6 +1623,7 @@ fn service_route_table() -> Router {
         .route("/{org_id}/alerts/templates/preview", post(alerts::templates::preview_template))
         .route("/{org_id}/alerts/templates/{template_name}", get(alerts::templates::get_template).put(alerts::templates::update_template).delete(alerts::templates::delete_template))
         .route("/{org_id}/alerts/templates/bulk", delete(alerts::templates::delete_template_bulk))
+        .route("/{org_id}/alerts/library/suggestions", get(alerts::library::get_suggestions))
 
         // Alert destinations
         .route("/{org_id}/alerts/destinations", get(alerts::destinations::list_destinations).post(alerts::destinations::save_destination))

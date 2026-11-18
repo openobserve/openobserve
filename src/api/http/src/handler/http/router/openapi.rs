@@ -165,6 +165,7 @@ use crate::{
         openobserve_api_management::request::alerts::create_alert,
         openobserve_api_management::request::alerts::validate_composite_alert,
         openobserve_api_management::request::alerts::evaluate::evaluate_alert,
+        openobserve_api_management::request::alerts::library::get_suggestions,
         openobserve_api_management::request::alerts::get_composite_references,
         openobserve_api_management::request::alerts::get_composite_timeline,
         openobserve_api_management::request::alerts::get_alert,

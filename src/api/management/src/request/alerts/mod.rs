@@ -91,6 +91,7 @@ pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;
 pub mod leases;
+pub mod library;
 pub mod mute;
 #[cfg(feature = "cloud")]
 pub mod slack_oauth;
