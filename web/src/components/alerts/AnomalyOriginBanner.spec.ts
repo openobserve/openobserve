@@ -102,7 +102,7 @@ describe("AnomalyOriginBanner", () => {
 
   it("shows no numbers for an absence and no range for a partial drop", async () => {
     await mountBanner({ ...VALUE_LINK, anomaly_kind: "absence", anomaly_actual: "" });
-    expect(find("values").text()).toBe("count(*) per 15 min: returned no data, 18:00-19:00 UTC");
+    expect(find("values").text()).toBe("No data for this detector's query since 18:00 UTC");
     wrapper?.unmount();
     await mountBanner({ ...VALUE_LINK, anomaly_kind: "partial_drop", anomaly_actual: "12" });
     expect(find("values").text()).toBe("count(*) per 15 min: actual 12.00, 18:00-19:00 UTC");
@@ -123,11 +123,14 @@ describe("AnomalyOriginBanner", () => {
     expect(find("title").exists()).toBe(true);
     expect(find("values").exists()).toBe(false);
     wrapper?.unmount();
-    // A shortened absence link: the window stays, the measure was dropped.
+    // A shortened absence link keeps its start, and the sentence needs no measure.
     const { anomaly_measure: _measure, ...lean } = VALUE_LINK;
     await mountBanner({ ...lean, anomaly_kind: "absence", anomaly_actual: "" });
-    expect(find("title").exists()).toBe(true);
-    expect(find("values").exists()).toBe(false);
+    expect(find("values").text()).toBe("No data for this detector's query since 18:00 UTC");
+    wrapper?.unmount();
+    const { anomaly_start: _start, ...noStart } = lean;
+    await mountBanner({ ...noStart, anomaly_kind: "absence", anomaly_actual: "" });
+    expect(find("values").text()).toBe("No data for this detector's query");
   });
 
   it("falls back to the unnamed title when the user cannot read the detector", async () => {

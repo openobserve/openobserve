@@ -115,8 +115,14 @@ const title = computed<I18nText>(() => {
 
 const valuesLine = computed<I18nText | null>(() => {
   const l = link.value;
-  // An absence carries only the measure, so without it no value parameter is left.
-  if (!l || (l.kind === "absence" ? !l.measure : l.actual === null)) return null;
+  if (!l) return null;
+  // The same sentence as the alert message, from the start of the absence.
+  if (l.kind === "absence") {
+    return l.startUs === null
+      ? t("alerts.anomaly.stripAbsence")
+      : t("alerts.anomaly.stripAbsenceSince", { time: raw(`${formatUtcHm(l.startUs)} UTC`) });
+  }
+  if (l.actual === null) return null;
   const measure = l.measure ? raw(l.measure) : t("alerts.anomaly.originMeasureFallback");
   const span =
     l.startUs !== null && l.endUs !== null
@@ -125,11 +131,6 @@ const valuesLine = computed<I18nText | null>(() => {
           end: formatUtcHm(l.endUs),
         })
       : null;
-  if (l.kind === "absence") {
-    return span
-      ? t("alerts.anomaly.originValuesAbsence", { measure, window: span })
-      : t("alerts.anomaly.originValuesAbsenceNoWindow", { measure });
-  }
   const actual = formatAnomalyNumber(l.actual as number);
   if (l.kind !== "partial_drop" && l.lower !== null && l.upper !== null) {
     const params = {

@@ -4351,7 +4351,7 @@ fn anomaly_alert_body(
         // A continuing absence stores only its first bucket, so the body names no end time.
         AnomalyAlertKind::Absence => format!(
             "No data for this detector's query since {}",
-            fmt_alert_clock(ctx.window_start_us)
+            absence_clock(ctx)
         ),
         AnomalyAlertKind::PartialDrop => {
             let worst = ctx.worst_actual_value.unwrap_or(0.0);
@@ -4431,6 +4431,14 @@ fn value_change_percent(
     Some(if change == 0.0 { 0.0 } else { change })
 }
 
+/// The start of an absence as the body and the headline name it.
+#[cfg(feature = "enterprise")]
+fn absence_clock(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> String {
+    fmt_alert_clock(ctx.window_start_us)
+}
+
 /// One sentence of what went wrong, in value space only: never the score, which is not the metric.
 #[cfg(feature = "enterprise")]
 fn anomaly_headline(
@@ -4440,7 +4448,13 @@ fn anomaly_headline(
     let stream = &ctx.stream_name;
     match ctx.kind {
         AnomalyAlertKind::Recovery => format!("{stream} recovered"),
-        AnomalyAlertKind::Absence => format!("{stream} returned no data"),
+        // P1.12 step 5: the body sentence, lower-cased, as the reply puts it after a prefix.
+        AnomalyAlertKind::Absence => {
+            format!(
+                "no data for this detector's query since {}",
+                absence_clock(ctx)
+            )
+        }
         AnomalyAlertKind::Value | AnomalyAlertKind::PartialDrop => {
             match value_change_percent(ctx) {
                 Some(change) if change > 0.0 => {
@@ -8738,7 +8752,15 @@ mod tests {
             };
             assert_eq!(
                 headline(AnomalyAlertKind::Absence),
-                "app_logs returned no data"
+                "no data for this detector's query since 00:00 UTC",
+                "the body text, with the absence start"
+            );
+            let mut absent = ctx(AnomalyAlertKind::Absence);
+            absent.judged_end_us = absent.window_end_us;
+            let hint = super::super::anomaly_notification_context(&absent).slack_thread;
+            assert_eq!(
+                hint.and_then(|h| h.thread_headline).as_deref(),
+                Some("no data for this detector's query since 00:00 UTC")
             );
             assert_eq!(headline(AnomalyAlertKind::Recovery), "app_logs recovered");
         }

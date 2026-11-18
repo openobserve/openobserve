@@ -13821,8 +13821,6 @@
       "originValuesExpectedNoWindow": "{measure}: actual {actual}, expected {expected}",
       "originValuesActual": "{measure}: actual {actual}, {window}",
       "originValuesActualNoWindow": "{measure}: actual {actual}",
-      "originValuesAbsence": "{measure}: returned no data, {window}",
-      "originValuesAbsenceNoWindow": "{measure}: returned no data",
       "notifications": "Notifications",
       "notificationsTooltip": "When enabled, a notification will be sent to the selected destination whenever an anomaly is detected.",
       "previewCaption": "A sample of the data this alert will watch, so you can check the query looks right before saving. Anomalies are marked once the model finishes training — see Detection results.",
