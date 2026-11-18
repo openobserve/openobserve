@@ -26,7 +26,7 @@ import {
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, debounce, set } from "lodash-es";
+import { cloneDeep, debounce, get, set } from "lodash-es";
 import {
   alertConditionsPayload,
   loadAlertConditions,
@@ -63,6 +63,8 @@ import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import { modesWithContent } from "@/utils/alerts/alertCondition";
+import { promqlMetricNames } from "@/utils/alerts/promqlMetrics";
+import { joinListMore } from "@/utils/alerts/alertCopy";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
@@ -173,7 +175,8 @@ export const defaultAlertValue: any = () => {
         having: {
           column: "",
           operator: ">=",
-          value: 1,
+          // A value threshold has no safe default: 1 fires at once on most measures.
+          value: "",
         },
       },
       promql_condition: null,
@@ -421,6 +424,20 @@ export const streamNamesUserFirst = (list: { name: string; is_internal?: boolean
     s.is_internal === true || s.name.startsWith("_");
   return [...list.filter((s) => !isSystem(s)), ...list.filter(isSystem)].map((s) => s.name);
 };
+
+/** The SQL tab opens with the builder's alert SQL; SQL alerts refuse `SELECT *`, so it names the timestamp instead (same rows). */
+export const sqlTabSeed = (builderSql: string, timestampColumn: string): string =>
+  builderSql.trim().replace(/^SELECT\s+\*\s+FROM/i, `SELECT ${timestampColumn} FROM`);
+
+/** The SQL tab takes a new seed only while it holds no query of the user's own. */
+export const canSeedSqlTab = (current: string | undefined, lastSeed: string): boolean => {
+  const sql = (current ?? "").trim();
+  return !modesWithContent({ sql }).includes("sql") || sql === lastSeed.trim();
+};
+
+/** The stream a PromQL query reads: its first metric that is a stream of the org, or "" when none is. */
+export const promqlQueryStream = (promql: string, streamNames: readonly string[]): string =>
+  promqlMetricNames(promql).find((name) => streamNames.includes(name)) ?? "";
 
 /** Copies a source's description and destinations from `meta`, since AlertPrefill has no field for either. */
 export const applyMetaSettings = (data: any, meta: AlertPrefill["meta"]): any => {
@@ -1239,6 +1256,62 @@ export function useAlertForm(
     },
   );
 
+  // The stream names the alert, its read-back and its preview, so it follows the metric the query reads.
+  const debouncedSyncStreamFromPromql = debounce(async (promql: string) => {
+    if (beingUpdated.value || formData.value.stream_type !== "metrics") return;
+    const stream = promqlQueryStream(promql, indexOptions.value);
+    if (!stream || stream === formData.value.stream_name) return;
+    setF("stream_name", stream);
+    await updateStreamFields(stream).catch(() => undefined);
+  }, 600);
+
+  watch(
+    () => formData.value.query_condition.promql,
+    (promql) => {
+      if (formData.value.query_condition.type === "promql")
+        debouncedSyncStreamFromPromql(promql || "");
+    },
+  );
+
+  const promqlStreamNote = computed<I18nText | "">(() => {
+    const qc = formData.value.query_condition;
+    if (qc?.type !== "promql" || formData.value.stream_type !== "metrics") return "";
+    const metrics = promqlMetricNames(qc.promql || "").filter((m) =>
+      indexOptions.value.includes(m),
+    );
+    if (!metrics.length) return "";
+    return metrics.length === 1
+      ? t("alerts.form.promqlStream.fromQuery", { metric: raw(metrics[0]) })
+      : t("alerts.form.promqlStream.fromQueryMany", { metrics: joinListMore(metrics, t) });
+  });
+
+  // The value threshold the condition compares against; a count limit has none.
+  const valueThresholdPath = computed(() => {
+    const qc = formData.value.query_condition;
+    if (formData.value.is_real_time !== "false") return "";
+    if (qc?.type === "promql")
+      return qc.promql_rule_mode ? "" : "query_condition.promql_condition.value";
+    return qc?.type === "custom" && isAggregationEnabled.value
+      ? "query_condition.aggregation.having.value"
+      : "";
+  });
+  const valueThresholdAtPick = ref<{ path: string; value: unknown } | null>(null);
+  watch(
+    () => [formData.value.stream_name, valueThresholdPath.value],
+    async () => {
+      await nextTick();
+      const path = valueThresholdPath.value;
+      valueThresholdAtPick.value = path ? { path, value: get(formData.value, path) } : null;
+    },
+  );
+  /** A value threshold the form filled in and nobody has changed since the stream was picked. */
+  const valueThresholdUntouched = computed(() => {
+    const pick = valueThresholdAtPick.value;
+    if (beingUpdated.value || !pick || pick.path !== valueThresholdPath.value) return false;
+    const value = get(formData.value, pick.path);
+    return value !== "" && value !== null && value !== undefined && value === pick.value;
+  });
+
   const updateStreams = (resetStream = true) => {
     if (resetStream) setF("stream_name", "");
     // Read the synchronous source of truth (not the reactive read-view, which
@@ -1335,6 +1408,64 @@ export function useAlertForm(
     return true;
   };
 
+  const builderSqlRequest = (): any => {
+    const payload: any = {
+      stream_name: formData.value.stream_name,
+      stream_type: formData.value.stream_type || "logs",
+      query_condition: {
+        type: "custom",
+        conditions: {
+          version: 2,
+          conditions: formData.value.query_condition.conditions,
+        },
+      },
+    };
+    if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
+      const groupBy = formData.value.query_condition.aggregation.group_by || [];
+      payload.query_condition.aggregation = {
+        ...formData.value.query_condition.aggregation,
+        group_by: groupBy.filter((field: string) => field && field.trim() !== ""),
+      };
+    }
+    return payload;
+  };
+
+  // The SQL tab counts the rows its query returns, so per-group SQL keeps the HAVING that
+  // the one-per-group builder query leaves to the server.
+  const lastSeededSql = ref("");
+  const seedSqlTabFromBuilder = async () => {
+    if (
+      !formData.value.stream_name ||
+      !canSeedSqlTab(formData.value.query_condition?.sql, lastSeededSql.value)
+    )
+      return;
+    const conditions = formData.value.query_condition?.conditions;
+    if (conditions && !allConditionsValid(conditions)) return;
+    if (!isAggregationValid()) return;
+    const request = builderSqlRequest();
+    if (request.query_condition.aggregation)
+      request.query_condition.aggregation.multi_alert = false;
+    try {
+      const response = await alertsService.generate_sql(
+        store.state.selectedOrganization.identifier,
+        request,
+      );
+      const seed = response?.data?.sql
+        ? sqlTabSeed(response.data.sql, store.state.zoConfig.timestamp_column || "_timestamp")
+        : "";
+      if (
+        !seed ||
+        formData.value.query_condition?.type !== "sql" ||
+        !canSeedSqlTab(formData.value.query_condition?.sql, lastSeededSql.value)
+      )
+        return;
+      lastSeededSql.value = seed;
+      setF("query_condition.sql", seed);
+    } catch {
+      // Without the builder's SQL the tab opens as it always did, empty for the user to write.
+    }
+  };
+
   // Generation counter to discard stale async responses when the user switches
   // tabs (e.g. builder → SQL) before the API call completes.
   const generateRequestId = ref(0);
@@ -1370,30 +1501,9 @@ export function useAlertForm(
         return;
       }
 
-      const payload: any = {
-        stream_name: formData.value.stream_name,
-        stream_type: formData.value.stream_type || "logs",
-        query_condition: {
-          type: "custom",
-          conditions: {
-            version: 2,
-            conditions: formData.value.query_condition.conditions,
-          },
-        },
-      };
-
-      if (isAggregationEnabled.value && formData.value.query_condition.aggregation) {
-        const groupBy = formData.value.query_condition.aggregation.group_by || [];
-        const filteredGroupBy = groupBy.filter((field: string) => field && field.trim() !== "");
-        payload.query_condition.aggregation = {
-          ...formData.value.query_condition.aggregation,
-          group_by: filteredGroupBy,
-        };
-      }
-
       const response = await alertsService.generate_sql(
         store.state.selectedOrganization.identifier,
-        payload,
+        builderSqlRequest(),
       );
 
       // Discard if a newer request was started (e.g. user changed tabs or
@@ -3011,7 +3121,7 @@ export function useAlertForm(
   // Watch for tab changes
   watch(
     () => formData.value.query_condition?.type,
-    (newType) => {
+    (newType, oldType) => {
       // Builder SQL still in flight would land in the new mode's preview.
       if (newType !== "custom") generateRequestId.value++;
       if (newType === "sql") {
@@ -3019,6 +3129,8 @@ export function useAlertForm(
           ? formData.value.query_condition.sql.trim()
           : "";
         isUsingBackendSql.value = false;
+        if (oldType === "custom" && formData.value.is_real_time === "false")
+          void seedSqlTabFromBuilder();
       } else if (newType === "promql") {
         previewQuery.value = formData.value.query_condition?.promql
           ? formData.value.query_condition.promql.trim()
@@ -3031,7 +3143,7 @@ export function useAlertForm(
           setF("query_condition.promql_condition", {
             column: "value",
             operator: ">=",
-            value: 1,
+            value: "",
           });
         }
       } else if (newType === "custom") {
@@ -3537,6 +3649,8 @@ export function useAlertForm(
     getSelectedTab,
     getFormattedDestinations,
     generatedSqlQuery,
+    promqlStreamNote,
+    valueThresholdUntouched,
 
     // Form (Rule ③ owner) + write helpers
     form,
