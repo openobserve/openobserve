@@ -17,14 +17,23 @@ const BUILDER_SQL =
 const START = Date.UTC(2026, 10, 5, 0, 0, 0);
 
 describe("replaysDay", () => {
-  const builder = { stream_name: "app", is_real_time: "false", query_condition: { type: "custom" } };
+  const builder = {
+    stream_name: "app",
+    is_real_time: "false",
+    query_condition: { type: "custom" },
+  };
   it.each([
     ["a scheduled builder count", builder, false, true],
     ["a real-time builder count", { ...builder, is_real_time: "true" }, false, true],
     ["no stream yet", { ...builder, stream_name: "" }, false, false],
     ["an aggregation", builder, true, false],
     ["a SQL query", { ...builder, query_condition: { type: "sql" } }, false, false],
-    ["an anomaly alert, which has no threshold", { ...builder, is_real_time: "anomaly" }, false, false],
+    [
+      "an anomaly alert, which has no threshold",
+      { ...builder, is_real_time: "anomaly" },
+      false,
+      false,
+    ],
     ["a composite alert", { ...builder, is_real_time: "composite" }, false, false],
   ])("%s", (_case, form, aggregated, expected) => {
     expect(replaysDay(form, aggregated)).toBe(expected);

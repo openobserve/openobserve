@@ -32,7 +32,7 @@ describe("withHistogramMinutes", () => {
   it.each([
     [
       "an automatic bucket",
-      "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM \"a\" GROUP BY 1",
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "a" GROUP BY 1',
       "SELECT histogram(_timestamp, '5 minute') AS zo_sql_key, count(*) AS zo_sql_num FROM \"a\" GROUP BY 1",
     ],
     [
