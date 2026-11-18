@@ -32,10 +32,10 @@ const props = withDefaults(
     alertId: string;
     folderId?: string;
     orgId: string;
-    /** `trail` sits after the title; `menu` is the below-lg copy of mute and history as items of the More menu. */
-    part?: "trail" | "menu";
+    /** `state` trails the title, `actions` sits with the header actions, `menu` is their below-lg copy in More. */
+    part: "state" | "actions" | "menu";
   }>(),
-  { folderId: undefined, part: "trail" },
+  { folderId: undefined },
 );
 
 const { t } = useI18nTyped();
@@ -87,64 +87,19 @@ const openHistory = () =>
       {{ t("alerts.editMode.history") }}
     </ODropdownItem>
   </template>
-  <div v-else class="flex min-w-0 items-center gap-2" data-test="add-alert-edit-status">
-    <template v-if="header.muteEnabled.value">
-      <div
-        v-if="header.muted.value"
-        class="flex items-center gap-1 max-lg:hidden"
-        data-test="add-alert-muted"
-      >
-        <OTag
-          variant="warning-soft"
-          icon="notifications-paused"
-          size="sm"
-          :label="header.mutedUntilText.value"
-          data-test="add-alert-muted-until"
-        />
-        <OButton
-          variant="ghost-primary"
-          size="xs"
-          :disabled="header.pending.value"
-          data-test="add-alert-unmute-btn"
-          @click="header.unmute()"
-          >{{ t("alerts.editMode.unmute") }}</OButton
-        >
-      </div>
-      <div v-else class="flex items-center max-lg:hidden" data-test="add-alert-mute">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="notifications-paused"
-          class="rounded-e-none"
-          :disabled="header.pending.value"
-          data-test="add-alert-mute-btn"
-          @click="mute"
-          >{{ t("alerts.editMode.muteFor") }}</OButton
-        >
-        <ODropdown align="start">
-          <template #trigger>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              icon-right="arrow-drop-down"
-              class="rounded-s-none border-s-0"
-              :aria-label="t('alerts.editMode.muteDuration')"
-              data-test="add-alert-mute-duration"
-              >{{ t(preset.labelKey) }}</OButton
-            >
-          </template>
-          <ODropdownItem
-            v-for="option in QUICK_MUTE_PRESETS"
-            :key="option.key"
-            :icon-left="option.key === presetKey ? 'check' : undefined"
-            :data-test="`add-alert-mute-duration-${option.key}`"
-            @select="presetKey = option.key"
-          >
-            {{ t(option.labelKey) }}
-          </ODropdownItem>
-        </ODropdown>
-      </div>
-    </template>
+  <div
+    v-else-if="part === 'state'"
+    class="flex min-w-0 items-center gap-2"
+    data-test="add-alert-edit-status"
+  >
+    <OTag
+      v-if="header.muteEnabled.value && header.muted.value"
+      variant="warning-soft"
+      icon="notifications-paused"
+      size="sm"
+      :label="header.mutedUntilText.value"
+      data-test="add-alert-muted-until"
+    />
     <OTag
       v-if="header.state.value.kind === 'outcome'"
       type="alertState"
@@ -171,14 +126,61 @@ const openHistory = () =>
         data-test="add-alert-enabled-switch"
       />
     </span>
+  </div>
+  <template v-else>
     <OButton
-      variant="ghost-primary"
+      variant="outline"
       size="sm"
       icon-left="history"
-      class="max-lg:hidden"
       data-test="add-alert-history-link"
       @click="openHistory"
       >{{ t("alerts.editMode.history") }}</OButton
     >
-  </div>
+    <template v-if="header.muteEnabled.value">
+      <OButton
+        v-if="header.muted.value"
+        variant="outline"
+        size="sm"
+        icon-left="notifications-active"
+        :disabled="header.pending.value"
+        data-test="add-alert-unmute-btn"
+        @click="header.unmute()"
+        >{{ t("alerts.editMode.unmute") }}</OButton
+      >
+      <div v-else class="flex items-center" data-test="add-alert-mute">
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="notifications-paused"
+          class="rounded-e-none"
+          :disabled="header.pending.value"
+          data-test="add-alert-mute-btn"
+          @click="mute"
+          >{{ t("alerts.editMode.muteFor") }}</OButton
+        >
+        <ODropdown align="start">
+          <template #trigger>
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-right="arrow-drop-down"
+              class="rounded-s-none border-s-0"
+              :aria-label="t('alerts.editMode.muteDuration')"
+              data-test="add-alert-mute-duration"
+              >{{ t(preset.labelKey) }}</OButton
+            >
+          </template>
+          <ODropdownItem
+            v-for="option in QUICK_MUTE_PRESETS"
+            :key="option.key"
+            :icon-left="option.key === presetKey ? 'check' : undefined"
+            :data-test="`add-alert-mute-duration-${option.key}`"
+            @select="presetKey = option.key"
+          >
+            {{ t(option.labelKey) }}
+          </ODropdownItem>
+        </ODropdown>
+      </div>
+    </template>
+  </template>
 </template>

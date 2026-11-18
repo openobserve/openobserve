@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dataTest: 'add-alert-back-btn',
           }"
           title-overflow="visible"
-          :overflow-first="isEditingAlert"
         >
           <template #title>
             <span class="flex min-w-0 items-center gap-1">
@@ -54,10 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
-          <!-- EDIT MODE (anomaly): status + last-run + retry trail the name -->
+          <!-- EDIT MODE: the alert's state trails the name (anomaly: status, last run, retry) -->
           <template #title-trail>
             <AlertEditStatus
               v-if="isEditingAlert"
+              part="state"
               :header="editHeader"
               :alert-id="editAlertId"
               :folder-id="editFolderId"
@@ -143,15 +143,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
 
-          <template v-if="isEditingAlert && lgUp" #actions-overflow>
-            <AlertEditActions
-              part="fire"
-              :header="editHeader"
-              :name="formData.name"
-              :folder-id="editFolderId"
-            />
-          </template>
           <template v-if="isEditingAlert" #actions>
+            <template v-if="lgUp">
+              <AlertEditStatus
+                part="actions"
+                :header="editHeader"
+                :alert-id="editAlertId"
+                :folder-id="editFolderId"
+                :org-id="store.state.selectedOrganization.identifier"
+              />
+              <AlertEditActions
+                part="fire"
+                :header="editHeader"
+                :name="formData.name"
+                :folder-id="editFolderId"
+              />
+            </template>
             <AlertEditActions
               part="more"
               :compact="!lgUp"

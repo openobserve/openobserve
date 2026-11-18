@@ -37,9 +37,9 @@ const fakeHeader = (opts: {
   refresh: vi.fn(),
 });
 
-const mountStatus = (header: AlertEditHeader) =>
+const mountStatus = (header: AlertEditHeader, part: "state" | "actions" = "state") =>
   mount(AlertEditStatus, {
-    props: { header, alertId: "a1", folderId: "f1", orgId: "default" },
+    props: { header, alertId: "a1", folderId: "f1", orgId: "default", part },
   });
 
 // The menu part renders inside the More menu; a plain stand-in for its items keeps it testable alone.
@@ -56,15 +56,19 @@ const mountMenu = (header: AlertEditHeader) =>
   });
 
 describe("AlertEditStatus", () => {
-  it("hides mute and history below lg, where the More menu carries them", () => {
-    const wrapper = mountStatus(fakeHeader({}));
-    expect(wrapper.find('[data-test="add-alert-mute"]').classes()).toContain("max-lg:hidden");
-    expect(wrapper.find('[data-test="add-alert-history-link"]').classes()).toContain(
-      "max-lg:hidden",
-    );
-    expect(wrapper.find('[data-test="add-alert-state-chip"]').classes()).not.toContain(
-      "max-lg:hidden",
-    );
+  it.each([
+    [
+      "state",
+      ["state-chip", "enabled-switch", "muted-until"],
+      ["mute", "unmute-btn", "history-link"],
+    ],
+    ["actions", ["unmute-btn", "history-link"], ["state-chip", "enabled-switch", "muted-until"]],
+  ] as const)("the %s part holds only its own controls", (part, shown, absent) => {
+    const wrapper = mountStatus(fakeHeader({ muted: true }), part);
+    for (const id of shown)
+      expect(wrapper.find(`[data-test="add-alert-${id}"]`).exists()).toBe(true);
+    for (const id of absent)
+      expect(wrapper.find(`[data-test="add-alert-${id}"]`).exists()).toBe(false);
   });
 
   it("gives the More menu Mute for 1 h and Alert History below lg", async () => {
@@ -88,28 +92,29 @@ describe("AlertEditStatus", () => {
 
   it("offers Mute for 1 h and mutes for an hour", async () => {
     const header = fakeHeader({});
-    const wrapper = mountStatus(header);
+    const wrapper = mountStatus(header, "actions");
     expect(wrapper.find('[data-test="add-alert-mute-duration"]').text()).toContain("1 h");
     await wrapper.find('[data-test="add-alert-mute-btn"]').trigger("click");
     expect(header.muteFor).toHaveBeenCalledWith(3600);
-    expect(wrapper.find('[data-test="add-alert-muted"]').exists()).toBe(false);
   });
 
   it("shows Muted until and an Unmute that ends the mute", async () => {
     const header = fakeHeader({ muted: true });
-    const wrapper = mountStatus(header);
-    expect(wrapper.find('[data-test="add-alert-muted-until"]').text()).toContain(
+    expect(mountStatus(header).find('[data-test="add-alert-muted-until"]').text()).toContain(
       "Muted until 14:00",
     );
+    const wrapper = mountStatus(header, "actions");
     expect(wrapper.find('[data-test="add-alert-mute-btn"]').exists()).toBe(false);
     await wrapper.find('[data-test="add-alert-unmute-btn"]').trigger("click");
     expect(header.unmute).toHaveBeenCalled();
   });
 
   it("hides mute entirely when downtimes are off", () => {
-    const wrapper = mountStatus(fakeHeader({ muteEnabled: false, muted: true }));
-    expect(wrapper.find('[data-test="add-alert-mute"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="add-alert-muted"]').exists()).toBe(false);
+    const header = fakeHeader({ muteEnabled: false, muted: true });
+    expect(mountStatus(header).find('[data-test="add-alert-muted-until"]').exists()).toBe(false);
+    const actions = mountStatus(header, "actions");
+    expect(actions.find('[data-test="add-alert-mute"]').exists()).toBe(false);
+    expect(actions.find('[data-test="add-alert-unmute-btn"]').exists()).toBe(false);
   });
 
   it("chips the last run outcome or no run yet", () => {
@@ -131,7 +136,7 @@ describe("AlertEditStatus", () => {
   });
 
   it("links Alert History to the alert's detail page", async () => {
-    const wrapper = mountStatus(fakeHeader({}));
+    const wrapper = mountStatus(fakeHeader({}), "actions");
     await wrapper.find('[data-test="add-alert-history-link"]').trigger("click");
     expect(push).toHaveBeenCalledWith({
       name: "alertDetail",
@@ -161,7 +166,7 @@ describe("the Enabled switch", () => {
     expect(control().attributes("aria-checked")).toBe("false");
   });
 
-  it("is not repeated as an Enable item in More…", () => {
+  it("is not repeated as an Enable item in More", () => {
     const wrapper = mount(AlertEditActions, {
       props: { header: fakeHeader({}), name: "errors", part: "more" },
       global: {

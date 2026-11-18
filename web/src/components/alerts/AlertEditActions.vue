@@ -26,6 +26,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 
 const props = defineProps<{
@@ -87,7 +88,7 @@ const onExported = ({ count }: { count: number }) =>
   <template v-if="part === 'fire'">
     <OButton
       variant="outline"
-      size="sm-action"
+      size="sm"
       icon-left="play-arrow"
       :disabled="header.pending.value"
       data-test="add-alert-fire-now-btn"
@@ -101,11 +102,13 @@ const onExported = ({ count }: { count: number }) =>
       <template #trigger>
         <OButton
           variant="outline"
-          size="sm-action"
+          size="icon-md"
           icon-left="more-horiz"
+          :aria-label="t('common.moreActions')"
           data-test="add-alert-more-btn"
-          >{{ t("alerts.editMode.more") }}</OButton
         >
+          <OTooltip side="bottom" :content="t('common.moreActions')" />
+        </OButton>
       </template>
       <template v-if="compact">
         <ODropdownItem
