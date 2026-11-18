@@ -350,15 +350,15 @@ async fn explore_response(
     let has_run = detector.last_processed_timestamp.is_some() || !buckets.is_empty();
     let mut decision =
         explore_state::decide(&buckets, bucket_us, range.0, has_run, detector.is_trained);
-    explore_state::extend_ongoing_absence(&mut decision, last_detection_run);
-
-    let (start_us, end_us) = explore_state::link_window(
-        requested,
-        decision.window.as_ref(),
+    let freshness = explore_state::freshness(
+        is_peer_cluster().await,
+        last_detection_run,
         detector.last_processed_timestamp,
         bucket_us,
         now_us,
     );
+    let (start_us, end_us) =
+        explore_state::served_link_window(&mut decision, &freshness, requested, bucket_us, now_us);
     let target = explore_target(
         detector,
         start_us,
@@ -397,13 +397,6 @@ async fn explore_response(
         })
         .unwrap_or_default();
 
-    let freshness = explore_state::freshness(
-        is_peer_cluster().await,
-        last_detection_run,
-        detector.last_processed_timestamp,
-        bucket_us,
-        now_us,
-    );
     Ok(ExploreResponse {
         target: if link.target.is_empty() {
             explore_state::link_target(&detector.stream_type).to_string()

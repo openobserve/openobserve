@@ -253,6 +253,25 @@ pub fn link_window(
     }
 }
 
+/// The absence extension and the link read the freshness the response reports, so a peer
+/// cluster never builds a window from a run time it hides.
+pub fn served_link_window(
+    decision: &mut ExploreDecision,
+    freshness: &Freshness,
+    requested: Option<(i64, i64)>,
+    bucket_us: i64,
+    now_us: i64,
+) -> (i64, i64) {
+    extend_ongoing_absence(decision, freshness.last_detection_run);
+    link_window(
+        requested,
+        decision.window.as_ref(),
+        freshness.cursor_us,
+        bucket_us,
+        now_us,
+    )
+}
+
 /// The bucket that holds `ts_us`, if the read has it.
 pub fn bucket_at(buckets: &[ExploreBucket], ts_us: i64, bucket_us: i64) -> Option<&ExploreBucket> {
     buckets
@@ -705,6 +724,32 @@ mod tests {
         let mut back = decide(&[normal(1), absent(2), normal(3)], B, 0, true, true);
         extend_ongoing_absence(&mut back, Some(9 * B));
         assert_eq!(back.window.unwrap().end_us, 3 * B);
+    }
+
+    #[test]
+    fn test_a_peer_cluster_link_keeps_the_absence_bucket_end() {
+        let now = 20 * B;
+        let local = freshness(false, Some(9 * B), Some(9 * B), B, now);
+        let mut d = decide(&[normal(1), absent(3)], B, 0, true, true);
+        assert_eq!(
+            served_link_window(&mut d, &local, None, B, now),
+            (3 * B, 9 * B)
+        );
+        assert_eq!(d.window.unwrap().end_us, 9 * B);
+        let peer = freshness(true, Some(9 * B), Some(9 * B), B, now);
+        let mut d = decide(&[normal(1), absent(3)], B, 0, true, true);
+        assert_eq!(
+            served_link_window(&mut d, &peer, None, B, now),
+            (3 * B, 4 * B),
+            "a peer hides the run time, so the window keeps its bucket end"
+        );
+        assert_eq!(d.window.unwrap().end_us, 4 * B);
+        let mut none = decide(&[], B, 0, true, true);
+        assert_eq!(
+            served_link_window(&mut none, &peer, None, B, now),
+            (now - HOUR_US, now),
+            "a peer has no cursor for the fallback bucket"
+        );
     }
 
     #[test]
