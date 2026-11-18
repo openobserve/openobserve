@@ -226,6 +226,19 @@ describe("QueryFilterBar", () => {
     expect(sql(state)).toBe("level IN ('error', 'warn')");
   });
 
+  it.each([
+    ["Counts cover the last day", "Counts cover the last day"],
+    [undefined, null],
+  ])("a value note %s shows above the value footer as %s", async (valueNote, shown) => {
+    mountBar({ valueNote });
+    await openBar();
+    await clickRow("level");
+    await clickRow("in");
+    await vi.waitFor(() => expect(rowKeys()).toContain("warn"));
+    const note = document.body.querySelector('[data-test="query-filter-bar-value-note"]');
+    expect(note?.textContent?.trim() ?? null).toBe(shown);
+  });
+
   it("ticks several values for is any of and applies them from the footer", async () => {
     const state = mountBar();
     await openBar();

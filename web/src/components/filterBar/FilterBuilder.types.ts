@@ -40,6 +40,8 @@ export interface FilterBuilderProps {
   fieldDetail?: (field: string) => I18nText | undefined;
   /** What the value list says for a field when it has nothing to offer. */
   valueEmptyText?: (field: string) => I18nText | undefined;
+  /** A line under the value list, e.g. the range its counts cover. */
+  valueNote?: I18nText;
   /** Overrides the profile's layout. */
   layout?: FilterLayout;
   fieldsLoading?: boolean;

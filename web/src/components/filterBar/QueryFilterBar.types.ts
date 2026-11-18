@@ -83,6 +83,8 @@ export interface QueryFilterBarProps {
   fieldDetail?: (field: string) => I18nText | undefined;
   /** What the value list says for a field when it has nothing to offer. */
   valueEmptyText?: (field: string) => I18nText | undefined;
+  /** A line under the value list, e.g. the range its counts cover. */
+  valueNote?: I18nText;
   /** A display name for a stored value: its value row reads as the label, and a vertical row shows it beside the chip. */
   valueLabel?: (field: string, value: string) => FilterValueLabel | undefined;
   fieldsLoading?: boolean;

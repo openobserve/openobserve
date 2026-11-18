@@ -50,6 +50,7 @@ const props = withDefaults(defineProps<QueryFilterBarProps>(), {
   valueLabel: undefined,
   fieldDetail: undefined,
   valueEmptyText: undefined,
+  valueNote: undefined,
   fieldsLoading: false,
   placeholder: undefined,
   disabled: false,
@@ -616,6 +617,13 @@ const draftOperator = computed(() => {
       />
     </template>
     <template v-if="multiStep" #footer>
+      <p
+        v-if="valueNote"
+        class="text-text-secondary m-0 mb-1.5 text-xs"
+        :data-test="`${dataTest}-value-note`"
+      >
+        {{ valueNote }}
+      </p>
       <div class="flex items-center gap-2">
         <span class="min-w-0 flex-1" :data-test="`${dataTest}-selected-count`">{{
           valuesAtLimit

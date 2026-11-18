@@ -36,6 +36,7 @@ const props = withDefaults(defineProps<FilterBuilderProps>(), {
   valueLabel: undefined,
   fieldDetail: undefined,
   valueEmptyText: undefined,
+  valueNote: undefined,
   layout: undefined,
   fieldsLoading: false,
   placeholder: undefined,
@@ -135,6 +136,7 @@ defineExpose<FilterBuilderExpose>({ focus, activate, validate });
       :value-label="valueLabel"
       :field-detail="fieldDetail"
       :value-empty-text="valueEmptyText"
+      :value-note="valueNote"
       :issues="shownIssues"
       :fields-loading="fieldsLoading"
       :placeholder="placeholder"
