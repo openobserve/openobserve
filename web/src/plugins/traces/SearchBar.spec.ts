@@ -67,7 +67,10 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // The last autoCompleteData the component created, so tests can read the stream context it was given.
-const suggestState = vi.hoisted(() => ({ autoCompleteData: null as any }));
+const suggestState = vi.hoisted(() => ({
+  autoCompleteData: null as any,
+  setValuesTimeRange: vi.fn(),
+}));
 
 vi.mock("@/composables/useSuggestions", () => ({
   default: () => ({
@@ -85,6 +88,7 @@ vi.mock("@/composables/useSuggestions", () => ({
     getSuggestions: vi.fn(),
     updateFieldKeywords: vi.fn(),
     updateStreamKeywords: vi.fn(),
+    setValuesTimeRange: suggestState.setValuesTimeRange,
   }),
 }));
 
@@ -390,6 +394,7 @@ const sharedStubs = {
       "nlpMode",
       "transformGeneratedQuery",
       "fullTextSearch",
+      "valuesTimeRange",
     ],
     emits: ["update:query", "run-query", "focus", "blur", "user-edit", "update:nlpMode"],
     setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
@@ -2002,6 +2007,19 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(editorProps().props("fullTextSearch")).toBe(false);
+    });
+
+    it("looks up values over the selected range, cut to its latest day", async () => {
+      const HOUR = 3_600_000_000;
+      const end = 29_000_000 * 60_000_000;
+      searchObjInstance.data.datetime.startTime = end - 7 * 24 * HOUR;
+      searchObjInstance.data.datetime.endTime = end;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const window = { startTime: end - 24 * HOUR, endTime: end, capped: true };
+      expect(suggestState.setValuesTimeRange).toHaveBeenLastCalledWith(window);
+      expect(editorProps().props("valuesTimeRange")).toEqual(window);
     });
 
     it("hands the query to suggestions after 100 ms, as Logs does", async () => {

@@ -55,6 +55,11 @@ const MAX_FIELDS_STORED = Number((import.meta as any).env?.VITE_MAX_FIELDS_STORE
 export const FIELD_VALUES_LOOKBACK_MINUTES = 15;
 const VALUES_LOOKBACK_MS = FIELD_VALUES_LOOKBACK_MINUTES * 60 * 1000;
 
+// Lookups over a page's own time range search its latest day at most, which bounds the scan.
+export const FIELD_VALUES_MAX_RANGE_HOURS = 24;
+const MAX_RANGE_MICROS = FIELD_VALUES_MAX_RANGE_HOURS * 3_600_000_000;
+const MICROS_PER_MINUTE = 60_000_000;
+
 // How many values one request asks for. A dropdown shows a handful; the
 // endpoint charges for the rest.
 const VALUES_REQUEST_SIZE = 10;
@@ -340,6 +345,25 @@ export interface ValueLookupOptions {
   /** What the user typed inside the value's quote, so the resolver can ask past the top values. */
   prefix?: string;
 }
+
+export interface FieldValuesWindow extends FieldValuesTimeRange {
+  /** Set when only the latest FIELD_VALUES_MAX_RANGE_HOURS of the caller's range are searched. */
+  capped?: boolean;
+}
+
+/** A page's time range as the window its value lookups search; null when it has no usable range. */
+export const valuesWindowFor = (startTime: unknown, endTime: unknown): FieldValuesWindow | null => {
+  const start = Number(startTime);
+  const end = Number(endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) return null;
+  const capped = end - start > MAX_RANGE_MICROS;
+  // Whole minutes, so a relative range re-run within one minute asks the cached question again.
+  const windowEnd = Math.ceil(end / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+  const windowStart = capped
+    ? windowEnd - MAX_RANGE_MICROS
+    : Math.floor(start / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+  return { startTime: windowStart, endTime: windowEnd, capped };
+};
 
 // The read cache is filled synchronously so the next keystroke is local; IndexedDB persistence can wait.
 const storeAnswer = (

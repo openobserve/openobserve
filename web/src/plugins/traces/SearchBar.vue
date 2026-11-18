@@ -684,6 +684,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :field-value-resolver="resolveFieldValues"
           :recent-queries="recentQueries"
           :full-text-search="false"
+          :values-time-range="valuesWindow"
           :debounce-time="100"
           :filter-mode="!searchObj.meta.sqlMode"
           :hide-nl-toggle="!isAiEnabled"
@@ -806,6 +807,7 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { valuesWindowFor } from "@/composables/fieldValueStore";
 import useStreams from "@/composables/useStreams";
 import {
   applyFilterTerm,
@@ -1060,7 +1062,13 @@ export default defineComponent({
       updateFieldKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
+
+    const valuesWindow = computed(() =>
+      valuesWindowFor(searchObj.data.datetime?.startTime, searchObj.data.datetime?.endTime),
+    );
+    watch(valuesWindow, (range) => setValuesTimeRange(range), { immediate: true });
 
     const { builderOn: filterBuilderOn, toggle: toggleFilterBuilder } =
       useFilterBuilderPreference("o2.traces.queryInput");
@@ -1784,6 +1792,7 @@ export default defineComponent({
       onFilterBuilderFocus,
       showRunQueryPending,
       recentQueries,
+      valuesWindow,
       recentExamples,
       onRecentEditorEdit,
       dismissRecentFocus,

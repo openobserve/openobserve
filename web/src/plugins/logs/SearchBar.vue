@@ -1382,6 +1382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :field-value-resolver="resolveFieldValues"
                 :recent-queries="recentQueries"
                 :full-text-search="streamsSearchFullText"
+                :values-time-range="valuesWindow"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -1866,6 +1867,7 @@ import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuil
 import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { valuesWindowFor } from "@/composables/fieldValueStore";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
@@ -2557,7 +2559,13 @@ export default defineComponent({
       updateFunctionKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
+
+    const valuesWindow = computed(() =>
+      valuesWindowFor(searchObj.data.datetime?.startTime, searchObj.data.datetime?.endTime),
+    );
+    watch(valuesWindow, (range) => setValuesTimeRange(range), { immediate: true });
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
@@ -5365,6 +5373,7 @@ export default defineComponent({
       onFilterBuilderFocus,
       recentQueries,
       streamsSearchFullText,
+      valuesWindow,
       recentExamples,
       onRecentEditorKeydown,
       noteEditorPointer,
