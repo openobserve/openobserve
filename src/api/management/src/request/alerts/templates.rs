@@ -617,6 +617,13 @@ mod tests {
     #[test]
     fn test_empty_body_is_bad_request() {
         assert_eq!(status(TemplateError::EmptyBody), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            status(TemplateError::BodyTooLarge {
+                size: 2_000_000,
+                max: 1_048_576
+            }),
+            StatusCode::BAD_REQUEST
+        );
     }
 
     #[test]

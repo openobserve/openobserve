@@ -32,7 +32,7 @@ use db::{
     alerts::templates::TemplateError,
     authz::{remove_ownership, set_ownership},
 };
-use infra::table::templates::NAME_MAX_CHARS;
+use infra::table::templates::{BODY_MAX_BYTES, NAME_MAX_CHARS};
 
 use crate::{
     alerts::notifications::default_template::{
@@ -74,6 +74,31 @@ pub(crate) fn write_org(
 /// The org a saved template's ownership tuple names, which org deletion looks up.
 pub(crate) fn ownership_of(saved: &Template) -> (&str, Authz) {
     (&saved.org_id, Authz::new(&saved.name))
+}
+
+/// Refuses a body over [`BODY_MAX_BYTES`] unless it equals the stored body, so an older large row
+/// keeps saving edits to its other fields (o2-enterprise#3431 B14).
+pub(crate) fn check_body_size(body: &str, existing: Option<&str>) -> Result<(), TemplateError> {
+    if body.len() <= BODY_MAX_BYTES || existing == Some(body) {
+        return Ok(());
+    }
+    Err(TemplateError::BodyTooLarge {
+        size: body.len(),
+        max: BODY_MAX_BYTES,
+    })
+}
+
+/// The body limit on a draft spec, measured as the JSON a save of the spec stores.
+pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
+    // A spec serializes to JSON infallibly; on a failure fall back to the body text alone.
+    let size = serde_json::to_vec(spec).map_or(spec.body.len(), |json| json.len());
+    if size <= BODY_MAX_BYTES {
+        return Ok(());
+    }
+    Err(TemplateError::BodyTooLarge {
+        size,
+        max: BODY_MAX_BYTES,
+    })
 }
 
 pub async fn save(
@@ -132,6 +157,9 @@ pub async fn save(
             None
         }
     };
+
+    // Before the content parse below, so an oversized draft is not parsed.
+    check_body_size(&template.body, existing.as_ref().map(|e| e.body.as_str()))?;
 
     let existing_kind = existing.as_ref().map(|e| e.kind);
     template.kind = resolve_kind(requested_kind, existing_kind, create);
@@ -1421,5 +1449,126 @@ mod tests {
         assert_eq!(resolve_kind(Some(Content), None, true), Content); // explicit create
         assert_eq!(resolve_kind(None, Some(Content), false), Content); // sticky update
         assert_eq!(resolve_kind(Some(Custom), Some(Content), false), Custom); // explicit downgrade
+    }
+
+    #[test]
+    fn a_body_over_the_limit_is_refused_unless_it_is_the_stored_body() {
+        let at_limit = "a".repeat(BODY_MAX_BYTES);
+        let over = "a".repeat(BODY_MAX_BYTES + 1);
+        // Create: no stored row.
+        assert!(check_body_size(&at_limit, None).is_ok());
+        let err = check_body_size(&over, None).unwrap_err();
+        assert!(
+            matches!(err, TemplateError::BodyTooLarge { size, max }
+                if size == BODY_MAX_BYTES + 1 && max == BODY_MAX_BYTES),
+            "{err}"
+        );
+        assert!(err.to_string().contains("1048576"), "{err}");
+        // A changed body over the limit is refused, even when the stored row is also large.
+        let old_large = "b".repeat(BODY_MAX_BYTES + 10);
+        assert!(check_body_size(&over, Some(&old_large)).is_err());
+        assert!(check_body_size(&over, Some("small")).is_err());
+        // An unchanged old large body keeps saving.
+        assert!(check_body_size(&old_large, Some(&old_large)).is_ok());
+        // Multi-byte text counts bytes, not characters.
+        let wide = "\u{e9}".repeat(BODY_MAX_BYTES / 2 + 1);
+        assert!(check_body_size(&wide, None).is_err());
+    }
+
+    #[test]
+    fn a_draft_spec_over_the_limit_is_refused() {
+        let small = ContentSpec {
+            title: "t".into(),
+            body: "b".into(),
+            ..Default::default()
+        };
+        assert!(check_spec_size(&small).is_ok());
+        let large = ContentSpec {
+            body: "b".repeat(BODY_MAX_BYTES),
+            ..small
+        };
+        assert!(matches!(
+            check_spec_size(&large),
+            Err(TemplateError::BodyTooLarge { .. })
+        ));
+    }
+
+    /// Save refuses a new or changed large body, and keeps saving an old large row whose body is
+    /// unchanged.
+    #[tokio::test]
+    async fn test_save_enforces_the_body_limit_on_new_and_changed_bodies_only() {
+        use config::meta::destinations::TemplateType;
+
+        if !meta_store().await {
+            return;
+        }
+        let suffix = config::utils::time::now_micros();
+        let org = format!("t_body_org_{suffix}");
+        let over = "x".repeat(BODY_MAX_BYTES + 1);
+        let template = |name: &str, body: &str, title: &str| Template {
+            org_id: org.clone(),
+            name: name.to_string(),
+            body: body.to_string(),
+            template_type: TemplateType::Email {
+                title: title.to_string(),
+            },
+            ..Default::default()
+        };
+
+        // Create over the limit.
+        let created = save(
+            "",
+            template(&format!("t_body_new_{suffix}"), &over, "t"),
+            None,
+            None,
+            true,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(created, Err(TemplateError::BodyTooLarge { .. })),
+            "{created:?}"
+        );
+
+        // An old row over the limit, written before the limit existed.
+        let old = format!("t_body_old_{suffix}");
+        infra::table::templates::put(template(&old, &over, "old title"))
+            .await
+            .unwrap();
+        // Unchanged body, changed title: saves.
+        let renamed = save(
+            &old,
+            template(&old, &over, "new title"),
+            None,
+            None,
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+        assert!(
+            matches!(&renamed.template_type, TemplateType::Email { title } if title == "new title")
+        );
+        // Changed body still over the limit: refused.
+        let changed = format!("{over}y");
+        let refused = save(
+            &old,
+            template(&old, &changed, "t"),
+            None,
+            None,
+            false,
+            false,
+        )
+        .await;
+        assert!(
+            matches!(refused, Err(TemplateError::BodyTooLarge { .. })),
+            "{refused:?}"
+        );
+        // Changed body under the limit: saves.
+        assert!(
+            save(&old, template(&old, "small", "t"), None, None, false, false)
+                .await
+                .is_ok()
+        );
     }
 }

@@ -350,6 +350,9 @@ pub const RENAMED_ALIASES_KEY: &str = "templates_renamed";
 pub const RENAMES_PENDING_KEY: &str = "templates_renamed_pending";
 /// The templates and destinations name columns are varchar(256).
 pub const NAME_MAX_CHARS: usize = 256;
+/// Largest template body an API save, preview or test send accepts (1 MiB, o2-enterprise#3431
+/// B14). Seeder and super-cluster writes do not go through the API save.
+pub const BODY_MAX_BYTES: usize = 1_048_576;
 
 /// A shipped seed row: the default org, one of `seeds` or a branch kind seed, Content; the seeder
 /// writes `prebuilt_default` with `is_default` false, which an API save in the default org never

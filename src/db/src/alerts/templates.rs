@@ -56,6 +56,8 @@ pub enum TemplateError {
     EmptyTitle,
     #[error("Template body cannot be empty")]
     EmptyBody,
+    #[error("Template body is {size} bytes, over the limit of {max} bytes (1 MB)")]
+    BodyTooLarge { size: usize, max: usize },
     #[error("Template with the same name already exists")]
     AlreadyExists,
     #[error("Template is in use for destination {0}")]
