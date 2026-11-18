@@ -15687,7 +15687,7 @@
       "remind": {
         "label": "Notify at most every",
         "help": "After a notification, wait this long before the next one",
-        "realtimeHelp": "The first event notifies at once; later ones wait Notify at most every"
+        "realtimeHelp": "The first event notifies at once; later ones wait this long"
       },
       "units": {
         "months": "months",
