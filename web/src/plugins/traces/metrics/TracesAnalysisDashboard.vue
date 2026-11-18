@@ -150,9 +150,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <li
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
-                      class="dimension-list-item hover:bg-interactive-hover-bg flex items-center gap-2 border-none! px-3 py-1"
+                      class="dimension-list-item hover:bg-interactive-hover-bg flex cursor-pointer items-center gap-2 border-none! px-3 py-1"
+                      :data-test="`dimension-row-${dimension.value}`"
+                      @click="toggleDimension(dimension.value)"
                     >
-                      <div class="flex shrink-0 items-center">
+                      <div class="flex shrink-0 items-center" @click.stop>
                         <OCheckbox
                           :model-value="selectedDimensions.includes(dimension.value)"
                           @update:model-value="toggleDimension(dimension.value)"

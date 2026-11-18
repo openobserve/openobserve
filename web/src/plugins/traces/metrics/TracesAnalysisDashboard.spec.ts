@@ -729,6 +729,50 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
     expect(page.attributes("title")).toBeUndefined();
   });
 
+  describe("dimension row click", () => {
+    const remountWithFields = async () => {
+      wrapper.unmount();
+      wrapper = mountComponent({
+        embedded: true,
+        streamType: "logs",
+        streamName: "app_logs",
+        analysisType: "volume",
+        streamFields: [{ name: "service_name" }, { name: "span_status" }],
+      });
+      await flushPromises();
+      wrapper.vm.selectedDimensions = ["service_name"];
+      await flushPromises();
+    };
+
+    it("selects a dimension when its name is clicked", async () => {
+      await remountWithFields();
+
+      await wrapper
+        .find('[data-test="dimension-row-span_status"] .dimension-label')
+        .trigger("click");
+
+      expect(wrapper.vm.selectedDimensions).toContain("span_status");
+    });
+
+    it("deselects a selected dimension when its row is clicked", async () => {
+      await remountWithFields();
+
+      await wrapper.find('[data-test="dimension-row-service_name"]').trigger("click");
+
+      expect(wrapper.vm.selectedDimensions).not.toContain("service_name");
+    });
+
+    it("toggles once, not twice, when the checkbox itself is clicked", async () => {
+      await remountWithFields();
+
+      await wrapper.find('[data-test="dimension-checkbox-span_status"]').trigger("click");
+
+      expect(wrapper.vm.selectedDimensions.filter((d: string) => d === "span_status")).toHaveLength(
+        1,
+      );
+    });
+  });
+
   describe("dimension value counts", () => {
     const fields = [
       { name: "alert_id" },
