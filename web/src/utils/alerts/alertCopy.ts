@@ -29,6 +29,35 @@ const FORECAST_WINDOW_WORDS: Record<string, I18nKey> = {
   "7d": "alerts.forecast.window7d",
 };
 
+const SHORT_UNIT_KEYS: Record<string, I18nKey> = {
+  percent: "alerts.units.short.percent",
+  seconds: "alerts.units.short.seconds",
+  milliseconds: "alerts.units.short.milliseconds",
+  microseconds: "alerts.units.short.microseconds",
+  nanoseconds: "alerts.units.short.nanoseconds",
+  bytes: "alerts.units.short.bytes",
+  "bytes-per-sec": "alerts.units.short.bytesPerSec",
+  "count-per-sec": "alerts.units.short.countPerSec",
+};
+
+const UNIT_WORD_KEYS: Record<string, I18nKey> = {
+  seconds: "alerts.units.words.seconds",
+  milliseconds: "alerts.units.words.milliseconds",
+  microseconds: "alerts.units.words.microseconds",
+  nanoseconds: "alerts.units.words.nanoseconds",
+  bytes: "alerts.units.words.bytes",
+};
+
+const UNITLESS = new Set(["", "none", "short"]);
+
+const SECONDS_PER = { day: 86400, hour: 3600, minute: 60 } as const;
+
+const DURATION_UNITS: ReadonlyArray<readonly [I18nKey, number]> = [
+  ["alerts.form.duration.days", SECONDS_PER.day],
+  ["alerts.form.duration.hours", SECONDS_PER.hour],
+  ["alerts.form.duration.minutes", SECONDS_PER.minute],
+];
+
 /** What an alert counts: events, samples or spans by stream type; rows for SQL; series for PromQL. */
 export function dataNoun(
   streamType: string | undefined,
@@ -71,3 +100,69 @@ export const forecastWindowWords = (window: string | undefined, t: TranslateFn):
   const key = FORECAST_WINDOW_WORDS[window ?? ""];
   return key ? t(key) : raw(window ?? "");
 };
+
+/** A list of at most `max` names, the rest counted: "A, B, C, and 2 more". */
+export const joinListMore = (items: readonly string[], t: TranslateFn, max = 3): I18nText => {
+  if (items.length <= max) return joinList(items);
+  const rest = items.length - max;
+  return joinList([
+    ...items.slice(0, max),
+    t("alerts.copy.nMore", { count: formatNumber(rest) }, rest),
+  ]);
+};
+
+/**
+ * A number with its unit: "90 %", "0.85 (85 %)", "500 ms". `unit` is a canonical id from
+ * metricDefaults (`percent-1` is a 0-1 ratio) or a display glyph such as "°C".
+ */
+export function valueWithUnit(
+  value: number,
+  unit: string | undefined,
+  t: TranslateFn,
+  style: "short" | "words" = "short",
+): I18nText {
+  const id = unit ?? "";
+  const shown = formatNumber(value);
+  if (UNITLESS.has(id)) return shown;
+  if (id === "percent-1")
+    return t("alerts.units.short.ratio", { value: shown, percent: formatNumber(value * 100) });
+  const wordKey = style === "words" ? UNIT_WORD_KEYS[id] : undefined;
+  if (wordKey) return t(wordKey, { count: shown }, value);
+  const shortKey = SHORT_UNIT_KEYS[id];
+  if (shortKey) return t(shortKey, { value: shown });
+  return t("alerts.units.short.custom", { value: shown, unit: raw(id) });
+}
+
+/** The words after "every" for any whole number of seconds: "minute", "90 seconds", "2 hours", "day". */
+export function everyDuration(seconds: number, t: TranslateFn): I18nText {
+  if (seconds > 0 && seconds % SECONDS_PER.day === 0) {
+    const n = seconds / SECONDS_PER.day;
+    return t("alerts.copy.everyDays", { count: n }, n);
+  }
+  if (seconds > 0 && seconds % SECONDS_PER.minute === 0) return everyWords(seconds / 60, t);
+  return t("alerts.copy.everySeconds", { count: seconds }, seconds);
+}
+
+/** A duration in sentence words, in its largest whole unit: "90 seconds", "1 day". */
+export function durationText(seconds: number, t: TranslateFn): I18nText {
+  for (const [key, size] of DURATION_UNITS) {
+    if (seconds > 0 && seconds % size === 0)
+      return t(key, { count: seconds / size }, seconds / size);
+  }
+  return t("alerts.form.duration.seconds", { count: seconds }, seconds);
+}
+
+/** A duration for tight spots, rounded down to its largest unit: "12 s", "5 min", "3 h", "2 d". */
+export function compactDuration(seconds: number, t: TranslateFn): I18nText {
+  if (seconds >= SECONDS_PER.day)
+    return t("alerts.copy.dayCompact", { count: Math.floor(seconds / SECONDS_PER.day) });
+  if (seconds >= SECONDS_PER.hour)
+    return t("alerts.form.preview.hrCompact", { count: Math.floor(seconds / SECONDS_PER.hour) });
+  if (seconds >= SECONDS_PER.minute)
+    return t("alerts.form.preview.minCompact", { count: Math.floor(seconds / SECONDS_PER.minute) });
+  return t("alerts.copy.secCompact", { count: Math.max(0, Math.floor(seconds)) });
+}
+
+/** A count for tight spots, as the reader's locale shortens it: "22K", "1.3M". */
+export const compactNumber = (value: number): I18nText =>
+  raw(new Intl.NumberFormat(getIntlLocale(), { notation: "compact" }).format(value));
