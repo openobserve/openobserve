@@ -770,12 +770,12 @@ fn refreshed_org_copy(org_id: &str, existing: &Template) -> Option<Template> {
         return None;
     }
     let shipped = get_prebuilt_template(existing.name.strip_prefix(PREBUILT_TEMPLATE_PREFIX)?)?;
-    if shipped.body == existing.body && shipped.template_type == existing.template_type {
+    if shipped.body == existing.body {
         return None;
     }
+    // Only the body: an email subject the root user changed stays as it is.
     Some(Template {
         body: shipped.body,
-        template_type: shipped.template_type,
         ..existing.clone()
     })
 }
@@ -1403,6 +1403,32 @@ mod tests {
             r#"{"text": "[{alert_status}] {alert_name}"}"#,
         );
         assert!(refreshed_org_copy(DEFAULT_ORG, &shared).is_none());
+    }
+
+    #[test]
+    fn teams_alias_copy_is_refreshed_and_email_subject_is_kept() {
+        let teams = org_copy(
+            "acme",
+            "prebuilt_teams",
+            r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#,
+        );
+        let new = refreshed_org_copy("acme", &teams).expect("teams alias is refreshed");
+        assert_ne!(new.body, teams.body);
+
+        let mut email = config::prebuilt_loader::get_prebuilt_template("email").unwrap();
+        email.org_id = "acme".to_string();
+        email.body = "<h2>[{alert_status}] {alert_name}</h2>".to_string();
+        email.template_type = TemplateType::Email {
+            title: "Custom subject".to_string(),
+        };
+        let new = refreshed_org_copy("acme", &email).expect("legacy email body is refreshed");
+        assert_ne!(new.body, email.body);
+        assert_eq!(
+            new.template_type,
+            TemplateType::Email {
+                title: "Custom subject".to_string()
+            }
+        );
     }
 
     #[test]

@@ -212,6 +212,11 @@ pub const LEGACY_BUILTIN_BODIES: &[(&str, &str)] = &[
         "prebuilt_msteams",
         r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#,
     ),
+    // A destination of type `teams` saves its copy under the endpoint type's name.
+    (
+        "prebuilt_teams",
+        r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#,
+    ),
     (
         "prebuilt_pagerduty",
         r#"{"payload": {"summary": "OpenObserve [{alert_status}]: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#,
@@ -663,6 +668,22 @@ mod tests {
         assert!(body.contains("\"blocks\""), "{body}");
         assert!(body.contains("{alert_url}"), "{body}");
         assert!(!is_legacy_builtin_body("prebuilt_slack", &body));
+    }
+
+    /// Slack rejects a header block over 150 characters, and an alert name has no such limit.
+    #[test]
+    fn slack_body_has_no_header_block() {
+        let body = get_prebuilt_template("slack").unwrap().body;
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        for block in v["blocks"].as_array().unwrap() {
+            assert_ne!(block["type"], "header", "{block}");
+        }
+    }
+
+    #[test]
+    fn teams_alias_resolves_to_the_msteams_template() {
+        let teams = get_prebuilt_template("teams").unwrap();
+        assert_eq!(teams.body, get_prebuilt_template("msteams").unwrap().body);
     }
 
     #[test]
