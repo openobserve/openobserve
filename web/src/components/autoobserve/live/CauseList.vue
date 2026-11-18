@@ -233,6 +233,8 @@ const props = withDefaults(
     context: AutoObserveIssueContext | null;
     // The issue is over, so the impact reads as past and neutral.
     recovered: boolean;
+    // Decides whether the served next ask is still ahead or already due.
+    nowMs: number;
     // Whether the block holds a Next step box, which its fixed height includes.
     step?: boolean;
   }>(),
@@ -265,7 +267,7 @@ const loading = computed(() => !props.context || props.context.asked_at === null
 const copy = computed(() =>
   loading.value || !props.context
     ? null
-    : causeBlockCopy(t, zone.value, props.context, props.recovered),
+    : causeBlockCopy(t, zone.value, props.context, props.nowMs, props.recovered),
 );
 
 const slots = computed(() =>

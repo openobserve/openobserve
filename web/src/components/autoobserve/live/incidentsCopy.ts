@@ -31,9 +31,7 @@ import {
 import type { AiFinding } from "../insight/insightCta";
 import { logsForFinding, PAGED_LEAD_US } from "../insight/targets/logsTargets";
 import type { IssuesRange } from "../v2/autoobserveRoute";
-import { RECHECK_AFTER_US } from "./causeCopy";
 import { agoText, dayKey, formatWhen } from "./liveCopy";
-import { WORKING_MAX_MS } from "./nextStepCopy";
 
 export interface AnalysisLine {
   label: I18nText;
@@ -449,11 +447,12 @@ export const itemPolls = (item: AutoObserveIncidentItem, nowMs: number): boolean
   if (isLiveRca(item.investigation)) return true;
   const cx = item.context;
   if (!cx) return false;
-  if (cx.asked_at === null) return nowMs < item.incident.created_at / 1000 + WORKING_MAX_MS;
-  if (!cx.settled && nowMs < (cx.asked_at + RECHECK_AFTER_US) / 1000 + CONTEXT_GRACE_MS)
+  const recheck = cx.recheck_at;
+  if (recheck !== null && recheck !== undefined && nowMs < recheck / 1000 + CONTEXT_GRACE_MS)
     return true;
   const state = cx.next_step?.state;
-  if (typeof state === "object" && nowMs < state.working.since / 1000 + WORKING_MAX_MS) return true;
+  const until = typeof state === "object" ? state.working.until : undefined;
+  if (until !== undefined && nowMs < until / 1000) return true;
   return awaitsStep(item, nowMs);
 };
 

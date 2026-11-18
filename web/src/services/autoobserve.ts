@@ -243,7 +243,9 @@ export interface AutoObserveNextStep {
   run_id: string | null;
 }
 
-export type AutoObserveStepState = "engine_only" | { working: { since: number } } | "ready";
+// since and until are microseconds; an older server sends no until, and then no deadline shows.
+export type AutoObserveStepState =
+  "engine_only" | { working: { since: number; until?: number } } | "ready";
 
 export interface AutoObserveStepView {
   step: AutoObserveNextStep;
@@ -254,13 +256,15 @@ export interface AutoObserveStepView {
   issue_id: string;
 }
 
-// window and asked_at are microseconds; asked_at is null until the first ask is stored.
+// Times are microseconds; asked_at is null until the first ask is stored. recheck_at is the next
+// planned ask, past once it is due, null when none is planned; an older server leaves it out.
 export interface AutoObserveIssueContext {
   causes: { top: AutoObserveCauseLine[]; more: number };
   impact: AutoObserveImpactLine[];
   classes: string[];
   window: [number, number];
   asked_at: number | null;
+  recheck_at?: number | null;
   settled: boolean;
   checks: AutoObserveProviderCheck[];
   hidden: number;
@@ -355,7 +359,7 @@ const autoobserve = {
     http().get<AutoObserveCoverage>(`/api/v2/${org}/autoobserve/coverage`, { params: { view } }),
   suggestions: (org: string, params: AutoObserveSuggestionParams) =>
     http().get<AutoObserveSuggestionList>(`/api/v2/${org}/autoobserve/suggestions`, { params }),
-  incidents: (org: string, params: { limit: number; offset: number }) =>
+  incidents: (org: string, params: { limit: number; offset: number; incident_id?: string }) =>
     http().get<AutoObserveIncidentList>(`/api/v2/${org}/autoobserve/incidents`, { params }),
   pagingSettings: (org: string) =>
     http().get<AutoObservePagingSettings>(`/api/v2/${org}/autoobserve/settings/paging`, {

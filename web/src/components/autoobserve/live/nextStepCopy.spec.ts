@@ -21,7 +21,7 @@ import type {
   AutoObserveIssueContext,
   AutoObserveStepView,
 } from "@/services/autoobserve";
-import { WORKING_MAX_MS, nextStepLine, type StepLine } from "./nextStepCopy";
+import { nextStepLine, type StepLine } from "./nextStepCopy";
 
 const NOW_MS = Date.UTC(2026, 10, 16, 14, 15);
 const PIPELINE = { path: "pipeline/pipelines/edit", query: { id: "p1" } };
@@ -75,7 +75,13 @@ const ai = (cites: string[], judged: boolean | null = null, open = PIPELINE) => 
   return view;
 };
 
-const working = (ago: number) => ({ working: { since: (NOW_MS - ago) * 1000 } });
+// The server's until, `left` ms from now; null as an older server sends it, with none.
+const working = (left: number | null) => ({
+  working: {
+    since: (NOW_MS - 60_000) * 1000,
+    ...(left === null ? {} : { until: (NOW_MS + left) * 1000 }),
+  },
+});
 
 describe("nextStepLine", () => {
   it.each<[string, AutoObserveStepView, Partial<StepLine>]>([
@@ -98,11 +104,8 @@ describe("nextStepLine", () => {
       step({ state: working(60_000) }),
       { note: "working", notHelpful: null },
     ],
-    [
-      "past WORKING_MAX: engine step, no note",
-      step({ state: working(WORKING_MAX_MS + 1) }),
-      { note: null },
-    ],
+    ["past the served until: engine step, no note", step({ state: working(-1) }), { note: null }],
+    ["no until served: engine step, no note", step({ state: working(null) }), { note: null }],
     [
       "AI step on 2 of 3 changes: the based-on note and Not helpful",
       ai(["c1", "c2"]),

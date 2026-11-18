@@ -131,25 +131,21 @@ describe("autoobserveIncidentsPageQuery (D9-web)", () => {
     expect(interval({ state: { data: undefined } })).toBe(false);
   });
 
-  it("finds one incident past the first page, says when the list ended, and when the cap stopped it", async () => {
-    const [first, second] = running.items;
-    const page = (items: unknown[], has_more: boolean) => ({
-      data: { ...running, has_more, items },
-    });
-    incidents
-      .mockResolvedValueOnce(page([first], true) as never)
-      .mockResolvedValueOnce(page([second], false) as never);
+  it("reads one incident by its id in one request, and null when AutoObserve did not open it", async () => {
+    const second = running.items[1];
+    const page = (items: unknown[]) => ({ data: { ...running, has_more: false, items } });
+    incidents.mockResolvedValueOnce(page([second]) as never);
     const options = autoobserveIncidentItemQuery("demo-org", second.incident.id);
     expect(options.queryKey.slice(0, 4)).toEqual(orgKey("demo-org", "autoobserve", "incidents"));
-    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: second, capped: false });
-    expect(incidents).toHaveBeenLastCalledWith("demo-org", { limit: 100, offset: 100 });
+    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: second });
+    expect(incidents).toHaveBeenCalledTimes(1);
+    expect(incidents).toHaveBeenLastCalledWith("demo-org", {
+      limit: 1,
+      offset: 0,
+      incident_id: second.incident.id,
+    });
 
-    incidents.mockResolvedValueOnce(page([], false) as never);
-    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: null, capped: false });
-
-    incidents.mockReset();
-    incidents.mockResolvedValue(page([first], true) as never);
-    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: null, capped: true });
-    expect(incidents).toHaveBeenLastCalledWith("demo-org", { limit: 100, offset: 900 });
+    incidents.mockResolvedValueOnce(page([]) as never);
+    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: null });
   });
 });

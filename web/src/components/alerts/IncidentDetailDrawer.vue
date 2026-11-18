@@ -161,15 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
 
-          <OTag
-            v-if="findingBadge"
-            :variant="findingBadge.quiet ? 'error-soft' : 'default-soft'"
-            icon="shield"
-            :label="findingBadge.label"
-            data-test="incident-detail-security-source"
-          />
-
-          <!-- Last in the row, so its skeleton growing into the chip moves nothing after it. -->
+          <!-- Only the security badge follows, and it waits for the chip, so the skeleton's growth moves nothing. -->
           <OSkeleton
             v-if="liveChip === 'loading'"
             animation="none"
@@ -189,6 +181,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTooltip v-if="liveChip.tooltip" :content="liveChip.tooltip" />
           </span>
+
+          <OTag
+            v-if="findingBadge && liveChip !== 'loading'"
+            :variant="findingBadge.quiet ? 'error-soft' : 'default-soft'"
+            icon="shield"
+            :label="findingBadge.label"
+            data-test="incident-detail-security-source"
+          />
         </template>
       </template>
 
@@ -1322,7 +1322,7 @@ import {
   issueLogsEndMs,
   issueLogStreams,
 } from "@/components/autoobserve/live/issueModel";
-import { LOCATE_INCIDENT_CAP, autoobserveIncidentItemQuery } from "@/services/autoobserve.queries";
+import { autoobserveIncidentItemQuery } from "@/services/autoobserve.queries";
 import { isLiveRca } from "@/utils/incidents/rcaCell";
 import {
   AUTOOBSERVE_TRIGGER_KIND,
@@ -1769,10 +1769,6 @@ export default defineComponent({
       const lookup = findingItemQuery.data.value;
       if (findingContext.value) return null;
       if (!lookup) return findingItemQuery.isError.value ? { failed: true } : null;
-      if (lookup.capped) {
-        const count = LOCATE_INCIDENT_CAP.toLocaleString(getIntlLocale());
-        return { note: t("autoobserve.context.olderThanCap", { count }) };
-      }
       if (isLiveRca(rcaSummary.value)) return { note: t("autoobserve.issueLive.noCauseRunning") };
       return {
         note:

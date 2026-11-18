@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ held.note }}
         </p>
       </div>
-      <CauseList v-else :context="context" :recovered="recovered" :step="flags.step">
+      <CauseList v-else :context="context" :recovered="recovered" :now-ms="now" :step="flags.step">
         <NextStepLine
           v-if="flags.step && showsNextStep(context)"
           :context="context"

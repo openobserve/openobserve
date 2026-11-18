@@ -27,6 +27,7 @@ import { causeBlockCopy, impactCopy, type CauseBlockCopy } from "./causeCopy";
 const MIN_US = 60_000_000;
 const ONSET_US = Date.UTC(2026, 10, 16, 14, 2) * 1000;
 const zone = { locale: "en-GB", timeZone: "UTC" };
+const NOW_MS = ONSET_US / 1000 + 10 * 60_000;
 
 const cause = (i: number, used = false): AutoObserveCauseLine => ({
   id: `c${i}`,
@@ -93,10 +94,23 @@ describe("causeBlockCopy", () => {
     ],
     [
       "0 causes, not settled: found nothing so far and says when it checks again",
-      context({ settled: false }),
+      context({ settled: false, recheck_at: ONSET_US + 20 * MIN_US }),
       (c) => {
         expect(c.empty).toContain("so far");
         expect(c.footer).toContain("checks again at 14:22");
+      },
+    ],
+    [
+      "not settled, the served recheck already due: checks again shortly",
+      context({ settled: false, recheck_at: ONSET_US + 5 * MIN_US }),
+      (c) => expect(c.footer).toContain("checks again shortly."),
+    ],
+    [
+      "not settled, no recheck served: no time promised",
+      context({ settled: false }),
+      (c) => {
+        expect(c.footer).toContain("may not be visible yet.");
+        expect(c.footer).not.toContain("checks again");
       },
     ],
     [
@@ -152,8 +166,18 @@ describe("causeBlockCopy", () => {
     ],
     [
       "failed before the second ask: red with the retry time",
-      context({ checks: checks("failed"), settled: false }),
+      context({ checks: checks("failed"), settled: false, recheck_at: ONSET_US + 20 * MIN_US }),
       (c) => expect(c.failed).toContain("Trying again at 14:22"),
+    ],
+    [
+      "failed with the retry due: red, trying again shortly",
+      context({ checks: checks("failed"), settled: false, recheck_at: ONSET_US }),
+      (c) => expect(c.failed).toContain("Trying again shortly"),
+    ],
+    [
+      "failed with no retry served: red, no retry promised",
+      context({ checks: checks("failed"), settled: false }),
+      (c) => expect(c.failed).not.toContain("Trying again"),
     ],
     [
       "not recorded: a neutral footer sentence, not a gap",
@@ -173,7 +197,7 @@ describe("causeBlockCopy", () => {
       context({ hidden: 2 }),
       (c) => expect([c.hidden, c.empty]).toEqual([expect.stringContaining("2 changes"), null]),
     ],
-  ])("%s", (_name, cx, check) => check(causeBlockCopy(gt, zone, cx)));
+  ])("%s", (_name, cx, check) => check(causeBlockCopy(gt, zone, cx, NOW_MS)));
 });
 
 describe("impactCopy", () => {

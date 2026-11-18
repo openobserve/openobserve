@@ -33,9 +33,6 @@ export interface StepLine {
   notHelpful: "offer" | "pressed" | null;
 }
 
-/** Past this the AI is taken to have failed: the note goes and the engine step stays (L6). */
-export const WORKING_MAX_MS = 12 * 60 * 1000;
-
 const LOGS_PAGE = "logs";
 
 export const nextStepLine = (
@@ -46,7 +43,9 @@ export const nextStepLine = (
 ): StepLine => {
   const ai = view.state === "ready" && view.step.source === "ai";
   const state = view.state;
-  const working = typeof state === "object" && nowMs - state.working.since / 1000 < WORKING_MAX_MS;
+  // Past the served until the AI is taken to have failed: the note goes, the engine step stays (L6).
+  const until = typeof state === "object" ? state.working.until : undefined;
+  const working = until !== undefined && nowMs < until / 1000;
   const judged = view.judged === false;
   const note: StepNote = ai ? (judged ? "judged" : "ai") : working ? "working" : null;
   return {

@@ -48,9 +48,6 @@ export interface ImpactCopy {
   link: { label: I18nText; item: number } | null;
 }
 
-/** Matches the server's second ask, ten minutes after the first. */
-export const RECHECK_AFTER_US = 10 * 60 * 1_000_000;
-
 export const SECURITY_SOURCE = "security_source";
 
 /** Two-line row slots of the collapsed block; an impact callout takes two of them. */
@@ -110,20 +107,21 @@ export const causeBlockCopy = (
   t: TranslateFn,
   zone: InsightZone,
   cx: AutoObserveIssueContext,
+  nowMs: number,
   recovered = false,
 ): CauseBlockCopy => {
   const groups = checkGroups(cx.checks);
   const clock = clockOf(zone, cx.window[0]);
   const list = (labels: string[]) => sourcesText(zone.locale, labels);
-  const recheck = (cx.asked_at ?? cx.window[1]) + RECHECK_AFTER_US;
-  const failed = groups.failed.length
-    ? cx.settled
-      ? t("autoobserve.context.failed", { sources: list(groups.failed) })
-      : t("autoobserve.context.failedRetry", {
-          sources: list(groups.failed),
-          time: clock(recheck),
-        })
-    : null;
+  const recheck = recheckOf(cx, nowMs);
+  const failing = groups.failed.length ? list(groups.failed) : null;
+  const failed = !failing
+    ? null
+    : recheck === null
+      ? t("autoobserve.context.failed", { sources: failing })
+      : recheck === "due"
+        ? t("autoobserve.context.failedRetrySoon", { sources: failing })
+        : t("autoobserve.context.failedRetry", { sources: failing, time: clock(recheck.at) });
   const gaps = [
     groups.off.length
       ? t("autoobserve.context.off", { sources: list(groups.off) }, groups.off.length)
@@ -140,7 +138,7 @@ export const causeBlockCopy = (
         groups.notRecorded.length,
       )
     : null;
-  const checked = groups.ok.length ? footerOf(t, cx, list(groups.ok), clock) : null;
+  const checked = groups.ok.length ? footerOf(t, cx, list(groups.ok), clock, recheck) : null;
   const footer = [checked, notRecorded].filter((s): s is I18nText => s !== null);
   const impacts = cx.impact
     .flatMap((line) => {
@@ -202,23 +200,49 @@ const capital = (text: string, locale: string) =>
 const clockOf = (zone: InsightZone, anchorUs: number) => (us: number) =>
   formatWhen(us / 1000, zone.locale, zone.timeZone, anchorUs / 1000);
 
+type Recheck = { at: number } | "due" | null;
+
+// The served next ask: its time, "due" once past, null when none is planned or the server does not say.
+const recheckOf = (cx: AutoObserveIssueContext, nowMs: number): Recheck => {
+  const at = cx.recheck_at;
+  if (at === null || at === undefined) return null;
+  return at / 1000 <= nowMs ? "due" : { at };
+};
+
 const footerOf = (
   t: TranslateFn,
   cx: AutoObserveIssueContext,
   sources: I18nText,
   clock: (us: number) => I18nText,
+  recheck: Recheck,
 ): I18nText => {
   const window = { sources, from: clock(cx.window[0]), to: clock(cx.window[1]) };
-  const at = cx.asked_at ?? cx.window[1];
-  const time = cx.settled ? clock(at) : clock(at + RECHECK_AFTER_US);
-  const key: I18nKey = cx.region_only
-    ? cx.settled
+  const region = cx.region_only;
+  if (cx.settled) {
+    const time = clock(cx.asked_at ?? cx.window[1]);
+    const key: I18nKey = region
       ? "autoobserve.context.footerRegionSettled"
-      : "autoobserve.context.footerRegionAsking"
-    : cx.settled
-      ? "autoobserve.context.footerSettled"
-      : "autoobserve.context.footerAsking";
-  return t(key, { ...window, time });
+      : "autoobserve.context.footerSettled";
+    return t(key, { ...window, time });
+  }
+  if (recheck === null)
+    return t(
+      region
+        ? "autoobserve.context.footerRegionAskingOpen"
+        : "autoobserve.context.footerAskingOpen",
+      window,
+    );
+  if (recheck === "due")
+    return t(
+      region
+        ? "autoobserve.context.footerRegionAskingSoon"
+        : "autoobserve.context.footerAskingSoon",
+      window,
+    );
+  const key: I18nKey = region
+    ? "autoobserve.context.footerRegionAsking"
+    : "autoobserve.context.footerAsking";
+  return t(key, { ...window, time: clock(recheck.at) });
 };
 
 const emptyOf = (

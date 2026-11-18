@@ -142,28 +142,18 @@ export const autoobserveIncidentsPageQuery = (org: string, limit: number, offset
     refetchInterval: (query) => (listPolls(query.state.data, Date.now()) ? PAGED_POLL_MS : false),
   });
 
-const LOCATE_INCIDENT_PAGE = 100;
-export const LOCATE_INCIDENT_CAP = 1_000;
-
-// One incident's item; `capped` when the cap was reached with more pages left, so it may still exist.
+// One incident's item; null when AutoObserve did not open that incident.
 export interface IncidentLookup {
   item: AutoObserveIncidentItem | null;
-  capped: boolean;
 }
 
-// The list route has no id filter and no route serves one incident, so it is found page by page, newest first.
 export const autoobserveIncidentItemQuery = (org: string, incidentId: string) =>
   queryOptions({
     queryKey: autoobserveKeys.incidentItem(org, incidentId),
     queryFn: async (): Promise<IncidentLookup> => {
-      for (let offset = 0; offset < LOCATE_INCIDENT_CAP; offset += LOCATE_INCIDENT_PAGE) {
-        const page = (await autoobserve.incidents(org, { limit: LOCATE_INCIDENT_PAGE, offset }))
-          .data;
-        const found = page.items.find((i) => i.incident.id === incidentId);
-        if (found) return { item: found, capped: false };
-        if (!page.has_more) return { item: null, capped: false };
-      }
-      return { item: null, capped: true };
+      const params = { limit: 1, offset: 0, incident_id: incidentId };
+      const page = (await autoobserve.incidents(org, params)).data;
+      return { item: page.items.find((i) => i.incident.id === incidentId) ?? null };
     },
     staleTime: LIVE_STALE_TIME,
     refetchInterval: (query) => {

@@ -287,6 +287,8 @@ describe("polling", () => {
   const AT = 1_794_309_300_000_000;
   const NOW = AT / 1000 + 5 * 60_000;
   const MIN = 60_000;
+  const us = (ms: number) => ms * 1000;
+  const working = (untilMs: number) => ({ working: { since: AT, until: us(untilMs) } });
   const view = (state: AutoObserveStepView["state"], runId: string | null = null) =>
     ({ step: { run_id: runId }, state }) as AutoObserveStepView;
   const cx = (over: Partial<AutoObserveIssueContext>) =>
@@ -310,15 +312,32 @@ describe("polling", () => {
     ["a run waiting for input", withRun(1, { state: "waiting_input" }), NOW, true],
     ["no run and no context", item(1), NOW, false],
     ["a context that owes nothing", owed({}), NOW, false],
-    ["the first ask not stored yet", owed({ asked_at: null }), NOW, true],
-    ["the first ask never stored", owed({ asked_at: null }), NOW + 8 * MIN, false],
-    ["the recheck still due", owed({ settled: false }), NOW, true],
-    ["the recheck overdue", owed({ settled: false }), NOW + 8 * MIN, false],
-    ["the AI working on a step", owed({ next_step: view({ working: { since: AT } }) }), NOW, true],
     [
-      "the AI past its time",
-      owed({ next_step: view({ working: { since: AT } }) }),
+      "the first ask due a minute ago",
+      owed({ asked_at: null, recheck_at: us(NOW - MIN) }),
+      NOW,
+      true,
+    ],
+    [
+      "the first ask due past the grace",
+      owed({ asked_at: null, recheck_at: us(NOW - 3 * MIN) }),
+      NOW,
+      false,
+    ],
+    ["the recheck ahead", owed({ settled: false, recheck_at: us(NOW + 5 * MIN) }), NOW, true],
+    [
+      "the recheck overdue",
+      owed({ settled: false, recheck_at: us(NOW + 5 * MIN) }),
       NOW + 8 * MIN,
+      false,
+    ],
+    ["no recheck served", owed({ settled: false }), NOW, false],
+    ["the AI working on a step", owed({ next_step: view(working(NOW + MIN)) }), NOW, true],
+    ["the AI past its until", owed({ next_step: view(working(NOW + MIN)) }), NOW + 2 * MIN, false],
+    [
+      "the AI working, no until served",
+      owed({ next_step: view({ working: { since: AT } }) }),
+      NOW,
       false,
     ],
     ["a failed run owes no step", owed({}, { run_id: "r-failed", state: "failed" }), NOW, false],

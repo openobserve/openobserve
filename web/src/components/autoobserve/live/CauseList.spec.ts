@@ -58,7 +58,7 @@ const context = (over: Partial<AutoObserveIssueContext>): AutoObserveIssueContex
 
 const mountList = (cx: AutoObserveIssueContext | null) =>
   mount(CauseList, {
-    props: { context: cx, recovered: false },
+    props: { context: cx, recovered: false, nowMs: AT_US / 1000 },
     global: { plugins: [i18n, store] },
   });
 

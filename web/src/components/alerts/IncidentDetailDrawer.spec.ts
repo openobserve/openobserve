@@ -2217,18 +2217,12 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it.each([
       ["a failed lookup says so and retries", "failed", null, true],
-      ["an incident on the second page still gets its card", "located", null, true],
+      ["an incident read by its id gets its card", "located", null, true],
       ["with the Next step flag off, the card has no Next step box", "located", null, false],
       [
         "an item without context holds the space with the no-cause line",
         "off",
         "No cause found yet.",
-        true,
-      ],
-      [
-        "a lookup stopped by the cap says so, not the no-cause line",
-        "capped",
-        "isn't available for incidents older than the newest 1,000",
         true,
       ],
       ["with the context flag off, there is no card", "flag-off", null, true],
@@ -2272,16 +2266,13 @@ describe("IncidentDetailDrawer.vue", () => {
       const incidents = vi.mocked(autoobserveService.incidents);
       incidents.mockReset();
       if (outcome === "failed") incidents.mockRejectedValueOnce(new Error("down"));
-      const other = { data: { paging: true, has_more: true, items: [item("other", null)] } };
-      if (outcome === "capped") incidents.mockResolvedValue(other as never);
-      else
-        incidents.mockResolvedValueOnce(other as never).mockResolvedValue({
-          data: {
-            paging: true,
-            has_more: false,
-            items: [item("inc-1", outcome === "off" ? undefined : context)],
-          },
-        } as never);
+      incidents.mockResolvedValue({
+        data: {
+          paging: true,
+          has_more: false,
+          items: [item("inc-1", outcome === "off" ? undefined : context)],
+        },
+      } as never);
       await openOn("incidentAnalysis", { group_values: FINDING, triggers: [findingTrigger(5)] });
       if (outcome === "failed") {
         expect(byTest("autoobserve-issue-context-card-failed").exists()).toBe(true);

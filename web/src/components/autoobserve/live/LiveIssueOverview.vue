@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="item.incident.id"
               :context="context"
               :recovered="recovered"
+              :now-ms="nowMs"
               :step="stepSlot"
             >
               <NextStepLine v-if="stepShown" :context="context" :now-ms="nowMs" />
