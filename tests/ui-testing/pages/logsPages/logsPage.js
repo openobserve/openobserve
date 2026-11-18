@@ -12509,14 +12509,7 @@ export class LogsPage {
         await monacoHelper.triggerSuggestions();
     }
 
-    /**
-     * Set editor content, then re-open suggestions until a label matches one of
-     * expectedLabels (case-insensitive) or the deadline passes; returns the last labels.
-     * @param {string} content
-     * @param {string[]} expectedLabels
-     * @param {number} timeout
-     * @returns {Promise<string[]>}
-     */
+    /** Re-opens suggestions until a label matches expectedLabels (case-insensitive) or the timeout passes; returns the last labels. */
     async setQueryEditorContentAndWaitForSuggestions(content, expectedLabels, timeout = 10000) {
         const monacoHelper = this.getMonacoEditorHelper();
         await monacoHelper.setContent(this.getQueryEditorContainer(), content);
