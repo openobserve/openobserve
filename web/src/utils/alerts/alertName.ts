@@ -27,3 +27,9 @@ export const unusedAlertName = (name: string, taken: ReadonlySet<string>): strin
   while (taken.has(`${name}_${n}`)) n++;
   return `${name}_${n}`;
 };
+
+/** The name offered: none until the user reaches it, then a ready-made alert's name, else the generated one. */
+export const suggestedAlertName = (
+  generated: string,
+  opts: { due: boolean; fromLibrary?: string },
+): string => (opts.due ? savedAlertName(opts.fromLibrary ?? "") || generated : "");
