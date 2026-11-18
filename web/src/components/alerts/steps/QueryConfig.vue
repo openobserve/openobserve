@@ -1013,6 +1013,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         queryEditorPlaceholderFlag
                       "
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
+                      data-test="alert-query-editor-placeholder"
                     >
                       <span class="query-editor-placeholder-typewriter">{{
                         inlineEditorPlaceholder
@@ -1838,7 +1839,6 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import { savedBrowserTimezone } from "@/utils/timezoneAliases";
-import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
@@ -2357,13 +2357,11 @@ export default defineComponent({
           })
         : [],
     );
-    const promqlPlaceholderEnabled = computed(
-      () => localTab.value === "promql" && promqlSamples.value.length > 0,
-    );
-    const { placeholder: promqlEditorPlaceholder } = useTypewriterPlaceholder(
-      computed(() => promqlSamples.value.map((s) => s.query)),
-      { enabled: promqlPlaceholderEnabled },
-    );
+    // Static and labelled as an example: a typed-out query reads as one already written.
+    const promqlEditorPlaceholder = computed(() => {
+      const example = promqlSamples.value[0]?.query;
+      return example ? t("alerts.composite.expressionExample", { example: raw(example) }) : "";
+    });
     const inlineEditorPlaceholder = computed(() =>
       localTab.value === "promql" && promqlSamples.value.length
         ? promqlEditorPlaceholder.value

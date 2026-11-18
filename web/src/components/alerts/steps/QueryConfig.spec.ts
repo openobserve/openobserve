@@ -2115,6 +2115,15 @@ describe("QueryConfig.vue", () => {
       h.unmount();
     });
 
+    it("promql: an empty editor shows a static example and keeps the query empty", async () => {
+      const h = mountMetrics({ streamName: "cpu_usage", promqlQuery: "" });
+      await flushPromises();
+      const placeholder = h.get('[data-test="alert-query-editor-placeholder"]').text();
+      expect(placeholder).toContain("cpu_usage");
+      expect(h.findComponent(QueryConfig).emitted("update:promqlQuery")).toBeUndefined();
+      h.unmount();
+    });
+
     it('promql: value "" BLOCKS (§4 restore)', async () => {
       const h = mountMetrics({ promqlCondition: { operator: ">=", value: "" } });
       await flushPromises();
