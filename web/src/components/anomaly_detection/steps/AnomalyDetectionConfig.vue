@@ -585,7 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fill
           data-test="anomaly-sql-preview-row"
         >
-          <div class="border-border-default rounded-default h-45 overflow-hidden border">
+          <div class="border-border-default rounded-default h-32 overflow-hidden border">
             <QueryEditor
               data-test-prefix="anomaly-sql-preview"
               :read-only="true"
