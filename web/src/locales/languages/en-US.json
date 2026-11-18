@@ -12201,8 +12201,8 @@
         "checksCron": "Checks on the cron schedule {cron}, looking at the last {window}.",
         "checksRealtime": "Checks as events arrive.",
         "checksAnomaly": "Checks every {every}.",
-        "minutes": "{count} min",
-        "hours": "{count} h"
+        "minutes": "{count} minute | {count} minutes",
+        "hours": "{count} hour | {count} hours"
       },
       "watch": {
         "title": "What should we watch?",

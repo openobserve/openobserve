@@ -388,8 +388,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
 
   const durationPart = (minutes: number): I18nText =>
     minutes >= 60 && minutes % 60 === 0
-      ? t("alerts.sections.review.hours", { count: minutes / 60 })
-      : t("alerts.sections.review.minutes", { count: minutes });
+      ? t("alerts.sections.review.hours", { count: minutes / 60 }, minutes / 60)
+      : t("alerts.sections.review.minutes", { count: minutes }, minutes);
   const strong = (text: I18nText) => ({ text, strong: true });
   const plain = (text: I18nText) => ({ text });
 

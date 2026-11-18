@@ -318,9 +318,9 @@ describe("useAlertFormSections", () => {
       {},
       [
         "Watches Logs in default, on a schedule.",
-        "Fires when 1+ events turn up in the last 5 min.",
-        "Tells ops-slack, reminding at most every 10 min.",
-        "Checks every 5 min, looking at the last 5 min.",
+        "Fires when 1+ events turn up in the last 5 minutes.",
+        "Tells ops-slack, reminding at most every 10 minutes.",
+        "Checks every 5 minutes, looking at the last 5 minutes.",
       ],
     ],
     [
@@ -338,9 +338,9 @@ describe("useAlertFormSections", () => {
       },
       [
         "Watches Logs in default, on a schedule.",
-        "Fires when the query returns 1+ rows in the last 5 min.",
-        "Opens an incident, reminding at most every 2 h.",
-        "Checks on the cron schedule 0 9 * * *, looking at the last 5 min.",
+        "Fires when the query returns 1+ rows in the last 5 minutes.",
+        "Opens an incident, reminding at most every 2 hours.",
+        "Checks on the cron schedule 0 9 * * *, looking at the last 5 minutes.",
       ],
     ],
     [
