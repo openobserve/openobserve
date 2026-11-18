@@ -50,3 +50,13 @@ export function promqlMetricNames(query: string): string[] {
   }
   return [...new Set(names)];
 }
+
+/** Whether the whole query is scaled by 100, so its value (and the threshold) reads in percent. */
+export function promqlScaledToPercent(query: string): boolean {
+  const bare = query
+    .replace(STRINGS, '""')
+    .replace(/\{[^}]*\}/g, "")
+    .replace(/\[[^\]]*\]/g, "")
+    .trim();
+  return /^100\s*\*/.test(bare) || /\*\s*100$/.test(bare);
+}

@@ -557,11 +557,11 @@ describe("useAlertFormSections", () => {
       },
       card: [
         "Watches Metrics in node_cpu_seconds_total, on a schedule.",
-        "Fires for each k8s_node_name whose latest value is more than 90. Fires only after it lasts 5 minutes. Warns at more than 80.",
+        "Fires for each k8s_node_name whose latest value is more than 90 %. Fires only after it lasts 5 minutes. Warns at more than 80 %.",
         "Tells O2K8SAlerts (Slack webhook), notifying at most every 30 minutes.",
         "Checks every minute, looking at the last 1 minute.",
       ],
-      nav: ["> 90 · One per k8s_node_name · Must last 5 min · Warning > 80", "O2K8SAlerts"],
+      nav: ["> 90 % · One per k8s_node_name · Must last 5 min · Warning > 80 %", "O2K8SAlerts"],
     },
     {
       scenario: "MEM: PromQL rule per pod with recovery and suppress",

@@ -41,6 +41,7 @@ import {
 } from "@/utils/alerts/alertCopy";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { compareFactor } from "@/utils/alerts/alertIntents";
+import { promqlScaledToPercent } from "@/utils/alerts/promqlMetrics";
 import {
   CONDITION_GAP_KEYS,
   conditionGap,
@@ -378,13 +379,22 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       mode.value === "true" || (mode.value === "false" && (qc.type ?? "custom") === "custom");
     return builder ? filterPhrase(qc.conditions, "alert", t) : null;
   };
+  // A query scaled by 100 reads in percent, so its limits do too.
+  const promqlValueText = (fd: AlertSectionsFormData, value: unknown): I18nText =>
+    promqlScaledToPercent(fd.query_condition?.promql ?? "")
+      ? t("alerts.units.short.percent", { value: formatNumber(value) })
+      : formatNumber(value);
   const warningLimit = (
     fd: AlertSectionsFormData,
   ): { operator?: string; value: unknown; shown?: I18nText } | null => {
     const qc = fd.query_condition ?? {};
     if (qc.type === "promql") {
       if (forecastOf(fd) || qc.promql_rule_mode || !hasValue(qc.promql_warning_value)) return null;
-      return { operator: qc.promql_condition?.operator, value: qc.promql_warning_value };
+      return {
+        operator: qc.promql_condition?.operator,
+        value: qc.promql_warning_value,
+        shown: promqlValueText(fd, qc.promql_warning_value),
+      };
     }
     if (sqlRowValue(fd) || builderMeasure(fd)) {
       const agg = qc.aggregation;
@@ -434,14 +444,14 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     if (qc.promql_multi_alert) {
       const pc = qc.promql_condition;
       return hasValue(pc?.value)
-        ? raw(`${operatorSymbol(pc?.operator)} ${formatNumber(pc?.value)}`)
+        ? raw(`${operatorSymbol(pc?.operator)} ${promqlValueText(fd, pc?.value)}`)
         : raw(alertConditionText(fd));
     }
     const tc = fd.trigger_condition ?? {};
     const count = countLimit(tc.operator, tc.threshold ?? 1);
     const pc = qc.promql_condition;
     if (!pc || !hasValue(pc.value)) return t("alerts.sections.condition.series", { count });
-    const limit = `${operatorSymbol(pc.operator)} ${formatNumber(pc.value)}`.trim();
+    const limit = `${operatorSymbol(pc.operator)} ${promqlValueText(fd, pc.value)}`.trim();
     return t("alerts.sections.condition.seriesOver", { count, limit });
   };
 
@@ -810,7 +820,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       const rule = ruleComparison(fd);
       const pc = rule ?? (qc.promql_rule_mode ? null : qc.promql_condition);
       if (forecastOf(fd) || !pc || !hasValue(pc.value)) return null;
-      const comparison = strong(comparisonWords(pc.operator, pc.value, t));
+      const comparison = strong(
+        comparisonWords(pc.operator, pc.value, t, promqlValueText(fd, pc.value)),
+      );
       if (qc.promql_multi_alert) {
         return labels.length
           ? {
@@ -966,7 +978,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         parts: { trigger: strong(trigger), window: plain(forecastWindowWords(fd)) },
       };
     }
-    const comparison = strong(comparisonWords(pc.operator, pc.value, t));
+    const comparison = strong(
+      comparisonWords(pc.operator, pc.value, t, promqlValueText(fd, pc.value)),
+    );
     if (kind === "promqlEach") return { keypath: FIRES_KEYS.promqlEach, parts: { comparison } };
     const count = Number(fd.trigger_condition?.threshold ?? 1);
     return {

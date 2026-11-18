@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { promqlMetricNames } from "./promqlMetrics";
+import { promqlMetricNames, promqlScaledToPercent } from "./promqlMetrics";
 
 describe("promqlMetricNames", () => {
   it.each([
@@ -36,5 +36,16 @@ describe("promqlMetricNames", () => {
     ['label_replace(up, "dst", "$1", "src", "(.*)") and on() vector(1)', ["up"]],
   ])("%s reads %j", (query, names) => {
     expect(promqlMetricNames(query)).toEqual(names);
+  });
+
+  it.each([
+    ['sum(rate(a{c=~"5.."}[5m])) / sum(rate(a[5m])) * 100', true],
+    ['100 * (1 - avg(rate(cpu{mode="idle"}[5m])))', true],
+    ["(a / b) *100", true],
+    ["a * 100 > 5", false],
+    ["sum(a) / sum(b)", false],
+    ["a * 1000", false],
+  ])("%s reads in percent: %s", (query, percent) => {
+    expect(promqlScaledToPercent(query)).toBe(percent);
   });
 });

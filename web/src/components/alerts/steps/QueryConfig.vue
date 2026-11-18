@@ -1903,6 +1903,7 @@ import { dataNoun, joinListMore } from "@/utils/alerts/alertCopy";
 import { isSpanDurationMeasure, UNIT_KEEPING_FUNCTIONS } from "@/utils/alerts/alertReadBack";
 import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
+import { promqlScaledToPercent } from "@/utils/alerts/promqlMetrics";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
 import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
@@ -2930,6 +2931,7 @@ export default defineComponent({
       }
       if (localTab.value !== "promql") return "";
       const query = editorPromqlQuery.value ?? "";
+      if (promqlScaledToPercent(query)) return raw("%");
       const bare = query
         .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "")
         .replace(/\{[^}]*\}/g, "")
