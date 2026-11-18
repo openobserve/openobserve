@@ -865,6 +865,25 @@ describe("IndexList Component", () => {
     });
   });
 
+  describe("field-values where clause with brackets", () => {
+    const valuesSql = async (editorValue: string, field: string) => {
+      mockSearchObj.data.editorValue = editorValue;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: field });
+      await flushPromises();
+      return atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql);
+    };
+    const clause = "(service_name='a' AND span_status='ERROR') OR duration > 1000";
+
+    it.each([
+      ["service_name", "(span_status='ERROR') OR duration > 1000"],
+      ["span_status", "(service_name='a') OR duration > 1000"],
+      ["http_status_code", clause],
+    ])("keeps the brackets balanced when the values of %s load", async (field, where) => {
+      expect(await valuesSql(clause, field)).toBe(`SELECT * FROM "test_stream" WHERE ${where}`);
+    });
+  });
+
   // ─── onStreamChange side-effects ──────────────────────────────────────────
 
   describe("onStreamChange side-effects", () => {

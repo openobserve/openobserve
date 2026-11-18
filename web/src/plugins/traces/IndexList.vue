@@ -208,7 +208,7 @@ import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
-import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
+import { removeConditions } from "@/utils/query/sqlFilterBuilder";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -410,12 +410,7 @@ export default defineComponent({
     const removeFieldFromWhereStr = (whereClause: string, fieldName: string): string => {
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
-      const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
-      const remaining = splitOnAnd(whereClause).filter((cond) => {
-        const trimmed = cond.trim();
-        return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
-      });
-      return remaining.join(" AND ");
+      return removeConditions(whereClause, (condition) => fieldPattern.test(condition));
     };
 
     const buildFieldValuesSql = (fieldName: string): string => {

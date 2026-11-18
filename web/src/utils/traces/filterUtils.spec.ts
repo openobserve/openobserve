@@ -440,6 +440,37 @@ describe("replaceExistingFieldCondition quotes and replacement tokens (issue 119
   });
 });
 
+describe("removeFieldCondition with brackets", () => {
+  it.each([
+    [
+      "removes only the unticked comparison inside a group",
+      "service_name='c' AND (http_status_code='500' OR span_status='ERROR')",
+      "http_status_code",
+      "service_name='c' AND (span_status='ERROR')",
+    ],
+    [
+      "removes a comparison from a bracketed AND inside an OR",
+      "(service_name='a' AND span_status='ERROR') OR duration > 1000",
+      "service_name",
+      "(span_status='ERROR') OR duration > 1000",
+    ],
+    [
+      "drops a group once every comparison in it is gone",
+      "env='prod' AND (code='500' OR code='502')",
+      "code",
+      "env='prod'",
+    ],
+    [
+      "leaves a bracketed filter as typed when the field is absent",
+      "(service_name='a' and span_status='ERROR') or duration > 1000",
+      "level",
+      "(service_name='a' and span_status='ERROR') or duration > 1000",
+    ],
+  ])("%s", (_name, query, field, expected) => {
+    expect(removeFieldCondition(query, field)).toBe(expected);
+  });
+});
+
 describe("removeFieldCondition with AND inside a quoted value (issue 11966)", () => {
   it("removes only the target condition and keeps a quoted ' and ' intact", () => {
     expect(removeFieldCondition("a = 'x and y' AND b = '1'", "b")).toBe("a = 'x and y'");

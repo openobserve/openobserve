@@ -152,6 +152,17 @@ describe("splitOnAnd", () => {
       ["-- it's noisy\nservice = 'api'", "level = 'error'\n-- that's all"],
     ],
     [
+      "keeps an AND inside brackets with its group",
+      "(service_name='a' AND span_status='ERROR') OR duration > 1000",
+      ["(service_name='a' AND span_status='ERROR') OR duration > 1000"],
+    ],
+    [
+      "splits only the top-level AND of a bracketed filter",
+      "service_name='c' AND (http_status_code='500' AND span_status='ERROR')",
+      ["service_name='c'", "(http_status_code='500' AND span_status='ERROR')"],
+    ],
+    ["does not count a bracket inside a quoted value", "a = '(' AND b = 1", ["a = '('", "b = 1"]],
+    [
       "falls back to a plain AND split when a quote is left unbalanced",
       "a = 'x AND b = 1",
       ["a = 'x", "b = 1"],
