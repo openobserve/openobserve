@@ -2632,10 +2632,16 @@ describe("QueryConfig.vue", () => {
           },
         },
       );
+      await flushPromises();
+      const column = () =>
+        host.find('[data-test="add-alert-group-limit"] [data-test="alert-sql-agg-column-select"]');
+      // The unpicked answer's controls stay hidden; the picked one's line starts at the column.
+      expect(column().exists()).toBe(false);
       wrapper.vm.onGroupAnswer("each");
       wrapper.vm.onGroupAnswer("one");
       wrapper.vm.onGroupAnswer("each");
       await flushPromises();
+      expect(column().exists()).toBe(true);
       const v = hostForm().state.values;
       expect(v.query_condition.aggregation.multi_alert).toBe(true);
       expect([v.trigger_condition.operator, v.trigger_condition.threshold]).toEqual([">", 5]);
