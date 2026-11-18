@@ -864,6 +864,31 @@ describe("IndexList Component", () => {
       await atLeast!.trigger("click");
       expect((wrapper.vm as any).searchObj.data.stream.addToFilter).toBe("duration>=5000");
     });
+
+    it("offers no filter for a percentile the server did not return", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({
+        fieldList: [{ name: "duration", label: "Duration", showValues: true, ftsKey: false }],
+      });
+      await flushPromises();
+      (wrapper.vm as any).durationPercentiles = {
+        p25: null,
+        p50: 2000,
+        p75: 3000,
+        p95: 4000,
+        p99: 5000,
+        max: 6000,
+      };
+      await flushPromises();
+
+      for (const button of wrapper.findAll("button")) await button.trigger("click");
+      const written = (wrapper.vm as any).searchObj.data.stream.addToFilter;
+      expect(wrapper.text()).not.toContain("P25");
+      expect(wrapper.findAll("button").map((b) => b.attributes("title"))).not.toContain(
+        "duration >= ",
+      );
+      expect(written).not.toContain("null");
+    });
   });
 
   describe("handleAddSearchTerm value escaping", () => {
