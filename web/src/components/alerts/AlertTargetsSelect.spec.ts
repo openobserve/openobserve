@@ -28,7 +28,15 @@ import AlertTargetsSelect from "./AlertTargetsSelect.vue";
 
 const OSelectStub = {
   name: "OSelect",
-  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups", "pinSelectedInGroups"],
+  props: [
+    "modelValue",
+    "options",
+    "multiple",
+    "error",
+    "collapsibleGroups",
+    "pinSelectedInGroups",
+    "dropdownStyle",
+  ],
   emits: ["update:modelValue"],
   template: `<div class="o-select" :data-error="String(error)" :data-multiple="String(multiple)">
     <span class="o-select-empty"><slot name="empty" /></span>
@@ -157,6 +165,12 @@ describe("AlertTargetsSelect", () => {
         ["pager", "pager · PagerDuty · events.pagerduty.com", "PagerDuty events.pagerduty.com"],
         ["chat", "chat · Slack webhook", "Slack webhook"],
       ]);
+      expect(
+        select(createWrapper({ destinationOptions: options, describe })).props("dropdownStyle"),
+      ).toBeTruthy();
+      expect(select(createWrapper({ destinationOptions: options })).props("dropdownStyle")).toBe(
+        undefined,
+      );
       const list = createWrapper({ destinationOptions: options, describe, list: true });
       expect(list.find('[data-test="alert-destinations-list"]').text()).toContain(
         "pager · PagerDuty · events.pagerduty.com",

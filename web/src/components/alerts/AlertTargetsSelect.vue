@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :error="error"
       :collapsible-groups="workflowsEnabled"
       pin-selected-in-groups
+      :dropdown-style="describe ? DESCRIBED_MENU : undefined"
       class="max-w-[18.75rem] min-w-[11.25rem] max-md:max-w-none max-md:min-w-0 max-md:flex-1 max-md:basis-[calc(100%-2rem)]"
       :class="[wrap && 'flex-1', oneLine && 'min-w-0!']"
       data-test="alert-destinations-select"
@@ -204,6 +205,8 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
+// Rows that also name the type and target need more room than a bare name.
+const DESCRIBED_MENU = { width: "min(32rem, calc(100vw - 1.5rem))" };
 const DEST = "dest:";
 const LIST_MAX = 8;
 const WF = "wf:";
