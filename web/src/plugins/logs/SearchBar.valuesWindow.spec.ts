@@ -51,7 +51,12 @@ describe("SearchBar — value suggestions search the selected time range", () =>
     vi.mocked(requestFieldValues).mockClear();
   });
 
-  const mountAt = async (startTime: unknown, endTime: unknown, type = "absolute") => {
+  const mountAt = async (
+    startTime: unknown,
+    endTime: unknown,
+    type = "absolute",
+    relativeTimePeriod?: string,
+  ) => {
     await router.replace({ name: "logs" });
     wrapper = mount(SearchBar, {
       global: {
@@ -67,7 +72,7 @@ describe("SearchBar — value suggestions search the selected time range", () =>
       },
     });
     wrapper.vm.searchObj.data.stream.selectedStream = ["app"];
-    wrapper.vm.searchObj.data.datetime = { type, startTime, endTime };
+    wrapper.vm.searchObj.data.datetime = { type, startTime, endTime, relativeTimePeriod };
     await nextTick();
   };
 
@@ -111,8 +116,24 @@ describe("SearchBar — value suggestions search the selected time range", () =>
     try {
       // Past 15 minutes, run at END, typed in an hour later.
       vi.setSystemTime((END + HOUR) / 1000);
-      await mountAt(END - 15 * MINUTE, END, "relative");
+      await mountAt(END - 15 * MINUTE, END, "relative", "15m");
       expect(await askedRange()).toEqual({ startTime: END + 45 * MINUTE, endTime: END + HOUR });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps Last week inside its calendar bounds instead of the last day before now", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime((END + HOUR) / 1000);
+      const { resolveCalendarPeriod } = await import("@/utils/dashboard/calendarPeriods");
+      const lastWeek = resolveCalendarPeriod("calendar:week:-1")!;
+      await mountAt(lastWeek.startTime, lastWeek.endTime, "relative", "calendar:week:-1");
+      expect(await askedRange()).toEqual({
+        startTime: lastWeek.endTime - 24 * HOUR,
+        endTime: lastWeek.endTime,
+      });
     } finally {
       vi.useRealTimers();
     }

@@ -729,7 +729,7 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { valuesWindowFor } from "@/composables/fieldValueStore";
+import { pageValuesWindow } from "@/composables/fieldValueStore";
 import useStreams from "@/composables/useStreams";
 import {
   applyFilterTerm,
@@ -748,6 +748,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
 import { useMutation, useQuery } from "@tanstack/vue-query";
+import { getConsumableRelativeTime } from "@/utils/date";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import savedViewsService from "@/services/saved_views";
@@ -963,11 +964,11 @@ export default defineComponent({
       setValuesTimeRange,
     } = useSqlSuggestions();
 
-    const pageValuesWindow = () =>
-      valuesWindowFor(searchObj.data.datetime ?? {}, Date.now() * 1000);
-    setValuesTimeRange(pageValuesWindow);
+    const currentValuesWindow = () =>
+      pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
+    setValuesTimeRange(currentValuesWindow);
     // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
-    const valuesWindow = computed(pageValuesWindow);
+    const valuesWindow = computed(currentValuesWindow);
 
     onActivated(async () => {
       await nextTick();

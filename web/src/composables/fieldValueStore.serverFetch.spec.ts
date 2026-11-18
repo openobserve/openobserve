@@ -29,7 +29,7 @@
 // In its own file because it needs @/services/stream mocked, and the existing
 // fieldValueStore.spec.ts deliberately mocks only the DB layer.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // A DB that actually remembers. Asserting "mergeValues was called" would pin
 // which writer the implementation picks; asserting the value comes back out
@@ -57,6 +57,7 @@ vi.mock("@/services/stream", async (importOriginal) => {
 });
 
 import streamService from "@/services/stream";
+import { getConsumableRelativeTime } from "@/utils/date";
 
 /**
  * A fresh copy of the module per test.
@@ -489,18 +490,11 @@ describe("requestFieldValues — an explicit time range", () => {
   });
 });
 
-describe("valuesWindowFor — the window a page's time range searches", () => {
+describe("valuesWindowFor — a time range cut to the window value lookups search", () => {
   const MINUTE = 60_000_000;
   const HOUR = 60 * MINUTE;
   // A minute boundary, so whole-minute ranges come back unchanged.
   const end = 29_000_000 * MINUTE;
-  const absolute = (startTime: unknown, endTime: unknown) => ({
-    type: "absolute",
-    startTime,
-    endTime,
-  });
-  // An absolute range ignores the clock, so any later time will do.
-  const later = end + 5 * HOUR;
 
   it.each([
     ["a range under a day, whole", end - 2 * HOUR, end, end - 2 * HOUR, false],
@@ -515,49 +509,24 @@ describe("valuesWindowFor — the window a page's time range searches", () => {
     ],
   ])("%s", async (_name, startTime, endTime, expectedStart, capped) => {
     const { valuesWindowFor } = await freshStore();
-    expect(valuesWindowFor(absolute(startTime, endTime), later)).toEqual({
+    expect(valuesWindowFor(startTime, endTime)).toEqual({
       startTime: expectedStart,
       endTime,
       capped,
     });
   });
 
-  it("takes a relative range from now, not from when it last ran", async () => {
-    const { valuesWindowFor } = await freshStore();
-    // Past 15 minutes, run at `end`, looked up an hour later.
-    const ranAt = { type: "relative", startTime: end - 15 * MINUTE, endTime: end };
-    expect(valuesWindowFor(ranAt, end + HOUR)).toEqual({
-      startTime: end + 45 * MINUTE,
-      endTime: end + HOUR,
-      capped: false,
-    });
-  });
-
-  it("cuts a relative range longer than a day to the day before now", async () => {
-    const { valuesWindowFor } = await freshStore();
-    const week = { type: "relative", startTime: end - 7 * 24 * HOUR, endTime: end };
-    expect(valuesWindowFor(week, end + HOUR)).toEqual({
-      startTime: end - 23 * HOUR,
-      endTime: end + HOUR,
-      capped: true,
-    });
-  });
-
   it("widens to whole minutes, so lookups inside one minute ask the same question", async () => {
     const { valuesWindowFor } = await freshStore();
-    const first = valuesWindowFor(absolute(end - HOUR + 5_000_000, end + 5_000_000), later);
-    const rerun = valuesWindowFor(absolute(end - HOUR + 40_000_000, end + 40_000_000), later);
+    const first = valuesWindowFor(end - HOUR + 5_000_000, end + 5_000_000);
+    const again = valuesWindowFor(end - HOUR + 40_000_000, end + 40_000_000);
     expect(first).toEqual({ startTime: end - HOUR, endTime: end + MINUTE, capped: false });
-    expect(rerun).toEqual(first);
-    const relative = { type: "relative", startTime: end - HOUR, endTime: end };
-    expect(valuesWindowFor(relative, end + 5_000_000)).toEqual(
-      valuesWindowFor(relative, end + 40_000_000),
-    );
+    expect(again).toEqual(first);
   });
 
   it("reads the microsecond strings a page may hold", async () => {
     const { valuesWindowFor } = await freshStore();
-    expect(valuesWindowFor(absolute(String(end - HOUR), String(end)), later)).toMatchObject({
+    expect(valuesWindowFor(String(end - HOUR), String(end))).toMatchObject({
       startTime: end - HOUR,
       endTime: end,
     });
@@ -570,13 +539,12 @@ describe("valuesWindowFor — the window a page's time range searches", () => {
     ["a range that ends before it starts", end, end - HOUR],
   ])("is null for %s, so the lookup keeps the fifteen-minute window", async (_name, s, e) => {
     const { valuesWindowFor } = await freshStore();
-    expect(valuesWindowFor(absolute(s, e), later)).toBeNull();
-    expect(valuesWindowFor({ type: "relative", startTime: s, endTime: e }, later)).toBeNull();
+    expect(valuesWindowFor(s, e)).toBeNull();
   });
 
   it("asks the server for the latest day of a week-long range", async () => {
     const store = await freshStore();
-    const timeRange = store.valuesWindowFor(absolute(end - 7 * 24 * HOUR, end), later)!;
+    const timeRange = store.valuesWindowFor(end - 7 * 24 * HOUR, end)!;
     await store.requestFieldValues(ctx, "level", { timeRange });
     const [args] = vi.mocked(streamService.fieldValues).mock.calls[0] as any[];
     expect(args.start_time).toBe(end - 24 * HOUR);
@@ -586,6 +554,68 @@ describe("valuesWindowFor — the window a page's time range searches", () => {
   it("names the cap the editor quotes", async () => {
     const store = await freshStore();
     expect(store.FIELD_VALUES_MAX_RANGE_HOURS).toBe(24);
+  });
+});
+
+describe("pageValuesWindow — the window for a page's date-time, resolved as its search resolves it", () => {
+  const MINUTE = 60_000_000;
+  const HOUR = 60 * MINUTE;
+  // Wednesday 2026-11-18 10:00 UTC; any day works, the bounds come from the same resolver.
+  const NOW_MS = Date.UTC(2026, 10, 18, 10, 0);
+  // Stored times from the last run, an hour before now: a lookup must not use them.
+  const stale = { startTime: NOW_MS * 1000 - 3 * HOUR, endTime: NOW_MS * 1000 - 2 * HOUR };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW_MS);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("takes a rolling period up to now", async () => {
+    const { pageValuesWindow } = await freshStore();
+    expect(
+      pageValuesWindow(
+        { type: "relative", relativeTimePeriod: "15m", ...stale },
+        getConsumableRelativeTime,
+      ),
+    ).toEqual({
+      startTime: NOW_MS * 1000 - 15 * MINUTE,
+      endTime: NOW_MS * 1000,
+      capped: false,
+    });
+  });
+
+  it.each([
+    ["Yesterday", "calendar:day:-1"],
+    ["Last week", "calendar:week:-1"],
+  ])("keeps %s inside its own calendar bounds", async (_name, token) => {
+    const { pageValuesWindow } = await freshStore();
+    const { resolveCalendarPeriod } = await import("@/utils/dashboard/calendarPeriods");
+    const period = resolveCalendarPeriod(token)!;
+    const window = pageValuesWindow(
+      { type: "relative", relativeTimePeriod: token, ...stale },
+      getConsumableRelativeTime,
+    )!;
+    expect(window.endTime).toBe(period.endTime);
+    expect(window.startTime).toBe(Math.max(period.startTime, period.endTime - 24 * HOUR));
+  });
+
+  it("uses an absolute range as stored", async () => {
+    const { pageValuesWindow } = await freshStore();
+    expect(pageValuesWindow({ type: "absolute", ...stale }, getConsumableRelativeTime)).toEqual({
+      ...stale,
+      capped: false,
+    });
+  });
+
+  it("is null for a relative period it cannot read", async () => {
+    const { pageValuesWindow } = await freshStore();
+    expect(
+      pageValuesWindow(
+        { type: "relative", relativeTimePeriod: "soon", ...stale },
+        getConsumableRelativeTime,
+      ),
+    ).toBeNull();
   });
 });
 

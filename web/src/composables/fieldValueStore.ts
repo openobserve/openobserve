@@ -351,31 +351,39 @@ export interface FieldValuesWindow extends FieldValuesTimeRange {
   capped?: boolean;
 }
 
-/** A page's date-time state: microseconds, possibly as strings, and whether it is relative to now. */
+/** A page's date-time state: microseconds, possibly as strings, or a relative period such as `15m` or `calendar:week:-1`. */
 export interface PageTimeRange {
   type?: string;
   startTime?: unknown;
   endTime?: unknown;
+  relativeTimePeriod?: unknown;
 }
 
-/** The window a page's value lookups search at `nowMicros`; null when the page has no usable range. */
-export const valuesWindowFor = (
-  range: PageTimeRange,
-  nowMicros: number,
-): FieldValuesWindow | null => {
-  const start = Number(range.startTime);
-  const end = Number(range.endTime);
+/** A time range as the window value lookups search: its latest day at most; null when it is not a range. */
+export const valuesWindowFor = (startTime: unknown, endTime: unknown): FieldValuesWindow | null => {
+  const start = Number(startTime);
+  const end = Number(endTime);
   if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) return null;
-  const span = end - start;
-  // A relative range's stored times are from its last run; the same period now is what it means.
-  const [from, to] = range.type === "relative" ? [nowMicros - span, nowMicros] : [start, end];
-  const capped = span > MAX_RANGE_MICROS;
+  const capped = end - start > MAX_RANGE_MICROS;
   // Whole minutes, so lookups within one minute ask the cached question again.
-  const windowEnd = Math.ceil(to / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+  const windowEnd = Math.ceil(end / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
   const windowStart = capped
     ? windowEnd - MAX_RANGE_MICROS
-    : Math.floor(from / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+    : Math.floor(start / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
   return { startTime: windowStart, endTime: windowEnd, capped };
+};
+
+/** The window for a page's date-time; `resolveRelative` is the page search's own resolver (getConsumableRelativeTime). */
+export const pageValuesWindow = (
+  datetime: PageTimeRange,
+  resolveRelative: (period: string) => FieldValuesTimeRange | null | undefined,
+): FieldValuesWindow | null => {
+  // The stored times are from the last run, and a calendar period is not "the same length up to now".
+  const range =
+    datetime.type === "relative"
+      ? resolveRelative(String(datetime.relativeTimePeriod ?? ""))
+      : datetime;
+  return range ? valuesWindowFor(range.startTime, range.endTime) : null;
 };
 
 // The read cache is filled synchronously so the next keystroke is local; IndexedDB persistence can wait.
