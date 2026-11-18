@@ -4582,6 +4582,11 @@ async fn attach_anomaly_chart(
 
     use crate::alerts::notifications::{ChannelFormat, chart, derive_channel_format};
     if !template_wants_anomaly_chart(&resolved.effective) {
+        log::debug!(
+            "[ALERT_CHART] anomaly {} template has the chart off",
+            actx.anomaly_id
+        );
+        chart::chart_event("template_off");
         return;
     }
     let current: Vec<chart::AnomalySeriesPoint> = actx
@@ -4619,9 +4624,14 @@ async fn attach_anomaly_chart(
         ChannelFormat::Discord
     );
     ctx.chart_url = Some(url);
-    ctx.chart_png = needs_png
-        .then(|| chart::try_render_png(&payload).map(std::sync::Arc::new))
-        .flatten();
+    // Several detectors fire on one tick, so an anomaly send waits briefly for a render permit.
+    ctx.chart_png = if needs_png {
+        chart::render_png_waiting(&payload)
+            .await
+            .map(std::sync::Arc::new)
+    } else {
+        None
+    };
 }
 
 /// The compiled default (also as its seeded copy) charts though its flag is off (D5).

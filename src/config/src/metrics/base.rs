@@ -1368,7 +1368,8 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
 // deliberately NO organization/alert labels: signature failures carry
 // attacker-controlled request data, which must never become label values.
 // Events: rendered_fetch, cache_hit, rendered_send, bad_signature, expired,
-// malformed, over_capacity, send_rate_capped.
+// malformed, over_capacity, send_rate_capped, render_busy, render_failed, disabled,
+// build_timeout, bad_request, no_points, url_failed, template_off.
 pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(

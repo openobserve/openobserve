@@ -53,6 +53,8 @@ const ANOMALY_STREAM: &str = "_anomalies";
 /// Each destination of one run reuses the chart instead of querying again.
 const ANOMALY_CHART_TTL: Duration = Duration::from_secs(60);
 const ANOMALY_BUILD_TIMEOUT: Duration = Duration::from_secs(5);
+/// An anomaly send waits this long for a render permit, then goes out without the chart.
+const ANOMALY_RENDER_WAIT: Duration = Duration::from_secs(2);
 /// A 24 h lookback of 1-minute buckets is 1,440 rows; this leaves room for event rows.
 const ANOMALY_SERIES_ROWS: i64 = 5000;
 
@@ -371,6 +373,11 @@ pub async fn build_payload(req: &ChartRequest<'_>) -> Option<ChartPayload> {
 /// The signed URL and payload of an anomaly chart, cached 60 s per run, with a 5 s build cap.
 pub async fn build_anomaly_chart(req: &AnomalyChartRequest<'_>) -> Option<(String, ChartPayload)> {
     if !config::get_config().limit.alert_chart_enabled {
+        log::debug!(
+            "[ALERT_CHART] charts are off; anomaly {} sends without one",
+            req.anomaly_id
+        );
+        chart_event("disabled");
         return None;
     }
     let key = (
@@ -390,6 +397,7 @@ pub async fn build_anomaly_chart(req: &AnomalyChartRequest<'_>) -> Option<(Strin
             req.org_id,
             req.anomaly_id
         );
+        chart_event("build_timeout");
         return None;
     };
     let (url, payload) = built?;
@@ -439,7 +447,35 @@ pub async fn build_chart_url(org_id: &str, p: &ChartPayload) -> Option<String> {
 /// per-node semaphore as fetch-side renders; at capacity the send proceeds
 /// chartless.
 pub fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
-    let _permit = render_semaphore().try_acquire().ok()?;
+    let Ok(_permit) = render_semaphore().try_acquire() else {
+        return render_busy();
+    };
+    render_send_png(p)
+}
+
+/// The anomaly send's render: it waits up to [`ANOMALY_RENDER_WAIT`] for a permit.
+pub async fn render_png_waiting(p: &ChartPayload) -> Option<Vec<u8>> {
+    let Ok(Ok(_permit)) =
+        tokio::time::timeout(ANOMALY_RENDER_WAIT, render_semaphore().acquire()).await
+    else {
+        return render_busy();
+    };
+    render_send_png(p)
+}
+
+fn render_busy() -> Option<Vec<u8>> {
+    log::warn!("[ALERT_CHART] render busy, sending without chart");
+    chart_event("render_busy");
+    None
+}
+
+pub(crate) fn chart_event(event: &str) {
+    config::metrics::ALERT_CHART_EVENTS_TOTAL
+        .with_label_values(&[event])
+        .inc();
+}
+
+fn render_send_png(p: &ChartPayload) -> Option<Vec<u8>> {
     match render::render_png(p) {
         Ok(png) => {
             config::metrics::ALERT_CHART_EVENTS_TOTAL
@@ -449,6 +485,7 @@ pub fn try_render_png(p: &ChartPayload) -> Option<Vec<u8>> {
         }
         Err(e) => {
             log::warn!("[ALERT_CHART] send-time render failed: {e}");
+            chart_event("render_failed");
             None
         }
     }
@@ -464,12 +501,20 @@ async fn build_anomaly_chart_uncached(
     req: &AnomalyChartRequest<'_>,
 ) -> Option<(String, ChartPayload)> {
     if !ids_are_safe(req.org_id, req.anomaly_id) || req.window_end_us <= 0 {
+        log::warn!(
+            "[ALERT_CHART] anomaly {} has no chart: unsafe id or window end {}",
+            req.anomaly_id,
+            req.window_end_us
+        );
+        chart_event("bad_request");
         return None;
     }
     if !query_budget_available() {
-        config::metrics::ALERT_CHART_EVENTS_TOTAL
-            .with_label_values(&["send_rate_capped"])
-            .inc();
+        log::warn!(
+            "[ALERT_CHART] chart query budget spent, anomaly {} sends without chart",
+            req.anomaly_id
+        );
+        chart_event("send_rate_capped");
         return None;
     }
     let lookback = anomaly_lookback_secs(req.bucket_seconds);
@@ -498,8 +543,22 @@ async fn build_anomaly_chart_uncached(
         .min()
         .unwrap_or(req.window_end_us - req.bucket_seconds.max(1) * 1_000_000);
     let title = format!("{} · {}", req.anomaly_name, req.stream_name);
-    let payload = anomaly_payload(title, &points, run_start_us, req.window_end_us)?;
-    let url = build_chart_url(req.org_id, &payload).await?;
+    let Some(payload) = anomaly_payload(title, &points, run_start_us, req.window_end_us) else {
+        log::warn!(
+            "[ALERT_CHART] anomaly {} has no points to chart",
+            req.anomaly_id
+        );
+        chart_event("no_points");
+        return None;
+    };
+    let Some(url) = build_chart_url(req.org_id, &payload).await else {
+        log::warn!(
+            "[ALERT_CHART] anomaly {} chart URL not signed",
+            req.anomaly_id
+        );
+        chart_event("url_failed");
+        return None;
+    };
     Some((url, payload))
 }
 
@@ -1066,5 +1125,52 @@ mod tests {
         assert_eq!(band.len(), 4);
         assert_eq!(band[2], None);
         assert_eq!(band[3], Some((90.0, 110.0)));
+    }
+
+    /// The permit tests share the node semaphore, and a fair queue would deadlock two of them.
+    static PERMIT_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[tokio::test]
+    async fn an_anomaly_send_waits_for_a_render_permit_and_a_scheduled_one_does_not() {
+        let _serial = PERMIT_TESTS.lock().await;
+        let points: Vec<AnomalySeriesPoint> = (0..9).map(|i| anomalous(i, 300.0)).collect();
+        let p = anomaly_payload("t".into(), &points, T0, T0 + 9 * B).unwrap();
+        assert_eq!(
+            (p.points.len(), p.marks.len()),
+            (9, 9),
+            "a run with no normal point charts"
+        );
+        let held = render_semaphore()
+            .acquire_many(max_concurrent_renders() as u32)
+            .await
+            .unwrap();
+        let started = Instant::now();
+        assert!(try_render_png(&p).is_none());
+        // It never waits: a wait would last the whole ANOMALY_RENDER_WAIT.
+        assert!(started.elapsed() < ANOMALY_RENDER_WAIT);
+        let release = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            drop(held);
+        });
+        let png = render_png_waiting(&p)
+            .await
+            .expect("a PNG once a permit frees");
+        assert!(png.starts_with(b"\x89PNG"));
+        release.await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn two_anomaly_sends_on_one_permit_both_get_a_png() {
+        let _serial = PERMIT_TESTS.lock().await;
+        let points: Vec<AnomalySeriesPoint> = (0..9).map(|i| anomalous(i, 300.0)).collect();
+        let p = anomaly_payload("t".into(), &points, T0, T0 + 9 * B).unwrap();
+        let others = (max_concurrent_renders() - 1) as u32;
+        let _held = render_semaphore().acquire_many(others).await.unwrap();
+        let send = |p: ChartPayload| tokio::spawn(async move { render_png_waiting(&p).await });
+        let (a, b) = tokio::join!(send(p.clone()), send(p));
+        assert!(
+            a.unwrap().is_some() && b.unwrap().is_some(),
+            "the second send waits"
+        );
     }
 }
