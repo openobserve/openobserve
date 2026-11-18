@@ -344,12 +344,6 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.vm.operatorLabel("<")).toBe("fewer than");
       expect(wrapper.vm.operatorLabel("~=")).toBe("~=");
     });
-
-    it("stores the same operator symbols whether a row shows words or symbols", () => {
-      expect(wrapper.vm.plainOperators.map((o: { value: string }) => o.value).sort()).toEqual(
-        [...wrapper.vm.numericOperators].sort(),
-      );
-    });
   });
 
   describe("Timezone Options", () => {
@@ -2112,6 +2106,33 @@ describe("QueryConfig.vue", () => {
       });
       await flushPromises();
       expect(await submitHost(h)).toBe(true);
+      h.unmount();
+    });
+
+    it("promql: the value limit offers the same worded comparisons as a count", async () => {
+      const h = mountMetrics();
+      await flushPromises();
+      const select = h
+        .findAllComponents({ name: "OFormSelect" })
+        .find((c) => c.props("name") === "query_condition.promql_condition.operator");
+      const qc = h.findComponent(QueryConfig).vm as any;
+      expect(select?.props("options")).toEqual(qc.plainOperators);
+      h.unmount();
+    });
+
+    it("sql: an empty editor shows a static example, not one that types itself out", async () => {
+      const { h } = mountHost({
+        tab: "sql",
+        sqlQuery: "",
+        streamName: "k8s_events",
+        columns: [{ label: "level", value: "level", type: "Utf8" }],
+      });
+      await flushPromises();
+      const placeholder = () => h.get('[data-test="alert-query-editor-placeholder"]').text();
+      const first = placeholder();
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      expect(first).toContain("SELECT");
+      expect(placeholder()).toBe(first);
       h.unmount();
     });
 

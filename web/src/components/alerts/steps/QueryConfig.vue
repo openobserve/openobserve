@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OFormSelect
                               :aria-label="t('common.operator')"
                               name="query_condition.aggregation.having.operator"
-                              :options="numericOperators"
+                              :options="plainOperators"
                               :searchable="false"
                               width="xs"
                               data-test="alert-condition-operator-select"
@@ -346,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                             <span
                               class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                              >{{ conditionOperator }}</span
+                              >{{ operatorLabel(conditionOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
                               <OFormInput
@@ -639,7 +639,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <OFormSelect
                               :aria-label="t('common.operator')"
                               name="query_condition.aggregation.having.operator"
-                              :options="numericOperators"
+                              :options="plainOperators"
                               :searchable="false"
                               width="xs"
                               @update:model-value="onConditionOperatorChange"
@@ -679,7 +679,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                             <span
                               class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                              >{{ conditionOperator }}</span
+                              >{{ operatorLabel(conditionOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
                               <OFormInput
@@ -1415,7 +1415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <OFormSelect
                                   :aria-label="t('common.operator')"
                                   name="query_condition.aggregation.having.operator"
-                                  :options="numericOperators"
+                                  :options="plainOperators"
                                   :searchable="false"
                                   class="w-16!"
                                   :disabled="groupAnswer === 'one'"
@@ -1511,7 +1511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                             <span
                               class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                              >{{ conditionOperator }}</span
+                              >{{ operatorLabel(conditionOperator) }}</span
                             >
                             <div class="flex flex-col gap-1">
                               <OFormInput
@@ -1595,7 +1595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OFormSelect
                             :aria-label="t('alerts.alertIfValueIs')"
                             name="query_condition.promql_condition.operator"
-                            :options="numericOperators"
+                            :options="plainOperators"
                             :searchable="false"
                             data-test="alert-threshold-operator-select"
                             width="xs"
@@ -1635,7 +1635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                           <span
                             class="text-text-secondary text-compact w-field-width-xs shrink-0 text-center leading-8.5 font-semibold"
-                            >{{ promqlOperatorEcho }}</span
+                            >{{ operatorLabel(promqlOperatorEcho) }}</span
                           >
                           <div class="flex flex-col gap-1">
                             <OFormInput
@@ -2338,7 +2338,7 @@ export default defineComponent({
     const vrlEditorPlaceholderFlag = ref(true);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
-    // ─── Typewriter placeholder for the inline query editor ──────────
+    // ─── Example placeholder for the inline query editor ──────────
     const streamFieldsForPlaceholder = computed(() =>
       (props.columns as any[]).map((c: any) => ({
         name: typeof c === "string" ? c : (c.value ?? c.label ?? ""),
@@ -2347,7 +2347,7 @@ export default defineComponent({
     );
     const noStreamForPlaceholder = computed(() => !props.streamName);
     const isSqlModeForPlaceholder = computed(() => localTab.value === "sql");
-    const { placeholder: sqlEditorPlaceholder } = useQueryPlaceholder(
+    const { examples: sqlExamples } = useQueryPlaceholder(
       streamFieldsForPlaceholder,
       ref({}),
       isSqlModeForPlaceholder,
@@ -2394,6 +2394,12 @@ export default defineComponent({
     const promqlEditorPlaceholder = computed(() => {
       const example = promqlSamples.value[0]?.query;
       return example ? t("alerts.composite.expressionExample", { example: raw(example) }) : "";
+    });
+    // Static like PromQL's: a typed-out query reads as one already written.
+    const sqlEditorPlaceholder = computed(() => {
+      const example = sqlExamples.value[0];
+      if (!example || noStreamForPlaceholder.value) return example ?? "";
+      return t("alerts.composite.expressionExample", { example: raw(example) });
     });
     const inlineEditorPlaceholder = computed(() =>
       localTab.value === "promql" && promqlSamples.value.length
@@ -2521,8 +2527,6 @@ export default defineComponent({
       },
     ]);
 
-    // Numeric-only operators (no Contains/NotContains for thresholds)
-    const numericOperators = ["=", "!=", ">=", ">", "<=", "<"];
     const plainOperators = computed(() => [
       { label: t("alerts.sections.operators.gte"), value: ">=" },
       { label: t("alerts.sections.operators.gt"), value: ">" },
@@ -4302,7 +4306,6 @@ export default defineComponent({
       // V3.1 inline condition
       isEventBased,
       logFunctionOptions,
-      numericOperators,
       operatorLabel,
       plainOperators,
       selectedFunction,

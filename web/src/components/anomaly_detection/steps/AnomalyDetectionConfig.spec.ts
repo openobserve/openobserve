@@ -1153,15 +1153,15 @@ describe("AnomalyDetectionConfig", () => {
       ];
       expect(units).toEqual([
         "Detection Resolution unit",
-        "Check Every unit",
-        "Look Back Window unit",
+        "Check every unit",
+        "Look back over unit",
       ]);
       expect(new Set(units).size).toBe(units.length);
 
       expect(label("anomaly-detection-function")).toBe("Detection Function");
       expect(label("anomaly-histogram-interval-value")).toBe("Detection Resolution");
-      expect(label("anomaly-schedule-interval-value")).toBe("Check Every");
-      expect(label("anomaly-detection-window-value")).toBe("Look Back Window");
+      expect(label("anomaly-schedule-interval-value")).toBe("Check every");
+      expect(label("anomaly-detection-window-value")).toBe("Look back over");
       expect(label("anomaly-training-window")).toBe("Training Window");
     });
 
