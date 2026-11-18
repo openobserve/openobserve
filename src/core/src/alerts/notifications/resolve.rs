@@ -137,6 +137,7 @@ pub fn resolve_content(
     };
     unknown_variables.append(&mut unk);
 
+    let default_fields = super::default_template::is_default_field_list(&spec.fields);
     let mut fields = Vec::new();
     for field in &spec.fields {
         if let Some(filter) = &field.show_when
@@ -144,7 +145,7 @@ pub fn resolve_content(
         {
             continue;
         }
-        if !super::default_template::default_field_applies(field, ctx.kind) {
+        if default_fields && !super::default_template::default_field_applies(field, ctx.kind) {
             continue;
         }
         let (label, mut unk) = substitute_raw(&field.label, ctx);

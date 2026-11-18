@@ -67,7 +67,15 @@ const FIELDS: [(&str, &str); 20] = [
     ("Time", "{alert_trigger_time_utc}"),
 ];
 
-/// Whether `field` of the default (or a copy of it) applies to a send of `kind`.
+/// True for the default's own field list, also in its seeded copy; an authored list keeps all.
+pub fn is_default_field_list(fields: &[ContentField]) -> bool {
+    fields.len() == FIELDS.len()
+        && fields.iter().zip(FIELDS).all(|(field, (label, value))| {
+            field.label == label && field.value == value && field.show_when.is_none()
+        })
+}
+
+/// Whether `field` of the default's field list applies to a send of `kind`.
 pub fn default_field_applies(field: &ContentField, kind: NotificationKind) -> bool {
     let is = |(label, value): &(&str, &str)| field.label == *label && field.value == *value;
     if kind == NotificationKind::Anomaly {
@@ -221,6 +229,42 @@ mod tests {
                 "{level:?}"
             );
         }
+    }
+
+    #[test]
+    fn an_authored_score_field_stays_on_an_anomaly_and_the_default_drops_it() {
+        let mut ctx = example_context(NotificationKind::Anomaly, false);
+        ctx.context_attributes.retain(|(k, _)| k != "anomaly_score");
+        ctx.context_attributes
+            .push(("anomaly_score".into(), "0.91 vs 0.80".into()));
+        let labels = |spec: &ContentSpec| -> Vec<String> {
+            resolve_content(spec, &ctx, "slack")
+                .fields
+                .into_iter()
+                .map(|(label, _)| label)
+                .collect()
+        };
+        assert!(!labels(&compiled_default_content()).contains(&"Score".to_string()));
+        let mut authored = compiled_default_content();
+        authored.fields = vec![
+            ContentField {
+                label: "Score".into(),
+                value: "{anomaly_score}".into(),
+                show_when: None,
+            },
+            ContentField {
+                label: "Expected".into(),
+                value: "{expected_lower}-{expected_upper}".into(),
+                show_when: None,
+            },
+        ];
+        assert_eq!(labels(&authored), ["Score", "Expected"]);
+        let mut edited = compiled_default_content();
+        edited.fields.pop();
+        assert!(
+            labels(&edited).contains(&"Score".to_string()),
+            "an edited copy of the default is an authored list"
+        );
     }
 
     #[test]
