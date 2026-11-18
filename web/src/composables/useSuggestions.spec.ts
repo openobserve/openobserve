@@ -733,6 +733,23 @@ describe("setValuesTimeRange — values follow the caller's time range", () => {
     await c.resolveFieldValues("level");
     expect(vi.mocked(requestFieldValues).mock.calls[0][2]?.timeRange).toBeUndefined();
   });
+
+  it("reads a range given as a function at each lookup, so a relative range follows the clock", async () => {
+    let current: typeof range | null = range;
+    const c = makeComposable();
+    c.setValuesTimeRange(() => current);
+    await c.resolveFieldValues("level");
+    const moved = {
+      startTime: range.startTime + 3_600_000_000,
+      endTime: range.endTime + 3_600_000_000,
+    };
+    current = moved;
+    await c.resolveFieldValues("level");
+    current = null;
+    await c.resolveFieldValues("level");
+    const asked = vi.mocked(requestFieldValues).mock.calls.map((call) => call[2]?.timeRange);
+    expect(asked).toEqual([range, moved, undefined]);
+  });
 });
 
 // ─── a typed prefix reaches past the top ten ──────────────────────────────────

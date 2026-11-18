@@ -2412,10 +2412,11 @@ export default defineComponent({
       setValuesTimeRange,
     } = useSqlSuggestions();
 
-    const valuesWindow = computed(() =>
-      valuesWindowFor(searchObj.data.datetime?.startTime, searchObj.data.datetime?.endTime),
-    );
-    watch(valuesWindow, (range) => setValuesTimeRange(range), { immediate: true });
+    const pageValuesWindow = () =>
+      valuesWindowFor(searchObj.data.datetime ?? {}, Date.now() * 1000);
+    setValuesTimeRange(pageValuesWindow);
+    // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
+    const valuesWindow = computed(pageValuesWindow);
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);

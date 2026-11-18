@@ -51,7 +51,7 @@ describe("SearchBar — value suggestions search the selected time range", () =>
     vi.mocked(requestFieldValues).mockClear();
   });
 
-  const mountAt = async (startTime: unknown, endTime: unknown) => {
+  const mountAt = async (startTime: unknown, endTime: unknown, type = "absolute") => {
     await router.replace({ name: "logs" });
     wrapper = mount(SearchBar, {
       global: {
@@ -67,7 +67,7 @@ describe("SearchBar — value suggestions search the selected time range", () =>
       },
     });
     wrapper.vm.searchObj.data.stream.selectedStream = ["app"];
-    wrapper.vm.searchObj.data.datetime = { type: "absolute", startTime, endTime };
+    wrapper.vm.searchObj.data.datetime = { type, startTime, endTime };
     await nextTick();
   };
 
@@ -104,6 +104,18 @@ describe("SearchBar — value suggestions search the selected time range", () =>
     };
     await nextTick();
     expect(await askedRange()).toEqual({ startTime: END - 26 * HOUR, endTime: END - 24 * HOUR });
+  });
+
+  it("looks up a relative range from now, not from when it last ran", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      // Past 15 minutes, run at END, typed in an hour later.
+      vi.setSystemTime((END + HOUR) / 1000);
+      await mountAt(END - 15 * MINUTE, END, "relative");
+      expect(await askedRange()).toEqual({ startTime: END + 45 * MINUTE, endTime: END + HOUR });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the fifteen-minute lookback when the page has no usable range", async () => {

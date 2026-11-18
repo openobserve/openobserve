@@ -162,22 +162,37 @@ const useSqlSuggestions = () => {
   const sameStreamContext = (a: StreamContext, b: StreamContext | null): boolean =>
     !!b && a.org === b.org && a.streamType === b.streamType && a.streamName === b.streamName;
 
-  // Null means the default fifteen-minute lookback; a dashboard panel sets its own range.
-  let valuesTimeRange: FieldValuesTimeRange | null = null;
+  const validRange = (range: FieldValuesTimeRange | null): FieldValuesTimeRange | null =>
+    !!range &&
+    Number.isFinite(range.startTime) &&
+    Number.isFinite(range.endTime) &&
+    range.startTime < range.endTime
+      ? { startTime: range.startTime, endTime: range.endTime }
+      : null;
 
-  const setValuesTimeRange = (range: { startTime: number; endTime: number } | null): void => {
-    const valid =
-      !!range &&
-      Number.isFinite(range.startTime) &&
-      Number.isFinite(range.endTime) &&
-      range.startTime < range.endTime;
-    valuesTimeRange = valid ? { startTime: range.startTime, endTime: range.endTime } : null;
+  // Null means the default fifteen-minute lookback; a dashboard panel or a page sets its own range.
+  let readValuesTimeRange = (): FieldValuesTimeRange | null => null;
+
+  /** A function is read at every lookup, so a range relative to now follows the clock; it must return equal ranges within a lookup. */
+  const setValuesTimeRange = (
+    range: FieldValuesTimeRange | null | (() => FieldValuesTimeRange | null),
+  ): void => {
+    if (typeof range === "function") {
+      readValuesTimeRange = () => validRange(range());
+      return;
+    }
+    const fixed = validRange(range);
+    readValuesTimeRange = () => fixed;
   };
 
-  const lookupUnchanged = (ctx: StreamContext, range: FieldValuesTimeRange | null): boolean =>
-    sameStreamContext(ctx, readStreamContext()) &&
-    range?.startTime === valuesTimeRange?.startTime &&
-    range?.endTime === valuesTimeRange?.endTime;
+  const lookupUnchanged = (ctx: StreamContext, range: FieldValuesTimeRange | null): boolean => {
+    const current = readValuesTimeRange();
+    return (
+      sameStreamContext(ctx, readStreamContext()) &&
+      range?.startTime === current?.startTime &&
+      range?.endTime === current?.endTime
+    );
+  };
 
   // Resolves to null when the server misses the wait, so local values are not held back by it.
   const withinServerWait = (lookup: Promise<string[]>, ms: number): Promise<string[] | null> => {
@@ -214,7 +229,7 @@ const useSqlSuggestions = () => {
       if (inSession.length) return inSession;
       throw noValueLookup();
     }
-    const range = valuesTimeRange;
+    const range = readValuesTimeRange();
 
     let stored: string[] = [];
     // Persisted values come from any window, so a caller with its own range does not get them.
