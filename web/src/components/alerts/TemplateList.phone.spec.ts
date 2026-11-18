@@ -52,6 +52,7 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
   };
 
   afterEach(() => {
+    localStorage.clear();
     wrapper?.unmount();
     wrapper = undefined;
     mdUpRef.value = true;
@@ -66,6 +67,23 @@ describe("TemplateList at phone width (B37)", { timeout: 15000 }, () => {
     const shown = headers(wrapper!);
     expect(shown).toContain("Name");
     expect(shown).not.toContain("Applies to");
+    expect(shown).not.toContain("Used by");
+  });
+
+  it("lets a phone user show a hidden column again from the column chooser", async () => {
+    mdUpRef.value = false;
+    await mountList();
+
+    const toggle = wrapper!.findComponent({ name: "OTableColumnToggle" });
+    expect(toggle.exists()).toBe(true);
+    expect(toggle.props("columns").map((c: { id: string }) => c.id)).toEqual(
+      expect.arrayContaining(["applies_to", "used_by"]),
+    );
+    toggle.vm.$emit("update:columnVisibility", { applies_to: true, used_by: false });
+    await flushPromises();
+
+    const shown = headers(wrapper!);
+    expect(shown).toContain("Applies to");
     expect(shown).not.toContain("Used by");
   });
 

@@ -92,6 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="visibleRows"
           :columns="columns"
           :column-visibility="columnVisibility"
+          table-id="alert-templates"
+          :persist-columns="true"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -541,6 +543,7 @@ const columns: OTableColumnDef[] = [
 ];
 // Below md the two 200px columns took the row and cut each name to a few letters.
 // An explicit map, not undefined, so the columns come back when the viewport grows.
+// The column chooser (persist-columns) lets a user show either column again; that choice wins.
 const { isMobile } = useBreakpoint();
 const columnVisibility = computed(() => ({
   applies_to: !isMobile.value,
