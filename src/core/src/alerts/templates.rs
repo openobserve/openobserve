@@ -76,21 +76,23 @@ pub(crate) fn ownership_of(saved: &Template) -> (&str, Authz) {
     (&saved.org_id, Authz::new(&saved.name))
 }
 
-/// Refuses a body over [`BODY_MAX_BYTES`] unless it is the stored body, so an older large row
-/// keeps saving edits to its other fields (o2-enterprise#3431 B14). A content body counts as
-/// unchanged when it parses to the same spec, because the editor re-formats the JSON on every save.
-pub(crate) fn check_body_size(
-    body: &str,
+/// Holds a saved body to [`BODY_MAX_BYTES`] and returns the body to store (o2-enterprise#3431 B14).
+/// The stored body passes unchanged, so an older large row keeps saving edits to its other fields.
+/// The editor re-formats content JSON on every save, so a content body that parses to the stored
+/// spec counts as unchanged, and the stored bytes are kept: the row cannot grow that way.
+pub(crate) fn limit_body(
+    body: String,
     existing: Option<&str>,
     content: bool,
-) -> Result<(), TemplateError> {
-    if body.len() <= BODY_MAX_BYTES {
-        return Ok(());
+) -> Result<String, TemplateError> {
+    if body.len() <= BODY_MAX_BYTES || existing == Some(body.as_str()) {
+        return Ok(body);
     }
     if let Some(stored) = existing
-        && (stored == body || (content && reformatted(stored, body)))
+        && content
+        && same_spec(stored, &body)
     {
-        return Ok(());
+        return Ok(stored.to_string());
     }
     Err(TemplateError::BodyTooLarge {
         size: body.len(),
@@ -98,27 +100,15 @@ pub(crate) fn check_body_size(
     })
 }
 
-/// `body` is a stored oversized content spec saved again as the editor saves it: the same spec
-/// values, printed with two-space indents, unknown keys kept and default keys filled in. The size
-/// bound (the stored JSON printed that way, plus one default spec) stops unknown fields, which the
-/// parse drops from the compare, from growing the row.
-fn reformatted(stored: &str, body: &str) -> bool {
-    if stored.len() <= BODY_MAX_BYTES {
-        return false;
-    }
-    let (Ok(old), Ok(new)) = (ContentSpec::parse(stored), ContentSpec::parse(body)) else {
-        return false;
+/// Both bodies parse to the same content spec. The editor trims the body text on save, so that
+/// trim does not count as a change.
+fn same_spec(a: &str, b: &str) -> bool {
+    let value = |body: &str| {
+        let mut spec = ContentSpec::parse(body).ok()?;
+        spec.body = spec.body.trim().to_string();
+        serde_json::to_value(spec).ok()
     };
-    let (Ok(old_value), Ok(new_value)) = (serde_json::to_value(&old), serde_json::to_value(&new))
-    else {
-        return false;
-    };
-    let pretty_len =
-        |value: &serde_json::Value| serde_json::to_string_pretty(value).map_or(0, |s| s.len());
-    let stored_pretty =
-        serde_json::from_str::<serde_json::Value>(stored).map_or(0, |v| pretty_len(&v));
-    let defaults = serde_json::to_value(ContentSpec::default()).map_or(0, |v| pretty_len(&v));
-    old_value == new_value && body.len() <= stored.len().max(stored_pretty) + defaults
+    matches!((value(a), value(b)), (Some(a), Some(b)) if a == b)
 }
 
 /// The body limit on a draft spec, measured as the editor saves it: JSON with two-space indents.
@@ -194,8 +184,8 @@ pub async fn save(
     let existing_kind = existing.as_ref().map(|e| e.kind);
     template.kind = resolve_kind(requested_kind, existing_kind, create);
     // Before the content parse below, so an oversized new draft is not parsed.
-    check_body_size(
-        &template.body,
+    template.body = limit_body(
+        std::mem::take(&mut template.body),
         existing.as_ref().map(|e| e.body.as_str()),
         template.kind == TemplateKind::Content,
     )?;
@@ -1489,11 +1479,14 @@ mod tests {
 
     #[test]
     fn a_body_over_the_limit_is_refused_unless_it_is_the_stored_body() {
+        let limit = |body: &str, existing: Option<&str>, content: bool| {
+            limit_body(body.to_string(), existing, content)
+        };
         let at_limit = "a".repeat(BODY_MAX_BYTES);
         let over = "a".repeat(BODY_MAX_BYTES + 1);
         // Create: no stored row.
-        assert!(check_body_size(&at_limit, None, false).is_ok());
-        let err = check_body_size(&over, None, false).unwrap_err();
+        assert_eq!(limit(&at_limit, None, false).unwrap(), at_limit);
+        let err = limit(&over, None, false).unwrap_err();
         assert!(
             matches!(err, TemplateError::BodyTooLarge { size, max }
                 if size == BODY_MAX_BYTES + 1 && max == BODY_MAX_BYTES),
@@ -1502,61 +1495,67 @@ mod tests {
         assert!(err.to_string().contains("1048576"), "{err}");
         // A changed body over the limit is refused, even when the stored row is also large.
         let old_large = "b".repeat(BODY_MAX_BYTES + 10);
-        assert!(check_body_size(&over, Some(&old_large), false).is_err());
-        assert!(check_body_size(&over, Some("small"), false).is_err());
+        assert!(limit(&over, Some(&old_large), false).is_err());
+        assert!(limit(&over, Some("small"), false).is_err());
         // An unchanged old large body keeps saving.
-        assert!(check_body_size(&old_large, Some(&old_large), false).is_ok());
+        assert_eq!(
+            limit(&old_large, Some(&old_large), false).unwrap(),
+            old_large
+        );
         // Multi-byte text counts bytes, not characters.
         let wide = "\u{e9}".repeat(BODY_MAX_BYTES / 2 + 1);
-        assert!(check_body_size(&wide, None, false).is_err());
+        assert!(limit(&wide, None, false).is_err());
     }
 
     #[test]
-    fn a_reformatted_content_body_over_the_limit_counts_as_unchanged() {
+    fn a_reformatted_content_body_over_the_limit_keeps_the_stored_bytes() {
+        let limit = |body: &str, existing: &str, content: bool| {
+            limit_body(body.to_string(), Some(existing), content)
+        };
         let spec = ContentSpec {
             title: "t".into(),
             body: "b".repeat(BODY_MAX_BYTES),
             ..Default::default()
         };
         let compact = serde_json::to_string(&spec).unwrap();
-        // The editor saves `JSON.stringify(spec, null, 2)`.
+        // The editor saves `JSON.stringify(spec, null, 2)`; the stored bytes are kept.
         let pretty = serde_json::to_string_pretty(&spec).unwrap();
         assert_ne!(compact, pretty);
-        assert!(check_body_size(&pretty, Some(&compact), true).is_ok());
+        assert_eq!(limit(&pretty, &compact, true).unwrap(), compact);
         // A custom body is compared byte for byte.
-        assert!(check_body_size(&pretty, Some(&compact), false).is_err());
+        assert!(limit(&pretty, &compact, false).is_err());
         // A real content change is refused.
         let edited = serde_json::to_string_pretty(&ContentSpec {
             title: "changed".into(),
-            ..spec
+            ..spec.clone()
         })
         .unwrap();
-        assert!(check_body_size(&edited, Some(&compact), true).is_err());
-        // Unknown fields, which the parse drops, cannot grow a row past the limit.
+        assert!(limit(&edited, &compact, true).is_err());
+        // Unknown fields, which the parse drops, are not stored: the row cannot grow.
         let padded = format!(
-            "{{\"title\":\"t\",\"body\":\"b\",\"junk\":\"{}\"}}",
-            "j".repeat(2 * BODY_MAX_BYTES)
-        );
-        assert!(check_body_size(&padded, Some(r#"{"title":"t","body":"b"}"#), true).is_err());
-        let padded_large = format!(
             "{}, \"junk\": \"{}\"}}",
             pretty.trim_end_matches('}').trim_end(),
             "j".repeat(BODY_MAX_BYTES)
         );
-        assert!(ContentSpec::parse(&padded_large).is_ok());
-        assert!(check_body_size(&padded_large, Some(&compact), true).is_err());
+        assert!(ContentSpec::parse(&padded).is_ok());
+        assert_eq!(limit(&padded, &compact, true).unwrap(), compact);
+        let small = r#"{"title":"t","body":"b"}"#;
+        let padded_small = format!(
+            r#"{{"title":"t","body":"b","junk":"{}"}}"#,
+            "j".repeat(2 * BODY_MAX_BYTES)
+        );
+        assert_eq!(limit(&padded_small, small, true).unwrap(), small);
 
-        // An old compact row with an unknown key and missing default keys: the editor keeps the
-        // key, fills the defaults and saves it pretty. That still counts as unchanged.
+        // The editor trims the body text and fills default keys: still unchanged.
         let legacy = format!(
-            "{{\"title\":\"t\",\"body\":\"{}\",\"future\":true}}",
+            "{{\"title\":\"t\",\"body\":\"\\n{}\",\"future\":true}}",
             "b".repeat(BODY_MAX_BYTES)
         );
-        let mut resaved = serde_json::to_value(ContentSpec::parse(&legacy).unwrap()).unwrap();
+        assert!(ContentSpec::parse(&legacy).unwrap().body.starts_with('\n'));
+        let mut resaved = serde_json::to_value(&spec).unwrap();
         resaved["future"] = serde_json::Value::Bool(true);
         let resaved = serde_json::to_string_pretty(&resaved).unwrap();
-        assert!(resaved.len() > legacy.len());
-        assert!(check_body_size(&resaved, Some(&legacy), true).is_ok());
+        assert_eq!(limit(&resaved, &legacy, true).unwrap(), legacy);
     }
 
     #[test]
