@@ -17,15 +17,16 @@
 
 use config::{
     meta::slack::{
-        MessageState, SLACK_ALERT_MESSAGE_CONTENT_MAX_BYTES, SlackAlertMessage,
-        SlackAlertMessageKey, SlackMessageContent,
+        ANOMALY_GROUP_KEY, ANOMALY_MARK_GROUP_KEY, MessageState,
+        SLACK_ALERT_MESSAGE_CONTENT_MAX_BYTES, SlackAlertMessage, SlackAlertMessageKey,
+        SlackMessageContent,
     },
     utils::{json, time::now_micros},
 };
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Select, Set, UpdateMany,
-    sea_query::{Expr, Func, OnConflict},
+    ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Select, Set, TransactionTrait, UpdateMany,
+    sea_query::{Expr, Func, LockType, OnConflict},
 };
 
 use super::{
@@ -193,6 +194,11 @@ pub async fn delete_by_org(org_id: &str) -> Result<u64, Error> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
 }
 
+/// Every anomaly thread and watermark row, for a leader that starts with threads turned off.
+pub async fn delete_anomaly_rows() -> Result<u64, Error> {
+    delete_anomaly_rows_with(get_orm_client_rw().await).await
+}
+
 pub async fn set_digest_ts(
     key: &SlackAlertMessageKey,
     digest_ts: &str,
@@ -331,17 +337,39 @@ pub async fn latest_open_for_with<C: ConnectionTrait>(
     alert_id: &str,
     group_key: &str,
 ) -> Result<Option<SlackAlertMessage>, Error> {
-    let _ = (conn, destination_id, alert_id, group_key);
-    todo!("threads stream")
+    live()
+        .filter(Column::DestinationId.eq(destination_id))
+        .filter(Column::AlertId.eq(alert_id))
+        .filter(Column::GroupKey.eq(group_key))
+        .filter(Column::State.is_in(state_texts(&MessageState::OPEN)?))
+        .filter(Column::MessageTs.is_not_null())
+        .order_by_desc(Column::FiringStartedAt)
+        .one(conn)
+        .await?
+        .map(from_model)
+        .transpose()
 }
 
 /// False when the order re-check dropped the change; a failure leaves both rows unchanged.
-pub async fn apply_thread_change_with<C: ConnectionTrait + sea_orm::TransactionTrait>(
+pub async fn apply_thread_change_with<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     change: &AnomalyThreadChange,
 ) -> Result<bool, Error> {
-    let _ = (conn, change);
-    todo!("threads stream")
+    let txn = conn.begin().await?;
+    match thread_change_in(&txn, change).await {
+        Ok(true) => {
+            txn.commit().await?;
+            Ok(true)
+        }
+        Ok(false) => {
+            txn.rollback().await?;
+            Ok(false)
+        }
+        Err(e) => {
+            let _ = txn.rollback().await;
+            Err(e)
+        }
+    }
 }
 
 pub async fn bump_wanted_with<C: ConnectionTrait>(
@@ -467,6 +495,7 @@ pub async fn list_open_with<C: ConnectionTrait>(
 ) -> Result<Vec<SlackAlertMessage>, Error> {
     let models = live()
         .filter(Column::State.is_in(state_texts(&MessageState::OPEN)?))
+        .filter(not_anomaly())
         .order_by_asc(Column::DestinationId)
         .order_by_asc(Column::AlertId)
         .order_by_asc(Column::GroupKey)
@@ -490,6 +519,7 @@ pub async fn list_folded_with<C: ConnectionTrait>(
         .filter(Column::State.is_in(state_texts(&MessageState::OPEN)?))
         .filter(Column::MessageTs.is_null())
         .filter(folded)
+        .filter(not_anomaly())
         .order_by_asc(Column::DestinationId)
         .order_by_asc(Column::AlertId)
         .order_by_asc(Column::GroupKey)
@@ -544,6 +574,14 @@ pub async fn delete_by_org_with<C: ConnectionTrait>(conn: &C, org_id: &str) -> R
     delete_where(conn, Column::OrgId.eq(org_id)).await
 }
 
+pub async fn delete_anomaly_rows_with<C: ConnectionTrait>(conn: &C) -> Result<u64, Error> {
+    delete_where(
+        conn,
+        Column::GroupKey.is_in([ANOMALY_GROUP_KEY, ANOMALY_MARK_GROUP_KEY]),
+    )
+    .await
+}
+
 pub async fn set_digest_ts_with<C: ConnectionTrait>(
     conn: &C,
     key: &SlackAlertMessageKey,
@@ -571,6 +609,7 @@ pub async fn list_unfolded_with<C: ConnectionTrait>(
         .filter(Column::DigestTs.is_null())
         .filter(Column::PostingSince.is_null())
         .filter(Column::CreatedAt.gte(since))
+        .filter(not_anomaly())
         .order_by_asc(Column::CreatedAt)
         .limit(limit)
         .all(conn)
@@ -626,6 +665,7 @@ pub async fn list_ended_unposted_with<C: ConnectionTrait>(
         .filter(Column::State.is_in(state_texts(&[MessageState::Cleared, MessageState::Gone])?))
         .filter(Column::CreatedAt.lte(to))
         .filter(Column::UpdatedAt.gte(from))
+        .filter(not_anomaly())
         .order_by_asc(Column::ChannelId)
         .order_by_asc(Column::FiringStartedAt)
         .limit(limit)
@@ -697,6 +737,135 @@ fn by_key<Q: QueryFilter>(query: Q, key: &SlackAlertMessageKey) -> Q {
         .filter(Column::AlertId.eq(&key.alert_id))
         .filter(Column::GroupKey.eq(&key.group_key))
         .filter(Column::FiringStartedAt.eq(key.firing_started_at))
+}
+
+/// Thread and watermark rows have their own lifecycle; the sweeps and digests must not see them.
+fn not_anomaly() -> sea_orm::sea_query::SimpleExpr {
+    Column::GroupKey.is_not_in([ANOMALY_GROUP_KEY, ANOMALY_MARK_GROUP_KEY])
+}
+
+fn watermark_key(change: &AnomalyThreadChange) -> SlackAlertMessageKey {
+    SlackAlertMessageKey {
+        destination_id: change.destination_id.clone(),
+        alert_id: change.anomaly_id.clone(),
+        group_key: ANOMALY_MARK_GROUP_KEY.to_string(),
+        firing_started_at: 0,
+    }
+}
+
+/// A `Cleared` row with no `message_ts`; its content holds only `last_data_us`.
+fn watermark_row(change: &AnomalyThreadChange) -> SlackAlertMessage {
+    let root = match &change.row {
+        AnomalyRowChange::InsertRoot(root) => Some(root.as_ref()),
+        _ => None,
+    };
+    let key = watermark_key(change);
+    SlackAlertMessage {
+        destination_id: key.destination_id,
+        org_id: change.org_id.clone(),
+        alert_id: key.alert_id,
+        group_key: key.group_key,
+        firing_started_at: 0,
+        installation_id: root.map(|r| r.installation_id.clone()).unwrap_or_default(),
+        channel_id: root.map(|r| r.channel_id.clone()).unwrap_or_default(),
+        state: MessageState::Cleared,
+        content: Some(SlackMessageContent::default()),
+        created_at: change.now,
+        updated_at: change.now,
+        origin_region: root.map_or_else(|| "default".to_string(), |r| r.origin_region.clone()),
+        ..Default::default()
+    }
+}
+
+async fn thread_change_in<C: ConnectionTrait>(
+    txn: &C,
+    change: &AnomalyThreadChange,
+) -> Result<bool, Error> {
+    if change.create_watermark {
+        insert_firing_with(txn, &watermark_row(change)).await?;
+    }
+    let mark = locked_watermark(txn, change).await?;
+    let last = mark
+        .as_ref()
+        .and_then(|m| m.content.as_ref())
+        .and_then(|c| c.last_data_us);
+    if last.is_some_and(|last| change.data_us <= last) {
+        return Ok(false);
+    }
+    apply_row_change(txn, change).await?;
+    if let Some(mark) = mark {
+        let content = SlackMessageContent {
+            last_data_us: Some(change.data_us),
+            ..mark.content.unwrap_or_default()
+        };
+        set_content_with(txn, &mark.key(), &content, change.now).await?;
+    }
+    Ok(true)
+}
+
+/// PostgreSQL holds the row lock until commit; SQLite serialises writers by its database lock.
+async fn locked_watermark<C: ConnectionTrait>(
+    txn: &C,
+    change: &AnomalyThreadChange,
+) -> Result<Option<SlackAlertMessage>, Error> {
+    let mut query = by_key(live(), &watermark_key(change));
+    if txn.get_database_backend() == DatabaseBackend::Postgres {
+        query = query.lock(LockType::Update);
+    }
+    query.one(txn).await?.map(from_model).transpose()
+}
+
+async fn apply_row_change<C: ConnectionTrait>(
+    txn: &C,
+    change: &AnomalyThreadChange,
+) -> Result<(), Error> {
+    match &change.row {
+        AnomalyRowChange::None => {}
+        AnomalyRowChange::InsertRoot(root) => {
+            close_other_roots(txn, root, change.now).await?;
+            insert_firing_with(txn, root).await?;
+        }
+        AnomalyRowChange::Reply { key, content } => {
+            set_content_with(txn, key, content, change.now).await?;
+        }
+        AnomalyRowChange::Close {
+            key,
+            state,
+            content,
+        } => {
+            let mut update = Entity::update_many()
+                .col_expr(Column::State, Expr::value(enum_text(state)?))
+                .col_expr(Column::UpdatedAt, Expr::value(change.now));
+            if let Some(content) = content {
+                update =
+                    update.col_expr(Column::Content, Expr::value(content_text(Some(content))?));
+            }
+            exec_for_key(txn, update, key).await?;
+        }
+    }
+    Ok(())
+}
+
+/// A holder that lost the lock may insert beside another root; one detector keeps one open root.
+async fn close_other_roots<C: ConnectionTrait>(
+    txn: &C,
+    root: &SlackAlertMessage,
+    now: i64,
+) -> Result<u64, Error> {
+    let result = Entity::update_many()
+        .col_expr(
+            Column::State,
+            Expr::value(enum_text(&MessageState::Cleared)?),
+        )
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::DestinationId.eq(&root.destination_id))
+        .filter(Column::AlertId.eq(&root.alert_id))
+        .filter(Column::GroupKey.eq(ANOMALY_GROUP_KEY))
+        .filter(Column::State.is_in(state_texts(&MessageState::OPEN)?))
+        .filter(Column::FiringStartedAt.ne(root.firing_started_at))
+        .exec(txn)
+        .await?;
+    Ok(result.rows_affected)
 }
 
 async fn exec_for_key<C: ConnectionTrait>(
@@ -1380,5 +1549,257 @@ mod tests {
         );
         let (count, newest) = refused_since_with(&db, "i1", "acme", 301).await.unwrap();
         assert_eq!((count, newest), (0, None));
+    }
+
+    fn anomaly_root(destination_id: &str, data_us: i64, ts: &str) -> SlackAlertMessage {
+        SlackAlertMessage {
+            alert_id: "an1".into(),
+            message_ts: Some(ts.into()),
+            content: Some(SlackMessageContent {
+                last_data_us: Some(data_us),
+                last_bucket_end_us: Some(data_us),
+                model_version: Some(7),
+                ..Default::default()
+            }),
+            ..row(destination_id, ANOMALY_GROUP_KEY, data_us)
+        }
+    }
+
+    fn change(data_us: i64, row: AnomalyRowChange) -> AnomalyThreadChange {
+        AnomalyThreadChange {
+            org_id: "acme".into(),
+            destination_id: "d1".into(),
+            anomaly_id: "an1".into(),
+            data_us,
+            row,
+            create_watermark: true,
+            now: data_us + 1,
+        }
+    }
+
+    async fn mark(db: &DatabaseConnection) -> Option<SlackAlertMessage> {
+        let key = SlackAlertMessageKey {
+            destination_id: "d1".into(),
+            alert_id: "an1".into(),
+            group_key: ANOMALY_MARK_GROUP_KEY.into(),
+            firing_started_at: 0,
+        };
+        get_by_key_with(db, &key).await.unwrap()
+    }
+
+    async fn open_roots(db: &DatabaseConnection) -> Vec<i64> {
+        let mut open = Vec::new();
+        for r in [10, 20, 30] {
+            if let Some(m) = get_by_key_with(db, &anomaly_root("d1", r, "x").key())
+                .await
+                .unwrap()
+                .filter(|m| MessageState::OPEN.contains(&m.state))
+            {
+                open.push(m.firing_started_at);
+            }
+        }
+        open
+    }
+
+    #[tokio::test]
+    async fn latest_open_for_skips_closed_and_unposted_rows() {
+        let db = db().await;
+        insert_firing_with(&db, &anomaly_root("d1", 10, "1.1"))
+            .await
+            .unwrap();
+        insert_firing_with(
+            &db,
+            &SlackAlertMessage {
+                message_ts: None,
+                ..anomaly_root("d1", 30, "")
+            },
+        )
+        .await
+        .unwrap();
+        insert_firing_with(
+            &db,
+            &SlackAlertMessage {
+                state: MessageState::Cleared,
+                ..anomaly_root("d1", 40, "1.4")
+            },
+        )
+        .await
+        .unwrap();
+        let open = latest_open_for_with(&db, "d1", "an1", ANOMALY_GROUP_KEY)
+            .await
+            .unwrap();
+        assert_eq!(open.map(|m| m.firing_started_at), Some(10));
+        assert!(
+            latest_open_for_with(&db, "d2", "an1", ANOMALY_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_thread_change_writes_the_watermark_and_drops_an_old_or_repeated_one() {
+        let db = db().await;
+        let root = AnomalyRowChange::InsertRoot(Box::new(anomaly_root("d1", 10, "1.1")));
+        assert!(
+            apply_thread_change_with(&db, &change(10, root.clone()))
+                .await
+                .unwrap()
+        );
+        let m = mark(&db).await.expect("a watermark row");
+        assert_eq!(m.state, MessageState::Cleared);
+        assert_eq!(m.message_ts, None);
+        assert_eq!(m.content.and_then(|c| c.last_data_us), Some(10));
+        assert!(
+            !apply_thread_change_with(&db, &change(10, root.clone()))
+                .await
+                .unwrap(),
+            "a redelivery is dropped"
+        );
+        assert!(
+            !apply_thread_change_with(&db, &change(5, AnomalyRowChange::None))
+                .await
+                .unwrap(),
+            "older data is dropped"
+        );
+        assert!(
+            apply_thread_change_with(&db, &change(15, AnomalyRowChange::None))
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            mark(&db).await.unwrap().content.unwrap().last_data_us,
+            Some(15)
+        );
+        assert_eq!(
+            open_roots(&db).await,
+            [10],
+            "a watermark move leaves the root"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_new_root_closes_every_other_open_root_of_the_detector() {
+        let db = db().await;
+        insert_firing_with(&db, &anomaly_root("d1", 10, "1.1"))
+            .await
+            .unwrap();
+        insert_firing_with(&db, &anomaly_root("d1", 20, "1.2"))
+            .await
+            .unwrap();
+        insert_firing_with(&db, &anomaly_root("d2", 20, "2.2"))
+            .await
+            .unwrap();
+        let root = AnomalyRowChange::InsertRoot(Box::new(anomaly_root("d1", 30, "1.3")));
+        assert!(
+            apply_thread_change_with(&db, &change(30, root))
+                .await
+                .unwrap()
+        );
+        assert_eq!(open_roots(&db).await, [30]);
+        let other = get_by_key_with(&db, &anomaly_root("d2", 20, "x").key())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            other.state,
+            MessageState::Firing,
+            "another destination keeps its root"
+        );
+    }
+
+    #[tokio::test]
+    async fn reply_and_close_change_the_row_and_mixed_builds_create_no_watermark() {
+        let db = db().await;
+        let root = anomaly_root("d1", 10, "1.1");
+        insert_firing_with(&db, &root).await.unwrap();
+        let replied = SlackMessageContent {
+            repeats: 1,
+            last_data_us: Some(20),
+            ..root.content.clone().unwrap()
+        };
+        let reply = AnomalyRowChange::Reply {
+            key: root.key(),
+            content: replied.clone(),
+        };
+        let mixed = AnomalyThreadChange {
+            create_watermark: false,
+            ..change(20, reply)
+        };
+        assert!(apply_thread_change_with(&db, &mixed).await.unwrap());
+        assert!(
+            mark(&db).await.is_none(),
+            "mixed builds write no watermark row"
+        );
+        assert_eq!(get(&db, &root).await.content, Some(replied));
+        let close = AnomalyRowChange::Close {
+            key: root.key(),
+            state: MessageState::Failed,
+            content: None,
+        };
+        assert!(
+            apply_thread_change_with(&db, &change(30, close))
+                .await
+                .unwrap()
+        );
+        let closed = get(&db, &root).await;
+        assert_eq!(
+            (closed.state, closed.updated_at),
+            (MessageState::Failed, 31)
+        );
+        assert_eq!(
+            mark(&db).await.unwrap().content.unwrap().last_data_us,
+            Some(30)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_failed_row_write_leaves_the_watermark_and_the_row_unchanged() {
+        let db = db().await;
+        let mut huge = anomaly_root("d1", 10, "1.1");
+        huge.content.as_mut().unwrap().rendered.body =
+            "x".repeat(SLACK_ALERT_MESSAGE_CONTENT_MAX_BYTES);
+        let failed = change(10, AnomalyRowChange::InsertRoot(Box::new(huge)));
+        assert!(apply_thread_change_with(&db, &failed).await.is_err());
+        assert!(mark(&db).await.is_none());
+        assert!(open_roots(&db).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn sweeps_and_digests_never_list_anomaly_rows_and_the_off_switch_deletes_them() {
+        let db = db().await;
+        let root = AnomalyRowChange::InsertRoot(Box::new(anomaly_root("d1", 10, "1.1")));
+        apply_thread_change_with(&db, &change(10, root))
+            .await
+            .unwrap();
+        insert_firing_with(
+            &db,
+            &SlackAlertMessage {
+                message_ts: None,
+                ..anomaly_root("d1", 20, "")
+            },
+        )
+        .await
+        .unwrap();
+        insert_firing_with(&db, &row("d1", "k", 1)).await.unwrap();
+        let keys = |rows: Vec<SlackAlertMessage>| {
+            rows.into_iter().map(|m| m.group_key).collect::<Vec<_>>()
+        };
+        assert_eq!(keys(list_open_with(&db, 10).await.unwrap()), ["k"]);
+        assert_eq!(keys(list_folded_with(&db, 0, 10).await.unwrap()), ["k"]);
+        assert_eq!(
+            keys(list_unfolded_with(&db, "i1", "C1", 0, 10).await.unwrap()),
+            ["k"]
+        );
+        assert!(
+            list_ended_unposted_with(&db, "i1", 0, i64::MAX, 10)
+                .await
+                .unwrap()
+                .is_empty(),
+            "the watermark is not an outage line"
+        );
+        assert_eq!(delete_anomaly_rows_with(&db).await.unwrap(), 3);
+        assert_eq!(list_open_with(&db, 10).await.unwrap().len(), 1);
+        assert!(mark(&db).await.is_none());
     }
 }
