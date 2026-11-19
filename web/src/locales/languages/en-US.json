@@ -16130,7 +16130,7 @@
     "conditionCountWith": "{noun} with",
     "promRuleModeHelp": "Every series the query returns alerts: the comparison is in the query (for example > 0.9), with no threshold here.",
     "lookAlike": {
-      "line": "{names} already watches {stream} with a similar condition | {names} already watch {stream} with a similar condition"
+      "line": "Similar alert already set up: {names} | Similar alerts already set up: {names}"
     }
   },
   "alert_dependencies": {
