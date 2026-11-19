@@ -1425,7 +1425,6 @@
     "fetchingValues": "Fetching values...",
     "noDataInRangeHint": "No data in range — values from active filter",
     "viewMoreValues": "View more values",
-    "aiIconAlt": "AI",
     "aiModeIconAlt": "AI Mode",
     "firstPage": "First page",
     "lastPage": "Last page",
@@ -11386,8 +11385,6 @@
       "chipName": "{label}, {secondary}",
       "dataSharing": "Data sharing · {level}",
       "disclosure": "Attached data is sent to @:{'brand.autobot'} and saved with this chat.",
-      "defaultContext": "Default context",
-      "seesEmpty": "Only your message is sent.",
       "disclosureShared": "Attached data is sent to @:{'brand.autobot'}, saved with this chat and included in any share.",
       "field": {
         "alert": "Alert",
@@ -11421,7 +11418,6 @@
       "mixedStreams": "One stream type per message. Remove the {type} stream to add this one.",
       "more": "+{count}",
       "moreName": "Show {count} more context chip | Show {count} more context chips",
-      "orgLine": "{org} organization",
       "notReadYet": "not read yet",
       "openSource": "Open in {page}",
       "remove": "Remove {label} from context",
@@ -11460,7 +11456,6 @@
     "credits": {
       "copyRequest": "Please add AI credits for {org}: {used} of {limit} included credits used as of {date}.",
       "copyRequestNoUsage": "Please add AI credits for {org}: included credits used up as of {date}.",
-      "exhaustedTag": "Credits used up",
       "manage": "Manage paid usage",
       "manageName": "Manage paid usage (opens in a new tab)",
       "meter": {
@@ -12119,7 +12114,6 @@
         "typeToConfirm": "Type delete to confirm"
       },
       "clearOnSignOut": "Delete my browser chats when I sign out",
-      "clearSearch": "Clear search",
       "delete": {
         "bodyLocal": "This removes the chat from this browser.",
         "bodyServer": "This deletes the chat from every device and stops any answer still running.",
@@ -12344,9 +12338,13 @@
       "versionOf": "{n} of {count}",
       "you": "You",
       "metaHandoff": "{meta} · to {agent}",
+      "toAgent": "To {agent}",
       "copyChatId": "Copy chat id",
-      "shareAnswer": "Share link",
+      "shareAnswer": "Copy link to this answer",
       "linkCopied": "Link copied",
+      "linkCopiedPrivate": "Link copied · only you can open it",
+      "linkCopiedOrg": "Link copied · anyone in {org} with the link can open it",
+      "linkCopiedPublic": "Link copied · anyone with the link can open it",
       "branch": "Branch in new chat",
       "branchTitle": "Branch of {title}",
       "branchedFrom": "Branched from",
@@ -12954,7 +12952,7 @@
       "rename": "Rename",
       "renameFailed": "Couldn't rename the chat",
       "renameLabel": "Chat title",
-      "renameHint": "Click to rename this chat",
+      "renameChat": "Rename chat",
       "renamed": "Renamed",
       "thisChat": "This chat",
       "renaming": "Renaming…",
@@ -13190,10 +13188,7 @@
       "launcher": {
         "ask": "Ask",
         "inputName": "Ask {product}",
-        "noThreadsYet": "No chats yet",
-        "openFull": "Open full view",
         "recentThreads": "Recent chats",
-        "allThreads": "All chats",
         "askEmpty": "Type a question or attach an image to ask"
       },
       "prefill": {
@@ -13246,7 +13241,7 @@
           "alert": "Explain this alert's conditions",
           "pipeline": "Explain what this pipeline does"
         },
-        "learn": "What can you do here?",
+        "learn": "What can you do?",
         "logs": {
           "1": "Why did errors spike in `{stream}` in the last {range}?",
           "2": "Summarise what's in `{stream}` right now",
@@ -13274,7 +13269,8 @@
           "1Generic": "Which services had the slowest spans recently?"
         }
       },
-      "question": "What do you want to look into?"
+      "viewAll": "View all",
+      "whatCanYouDo": "What can you do?"
     },
     "rca": {
       "tag": "Incident analysis",
@@ -15202,9 +15198,6 @@
         "chipIgnore": "Ignore …",
         "chipFocus": "Focus on service …",
         "chipChanged": "We changed …",
-        "sentAs": "Sent as",
-        "thisIncident": "This incident",
-        "visibleOnIncident": "Visible on this incident",
         "send": "Send",
         "steered": "steered {count}×",
         "fromSteering": "from steering",

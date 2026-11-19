@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else>
-      <!-- A toolbar reads New chat and ⓘ before its More menu -->
+      <!-- A toolbar reads its title, New chat, then its More menu -->
       <div
         v-if="toolbar"
         role="heading"
@@ -58,19 +58,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="assistant-thread-heading"
       >
         <span :id="headingTitleId" class="sr-only">{{ titleText }}</span>
-        <OInlineEdit
-          :model-value="String(titleText)"
-          size="lg"
-          tone="title"
+        <AssistantTitleEdit
+          ref="titleEdit"
+          :title="String(titleText)"
           :readonly="!chatActions"
-          :aria-label="titleEditing ? t('assistant.thread.renameLabel') : undefined"
-          :edit-hint="t('assistant.thread.renameHint')"
+          :pending="renamePending"
           :maxlength="MAX_TITLE"
-          :aria-busy="renamePending ? 'true' : undefined"
-          data-test="assistant-thread-heading-edit"
-          @edit-start="titleEditing = true"
-          @commit="onTitleCommit"
-          @cancel="titleEditing = false"
+          @commit="saveTitle"
         />
       </div>
       <div v-if="toolbar" class="flex shrink-0 items-center gap-1">
@@ -85,32 +79,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <slot name="container-actions" :narrow="narrow" />
       </div>
-      <div v-if="!toolbar && renaming" class="min-w-0 flex-1" data-test="assistant-thread-rename">
-        <OInlineEdit
-          ref="renameInput"
-          v-model="draft"
-          size="sm"
-          tone="title"
-          :aria-label="t('assistant.thread.renameLabel')"
-          :maxlength="MAX_TITLE"
-          @commit="commitRename"
-          @cancel="cancelRename"
-        />
-      </div>
       <div
-        v-else-if="!toolbar || chatActions"
-        :class="['relative flex items-center gap-2', toolbar ? 'shrink-0' : 'min-w-0 flex-1']"
+        v-if="!toolbar || chatActions"
+        :class="['relative flex items-center gap-1', toolbar ? 'shrink-0' : 'min-w-0 flex-1']"
       >
-        <component
-          :is="toolbar ? 'div' : 'h2'"
-          :aria-describedby="toolbar ? undefined : describedBy"
-          :aria-busy="renamePending ? 'true' : undefined"
-          :class="[
-            'flex min-w-0 items-center text-sm font-medium',
-            renamePending ? 'text-text-secondary' : 'text-text-heading',
-          ]"
-          :data-test="toolbar ? undefined : 'assistant-thread-title'"
+        <div
+          v-if="!toolbar"
+          role="heading"
+          :aria-level="2"
+          :aria-labelledby="headingTitleId"
+          :aria-describedby="describedBy"
+          class="flex min-w-0 items-center gap-1"
+          data-test="assistant-thread-title"
         >
+          <span :id="headingTitleId" class="sr-only">{{ titleText }}</span>
+          <AssistantStatusDot
+            v-if="ownSignal"
+            :state="ownSignal"
+            data-test="assistant-thread-title-status"
+          />
+          <AssistantTitleEdit
+            ref="titleEdit"
+            :title="String(titleText)"
+            :readonly="!chatActions"
+            :pending="renamePending"
+            :maxlength="MAX_TITLE"
+            size="sm"
+            class="min-w-0"
+            data-test="assistant-thread-title-edit"
+            @commit="saveTitle"
+          />
+        </div>
+        <div class="flex shrink-0 items-center">
           <ODropdown
             v-model:open="menuOpen"
             side="bottom"
@@ -137,28 +137,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 focusable-unavailable
                 :aria-label="titleName"
                 aria-haspopup="menu"
-                class="max-w-full min-w-0 justify-start! gap-1 text-sm! font-medium text-inherit! max-md:min-h-11 pointer-coarse:min-h-11"
+                class="shrink-0 gap-1 text-sm! font-medium max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 data-test="assistant-thread-title-button"
-                @pointerenter="measureTitle"
-                @focus="measureTitle"
               >
-                <!-- First in the slot so it anchors to the whole button, not a sibling; only a cut-off title needs it, never over its open menu (D2) -->
                 <OTooltip
                   :content="titleTooltip"
-                  :disabled="menuOpen || !titleCut"
+                  :disabled="menuOpen || !mark"
                   max-width="22.5rem"
                 />
-                <AssistantStatusDot
-                  v-if="ownSignal"
-                  :state="ownSignal"
-                  data-test="assistant-thread-title-status"
-                />
-                <span
-                  ref="titleEl"
-                  class="min-w-0 truncate"
-                  data-test="assistant-thread-title-text"
-                  >{{ titleText }}</span
-                >
                 <OIcon
                   :name="menuOpen ? assistantGlyph.collapse : assistantGlyph.expand"
                   size="xs"
@@ -168,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- A phone's header button already carries this count, so the title keeps the room -->
                 <span
                   v-if="mark"
-                  class="text-text-body ms-1 inline-flex shrink-0 items-center gap-1 text-xs tabular-nums max-md:hidden"
+                  class="text-text-body inline-flex shrink-0 items-center gap-1 text-xs tabular-nums max-md:hidden"
                   :data-state="mark.signal"
                   data-test="assistant-title-mark"
                 >
@@ -202,14 +188,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <slot name="menu-share" />
-                  <ODropdownItem
-                    v-if="!toolbar"
-                    :icon-left="assistantGlyph.edit"
-                    data-test="assistant-thread-menu-rename"
-                    @select="startRenameSoon"
-                  >
-                    {{ t("assistant.thread.rename") }}
-                  </ODropdownItem>
                   <ODropdownItem
                     :icon-left="assistantGlyph.pin"
                     data-test="assistant-thread-menu-pin"
@@ -262,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </AssistantTitleMenu>
           </ODropdown>
-        </component>
+        </div>
         <OTag
           v-if="saveTag && !narrow && !toolbar"
           :id="saveTagId"
@@ -362,7 +340,6 @@ import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatus
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantHistoryConfirm from "@/components/ai-assistant/history/AssistantHistoryConfirm.vue";
-import { editableTitle } from "@/components/ai-assistant/history/chatStatus";
 import { trayState } from "@/components/ai-assistant/shell/threadsBar";
 import {
   historyTargetAbove,
@@ -383,17 +360,16 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { isElementTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
+import AssistantTitleEdit from "./AssistantTitleEdit.vue";
 import AssistantTitleMenu from "./AssistantTitleMenu.vue";
 
 const props = defineProps<AssistantThreadHeaderProps>();
@@ -416,18 +392,12 @@ const host = inject(assistantThreadHostKey, null);
 const vuex = useStore();
 const root = ref<HTMLElement | null>(null);
 const heading = ref<ComponentPublicInstance | null>(null);
-const renameInput = ref<InstanceType<typeof OInlineEdit> | null>(null);
+const titleEdit = ref<InstanceType<typeof AssistantTitleEdit> | null>(null);
 const backButton = ref<InstanceType<typeof AssistantIconButton> | null>(null);
-const renaming = ref(false);
-const draft = ref("");
 const menuOpen = ref(false);
-const titleEl = ref<HTMLElement | null>(null);
-const titleCut = ref(false);
 const deleteOpen = ref(false);
 const widthRem = ref(Number.POSITIVE_INFINITY);
 const headingTitleId = `assistant-thread-${useId()}-title`;
-// The title button is named by the title it shows; only the edit field needs the "Chat title" label.
-const titleEditing = ref(false);
 const saveTagId = `assistant-thread-${useId()}-save`;
 let sizes: ResizeObserver | null = null;
 
@@ -549,39 +519,8 @@ const titleTooltip = computed<I18nText>(() => {
 });
 const downloading = computed(() => !!props.sid && exporter.busy.value.has(props.sid));
 
-function measureTitle(): void {
-  titleCut.value = isElementTruncated(titleEl.value);
-}
-
 function startRename(): void {
-  if (!chatActions.value || renamePending.value) return;
-  draft.value = editableTitle(String(titleText.value));
-  renaming.value = true;
-  void nextTick(() => renameInput.value?.focus());
-}
-
-// The menu returns focus to its trigger as it closes; the field waits for that.
-function startRenameSoon(): void {
-  setTimeout(startRename, 0);
-}
-
-function commitRename(value: string): void {
-  if (!renaming.value) return;
-  // Still focused in the field means Enter; after a blur focus already moved on purpose.
-  const byKey = !!document.activeElement?.closest('[data-test="assistant-thread-rename"]');
-  saveTitle(value);
-  if (byKey) void finishRename();
-  else renaming.value = false;
-}
-
-function cancelRename(): void {
-  void finishRename();
-}
-
-async function finishRename(): Promise<void> {
-  renaming.value = false;
-  await nextTick();
-  focusTitle();
+  if (chatActions.value && !renamePending.value) void titleEdit.value?.focus();
 }
 
 function focusTitle(): void {
@@ -590,11 +529,6 @@ function focusTitle(): void {
 
 // A rename typed while one is saving waits for it, then saves.
 let queuedTitle = "";
-
-function onTitleCommit(value: string): void {
-  titleEditing.value = false;
-  saveTitle(value);
-}
 
 function saveTitle(value: string): void {
   const next = value.trim().slice(0, MAX_TITLE);

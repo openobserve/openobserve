@@ -30,7 +30,8 @@ export class AssistantPage {
 
   /** Every v2 assistant id in the DOM; gates asserts there are none where the assistant is locked. */
   v2Ids() {
-    return this.page.locator('[data-test^="assistant-"]');
+    // The spark is the product mark, drawn by the locked OSS header door too.
+    return this.page.locator('[data-test^="assistant-"]:not([data-test^="assistant-spark"])');
   }
 
   /** Opens the assistant by the header button or the chord and waits for its container. */
@@ -123,7 +124,7 @@ export class AssistantPage {
   }
 
   launcher() {
-    return this.page.locator('[data-test="assistant-launcher"][data-layout]');
+    return this.page.locator('section[data-test="assistant-launcher"]');
   }
 
   consentCard() {
@@ -227,18 +228,6 @@ export class AssistantPage {
   /** Staged images are chips of their own; a cap notice hides the tray for a few seconds. */
   imageChips() {
     return this.tray().locator('[data-test="assistant-context-chip-image"]');
-  }
-
-  /** The ⓘ that opens what the assistant sees; it always sits in the composer box's top-end corner. */
-  sees() {
-    return this.container()
-      .locator('[data-test="assistant-composer-corner"] [data-test="assistant-context-sees"]')
-      .filter({ visible: true });
-  }
-
-  /** Opens what the assistant sees from the composer's ⓘ. */
-  async openSees() {
-    await this.sees().click();
   }
 
   /** A host's docked chat; `hostId` is the dock's `data-host`. */

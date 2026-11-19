@@ -73,12 +73,10 @@ export interface AssistantHistory extends HistoryService {
   setFilter(patch: Partial<HistoryFilter>): void;
   /** The chats the user's share links point at, for the Shared filter. */
   noteShared(sids: readonly Sid[]): void;
-  /** `rows` after the filter chip and the search; client-side unless the server advertises search. */
+  /** `rows` after the filter chip and the list menu's views. */
   visible: ComputedRef<HistoryRow[]>;
   /** Chats with a typed draft and no sent turn, which no list read returns. */
   drafts: ComputedRef<HistoryRow[]>;
-  /** Loaded pages only, so the list says it searched those. */
-  searchPartial: ComputedRef<boolean>;
   /** How many chats a clear-all deletes; `null` when more pages exist and the server sends no total. */
   total: ComputedRef<number | null>;
   pending: Readonly<Record<Sid, HistoryPending>>;

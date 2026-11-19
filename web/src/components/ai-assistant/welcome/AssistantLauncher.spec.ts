@@ -175,7 +175,7 @@ describe("AssistantLauncher", () => {
     document.body.innerHTML = "";
   });
 
-  it("maps gates: skeleton while loading, nothing on G0/G1, the locked state on G2", () => {
+  it("maps gates: skeleton while loading, nothing on G0/G1, the field marked locked on G2", () => {
     expect(launcherState("loading")).toBe("loading");
     expect(launcherState("not_entitled")).toBeNull();
     expect(launcherState("not_configured")).toBeNull();
@@ -184,25 +184,24 @@ describe("AssistantLauncher", () => {
       false,
     );
     const locked = setup("no_permission").wrapper;
-    expect(locked.get('[data-test="assistant-gate-state"]').attributes("data-gate")).toBe(
-      "no_permission",
-    );
-    expect(locked.find("textarea").exists()).toBe(false);
+    expect(locked.get('[data-test="assistant-launcher"]').attributes("data-state")).toBe("gate");
+    expect(locked.find('[data-test="assistant-gate-state"]').exists()).toBe(false);
   });
 
-  it("is one masked card named by its heading, with a named input and three starters", () => {
+  it("is one masked field named for the assistant, with no heading, starters or recent chats", () => {
     const { wrapper } = setup();
-    const card = wrapper.get('[data-test="assistant-launcher"]');
-    expect(card.attributes("data-dd-privacy")).toBe("mask");
-    const heading = wrapper.get(`#${card.attributes("aria-labelledby")}`);
-    expect(heading.text()).toBe(`${brandNames.autobot}`);
+    const launcher = wrapper.get('[data-test="assistant-launcher"]');
+    expect(launcher.attributes("data-dd-privacy")).toBe("mask");
+    expect(launcher.attributes("aria-label")).toBe(`Ask ${brandNames.autobot}`);
+    expect(launcher.find("h2").exists()).toBe(false);
     expect(input(wrapper).attributes("aria-label")).toBe(`Ask ${brandNames.autobot}`);
     expect(input(wrapper).attributes("maxlength")).toBe("4000");
-    expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
+    expect(wrapper.find('[data-test^="assistant-launcher-starter-"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(false);
   });
 
   it("fills the field with an example prompt and focuses it, sending nothing", async () => {
-    const { wrapper } = setupOn({ layout: "overview" });
+    const { wrapper } = setupOn({});
     await flushPromises();
     (wrapper.vm as unknown as { fill(prompt: string): void }).fill("Help me write a query");
     await flushPromises();
@@ -212,7 +211,7 @@ describe("AssistantLauncher", () => {
   });
 
   it("picks the agent an example is for along with its prompt, when that agent can answer", async () => {
-    const { wrapper } = setupOn({ layout: "overview" });
+    const { wrapper } = setupOn({});
     fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
     await flushPromises();
     const vm = wrapper.vm as unknown as { fill(prompt: string, agent?: string): void };
@@ -236,7 +235,7 @@ describe("AssistantLauncher", () => {
       sent: "whitelist",
     };
     mentionPick.current = { id: chip.id, kind: "stream", label: chip.label, chip };
-    const { wrapper } = setupOn({ layout: "overview" });
+    const { wrapper } = setupOn({});
     await flushPromises();
     await input(wrapper).setValue("@ta_comp");
     await flushPromises();
@@ -257,7 +256,7 @@ describe("AssistantLauncher", () => {
 
   it("keeps an unmatched @query as text and lists context only in the @ menu", async () => {
     mentionPick.current = null;
-    const { wrapper } = setupOn({ layout: "overview" });
+    const { wrapper } = setupOn({});
     await flushPromises();
     await input(wrapper).setValue("@nothing");
     await flushPromises();
@@ -270,7 +269,7 @@ describe("AssistantLauncher", () => {
   });
 
   it("sends the agent picked on the agent chip with the new chat, then goes back to the default", async () => {
-    const { wrapper } = setupOn({ layout: "overview" });
+    const { wrapper } = setupOn({});
     fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
     await flushPromises();
     const agentChip = () => wrapper.get('[data-test="assistant-launcher-agent"]');
@@ -290,7 +289,6 @@ describe("AssistantLauncher", () => {
 
   it("sends every line to a fixed agent, whose menu offers no other agent, under the given hint", async () => {
     const { wrapper } = setupOn({
-      layout: "overview",
       fixedAgent: "sre",
       askPlaceholder: "Describe what went wrong",
     });
@@ -309,7 +307,7 @@ describe("AssistantLauncher", () => {
   });
 
   it("never sends a fixed agent's line to another agent when the org cannot reach it", async () => {
-    const { wrapper } = setupOn({ layout: "overview", fixedAgent: "sre" });
+    const { wrapper } = setupOn({ fixedAgent: "sre" });
     fake.current.capability.value = {
       ...fake.current.capability.value,
       agents: [ROSTER[0], { id: "sre", pickable: true, available: false, reason: "disabled" }],
@@ -326,7 +324,7 @@ describe("AssistantLauncher", () => {
   });
 
   it("holds a fixed agent's line when the roster does not list that agent", async () => {
-    const { wrapper } = setupOn({ layout: "overview", fixedAgent: "sre" });
+    const { wrapper } = setupOn({ fixedAgent: "sre" });
     fake.current.capability.value = { ...fake.current.capability.value, agents: [ROSTER[0]] };
     await flushPromises();
     await input(wrapper).setValue("why?");
@@ -336,13 +334,22 @@ describe("AssistantLauncher", () => {
   });
 
   it("keeps a fixed agent's chats on the page with the sidebar open", async () => {
-    const { wrapper, store } = setupOn({ layout: "overview", fixedAgent: "sre" });
+    const { wrapper, store } = setupOn({ fixedAgent: "sre" });
     fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
     store.state.shell.placement = { kind: "sidebar" };
     await flushPromises();
     await input(wrapper).setValue("why?");
     await input(wrapper).trigger("keydown", { key: "Enter" });
     expect(open.mock.calls[0][0]).toMatchObject({ agent: "sre", container: "full" });
+  });
+
+  it("keeps a typed line over a starter chip, sending nothing", async () => {
+    const { wrapper } = setup();
+    await input(wrapper).setValue("half a thought");
+    (wrapper.vm as unknown as { send(p: string): void }).send("What can you do?");
+    await flushPromises();
+    expect(open).not.toHaveBeenCalled();
+    expect((input(wrapper).element as HTMLTextAreaElement).value).toBe("half a thought");
   });
 
   it("sends the typed line on Enter as a new chat in the full view (HOME-01)", async () => {
@@ -361,26 +368,6 @@ describe("AssistantLauncher", () => {
     expect((input(wrapper).element as HTMLInputElement).value).toBe("");
   });
 
-  it("makes Shift+Enter a new line, ignores an IME Enter and opens /assistant on an empty Enter", async () => {
-    const { wrapper, router } = setup();
-    await input(wrapper).setValue("draft");
-    await input(wrapper).trigger("keydown", { key: "Enter", isComposing: true });
-    await input(wrapper).trigger("keydown", { key: "Enter", shiftKey: true });
-    expect(open).not.toHaveBeenCalled();
-    await input(wrapper).setValue("");
-    await input(wrapper).trigger("keydown", { key: "Enter" });
-    await flushPromises();
-    expect(router.currentRoute.value.name).toBe("assistant");
-  });
-
-  it("keeps the route query when an empty Enter opens the full view (T-02-02)", async () => {
-    const { wrapper, router } = setup();
-    await router.replace({ name: "home", query: { org_identifier: "org1", period: "7d" } });
-    await input(wrapper).trigger("keydown", { key: "Enter" });
-    await flushPromises();
-    expect(router.currentRoute.value.query).toEqual({ org_identifier: "org1", period: "7d" });
-  });
-
   it("keeps the text on Escape and draws no clear button in the bar (HOME-03, round 1 X-20)", async () => {
     const { wrapper } = setup();
     await input(wrapper).setValue("keep me");
@@ -391,90 +378,6 @@ describe("AssistantLauncher", () => {
     expect(wrapper.find('[data-test="assistant-launcher-clear"]').exists()).toBe(false);
   });
 
-  it("stages a starter without sending", async () => {
-    const { wrapper } = setup();
-    await wrapper.get('[data-test="assistant-launcher-starter-1"]').trigger("click");
-    expect(open.mock.calls[0][0]).toMatchObject({ intent: "stage", payload: { text: "Prompt 1" } });
-  });
-
-  it("carries a Home starter's provenance into the staged payload (PO A26)", async () => {
-    STARTERS[1].home = true;
-    const { wrapper } = setup();
-    await wrapper.get('[data-test="assistant-launcher-starter-1"]').trigger("click");
-    delete STARTERS[1].home;
-    expect(open.mock.calls[0][0].payload).toMatchObject({ text: "Prompt 1", homeStarter: true });
-  });
-
-  it("stages a starter's window as a time chip ending at the click", async () => {
-    STARTERS[0].period = "1h";
-    const { wrapper } = setup();
-    await wrapper.get('[data-test="assistant-launcher-starter-0"]').trigger("click");
-    delete STARTERS[0].period;
-    const chips = open.mock.calls[0][0].payload.chips;
-    expect(chips[0]).toMatchObject({ kind: "time", provenance: "door" });
-    expect(chips[0].ref.to - chips[0].ref.from).toBe(3_600_000);
-  });
-
-  it("lists this tab's recent chats, a running one marked, and says when there are none", async () => {
-    const { wrapper, store } = setup();
-    expect(wrapper.find('[data-test="assistant-launcher-recent-empty"]').exists()).toBe(true);
-    const sid = store.createSession({
-      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
-    });
-    store.state.sessions[sid].messages.push({ role: "user", content: raw("q") });
-    store.state.sessions[sid].turn = { state: "responding.writing" };
-    await flushPromises();
-    const row = wrapper.get('[data-test="assistant-launcher-recent-0"]');
-    expect(row.attributes("data-status")).toBe("answering");
-    expect(row.get('[data-test="assistant-launcher-recent-status"]').text()).toBe("Answering");
-    expect(wrapper.get('[data-test="assistant-launcher-all-chats"]').text()).toBe("All chats");
-  });
-
-  it("puts a chat that needs the user first in Your chats, with its state in words", async () => {
-    const { wrapper, store } = setup();
-    const waiting = store.createSession({
-      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
-    });
-    store.state.sessions[waiting].messages.push({ role: "user", content: raw("old") });
-    store.state.sessions[waiting].pendingApproval = { id: "a1" } as never;
-    store.setActive(null);
-    for (const title of ["b", "c", "d"]) {
-      const sid = store.createSession({
-        origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
-      });
-      store.state.sessions[sid].messages.push({ role: "user", content: raw(title) });
-      store.setActive(null);
-    }
-    await flushPromises();
-    const first = wrapper.get('[data-test="assistant-launcher-recent-0"]');
-    expect(first.attributes("data-status")).toBe("needs_you");
-    expect(first.text()).toContain("Needs you");
-    expect(wrapper.findAll('[data-test^="assistant-launcher-recent-"]').length).toBeLessThanOrEqual(
-      4,
-    );
-    expect(wrapper.get('[data-test="assistant-launcher-your-chats"]').classes()).toContain(
-      "max-md:order-first",
-    );
-  });
-
-  it("keeps a read-only Your chats under the locked row on G2 (PO A7)", () => {
-    const { wrapper } = setup("no_permission");
-    expect(wrapper.find('[data-test="assistant-gate-state"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
-  });
-
-  it("hides while the sidebar is open, so Home never shows a second assistant", async () => {
-    const { wrapper, store } = setup();
-    expect(wrapper.find('[data-test="assistant-launcher"]').exists()).toBe(true);
-    store.state.shell.placement = { kind: "sidebar" };
-    await flushPromises();
-    expect(wrapper.find('[data-test="assistant-launcher"]').exists()).toBe(false);
-    store.state.shell.placement = { kind: "hidden" };
-    await flushPromises();
-    expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(true);
-  });
-
   it("draws no time chip and sends no range of its own, so the agent picks the window", async () => {
     const { wrapper } = setup();
     expect(wrapper.find('[data-test="assistant-context-chip-time"]').exists()).toBe(false);
@@ -483,7 +386,7 @@ describe("AssistantLauncher", () => {
     expect(open.mock.calls[0][0].payload).not.toHaveProperty("timeOverride");
   });
 
-  it("is the composer everywhere else is: + left, agent mic Send right, (i) in the corner, 28 px square controls", async () => {
+  it("is the composer everywhere else is: + left, agent mic Send right, 28 px square controls, no (i)", async () => {
     const { wrapper } = setup();
     fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
     await flushPromises();
@@ -493,7 +396,7 @@ describe("AssistantLauncher", () => {
     const ids = (node: typeof left) =>
       node
         .findAll(
-          '[data-test="assistant-composer-plus"], [data-test="assistant-context-sees"], [data-test="assistant-context-chip-time"], [data-test="assistant-launcher-agent"], [data-test="assistant-dictate"], [data-test="assistant-launcher-ask"]',
+          '[data-test="assistant-composer-plus"], [data-test="assistant-context-chip-time"], [data-test="assistant-launcher-agent"], [data-test="assistant-dictate"], [data-test="assistant-launcher-ask"]',
         )
         .map((n) => n.attributes("data-test"));
     expect(ids(left)).toEqual(["assistant-composer-plus"]);
@@ -514,49 +417,13 @@ describe("AssistantLauncher", () => {
     );
     expect(left.get('[data-test="assistant-composer-plus"]').attributes("data-size")).toBe("sm");
     expect(ask.attributes("data-size")).toBe("sm");
-    const corner = wrapper.get('[data-test="assistant-composer-corner"]');
-    expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
-  });
-
-  it("drops the (i) while gated", async () => {
-    const gated = setupOn({ layout: "overview" });
-    fake.current.capability.value = { ...fake.current.capability.value, gate: "no_permission" };
-    await flushPromises();
-    expect(gated.wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
-  });
-
-  it("opens the (i) on what Ask would send: the @ picks", async () => {
-    mentionPick.current = {
-      id: "mention:stream:logs|checkout",
-      kind: "stream",
-      label: raw("checkout"),
-      chip: {
-        id: "mention:stream:logs|checkout",
-        kind: "stream",
-        label: raw("checkout"),
-        ref: { type: "stream", id: "checkout", org: "default", streamType: "logs" },
-        sizeBytes: 8,
-        provenance: "mention",
-        sent: "whitelist",
-      },
-    };
-    const { wrapper } = setupOn({ layout: "overview" });
-    await flushPromises();
-    await input(wrapper).setValue("@check");
-    await flushPromises();
-    await input(wrapper).trigger("keydown", { key: "Enter" });
-    await flushPromises();
-    await wrapper.get('[data-test="assistant-context-sees"]').trigger("click");
-    await flushPromises();
-    const list = document.body.querySelector('[data-test="assistant-context-sees-page"]');
-    expect(list?.textContent).toContain("checkout");
+    expect(wrapper.find('[data-test="assistant-composer-corner"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
   });
 
   it("gives Home's field the same plain frame as every other composer", async () => {
-    const { wrapper } = setupOn({ layout: "overview" });
+    const { wrapper } = setupOn({});
     const home = wrapper.get('[data-test="assistant-composer-frame"] > div').classes();
-    const card = setup().wrapper.get('[data-test="assistant-composer-frame"] > div').classes();
-    expect(home).toEqual(card);
     expect(home).toContain("[&>div]:focus-within:ring-1");
     expect(home.some((c) => /glow|gradient|shadow/.test(c))).toBe(false);
     expect(
@@ -571,7 +438,7 @@ describe("AssistantLauncher", () => {
   it("shows one plain hint that never types itself", async () => {
     vi.useFakeTimers();
     try {
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       const shown = () => input(wrapper).attributes("placeholder") ?? "";
       expect(shown()).toBe("Ask anything · @ to add context");
       await vi.advanceTimersByTimeAsync(5_000);
@@ -594,7 +461,7 @@ describe("AssistantLauncher", () => {
   });
 
   it("does nothing on an empty Enter on Home but say why, and keeps Home's URL", async () => {
-    const { wrapper, router } = setupOn({ layout: "overview" });
+    const { wrapper, router } = setupOn({});
     await router.replace({ name: "home", query: { period: "7d" } });
     await flushPromises();
     await input(wrapper).trigger("keydown", { key: "Enter" });
@@ -605,44 +472,6 @@ describe("AssistantLauncher", () => {
     expect(wrapper.get('[data-test="assistant-launcher-status"]').text()).toBe(
       "Type a question or attach an image to ask",
     );
-  });
-
-  it("states a failed list with the same words as the title menu, and retries", async () => {
-    const retry = vi.fn();
-    const listState = computed(() => ({ status: "error", offline: false }));
-    const { wrapper } = setup("available", { listState, retry });
-    await flushPromises();
-    const row = wrapper.get('[data-test="assistant-launcher-recent-failed"]');
-    expect(row.text()).toContain("Couldn't load your chats");
-    await wrapper.get('[data-test="assistant-launcher-recent-retry"]').trigger("click");
-    expect(retry).toHaveBeenCalled();
-  });
-
-  it("shows at most three suggestions and no other suggestion group (PO A34)", () => {
-    const { wrapper } = setup();
-    expect(wrapper.findAll('[data-test^="assistant-launcher-starter-"]')).toHaveLength(3);
-    expect(wrapper.findAll("h3").map((heading) => heading.text())).toEqual(["Recent chats"]);
-  });
-
-  it("shows skeleton rows while the starters load, and keeps the field typable unless the gate loads", () => {
-    loading.value = true;
-    const { wrapper } = setup();
-    expect(wrapper.find('[data-test="assistant-launcher-loading"]').exists()).toBe(true);
-    expect(input(wrapper).attributes("disabled")).toBeUndefined();
-    const gated = setup("loading");
-    expect(input(gated.wrapper).attributes("disabled")).toBeDefined();
-  });
-
-  it("tags used-up credits next to the title", () => {
-    fake.current = null;
-    const { wrapper, store } = setup();
-    void store;
-    fake.current.capability.value = { ...fake.current.capability.value, creditMode: "exhausted" };
-    return flushPromises().then(() => {
-      expect(wrapper.get('[data-test="assistant-launcher-credits"]').text()).toBe(
-        "Credits used up",
-      );
-    });
   });
 
   describe("Attach Image", () => {
@@ -659,7 +488,7 @@ describe("AssistantLauncher", () => {
       const click = vi
         .spyOn(HTMLInputElement.prototype, "click")
         .mockImplementation(() => undefined);
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       plus(wrapper, "attach");
       expect(click).toHaveBeenCalled();
@@ -687,7 +516,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("moves focus to the next chip, then to the box, as chips are removed, and says each removal", async () => {
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       pick(wrapper, [png("a.png"), png("b.png")]);
       await vi.waitFor(() => expect(thumbs(wrapper)).toHaveLength(2));
@@ -707,7 +536,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("hands the images to the new chat with the line on Enter, and sends images alone", async () => {
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       pick(wrapper, [png("a.png"), png("b.png", 20)]);
       await vi.waitFor(() =>
@@ -742,7 +571,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("refuses with the composer's lines: a fifth image, a wrong type and an image over the size cap", async () => {
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       pick(
         wrapper,
@@ -777,7 +606,7 @@ describe("AssistantLauncher", () => {
     };
 
     it("stays visible with the dock open, with no starters or recent chats", async () => {
-      const { wrapper, store } = setupOn({ layout: "overview" });
+      const { wrapper, store } = setupOn({});
       store.state.shell.placement = { kind: "sidebar" };
       await flushPromises();
       expect(wrapper.find('[data-test="assistant-launcher"]').exists()).toBe(true);
@@ -785,36 +614,32 @@ describe("AssistantLauncher", () => {
       expect(wrapper.find('[data-test="assistant-launcher-suggestions"]').exists()).toBe(false);
     });
 
-    it("draws the agent first on the right in both layouts, as quiet text with no box", async () => {
-      for (const mountIt of [() => setupOn({ layout: "overview" }), () => setup()]) {
-        const { wrapper } = mountIt();
-        fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
-        await flushPromises();
-        const right = wrapper.get('[data-test="assistant-composer-bar-right"]');
-        expect(right.findAll("[data-test]")[0].attributes("data-test")).toBe(
-          "assistant-launcher-agent",
-        );
-        const classes = wrapper.get('[data-test="assistant-launcher-agent"]').classes();
-        expect(classes).toContain("text-text-secondary!");
-        expect(classes.some((name) => /^(border-(?!0)|bg-surface)/.test(name))).toBe(false);
-        expect(wrapper.find('[data-test="assistant-agent-pill"]').exists()).toBe(false);
-      }
+    it("draws the agent first on the right, as quiet text with no box", async () => {
+      const { wrapper } = setupOn({});
+      fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
+      await flushPromises();
+      const right = wrapper.get('[data-test="assistant-composer-bar-right"]');
+      expect(right.findAll("[data-test]")[0].attributes("data-test")).toBe(
+        "assistant-launcher-agent",
+      );
+      const classes = wrapper.get('[data-test="assistant-launcher-agent"]').classes();
+      expect(classes).toContain("text-text-secondary!");
+      expect(classes.some((name) => /^(border-(?!0)|bg-surface)/.test(name))).toBe(false);
+      expect(wrapper.find('[data-test="assistant-agent-pill"]').exists()).toBe(false);
     });
 
     it("reads no starters, so their load never holds the field", () => {
       loading.value = true;
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       expect(startersRead).not.toHaveBeenCalled();
       expect(wrapper.get('[data-test="assistant-launcher"]').attributes("data-state")).toBe(
         "ready",
       );
       expect(wrapper.find('[data-test="assistant-launcher-loading"]').exists()).toBe(false);
-      setup();
-      expect(startersRead).toHaveBeenCalledTimes(1);
     });
 
     it("always starts a new chat, in the dock while it is open", async () => {
-      const { wrapper, store } = setupOn({ layout: "overview" });
+      const { wrapper, store } = setupOn({});
       store.state.shell.placement = { kind: "sidebar" };
       await flushPromises();
       await input(wrapper).setValue("why 5xx?");
@@ -833,7 +658,7 @@ describe("AssistantLauncher", () => {
           }) as never,
       });
       contextRegistry.setActive("home");
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       expect(wrapper.find('[data-test="assistant-launcher-page-chip"]').exists()).toBe(false);
       expect(wrapper.find('[data-state="ghost"]').exists()).toBe(false);
@@ -853,7 +678,7 @@ describe("AssistantLauncher", () => {
         sent: "whitelist",
       };
       mentionPick.current = { id: chip.id, kind: "stream", label: chip.label, chip };
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       await input(wrapper).setValue("@check");
       await flushPromises();
@@ -873,7 +698,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("opens no results list or Ask row while typing when the assistant is usable", async () => {
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       await input(wrapper).setValue("logs");
       await flushPromises();
@@ -884,7 +709,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("asks on Enter when nothing is arrowed onto", async () => {
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       await input(wrapper).setValue("why is checkout failing");
       await flushPromises();
@@ -894,7 +719,7 @@ describe("AssistantLauncher", () => {
 
     it("answers the ⌘K focus request while it can take a question", async () => {
       expect(requestOverviewFocus()).toBe(false);
-      const { wrapper } = setupOn({ layout: "overview" });
+      const { wrapper } = setupOn({});
       await flushPromises();
       expect(requestOverviewFocus()).toBe(true);
       expect(document.activeElement).toBe(input(wrapper).element);
@@ -903,7 +728,7 @@ describe("AssistantLauncher", () => {
     });
 
     it("clears and focuses the field once on focus=ask, then drops the key", async () => {
-      const { wrapper, router } = setupOn({ layout: "overview" });
+      const { wrapper, router } = setupOn({});
       await router.replace({ name: "home", query: { focus: "ask", row: "incident:7" } });
       await flushPromises();
       expect(document.activeElement).toBe(input(wrapper).element);

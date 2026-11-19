@@ -426,6 +426,10 @@
   --color-cancel-query-bg: #f67a7a;
   --color-highlight-bg: #e7e6e6; /* syntax-guide highlight chip (dark: #747474) */
   --color-brand-indigo: #5960b2; /* brand indigo — loading bar, AI accents (theme-independent) */
+  /* Assistant spark stops, from the logo ring; each clears 3:1 on the header and on surfaces. */
+  --color-assistant-spark-from: #2a86d6;
+  --color-assistant-spark-via: #6b76e3;
+  --color-assistant-spark-to: #e04a38;
   --color-card-glass-bg: rgba(255, 255, 255, 0.8);
   --color-card-glass-solid: rgba(255, 255, 255);
   --color-dashboard-placeholder-bg: #b3bdf1;

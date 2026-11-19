@@ -23,7 +23,7 @@ const STARTER_ICONS: Record<StarterKind, IconName> = {
   object: assistantGlyph.explain,
   recent: assistantGlyph.history,
   ingest: assistantGlyph.download,
-  learn: assistantGlyph.sparkle,
+  learn: assistantGlyph.assistant,
 };
 
 /** The icon a starter card shows for its kind. */

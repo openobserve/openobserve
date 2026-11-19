@@ -544,6 +544,10 @@ describe("AssistantTranscript", () => {
     await flushPromises();
     const classes = wrapper.get('[data-test="assistant-transcript-jump-latest"]').classes();
     expect(classes).toEqual(expect.arrayContaining(TOUCH_TARGET_CLASS.split(" ")));
+    // A phone's answer actions span the middle, so the button keeps to the end, clear of them.
+    expect(wrapper.get('[data-test="assistant-transcript-jump-row"]').classes()).toEqual(
+      expect.arrayContaining(["max-md:justify-end", "max-md:pe-3"]),
+    );
   });
 
   it("gives each answer the anchor its share link lands on", async () => {
@@ -622,8 +626,8 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
     expect(turn.get('[data-test="assistant-handoff-given-panel"]').text()).toContain(
       "1 questions, 1 answers",
     );
-    expect(turn.get('[data-test="assistant-message-meta"]').text()).toContain(
-      `· to ${brandNames.autobotInvestigate}`,
+    expect(turn.get('[data-test="assistant-message-meta"]').text()).toBe(
+      `To ${brandNames.autobotInvestigate}`,
     );
   });
 

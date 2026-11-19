@@ -206,7 +206,7 @@ describe("buildRoleModules - assistant groups", () => {
       new Set(modules.filter((module) => module.group === group).map((module) => module.icon));
     const shared = [...icons("assistant")].filter((icon) => icons("llmObservability").has(icon));
     expect(shared).toEqual([]);
-    expect(modules.find((module) => module.key === "ai")?.icon).toBe("auto-awesome");
+    expect(modules.find((module) => module.key === "ai")?.icon).toBe("assistant-spark");
   });
 });
 

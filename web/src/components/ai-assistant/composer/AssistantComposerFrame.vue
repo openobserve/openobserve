@@ -30,28 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       autogrow
       :max-rows="MAX_ROWS"
       width="full"
-      :input-attrs="
-        $slots.corner
-          ? { ...fieldAttrs, class: `${fieldAttrs.class} ${CORNER_FIELD_CLASS}` }
-          : fieldAttrs
-      "
+      :input-attrs="fieldAttrs"
       :class="[FRAME_CLASS, inert ? INERT_CLASS : '', listening ? LISTENING_CLASS : '']"
       @update:model-value="(value: string) => emit('update:modelValue', value)"
     >
       <template #header>
-        <div v-if="$slots.strip" :class="['min-w-0', $slots.corner ? 'pe-7' : '']">
+        <div v-if="$slots.strip" class="min-w-0">
           <slot name="strip" />
         </div>
       </template>
       <template #footer>
-        <!-- Drawn at the top corner but placed after the field, so Tab reaches the text first -->
-        <span
-          v-if="$slots.corner"
-          class="absolute end-2 top-3 flex max-md:top-1 pointer-coarse:top-1"
-          data-test="assistant-composer-corner"
-        >
-          <slot name="corner" />
-        </span>
         <slot name="bar" />
       </template>
     </OTextarea>
@@ -82,7 +70,7 @@ export const MAX_ROWS = 6;
 
 // OTextarea's bordered box is its only div child here, so the frame styles it from the root until the lib grows a frame variant.
 const FRAME_CLASS = [
-  "[&>div]:rounded-surface [&>div]:border-border-default [&>div]:gap-1 [&>div]:px-2 [&>div]:pt-2.5 [&>div]:pb-2",
+  "[&>div]:rounded-surface [&>div]:border-border-default [&>div]:gap-2 [&>div]:px-2.5 [&>div]:pt-3 [&>div]:pb-2.5",
   "[&>div]:ring-offset-0 [&>div]:motion-reduce:transition-none [&>div]:focus-within:border-input-border-focus [&>div]:focus-within:ring-1 [&>div]:focus-within:ring-focus-ring-accent",
 ].join(" ");
 
@@ -92,9 +80,6 @@ const LISTENING_CLASS =
   "[&>div]:border-status-error-text! [&>div]:ring-1 [&>div]:ring-status-error-text! [&>div]:focus-within:border-status-error-text! [&>div]:focus-within:ring-status-error-text!";
 
 const FIELD_CLASS = "px-1.5! py-0! my-1! min-h-6 max-h-36! text-sm leading-6! basis-auto!";
-
-// Clears the corner button, which shares the box's end padding with Send.
-const CORNER_FIELD_CLASS = "pe-8! max-md:pe-11! pointer-coarse:pe-11!";
 </script>
 
 <script setup lang="ts">
@@ -120,8 +105,6 @@ const emit = defineEmits<AssistantComposerFrameEmits>();
 
 defineSlots<{
   strip?: () => unknown;
-  /** Top end of the box, over the field: the ⓘ. */
-  corner?: () => unknown;
   bar?: () => unknown;
 }>();
 

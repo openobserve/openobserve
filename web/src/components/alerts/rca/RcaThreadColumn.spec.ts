@@ -483,7 +483,6 @@ describe("RcaThreadColumn", () => {
     const STEERABLE = {
       steering: rcaSteeringLive(),
       canSteer: true,
-      authorEmail: "a.rao@acme.io",
       send,
     };
     const bubbles = (wrapper: VueWrapper) => wrapper.findAll('[data-test="rca-thread-steer"]');
@@ -727,7 +726,6 @@ describe("RcaThreadColumn", () => {
       ...SAVED,
       steering: rcaSteeringLive({ can_steer: true }),
       canSteer: true,
-      authorEmail: "a.rao@acme.io",
       send,
     };
 

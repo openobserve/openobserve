@@ -70,7 +70,7 @@ vi.mock("@/composables/useBreakpoint", async () => {
 vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
-    props: ["layout", "fixedAgent", "askPlaceholder"],
+    props: ["fixedAgent", "askPlaceholder"],
     methods: { focusAsk: () => undefined, fill: (prompt: string) => mocks.fill(prompt) },
     template:
       '<div data-test="launcher-stub" :data-agent="fixedAgent" :data-placeholder="askPlaceholder" />',

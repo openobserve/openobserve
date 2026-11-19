@@ -31,34 +31,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-state="view.state"
       :aria-label="view.name"
       :class="[
-        'group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md',
         'relative max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
-        view.state === 'open' ? 'border-border-strong border' : '',
+        view.state === 'open' ? OPEN_CLASS : '',
       ]"
       @click="onClick"
     >
       <span class="relative inline-flex">
-        <img
-          alt=""
-          :src="
-            getImageURL(
-              isDark ? 'images/common/ai_icon_dark.svg' : 'images/common/ai_icon_gradient.svg',
-            )
-          "
-          :class="[
-            'h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease] forced-colors:hidden',
-            view.state === 'off' ? 'opacity-50 grayscale' : '',
-          ]"
-        />
-        <!-- The image keeps its own fill in forced colours and vanishes on a matching canvas; the mask takes ButtonText -->
-        <span
-          aria-hidden="true"
-          data-icon="forced"
-          :class="[
-            'hidden size-5 shrink-0 bg-[ButtonText] forced-color-adjust-none [mask:var(--o-ai-icon)_center/contain_no-repeat] forced-colors:inline-block',
-            view.state === 'off' ? 'opacity-50' : '',
-          ]"
-          :style="{ '--o-ai-icon': `url(${getImageURL('images/common/ai_icon_gradient.svg')})` }"
+        <AssistantSpark
+          :size="20"
+          :working="view.state === 'working'"
+          :muted="view.state === 'off'"
         />
         <!-- Anchored by its start edge so a needs-you count grows away from the icon, not over it -->
         <span
@@ -197,6 +179,9 @@ export const HEADER_TOAST_MS = 6_000;
 
 const AT_REST: ReadonlySet<string> = new Set(["idle", "done", "failed", "refused", "stopped"]);
 
+// The spark keeps its gradient, so open reads by a deeper tint and an accent hairline, never as hover.
+const OPEN_CLASS = "bg-button-ghost-active-bg! ring-button-outline-hover-border ring-1 ring-inset";
+
 interface HeaderView {
   state: HeaderButtonState;
   name: I18nText;
@@ -225,6 +210,7 @@ import { useStore } from "vuex";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantGateState, {
@@ -250,8 +236,6 @@ import {
   useAssistantStore,
 } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { useTheme } from "@/composables/useTheme";
-import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -271,7 +255,6 @@ import { useLockedPanel } from "./lockedPanel";
 provideAssistantSurface();
 
 const { t } = useI18nTyped();
-const { isDark } = useTheme();
 const { product } = useAssistantName();
 const store = useAssistantStore();
 const runs = useAssistantRuns();

@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :minimised="minimisedPills"
       :others-count="othersCount"
       :others-signal="othersSignal"
-      :others-shown="!chatOpen || othersSignal === SIGNAL.approval"
+      :others-shown="!listOnScreen && (!chatOpen || othersSignal === SIGNAL.approval)"
       :expanded="expanded"
       @toggle="toggle"
       @restore="openThread"
@@ -148,7 +148,7 @@ import { useStore } from "vuex";
 
 import config from "@/aws-exports";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
-import { useAssistantRuns, useAssistantStore } from "@/composables/assistant";
+import { historyTargetAbove, useAssistantRuns, useAssistantStore } from "@/composables/assistant";
 import {
   fullThreadLocation,
   isFullThreadRoute,
@@ -254,6 +254,8 @@ const minimisedPills = computed<ThreadPill[]>(() =>
   }),
 );
 const othersCount = computed(() => threads.value.length + incidents.value.shown.length);
+// A chat list rail already on the page lists these chats, so the pill would repeat it.
+const listOnScreen = computed(() => historyTargetAbove(1));
 const othersSignal = computed(() => {
   const signals = threads.value.map((pill) => pill.signal);
   if (signals.includes("approval")) return SIGNAL.approval;

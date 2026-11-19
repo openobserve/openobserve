@@ -1633,7 +1633,7 @@ function initialState(viewportRem: () => number): AssistantState {
     sessions: {},
     recent: [],
     history: {
-      filter: { kind: "all", q: "" },
+      filter: { kind: "all" },
       cursor: null,
       hasMore: false,
       importState: "idle",

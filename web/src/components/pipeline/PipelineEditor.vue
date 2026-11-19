@@ -159,15 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="openUpgradeDialog"
         data-test="menu-link-ai-item"
         :aria-label="t('menu.aiAssistant')"
-        class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-        @mouseenter="isJsonEditorAiHovered = true"
-        @mouseleave="isJsonEditorAiHovered = false"
+        class="relative"
       >
-        <img
-          alt=""
-          :src="jsonEditorAiBtnLogo"
-          class="header-icon size-5 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-        />
+        <AssistantSpark :size="20" />
         <span
           aria-hidden="true"
           class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
@@ -228,13 +222,13 @@ import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.
 import functionsService from "@/services/jstransform";
 
 import { useStore } from "vuex";
-import useTheme from "@/composables/useTheme";
 import pipelineService from "@/services/pipelines";
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -337,7 +331,6 @@ const pipeline = ref<Pipeline>({
 const router = useRouter();
 const store = useStore();
 const orgId = useOrgId();
-const { isDark } = useTheme();
 
 // nodeTypes is built at module scope, so `t` has to be in scope above it.
 const { t } = useI18nTyped();
@@ -499,13 +492,6 @@ const AiEntryButton = defineAsyncComponent(
 // Edition check via the registry; OSS gets the locked button and upgrade dialog.
 const aiAccess = useLockedAffordance("aiAssistant");
 const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
-const isJsonEditorAiHovered = ref(false);
-const jsonEditorAiBtnLogo = computed(() => {
-  if (isJsonEditorAiHovered.value || isDark.value) {
-    return getImageURL("images/common/ai_icon_dark.svg");
-  }
-  return getImageURL("images/common/ai_icon_gradient.svg");
-});
 
 const validationErrors = ref<string[]>([]);
 

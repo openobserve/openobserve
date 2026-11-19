@@ -69,7 +69,8 @@ export interface AssistantModeButtonsProps {
   dockHost?: DockHostId;
 }
 
-const PRESSED_CLASS = "bg-button-ghost-subtle-active-bg! text-text-heading!";
+// The current placement reads by its icon colour alone, so it never outweighs a hovered button.
+const PRESSED_CLASS = "text-accent!";
 
 const PLACE_ICONS: Record<PlaceId, IconName> = {
   sidebar: assistantGlyph.sidePanel,

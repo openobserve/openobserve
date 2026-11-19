@@ -66,10 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-org="selectedOrg"
         :user-clicked-org="userClickedOrg"
         :organizations="orgOptions"
-        :is-hovered="isHovered"
-        :get-btn-logo="getBtnLogo"
         @update:selected-org="selectedOrg = $event"
-        @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
         @go-to-home="goToHome"
         @go-to-about="goToAbout"
@@ -507,7 +504,6 @@ export default defineComponent({
     const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
-    const isHovered = ref(false);
     let customOrganization = Object.prototype.hasOwnProperty.call(
       router.currentRoute.value.query,
       "org_identifier",
@@ -1818,17 +1814,6 @@ export default defineComponent({
       window.open(slackURL, "_blank");
     };
 
-    const getBtnLogo = computed(() => {
-      if (isDark.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      if (isHovered.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      return getImageURL("images/common/ai_icon_gradient.svg");
-    });
     // A page's `sendToAiChat` payload goes through the one door as chips and text.
     const relayToChat = (value: unknown, _append = true, autoSend = false) =>
       void import("@/composables/assistant").then((m) =>
@@ -1920,8 +1905,6 @@ export default defineComponent({
       openSlack,
       settings: "settings",
       splitterModel,
-      getBtnLogo,
-      isHovered,
       userClickedOrg,
       verifyStreamExist,
       filterMenus,

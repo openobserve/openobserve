@@ -31,7 +31,6 @@ import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
 import AssistantHistoryList, {
   type AssistantHistoryListProps,
   INVESTIGATION_AUTO_PAGES,
-  SEARCH_DEBOUNCE_MS,
   VIRTUAL_FROM,
 } from "./AssistantHistoryList.vue";
 
@@ -203,13 +202,11 @@ describe("AssistantHistoryList", () => {
     expect(line.text()).toBe("Saved in this browser only");
   });
 
-  it("roves one tab stop over the row buttons with arrows, Home, End and type-ahead", async () => {
+  it("opens the panel on its first row and roves one tab stop with arrows, Home, End and type-ahead", async () => {
     const { wrapper } = await setup();
     const buttons = () => rowButtons(wrapper).map((b) => b.element as HTMLElement);
     expect(buttons().filter((b) => b.tabIndex === 0)).toHaveLength(1);
-    await wrapper
-      .get('[data-test="assistant-history-search"] input')
-      .trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
     expect(document.activeElement).toBe(buttons()[0]);
     await rowButtons(wrapper)[0].trigger("keydown", { key: "ArrowDown" });
     expect(document.activeElement).toBe(buttons()[1]);
@@ -229,65 +226,6 @@ describe("AssistantHistoryList", () => {
     expect(current[0].text()).toContain("Gamma this week");
   });
 
-  it("searches on the client and offers Clear search when nothing matches", async () => {
-    const { wrapper, history } = await setup();
-    history.setFilter({ q: "gamma" });
-    await flushPromises();
-    expect(rowButtons(wrapper)).toHaveLength(1);
-    expect(wrapper.get('[data-test="assistant-history-search-line"]').text()).toBe(
-      "1 chat matches",
-    );
-    history.setFilter({ q: "zzz" });
-    await flushPromises();
-    expect(wrapper.get('[data-test="assistant-history-no-match"]').text()).toContain(
-      "No chats match “zzz”",
-    );
-  });
-
-  it("says nothing matches, not No chats yet, when the server search finds nothing", async () => {
-    vi.spyOn(assistant, "listChats").mockImplementation(async (_org, params = {}) => ({
-      chats: params.q
-        ? []
-        : [
-            {
-              session_id: "0190a1b2-c3d4-7e5f-8a9b-00000000aaaa",
-              title: "Saved",
-              created_at: 1,
-              updated_at: 2,
-            },
-          ],
-    }));
-    const { wrapper, history } = await setup(
-      {},
-      { seed: [], persistence: true, historySearch: true },
-    );
-    await vi.waitFor(() => expect(rowButtons(wrapper)).toHaveLength(1));
-    history.setFilter({ q: "zzz" });
-    await vi.waitFor(() =>
-      expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(true),
-    );
-    expect(wrapper.find('[data-test="assistant-history-empty"]').exists()).toBe(false);
-  });
-
-  it("shows the skeleton, not No chats match, while a server search is still loading", async () => {
-    vi.spyOn(assistant, "listChats").mockImplementation((_org, params = {}) =>
-      params.q ? new Promise(() => {}) : Promise.resolve({ chats: [] }),
-    );
-    const { wrapper, history } = await setup(
-      {},
-      {
-        seed: [record(9, NOW - 60_000, { title: "Browser only" })],
-        persistence: true,
-        historySearch: true,
-      },
-    );
-    await vi.waitFor(() => expect(rowButtons(wrapper)).toHaveLength(1));
-    history.setFilter({ q: "zzz" });
-    await flushPromises();
-    expect(wrapper.find('[data-test="assistant-history-no-match"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="assistant-history-skeleton"]').exists()).toBe(true);
-  });
-
   it("shows the empty state without Delete all chats", async () => {
     const { wrapper } = await setup({}, { seed: [] });
     expect(wrapper.find('[data-test="assistant-history-empty"]').exists()).toBe(true);
@@ -305,8 +243,9 @@ describe("AssistantHistoryList", () => {
 
   it("confirms a delete in a dialog that starts on Cancel, then removes the row", async () => {
     const { wrapper, db, history } = await setup();
-    await wrapper.findAll('[data-test="assistant-history-item"]')[1].trigger("pointerenter");
-    await wrapper.get('[data-test="assistant-history-row-delete"]').trigger("click");
+    const item = wrapper.findAll('[data-test="assistant-history-item"]')[1];
+    await item.trigger("pointerenter");
+    await item.get('[data-test="assistant-history-row-delete"]').trigger("click");
     const dialog = wrapper.get('[data-test="assistant-history-delete-dialog"]');
     expect(dialog.get("h2").text()).toBe("Delete “Alpha today”?");
     expect(dialog.text()).toContain("This removes the chat from this browser.");
@@ -548,14 +487,20 @@ describe("AssistantHistoryList", () => {
     expect(root.attributes("role")).toBe("region");
     expect(root.attributes("aria-label")).toBe("All chats");
     expect(wrapper.find('[data-test="assistant-history-new"]').exists()).toBe(false);
-    const search = wrapper.get('[data-test="assistant-history-search"] input');
-    await search.setValue("alpha");
-    await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS + 50));
+    const open = wrapper.get('[data-test="assistant-history-search-open"]');
+    expect(open.text()).toBe("");
+    expect(open.attributes("aria-label")).toBe("Search chats");
+    await open.trigger("click");
     await flushPromises();
-    await search.trigger("keydown", { key: "Escape" });
-    expect(wrapper.emitted("close")).toBeUndefined();
+    expect(wrapper.find('[data-test="assistant-chat-search"]').exists()).toBe(true);
     await root.trigger("keydown", { key: "Escape" });
     expect(wrapper.emitted("close")).toHaveLength(1);
+  });
+
+  it("puts Share in a row's menu only where chats can be shared", async () => {
+    const { wrapper } = await setup();
+    await wrapper.get('[data-test="assistant-history-item"]').trigger("pointerenter");
+    expect(wrapper.find('[data-test="assistant-history-row-share"]').exists()).toBe(false);
   });
 
   it("leads with Needs You for chats that answer or wait, out of their day group", async () => {
@@ -678,16 +623,16 @@ describe("AssistantHistoryConfirm", () => {
     expect(loadOlder).toHaveBeenCalledTimes(12);
   });
 
-  it("drops a search left by the chat list before listing investigations", async () => {
+  it("drops a view left by the chat list before listing investigations", async () => {
     const { history } = await setup(
       { investigationsOnly: true },
       {
         patchHistory: (h: any) => {
-          h.setFilter({ q: "checkout", kind: "shared" });
+          h.setFilter({ kind: "shared" });
           return h;
         },
       },
     );
-    expect(history.filter.value).toMatchObject({ q: "", kind: "all" });
+    expect(history.filter.value).toMatchObject({ kind: "all" });
   });
 });

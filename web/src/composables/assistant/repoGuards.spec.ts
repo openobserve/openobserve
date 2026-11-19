@@ -26,7 +26,6 @@ const SRC = join(WEB, "src");
 const LEGACY_AI_EVENT_FILES = ["composables/useNLQuery.ts", "services/ai_toolsets.ts"];
 const LEGACY_ASSISTANT_UI = [/^components\/ai-assistant\/welcome\//];
 const AUTO_AWESOME_CALL_SITES = [
-  "components/ai-assistant/common/glyphs.ts",
   "components/alerts/AlertsDestinationList.vue",
   "components/alerts/IncidentAiAnalysisCell.vue",
   "components/alerts/IncidentRCAAnalysis.vue",
@@ -52,7 +51,6 @@ const AUTO_AWESOME_CALL_SITES = [
   "lib/core/EmptyState/presets.ts",
   "lib/core/Icon/OIcon.icons.ts",
   "plugins/traces/LLMInsightsDashboard.vue",
-  "utils/featureGate.ts",
   "views/Infrastructure/kubernetes2/K8sAttentionList.vue",
   "views/Infrastructure/kubernetes2/K8sDetailsDrawer.vue",
   "views/OverviewTab.vue",
@@ -74,12 +72,9 @@ const AI_TOKEN_LEGACY_CONSUMERS = [
   "enterprise/components/ServiceVersions/VersionCompareDrawer.vue",
   "enterprise/components/ServiceVersions/VersionSummaryTiles.vue",
   "components/dbm/DbmSuggestFixButton.vue",
-  "components/pipeline/PipelineEditor.vue",
   "components/QueryEditor.vue",
   "lib/core/Button/OButton.vue",
   "lib/core/EmptyState/EmptyStateIngestionChip.vue",
-  "plugins/logs/SearchBar.vue",
-  "plugins/traces/SearchBar.vue",
   "utils/activityTimeline.ts",
   "views/HomeView.vue",
 ];
@@ -271,10 +266,10 @@ describe("assistant repo guards", () => {
     ).toEqual([]);
   });
 
-  it("names auto-awesome only in glyphs.ts and the frozen call sites", () => {
+  it("names auto-awesome only at the frozen call sites; the assistant draws its spark", () => {
     const found = offenders((f) => /["']auto-awesome["']|\/auto-awesome/.test(f.text));
     expect(found.filter((path) => !AUTO_AWESOME_CALL_SITES.includes(path))).toEqual([]);
-    expect(found).toContain("components/ai-assistant/common/glyphs.ts");
+    expect(found).not.toContain("components/ai-assistant/common/glyphs.ts");
     expect(found).not.toContain("plugins/traces/ThreadView.vue");
   });
 

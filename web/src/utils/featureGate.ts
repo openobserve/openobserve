@@ -28,7 +28,7 @@ export const FREE_LIMIT_GB = 50;
 
 // Icon mirrors each feature's own nav entry.
 export const LOCKED_FEATURES: Partial<Record<string, { icon: IconName }>> = {
-  ai_assistant: { icon: "auto-awesome" },
+  ai_assistant: { icon: "assistant-spark" },
 };
 
 interface RejectedResponse {

@@ -27,7 +27,7 @@ const mountGreeting = (email?: string) =>
   });
 
 describe("AgentHomeGreeting", () => {
-  it("puts the name in the translated greeting as plain heading text, with no logo", () => {
+  it("puts the name in the translated greeting as plain heading text, the spark to its left", () => {
     const wrapper = mountGreeting("marco.rossi@example.com");
     const heading = wrapper.get('[data-test="agent-home-greeting-text"]');
     expect(heading.element.tagName).toBe("H2");
@@ -39,6 +39,9 @@ describe("AgentHomeGreeting", () => {
     expect(name.classes()).not.toContain("text-transparent");
     expect(name.classes()).not.toContain("bg-gradient-brand-ribbon");
     expect(wrapper.find('[data-test="agent-home-greeting-mark"]').exists()).toBe(false);
+    const spark = wrapper.get('[data-test="assistant-spark"]');
+    expect(spark.attributes("aria-hidden")).toBe("true");
+    expect(spark.element.nextElementSibling).toBe(heading.element);
     expect(wrapper.find("img").exists()).toBe(false);
   });
 

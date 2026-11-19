@@ -105,20 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
     <!-- The row keeps its height while hidden, so hovering a message never moves the transcript -->
     <div
-      v-if="$slots.actions || (answerTime && !userMeta)"
+      v-if="$slots.actions"
       class="flex min-h-6 items-center justify-end gap-1"
       data-test="assistant-message-user-line"
     >
       <slot name="actions" />
-      <OText
-        v-if="answerTime && !userMeta"
-        variant="meta"
-        as="span"
-        class="shrink-0 whitespace-nowrap opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100"
-        data-test="assistant-message-user-time"
-      >
-        {{ answerTime }}
-      </OText>
     </div>
   </div>
 
@@ -290,15 +281,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="assistant-answer-line"
         >
           <slot name="actions" />
-          <OText
-            v-if="answerTime"
-            variant="meta"
-            as="span"
-            class="ms-auto shrink-0 whitespace-nowrap"
-            data-test="assistant-answer-time"
-          >
-            {{ answerTime }}
-          </OText>
           <AssistantAnswerMeta
             v-if="!hasFindings"
             :message="message"
@@ -457,7 +439,7 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatOrgRange, formatOrgTime } from "@/utils/formatters";
+import { formatOrgRange } from "@/utils/formatters";
 
 import { decisionsAfterProposal } from "@/components/ai-assistant/approvals/approvalPlacement";
 
@@ -554,20 +536,14 @@ const sentChips = computed(() =>
 const sentContext = computed(() => raw(sentChips.value.map((chip) => chip.label).join(" · ")));
 const images = computed<ImageAttachment[]>(() => props.message.images ?? []);
 
-// The hour sits on the answer line; a handoff keeps it as the start of its "to agent" line.
 const userMeta = computed<I18nText | null>(() => {
   const who = props.message.author ? raw(props.message.author) : null;
   const { handoffFrom, agentId } = props.message;
   if (!handoffFrom || !agentId) return who;
-  const at = props.message.sentAt;
-  const meta = who ?? (at === undefined ? raw("") : raw(formatOrgTime(at)));
-  return t("assistant.message.metaHandoff", { meta, agent: agentName(agentId, t) });
-});
-
-// An answer record carries no time of its own, so it shows when its question was sent.
-const answerTime = computed<I18nText | null>(() => {
-  const at = props.message.sentAt ?? props.turn?.prompt?.sentAt;
-  return at === undefined ? null : raw(formatOrgTime(at));
+  const agent = agentName(agentId, t);
+  return who
+    ? t("assistant.message.metaHandoff", { meta: who, agent })
+    : t("assistant.message.toAgent", { agent });
 });
 
 const rerunRange = computed(() => {
@@ -785,11 +761,14 @@ function markdownTarget(href: string): LinkTarget | null {
 
 const hasFindings = computed(() => blocks.value.some((block) => block.type === "findings"));
 
-// With no findings the first text is the conclusion.
+// With no findings the first text is the conclusion, unless a tool step follows it: then it narrates the work.
 const leadKey = computed(() => {
   if (hasFindings.value) return null;
   const first = rendered.value[0];
-  return first?.kind === "markdown" ? first.key : null;
+  if (first?.kind !== "markdown") return null;
+  const base = baseBlocks.value;
+  const text = base.findIndex((block) => block.type === "text" && !!block.text?.trim());
+  return base.slice(text + 1).some((block) => block.type === "tool_call") ? null : first.key;
 });
 
 // A citation's number is its row in the queries list; a claim on a step this view lacks comes after them.

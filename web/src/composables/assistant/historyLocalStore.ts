@@ -85,19 +85,21 @@ export async function writeCache(
   ctx: HistoryCtx,
   patch: Partial<LocalRecord>,
   required = false,
+  /** A listed server chat never opened here has no row yet; this seeds one, e.g. for a browser pin. */
+  seed?: Pick<LocalRecord, "title" | "timestamp">,
 ): Promise<void> {
   const session = ctx.session(sid);
   const stored = await readLocal(sid, ctx);
   const userOrgKey = session?.userOrgKey ?? ctx.key();
-  if (!userOrgKey || (!stored && !session) || ctx.deleted.has(sid)) {
+  if (!userOrgKey || (!stored && !session && !seed) || ctx.deleted.has(sid)) {
     if (required) throw new Error("Nothing stored for this chat");
     return;
   }
   const base: LocalRecord = stored ??
-    recordFromSession(session!, ctx, null) ?? {
+    (session ? recordFromSession(session, ctx, null) : null) ?? {
       id: recordIdOf(sid, ctx) ?? ctx.deps.now(),
-      timestamp: new Date(ctx.deps.now()).toISOString(),
-      title: String(session?.title ?? ""),
+      timestamp: seed?.timestamp ?? new Date(ctx.deps.now()).toISOString(),
+      title: seed?.title ?? String(session?.title ?? ""),
       messages: [],
       sessionId: sid,
       userOrgKey,

@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <AssistantLauncher
           v-else
           ref="launcher"
-          layout="overview"
           fixed-agent="sre"
           :ask-placeholder="t('autobotInvestigate.placeholder')"
           class="mx-auto mt-3 max-w-3xl"

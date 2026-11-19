@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton
+    ref="root"
     :variant="on ? 'primary' : variant"
     :size="done ? 'xs' : ICON_SIZES[size]"
     :disabled="disabled"
@@ -55,7 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip
       v-if="!noTooltip && !done"
       exclusive
-      :disabled="$attrs['aria-expanded'] === true || $attrs['aria-expanded'] === 'true'"
+      :disabled="
+        confirmingCopy || $attrs['aria-expanded'] === true || $attrs['aria-expanded'] === 'true'
+      "
       :content="$slots.tooltip && !unavailable ? undefined : tooltip"
       :shortcut-id="shortcutId"
     >
@@ -65,10 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { copyConfirm } from "@/lib/feedback/Toast/copyConfirm";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 import { assistantGlyph } from "./glyphs";
@@ -102,6 +106,11 @@ defineSlots<AssistantIconButtonSlots>();
 
 // A disabled button with a reason stays focusable so keyboard and screen-reader users can reach why.
 const unavailable = computed(() => props.disabled && !!props.disabledReason);
+const root = ref<InstanceType<typeof OButton> | null>(null);
+// The copy bubble takes the tooltip's place on its button; both open would overlap.
+const confirmingCopy = computed(
+  () => copyConfirm.open && !!root.value?.$el && copyConfirm.anchor === root.value.$el,
+);
 const tooltip = computed(() =>
   unavailable.value && props.disabledReason ? props.disabledReason : props.label,
 );

@@ -50,7 +50,7 @@ export const historyStubs = {
     props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonDisabled"],
     emits: ["update:open", "click:primary", "click:secondary"],
     template: `<div v-if="open" role="dialog" v-bind="$attrs">
-      <h2>{{ title }}</h2><slot />
+      <h2>{{ title }}</h2><slot name="header" /><slot />
       <button data-stub="secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
       <button data-stub="primary" :disabled="primaryButtonDisabled" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
     </div>`,

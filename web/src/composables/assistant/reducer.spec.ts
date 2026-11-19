@@ -2327,3 +2327,62 @@ describe("branchedFromOf (C1 branched_from on a stored chat)", () => {
     expect(branchedFromOf({ session_id: "s1", turn_id: "t", title: 3 })?.title).toBe("");
   });
 });
+
+describe("answer text around a tool call", () => {
+  const live = () => makeCtx({ phase: "live" });
+  const lastBlocks = (state: StreamState) => state.messages.at(-1)?.contentBlocks ?? [];
+  const texts = (state: StreamState) =>
+    lastBlocks(state)
+      .filter((block) => block.type === "text")
+      .map((block) => block.text);
+
+  it("renders text, a tool step and the next text as two text blocks joined by a blank line", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "I'll list your streams." }, live());
+    reduce(
+      state,
+      { type: "tool_call", tool: "StreamList", message: "Listing streams", call_id: "c1" },
+      live(),
+    );
+    reduce(
+      state,
+      { type: "tool_result", tool: "StreamList", success: true, call_id: "c1" },
+      live(),
+    );
+    reduce(state, { type: "message_delta", content: "You have 47 streams" }, live());
+    expect(lastBlocks(state).map((block) => block.type)).toEqual(["text", "tool_call", "text"]);
+    expect(texts(state)).toEqual(["I'll list your streams.", "You have 47 streams"]);
+    expect(String(state.messages.at(-1)?.content)).toBe(
+      "I'll list your streams.\n\nYou have 47 streams",
+    );
+  });
+
+  it("closes the text block when a step frame opens the row before its tool_call", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "I'll list your streams." }, live());
+    reduce(state, { type: "step", call_id: "c1", state: "running", label: "StreamList" }, live());
+    reduce(state, { type: "message_delta", content: "You have 47 streams" }, live());
+    expect(lastBlocks(state).map((block) => block.type)).toEqual(["text", "tool_call", "text"]);
+    expect(texts(state)).toEqual(["I'll list your streams.", "You have 47 streams"]);
+  });
+
+  it("adds no blank line when the text before the tool step already ends with a newline", () => {
+    const state = makeState();
+    reduce(state, { type: "message_delta", content: "I'll list your streams.\n" }, live());
+    reduce(
+      state,
+      { type: "tool_call", tool: "StreamList", message: "Listing streams", call_id: "c1" },
+      live(),
+    );
+    reduce(
+      state,
+      { type: "tool_result", tool: "StreamList", success: true, call_id: "c1" },
+      live(),
+    );
+    reduce(state, { type: "message_delta", content: "You have 47 streams" }, live());
+    expect(texts(state)).toEqual(["I'll list your streams.\n", "You have 47 streams"]);
+    expect(String(state.messages.at(-1)?.content)).toBe(
+      "I'll list your streams.\nYou have 47 streams",
+    );
+  });
+});

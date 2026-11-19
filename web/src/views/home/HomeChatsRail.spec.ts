@@ -23,7 +23,7 @@ import {
   fakeVuex,
 } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import { historyStubs } from "@/components/ai-assistant/__tests__/historyStubs";
-import { SEARCH_DEBOUNCE_MS } from "@/components/ai-assistant/history/AssistantHistoryList.vue";
+import { SEARCH_DEBOUNCE_MS } from "@/components/ai-assistant/history/AssistantChatSearch.vue";
 import type { AssistantHistory } from "@/composables/assistant";
 import type { LocalRecord } from "@/composables/assistant/historyDb";
 import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
@@ -80,11 +80,12 @@ function record(id: number, title: string): LocalRecord {
 async function setup({
   seed = [] as LocalRecord[],
   persistence = false,
+  historySearch = false,
   patchHistory = (history: AssistantHistory) => history,
   thread = false,
   investigations = false,
 } = {}) {
-  fake.current = fakeAssistant("available", { persistence }, {}, 80, true);
+  fake.current = fakeAssistant("available", { persistence, historySearch }, {}, 80, true);
   for (const row of seed) fake.current.db.rows.set(row.id, structuredClone(row));
   fake.current.history = patchHistory(fake.current.history);
   const router = fakeRouter();
@@ -99,6 +100,15 @@ async function setup({
 
 const rows = (wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) =>
   wrapper.findAll('[data-test="assistant-history-row"]');
+
+async function search(wrapper: Awaited<ReturnType<typeof setup>>["wrapper"], q: string) {
+  await wrapper.get('[data-test="assistant-history-search-open"]').trigger("click");
+  await flushPromises();
+  await wrapper.get('[data-test="assistant-chat-search-input"] input').setValue(q);
+  await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS + 50));
+  await flushPromises();
+  return wrapper.findAll('[data-test="assistant-chat-search-result"]');
+}
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -116,7 +126,7 @@ afterEach(() => {
 });
 
 describe("HomeChatsRail", () => {
-  it("heads the shared chat list with Chats and New chat, groups the chats by day with a status or time each, from one list read", async () => {
+  it("heads the shared chat list with Chats, search and New chat, groups the chats by day with no time per row, from one list read", async () => {
     const listChats = vi.spyOn(assistant, "listChats").mockResolvedValue({
       chats: [
         chat(1, NOW - HOUR, { title: "Waiting on approval", pending_approval: true }),
@@ -125,12 +135,14 @@ describe("HomeChatsRail", () => {
       ],
     });
     const { wrapper } = await setup({ persistence: true });
-    expect(wrapper.get('[data-test="home-chats-rail-header"]').text()).toBe("Chats");
+    expect(wrapper.get('[data-test="assistant-history-heading"]').text()).toBe("Chats");
     expect(wrapper.get('[data-test="home-chats-rail-new"]').attributes("aria-label")).toBe(
       "New chat",
     );
     expect(wrapper.get('[data-test="assistant-history"]').attributes("data-mode")).toBe("rail");
-    expect(wrapper.find('[data-test="assistant-history-search"]').exists()).toBe(true);
+    expect(
+      wrapper.get('[data-test="assistant-history-search-open"]').attributes("aria-label"),
+    ).toBe("Search chats");
     const groups = wrapper.findAll('[data-test="assistant-history-group"]');
     expect(groups.map((group) => group.attributes("data-group"))).toEqual([
       "needs_you",
@@ -139,26 +151,29 @@ describe("HomeChatsRail", () => {
     ]);
     expect(groups[0].get('[data-test="assistant-history-row-state"]').text()).toBe("Needs you");
     expect(groups[1].text()).toContain("Checkout errors");
-    expect(groups[1].find('[data-test="assistant-history-row-time"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-history-row-time"]').exists()).toBe(false);
     expect(groups[2].text()).toContain("Slow login");
     expect(listChats).toHaveBeenCalledTimes(1);
   });
 
-  it("sits on the page's backdrop: no panel surface or band border, the main column's top padding, pill search and filters", async () => {
+  it("sits on the page's backdrop: no panel surface or band border, the main column's top padding, filter and list menu shown on hover", async () => {
     const { wrapper } = await setup({ seed: [record(1, "Alpha")] });
     expect(wrapper.get('[data-test="home-chats-rail"]').classes()).toContain("pt-4");
-    expect(wrapper.get('[data-test="home-chats-rail-header"]').classes()).not.toContain("border-b");
     const list = wrapper.get('[data-test="assistant-history"]').classes();
     expect(list).not.toContain("bg-surface-panel");
+    expect(list).toContain("group/list");
     const tools = wrapper.get('[data-test="assistant-history-tools"]').classes();
-    expect(tools).not.toEqual(expect.arrayContaining(["border-b"]));
+    expect(tools).not.toContain("border-b");
     expect(tools).not.toContain("border-border-default");
-    const search = wrapper.get('[data-test="assistant-history-search"]').classes();
-    expect(search).toContain("[&>div]:h-8");
-    expect(search.join(" ")).not.toContain("rounded-full");
-    expect(tools).toEqual(expect.arrayContaining(["gap-2"]));
-    expect(wrapper.get('[data-test="home-chats-rail-header"]').classes()).toEqual(
-      expect.arrayContaining(["px-3"]),
+    expect(wrapper.find('[data-test="assistant-history-search"]').exists()).toBe(false);
+    const menu = wrapper.get('[data-test="assistant-history-list-menu"]').classes();
+    expect(menu).toEqual(
+      expect.arrayContaining([
+        "opacity-0",
+        "group-hover/list:opacity-100",
+        "group-focus-within/list:opacity-100",
+        "pointer-coarse:opacity-100",
+      ]),
     );
     expect(list).toEqual(expect.arrayContaining(["px-3"]));
     expect(wrapper.get('[data-test="assistant-history-item"]').classes()).toEqual(
@@ -167,7 +182,7 @@ describe("HomeChatsRail", () => {
     expect(wrapper.find('[data-test="assistant-history-views"]').exists()).toBe(false);
   });
 
-  it("lays every row out as status dot, one-line title, the time, then the menu in its own slot", async () => {
+  it("lays every row out as a one-line title, the status light only where there is one, then the menu", async () => {
     vi.spyOn(assistant, "listChats").mockResolvedValue({
       chats: [
         chat(1, NOW - HOUR, { title: "Waiting on approval", pending_approval: true }),
@@ -176,21 +191,16 @@ describe("HomeChatsRail", () => {
     });
     const { wrapper } = await setup({ persistence: true });
     const lights = wrapper.findAll('[data-test="assistant-history-row-light"]');
-    expect(lights.map((light) => light.attributes("data-signal"))).toEqual(["attention", "ready"]);
-    expect(lights[1].find(".rounded-full").exists()).toBe(true);
+    expect(lights.map((light) => light.attributes("data-signal"))).toEqual(["attention"]);
     for (const row of rows(wrapper)) {
       expect(row.classes()).toContain("min-h-9");
       expect(row.get('[data-test="o-truncated-text"]').classes()).toContain("truncate");
     }
-    const time = wrapper.get('[data-test="assistant-history-row-time"]').classes();
-    expect(time).toContain("w-10");
-    expect(time.join(" ")).not.toContain("invisible");
+    expect(wrapper.find('[data-test="assistant-history-row-time"]').exists()).toBe(false);
     const state = wrapper.get('[data-test="assistant-history-row-state"]');
     expect(state.classes()).toEqual(["sr-only"]);
     expect(state.text()).toBe("Needs you");
-    expect(wrapper.get('[data-test="assistant-history-row-menu"]').classes()).not.toContain(
-      "absolute!",
-    );
+    expect(wrapper.findAll('[data-test="assistant-history-row-menu"]')).toHaveLength(2);
   });
 
   it("keeps the browser-only footer on one line, its explanation behind the info icon", async () => {
@@ -208,9 +218,7 @@ describe("HomeChatsRail", () => {
     const { wrapper } = await setup({ seed: [record(1, "Alpha")] });
     await wrapper.get('[data-test="home-chats-rail-new"]').trigger("click");
     expect(focus).toHaveBeenCalledTimes(1);
-    await wrapper
-      .get('[data-test="assistant-history-search"] input')
-      .trigger("keydown", { key: "Escape" });
+    await rows(wrapper)[0].trigger("keydown", { key: "Escape" });
     expect(focus).toHaveBeenCalledTimes(2);
     off();
   });
@@ -231,21 +239,148 @@ describe("HomeChatsRail", () => {
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("home");
     expect(router.currentRoute.value.query).toEqual({ tab: "ai", row: "incident:7", focus: "ask" });
-    await wrapper
-      .get('[data-test="assistant-history-search"] input')
-      .trigger("keydown", { key: "Escape" });
+    await rows(wrapper)[0].trigger("keydown", { key: "Escape" });
     expect(wrapper.emitted("close")).toHaveLength(1);
     expect(focus).not.toHaveBeenCalled();
     off();
   });
 
-  it("filters the chats with the list's own search box", async () => {
-    const { wrapper } = await setup({ seed: [record(1, "Alpha"), record(2, "Gamma")] });
+  it("searches the chats in a dialog, highlights the match and opens the chosen chat with Enter", async () => {
+    const { wrapper, router } = await setup({ seed: [record(1, "Alpha"), record(2, "Gamma")] });
     expect(rows(wrapper)).toHaveLength(2);
-    await wrapper.get('[data-test="assistant-history-search"] input').setValue("gamma");
-    await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS + 50));
+    const results = await search(wrapper, "gamma");
+    expect(results.map((row) => row.text())).toEqual([expect.stringContaining("Gamma")]);
+    expect(results[0].get("mark").text()).toBe("Gamma");
+    expect(results[0].attributes("aria-selected")).toBe("true");
+    await wrapper.get('[data-test="assistant-chat-search-input"] input').trigger("keydown", {
+      key: "Enter",
+    });
     await flushPromises();
-    expect(rows(wrapper).map((row) => row.text())).toEqual([expect.stringContaining("Gamma")]);
+    expect(router.currentRoute.value.name).toBe("assistant");
+    expect(router.currentRoute.value.params.chatId).toBe(SID(2));
+    expect(fake.current!.history.filter.value).toMatchObject({ kind: "all" });
+  });
+
+  it("asks the server with q when it searches, shows only its answer and leaves the list behind alone", async () => {
+    const listChats = vi
+      .spyOn(assistant, "listChats")
+      .mockImplementation(async (_org, params = {}) =>
+        params.q
+          ? { chats: [chat(3, NOW - 3 * HOUR, { title: "Older nginx parser" })] }
+          : {
+              chats: [
+                chat(1, NOW - HOUR, { title: "Alpha" }),
+                chat(2, NOW - HOUR, { title: "Beta" }),
+              ],
+            },
+      );
+    const { wrapper } = await setup({ persistence: true, historySearch: true });
+    await search(wrapper, "nginx");
+    expect(listChats).toHaveBeenCalledWith("default", expect.objectContaining({ q: "nginx" }));
+    await vi.waitFor(() =>
+      expect(
+        wrapper.findAll('[data-test="assistant-chat-search-result"]').map((row) => row.text()),
+      ).toEqual([expect.stringContaining("Older nginx parser")]),
+    );
+    expect(rows(wrapper)).toHaveLength(2);
+    expect(fake.current!.history.filter.value).toMatchObject({ kind: "all" });
+  });
+
+  it("reads a server match whose stored title hides the hit, and shows the matched prompt as its snippet", async () => {
+    vi.spyOn(assistant, "listChats").mockImplementation(async (_org, params = {}) => ({
+      chats: params.q
+        ? [
+            chat(4, NOW - HOUR, {
+              title: "Say in one short sentence what you will do, then list my…",
+            }),
+          ]
+        : [chat(1, NOW - HOUR, { title: "Alpha" })],
+    }));
+    const getChat = vi.spyOn(assistant, "getChat").mockResolvedValue({
+      ...chat(4, NOW - HOUR),
+      turns: [
+        {
+          turn_id: "t1",
+          user: { text: "Say in one short sentence what you will do, then list my streams" },
+          frames: [{ type: "message_delta", content: "I'll list your streams." }],
+        },
+      ],
+    } as never);
+    const { wrapper } = await setup({ persistence: true, historySearch: true });
+    await search(wrapper, "streams");
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="assistant-chat-search-snippet"]').exists()).toBe(true),
+    );
+    expect(getChat).toHaveBeenCalledWith("default", SID(4), undefined);
+    const snippet = wrapper.get('[data-test="assistant-chat-search-snippet"]');
+    expect(snippet.text()).toBe("… what you will do, then list my streams");
+    expect(snippet.get("mark").text()).toBe("streams");
+  });
+
+  it("shows a snippet of a loaded message that holds the match, and moves the choice with the arrows", async () => {
+    const seed = [record(1, "Alpha"), record(2, "Gamma")];
+    seed[0].messages.push({
+      role: "assistant",
+      content: raw("You have 47 log streams in default"),
+    });
+    const { wrapper } = await setup({ seed });
+    const results = await search(wrapper, "streams");
+    expect(results).toHaveLength(1);
+    expect(results[0].get('[data-test="assistant-chat-search-snippet"]').text()).toBe(
+      "You have 47 log streams in default",
+    );
+    expect(results[0].find('[data-test="assistant-chat-search-title"] mark').exists()).toBe(false);
+    const all = await search(wrapper, "a");
+    expect(all.length).toBe(2);
+    const input = wrapper.get('[data-test="assistant-chat-search-input"] input');
+    await input.trigger("keydown", { key: "ArrowDown" });
+    const now = wrapper.findAll('[data-test="assistant-chat-search-result"]');
+    expect(now.map((row) => row.attributes("aria-selected"))).toEqual(["false", "true"]);
+    expect(input.attributes("aria-activedescendant")).toBe(now[1].attributes("id"));
+  });
+
+  it("keeps the highlighted chat when a peeked match loads and the results recompute", async () => {
+    vi.spyOn(assistant, "listChats").mockImplementation(async (_org, params = {}) => ({
+      chats: params.q
+        ? [
+            chat(1, NOW - HOUR, { title: "Hidden one" }),
+            chat(2, NOW - 2 * HOUR, { title: "Hidden two" }),
+          ]
+        : [chat(1, NOW - HOUR, { title: "Alpha" })],
+    }));
+    let release = () => undefined as void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    vi.spyOn(assistant, "getChat").mockImplementation(async (_org, sid) => {
+      await gate;
+      return {
+        ...chat(sid === SID(1) ? 1 : 2, NOW - HOUR),
+        turns: [{ turn_id: "t1", user: { text: "list my streams" }, frames: [] }],
+      } as never;
+    });
+    const { wrapper } = await setup({ persistence: true, historySearch: true });
+    await search(wrapper, "streams");
+    await vi.waitFor(() =>
+      expect(wrapper.findAll('[data-test="assistant-chat-search-result"]')).toHaveLength(2),
+    );
+    await wrapper
+      .get('[data-test="assistant-chat-search-input"] input')
+      .trigger("keydown", { key: "ArrowDown" });
+    release();
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="assistant-chat-search-snippet"]').exists()).toBe(true),
+    );
+    const now = wrapper.findAll('[data-test="assistant-chat-search-result"]');
+    expect(now.map((row) => row.attributes("aria-selected"))).toEqual(["false", "true"]);
+  });
+
+  it("opens the chat matching what was typed when Enter beats the search debounce", async () => {
+    const { wrapper, router } = await setup({ seed: [record(1, "Alpha"), record(2, "Gamma")] });
+    expect(await search(wrapper, "a")).toHaveLength(2);
+    const input = wrapper.get('[data-test="assistant-chat-search-input"] input');
+    await input.setValue("gamma");
+    await input.trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(router.currentRoute.value.params.chatId).toBe(SID(2));
   });
 
   it("opens a chat in the full assistant view", async () => {
@@ -291,28 +426,25 @@ describe("HomeChatsRail", () => {
       persistence: true,
       investigations: true,
       patchHistory: (history) => {
-        history.setFilter({ kind: "shared", q: "" });
+        history.setFilter({ kind: "shared" });
         return history;
       },
     });
     const history = fake.current!.history;
     const stored = { ...history.filter.value };
-    expect(wrapper.get('[data-test="home-chats-rail-header"]').text()).toBe("Investigations");
+    expect(wrapper.get('[data-test="assistant-history-heading"]').text()).toBe("Investigations");
     expect(
-      wrapper.get('[data-test="assistant-history-search"] input').attributes("placeholder"),
+      wrapper.get('[data-test="assistant-history-search-open"]').attributes("aria-label"),
     ).toBe("Search investigations");
     expect(wrapper.find('[data-test="assistant-history-list-menu"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-history-filter"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-history-filter-active"]').exists()).toBe(false);
     expect(rows(wrapper).map((row) => row.text())).toEqual([
       expect.stringContaining("Checkout latency"),
       expect.stringContaining("Error spike"),
     ]);
-    await wrapper.get('[data-test="assistant-history-search"] input').setValue("spike");
-    await new Promise((resolve) => setTimeout(resolve, SEARCH_DEBOUNCE_MS + 50));
-    await flushPromises();
-    expect(rows(wrapper).map((row) => row.text())).toEqual([
-      expect.stringContaining("Error spike"),
-    ]);
+    const results = await search(wrapper, "spike");
+    expect(results.map((row) => row.text())).toEqual([expect.stringContaining("Error spike")]);
     expect(history.filter.value).toEqual(stored);
   });
 

@@ -71,9 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </AssistantComposerStrip>
       </template>
-      <template #corner>
-        <AssistantContextInfo :rows="contextRows" />
-      </template>
       <template #bar>
         <AssistantComposerBottomRow>
           <template #agent>
@@ -115,9 +112,6 @@ import AssistantComposerFrame from "@/components/ai-assistant/composer/Assistant
 import AssistantComposerStrip from "@/components/ai-assistant/composer/AssistantComposerStrip.vue";
 import { pickNotice, sentenceNotice } from "@/components/ai-assistant/composer/composerNotice";
 import { CHIP_HIT_AREA_CLASS } from "@/components/ai-assistant/composer/composerUi";
-import AssistantContextInfo, {
-  type AssistantContextInfoRow,
-} from "@/components/ai-assistant/context/AssistantContextInfo.vue";
 import type { RcaSteerSendResult } from "@/composables/useRcaSteering";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { RcaOpenQuestion } from "@/services/incidents";
@@ -132,8 +126,6 @@ const props = withDefaults(
     /** The run waits for an answer. */
     waitingInput: boolean;
     openQuestion?: RcaOpenQuestion | null;
-    /** The signed-in user's address ("Sending as"). */
-    authorEmail: string;
     sending?: boolean;
     /** Sends the text; resolves with the route's answer. */
     send: (text: string) => Promise<RcaSteerSendResult>;
@@ -201,21 +193,6 @@ const notice = computed(() =>
       },
   ]),
 );
-
-const contextRows = computed<AssistantContextInfoRow[]>(() => [
-  {
-    id: "incident",
-    label: t("assistant.context.field.incident"),
-    value: t("alerts.incidents.rcaSteer.thisIncident"),
-  },
-  {
-    id: "author",
-    label: t("alerts.incidents.rcaSteer.sentAs"),
-    value: raw(props.authorEmail),
-    secondary: t("alerts.incidents.rcaSteer.visibleOnIncident"),
-    secondaryTest: "rca-steer-sending-as",
-  },
-]);
 
 const canSend = computed(() => draft.value.trim().length > 0 && !props.sending);
 

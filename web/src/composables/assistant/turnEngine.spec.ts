@@ -1212,7 +1212,7 @@ describe("turnEngine: the SSE id rule (WP-18, D2)", () => {
     await expect(run).resolves.toEqual({ state: "done", saved: "server" });
     const blocks = h.session().messages[1].contentBlocks ?? [];
     expect(blocks.filter((block) => block.type === "tool_call")).toHaveLength(1);
-    expect(String(h.session().messages[1].content)).toBe("Hi.abcd");
+    expect(String(h.session().messages[1].content)).toBe("Hi.\n\nabcd");
   });
 
   // Live, then a drop, then one tail; returns the answer text and the turn's end.

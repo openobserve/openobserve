@@ -201,17 +201,21 @@ describe("useAssistantHistory in local-only mode", () => {
     expect(fake.history.rows.value.some((row) => row.sid === sid)).toBe(false);
   });
 
-  it("searches the loaded rows by title and first prompt on the client", async () => {
+  it("keeps the stored list view per tab, and lists every loaded row under the All view", async () => {
     const fake = setup({}, [record(1, { title: "Payments p95" }), record(2, { title: "VRL" })]);
     await flushPromises();
-    fake.history.setFilter({ q: "payments" });
-    expect(fake.history.visible.value.map((row) => String(row.title))).toEqual(["Payments p95"]);
-    fake.history.setFilter({ q: "question 2" });
-    expect(fake.history.visible.value.map((row) => String(row.title))).toEqual(["VRL"]);
-    expect(fake.history.searchPartial.value).toBe(false);
-    expect(JSON.parse(sessionStorage.getItem(`o2.assistant.historyFilter:${KEY}`) ?? "{}").q).toBe(
-      "question 2",
+    fake.history.setFilter({ kind: "pinned" });
+    expect(fake.history.visible.value).toEqual([]);
+    expect(JSON.parse(sessionStorage.getItem(`o2.assistant.historyFilter:${KEY}`) ?? "{}")).toEqual(
+      {
+        kind: "pinned",
+      },
     );
+    fake.history.setFilter({ kind: "all" });
+    expect(fake.history.visible.value.map((row) => String(row.title)).sort()).toEqual([
+      "Payments p95",
+      "VRL",
+    ]);
   });
 
   it("prunes the oldest unpinned chat on save and Undo puts it back", async () => {
@@ -499,26 +503,6 @@ describe("useAssistantHistory in server mode", () => {
     expect(String(browser.title)).toBe("Chat 7");
     expect(groupOf(browser, Date.now(), () => 0, true)).toBe("browser");
     expect(fake.history.hasMore.value).toBe(true);
-    fake.history.setFilter({ q: "server" });
-    expect(fake.history.searchPartial.value).toBe(true);
-  });
-
-  it("keeps an open chat the server search did not return out of the matches", async () => {
-    const list = vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
-    const fake = setup({ persistence: true, historySearch: true });
-    await flushPromises();
-    chat(fake, "Say only the word pineapple.");
-    await vi.waitFor(() => expect(fake.history.rows.value).toHaveLength(1));
-    fake.history.setFilter({ q: "checkoutzzzqqq" });
-    await flushPromises();
-    expect(list).toHaveBeenLastCalledWith(
-      "default",
-      expect.objectContaining({ q: "checkoutzzzqqq" }),
-    );
-    expect(fake.history.visible.value).toEqual([]);
-    fake.history.setFilter({ q: "pineapple" });
-    await flushPromises();
-    expect(fake.history.visible.value).toHaveLength(1);
   });
 
   it("moves browser chats in batches of ten and deletes a local row only once the server confirms it", async () => {
@@ -648,6 +632,28 @@ describe("useAssistantHistory mutations in server mode", () => {
     ]);
   }
 
+  it("keeps a browser pin on a server chat this browser never opened", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({
+      chats: [
+        {
+          session_id: record(1).sessionId!,
+          title: "Server chat",
+          created_at: 1_000_000,
+          updated_at: 2_000_000,
+          last_committed_seq: 1,
+        },
+      ],
+    });
+    const fake = setup({ persistence: true, historyPins: false });
+    await vi.waitFor(() => expect(fake.history.rows.value).toHaveLength(1));
+    const sid = record(1).sessionId!;
+    expect(await fake.history.pin(sid, true)).toEqual({ ok: true });
+    const stored = [...fake.db.rows.values()].find((row) => row.sessionId === sid);
+    expect(stored).toMatchObject({ pinned: true, serverBacked: true, title: "Server chat" });
+    expect(fake.history.rows.value[0].pinned).toBe(true);
+    expect(fake.toast).not.toHaveBeenCalled();
+  });
+
   it("restores the title, the pin and the row when the server refuses each change", async () => {
     vi.spyOn(assistant, "renameChat").mockRejectedValue(httpError(500));
     vi.spyOn(assistant, "pinChat").mockRejectedValue(httpError(500));
@@ -662,6 +668,28 @@ describe("useAssistantHistory mutations in server mode", () => {
     expect((await fake.history.remove(sid)).ok).toBe(false);
     expect(fake.history.rows.value.map((row) => row.sid)).toEqual([sid]);
     expect(fake.toast).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps the latest pin when an older pin request fails after it", async () => {
+    let failFirst = (_err: unknown) => undefined as void;
+    let settleRest = () => undefined as void;
+    const rest = new Promise<void>((resolve) => (settleRest = resolve));
+    const pinChat = vi
+      .spyOn(assistant, "pinChat")
+      .mockImplementationOnce(() => new Promise((_resolve, reject) => (failFirst = reject)))
+      .mockImplementation(() => rest as never);
+    const fake = served();
+    await vi.waitFor(() => expect(fake.history.rows.value).toHaveLength(1));
+    const sid = record(1).sessionId!;
+    const first = fake.history.pin(sid, true);
+    const later = [fake.history.pin(sid, false), fake.history.pin(sid, true)];
+    await vi.waitFor(() => expect(pinChat).toHaveBeenCalled());
+    failFirst(httpError(500));
+    expect((await first).ok).toBe(false);
+    expect(fake.history.rows.value[0].pinned).toBe(true);
+    settleRest();
+    await Promise.all(later);
+    expect(fake.history.rows.value[0].pinned).toBe(true);
   });
 
   it("counts a delete the server already lost as done, and stops the answer only after it", async () => {

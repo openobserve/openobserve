@@ -47,7 +47,7 @@ describe("AssistantDictationTail", () => {
     );
   });
 
-  it("takes the field's own side padding, so it wraps where the field does beside the corner ⓘ", async () => {
+  it("takes the field's own side padding, so it wraps where the field does", async () => {
     const parent = vi
       .spyOn(HTMLElement.prototype, "offsetParent", "get")
       .mockReturnValue(document.body);

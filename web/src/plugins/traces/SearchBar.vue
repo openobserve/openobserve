@@ -673,14 +673,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-search-bar-filter-builder-ai-btn"
           variant="ghost"
           size="icon-toolbar"
-          class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 right-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+          :aria-label="t('search.aiModeIconAlt')"
+          class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
           @click="openAiFromBuilder"
         >
-          <img
-            :src="aiIcon"
-            :alt="t('search.aiModeIconAlt')"
-            class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
-          />
+          <AssistantSpark :size="16" />
           <OTooltip :content="t('nlMode.toggle')" />
         </OButton>
         <UnifiedQueryEditor
@@ -801,6 +798,7 @@ import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -872,8 +870,6 @@ import {
 } from "@/utils/queryHistory/recentSearches";
 import { TRACES_EXAMPLE_QUERIES } from "@/utils/queryHistory/traces";
 import type { HistoryStatus } from "@/services/query_history";
-import { useTheme } from "@/composables/useTheme";
-import { getImageURL } from "@/utils/zincutils";
 import {
   savedViewsQuery,
   createSavedViewMutation,
@@ -884,6 +880,7 @@ import {
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    AssistantSpark,
     OPageHeaderStatus,
     OTag,
     OSeparator,
@@ -1112,12 +1109,6 @@ export default defineComponent({
     );
     // The AI button holds the corner slot in both modes: QueryEditor's own, or the builder's copy.
     const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.375rem" : "0.25rem"));
-    const { isDark } = useTheme();
-    const aiIcon = computed(() =>
-      getImageURL(
-        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
-      ),
-    );
     const aiAccess = computed(() =>
       checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
     );
@@ -1862,7 +1853,6 @@ export default defineComponent({
       toggleFilterBuilder,
       showFilterBuilder,
       filterBuilderToggleRight,
-      aiIcon,
       openAiFromBuilder,
       filterBuilderFields,
       filterBuilderRef,

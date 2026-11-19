@@ -509,6 +509,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </AssistantComposer>
       </slot>
+      <AssistantNewChatBelow
+        v-if="belowShown"
+        class="px-3 pt-5"
+        @ask="onAskStarter"
+        @open-chat="(sid) => onOpenChat({ sid })"
+        @view-all="viewAllOpen = true"
+      />
     </div>
 
     <AssistantShareControl
@@ -519,6 +526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @manage="shareManagerOpen = true"
     />
     <AssistantShareManager v-model:open="shareManagerOpen" initial-scope="mine" />
+    <AssistantChatSearch v-if="belowShown" v-model:open="viewAllOpen" mode="rail" />
 
     <ODialog
       :open="learnOpen"
@@ -642,6 +650,7 @@ import AssistantThreadHeader, {
   assistantThreadHostKey,
 } from "@/components/ai-assistant/thread/AssistantThreadHeader.vue";
 import AssistantShareControl from "@/components/ai-assistant/share/AssistantShareControl.vue";
+import AssistantChatSearch from "@/components/ai-assistant/history/AssistantChatSearch.vue";
 import AssistantHistoryList from "@/components/ai-assistant/history/AssistantHistoryList.vue";
 import AssistantShareManager from "@/components/ai-assistant/share/AssistantShareManager.vue";
 import { chatStatusWord } from "@/components/ai-assistant/history/chatStatus";
@@ -652,6 +661,7 @@ import AssistantTurnOutcome, {
   outcomeActionOf,
   type OutcomeAction,
 } from "@/components/ai-assistant/turn/AssistantTurnOutcome.vue";
+import AssistantNewChatBelow from "@/components/ai-assistant/welcome/AssistantNewChatBelow.vue";
 import AssistantWelcome from "@/components/ai-assistant/welcome/AssistantWelcome.vue";
 import {
   approvalOutcomeOf,
@@ -855,8 +865,11 @@ const readingWidth = computed(() =>
 // A new full-page chat holds its greeting and composer mid-page; the first message docks the composer.
 // A phone keeps it at the bottom, in thumb reach.
 const centered = computed(() => props.placement === "full" && state.value === "empty");
+// Recent chats sit under the composer at every width, in the same order as Home.
+const belowShown = computed(() => centered.value && !!welcome.value);
 // The Chats view hides the chat instead of unmounting it, so its draft, scroll and stream carry on.
 const chatsOpen = ref(false);
+const viewAllOpen = ref(false);
 // The phone sheet's only move is to the full page, so its menus show that move directly.
 const onlyFullPage = computed(() => props.sheet && props.placement === "sidebar");
 provide(assistantThreadHostKey, {
@@ -1625,6 +1638,10 @@ function onStarter(starter: Starter): void {
   const draft = store.state.sessions[sid]?.composer.text.trim() ?? "";
   store.stage(sid, { ...payload, mode: draft ? "append" : "replace" });
   focusEntry();
+}
+
+function onAskStarter(prompt: string): void {
+  void composer.value?.sendPrompt(prompt);
 }
 
 // A deleted chat shows its own state; any other failure says so instead of doing nothing.

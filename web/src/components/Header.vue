@@ -252,15 +252,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openLockedAiAssistant"
             data-test="menu-link-ai-locked"
             :aria-label="aiButtonLabel"
-            class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-            @mouseenter="handleMouseEnter"
-            @mouseleave="handleMouseLeave"
+            class="relative"
           >
-            <img
-              alt=""
-              :src="getBtnLogo"
-              class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-            />
+            <AssistantSpark :size="20" />
             <OLockBadge class="-end-2! -top-1!" />
             <OTooltip side="bottom" align="center" :content="aiButtonLabel" />
           </OButton>
@@ -503,6 +497,7 @@ import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
@@ -534,6 +529,7 @@ export default defineComponent({
     LinkedAccountsDialog,
     OButton,
     OIcon,
+    AssistantSpark,
     OLockBadge,
     OTooltip,
     ODropdown,
@@ -597,20 +593,9 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       required: true,
     },
-    // AI button hover state
-    isHovered: {
-      type: Boolean,
-      required: true,
-    },
-    // AI button logo based on state
-    getBtnLogo: {
-      type: String,
-      required: true,
-    },
   },
   emits: [
     "update:selectedOrg",
-    "update:isHovered",
     "updateOrganization",
     "goToHome",
     "goToAbout",
@@ -835,15 +820,6 @@ export default defineComponent({
       emit("signout");
     };
 
-    // Handle mouse hover events for AI button
-    const handleMouseEnter = () => {
-      emit("update:isHovered", true);
-    };
-
-    const handleMouseLeave = () => {
-      emit("update:isHovered", false);
-    };
-
     // Handle organization selection from the OrganizationSelector menu
     const handleOrgSelection = (org: any) => {
       emit("update:selectedOrg", org);
@@ -884,8 +860,6 @@ export default defineComponent({
       openPredefinedThemes,
       openShortcuts,
       signout,
-      handleMouseEnter,
-      handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
     };

@@ -133,7 +133,8 @@ describe("AssistantThreadHeader", () => {
   it("draws the title as a menu button, with + drawn but unavailable in an empty chat", async () => {
     const { wrapper } = await setup({}, { messages: false });
     const heading = wrapper.get('[data-test="assistant-thread-title"]');
-    expect(heading.element.tagName).toBe("H2");
+    expect(heading.attributes("role")).toBe("heading");
+    expect(heading.attributes("aria-level")).toBe("2");
     expect(heading.text()).toContain("New chat");
     const button = wrapper.get(title);
     expect(button.attributes("aria-haspopup")).toBe("menu");
@@ -168,32 +169,34 @@ describe("AssistantThreadHeader", () => {
     expect(ready()).toBe(true);
   });
 
-  it("hangs the title tooltip on the whole title button, not on its chevron", async () => {
+  const editTrigger = '[data-test="assistant-thread-title-edit-trigger"]';
+  const editInput = '[data-test="assistant-thread-title-edit-input"]';
+
+  it("makes the title itself click-to-rename, with the chats menu behind its own chevron", async () => {
     const { wrapper } = await setup();
-    const button = wrapper.get(title).element;
-    // jsdom computes no display:contents, so the anchor may be OButton's contents wrapper instead of the button.
-    const trigger = button.hasAttribute("data-o-tooltip-trigger")
-      ? button
-      : button.querySelector("[data-o-tooltip-trigger]");
-    expect(trigger?.querySelector('[data-test="assistant-thread-title-text"]')).not.toBeNull();
+    const heading = wrapper.get('[data-test="assistant-thread-title"]');
+    expect(heading.get(editTrigger).text()).toBe("Checkout 5xx spike");
+    expect(wrapper.get(title).text()).not.toContain("Checkout 5xx spike");
+    expect(wrapper.find('[data-test="assistant-thread-menu-rename"]').exists()).toBe(false);
   });
 
-  it("keeps the title button a 2.75 rem target below md and on coarse pointers", async () => {
+  it("keeps the menu button a 2.75 rem target below md and on coarse pointers", async () => {
     const { wrapper } = await setup();
     const classes = wrapper.get(title).classes();
     expect(classes).toEqual(
-      expect.arrayContaining(["min-w-0", "max-md:min-h-11", "pointer-coarse:min-h-11"]),
+      expect.arrayContaining(["max-md:min-h-11", "max-md:min-w-11", "pointer-coarse:min-h-11"]),
     );
   });
 
-  it("renames inline from the title menu: sticky renamed, Escape restores without a request", async () => {
-    const { wrapper, sid, store, db } = await setup();
-    vi.useFakeTimers();
-    await wrapper.get('[data-test="assistant-thread-menu-rename"]').trigger("click");
-    await vi.runAllTimersAsync();
-    vi.useRealTimers();
+  async function openRename(wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) {
+    await wrapper.get(editTrigger).trigger("click");
     await flushPromises();
-    const input = wrapper.get('[data-test="assistant-thread-rename"] input');
+    return wrapper.get(editInput);
+  }
+
+  it("renames by clicking the title: sticky renamed, Escape restores without a request", async () => {
+    const { wrapper, sid, store, db } = await setup();
+    const input = await openRename(wrapper);
     await input.setValue("Payments p95");
     await input.trigger("keydown", { key: "Enter" });
     await flushPromises();
@@ -202,22 +205,13 @@ describe("AssistantThreadHeader", () => {
     expect([...db.rows.values()][0]?.title).toBe("Payments p95");
     (wrapper.vm as unknown as { startRename(): void }).startRename();
     await flushPromises();
-    const again = wrapper.get('[data-test="assistant-thread-rename"] input');
+    const again = wrapper.get(editInput);
     await again.setValue("Something else");
     await again.trigger("keydown", { key: "Escape" });
     await flushPromises();
     expect(String(store.state.sessions[sid].title)).toBe("Payments p95");
-    expect(document.activeElement).toBe(wrapper.get(title).element);
+    expect(document.activeElement).toBe(wrapper.get(editTrigger).element);
   });
-
-  async function openRename(wrapper: Awaited<ReturnType<typeof setup>>["wrapper"]) {
-    vi.useFakeTimers();
-    await wrapper.get('[data-test="assistant-thread-menu-rename"]').trigger("click");
-    await vi.runAllTimersAsync();
-    vi.useRealTimers();
-    await flushPromises();
-    return wrapper.get('[data-test="assistant-thread-rename"] input');
-  }
 
   it("leaves focus where the user moved it when the rename field blurs", async () => {
     const { wrapper } = await setup();
@@ -238,7 +232,7 @@ describe("AssistantThreadHeader", () => {
     await input.setValue("Payments p95");
     await input.trigger("keydown", { key: "Enter" });
     await flushPromises();
-    expect(document.activeElement).toBe(wrapper.get(title).element);
+    expect(document.activeElement).toBe(wrapper.get(editTrigger).element);
   });
 
   it("starts a new chat at once even while an answer runs, and says the old one keeps going", async () => {
@@ -349,7 +343,8 @@ describe("AssistantThreadHeader", () => {
     runs.rows.value = [runRow("a")];
     await nextTick();
     expect(wrapper.find('[data-test="assistant-title-menu-all"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="assistant-thread-menu-rename"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-thread-menu-pin"]').exists()).toBe(true);
+    expect(wrapper.find(editTrigger).exists()).toBe(true);
   });
 
   it("keeps Layout on the bar below 24 rem, and the tag under the chat's name", async () => {
@@ -467,6 +462,33 @@ describe("AssistantThreadHeader", () => {
       await flushPromises();
       expect(String(store.state.sessions[sid].title)).toBe("Payments p95");
       expect(wrapper.find('[data-test="assistant-thread-more"]').exists()).toBe(true);
+    });
+
+    it("shows the title as plain text that describes itself as Rename chat, with no pencil or hint", async () => {
+      const { wrapper } = await setup(toolbar);
+      const trigger = wrapper.get('[data-test="assistant-thread-heading-edit-trigger"]');
+      expect(trigger.text()).toBe("Checkout 5xx spike");
+      expect(trigger.find("svg, [data-test='o-icon']").exists()).toBe(false);
+      expect(wrapper.get(`#${trigger.attributes("aria-describedby")}`).text()).toBe("Rename chat");
+    });
+
+    it("cancels a rename on Escape and saves one on blur", async () => {
+      const { wrapper, sid, history } = await setup(toolbar);
+      const rename = vi.spyOn(history, "rename").mockResolvedValue(undefined as never);
+      const edit = '[data-test="assistant-thread-heading-edit';
+      await wrapper.get(`${edit}-trigger"]`).trigger("click");
+      await flushPromises();
+      await wrapper.get(`${edit}-input"]`).setValue("Dropped");
+      await wrapper.get(`${edit}-input"]`).trigger("keydown", { key: "Escape" });
+      await flushPromises();
+      expect(wrapper.find(`${edit}-input"]`).exists()).toBe(false);
+      expect(rename).not.toHaveBeenCalled();
+      await wrapper.get(`${edit}-trigger"]`).trigger("click");
+      await flushPromises();
+      await wrapper.get(`${edit}-input"]`).setValue("Kept");
+      await wrapper.get(`${edit}-input"]`).trigger("blur");
+      await flushPromises();
+      expect(rename).toHaveBeenCalledWith(sid, "Kept");
     });
 
     it("keeps the heading focusable while a rename saves, so Enter returns focus to it", async () => {

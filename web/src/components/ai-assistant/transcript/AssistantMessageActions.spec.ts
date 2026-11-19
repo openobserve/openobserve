@@ -20,6 +20,7 @@ import { computed } from "vue";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 import { queryClient } from "@/composables/query/queryClient";
+import { copyConfirm } from "@/lib/feedback/Toast/copyConfirm";
 import { chatSharesQuery } from "@/services/ai_chat_share.queries";
 import { raw } from "@/types/i18n";
 
@@ -27,11 +28,12 @@ import { fakeAssistant } from "../__tests__/fakeAssistant";
 import AssistantMessageActions, { COPIED_MS } from "./AssistantMessageActions.vue";
 import { setMarkdownParserForTests, syncMarkdownParserForTests } from "./markdown";
 
-const { fake, copy, track, branch } = vi.hoisted(() => ({
+const { fake, copy, track, branch, toast } = vi.hoisted(() => ({
   fake: { current: null as any },
   copy: vi.fn(),
   track: vi.fn(),
   branch: vi.fn(),
+  toast: vi.fn(),
 }));
 
 vi.mock("./useBranchChat", async () => {
@@ -45,6 +47,7 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantCapability: () => fake.current.handle,
 }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: (...args: unknown[]) => copy(...args) }));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...args: unknown[]) => toast(...args) }));
 vi.mock("@/services/assistantAnalytics", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/assistantAnalytics")>()),
   trackAssistant: (...args: unknown[]) => track(...args),
@@ -209,25 +212,21 @@ describe("AssistantMessageActions", () => {
       ]);
     });
 
-    it("copies the answer's link and says Link copied in place for 2 s", async () => {
-      vi.useFakeTimers();
+    // The link's audience shows in the copy bubble beside the button, so it never covers the composer.
+    const linkSaid = () => String(copyConfirm.message);
+
+    it("copies the answer's private link and says only its owner can open it", async () => {
+      toast.mockClear();
       const wrapper = mountActions({ message: answer, turnId: "t1" });
-      // The live region is mounted before the text arrives, or a screen reader skips the change (A1).
-      const region = wrapper.get('[data-test="assistant-msg-share-link"] [aria-live="polite"]');
-      expect(region.text()).toBe("");
-      await wrapper.get('[data-test="assistant-msg-share-link"]').trigger("click");
+      const button = wrapper.get('[data-test="assistant-msg-share-link"]');
+      expect(button.attributes("aria-label")).toBe("Copy link to this answer");
+      await button.trigger("click");
       await flushPromises();
       expect(String(copy.mock.calls[0][0])).toContain("#answer-t1");
+      expect(String(copy.mock.calls[0][0])).toContain("thread=");
       expect(track).toHaveBeenCalledWith("ai_answer_link", { result: "copied" });
-      const done = wrapper.get('[data-test="assistant-msg-share-link"]');
-      expect(done.attributes("data-done")).toBe("true");
-      expect(done.text()).toContain("Link copied");
-      vi.advanceTimersByTime(COPIED_MS);
-      await flushPromises();
-      expect(wrapper.get('[data-test="assistant-msg-share-link"]').attributes("data-done")).toBe(
-        undefined,
-      );
-      vi.useRealTimers();
+      expect(linkSaid()).toBe("Link copied · only you can open it");
+      expect(copyConfirm.anchor).toBe(button.element);
     });
 
     it("copies the chat's share link when the chat has an active one, else the private thread link (WT-03)", async () => {
@@ -253,6 +252,11 @@ describe("AssistantMessageActions", () => {
       await wrapper.get('[data-test="assistant-msg-share-link"]').trigger("click");
       await flushPromises();
       expect(String(copy.mock.calls[0][0])).toMatch(/\/ai\/shared\/tok1#answer-t1$/);
+      expect(linkSaid()).toMatch(/^Link copied · anyone in .* with the link can open it$/);
+      queryClient.setQueryData(key, [{ ...share, visibility: "public" }]);
+      await wrapper.get('[data-test="assistant-msg-share-link"]').trigger("click");
+      await flushPromises();
+      expect(linkSaid()).toBe("Link copied · anyone with the link can open it");
     });
 
     it("branches at the shown answer's own server id, else at the turn and the version shown", async () => {

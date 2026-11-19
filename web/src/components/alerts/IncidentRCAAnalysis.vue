@@ -387,7 +387,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :steering="steering"
       :steering-status="steeringStatus"
       :can-steer="canSteer"
-      :author-email="authorEmail"
       :sending="steerSending"
       :send="sendMessage"
       :variant="layout === 'page' ? 'column' : 'inline'"
@@ -951,8 +950,6 @@ const { sending: steerSending, send: steer } = useRcaSteering(
   toRef(props, "incidentId"),
   recordRunId,
 );
-
-const authorEmail = computed<string>(() => store.state.userInfo?.email ?? "");
 
 /** The latest run is shown and live, and the server lets this user steer it. */
 const canSteer = computed(

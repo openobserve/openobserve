@@ -296,6 +296,11 @@ html.theme-switching *::after {
     opacity: 0;
   }
 }
+@keyframes assistant-spark-turn {
+  to {
+    --assistant-sweep-angle: 360deg;
+  }
+}
 @keyframes assistant-wave {
   0%,
   100% {
@@ -386,6 +391,27 @@ html.theme-switching *::after {
   animation: assistant-spin 1s linear infinite;
   @media (prefers-reduced-motion: reduce) {
     animation: none;
+  }
+}
+/* The working spark: the logo-ring colours turn inside the star; reduced motion keeps the still, full-colour star. */
+@utility assistant-spark-working {
+  background: conic-gradient(
+    from var(--assistant-sweep-angle),
+    var(--color-assistant-spark-from),
+    var(--color-assistant-spark-via),
+    var(--color-assistant-spark-to),
+    var(--color-assistant-spark-via),
+    var(--color-assistant-spark-from)
+  );
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1.5C14.34 7.8 17.22 10.32 21 12C17.22 13.68 14.34 16.2 12 22.5C9.66 16.2 6.78 13.68 3 12C6.78 10.32 9.66 7.8 12 1.5Z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  animation: assistant-spark-turn 3.2s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+  @media (forced-colors: active) {
+    forced-color-adjust: none;
+    background: currentColor;
   }
 }
 

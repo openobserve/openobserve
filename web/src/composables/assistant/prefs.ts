@@ -415,10 +415,10 @@ export function writeWindows(userOrgKey: string, windows: readonly FloatingWindo
 
 export function readHistoryFilter(userOrgKey: string): HistoryFilter | null {
   const stored = readJson<HistoryFilter>("session", SESSION_KEYS.historyFilter(userOrgKey));
-  // A tab can still hold a filter from the old origin chips.
-  return stored && !["all", "pinned", "shared"].includes(stored.kind)
-    ? { ...stored, kind: "all" }
-    : stored;
+  if (!stored) return null;
+  // A tab can still hold a filter from the old origin chips, or the list's old search text.
+  const kind = ["all", "pinned", "shared"].includes(stored.kind) ? stored.kind : "all";
+  return { kind, agent: stored.agent ?? null, started: stored.started ?? null };
 }
 
 export function writeHistoryFilter(userOrgKey: string, filter: HistoryFilter): void {

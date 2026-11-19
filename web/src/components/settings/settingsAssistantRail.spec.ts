@@ -78,7 +78,7 @@ describe("Settings rail: Assistant", () => {
     expect(item).toMatchObject({
       label: enLocale.brand.autobot,
       description: "Status, access, data, history, usage, toolsets, permissions and activity",
-      icon: "auto-awesome",
+      icon: "assistant-spark",
       dataTest: "settings-assistant-tab",
       locked: false,
     });

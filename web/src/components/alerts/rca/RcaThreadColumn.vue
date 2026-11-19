@@ -432,7 +432,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :run-id="thread?.run_id ?? ''"
         :waiting-input="runState === 'waiting_input'"
         :open-question="steering?.open_question ?? null"
-        :author-email="authorEmail"
         :sending="sending"
         :send="sendFromComposer"
       />
@@ -537,8 +536,6 @@ const props = withDefaults(
     steeringStatus?: RcaReadStatus;
     /** The steer box shows: the run takes messages and the user may send them. */
     canSteer?: boolean;
-    /** The signed-in user's address ("Sending as"). */
-    authorEmail?: string;
     sending?: boolean;
     /** Sends one message to the run. */
     send?: ((text: string) => Promise<RcaSteerSendResult>) | null;
@@ -564,7 +561,6 @@ const props = withDefaults(
     steering: null,
     steeringStatus: "idle",
     canSteer: false,
-    authorEmail: "",
     sending: false,
     send: null,
     variant: "column",

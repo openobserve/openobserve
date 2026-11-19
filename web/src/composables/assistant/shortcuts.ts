@@ -18,6 +18,7 @@ import {
   onMounted,
   onUnmounted,
   ref,
+  shallowReactive,
   shallowRef,
   type ComputedRef,
   type ShallowRef,
@@ -75,8 +76,8 @@ const openChordInstances: symbol[] = [];
 
 let openChordOwnerRef: ShallowRef<symbol | undefined> | null = null;
 
-// Mounted history triggers answer the `assistantHistory` chord, the rail before any header.
-const historyTargets: HistoryTarget[] = [];
+// Mounted history triggers answer the `assistantHistory` chord, the rail before any header; reactive so a rail's mount re-renders.
+const historyTargets = /* @__PURE__ */ shallowReactive<HistoryTarget[]>([]);
 
 export type EscapeRung = (typeof ESCAPE_RUNGS)[number];
 

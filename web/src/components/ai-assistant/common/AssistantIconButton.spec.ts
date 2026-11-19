@@ -16,6 +16,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 
+import { copyConfirm, dismissCopyConfirm } from "@/lib/feedback/Toast/copyConfirm";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
@@ -40,6 +41,23 @@ describe("AssistantIconButton", () => {
 
   it("shows its tooltip alone: opening another assistant tooltip closes this one", () => {
     expect(mountButton().findComponent(OTooltip).props("exclusive")).toBe(true);
+  });
+
+  it("holds its tooltip shut while the copy bubble confirms on this button", async () => {
+    const wrapper = mountButton();
+    const other = mountButton();
+    const tip = () => wrapper.findComponent(OTooltip).props("disabled");
+    expect(tip()).toBe(false);
+    copyConfirm.anchor = other.get("button").element as HTMLElement;
+    copyConfirm.open = true;
+    await wrapper.vm.$nextTick();
+    expect(tip()).toBe(false);
+    copyConfirm.anchor = wrapper.get("button").element as HTMLElement;
+    await wrapper.vm.$nextTick();
+    expect(tip()).toBe(true);
+    dismissCopyConfirm();
+    await wrapper.vm.$nextTick();
+    expect(tip()).toBe(false);
   });
 
   it("renders the glyph decoratively", () => {

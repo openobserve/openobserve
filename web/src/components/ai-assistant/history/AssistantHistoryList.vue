@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     ref="root"
     :class="[
-      '@container flex h-full min-h-0 min-w-0 flex-col gap-2',
+      'group/list @container flex h-full min-h-0 min-w-0 flex-col gap-2',
       bare ? 'px-3 py-2' : 'p-2',
       mode === 'rail' && 'pt-0',
       mode === 'rail' && !bare && 'bg-surface-panel',
@@ -32,45 +32,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="assistant-history"
   >
     <div
-      v-if="toolsShown"
+      v-if="toolsShown || mode === 'rail'"
       :class="[
-        'flex min-w-0 shrink-0 items-center gap-2',
+        'flex h-8 min-w-0 shrink-0 items-center gap-1',
         mode === 'rail' && !bare && 'border-border-default -mx-2 h-10 border-b px-2',
       ]"
       data-test="assistant-history-tools"
     >
-      <OSearchInput
-        :model-value="searchText"
-        size="sm"
-        :placeholder="
+      <!-- The list names itself with a hidden heading, so the visible title is not read twice -->
+      <span
+        v-if="mode === 'rail'"
+        aria-hidden="true"
+        class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium"
+        data-test="assistant-history-heading"
+      >
+        {{
           investigationsOnly
-            ? t('assistant.history.searchInvestigations')
-            : t('assistant.history.search')
-        "
-        :debounce="SEARCH_DEBOUNCE_MS"
-        clearable
-        :aria-controls="drawn.length ? listId : undefined"
-        :class="['min-w-0 flex-1', bare && BARE_SEARCH_CLASS]"
-        data-test="assistant-history-search"
-        @update:model-value="setSearch"
-        @keydown="onSearchKey"
-      />
-      <ODropdown v-if="!investigationsOnly" align="end" @update:open="onMenuOpen">
-        <template #trigger>
-          <AssistantIconButton
-            :label="t('assistant.history.listMenu')"
-            :no-tooltip="menuTipOff"
-            :icon="assistantGlyph.more"
-            class="h-8!"
-            data-test="assistant-history-list-menu"
-          />
-        </template>
-        <template v-if="menuViews.length">
+            ? t("assistant.history.filter.investigations")
+            : t("assistant.history.title")
+        }}
+      </span>
+      <span v-else class="flex-1" aria-hidden="true" />
+      <template v-if="toolsShown">
+        <ODropdown
+          v-if="menuViews.length"
+          align="end"
+          @update:open="(open) => onMenuOpen(open, 'filter')"
+        >
+          <template #trigger>
+            <AssistantIconButton
+              :label="t('assistant.history.filter.button')"
+              :icon="assistantGlyph.filter"
+              :no-tooltip="menuTipOff"
+              :class="[
+                REVEAL_CLASS,
+                (activeMenuView || openMenu === 'filter') && 'opacity-100',
+                activeMenuView && 'text-assistant-primary!',
+              ]"
+              data-test="assistant-history-filter"
+            />
+          </template>
           <OText variant="meta" as="p" class="px-2 py-1">{{
             t("assistant.history.filter.show")
           }}</OText>
           <ODropdownItem
-            v-for="item in menuViews"
+            v-for="item in filterItems"
             :key="item.id"
             :icon-left="item.icon"
             role="menuitemradio"
@@ -83,44 +89,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon :name="assistantGlyph.copied" size="xs" />
             </template>
           </ODropdownItem>
-          <ODropdownSeparator />
-        </template>
-        <ODropdownItem
-          v-if="sharesOffered"
-          :icon-left="assistantGlyph.share"
-          data-test="assistant-history-shared-links"
-          @select="emit('shared-links')"
+        </ODropdown>
+        <ODropdown
+          v-if="manageShown"
+          align="end"
+          @update:open="(open) => onMenuOpen(open, 'manage')"
         >
-          {{ t("assistant.history.sharedLinks") }}
-        </ODropdownItem>
-        <ODropdownItem
-          v-if="history.rows.value.length"
-          :icon-left="assistantGlyph.download"
-          data-test="assistant-history-download-all"
-          @select="exporter.exportAll('json')"
-        >
-          {{ t("assistant.history.downloadAll") }}
-        </ODropdownItem>
-        <ODropdownSub
-          v-if="narrow && $slots['menu-layout']"
-          :text-value="t('assistant.shell.openAs')"
-        >
-          <template #icon-left><OIcon :name="assistantGlyph.fullPage" size="sm" /></template>
-          <template #trigger>{{ t("assistant.shell.openAs") }}</template>
-          <slot name="menu-layout" />
-        </ODropdownSub>
-        <template v-if="history.rows.value.length && !readonly">
-          <ODropdownSeparator />
+          <template #trigger>
+            <AssistantIconButton
+              :label="t('assistant.history.listMenu')"
+              no-tooltip
+              :icon="assistantGlyph.moreHoriz"
+              :class="[REVEAL_CLASS, openMenu === 'manage' && 'opacity-100']"
+              data-test="assistant-history-list-menu"
+            />
+          </template>
           <ODropdownItem
-            variant="destructive"
-            :icon-left="assistantGlyph.remove"
-            data-test="assistant-history-clear-all"
-            @select="clearAllOpen = true"
+            v-if="sharesOffered"
+            :icon-left="assistantGlyph.share"
+            data-test="assistant-history-shared-links"
+            @select="emit('shared-links')"
           >
-            {{ t("assistant.history.clearAll.action") }}
+            {{ t("assistant.history.sharedLinks") }}
           </ODropdownItem>
-        </template>
-      </ODropdown>
+          <ODropdownItem
+            v-if="history.rows.value.length"
+            :icon-left="assistantGlyph.download"
+            data-test="assistant-history-download-all"
+            @select="exporter.exportAll('json')"
+          >
+            {{ t("assistant.history.downloadAll") }}
+          </ODropdownItem>
+          <ODropdownSub
+            v-if="narrow && $slots['menu-layout']"
+            :text-value="t('assistant.shell.openAs')"
+          >
+            <template #icon-left><OIcon :name="assistantGlyph.fullPage" size="sm" /></template>
+            <template #trigger>{{ t("assistant.shell.openAs") }}</template>
+            <slot name="menu-layout" />
+          </ODropdownSub>
+          <template v-if="history.rows.value.length && !readonly">
+            <ODropdownSeparator />
+            <ODropdownItem
+              variant="destructive"
+              :icon-left="assistantGlyph.remove"
+              data-test="assistant-history-clear-all"
+              @select="clearAllOpen = true"
+            >
+              {{ t("assistant.history.clearAll.action") }}
+            </ODropdownItem>
+          </template>
+        </ODropdown>
+        <AssistantIconButton
+          :label="searchLabel"
+          :icon="assistantGlyph.search"
+          aria-haspopup="dialog"
+          data-test="assistant-history-search-open"
+          @click="openSearch"
+        />
+      </template>
+      <slot name="actions" />
     </div>
     <div
       v-if="toolsShown && activeMenuView"
@@ -190,16 +218,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @retry="history.retry()"
       />
 
-      <OText
-        v-if="searchLine"
-        variant="meta"
-        as="p"
-        class="sr-only"
-        data-test="assistant-history-search-line"
-      >
-        {{ searchLine }}
-      </OText>
-
       <div v-if="view === 'auto_runs'" class="shrink-0" data-test="assistant-history-auto-runs">
         <div v-if="autoRuns.isPending.value" class="flex flex-col gap-2">
           <OSkeleton v-for="n in 3" :key="n" type="rect" class="h-8 w-full" />
@@ -232,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="
             (listState.status === 'loading' || listState.status === 'idle') &&
-            (!history.rows.value.length || (!!query && !drawn.length))
+            !history.rows.value.length
           "
           class="flex flex-col gap-2"
           data-test="assistant-history-skeleton"
@@ -268,30 +286,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </AssistantErrorRow>
         <OEmptyState
-          v-else-if="investigationsOnly && !drawn.length && !query && !history.hasMore.value"
+          v-else-if="investigationsOnly && !drawn.length && !history.hasMore.value"
           size="inline"
           :backdrop="false"
           :title="t('assistant.history.investigationsEmpty')"
           data-test="assistant-history-investigations-empty"
         />
         <OEmptyState
-          v-else-if="!history.rows.value.length && !drawn.length && !query"
+          v-else-if="!history.rows.value.length && !drawn.length"
           size="inline"
           :backdrop="false"
           :title="t('assistant.history.empty.title')"
           data-test="assistant-history-empty"
-        />
-        <OEmptyState
-          v-else-if="!drawn.length && query"
-          size="inline"
-          :backdrop="false"
-          :title="t('assistant.history.noMatch', { q: raw(query) })"
-          :description="titlesOnly ? t('assistant.history.titlesOnly') : undefined"
-          :action-label="
-            titlesOnly ? t('assistant.history.loadOlder') : t('assistant.history.clearSearch')
-          "
-          data-test="assistant-history-no-match"
-          @action="titlesOnly ? loadOlder() : clearSearch()"
         />
         <OEmptyState
           v-else-if="!drawn.length"
@@ -400,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
         </ul>
         <OButton
-          v-if="history.hasMore.value && (drawn.length || investigationsOnly) && !endScope"
+          v-if="history.hasMore.value && (drawn.length || investigationsOnly)"
           variant="ghost-primary"
           size="xs"
           class="mt-1 max-md:min-h-11 pointer-coarse:min-h-11"
@@ -422,22 +428,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="px-0"
         @update:clear-on-sign-out="setClearOnSignOut"
       />
-      <p
-        v-else-if="endScope"
-        :id="modeLineId"
-        class="text-text-secondary text-xs"
-        data-test="assistant-history-end-scope"
-      >
-        {{ t("assistant.history.titlesOnly") }} ·
-        <OButton
-          variant="ghost-primary"
-          size="xs"
-          data-test="assistant-history-load-older"
-          @click="loadOlder()"
-        >
-          {{ t("assistant.history.loadOlder") }}
-        </OButton>
-      </p>
       <OText
         v-else-if="retentionLine"
         :id="modeLineId"
@@ -472,6 +462,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:open="(open) => (clearAllOpen = open)"
       @confirm="confirmClearAll"
     />
+    <AssistantChatSearch
+      v-model:open="searchOpen"
+      :mode="mode"
+      :window-sid="windowSid ?? null"
+      :investigations-only="investigationsOnly"
+      @opened="(sid) => emit('opened', sid)"
+    />
     <AssistantShareControl
       v-if="sharing"
       v-model:open="sharingOpen"
@@ -503,8 +500,6 @@ export interface AssistantHistoryListProps {
 /** Filter joins the tools from this many chats, or while one is active. */
 export const FILTER_FROM = 8;
 
-export const SEARCH_DEBOUNCE_MS = 300;
-
 /** Investigations are filtered here; opening the list reads at most this many pages before Load older takes over. */
 export const INVESTIGATION_AUTO_PAGES = 5;
 
@@ -533,7 +528,12 @@ const COUNTDOWN_TICK_MS = 1_000;
 const GROUP_HEADING_CLASS =
   "text-text-secondary flex items-center justify-between gap-1.5 pb-1 text-xs font-medium";
 
-const BARE_SEARCH_CLASS = "[&>div]:h-8 [&_input]:text-xs";
+// Filter and list actions wait for the pointer or focus; touch shows them always.
+const REVEAL_CLASS = [
+  "transition-opacity motion-reduce:transition-none data-[state=open]:opacity-100",
+  "opacity-0 group-hover/list:opacity-100 group-focus-within/list:opacity-100",
+  "max-md:opacity-100 pointer-coarse:opacity-100",
+];
 
 type GroupId = (typeof GROUP_ORDER)[number];
 
@@ -549,7 +549,7 @@ type FlatEntry = { kind: "group"; id: GroupId } | { kind: "row"; id: string; row
 <script setup lang="ts">
 import { useQuery } from "@tanstack/vue-query";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AssistantErrorDetails from "@/components/ai-assistant/common/AssistantErrorDetails.vue";
@@ -569,7 +569,7 @@ import {
   useChatExport,
   type RunRow,
 } from "@/composables/assistant";
-import { rosterOffersChoice, homeQueryFrom } from "@/composables/assistant/pure";
+import { rosterOffersChoice } from "@/composables/assistant/pure";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -579,7 +579,6 @@ import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -593,6 +592,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatOrgTime, orgDayDistance, orgTimeZone } from "@/utils/formatters";
 
 import AssistantAutoRunRow from "./AssistantAutoRunRow.vue";
+import AssistantChatSearch from "./AssistantChatSearch.vue";
 import AssistantHistoryConfirm from "./AssistantHistoryConfirm.vue";
 import AssistantHistoryRow from "./AssistantHistoryRow.vue";
 import AssistantImportCard from "./AssistantImportCard.vue";
@@ -601,12 +601,13 @@ import { useRcaFollow } from "@/components/ai-assistant/shell/rcaFollow";
 
 import { chatStatusOf, isInProgress, type ChatStatus } from "./chatStatus";
 import { useAssistantHistoryKeys } from "./useAssistantHistoryKeys";
+import { useOpenChat } from "./useOpenChat";
 
 const props = defineProps<AssistantHistoryListProps>();
 
 const emit = defineEmits<{ opened: [sid: Sid]; close: []; "shared-links": [] }>();
 
-defineSlots<{ "menu-layout"?: () => unknown }>();
+const slots = defineSlots<{ "menu-layout"?: () => unknown; actions?: () => unknown }>();
 
 const { t } = useI18nTyped();
 const history = useAssistantHistory();
@@ -615,7 +616,6 @@ const store = useAssistantStore();
 const runs = useAssistantRuns();
 const exporter = useChatExport();
 const router = useRouter();
-const route = useRoute();
 const vuex = useStore();
 const root = ref<HTMLElement | null>(null);
 const scroller = ref<HTMLElement | null>(null);
@@ -671,16 +671,13 @@ const narrow = computed(() => {
   if (props.mode !== "panel") return false;
   return props.container === "window" ? props.narrow : widthRem.value < NARROW_REM;
 });
-const localSearch = ref("");
-const searchText = computed(() =>
-  props.investigationsOnly ? localSearch.value : history.filter.value.q,
+const searchOpen = ref(false);
+const openChat = useOpenChat();
+const searchLabel = computed(() =>
+  props.investigationsOnly
+    ? t("assistant.history.searchInvestigations")
+    : t("assistant.history.search"),
 );
-const query = computed(() => searchText.value.trim());
-const titlesOnly = computed(() =>
-  props.investigationsOnly ? !!query.value && history.hasMore.value : history.searchPartial.value,
-);
-// The end line carries Load older while a title search has more to read.
-const endScope = computed(() => titlesOnly.value && drawn.value.length > 0);
 const sharesOffered = computed(
   () => capability.value.persistence && capability.value.canShare !== "no",
 );
@@ -705,6 +702,21 @@ const menuViews = computed(() => {
   return list;
 });
 const activeMenuView = computed(() => menuViews.value.find((item) => item.id === view.value));
+const filterItems = computed(() => [
+  {
+    id: "all" as HistoryView,
+    label: t("assistant.history.filter.all"),
+    icon: assistantGlyph.thread as IconName,
+  },
+  ...menuViews.value,
+]);
+const manageShown = computed(
+  () =>
+    !props.investigationsOnly &&
+    (sharesOffered.value ||
+      history.rows.value.length > 0 ||
+      (narrow.value && !!slots["menu-layout"])),
+);
 const localView = ref<"all" | "auto_runs">("all");
 // Shared and Investigations live in the stored filter, so a reload keeps them; the rest are this list's own.
 const view = computed<HistoryView>(() => {
@@ -732,8 +744,7 @@ const toolsShown = computed(
     listState.value.status === "loading" ||
     listState.value.status === "idle" ||
     history.rows.value.length > 0 ||
-    history.drafts.value.length > 0 ||
-    !!query.value,
+    history.drafts.value.length > 0,
 );
 
 const retentionLine = computed(() => {
@@ -748,29 +759,17 @@ const liveRows = computed<HistoryRow[]>(() => {
   const listed = new Set(history.rows.value.map((row) => row.sid));
   return runs.rows.value.filter((row) => !listed.has(row.sid) && isCounted(row)).map(rowOfRun);
 });
-// Titles only: the shared filter's server search and content match key off the stored query, which this list leaves alone.
-const investigationRows = computed<HistoryRow[]>(() => {
-  const needle = query.value.toLowerCase();
-  return history.rows.value.filter(
-    (row) =>
-      runAgentKey(row.agentType) === "investigator" &&
-      (!needle || String(row.title).toLowerCase().includes(needle)),
-  );
-});
+const investigationRows = computed<HistoryRow[]>(() =>
+  history.rows.value.filter((row) => runAgentKey(row.agentType) === "investigator"),
+);
 const shownRows = computed<HistoryRow[]>(() => {
   if (props.investigationsOnly) return investigationRows.value;
-  if (query.value || narrowed.value) return history.visible.value;
+  if (narrowed.value) return history.visible.value;
   const seen = new Set(history.visible.value.map((row) => row.sid));
   const drafts = history.drafts.value.filter((row) => !seen.has(row.sid));
   return [...liveRows.value, ...history.visible.value, ...drafts];
 });
 const drawn = computed(() => shownRows.value);
-
-const searchLine = computed(() => {
-  if (!query.value || !drawn.value.length) return null;
-  const count = drawn.value.length;
-  return t("assistant.history.matchCount", { count }, count);
-});
 
 const groups = computed(() => {
   const server = history.mode.value === "server";
@@ -830,15 +829,15 @@ onMounted(() => {
     unregisterHistory = registerHistoryTarget({
       el: () => root.value,
       priority: 2,
-      run: focusSearch,
+      run: openSearch,
     });
-  if (props.mode === "panel") root.value?.addEventListener("keydown", onRootKey);
+  root.value?.addEventListener("keydown", onRootKey);
   history.ensureLoaded();
   // A filter stored before the filter row existed has no control left to clear it.
   const stored = history.filter.value;
   // Investigations search locally, so a server search or view left by the chat list would hide them.
-  if (props.investigationsOnly && (stored.q || stored.kind !== "all" || stored.started))
-    history.setFilter({ q: "", kind: "all", agent: null, started: null });
+  if (props.investigationsOnly && (stored.kind !== "all" || stored.started))
+    history.setFilter({ kind: "all", agent: null, started: null });
   if (
     !props.investigationsOnly &&
     (stored.kind === "pinned" ||
@@ -848,7 +847,7 @@ onMounted(() => {
     setView("all");
   trackAssistant("ai_history_open", { placement: props.mode });
   clock = setInterval(tick, 60_000);
-  if (props.mode !== "rail") void nextTick(() => focusSearch());
+  if (props.mode !== "rail") void nextTick(() => focusEntry());
   measure();
   if (typeof ResizeObserver === "undefined" || !root.value) return;
   sizes = new ResizeObserver(measure);
@@ -880,7 +879,6 @@ function rowProps(row: HistoryRow) {
     expiresAt: run?.expiresAt ?? null,
     now: now.value,
     org: run?.otherOrg ? orgLabel(run.org) : null,
-    agentIcon: agentIcon(row),
     sharedAs: row.share?.visibility ?? shareVisibility.value.get(row.sid) ?? null,
     current: row.sid === props.currentSid,
     mode: props.mode,
@@ -891,8 +889,8 @@ function rowProps(row: HistoryRow) {
     serverPins: history.serverPins.value,
     timezone: timezone.value,
     compact: props.bare,
-    quietStatus: statusOf(row) === "needs_you",
     drafted: drafted(row.sid),
+    shareable: sharesOffered.value,
   };
 }
 
@@ -900,13 +898,6 @@ function rowProps(row: HistoryRow) {
 function drafted(sid: Sid): boolean {
   const session = store.state.sessions[sid];
   return !!session?.messages.length && !!session.composer.text.trim();
-}
-
-function agentIcon(row: HistoryRow): IconName | null {
-  if (!offersAgents.value) return null;
-  const key = runAgentKey(row.agentType);
-  if (key === "investigator") return assistantGlyph.agentInvestigator;
-  return key === "queryBuilder" ? assistantGlyph.agentQueryBuilder : null;
 }
 
 function orgLabel(id: string): string {
@@ -957,7 +948,7 @@ function groupCount(id: GroupId): number {
   return groups.value.find((group) => group.id === id)?.rows.length ?? 0;
 }
 
-// Escape that nothing inside used (search clearing, a menu) returns the panel to its chat.
+// Escape that nothing inside used (a rename, a menu) hands focus back: the panel to its chat, the rail to the page.
 function onRootKey(event: KeyboardEvent): void {
   if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
   event.preventDefault();
@@ -982,49 +973,40 @@ function setRow(sid: Sid, el: unknown): void {
   else rowRefs.delete(sid);
 }
 
-function focusSearch(): void {
-  root.value
-    ?.querySelector<HTMLInputElement>(
-      '[data-test="assistant-history-search"] input, input[type="search"]',
-    )
-    ?.focus();
+function openSearch(): void {
+  searchOpen.value = true;
 }
 
-// Escape clears the search first; a second Escape reaches the popover.
-function onSearchKey(event: KeyboardEvent): void {
-  if (event.key === "ArrowDown") {
-    event.preventDefault();
-    keys.focusFirst();
-  } else if (event.key === "Escape" && searchText.value) {
-    event.stopPropagation();
-    event.preventDefault();
-    setSearch("");
-  } else if (event.key === "Escape" && props.mode === "rail") {
-    event.preventDefault();
-    emit("close");
-  }
-}
-
-function setSearch(q: string): void {
-  if (props.investigationsOnly) localSearch.value = q;
-  else history.setFilter({ q });
-}
-
-function clearSearch(): void {
-  setSearch("");
-  focusSearch();
+// The panel opens on its rows: the open chat's, else the first; until they load, on its search.
+function focusEntry(): void {
+  const sid = keys.active.value;
+  if (sid) return void focusRow(sid);
+  const search = root.value?.querySelector<HTMLElement>(
+    '[data-test="assistant-history-search-open"]',
+  );
+  search?.focus();
+  const stop = watch(
+    keys.active,
+    (first) => {
+      stop();
+      const resting = document.activeElement;
+      if (first && (resting === search || resting === document.body)) void focusRow(first);
+    },
+    { flush: "post" },
+  );
 }
 
 function clearFilters(): void {
   setView("all");
-  focusSearch();
 }
 
 // The menu's close leaves the pointer and focus on its button, so its tooltip stays unmounted until the menu has settled.
 const menuTipOff = ref(false);
+const openMenu = ref<"filter" | "manage" | null>(null);
 let menuTipTimer: ReturnType<typeof setTimeout> | null = null;
-function onMenuOpen(open: boolean): void {
+function onMenuOpen(open: boolean, which: "filter" | "manage"): void {
   if (menuTipTimer) clearTimeout(menuTipTimer);
+  openMenu.value = open ? which : null;
   if (open) menuTipOff.value = true;
   else menuTipTimer = setTimeout(() => (menuTipOff.value = false), 600);
 }
@@ -1054,21 +1036,9 @@ function openRun(run: OrgRcaRun): void {
 
 async function openRow(sid: Sid): Promise<void> {
   keys.setActive(sid);
-  if (props.mode === "rail") {
-    await router.push({
-      name: "assistant",
-      params: { chatId: sid },
-      query: { ...homeQueryFrom(route), org_identifier: org.value },
-    });
-    emit("opened", sid);
-    return;
-  }
-  emit("opened", sid);
-  const windowSid = props.windowSid;
-  const opening = windowSid
-    ? store.openInWindow(windowSid, { sid })
-    : store.openSession({ sid }, { focus: true });
-  await opening.catch(() => undefined);
+  await openChat(sid, { mode: props.mode, windowSid: props.windowSid }, (opened) =>
+    emit("opened", opened),
+  );
 }
 
 async function stopRow(sid: Sid): Promise<void> {
@@ -1146,5 +1116,5 @@ watch(
   { immediate: true },
 );
 
-defineExpose({ focusSearch });
+defineExpose({ openSearch, focusEntry });
 </script>

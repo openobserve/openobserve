@@ -175,17 +175,12 @@ test.describe("assistant incident chat", () => {
     await mockIncident(page);
   }
 
-  test("RCA-10 an incident link attaches Incident and the report run's Report, lists the time range as default context, and sends nothing", async ({
+  test("RCA-10 an incident link attaches Incident and the report run's Report, and sends nothing", async ({
     context,
     page,
   }) => {
     await start(page, context);
     await openIncidentChat(page);
-    await assistant.openSees();
-    await expect(
-      page.locator('[data-test="assistant-context-sees-page"]'),
-    ).toContainText("Time range");
-    await page.keyboard.press("Escape");
     await assistant.openMore();
     const chips = assistant.allChips();
     await expect(chips).toHaveCount(2);

@@ -994,7 +994,7 @@ describe("TracesLatencyHeatmap", () => {
         wrapper = await mountAttached({ aiEnabled: true });
         await drawBox();
         expect(el("ask-ai")!.textContent!.trim()).toBe(en.brand.askAutobot);
-        expect(el("ask-ai")!.querySelector("img")).not.toBeNull();
+        expect(el("ask-ai")!.querySelector('[data-test="assistant-spark"]')).not.toBeNull();
         await choose("ask-ai");
         expect(wrapper.emitted("ask-ai")).toEqual([
           [{ selection: SELECTED, count: 40, band: "100ms–500ms", window: "10:00:10–10:00:30" }],

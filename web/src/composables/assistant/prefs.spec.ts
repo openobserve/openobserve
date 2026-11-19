@@ -418,15 +418,20 @@ describe("per-tab session keys", () => {
       placement: { kind: "sidebar" },
       previousPlacement: null,
     });
-    writeHistoryFilter(KEY, { kind: "pinned", q: "" });
+    writeHistoryFilter(KEY, { kind: "pinned" });
     expect(readPlacement(KEY)?.placement).toEqual({ kind: "sidebar" });
-    expect(readHistoryFilter(KEY)).toEqual({ kind: "pinned", q: "" });
+    expect(readHistoryFilter(KEY)).toEqual({ kind: "pinned", agent: null, started: null });
+    sessionStorage.setItem(
+      `o2.assistant.historyFilter:${KEY}`,
+      JSON.stringify({ kind: "origin", q: "old search", started: "alert" }),
+    );
+    expect(readHistoryFilter(KEY)).toEqual({ kind: "all", agent: null, started: "alert" });
     expect(localStorage.length).toBe(0);
   });
 
   it("removes every o2.assistant.* session key of the user+org on sign-out, drafts included", () => {
     rememberSelection(KEY, "sid-1");
-    writeHistoryFilter(KEY, { kind: "all", q: "" });
+    writeHistoryFilter(KEY, { kind: "all" });
     sessionStorage.setItem(`o2.assistant.draft:${KEY}:sid-1`, "{}");
     sessionStorage.setItem(`o2.assistant.draft:other:sid-1`, "{}");
     sessionStorage.setItem("unrelated", "1");

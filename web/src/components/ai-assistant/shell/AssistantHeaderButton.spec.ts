@@ -134,7 +134,7 @@ describe("AssistantHeaderButton gates", () => {
       `${brandNames.autobot} is part of OpenObserve Enterprise and Cloud`,
     );
     expect(el.find(".rounded-default.absolute svg").exists()).toBe(true);
-    expect(wrapper.find('[data-test^="assistant-"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test^="assistant-header-status"]').exists()).toBe(false);
     await el.trigger("click");
     await flushPromises();
     expect(
@@ -149,6 +149,7 @@ describe("AssistantHeaderButton gates", () => {
     const { wrapper } = setup("not_configured", { isAdmin: true });
     const el = button(wrapper);
     expect(el.attributes("data-state")).toBe("off");
+    expect(el.get('[data-test="assistant-spark"]').attributes("data-tone")).toBe("muted");
     expect(el.attributes("aria-label")).toBe(`${brandNames.autobot}, not set up`);
     expect(el.attributes("aria-disabled")).toBeUndefined();
     expect(el.attributes("disabled")).toBeUndefined();
@@ -269,21 +270,16 @@ describe("AssistantHeaderButton light", () => {
     );
   });
 
-  it("swaps the fixed-fill icon for a ButtonText mask in forced colours", () => {
+  it("draws the spark alone, with no gradient tile, and takes the system colour in forced colours", () => {
     const { wrapper } = setup();
-    expect(wrapper.get("img").classes()).toContain("forced-colors:hidden");
-    const mask = wrapper.get('[data-icon="forced"]').classes();
-    expect(mask).toEqual(
-      expect.arrayContaining([
-        "hidden",
-        "forced-colors:inline-block",
-        "bg-[ButtonText]",
-        "forced-color-adjust-none",
-      ]),
-    );
+    const el = button(wrapper);
+    expect(el.find("img").exists()).toBe(false);
+    expect(el.classes().join(" ")).not.toContain("gradient-ai");
+    expect(el.get('[data-test="assistant-spark"]').attributes("data-tone")).toBe("brand");
+    expect(el.get("path").classes()).toContain("forced-colors:fill-current");
   });
 
-  it("shows open with the neutral pressed border while a container is visible", async () => {
+  it("shows open as a pressed state that hover alone never looks like", async () => {
     const { wrapper, store } = setup();
     session(store, "Checkout");
     store.open({ kind: "sidebar" }, { focus: "none" });
@@ -291,7 +287,10 @@ describe("AssistantHeaderButton light", () => {
     const el = button(wrapper);
     expect(el.attributes("data-state")).toBe("open");
     expect(el.attributes("aria-label")).toBe(`Close ${brandNames.autobot}`);
-    expect(el.classes()).toContain("border-border-strong");
+    expect(el.classes()).toEqual(
+      expect.arrayContaining(["bg-button-ghost-active-bg!", "ring-button-outline-hover-border"]),
+    );
+    expect(el.classes()).not.toContain("bg-button-ghost-hover-bg!");
     expect(tooltip(wrapper)).toBe(`Close ${brandNames.autobot}`);
   });
 
@@ -373,6 +372,7 @@ describe("AssistantHeaderButton light", () => {
     store.state.sessions[a].turn = { state: "responding.writing" };
     await flushPromises();
     expect(button(wrapper).attributes("data-state")).toBe("working");
+    expect(button(wrapper).find('[data-test="assistant-spark-working"]').exists()).toBe(true);
     expect(button(wrapper).attributes("aria-label")).toBe(`${brandNames.autobot}, answering`);
     expect(tooltip(wrapper)).toBe("Answering: Checkout 5xx");
     expect(

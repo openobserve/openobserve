@@ -389,6 +389,7 @@ import SupportAgentIcon from "~icons/material-symbols/support-agent";
 import CloudSyncIcon from "~icons/material-symbols/cloud-sync-outline";
 
 // Brand marks (not Material Symbols) — local inline SVG components using currentColor.
+import AssistantSparkGlyph from "./AssistantSparkGlyph.vue";
 import McpLogo from "./McpLogo.vue";
 import SlackLogo from "./SlackLogo.vue";
 
@@ -397,6 +398,7 @@ import type { Component } from "vue";
 export const iconRegistry = {
   alarm: Alarm,
   add: Add,
+  "assistant-spark": AssistantSparkGlyph,
   mcp: McpLogo,
   slack: SlackLogo,
   "arrow-back": ArrowBack,

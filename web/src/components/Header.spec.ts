@@ -199,8 +199,6 @@ describe("Header Component", () => {
         { identifier: "test-org", label: "Test Organization" },
         { identifier: "another-org", label: "Another Organization" },
       ],
-      isHovered: false,
-      getBtnLogo: "mock-logo.svg",
     };
 
     defaultGlobalConfig = {
@@ -509,13 +507,14 @@ describe("Header Component", () => {
       aiWrapper.unmount();
     });
 
-    it("keeps the AI logo with a lock badge and under a locked license", async () => {
+    it("keeps the assistant spark with a lock badge under a locked license", async () => {
       const aiWrapper = aiWrapperFor({ ai_enabled: true, features: { ai_assistant: "locked" } });
       await aiWrapper.vm.$nextTick();
 
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-locked"]');
       expect(aiButton.exists()).toBe(true);
-      expect(aiButton.find("img").exists()).toBe(true);
+      expect(aiButton.find('[data-test="assistant-spark"]').exists()).toBe(true);
+      expect(aiButton.find("img").exists()).toBe(false);
       expect(aiButton.findComponent(OLockBadge).exists()).toBe(true);
       expect(aiButton.attributes("aria-label")).toContain("Locked: needs");
       aiWrapper.unmount();
@@ -557,50 +556,6 @@ describe("Header Component", () => {
       await aiWrapper.vm.$nextTick();
       expect(aiWrapper.find(ASSISTANT_BUTTON).exists()).toBe(true);
       aiWrapper.unmount();
-    });
-
-    it("should emit update:isHovered true on mouse enter", async () => {
-      const aiWrapper = aiWrapperFor({ ai_enabled: true, features: { ai_assistant: "locked" } });
-      await aiWrapper.vm.$nextTick();
-
-      await aiWrapper.get('[data-test="menu-link-ai-locked"]').trigger("mouseenter");
-
-      expect(aiWrapper.emitted("update:isHovered")).toBeTruthy();
-      expect(aiWrapper.emitted("update:isHovered")[0]).toEqual([true]);
-      aiWrapper.unmount();
-    });
-
-    it("should emit update:isHovered false on mouse leave", async () => {
-      const aiWrapper = aiWrapperFor({ ai_enabled: true, features: { ai_assistant: "locked" } });
-      await aiWrapper.vm.$nextTick();
-
-      await aiWrapper.get('[data-test="menu-link-ai-locked"]').trigger("mouseleave");
-
-      expect(aiWrapper.emitted("update:isHovered")).toBeTruthy();
-      expect(aiWrapper.emitted("update:isHovered")[0]).toEqual([false]);
-      aiWrapper.unmount();
-    });
-
-    it("should accept getBtnLogo prop for AI icon", () => {
-      const customLogoPath = "path/to/ai-logo.svg";
-      const aiWrapper = createWrapper({
-        storeOverrides: {
-          state: {
-            zoConfig: {
-              ai_enabled: true,
-            },
-          },
-        },
-        configOverrides: {
-          isEnterprise: "true",
-        },
-        propsOverrides: {
-          getBtnLogo: customLogoPath,
-        },
-      });
-
-      // Verify the getBtnLogo prop is passed correctly
-      expect(aiWrapper.props("getBtnLogo")).toBe(customLogoPath);
     });
   });
 
@@ -1064,8 +1019,6 @@ describe("Header Component", () => {
       expect(wrapper.props("selectedLanguage")).toBeDefined();
       expect(wrapper.props("selectedOrg")).toBeDefined();
       expect(wrapper.props("organizations")).toHaveLength(2);
-      expect(wrapper.props("isHovered")).toBe(false);
-      expect(wrapper.props("getBtnLogo")).toBe("mock-logo.svg");
     });
   });
 

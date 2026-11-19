@@ -272,7 +272,7 @@ describe("rows (§1, S1)", () => {
     );
   });
 
-  it("keeps one slot order: + on the left, agent mic Send on the right, (i) in the corner, on one line", async () => {
+  it("keeps one slot order: + on the left, agent mic Send on the right, on one line", async () => {
     resetVoiceForTests(fakeVoiceEngine());
     const { wrapper } = setup();
     await flushPromises();
@@ -281,7 +281,7 @@ describe("rows (§1, S1)", () => {
     const ids = (node: typeof left) =>
       node
         .findAll(
-          '[data-test="assistant-composer-plus"], [data-test="assistant-context-sees"], [data-test="assistant-context-chip-time"], [data-test="assistant-agent-pill"], [data-test="assistant-agent-picker"], [data-test="assistant-dictate"], [data-test="assistant-send"]',
+          '[data-test="assistant-composer-plus"], [data-test="assistant-context-chip-time"], [data-test="assistant-agent-pill"], [data-test="assistant-agent-picker"], [data-test="assistant-dictate"], [data-test="assistant-send"]',
         )
         .map((n) => n.attributes("data-test"));
     expect(ids(left)).toEqual(["assistant-composer-plus"]);
@@ -291,44 +291,19 @@ describe("rows (§1, S1)", () => {
       "attach",
       "connectors",
     ]);
-    const corner = wrapper.get('[data-test="assistant-composer-corner"]');
-    expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="assistant-composer-corner"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-context-chip-time"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-mention-button"]').exists()).toBe(false);
     resetVoiceForTests();
   });
 
-  it("puts the (i) in the field's corner, never in the bar or the strip", async () => {
+  it("advertises no default context: no (i) and no end padding reserved for one", async () => {
     const { wrapper, store, sid, textarea } = setup();
-    const sees = () => wrapper.findAll('[data-test="assistant-context-sees"]');
-    expect(sees()).toHaveLength(1);
-    const bar = wrapper.get('[data-test="assistant-composer-bar"]');
-    expect(bar.element.contains(sees()[0].element)).toBe(false);
-    expect(textarea().classes()).toContain("pe-8!");
-    // Tab reaches the text before the (i): the corner follows the field in the DOM.
-    expect(
-      textarea().element.compareDocumentPosition(sees()[0].element) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    store.addChip(sid, ROW);
-    noteCap(sid, raw("Up to 4 images, 2 MB each"));
-    await flushPromises();
-    const strip = wrapper.get('[data-test="assistant-composer-strip"]');
-    expect(strip.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
-    expect(sees()).toHaveLength(1);
-  });
-
-  it("drops the ⓘ and its padding while the box is held for a decision or access is gone", async () => {
-    const { wrapper, store, sid, textarea } = setup();
-    const sees = () => wrapper.find('[data-test="assistant-context-sees"]');
-    expect(sees().exists()).toBe(true);
-    await wrapper.setProps({ accessLost: true });
-    expect(sees().exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
     expect(textarea().classes()).not.toContain("pe-8!");
-    await wrapper.setProps({ accessLost: false });
-    store.state.sessions[sid].turn = { state: "awaiting_consent" };
+    store.addChip(sid, ROW);
     await flushPromises();
-    expect(sees().exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
   });
 
   it("draws the tray inside the frame, above the text", async () => {
@@ -492,7 +467,7 @@ describe("refused sends (§1)", () => {
     expect(wrapper.get(NOTICE).attributes("title")).toBe("You're offline. Draft kept.");
   });
 
-  it("keeps the first chip in the strip and lists it under the (i) with no saved-with-chat note (B-composer-6)", async () => {
+  it("keeps the first chip in the strip with no saved-with-chat note (B-composer-6)", async () => {
     const { wrapper, store, sid } = setup();
     localStorage.removeItem("o2.assistant.hints:k1");
     store.addChip(sid, ROW);
@@ -501,12 +476,6 @@ describe("refused sends (§1)", () => {
     expect(wrapper.find('[data-test="assistant-composer-strip"]').text()).not.toContain(
       "Attachments are saved",
     );
-    const corner = wrapper.get('[data-test="assistant-composer-corner"]');
-    await corner.get('[data-test="assistant-context-sees"]').trigger("click");
-    await flushPromises();
-    const panel = document.body.querySelector('[data-test="assistant-context-sees-popover"]')!;
-    expect(panel.textContent).toContain("1 attachment");
-    expect(panel.textContent).not.toContain("Saved with this chat.");
   });
 });
 
@@ -758,17 +727,36 @@ describe("states (`40` §1.3)", () => {
     store.addChip(sid, ROW);
     await flushPromises();
     expect(wrapper.find('[data-notice="storage"]').exists()).toBe(false);
-    await wrapper.get('[data-test="assistant-context-sees"]').trigger("click");
-    await flushPromises();
-    expect(
-      document.body
-        .querySelector('[data-test="assistant-composer-storage-blocked"]')
-        ?.textContent?.trim(),
-    ).toBe("Drafts won't be kept if you reload this page.");
+    const hint = wrapper.get('[data-test="assistant-composer-storage-hint"]');
+    expect(hint.text()).toBe("Drafts won't be kept if you reload this page.");
+    const describedBy = wrapper.get("textarea").attributes("aria-describedby") ?? "";
+    expect(describedBy.split(" ")).toContain(hint.get(".sr-only").attributes("id"));
   });
 });
 
 describe("keys (`40` §1.4, CT-09)", () => {
+  it("sends a starter prompt at once through the same Send path when the box is empty", async () => {
+    const { wrapper, store, sid, send } = setup();
+    await (wrapper.vm as unknown as { sendPrompt(p: string): Promise<void> }).sendPrompt(
+      "What can you do?",
+    );
+    await flushPromises();
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith(sid);
+    expect(store.state.sessions[sid].composer.text).toBe("What can you do?");
+  });
+
+  it("keeps a typed draft over a starter prompt, never sending or discarding it", async () => {
+    const { wrapper, store, sid, send, textarea } = setup();
+    await type(textarea(), "half a thought");
+    await (wrapper.vm as unknown as { sendPrompt(p: string): Promise<void> }).sendPrompt(
+      "What can you do?",
+    );
+    await flushPromises();
+    expect(send).not.toHaveBeenCalled();
+    expect(store.state.sessions[sid].composer.text).toBe("half a thought");
+  });
+
   it("sends once per draft on Enter, however often Enter repeats", async () => {
     const { send, textarea, sid } = setup();
     await type(textarea(), "why?");

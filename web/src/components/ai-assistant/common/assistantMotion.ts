@@ -21,6 +21,7 @@ export const ASSISTANT_MOTION = {
   sweep: "assistant-sweep",
   wave: "assistant-wave",
   spin: "assistant-spin",
+  sparkWorking: "assistant-spark-working",
 } as const;
 
 /** Durations in milliseconds, matching the utilities, for code that waits on an animation to end. */

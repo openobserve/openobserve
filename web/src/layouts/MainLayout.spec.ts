@@ -939,23 +939,6 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Theme and UI State Management", () => {
-    it("should compute button logo for light theme", () => {
-      const getImageURL = vi.fn((path: string) => `mock-${path}`);
-
-      const getBtnLogo = (theme: string, isHovered: boolean, isEnabled: boolean) => {
-        if (isHovered || isEnabled) {
-          return getImageURL("images/common/ai_icon_dark.svg");
-        }
-
-        return theme === "dark"
-          ? getImageURL("images/common/ai_icon_dark.svg")
-          : getImageURL("images/common/ai_icon.svg");
-      };
-
-      const result = getBtnLogo("light", false, false);
-      expect(result).toContain("ai_icon.svg");
-    });
-
     it("should handle theme switching", () => {
       const switchTheme = (currentTheme: string) => {
         return currentTheme === "dark" ? "light" : "dark";

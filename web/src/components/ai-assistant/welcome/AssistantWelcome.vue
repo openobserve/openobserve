@@ -28,43 +28,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       :class="[
-        'flex min-w-0 flex-col gap-3',
-        variant === 'roomy' ? 'items-center pb-2 text-center' : 'items-start',
+        'flex min-w-0 items-center',
+        variant === 'roomy' ? 'justify-center gap-3 pb-2' : 'gap-2',
         opening ? fadeUpClasses(0) : '',
       ]"
       data-test="assistant-welcome-greeting"
     >
-      <div :class="['flex min-w-0 flex-col', variant === 'roomy' ? 'gap-2' : 'gap-0.5']">
-        <h2
-          :id="headingId"
-          :class="[
-            'text-text-heading font-semibold',
-            variant === 'roomy' ? 'text-3xl leading-tight max-md:text-2xl' : 'text-lg',
-          ]"
-          data-test="assistant-welcome-heading"
-        >
-          {{ greeting }}
-        </h2>
-        <OText variant="meta" as="p" class="text-sm">{{ t("assistant.welcome.question") }}</OText>
-      </div>
-    </div>
-    <div v-if="loading" class="flex flex-col gap-2" data-test="assistant-welcome-loading">
-      <OSkeleton v-for="row in 3" :key="row" type="rect" class="h-16 w-full" />
-    </div>
-    <ul v-else class="flex flex-col gap-2">
-      <li
-        v-for="(starter, index) in shownStarters"
-        :key="starter.id"
-        :class="['flex min-w-0', opening ? fadeUpClasses(index + 1) : '']"
+      <AssistantSpark
+        :size="variant === 'roomy' ? 32 : 20"
+        :class="variant === 'roomy' && 'max-md:size-6'"
+      />
+      <h2
+        :id="headingId"
+        :class="[
+          'text-text-heading min-w-0 font-semibold',
+          variant === 'roomy' ? 'text-3xl leading-tight max-md:text-2xl' : 'text-lg',
+        ]"
+        data-test="assistant-welcome-heading"
       >
-        <AssistantStarterRow
-          :label="starter.label"
-          :icon="starterIcon(starter.kind)"
-          :data-test="starter.dataTest"
-          @click="select(starter, index)"
-        />
-      </li>
-    </ul>
+        {{ greeting }}
+      </h2>
+    </div>
+    <!-- The full page lists recent chats under its composer instead, so only a panel offers starters -->
+    <template v-if="variant === 'compact'">
+      <div v-if="loading" class="flex flex-col gap-2" data-test="assistant-welcome-loading">
+        <OSkeleton v-for="row in 3" :key="row" type="rect" class="h-9 w-full" />
+      </div>
+      <ul v-else class="-mx-2.5 flex flex-col">
+        <li
+          v-for="(starter, index) in shownStarters"
+          :key="starter.id"
+          :class="['flex min-w-0', opening ? fadeUpClasses(index + 1) : '']"
+        >
+          <AssistantStarterRow
+            :label="starter.label"
+            :icon="starterIcon(starter.kind)"
+            :data-test="starter.dataTest"
+            @click="select(starter, index)"
+          />
+        </li>
+      </ul>
+    </template>
+    <slot />
   </section>
 </template>
 
@@ -104,11 +109,10 @@ export function resetWelcomeTelemetryForTests(): void {
 import { computed, useId, watch } from "vue";
 import { useStore } from "vuex";
 
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { fadeUpClasses } from "@/components/ai-assistant/common/assistantMotion";
-import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { useI18nTyped } from "@/types/i18n";
 
 import AssistantStarterRow from "./AssistantStarterRow.vue";
 import { starterIcon } from "./starterIcons";
@@ -122,7 +126,8 @@ const props = withDefaults(defineProps<AssistantWelcomeProps>(), {
 
 const emit = defineEmits<AssistantWelcomeEmits>();
 
-const { t } = useI18nTyped();
+defineSlots<{ default?: () => unknown }>();
+
 const vuex = useStore();
 const { greeting } = useGreeting(() => vuex?.state.userInfo?.email);
 const headingId = `assistant-welcome-${useId()}`;
@@ -145,7 +150,8 @@ watch(
     shown.add(props.container);
     trackAssistant("ai_welcome_shown", {
       fresh_org: fresh.value,
-      starter_kinds: props.starters.map((s) => s.kind),
+      starter_kinds:
+        props.variant === "compact" ? shownStarters.value.map((starter) => starter.kind) : [],
     });
   },
   { immediate: true },

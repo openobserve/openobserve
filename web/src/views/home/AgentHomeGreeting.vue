@@ -19,7 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex min-w-0 items-center justify-center pt-10 pb-2 max-md:pt-6"
     data-test="agent-home-greeting"
   >
-    <div class="flex min-w-0 flex-col gap-1.5">
+    <div class="flex min-w-0 items-center gap-3">
+      <AssistantSpark :size="32" class="max-md:size-6" />
       <i18n-t
         v-if="displayName"
         :keypath="namedKey"
@@ -42,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { useGreeting } from "@/components/ai-assistant/welcome/useGreeting";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 

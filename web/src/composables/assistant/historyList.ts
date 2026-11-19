@@ -18,7 +18,6 @@ import { computed, ref, shallowRef, watch, type ComputedRef } from "vue";
 
 import type { ChatsPage, ChatSummaryWire } from "@/services/assistant";
 import { assistantChatsQuery } from "@/services/assistant.queries";
-import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
 
 import { toAssistantError } from "./assistantErrors";
@@ -79,21 +78,16 @@ export function createHistoryList(ctx: HistoryCtx) {
   const errors = shallowRef<unknown>(null);
   const fetching = ref(false);
   const observers: { observer: QueryObserver<ChatsPage>; stop: () => void }[] = [];
-  const filterState = ref<HistoryFilter>({ kind: "all", q: "" });
+  const filterState = ref<HistoryFilter>({ kind: "all" });
   // The chats the owner's share links point at; a listed row carries no share of its own.
   const sharedSids = shallowRef<ReadonlySet<Sid>>(new Set());
   const loadedFor = ref<string | null>(null);
   let wanted = false;
 
-  const searchOnServer = () => deps.capability().historySearch === true;
-
   const observe = (org: string, cursor: string | undefined, index: number) => {
-    const q = searchOnServer() ? filterState.value.q.trim() : "";
-    const options = assistantChatsQuery(
-      org,
-      cursor,
-      q || undefined,
-    ) as unknown as ConstructorParameters<typeof QueryObserver<ChatsPage>>[1];
+    const options = assistantChatsQuery(org, cursor) as unknown as ConstructorParameters<
+      typeof QueryObserver<ChatsPage>
+    >[1];
     const observer = new QueryObserver<ChatsPage>(deps.queryClient, options);
     const report = () => {
       const result = observer.getCurrentResult();
@@ -174,19 +168,12 @@ export function createHistoryList(ctx: HistoryCtx) {
   });
 
   const visible = computed(() => {
-    const { kind, q, agent, started } = filterState.value;
-    const needle = q.trim().toLowerCase();
+    const { kind, agent, started } = filterState.value;
     return rows.value.filter((row) => {
       if (kind === "pinned" && !row.pinned) return false;
       if (kind === "shared" && !row.share && !sharedSids.value.has(row.sid)) return false;
       if (agent && runAgentKey(row.agentType) !== agent) return false;
-      if (started && !startedFrom(row.origin, started)) return false;
-      if (!needle) return true;
-      // The server already matched its own rows; browser and live rows it never saw still need the needle.
-      if (ctx.serverMode() && searchOnServer() && serverSids.value.has(row.sid)) return true;
-      return (
-        String(row.title).toLowerCase().includes(needle) || contentMatches(row.sid, needle, ctx)
-      );
+      return !started || startedFrom(row.origin, started);
     });
   });
 
@@ -234,7 +221,7 @@ export function createHistoryList(ctx: HistoryCtx) {
     () => [ctx.key(), ctx.serverMode()] as const,
     ([userOrgKey]) => {
       reset();
-      filterState.value = (userOrgKey && readHistoryFilter(userOrgKey)) || { kind: "all", q: "" };
+      filterState.value = (userOrgKey && readHistoryFilter(userOrgKey)) || { kind: "all" };
       // A view that asked before identity or capability settled still needs the list after the reset.
       if (wanted) ensureLoaded();
     },
@@ -250,9 +237,6 @@ export function createHistoryList(ctx: HistoryCtx) {
     mode: computed<"server" | "local">(() => (ctx.serverMode() ? "server" : "local")),
     canReload: computed(() => !!ctx.key()),
     filter: computed(() => filterState.value),
-    searchPartial: computed(
-      () => !!filterState.value.q.trim() && hasMore.value && !searchOnServer(),
-    ),
     localCount: computed(
       () => ctx.local.value.filter((row) => !isHelperChat(rowHints(row))).length,
     ),
@@ -271,19 +255,9 @@ export function createHistoryList(ctx: HistoryCtx) {
     },
     setFilter(patch: Partial<HistoryFilter>) {
       const next = { ...filterState.value, ...patch };
-      const searched = next.q !== filterState.value.q;
       filterState.value = next;
       const userOrgKey = ctx.key();
       if (userOrgKey) writeHistoryFilter(userOrgKey, next);
-      if (searched && next.q.trim())
-        trackAssistant("ai_history_search", {
-          length_bucket: lengthBucket(next.q.trim()),
-          server: ctx.serverMode() && searchOnServer(),
-        });
-      if (searched && searchOnServer() && ctx.serverMode()) {
-        loadedFor.value = null;
-        ensureLoaded();
-      }
     },
     async retry() {
       if (!ctx.serverMode()) return void (await ctx.reloadLocal());
@@ -489,21 +463,4 @@ function liveRow(session: AssistantSession, ctx: HistoryCtx): HistoryRow {
     agentType: null,
     ...({ firstPrompt: first ? String(first.content) : undefined } as object),
   } as HistoryRow;
-}
-
-function contentMatches(sid: Sid, needle: string, ctx: HistoryCtx): boolean {
-  const session = ctx.deps.store().state.sessions[sid] as AssistantSession | undefined;
-  const messages = ctx.localBySid.value.get(sid)?.messages ?? session?.messages ?? [];
-  return messages.some(
-    (message) => message.role === "user" && String(message.content).toLowerCase().includes(needle),
-  );
-}
-
-function lengthBucket(text: string): "0" | "1_20" | "21_100" | "101_500" | "500_plus" {
-  const n = text.length;
-  if (n === 0) return "0";
-  if (n <= 20) return "1_20";
-  if (n <= 100) return "21_100";
-  if (n <= 500) return "101_500";
-  return "500_plus";
 }

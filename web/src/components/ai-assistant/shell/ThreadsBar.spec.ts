@@ -23,6 +23,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 import { setLauncherDismissed } from "@/composables/assistant/prefs";
+import { registerHistoryTarget } from "@/composables/assistant/shortcuts";
 
 import ThreadsBar from "./ThreadsBar.vue";
 
@@ -50,7 +51,9 @@ vi.mock("@/composables/assistant", async () => {
   const { computed, reactive: live } = await import("vue");
   const rows = live(mocks.rows);
   const prefs = await import("@/composables/assistant/prefs");
+  const shortcuts = await import("@/composables/assistant/shortcuts");
   return {
+    historyTargetAbove: shortcuts.historyTargetAbove,
     setLauncherDismissed: prefs.setLauncherDismissed,
     useAssistantRuns: () => ({ rows: computed(() => rows.value), open: vi.fn() }),
     useAssistantStore: () => ({
@@ -159,6 +162,20 @@ describe("ThreadsBar", () => {
     const chip = wrapper.get('[data-test="assistant-launcher-toggle"]');
     expect(chip.text()).toContain("Chats");
     expect(chip.attributes("data-signal")).toBe("attention");
+  });
+
+  it("hides the Chats chip while a chat list rail is on the page, and brings it back when it goes", async () => {
+    const wrapper = mountBar();
+    await flushPromises();
+    const rail = document.createElement("aside");
+    document.body.append(rail);
+    const unregister = registerHistoryTarget({ el: () => rail, priority: 2, run: () => {} });
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-launcher-toggle"]').exists()).toBe(false);
+    unregister();
+    rail.remove();
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-launcher-toggle"]').exists()).toBe(true);
   });
 
   it("draws no incidents section or note when no run is live", async () => {

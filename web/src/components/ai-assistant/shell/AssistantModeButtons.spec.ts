@@ -137,6 +137,9 @@ describe("header move group", () => {
     expect(item("sidebar")?.getAttribute("aria-pressed")).toBe("true");
     expect(item("full")?.getAttribute("aria-pressed")).toBe("false");
     expect(item("window")?.getAttribute("aria-pressed")).toBe("false");
+    // The current placement is marked by its icon colour, not a filled tile.
+    expect(item("sidebar")?.className).toContain("text-accent!");
+    expect(item("sidebar")?.className).not.toContain("subtle-active-bg");
     item("sidebar")!.click();
     await flushPromises();
     expect(fake.current.store.state.shell.placement.kind).toBe("sidebar");

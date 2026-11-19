@@ -134,8 +134,8 @@ describe("AssistantMessage", () => {
     const handed = mount(AssistantMessage, {
       props: { message: { ...prompt, agentId: "sre", handoffFrom: "o2-ai" }, turnId: "t1" },
     });
-    expect(handed.get('[data-test="assistant-message-meta"]').text()).toContain(
-      `· to ${brandNames.autobotInvestigate}`,
+    expect(handed.get('[data-test="assistant-message-meta"]').text()).toBe(
+      `To ${brandNames.autobotInvestigate}`,
     );
     const later = mount(AssistantMessage, {
       props: { message: { ...prompt, agentId: "sre" }, turnId: "t1" },
@@ -188,17 +188,17 @@ describe("AssistantMessage", () => {
     expect(bubble.classes()).not.toContain("rounded-ee-default");
   });
 
-  it("keeps a sent message's action row at a fixed height, its time shown on hover or focus", () => {
+  it("keeps a sent message's action row at a fixed height and shows no time under the bubble", () => {
     const wrapper = mount(AssistantMessage, {
-      props: { message: user(), turnId: "t1" },
+      props: { message: user({ sentAt: 1_772_417_580_000 }), turnId: "t1" },
       slots: { actions: '<div data-test="prompt-actions" />' },
     });
     const line = wrapper.get('[data-test="assistant-message-user-line"]');
     expect(line.classes()).toContain("min-h-6");
     expect(line.find('[data-test="prompt-actions"]').exists()).toBe(true);
-    expect(line.get('[data-test="assistant-message-user-time"]').classes()).toEqual(
-      expect.arrayContaining(["opacity-0", "group-hover/message:opacity-100"]),
-    );
+    expect(wrapper.find('[data-test="assistant-message-user-time"]').exists()).toBe(false);
+    const bare = mount(AssistantMessage, { props: { message: user({ sentAt: 1 }), turnId: "t2" } });
+    expect(bare.find('[data-test="assistant-message-user-line"]').exists()).toBe(false);
   });
 
   it("names the agent above an answer only when another agent answered, never the main assistant", () => {
@@ -247,7 +247,7 @@ describe("AssistantMessage", () => {
     expect(wrapper.get('[data-test="assistant-message-chips"]').classes()).toContain("justify-end");
   });
 
-  it("shows the user's text as plain text, never Markdown, with its time on the answer line (`30` §2.1)", () => {
+  it("shows the user's text as plain text, never Markdown, and no time on the answer line", () => {
     const wrapper = mountMessage(user());
     const body = wrapper.get('[data-test="assistant-message-text"]');
     expect(body.text()).toBe("**not bold** <img src=x onerror=alert(1)>");
@@ -258,7 +258,8 @@ describe("AssistantMessage", () => {
     const reply = mountMessage(answer([{ type: "text", text: "a" }]), {
       turn: { prompt: user() } as never,
     });
-    expect(reply.get('[data-test="assistant-answer-time"]').text()).toMatch(/\d{2}:\d{2}$/);
+    expect(reply.find('[data-test="assistant-answer-time"]').exists()).toBe(false);
+    expect(reply.text()).not.toMatch(/\d{2}:\d{2}/);
   });
 
   it("names the author of a Slack-era record and lists sent chips read-only (CT-02 AC 10)", () => {
@@ -357,6 +358,18 @@ describe("AssistantMessage", () => {
     expect(html.find((h) => h.includes("Closing paragraph."))).not.toContain(
       'data-test="assistant-lead"',
     );
+  });
+
+  it("gives no lead to text that comes before a tool step, as it narrates the work", () => {
+    const wrapper = mountMessage(
+      answer([
+        { type: "text", text: "I'll list your streams." },
+        { type: "tool_call", tool: "StreamList", stepState: "done" },
+        { type: "text", text: "You have 47 streams." },
+      ]),
+    );
+    expect(wrapper.find('[data-test="assistant-lead"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("I'll list your streams.");
   });
 
   it("B-conversation-17: sets only the lead sentence in medium weight, never a callout's paragraph or the rest of the lead paragraph", () => {
@@ -839,7 +852,6 @@ describe("AssistantMessage", () => {
       });
       const line = done.get('[data-test="assistant-answer-line"]');
       expect(line.find('[data-test="actions"]').exists()).toBe(true);
-      expect(line.find('[data-test="assistant-answer-time"]').exists()).toBe(true);
       const trigger = done.get('[data-test="assistant-queries-line"]').element;
       expect(trigger.parentElement?.contains(line.element)).toBe(true);
       expect(done.find('[data-test="assistant-feedback"]').exists()).toBe(false);

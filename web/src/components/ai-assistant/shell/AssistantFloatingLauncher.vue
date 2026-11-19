@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="emit('toggle')"
     >
       <AssistantStatusDot v-if="othersSignal" :state="othersSignal" placement="inline" />
+      <AssistantSpark v-else :size="16" />
       <span>{{ t("assistant.threadsBar.title") }}</span>
       <span class="text-text-secondary tabular-nums" data-test="assistant-launcher-count">{{
         othersCount
@@ -123,6 +124,7 @@ const MAIN_SELECTOR = "main[data-test='main-content']";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import OButton from "@/lib/core/Button/OButton.vue";

@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-w-0 flex-1 items-center gap-2 text-start"
           data-test="assistant-dock-sheet-status"
         >
-          <AssistantMark size="sm" />
+          <AssistantMark size="sm" :working="peekRunning" />
           <OTruncatedText class="text-text-heading min-w-0 flex-1 text-sm font-medium">{{
             peekTitle
           }}</OTruncatedText>
@@ -73,6 +73,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 import AssistantMark from "@/components/ai-assistant/common/AssistantMark.vue";
 import {
+  isRunning,
   reportDockWidth,
   stopLadderEscape,
   useAssistantCapability,
@@ -102,9 +103,9 @@ let sizes: ResizeObserver | null = null;
 useAssistantPanelWidth();
 
 const mountable = computed(() => !UNMOUNTED_GATES.has(capability.gate.value));
-const peekTitle = computed(
-  () => store.state.sessions[store.state.shell.activeSid ?? ""]?.title ?? props.host.objectTitle(),
-);
+const peekSession = computed(() => store.state.sessions[store.state.shell.activeSid ?? ""]);
+const peekTitle = computed(() => peekSession.value?.title ?? props.host.objectTitle());
+const peekRunning = computed(() => !!peekSession.value && isRunning(peekSession.value.turn));
 const isOpen = computed(() => {
   const placement = store.state.shell.placement;
   return placement.kind === "docked" && placement.hostId === props.host.id;

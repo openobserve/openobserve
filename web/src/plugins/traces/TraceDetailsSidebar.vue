@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-span-ask-ai-btn"
               @click.stop="askAiAboutSpan"
             >
-              <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+              <AssistantSpark :size="16" />
               <OTooltip side="bottom" :content="t('traces.askAi.askAboutSpan')" />
             </OButton>
 
@@ -1170,7 +1170,7 @@ import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { valueErrorCause } from "@/lib/data/Value/valueErrorCause";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
-import { useAiIcon } from "@/composables/useAiIcon";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { buildSpanAiPayload } from "@/plugins/traces/utils/traceAiPayload";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -1357,6 +1357,7 @@ export default defineComponent({
     },
   },
   components: {
+    AssistantSpark,
     TraceIssuesPanel,
     AiEntryButton: defineAsyncComponent(
       () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
@@ -2309,8 +2310,6 @@ export default defineComponent({
       return { band, variant, tooltip };
     });
 
-    const { aiIconSrc } = useAiIcon();
-
     const askAiAboutSpan = () => {
       const trace = searchObj.data?.traceDetails?.selectedTrace;
       emit(
@@ -3095,7 +3094,6 @@ export default defineComponent({
       navigateToError,
       getDuration,
       operationPercentile,
-      aiIconSrc,
       askAiAboutSpan,
       spanProfileMatch,
       viewSpanProfile,

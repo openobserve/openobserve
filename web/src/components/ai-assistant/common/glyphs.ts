@@ -18,8 +18,8 @@ import type { IconName } from "@/lib/core/Icon/OIcon.types";
 
 /** The assistant's glyphs; assistant code names icons only through this map (`90` §4.1). */
 export const assistantGlyph = {
-  assistant: "auto-awesome",
-  agentGeneral: "auto-awesome",
+  assistant: "assistant-spark",
+  agentGeneral: "assistant-spark",
   agentInvestigator: "target",
   agentQueryBuilder: "auto-fix-high",
   handoff: "arrow-forward",
@@ -50,6 +50,8 @@ export const assistantGlyph = {
   share: "share",
   shared: "link",
   more: "more-vert",
+  moreHoriz: "more-horiz",
+  search: "search",
   sidePanel: "dock-to-right",
   minimise: "remove",
   grip: "drag-indicator",
@@ -110,13 +112,8 @@ export const assistantGlyph = {
   scan: "center-focus-weak",
   thread: "chat",
   checkShield: "verified-user",
-  sparkle: "auto-awesome",
   queue: "schedule",
   chart: "show-chart",
-  seesOrg: "business",
-  seesPage: "web",
-  seesZone: "language",
-  seesAttachment: "attach-file",
 } as const satisfies Record<string, IconName>;
 
 /** The glyph of each chip kind (`40` §2.1); the chip passes it to `OTag` as `icon`. */

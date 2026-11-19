@@ -60,18 +60,17 @@ beforeEach(() => resetWelcomeTelemetryForTests());
 afterEach(() => track.mockClear());
 
 describe("AssistantWelcome", () => {
-  it("greets with a heading and no logo, then three icon starter cards, nothing else (§8)", () => {
+  it("greets with the spark and a heading, then three icon starter rows, nothing else (§8)", () => {
     const wrapper = mountWelcome();
     const section = wrapper.get('[data-test="assistant-welcome"]');
     expect(section.element.tagName).toBe("SECTION");
     const heading = wrapper.get('[data-test="assistant-welcome-heading"]');
     expect(heading.text()).toMatch(/^(Good|Working)/);
     expect(section.attributes("aria-labelledby")).toBe(heading.attributes("id"));
-    expect(
-      wrapper
-        .find('[data-test="assistant-welcome-greeting"] [data-test="assistant-mark"]')
-        .exists(),
-    ).toBe(false);
+    const greeting = wrapper.get('[data-test="assistant-welcome-greeting"]');
+    expect(greeting.find('[data-test="assistant-spark"]').attributes("data-size")).toBe("20");
+    expect(greeting.find('[data-test="assistant-mark"]').exists()).toBe(false);
+    expect(greeting.find("p").exists()).toBe(false);
     expect(wrapper.find("img").exists()).toBe(false);
     expect(wrapper.findAll("li")).toHaveLength(3);
     expect(wrapper.findAll("h2")).toHaveLength(1);
@@ -113,10 +112,24 @@ describe("AssistantWelcome", () => {
     expect(wrapper.text()).not.toContain("`");
   });
 
-  it("keeps every starter card at least a 2.75 rem target at any width", () => {
+  it("keeps every starter row a 2.75 rem target on touch and below md", () => {
     for (const button of mountWelcome().findAll("ul > li button")) {
-      expect(button.classes()).toContain("min-h-16");
+      expect(button.classes()).toEqual(
+        expect.arrayContaining(["min-h-9", "max-md:min-h-11", "pointer-coarse:min-h-11"]),
+      );
+      expect(button.attributes("data-test")).toMatch(/^assistant-starter-/);
     }
+  });
+
+  it("on the full page greets alone, with a larger spark, and leaves the rest to its slot", () => {
+    const wrapper = mount(AssistantWelcome, {
+      props: { variant: "roomy", scope: SCOPE, starters: STARTERS, loading: false },
+      slots: { default: '<div data-test="below-stub" />' },
+    });
+    expect(wrapper.find('[data-test="assistant-spark"]').attributes("data-size")).toBe("32");
+    expect(wrapper.find("li").exists()).toBe(false);
+    expect(wrapper.find('[data-test="assistant-welcome-loading"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="below-stub"]').exists()).toBe(true);
   });
 
   it("shows skeleton rows instead of the starters while loading", () => {
@@ -145,6 +158,13 @@ describe("AssistantWelcome", () => {
     expect(track.mock.calls.filter(([name]) => name === "ai_welcome_shown")).toEqual([
       ["ai_welcome_shown", { fresh_org: false, starter_kinds: ["page", "page", "recent"] }],
       ["ai_welcome_shown", { fresh_org: false, starter_kinds: ["page", "page", "recent"] }],
+    ]);
+  });
+
+  it("reports no starters for the full page, which shows none", () => {
+    mountWelcome({ container: "full_view", variant: "roomy" });
+    expect(track.mock.calls.filter(([name]) => name === "ai_welcome_shown")).toEqual([
+      ["ai_welcome_shown", { fresh_org: false, starter_kinds: [] }],
     ]);
   });
 });

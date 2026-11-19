@@ -40,14 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :org="org"
           :class="HOME_COLUMN_CLASS"
         />
-        <AssistantLauncher v-else ref="launcher" layout="overview" :class="HOME_COLUMN_CLASS" />
-        <AssistantHomeExamples
+        <AssistantLauncher v-else ref="launcher" :class="HOME_COLUMN_CLASS" />
+        <AssistantNewChatBelow
           v-if="state === 'ai'"
-          :class="HOME_COLUMN_CLASS"
-          @select="(prompt, agent) => launcher?.fill(prompt, agent)"
+          :class="[HOME_COLUMN_CLASS, 'pt-2']"
+          @ask="(prompt) => launcher?.send(prompt)"
+          @open-chat="openChat"
+          @view-all="viewAllOpen = true"
         />
       </div>
     </div>
+    <AssistantChatSearch v-model:open="viewAllOpen" mode="rail" />
   </div>
 </template>
 
@@ -61,10 +64,14 @@ import {
   onMounted,
   ref,
 } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import AssistantHomeExamples from "@/components/ai-assistant/welcome/AssistantHomeExamples.vue";
+import AssistantChatSearch from "@/components/ai-assistant/history/AssistantChatSearch.vue";
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
+import AssistantNewChatBelow from "@/components/ai-assistant/welcome/AssistantNewChatBelow.vue";
+import type { Sid } from "@/composables/assistant";
+import { homeQueryFrom } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -109,4 +116,15 @@ const launcher = ref<InstanceType<typeof AssistantLauncher> | null>(null);
 function focusAsk(): void {
   void nextTick(() => launcher.value?.focusAsk?.());
 }
+
+const route = useRoute();
+const router = useRouter();
+
+function openChat(sid: Sid): void {
+  void router
+    .push({ name: "assistant", params: { chatId: sid }, query: homeQueryFrom(route) })
+    .catch(() => undefined);
+}
+
+const viewAllOpen = ref(false);
 </script>

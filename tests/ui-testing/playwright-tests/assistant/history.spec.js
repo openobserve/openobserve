@@ -282,7 +282,14 @@ test.describe("assistant history", () => {
     expect(state.chats.map((chat) => chat.title)).not.toContain("Seeded chat 2");
   });
 
-  const search = () => assistant.history().locator('[data-test="assistant-history-search"] input');
+  const searchDialog = () => assistant.page.locator('[data-test="assistant-chat-search"]');
+  const results = () => searchDialog().locator('[data-test="assistant-chat-search-result"]');
+  // Search lives in a dialog the list's magnifier opens; its field takes focus on open.
+  async function searchFor(q) {
+    if (!(await searchDialog().isVisible().catch(() => false)))
+      await assistant.history().locator('[data-test="assistant-history-search-open"]').click();
+    await searchDialog().locator('[data-test="assistant-chat-search-input"] input').fill(q);
+  }
 
   test("DOD-03 with server search the list asks the server with q and shows only its answer", { tag: ["@mock"] }, async ({
     context,
@@ -292,24 +299,94 @@ test.describe("assistant history", () => {
     await openOnLogs(page);
     await assistant.openHistory();
     await expect(item("VRL to parse nginx logs")).toHaveCount(1);
-    await search().fill("nginx");
+    await searchFor("nginx");
     await expect.poll(() => state.log.some((line) => /^GET \/api\/[^/]+\/ai\/chats\?.*\bq=nginx\b/.test(line)), {
       timeout: 15_000,
     }).toBe(true);
-    await expect(assistant.history().locator('[data-test="assistant-history-row"]')).toHaveCount(1);
-    await expect(item("VRL to parse nginx logs")).toHaveCount(1);
-    await expect(assistant.history().locator('[data-test="assistant-history-search-line"]')).not.toContainText(
-      "loaded",
-    );
+    await expect(results()).toHaveCount(1);
+    await expect(results()).toContainText("VRL to parse nginx logs");
+    await expect(searchDialog().locator('[data-test="assistant-chat-search-line"]')).toHaveText("1 chat matches");
   });
 
   test("DOD-03 without server search the list filters what it loaded and never sends q", { tag: ["@mock"] }, async ({ context, page }) => {
     await start(context, page);
     await openOnLogs(page);
     await assistant.openHistory();
-    await search().fill("nginx");
-    await expect(assistant.history().locator('[data-test="assistant-history-row"]')).toHaveCount(1);
+    await searchFor("nginx");
+    await expect(results()).toHaveCount(1);
+    await expect(results().locator("mark")).toHaveText("nginx");
     expect(state.log.some((line) => /^GET \/api\/[^/]+\/ai\/chats\?.*\bq=/.test(line))).toBe(false);
+  });
+
+  test("LIST-01 the search dialog moves with the arrows, opens the chosen chat with Enter and gives focus back on Escape", { tag: ["@mock"] }, async ({
+    context,
+    page,
+  }) => {
+    await start(context, page);
+    await openOnLogs(page);
+    await assistant.openHistory();
+    const open = assistant.history().locator('[data-test="assistant-history-search-open"]');
+    await open.click();
+    const input = searchDialog().locator('[data-test="assistant-chat-search-input"] input');
+    await expect(input).toBeFocused();
+    await expect(results().first()).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(searchDialog()).toHaveCount(0);
+    await expect(open).toBeFocused();
+    await searchFor("p95");
+    await expect(results()).toHaveCount(1);
+    await expect(results().first()).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Enter");
+    await expect(searchDialog()).toHaveCount(0);
+    await expect(assistant.transcript()).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("LIST-02 a row's pin button pins it into Pinned at the top, and the pin survives a reload", { tag: ["@mock"] }, async ({
+    context,
+    page,
+  }) => {
+    await start(context, page);
+    await openOnLogs(page);
+    await assistant.openHistory();
+    const row = item("PromQL for p95 latency by service");
+    await row.hover();
+    await row.locator('[data-test="assistant-history-row-pin-toggle"]').click();
+    const pinned = assistant.history().locator('[data-test="assistant-history-group"][data-group="pinned"]');
+    await expect(pinned).toContainText("PromQL for p95 latency by service");
+    await expect(row.locator('[data-test="assistant-history-row-time"]')).toHaveCount(0);
+    // The pin is announced once the browser copy holds it, so the reload reads it back.
+    await expect(page.locator('[role="status"]').filter({ hasText: /^Pinned$/ }).first()).toBeAttached();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await openOnLogs(page);
+    await assistant.openHistory();
+    await expect(pinned).toContainText("PromQL for p95 latency by service", { timeout: 15_000 });
+    await item("PromQL for p95 latency by service").locator('[data-test="assistant-history-row-menu"]').click();
+    await expect(page.locator('[data-test="assistant-history-row-pin"]')).toHaveText(/Unpin/);
+    await page.locator('[data-test="assistant-history-row-pin"]').click();
+    await expect(pinned).toHaveCount(0);
+  });
+
+  test("LIST-03 the row menu renames a chat in place: Enter saves, Escape keeps the title", { tag: ["@mock"] }, async ({
+    context,
+    page,
+  }) => {
+    await start(context, page);
+    await openOnLogs(page);
+    await assistant.openHistory();
+    const menu = (title) => item(title).locator('[data-test="assistant-history-row-menu"]');
+    await menu("VRL to parse nginx logs").click();
+    const items = page.locator('[role="menu"]').filter({ visible: true }).locator('[role="menuitem"]');
+    await expect(items).toHaveText([/Rename/, /Pin/, /Share/, /Export Markdown/, /Delete chat/]);
+    await page.locator('[data-test="assistant-history-row-rename"]').click();
+    const field = assistant.history().locator('[data-test="assistant-history-rename"] input');
+    await field.fill("Nginx parser");
+    await field.press("Enter");
+    await expect(item("Nginx parser")).toHaveCount(1);
+    await menu("Nginx parser").click();
+    await page.locator('[data-test="assistant-history-row-rename"]').click();
+    await field.fill("Something else");
+    await field.press("Escape");
+    await expect(item("Nginx parser")).toHaveCount(1);
   });
 
   test("DOD-03 with server pins a pin is stored on the server and lists under Pinned on another device", { tag: ["@mock"] }, async ({
@@ -429,12 +506,11 @@ test.describe("assistant history", () => {
     const openChat = async (i) => {
       const name = `Long chat ${String(i).padStart(2, "0")}`;
       await assistant.openHistory();
-      await search().fill(name);
+      await searchFor(name);
       // The search settles after a short debounce; a click before it lands where the row was.
-      const rows = assistant.history().locator('[data-test="assistant-history-row"]');
-      await expect(rows).toHaveCount(1);
-      await expect(rows).toContainText(name);
-      await rows.click();
+      await expect(results()).toHaveCount(1);
+      await expect(results()).toContainText(name);
+      await results().click();
       await expect(assistant.transcript()).toContainText(`${name} question 149`, { timeout: 30_000 });
     };
     await openChat(0);
@@ -484,8 +560,8 @@ test.describe("assistant history", () => {
     });
     await openOnLogs(page);
     await assistant.openHistory();
-    await search().fill("Chat 300");
-    const rows = assistant.history().locator('[data-test="assistant-history-row"]');
+    await searchFor("Chat 300");
+    const rows = results();
     await expect(rows).toHaveCount(1);
     await expect(rows).toContainText("Chat 300");
     // Click to the first frame that shows the last message, measured in the page so no round trip counts.

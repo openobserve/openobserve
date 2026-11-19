@@ -37,7 +37,7 @@ export { toAssistantError, ASSISTANT_ERROR_CODES } from "./assistantErrors";
 export { STALL_MS, elapsedText, turnStatusText } from "./turnStateMachine";
 export { starterPayload, widerPeriodText } from "./starterPayload";
 export { useAssistantStarters } from "./useAssistantStarters";
-export { groupOf, originOf, useAssistantHistory } from "./useAssistantHistory";
+export { groupOf, isHelperChat, originOf, useAssistantHistory } from "./useAssistantHistory";
 export type {
   FloatingWindow,
   MinimiseReason,

@@ -76,25 +76,14 @@ test.describe("assistant composer and context", () => {
     assistant = new AssistantPage(page);
   });
 
-  test("CTX-01 the composer has no time chip and its ⓘ lists the Default context", { tag: ["@mock"] }, async ({ page }) => {
+  test("CTX-01 the composer has no time chip and no default-context button", { tag: ["@mock"] }, async ({ page }) => {
     await openOnLogs(page);
     // The agent picks the time range itself; the page's range travels only as default context.
     await expect(assistant.container().locator('[data-test="assistant-context-chip-time"]')).toHaveCount(0);
-    // The page's own stream is read from the page, so it is listed in the popover, not staged as a chip.
+    // The page's own stream is read from the page, so it is sent without being staged as a chip.
     await expect(assistant.chips()).toHaveCount(0);
-    await expect(assistant.sees()).toHaveAccessibleName("Default context");
-    await assistant.openSees();
-    const popover = page.locator('[data-test="assistant-context-sees-popover"]');
-    await expect(popover).toBeVisible();
-    await expect(popover.locator("h2")).toHaveText("Default context");
-    const onPage = popover.locator('[data-test="assistant-context-sees-page"]');
-    for (const label of ["Page", "Streams", "Time range"]) await expect(onPage).toContainText(label);
-    await expect(onPage.locator('[data-test="assistant-context-sees-org"]')).toHaveText(`${harness.ENV.org} organization`);
-    // Only what is sent is listed; not-read rows stay out of the popover.
-    for (const label of ["Not Sent", "Quick mode"]) await expect(onPage).not.toContainText(label);
-    await page.keyboard.press("Escape");
-    await expect(popover).toBeHidden();
-    await expect(assistant.sees()).toBeFocused();
+    await expect(assistant.container().locator('[data-test="assistant-context-sees"]')).toHaveCount(0);
+    await expect(assistant.container().locator('[data-test="assistant-composer-corner"]')).toHaveCount(0);
   });
 
   test("CTX-01 Tab past a chip popover's last control moves on and stays there", { tag: ["@mock"] }, async ({ page }) => {

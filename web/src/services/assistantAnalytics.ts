@@ -292,7 +292,7 @@ export interface AiEventProps {
     agent: "o2-ai" | "sre" | "generate-query";
   };
   ai_handoff: { step: "sent" | "failed" | "accepted" | "dismissed" };
-  ai_context_inspected: { target: "sees" | "chip" | "add_context"; kind?: ChipKind };
+  ai_context_inspected: { target: "chip"; kind?: ChipKind };
   ai_composer_recall: { direction: "older" | "newer"; index: number };
   ai_composer_cap_hit: { cap: "images" | "rows" | "bytes" | "type" | "size" };
   ai_composer_enter_blocked: { reason: "running" | "inert" | "empty" | "elsewhere" };

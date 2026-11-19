@@ -54,7 +54,7 @@ function measure(): void {
   if (!field || !parent) return;
   const outer = parent.getBoundingClientRect();
   const inner = field.getBoundingClientRect();
-  // The field's end padding grows to clear the corner ⓘ, so the copy takes the field's own padding to wrap alike.
+  // The copy takes the field's own padding, so it wraps where the field does.
   const { paddingLeft, paddingRight } = getComputedStyle(field);
   box.value = {
     top: `${inner.top - outer.top}px`,

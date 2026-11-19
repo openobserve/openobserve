@@ -45,16 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-else-if="aiEnabled"
     variant="ghost"
     :size="size"
-    class="group text-ai-accent! hover:shadow-glow-md hover:shadow-ai-accent/35 dark:shadow-glow-md dark:shadow-ai-accent/20 dark:hover:shadow-glow-md dark:hover:shadow-ai-accent/35 shrink-0 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:[background:var(--color-gradient-ai)]! dark:text-white!"
+    class="shrink-0"
     :data-test="dataTest"
     @click.stop="emit('click')"
   >
     <template #icon-left>
-      <img
-        :src="aiIconSrc"
-        class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-        alt=""
-      />
+      <AssistantSpark :size="16" />
     </template>
     {{ label }}
     <OTooltip v-if="tooltip" side="top" :content="tooltip" />
@@ -66,10 +62,10 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 
 import config from "@/aws-exports";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ButtonSize } from "@/lib/core/Button/OButton.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { I18nText } from "@/types/i18n";
 
@@ -87,7 +83,6 @@ withDefaults(
 const emit = defineEmits<{ (e: "click"): void }>();
 
 const store = useStore();
-const { aiIconSrc } = useAiIcon();
 const aiLock = useLicenseLock("ai_assistant");
 
 const aiEnabled = computed(

@@ -493,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="explainTrace"
             >
               <template #icon-left>
-                <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+                <AssistantSpark :size="16" />
               </template>
               {{ t("traces.askAi.explainTrace") }}
               <OTooltip side="bottom" :content="t('traces.askAi.explainTraceHint')" />
@@ -1139,7 +1139,7 @@ import TraceHeader from "./TraceHeader.vue";
 import TraceErrorSpansMenu from "./components/TraceErrorSpansMenu.vue";
 import { errorSpansDeepestFirst } from "./utils/traceErrorSummary";
 import { buildTraceAiPayload, type AiChatHandoff } from "./utils/traceAiPayload";
-import { useAiIcon } from "@/composables/useAiIcon";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
@@ -1460,6 +1460,7 @@ export default defineComponent({
     },
   },
   components: {
+    AssistantSpark,
     ShareButton,
     OPageHeader,
     FeatureLockExempt,
@@ -2353,7 +2354,6 @@ export default defineComponent({
       },
     );
 
-    const { aiIconSrc } = useAiIcon();
     const askAiVisible = computed(
       () => props.showAskAi && config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
     );
@@ -3749,7 +3749,6 @@ export default defineComponent({
       raw,
       showCriticalPath,
       setShowCriticalPath,
-      aiIconSrc,
       askAiVisible,
       relayToAiChat,
       explainTrace,

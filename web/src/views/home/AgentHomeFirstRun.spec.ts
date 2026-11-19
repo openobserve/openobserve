@@ -19,7 +19,7 @@ import { computed } from "vue";
 
 import i18n from "@/locales";
 
-import { fakeVuex } from "../../components/ai-assistant/__tests__/fakeAssistant";
+import { fakeRouter, fakeVuex } from "../../components/ai-assistant/__tests__/fakeAssistant";
 
 const homeState = vi.hoisted(() => ({ value: "ai" as string }));
 
@@ -32,31 +32,36 @@ vi.mock("./useAgentHomeState", () => ({
 vi.mock("./AgentHomeGreeting.vue", () => ({
   default: { name: "AgentHomeGreeting", template: '<div data-test="greeting-stub" />' },
 }));
+vi.mock("@/components/ai-assistant/welcome/AssistantNewChatBelow.vue", () => ({
+  default: { name: "AssistantNewChatBelow", template: '<div data-test="new-chat-below-stub" />' },
+}));
+vi.mock("@/components/ai-assistant/history/AssistantChatSearch.vue", () => ({
+  default: { name: "AssistantChatSearch", props: ["open", "mode"], template: "<div />" },
+}));
 vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
-    props: ["layout"],
-    template: '<div data-test="launcher-stub" :data-layout="layout" />',
+    template: '<div data-test="launcher-stub" />',
   },
 }));
 import AgentHomeFirstRun from "./AgentHomeFirstRun.vue";
 
-const mountFirstRun = () => mount(AgentHomeFirstRun, { global: { plugins: [i18n, fakeVuex()] } });
+const mountFirstRun = () =>
+  mount(AgentHomeFirstRun, { global: { plugins: [i18n, fakeVuex(), fakeRouter()] } });
 
 describe("AgentHomeFirstRun (HomeFirstRun board, B-shell-5)", () => {
-  it("puts the no-data note above Ask, then the Ask launcher and main's examples, in the main column", () => {
+  it("puts the no-data note above Ask, then the calm new-chat block, not the starter grid", () => {
     const main = mountFirstRun().get('[data-test="agent-home-first-run-main"]');
     const order = [...main.element.children].map((el) => el.getAttribute("data-test"));
     expect(order).toEqual([
       "greeting-stub",
       "agent-home-first-run-note",
       "launcher-stub",
-      "assistant-home-examples",
+      "new-chat-below-stub",
     ]);
+    expect(main.find('[data-test="assistant-home-examples"]').exists()).toBe(false);
     expect(main.get('[data-test="agent-home-first-run-title"]').text()).toContain("No data yet");
-    expect(main.get('[data-test="launcher-stub"]').attributes("data-layout")).toBe("overview");
-    // The Ask box's chip row floats above it, so the box keeps room for it below the note.
-    expect(main.get('[data-test="launcher-stub"]').classes()).toContain("mt-6");
+    expect(main.find('[data-test="launcher-stub"]').exists()).toBe(true);
   });
 
   it("is one centred column with no right rail, Brief me or recent threads", () => {

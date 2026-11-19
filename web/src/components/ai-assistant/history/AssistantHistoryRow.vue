@@ -19,13 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :is="tag"
     :role="tag === 'div' ? 'listitem' : undefined"
     :class="[
-      'group/row rounded-default hover:bg-surface-subtle relative flex min-w-0 items-center gap-1',
-      current && CURRENT_CLASS,
+      'group/row rounded-default hover:bg-surface-subtle focus-within:bg-surface-subtle relative flex min-w-0 items-center gap-1',
+      current && 'bg-surface-subtle',
+      menuOpen && 'bg-surface-subtle',
       compact && '-mx-3 px-3',
     ]"
     :aria-busy="pending ? 'true' : undefined"
     :data-sid="row.sid"
     :data-current="current ? '' : undefined"
+    :data-menu-open="menuOpen ? '' : undefined"
     data-test="assistant-history-item"
     @pointerenter="arm"
     @focusin="arm"
@@ -56,150 +58,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             'h-auto! min-w-0 flex-1 justify-start! px-0! py-1.5 text-start max-md:min-h-11 pointer-coarse:min-h-11',
             'hover:bg-transparent! active:bg-transparent!',
-            compact ? 'min-h-9' : 'min-h-8',
+            compact ? '-ms-1.5 min-h-9 ps-1.5!' : 'min-h-8 ps-2!',
+            actions.length && (canPin ? RESERVE_CLASS.pin : RESERVE_CLASS.menu),
           ]"
           data-test="assistant-history-row"
           :aria-disabled="org ? 'true' : undefined"
           @click="choose"
           @keydown="onRowKey"
-          @pointerleave="chosen = false"
-          @blur="chosen = false"
         >
           <span class="flex min-w-0 flex-1 items-center gap-2">
-            <!-- A fixed slot keeps every title on one edge whether or not its row has a light -->
-            <span
-              :class="[
-                'inline-flex shrink-0',
-                compact ? 'w-3 justify-start' : 'w-4 justify-center',
-              ]"
-              data-test="assistant-history-row-light"
-              :data-signal="signal ?? (compact ? 'ready' : undefined)"
-            >
-              <AssistantStatusDot v-if="signal" :state="signal" />
-              <!-- A compact row at rest still marks its slot, so no title sits beside a blank gutter -->
-              <span
-                v-else-if="compact"
-                aria-hidden="true"
-                class="bg-border-default size-1.5 rounded-full"
-              />
-            </span>
             <span class="flex min-w-0 flex-1 flex-col">
-              <!-- A chosen row moves as the list re-sorts, so its bubble would be left over the nav (X1) -->
               <!-- The row is a button, whose nowrap would stop the 2-line clamp from wrapping or showing its ellipsis -->
               <OTruncatedText
                 :class="[
                   'text-text-body min-w-12',
+                  current && 'text-text-heading',
                   !compact && 'wrap-break-word whitespace-normal',
                 ]"
                 :lines="compact ? 1 : 2"
-                :tooltip="chosen ? false : fullTitle"
+                :tooltip="false"
                 >{{ row.title }}</OTruncatedText
               >
               <OText v-if="org" variant="meta" as="span" data-test="assistant-history-row-org">
                 {{ org }}
               </OText>
             </span>
-            <OIcon
-              v-if="agentIcon"
-              :name="agentIcon"
-              size="xs"
-              class="text-text-secondary shrink-0"
-              aria-hidden="true"
-              data-test="assistant-history-row-agent"
-            />
-            <template v-if="visibility">
-              <OIcon
-                :name="visibility === 'public' ? assistantGlyph.shared : 'corporate-fare'"
-                size="xs"
-                class="text-text-secondary shrink-0"
-                aria-hidden="true"
-                data-test="assistant-history-row-shared"
-                :data-visibility="visibility"
-              />
-              <span class="sr-only"
-                >,
-                {{
-                  visibility === "public"
-                    ? t("assistant.history.sharedPublic")
-                    : t("assistant.share.sharedOrg")
-                }}</span
-              >
-            </template>
-            <!-- The button is named by its content; these keep the spoken parts apart. -->
-            <span class="sr-only">, </span>
+            <span
+              v-if="visibility"
+              class="sr-only"
+              :data-visibility="visibility"
+              data-test="assistant-history-row-shared"
+              >,
+              {{
+                visibility === "public"
+                  ? t("assistant.history.sharedPublic")
+                  : t("assistant.share.sharedOrg")
+              }}</span
+            >
+            <!-- The button is named by its content; this keeps the spoken parts apart. -->
+            <span v-if="pending || status || drafted" class="sr-only">, </span>
             <template v-if="pending">
               <OSpinner size="xs" />
               <OText variant="meta" data-test="assistant-history-row-pending">{{
                 pendingText
               }}</OText>
             </template>
-            <span
-              v-else-if="status === 'answering'"
-              :class="[
-                'flex shrink-0 items-center justify-end',
-                compact ? COMPACT_TRAIL_CLASS : 'w-12',
-              ]"
-              data-status="answering"
-              data-test="assistant-history-row-state"
-            >
-              <span class="sr-only" aria-live="polite">{{
-                chatStatusWord(status, expiresAt, now ?? Date.now(), t)
-              }}</span>
+            <template v-else>
               <span
-                aria-hidden="true"
-                class="flex items-center gap-0.5"
-                data-test="assistant-history-row-working"
+                v-if="status && status !== 'draft'"
+                class="sr-only"
+                :aria-live="status === 'answering' ? 'polite' : undefined"
+                :data-status="status"
+                data-test="assistant-history-row-state"
+                >{{ chatStatusWord(status, expiresAt, now ?? Date.now(), t) }}</span
               >
-                <span class="bg-text-secondary size-1 rounded-full motion-safe:animate-pulse" />
-                <span
-                  class="bg-text-secondary size-1 rounded-full motion-safe:animate-pulse motion-safe:[animation-delay:200ms]"
-                />
-                <span
-                  class="bg-text-secondary size-1 rounded-full motion-safe:animate-pulse motion-safe:[animation-delay:400ms]"
-                />
+              <OText
+                v-if="status === 'draft' || drafted"
+                variant="meta"
+                as="span"
+                :class="[
+                  'shrink-0',
+                  current ? 'text-text-body!' : 'text-assistant-signal-attention!',
+                  actions.length && TRAIL_HIDE_CLASS,
+                ]"
+                :data-status="status === 'draft' ? 'draft' : undefined"
+                data-test="assistant-history-row-draft"
+                >{{ t("assistant.history.draftTag") }}</OText
+              >
+              <span
+                v-if="signal"
+                :class="[
+                  'inline-flex w-4 shrink-0 justify-center',
+                  actions.length && TRAIL_HIDE_CLASS,
+                ]"
+                aria-hidden="true"
+                data-test="assistant-history-row-light"
+                :data-signal="signal"
+              >
+                <AssistantStatusDot :state="signal" />
               </span>
-            </span>
-            <span
-              v-else-if="status === 'needs_you' && quietStatus"
-              class="sr-only"
-              data-status="needs_you"
-              data-test="assistant-history-row-state"
-              >{{ chatStatusWord(status, expiresAt, now ?? Date.now(), t) }}</span
-            >
-            <span
-              v-else-if="status"
-              :class="[
-                'group-hover/row:text-text-body min-w-12 shrink-0 text-end text-xs tabular-nums',
-                chatStatusClass(status, current),
-                compact && COMPACT_TRAIL_CLASS,
-              ]"
-              :data-status="status"
-              data-test="assistant-history-row-state"
-              >{{ chatStatusWord(status, expiresAt, now ?? Date.now(), t) }}</span
-            >
-            <OText
-              v-if="drafted && status !== 'draft'"
-              variant="meta"
-              as="span"
-              :class="[
-                'shrink-0',
-                current ? 'text-text-body!' : 'text-assistant-signal-attention!',
-              ]"
-              data-test="assistant-history-row-draft"
-              >{{ t("assistant.history.draftTag") }}</OText
-            >
-            <OText
-              v-if="!pending && !status"
-              variant="meta"
-              as="span"
-              :class="[
-                'group-hover/row:text-text-body! shrink-0 text-end tabular-nums',
-                compact ? COMPACT_TRAIL_CLASS : 'w-12',
-                current && 'text-text-body!',
-              ]"
-              data-test="assistant-history-row-time"
-              >{{ time }}</OText
-            >
+            </template>
           </span>
         </OButton>
       </template>
@@ -213,48 +151,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OContextMenuItem>
       </template>
     </OContextMenu>
-    <!-- The menu mounts once the row is pointed at or focused; a long list stays light until then. -->
-    <AssistantIconButton
-      v-if="!renaming && actions.length && !armed"
-      :label="t('assistant.history.rowMenu', { title: raw(String(row.title)) })"
-      :icon="assistantGlyph.more"
-      :disabled="!!pending"
-      :disabled-reason="pending ? pendingText : undefined"
-      no-tooltip
-      :class="[KEBAB_CLASS, compact && COMPACT_KEBAB_CLASS]"
-      data-test="assistant-history-row-menu"
-      @click="openMenuSoon"
-    />
-    <ODropdown
-      v-else-if="!renaming && actions.length"
-      v-model:open="menuOpen"
-      align="end"
-      privacy="mask"
+    <div
+      v-if="!renaming && actions.length"
+      :class="[
+        'flex shrink-0 items-center gap-0.5',
+        'bg-surface-subtle absolute inset-y-0 max-md:static max-md:bg-transparent pointer-coarse:static pointer-coarse:bg-transparent',
+        compact ? 'end-2' : 'end-1',
+        REVEAL_CLASS,
+        menuOpen && 'opacity-100',
+      ]"
+      data-test="assistant-history-row-actions"
     >
-      <template #trigger>
-        <AssistantIconButton
-          ref="kebab"
-          :label="t('assistant.history.rowMenu', { title: raw(String(row.title)) })"
-          :icon="assistantGlyph.more"
-          :disabled="!!pending"
-          :disabled-reason="pending ? pendingText : undefined"
-          no-tooltip
-          :class="[KEBAB_CLASS, compact && COMPACT_KEBAB_CLASS]"
-          data-test="assistant-history-row-menu"
-        />
-      </template>
-      <template v-for="action in actions" :key="action.id">
-        <ODropdownSeparator v-if="isDestructive(action.id) && actions.length > 1" />
-        <ODropdownItem
-          :icon-left="action.icon"
-          :variant="isDestructive(action.id) ? 'destructive' : 'default'"
-          :data-test="`assistant-history-row-${action.id}`"
-          @select="run(action.id)"
-        >
-          {{ action.label }}
-        </ODropdownItem>
-      </template>
-    </ODropdown>
+      <AssistantIconButton
+        v-if="canPin"
+        :label="pinLabel"
+        :icon="assistantGlyph.pin"
+        :disabled="!!pending"
+        :tabindex="tabbable ? undefined : -1"
+        no-tooltip
+        :class="['size-6! max-md:hidden pointer-coarse:hidden', row.pinned && 'text-text-heading!']"
+        data-test="assistant-history-row-pin-toggle"
+        @click="run('pin')"
+      />
+      <!-- The menu mounts once the row is pointed at or focused; a long list stays light until then. -->
+      <AssistantIconButton
+        v-if="!armed"
+        :label="t('assistant.history.rowMenu', { title: raw(String(row.title)) })"
+        :icon="assistantGlyph.moreHoriz"
+        :disabled="!!pending"
+        :disabled-reason="pending ? pendingText : undefined"
+        :tabindex="tabbable ? undefined : -1"
+        no-tooltip
+        class="size-6!"
+        data-test="assistant-history-row-menu"
+        @click="openMenuSoon"
+      />
+      <ODropdown v-else v-model:open="menuOpen" align="start" privacy="mask">
+        <template #trigger>
+          <AssistantIconButton
+            ref="kebab"
+            :label="t('assistant.history.rowMenu', { title: raw(String(row.title)) })"
+            :icon="assistantGlyph.moreHoriz"
+            :disabled="!!pending"
+            :disabled-reason="pending ? pendingText : undefined"
+            :tabindex="tabbable ? undefined : -1"
+            no-tooltip
+            class="size-6!"
+            data-test="assistant-history-row-menu"
+          />
+        </template>
+        <template v-for="action in actions" :key="action.id">
+          <ODropdownSeparator v-if="isDestructive(action.id) && actions.length > 1" />
+          <ODropdownItem
+            :icon-left="action.icon"
+            :variant="isDestructive(action.id) ? 'destructive' : 'default'"
+            :data-test="`assistant-history-row-${action.id}`"
+            @select="run(action.id)"
+          >
+            {{ action.label }}
+          </ODropdownItem>
+        </template>
+      </ODropdown>
+    </div>
   </component>
 </template>
 
@@ -277,8 +235,6 @@ export interface AssistantHistoryRowProps {
   now?: number;
   /** Another org's chat: the org is its second line, and it never opens in place (PO B51). */
   org?: string | null;
-  /** The agent's glyph; only with two or more agents, then on every row. */
-  agentIcon?: IconName | null;
   /** How the owner shared the chat, when a live link points at it; the row alone does not know. */
   sharedAs?: "org" | "public" | null;
   pending: HistoryPending | null;
@@ -292,28 +248,32 @@ export interface AssistantHistoryRowProps {
   timezone?: string;
   /** `div` inside a virtual list, which names it a list item itself. */
   tag?: "li" | "div";
-  /** One-line row for a narrow rail: every row marks its status, and the menu covers the time while shown. */
+  /** One-line row for a narrow rail. */
   compact?: boolean;
-  /** The row sits under a section that names its status, so only screen readers get the word. */
-  quietStatus?: boolean;
   /** A saved chat holding an unsent draft, which the row alone cannot see. */
   drafted?: boolean;
+  /** Share shows only where a chat can really be shared. */
+  shareable?: boolean;
 }
 
 type RowAction = "stop" | "rename" | "pin" | "share" | "export" | "delete" | "deleteDraft";
 
 const MAX_TITLE = 200;
 const COUNTER_FROM = 180;
-const KEBAB_CLASS = [
-  "shrink-0 transition-opacity motion-reduce:transition-none",
-  "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
-  "group-data-[current]/row:opacity-100",
-  "max-md:opacity-100 pointer-coarse:opacity-100",
+// Hover, focus, the open chat and an open menu show the row's actions; touch always shows them.
+const REVEAL_CLASS = [
+  "transition-opacity motion-reduce:transition-none",
+  "opacity-0 group-hover/row:opacity-100 group-focus-within/row:opacity-100",
+  "group-data-[current]/row:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100",
 ];
-const COMPACT_KEBAB_CLASS = "size-6! group-focus-within/row:opacity-100";
-const COMPACT_TRAIL_CLASS = "w-10 text-end";
-const CURRENT_CLASS =
-  "bg-surface-subtle before:bg-assistant-primary before:absolute before:inset-y-1.5 before:start-0 before:w-0.5";
+// The controls overlay the row's end only on a wide fine-pointer list; the title ends before them there.
+const RESERVE_CLASS = {
+  pin: "md:pointer-fine:group-hover/row:pe-14! md:pointer-fine:group-focus-within/row:pe-14! md:pointer-fine:group-data-[current]/row:pe-14! md:pointer-fine:group-data-[menu-open]/row:pe-14!",
+  menu: "md:pointer-fine:group-hover/row:pe-8! md:pointer-fine:group-focus-within/row:pe-8! md:pointer-fine:group-data-[current]/row:pe-8! md:pointer-fine:group-data-[menu-open]/row:pe-8!",
+};
+// The status light and draft tag give way to the actions, which sit over the row's end.
+const TRAIL_HIDE_CLASS =
+  "group-hover/row:invisible group-focus-within/row:invisible group-data-[current]/row:invisible group-data-[menu-open]/row:invisible max-md:visible! pointer-coarse:visible!";
 </script>
 
 <script setup lang="ts">
@@ -324,7 +284,6 @@ import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatus
 import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -336,9 +295,8 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { formatRelativeCompact } from "@/utils/formatters";
 
-import { chatStatusClass, chatStatusOf, chatStatusWord, editableTitle } from "./chatStatus";
+import { chatStatusOf, chatStatusWord, editableTitle } from "./chatStatus";
 
 // The Threads board's lights; a draft is at rest, so it has none.
 const STATUS_SIGNALS: Partial<Record<ChatStatus, AssistantSignal>> = {
@@ -353,14 +311,13 @@ const props = withDefaults(defineProps<AssistantHistoryRowProps>(), {
   expiresAt: null,
   now: undefined,
   org: null,
-  agentIcon: null,
   sharedAs: null,
   readonly: false,
   timezone: undefined,
   tag: "li",
   compact: false,
-  quietStatus: false,
   drafted: false,
+  shareable: true,
 });
 
 const emit = defineEmits<{
@@ -388,7 +345,6 @@ const kebab = ref<InstanceType<typeof AssistantIconButton> | null>(null);
 const renaming = ref(false);
 const armed = ref(false);
 const menuOpen = ref(false);
-const chosen = ref(false);
 const draft = ref("");
 let cancelled = false;
 
@@ -402,8 +358,6 @@ const signal = computed<AssistantSignal | null>(() =>
 const pendingText = computed(() =>
   props.pending ? t(`assistant.history.pending.${props.pending}`) : undefined,
 );
-const time = computed(() => formatRelativeCompact(props.row.updatedAt, props.now));
-const fullTitle = computed(() => raw(String(props.row.title)));
 const counter = computed(() => t("assistant.thread.titleCounter", { count: draft.value.length }));
 
 // A browser-only row in server mode can still be read and removed, nothing more.
@@ -429,7 +383,8 @@ const actions = computed<RowMenuAction[]>(() => {
   if (!props.readonly && !browserOnly) {
     list.push({ id: "rename", label: t("assistant.history.rename"), icon: assistantGlyph.edit });
     list.push({ id: "pin", label: pinLabel.value, icon: assistantGlyph.pin });
-    list.push({ id: "share", label: t("assistant.share.share"), icon: assistantGlyph.share });
+    if (props.shareable)
+      list.push({ id: "share", label: t("assistant.share.share"), icon: assistantGlyph.share });
   }
   list.push({
     id: "export",
@@ -444,6 +399,8 @@ const actions = computed<RowMenuAction[]>(() => {
     });
   return list;
 });
+
+const canPin = computed(() => actions.value.some((action) => action.id === "pin"));
 
 const pinLabel = computed(() => {
   const local = !props.serverPins;
@@ -472,12 +429,10 @@ async function openMenuSoon(): Promise<void> {
 
 function choose(): void {
   if (props.org) return;
-  chosen.value = true;
   emit("open", props.row.sid);
 }
 
 function onRowKey(event: KeyboardEvent): void {
-  if (event.key === "Enter" || event.key === " ") chosen.value = true;
   emit("navigate", event);
 }
 

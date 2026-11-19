@@ -657,6 +657,8 @@ function reduceText(
       state.streamingMsg += "\n\n";
       state.textSegment += "\n\n";
     }
+  } else if (state.textSegment === "" && state.streamingMsg && !state.streamingMsg.endsWith("\n")) {
+    state.streamingMsg += "\n\n";
   }
 
   state.streamingMsg += content;
@@ -783,8 +785,7 @@ function reduceTyped(state: StreamState, data: any, ctx: ReducerCtx): StreamEffe
       return [];
     case "step":
       reduceExtras(extras, data);
-      typedStep(state, data);
-      return [];
+      return typedStep(state, data, live);
     case "navigation_action":
       return typedLink(state, data, live);
     case "findings":
@@ -966,16 +967,19 @@ function appendFooter(state: StreamState, data: any, extras: StreamExtras): void
 }
 
 // A lifecycle `step` frame keys its row on the top-level `call_id` (params as the fallback) and says when it ended.
-function typedStep(state: StreamState, data: any): void {
+function typedStep(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
   const fromParams = data.params?.call_id;
   const callId = boundedId(
     data.call_id ?? (typeof fromParams === "string" ? fromParams : undefined) ?? data.id,
   );
-  if (!callId) return;
+  if (!callId) return [];
   const next: StepState = STEP_STATES.has(data.state) ? data.state : "running";
   const block = stepFor(state, callId, "");
   if (!block) {
-    if (stepCount(state) >= MAX_STEPS) return;
+    if (stepCount(state) >= MAX_STEPS) return [];
+    // A step row ends the text before it, as a tool_call does, so the next delta starts a fresh block.
+    const effects: StreamEffect[] = [];
+    finalizeTextBlock(state, ctx, effects);
     appendBlock(state, {
       type: "tool_call",
       tool: String(typeof data.label === "string" ? data.label : (data.kind ?? "")).slice(
@@ -986,12 +990,13 @@ function typedStep(state: StreamState, data: any): void {
       call_id: callId,
       stepState: next,
     });
-    return;
+    return effects;
   }
   // An ended step never goes back to running, and a result already written wins over the lifecycle frame.
-  if (next === "running" || block.stepState === "done" || block.stepState === "failed") return;
+  if (next === "running" || block.stepState === "done" || block.stepState === "failed") return [];
   block.stepState = next;
   if (next === "failed") block.success = false;
+  return [];
 }
 
 // A navigation is offered as a link card, never pushed; the model's label is never kept.

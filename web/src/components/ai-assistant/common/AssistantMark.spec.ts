@@ -23,20 +23,25 @@ import { agentGlyph } from "./glyphs";
 const agent = { glyph: agentGlyph.sre };
 
 describe("AssistantMark", () => {
-  it("draws the product as the logo, light and dark, with no tile", () => {
+  it("draws the product and its default agent as the spark, with no tile", () => {
     for (const props of [{}, { glyph: agentGlyph["o2-ai"] }]) {
       const mark = mount(AssistantMark, { props }).get('[data-test="assistant-mark"]');
-      expect(mark.attributes("data-logo")).toBe("");
+      expect(mark.attributes("data-spark")).toBe("");
       expect(mark.attributes("aria-hidden")).toBe("true");
-      expect(mark.findAll("img").map((img) => img.attributes("alt"))).toEqual(["", ""]);
+      expect(mark.find('[data-test="assistant-spark"]').attributes("data-tone")).toBe("brand");
+      expect(mark.find("img").exists()).toBe(false);
       expect(mark.classes()).not.toContain("bg-assistant-mark-bg");
-      expect(mark.find("svg, [data-test=o-icon]").exists()).toBe(false);
     }
+  });
+
+  it("turns the spark while a turn runs", () => {
+    const mark = mount(AssistantMark, { props: { working: true } });
+    expect(mark.find('[data-test="assistant-spark-working"]').exists()).toBe(true);
   });
 
   it("draws another agent as a decorative rounded square, never a circle", () => {
     const mark = mount(AssistantMark, { props: agent }).get('[data-test="assistant-mark"]');
-    expect(mark.attributes("data-logo")).toBeUndefined();
+    expect(mark.attributes("data-spark")).toBeUndefined();
     expect(mark.attributes("aria-hidden")).toBe("true");
     expect(mark.classes()).toContain("rounded-default");
     expect(mark.classes()).not.toContain("rounded-full");
@@ -56,11 +61,14 @@ describe("AssistantMark", () => {
     expect(mark.attributes("data-size")).toBe(size);
   });
 
-  it("mutes the glyph for gate states and never uses the accent", () => {
+  it("mutes the spark for gate states, with no gradient and never the accent", () => {
     const mark = mount(AssistantMark, { props: { muted: true } }).get(
       '[data-test="assistant-mark"]',
     );
-    expect(mark.classes()).toContain("text-text-muted");
+    const spark = mark.get('[data-test="assistant-spark"]');
+    expect(spark.attributes("data-tone")).toBe("muted");
+    expect(spark.classes()).toContain("text-text-muted");
+    expect(spark.find("linearGradient").exists()).toBe(false);
     expect(mark.html()).not.toContain("ai-accent");
   });
 

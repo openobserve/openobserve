@@ -30,7 +30,6 @@ const mountComposer = (props: Record<string, unknown> = {}) =>
   mount(RcaSteerComposer, {
     props: {
       waitingInput: false,
-      authorEmail: "a.rao@acme.io",
       send: okSend(),
       runId: "run-2",
       ...props,
@@ -45,12 +44,6 @@ const textarea = (wrapper: VueWrapper) => wrapper.find("textarea");
 describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
   let wrapper: VueWrapper;
   afterEach(() => wrapper?.unmount());
-
-  const openSees = async (wrapper: VueWrapper) => {
-    await byTest(wrapper, "assistant-context-sees").trigger("click");
-    await flushPromises();
-    return (id: string) => document.body.querySelector(`[data-test="${id}"]`);
-  };
 
   it("K6: the same composer frame, steer placeholder and Investigator pill, no helper lines", () => {
     wrapper = mountComposer();
@@ -83,7 +76,7 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
     );
   });
 
-  it("B-composer-9: a chip that does not fit on the one row is hidden whole, never cut under ⓘ", async () => {
+  it("B-composer-9: a chip that does not fit on the one row is hidden whole, never cut at the box edge", async () => {
     const top = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (
       this: HTMLElement,
     ) {
@@ -122,23 +115,12 @@ describe("RcaSteerComposer (04 SG37, §3 frames F and D)", () => {
     height.mockRestore();
   });
 
-  it("lists the incident and the sender under the (i) in the corner, with no notes", async () => {
+  it("draws no context button in the corner; the box holds only the field and its bar", () => {
     wrapper = mountComposer();
-    const corner = byTest(wrapper, "assistant-composer-corner");
-    expect(corner.find('[data-test="assistant-context-sees"]').exists()).toBe(true);
-    expect(byTest(wrapper, "assistant-composer-bar-left").text()).toBe("");
-    const find = await openSees(wrapper);
 
-    expect(find("assistant-context-sees-popover")?.querySelector("h2")?.textContent?.trim()).toBe(
-      "Default context",
-    );
-    const rows = [
-      ...document.body.querySelectorAll('[data-test="assistant-context-sees-row"]'),
-    ].map((row) => row.getAttribute("data-field"));
-    expect(rows).toEqual(["incident", "author"]);
-    expect(find("assistant-context-sees-page")?.textContent).toContain("a.rao@acme.io");
-    expect(find("rca-steer-sending-as")?.textContent?.trim()).toBe("Visible on this incident");
-    expect(find("assistant-context-sees-popover")?.querySelectorAll("p")).toHaveLength(0);
+    expect(byTest(wrapper, "assistant-composer-corner").exists()).toBe(false);
+    expect(byTest(wrapper, "assistant-context-sees").exists()).toBe(false);
+    expect(byTest(wrapper, "assistant-composer-bar-left").text()).toBe("");
   });
 
   it("paused: the strip says the agent asks, with the full question in title=", async () => {

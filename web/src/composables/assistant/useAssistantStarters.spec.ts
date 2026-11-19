@@ -161,7 +161,7 @@ describe("useAssistantStarters", () => {
     expect(labels(starters)).toEqual([
       "Why did errors spike in `default` in the last 15 min?",
       "Summarise what's in `default` right now",
-      "What can you do here?",
+      "What can you do?",
     ]);
     expect(starters.value[0].prompt).toBe(starters.value[0].label);
     expect(starters.value[0].chips.map((c) => c.kind)).toEqual(["time", "stream"]);
@@ -217,7 +217,7 @@ describe("useAssistantStarters", () => {
     expect(labels(starters)).toEqual([
       "Which alerts fired most in the past 24 hours?",
       "Draft an alert for errors",
-      "What can you do here?",
+      "What can you do?",
     ]);
   });
 
@@ -242,7 +242,7 @@ describe("useAssistantStarters", () => {
     await flushPromises();
     expect(labels(dashboard.starters)).toEqual([
       "What needs attention right now?",
-      "What can you do here?",
+      "What can you do?",
     ]);
     expect(dashboard.starters.value.every((starter) => starter.home === true)).toBe(true);
   });
@@ -250,7 +250,7 @@ describe("useAssistantStarters", () => {
   it("offers learn and org health off the page table, never the removed alerts starter", async () => {
     const { starters } = setup("assistant", { currentPage: "assistant" });
     await flushPromises();
-    expect(labels(starters)).toEqual(["What can you do here?", "What needs attention right now?"]);
+    expect(labels(starters)).toEqual(["What can you do?", "What needs attention right now?"]);
   });
 
   it("grounds Home on streams the org has, skips internal ones and stages the hour it names", async () => {

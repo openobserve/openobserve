@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="askAi"
             >
               <template #icon-left>
-                <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+                <AssistantSpark :size="16" />
               </template>
               {{ t("traces.latencyHeatmap.selection.askAi") }}
             </ODropdownItem>
@@ -195,7 +195,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, ref, shallowRef, watch
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useTheme from "@/composables/useTheme";
-import { useAiIcon } from "@/composables/useAiIcon";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import searchService from "@/services/search";
 import PanelBar from "@/components/common/PanelBar.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
@@ -269,7 +269,6 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const store = useStore();
 const { isDark } = useTheme();
-const { aiIconSrc } = useAiIcon();
 
 const MINUTE_US = 60 * 1_000_000;
 // ECharts canvas sizes are pixel numbers with no CSS cascade, and no chart size tokens exist.

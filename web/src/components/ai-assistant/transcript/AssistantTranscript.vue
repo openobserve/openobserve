@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </section>
     <div
       v-if="jumpShown"
-      class="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center"
+      class="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center max-md:justify-end max-md:pe-3"
       data-test="assistant-transcript-jump-row"
     >
       <OButton

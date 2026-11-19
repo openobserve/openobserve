@@ -54,6 +54,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-if="stripShown" #strip>
           <AssistantComposerStrip :notice="notice" :sentence-id="noticeId" @action="onNoticeAction">
+            <span
+              v-if="storageBlocked && chipsShown"
+              class="inline-flex shrink-0 items-center pe-1"
+              data-test="assistant-composer-storage-hint"
+            >
+              <OIcon :name="assistantGlyph.info" size="xs" class="text-text-secondary" />
+              <span :id="storageHintId" class="sr-only">{{
+                t("assistant.client.storageBlocked")
+              }}</span>
+              <OTooltip :content="t('assistant.client.storageBlocked')" />
+            </span>
             <slot v-if="!replying" name="chips" />
             <template #link-askAdmin>
               <AssistantAskAdminPopover kind="access" :org="org">
@@ -70,15 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </AssistantAskAdminPopover>
             </template>
           </AssistantComposerStrip>
-        </template>
-        <template v-if="!inertKind && !accessLost" #corner>
-          <AssistantContextSeesPopover :sid="liveSid">
-            <template v-if="storageBlocked" #detail>
-              <OText variant="meta" as="p" data-test="assistant-composer-storage-blocked">
-                {{ t("assistant.client.storageBlocked") }}
-              </OText>
-            </template>
-          </AssistantContextSeesPopover>
         </template>
         <template #bar>
           <AssistantComposerBottomRow
@@ -117,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('assistant.turn.stopLabel')"
                 :icon="assistantGlyph.stop"
                 :loading="state === 'stopping'"
+                :class="SEND_ACTION_CLASS"
                 data-test="assistant-stop"
                 @click="stop"
               />
@@ -222,7 +225,6 @@ import AssistantAgentPicker from "@/components/ai-assistant/agents/AssistantAgen
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { billingHrefOf } from "@/components/ai-assistant/credits/AssistantCreditManage.vue";
-import AssistantContextSeesPopover from "@/components/ai-assistant/context/AssistantContextSeesPopover.vue";
 import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
@@ -257,9 +259,10 @@ import {
 } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OText from "@/lib/core/Typography/OText.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { MAX_IMAGE_SIZE_BYTES } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -330,6 +333,7 @@ const width = useComposerWidth(root);
 const uid = useId();
 const listboxId = `assistant-mention-${uid}`;
 const noticeId = `assistant-composer-notice-${uid}`;
+const storageHintId = `assistant-composer-storage-${uid}`;
 
 // View state only; every draft write is a store action.
 const blockedLine = ref<I18nText | null>(null);
@@ -839,7 +843,7 @@ const quietNotice = computed<ComposerNotice | null>(() => {
   ]);
 });
 
-// The ⓘ always carries this line; the strip says it too only when no chips need the room.
+// The strip says this only when no chips need the room; with chips, an info mark carries it.
 const storageNotice = computed<ComposerNotice | null>(() =>
   storageBlocked.value && !chipsShown.value
     ? sentenceNotice("storage", t("assistant.client.storageBlocked"), "info")
@@ -865,7 +869,13 @@ const textboxAttrs = computed(() => ({
   "aria-label": t("assistant.composer.name", { product: agentLabel.value }),
   "aria-multiline": "true",
   "aria-placeholder": placeholder.value,
-  "aria-describedby": notice.value ? noticeId : undefined,
+  "aria-describedby":
+    [
+      notice.value && noticeId,
+      storageBlocked.value && chipsShown.value && !notice.value && storageHintId,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined,
   "aria-disabled": inertKind.value ? "true" : undefined,
   "aria-readonly": inertKind.value ? "true" : undefined,
   // A textarea cannot be a combobox, so there is no `aria-expanded`; the menu's state is spoken instead.
@@ -1263,6 +1273,16 @@ function prefill(payload: { text: string; chips: ContextChip[]; homeStarter?: bo
   }
   store.stage(id, { ...payload, mode: text.value.trim() ? "append" : "replace" });
   void nextTick(() => focusInput("end"));
+}
+
+// A starter never discards a typed draft (it only refocuses it); else it goes through every check Send makes.
+async function sendPrompt(prompt: string): Promise<void> {
+  if (hasContent.value) return focusInput("end");
+  const id = ensureSid();
+  if (!id) return;
+  store.stage(id, { text: prompt, chips: [], mode: "replace" });
+  await nextTick();
+  trySend();
 }
 
 function resolvePrefill(choice: "replace" | "append" | null): void {
@@ -1757,6 +1777,7 @@ onBeforeUnmount(() => {
 defineExpose({
   focusInput,
   prefill,
+  sendPrompt,
   closeOverlays: () => closeMention(),
 });
 </script>

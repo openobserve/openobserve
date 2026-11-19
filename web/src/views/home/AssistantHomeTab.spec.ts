@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => ({
   railMounted: vi.fn(),
   focusAsk: vi.fn(),
   fill: vi.fn(),
+  send: vi.fn(),
+  push: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("./useAgentHomeState", async () => {
@@ -57,13 +59,35 @@ vi.mock("@/composables/assistant", () => ({
   },
 }));
 vi.mock("@/services/rca_runs_org", () => ({ listOrgRcaRuns: mocks.listOrgRcaRuns }));
-vi.mock("vue-router", () => ({ useRoute: () => ({ query: mocks.query }) }));
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ query: mocks.query }),
+  useRouter: () => ({ push: mocks.push }),
+}));
 vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
-    props: ["layout", "pageRange"],
-    methods: { focusAsk: () => mocks.focusAsk(), fill: (prompt: string) => mocks.fill(prompt) },
-    template: '<div data-test="launcher-stub" :data-layout="layout" />',
+    props: ["pageRange"],
+    methods: {
+      focusAsk: () => mocks.focusAsk(),
+      fill: (prompt: string) => mocks.fill(prompt),
+      send: (prompt: string) => mocks.send(prompt),
+    },
+    template: '<div data-test="launcher-stub" />',
+  },
+}));
+vi.mock("@/components/ai-assistant/welcome/AssistantNewChatBelow.vue", () => ({
+  default: {
+    name: "AssistantNewChatBelow",
+    emits: ["ask", "open-chat", "view-all"],
+    template: '<div data-test="new-chat-below-stub" />',
+  },
+}));
+vi.mock("@/components/ai-assistant/history/AssistantChatSearch.vue", () => ({
+  default: {
+    name: "AssistantChatSearch",
+    props: ["open", "mode"],
+    emits: ["update:open"],
+    template: '<div data-test="chat-search-stub" :data-open="String(open)" :data-mode="mode" />',
   },
 }));
 vi.mock("./AgentHomeAskNote.vue", () => ({
@@ -98,6 +122,8 @@ describe("AssistantHomeTab", () => {
     mocks.railMounted.mockReset();
     mocks.focusAsk.mockReset();
     mocks.fill.mockReset();
+    mocks.send.mockReset();
+    mocks.push.mockClear();
     localStorage.clear();
     store.state.currentuser.role = "admin";
   });
@@ -105,7 +131,7 @@ describe("AssistantHomeTab", () => {
   it("with the agent on, shows the greeting, then the Ask box, in one centred column", async () => {
     const wrapper = mountTab();
     await flushPromises();
-    expect(wrapper.find('[data-test="launcher-stub"][data-layout="overview"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="launcher-stub"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="ask-note-stub"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="agent-home-greeting-answers"]').exists()).toBe(false);
     const main = wrapper.get('[data-test="assistant-home-main"]').element;
@@ -135,23 +161,43 @@ describe("AssistantHomeTab", () => {
     }
   });
 
-  it("lists main's capability cards and prompt chips under the Ask box, and a pick fills the box", async () => {
+  it("puts recent chats or the first-chat starter right under the Ask box, in its column", async () => {
     const wrapper = mountTab();
     await flushPromises();
-    const examples = wrapper.get('[data-test="assistant-home-examples"]');
-    expect(examples.classes()).toEqual(expect.arrayContaining(["mx-auto", "max-w-174"]));
+    const below = wrapper.getComponent({ name: "AssistantNewChatBelow" });
+    expect(below.classes()).toEqual(expect.arrayContaining(["mx-auto", "max-w-174"]));
     expect(wrapper.get('[data-test="launcher-stub"]').element.nextElementSibling).toBe(
-      examples.element,
+      below.element,
     );
-    expect(examples.findAll('[data-test^="assistant-home-capability-"]')).toHaveLength(4);
-    expect(examples.findAll(".suggestion-chip")).toHaveLength(6);
-    await examples.get('[data-test="assistant-home-capability-query"]').trigger("click");
-    expect(mocks.fill).toHaveBeenCalledWith("Help me write a query");
-    await examples.get(".suggestion-chip").trigger("click");
-    expect(mocks.fill).toHaveBeenLastCalledWith("Write VRL to parse JSON from my nginx logs");
+    expect(wrapper.find('[data-test="assistant-home-examples"]').exists()).toBe(false);
+    below.vm.$emit("ask", "What can you do?");
+    expect(mocks.send).toHaveBeenCalledWith("What can you do?");
+    below.vm.$emit("open-chat", "s-1");
+    expect(mocks.push).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "assistant", params: { chatId: "s-1" } }),
+    );
   });
 
-  it("shows no examples while the gate loads or when the agent cannot answer", async () => {
+  it("View all opens the chat search dialog on every screen size, keeping the page in place", async () => {
+    for (const wide of [true, false]) {
+      set(mocks.lgUp, wide);
+      const wrapper = mountTab();
+      await flushPromises();
+      const search = () => wrapper.get('[data-test="chat-search-stub"]');
+      expect(search().attributes("data-open")).toBe("false");
+      expect(search().attributes("data-mode")).toBe("rail");
+      wrapper.getComponent({ name: "AssistantNewChatBelow" }).vm.$emit("view-all");
+      await flushPromises();
+      expect(search().attributes("data-open")).toBe("true");
+      expect(wrapper.find('[data-test="assistant-home-tab"]').exists()).toBe(true);
+      wrapper.getComponent({ name: "AssistantChatSearch" }).vm.$emit("update:open", false);
+      await flushPromises();
+      expect(search().attributes("data-open")).toBe("false");
+      wrapper.unmount();
+    }
+  });
+
+  it("offers nothing under the box while the gate loads or when the agent cannot answer", async () => {
     for (const [state, reason] of [
       ["loading", null],
       ["budget", "budget"],
@@ -161,7 +207,7 @@ describe("AssistantHomeTab", () => {
       set(mocks.offReason, reason);
       const wrapper = mountTab();
       await flushPromises();
-      expect(wrapper.find('[data-test="assistant-home-examples"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "AssistantNewChatBelow" }).exists()).toBe(false);
       wrapper.unmount();
     }
   });
@@ -243,7 +289,7 @@ describe("AssistantHomeTab", () => {
       expect(main.classes()).toEqual(
         expect.arrayContaining(["flex", "flex-col", "justify-center-safe", "max-md:justify-start"]),
       );
-      const ask = wrapper.get('[data-test="launcher-stub"][data-layout="overview"]');
+      const ask = wrapper.get('[data-test="launcher-stub"]');
       expect(ask.element.previousElementSibling?.getAttribute("data-test")).toBe(
         "agent-home-greeting",
       );
@@ -322,8 +368,7 @@ describe("AssistantHomeTab", () => {
   it("draws no capability cards under Ask and no dashboards section", async () => {
     const wide = mountTab();
     await flushPromises();
-    const ask = (w: ReturnType<typeof mountTab>) =>
-      w.get('[data-test="launcher-stub"][data-layout="overview"]');
+    const ask = (w: ReturnType<typeof mountTab>) => w.get('[data-test="launcher-stub"]');
     expect(ask(wide).exists()).toBe(true);
     expect(wide.find(".capability-card").exists()).toBe(false);
     expect(wide.find('[data-test="assistant-launcher-capabilities"]').exists()).toBe(false);

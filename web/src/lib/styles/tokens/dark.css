@@ -1053,6 +1053,9 @@
 :root.dark,
 .dark :root,
 .dark {
+  --color-assistant-spark-from: #5bb2f6;
+  --color-assistant-spark-via: #8c95f0;
+  --color-assistant-spark-to: #ff7866;
   --color-assistant-link: var(--color-primary-400);
   --color-assistant-link-hover: var(--color-primary-300);
   --color-assistant-primary: var(--color-primary-600);

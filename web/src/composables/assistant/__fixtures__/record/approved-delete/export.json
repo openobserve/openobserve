@@ -7,7 +7,7 @@
   },
   {
     "role": "assistant",
-    "content": "I found **checkout-latency-old**. Deleting it needs your approval.Done — the alert was deleted.",
+    "content": "I found **checkout-latency-old**. Deleting it needs your approval.\n\nDone — the alert was deleted.",
     "contentBlocks": [
       {
         "type": "tool_call",

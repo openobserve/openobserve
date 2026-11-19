@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ShareView } from "@/services/ai_chat_share";
 
-import { activeShareUrl, answerAnchor, answerLink, answerTurnOf } from "./answerLink";
+import { activeShare, answerAnchor, answerLink, answerTurnOf } from "./answerLink";
 
 describe("answerLink", () => {
   it("links to the thread on Home with the answer anchor", () => {
@@ -57,7 +57,7 @@ describe("answerTurnOf", () => {
   });
 });
 
-describe("activeShareUrl (WT-03)", () => {
+describe("activeShare (WT-03)", () => {
   const share = (over: Partial<ShareView>): ShareView => ({
     id: "s",
     url_path: "/web/ai/shared/tok",
@@ -78,7 +78,7 @@ describe("activeShareUrl (WT-03)", () => {
   it("skips expired, linkless and stale-snapshot shares", () => {
     const now = 2_000_000;
     expect(
-      activeShareUrl(
+      activeShare(
         [
           share({ url_path: "/web/ai/shared/expired", expires_at: now - 1 }),
           share({ url_path: undefined }),
@@ -87,9 +87,9 @@ describe("activeShareUrl (WT-03)", () => {
         ],
         9,
         now,
-      ),
-    ).toMatch(/\/ai\/shared\/ok$/);
-    expect(activeShareUrl([share({ expires_at: now - 1 })], 9, now)).toBeNull();
-    expect(activeShareUrl(undefined, null)).toBeNull();
+      )?.url_path,
+    ).toBe("/web/ai/shared/ok");
+    expect(activeShare([share({ expires_at: now - 1 })], 9, now)).toBeNull();
+    expect(activeShare(undefined, null)).toBeNull();
   });
 });

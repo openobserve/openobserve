@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       'relative flex shrink-0 items-center gap-1',
       isLast
         ? ''
-        : 'opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100 max-md:opacity-100 pointer-coarse:opacity-100',
+        : 'opacity-0 group-focus-within/message:opacity-100 group-hover/message:opacity-100 pointer-coarse:opacity-100',
+      !isLast && variant === 'answer' && 'max-md:opacity-100',
     ]"
     :data-variant="variant"
     data-test="assistant-msg-actions"
@@ -30,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AssistantIconButton
       :label="copied ? t('common.copied') : copyName"
       :icon="copied ? assistantGlyph.copied : assistantGlyph.copy"
+      :class="variant === 'prompt' && PROMPT_BUTTON"
       :data-test="variant === 'prompt' ? 'assistant-msg-copy-prompt' : 'assistant-msg-copy-answer'"
       @click="copyText"
     />
@@ -37,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="variant === 'prompt' && editable"
       :label="t('assistant.message.edit')"
       :icon="assistantGlyph.edit"
+      :class="PROMPT_BUTTON"
       data-test="assistant-msg-edit"
       @click="editPrompt"
     />
@@ -45,8 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="turnId"
         :label="t('assistant.message.shareAnswer')"
         :icon="assistantGlyph.shareLink"
-        :done="linkCopied ? t('assistant.message.linkCopied') : undefined"
-        confirms
         data-test="assistant-msg-share-link"
         @click="copyLink"
       />
@@ -111,6 +112,11 @@ export interface AssistantMessageActionsProps {
 
 /** How long a copy button shows its check (EB-09 AC 5). */
 export const COPIED_MS = 2_000;
+/** Long enough to read who can open the link, when no room beside the button takes the bubble. */
+const LINK_TOAST_MS = 3_500;
+// A narrow window with a mouse keeps the bubble's buttons small; only touch needs the larger target.
+const PROMPT_BUTTON =
+  "pointer-fine:max-md:min-h-0! pointer-fine:max-md:min-w-0! text-text-secondary!";
 </script>
 
 <script setup lang="ts">
@@ -119,7 +125,9 @@ import { computed, inject, onBeforeUnmount, ref } from "vue";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { announceComposer } from "@/components/ai-assistant/composer/composerUi";
+import { shareLinkOf } from "@/components/ai-assistant/share/chatShare";
 import {
+  hostOrgName,
   useAssistantCapability,
   useAssistantSession,
   useAssistantStore,
@@ -132,12 +140,15 @@ import {
   useTurnLock,
 } from "@/composables/assistant/pure";
 import { queryClient } from "@/composables/query/queryClient";
+import { confirmCopy } from "@/lib/feedback/Toast/copyConfirm";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import type { ShareView } from "@/services/ai_chat_share";
 import { chatSharesQuery } from "@/services/ai_chat_share.queries";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 
-import { activeShareUrl, answerLink } from "./answerLink";
+import { activeShare, answerLink } from "./answerLink";
 import { markdownToPlainText } from "./markdown";
 import { useBranchChat } from "./useBranchChat";
 
@@ -178,9 +189,7 @@ const copyName = computed(() =>
 );
 
 const copied = ref(false);
-const linkCopied = ref(false);
 let copiedTimer: ReturnType<typeof setTimeout> | null = null;
-let linkTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Each block through the same worker path as its render; a block already rendered answers from cache, synchronously.
 function answerText(): string | Promise<string> {
@@ -210,21 +219,31 @@ async function copyText(): Promise<void> {
   copiedTimer = setTimeout(() => (copied.value = false), COPIED_MS);
 }
 
-async function copyLink(): Promise<void> {
+async function copyLink(event?: MouseEvent): Promise<void> {
   if (!props.turnId) return;
+  const anchor = event?.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   const turnId = footerOf(props.message)?.serverTurnId ?? props.turnId;
   // The cached list only: a network read here would cost the click's clipboard permission.
   const shares = queryClient.getQueryData(chatSharesQuery(org(), props.sid).queryKey);
   const session = view.session.value;
   const lastSeq = session?.record.cachedLastSeq ?? session?.turnMeta.lastSeq ?? null;
-  const shareUrl = activeShareUrl(shares, lastSeq);
+  const share = activeShare(shares, lastSeq);
+  const shareUrl = share ? shareLinkOf(share) : null;
   const link = answerLink({ org: org(), sid: props.sid, turnId, shareUrl });
   const ok = await copyToClipboard(link, t, { silent: true });
   trackAssistant("ai_answer_link", { result: ok ? "copied" : "failed" });
   if (!ok) return void announceComposer(props.sid, t("assistant.client.copyManually"));
-  linkCopied.value = true;
-  if (linkTimer) clearTimeout(linkTimer);
-  linkTimer = setTimeout(() => (linkCopied.value = false), COPIED_MS);
+  const message = linkAudience(share);
+  const toastIt = () => toast({ variant: "success", message, timeout: LINK_TOAST_MS });
+  if (anchor?.isConnected) confirmCopy(anchor, message, toastIt);
+  else toastIt();
+}
+
+// The thread link opens only for its owner; a share link opens for whoever its visibility admits.
+function linkAudience(share: ShareView | null): I18nText {
+  if (!share) return t("assistant.message.linkCopiedPrivate");
+  if (share.visibility === "public") return t("assistant.message.linkCopiedPublic");
+  return t("assistant.message.linkCopiedOrg", { org: raw(hostOrgName(org()) || org()) });
 }
 
 // The shown answer's own server id names its version; a stored record without it names the group and the version shown.
@@ -272,6 +291,5 @@ function findingsText(findings: FindingsData | null | undefined): string[] {
 
 onBeforeUnmount(() => {
   if (copiedTimer) clearTimeout(copiedTimer);
-  if (linkTimer) clearTimeout(linkTimer);
 });
 </script>

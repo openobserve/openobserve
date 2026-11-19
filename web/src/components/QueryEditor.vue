@@ -18,7 +18,7 @@
     >
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
-        <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5 shrink-0" />
+        <AssistantSpark :size="20" />
         <OSpinner variant="dots" size="xs" />
         <span class="flex-1 truncate text-sm">{{
           streamingText || aiStatusText || t("search.analyzingQuery")
@@ -44,7 +44,7 @@
           @keydown.enter="handleAIInputEnter"
         >
           <template #icon-left>
-            <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5" />
+            <AssistantSpark :size="20" />
           </template>
         </OInput>
         <!-- Send Button -->
@@ -130,14 +130,11 @@
         size="icon-toolbar"
         :disabled="props.disableAi"
         @click="onAiToggleClick"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
+        :aria-label="t('search.aiModeIconAlt')"
+        class="rounded-default border-card-glass-border! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
-        <img
-          :src="nlpIcon"
-          :alt="t('search.aiModeIconAlt')"
-          class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
-        />
+        <AssistantSpark :size="16" :muted="props.disableAi" />
         <span
           v-if="!aiAccess.allowed"
           aria-hidden="true"
@@ -160,12 +157,12 @@
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { useTheme } from "@/composables/useTheme";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
+import { getUUIDv7 } from "@/utils/zincutils";
 import { useChatHistory } from "@/composables/useChatHistory";
 import useAiChat from "@/composables/useAiChat";
 import type { ChatMessage } from "@/ts/interfaces/chat";
@@ -266,7 +263,6 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18nTyped();
-const { isDark } = useTheme();
 
 // Language state
 const currentLanguage = ref<Language>(props.defaultLanguage);
@@ -322,12 +318,6 @@ const { saveToHistory } = useChatHistory(
 );
 const currentChatId = ref<number | null>(null);
 const chatMessages = ref<ChatMessage[]>([]);
-
-const nlpIcon = computed(() => {
-  return isDark.value
-    ? getImageURL("images/common/ai_icon_dark.svg")
-    : getImageURL("images/common/ai_icon_gradient.svg");
-});
 
 // Computed: AI input field class based on theme
 const aiInputFieldClass = computed(() => "h-7! flex-1 my-px");

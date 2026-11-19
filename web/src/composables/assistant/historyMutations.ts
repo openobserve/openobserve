@@ -83,10 +83,19 @@ export function createHistoryMutations(ctx: HistoryCtx, list: HistoryList) {
     }
   };
 
+  // Overlapping toggles: the newest request owns the pin; a failure restores the last value that held.
+  const pinRuns = new Map<
+    Sid,
+    { seq: number; inflight: number; pin?: boolean; record?: boolean }
+  >();
   const pin = async (sid: Sid, pinned: boolean): Promise<MutationResult> => {
-    const had = ctx.pins[sid];
-    ctx.pins[sid] = pinned;
     const session = ctx.session(sid);
+    const run = pinRuns.get(sid) ?? { seq: 0, inflight: 0 };
+    if (!run.inflight) Object.assign(run, { pin: ctx.pins[sid], record: session?.record.pinned });
+    const seq = ++run.seq;
+    run.inflight += 1;
+    pinRuns.set(sid, run);
+    ctx.pins[sid] = pinned;
     if (session) session.record.pinned = pinned;
     const onServer = ctx.serverMode() && deps.capability().historyPins === true;
     try {
@@ -94,7 +103,14 @@ export function createHistoryMutations(ctx: HistoryCtx, list: HistoryList) {
         ctx.pending[sid] = "pin";
         await build(pinChatMutation(deps.org() ?? ""), { sid, pinned });
       }
-      await writeCache(sid, ctx, { pinned }, !onServer);
+      Object.assign(run, { pin: pinned, record: pinned });
+      if (run.seq !== seq) return { ok: true };
+      const row = list.api.rows.value.find((candidate) => candidate.sid === sid);
+      const seed = row && {
+        title: String(row.title),
+        timestamp: new Date(row.updatedAt).toISOString(),
+      };
+      await writeCache(sid, ctx, { pinned }, !onServer, seed);
       ctx.announce(pinned ? "assistant.history.pinned" : "assistant.history.unpinned");
       ctx.postChanged(sid, "pin");
       trackAssistant("ai_thread_action", {
@@ -103,13 +119,16 @@ export function createHistoryMutations(ctx: HistoryCtx, list: HistoryList) {
       });
       return { ok: true };
     } catch (err) {
-      if (had === undefined) delete ctx.pins[sid];
-      else ctx.pins[sid] = had;
-      if (session) session.record.pinned = !pinned;
+      if (run.seq === seq) {
+        if (run.pin === undefined) delete ctx.pins[sid];
+        else ctx.pins[sid] = run.pin;
+        if (session && run.record !== undefined) session.record.pinned = run.record;
+      }
       ctx.failToast("assistant.history.pinFailed", () => void pin(sid, pinned));
       return fail(err);
     } finally {
-      if (ctx.pending[sid] === "pin") delete ctx.pending[sid];
+      run.inflight -= 1;
+      if (!run.inflight && ctx.pending[sid] === "pin") delete ctx.pending[sid];
     }
   };
 

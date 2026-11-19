@@ -28,7 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @select="onSelect"
     >
       <template #icon-left>
-        <OIcon :name="glyph" size="sm" :class="glyphClass" />
+        <AssistantSpark v-if="sparkGlyph" :size="16" />
+        <OIcon v-else :name="glyph" size="sm" :class="glyphClass" />
         <OIcon v-if="locked" :name="assistantGlyph.locked" size="xs" class="text-text-secondary" />
       </template>
       <span ref="menuLabel">{{ visibleLabel }}</span>
@@ -83,7 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span></template
           >
         </OTooltip>
-        <OIcon :name="glyph" size="sm" :class="glyphClass" />
+        <AssistantSpark v-if="sparkGlyph" :size="16" />
+        <OIcon v-else :name="glyph" size="sm" :class="glyphClass" />
         <OIcon v-if="locked" :name="assistantGlyph.locked" size="xs" class="text-text-secondary" />
       </template>
       <span class="flex min-w-0 flex-col items-start text-start">
@@ -468,6 +470,7 @@ import { useStore } from "vuex";
 
 import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { announceComposer, noteCap } from "@/components/ai-assistant/composer/composerUi";
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import AssistantGateState, {
@@ -616,6 +619,8 @@ const glyph = computed<IconName>(() => {
 });
 
 const glyphClass = computed(() => (locked.value ? "text-text-secondary" : "text-ai-accent"));
+// The assistant's own door shows its full-colour spark; a locked or task door keeps a one-colour glyph.
+const sparkGlyph = computed(() => glyph.value === assistantGlyph.assistant && !locked.value);
 
 const tooltipLines = computed(() => {
   if (locked.value)

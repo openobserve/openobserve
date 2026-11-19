@@ -13,7 +13,7 @@ test.describe("assistant on Home", () => {
   let state;
 
   const homeUrl = () => `${harness.ENV.appUrl}/?org_identifier=${harness.ENV.org}`;
-  const askBox = () => page().locator('[data-test="assistant-launcher"][data-layout="overview"]');
+  const askBox = () => page().locator('section[data-test="assistant-launcher"]');
   const input = () => askBox().locator('[data-test="assistant-launcher-input-field"]');
   let currentPage;
   const page = () => currentPage;
@@ -45,6 +45,40 @@ test.describe("assistant on Home", () => {
     await expect(page.locator('[data-test="home-full-thread"]')).toBeVisible();
     await expect(assistant.full).toBeVisible();
     await expect(assistant.status()).toBeVisible();
+  });
+
+  test("HOME-04 a returning user sees three recent chats under the Ask box, View all opens the chat search, and a card opens its chat", { tag: ["@mock"] }, async ({ page }) => {
+    await openHome(page);
+    await expect(page.locator('[data-test="agent-home-greeting"] [data-test="assistant-spark"]')).toBeVisible();
+    const recent = page.locator('[data-test="assistant-recent-chats"]');
+    await expect(recent.locator("h3")).toHaveText("Recent chats");
+    await expect(recent.locator('[data-test^="assistant-recent-chat-"]:not([data-test$="-age"])')).toHaveCount(3);
+    await expect(recent.locator('[data-test="assistant-recent-chat-0"]')).toContainText(state.chats[0].title);
+    await expect(page.locator('[data-test="assistant-first-chat-starter"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="assistant-home-examples"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="assistant-context-sees"]')).toHaveCount(0);
+    await recent.locator('[data-test="assistant-recent-chats-all"]').click();
+    const search = page.locator('[data-test="assistant-chat-search"]');
+    await expect(search.locator('[data-test="assistant-chat-search-input"] input')).toBeFocused();
+    await expect(search.locator('[data-test="assistant-chat-search-result"]').first()).toContainText(state.chats[0].title);
+    await page.keyboard.press("Escape");
+    await expect(search).toHaveCount(0);
+    await recent.locator('[data-test="assistant-recent-chat-1"]').click();
+    await page.waitForURL(new RegExp(`[?&]thread=${state.chats[1].session_id}`));
+    await expect(assistant.full).toBeVisible();
+  });
+
+  test("HOME-05 a first-time user sees one quiet chip that asks what the agent can do", { tag: ["@mock"] }, async ({ page }) => {
+    state.chats.length = 0;
+    await openHome(page);
+    const chip = page.locator('[data-test="assistant-first-chat-ask"]');
+    await expect(chip).toHaveText("What can you do?");
+    await expect(page.locator('[data-test="assistant-first-chat-starter"] button')).toHaveCount(1);
+    await expect(page.locator('[data-test="assistant-recent-chats"]')).toHaveCount(0);
+    await chip.click();
+    await page.waitForURL(threadUrl);
+    await expect(assistant.full).toBeVisible();
+    await expect(assistant.full).toContainText("What can you do?");
   });
 
   test("HOME-02 a slow config shows the skeleton, then the launcher, with no tab pop-in", { tag: ["@mock"] }, async ({ context, page }) => {

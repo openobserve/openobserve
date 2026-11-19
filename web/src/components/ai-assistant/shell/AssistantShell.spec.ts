@@ -290,6 +290,30 @@ describe("AssistantShell states", () => {
     expect(starters).toHaveBeenCalledTimes(2);
   });
 
+  it("puts recent chats under the full page's centred composer, and none in a side panel", async () => {
+    const full = setup({ placement: "full", density: "roomy" });
+    await flushPromises();
+    const lower = full.wrapper.get('[data-test="assistant-shell-lower"]');
+    const below = full.wrapper.getComponent({ name: "AssistantNewChatBelow" });
+    expect(lower.element.contains(below.element)).toBe(true);
+    expect(
+      lower.get('[data-test="assistant-composer"]').element.compareDocumentPosition(below.element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    const welcome = full.wrapper.get('[data-test="assistant-welcome"]');
+    expect(welcome.find('[data-test^="assistant-starter-"]').exists()).toBe(false);
+    const search = full.wrapper.getComponent({ name: "AssistantChatSearch" });
+    expect(search.props()).toMatchObject({ open: false, mode: "rail" });
+    below.vm.$emit("view-all");
+    await flushPromises();
+    expect(search.props("open")).toBe(true);
+    full.wrapper.unmount();
+    document.body.innerHTML = "";
+    const side = setup({ placement: "sidebar" });
+    await flushPromises();
+    expect(side.wrapper.findComponent({ name: "AssistantNewChatBelow" }).exists()).toBe(false);
+  });
+
   it("shows the welcome on the dock's empty chat and stages a starter without sending", async () => {
     const { wrapper, store } = setup({ placement: "docked" });
     expect(root(wrapper).attributes("data-state")).toBe("empty");
@@ -404,7 +428,6 @@ describe("AssistantShell chrome and focus", () => {
     expect(chrome.get('[data-test="assistant-thread-heading"]').attributes("aria-level")).toBe("1");
     expect(chrome.find('[data-test="assistant-thread-title-button"]').exists()).toBe(false);
     expect(chrome.find('[data-test="assistant-thread-more"]').exists()).toBe(true);
-    // What the assistant sees opens from the composer box's corner, so the header carries no ⓘ.
     expect(chrome.find('[data-test="assistant-context-sees"]').exists()).toBe(false);
     // Home's full page offers the same moves as every other header.
     expect(chrome.find('[data-test^="assistant-shell-place-"]').exists()).toBe(true);
