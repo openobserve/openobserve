@@ -41,7 +41,6 @@ test.describe('Recent search restores a stream created after the list was cached
     await other.goto(logsUrl(NEW_STREAM));
     await otherPm.logsPage.waitForSearchResultRows(60000);
     await otherPm.logsPage.expectNoQueryInFlight(60000);
-    await otherPm.logsPage.ensureQueryEditorMode();
     await otherPm.logsPage.fillQueryEditor("level='info'");
     const recorded = other.waitForResponse(
       (r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/query_history') && r.ok(),

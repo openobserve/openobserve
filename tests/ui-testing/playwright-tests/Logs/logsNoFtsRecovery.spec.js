@@ -22,7 +22,7 @@ async function open(page, streams = NOFTS) {
   await navigateToBase(page);
   const requests = trackSearches(page);
   await page.goto(url(streams));
-  await page.locator('[data-test="logs-search-bar-query-editor"]').waitFor();
+  await page.locator('[data-test="logs-search-bar-query-editor"]').waitFor({ state: 'attached' });
   // The stream URL runs its own search on entry; clicking the shared run/cancel button mid-flight cancels it.
   await expect(page.locator(panel).or(page.locator('[data-test="logs-missing-stream-banner"]')).first()).toBeVisible();
   await expect(page.locator(run)).toHaveAttribute('title', 'Run query');

@@ -39,7 +39,7 @@ const baseAxeNodes = [
 async function open(page) {
   await navigateToBase(page);
   await page.goto(`/web/logs?org_identifier=${ORG}&stream=${STREAM}&stream_type=logs&period=15m&refresh=0&sql_mode=false&quick_mode=false&show_histogram=false`);
-  await page.locator('[data-test="logs-search-bar-query-editor"]').waitFor();
+  await page.locator('[data-test="logs-search-bar-query-editor"]').waitFor({ state: 'attached' });
   // The stream URL runs its own search on entry; clicking the shared run/cancel button mid-flight cancels it.
   await expect(page.locator(`${table} tbody tr[data-test^="o2-table-row-"]`)).toHaveCount(2);
   await expect(page.locator(run)).toHaveAttribute('title', 'Run query');

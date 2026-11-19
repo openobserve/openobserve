@@ -58,7 +58,7 @@ async function open(page, streams, query, extra = '') {
   });
   const searches = trackSearches(page);
   await page.goto(urlFor(streams, query, extra));
-  await page.locator(editor).first().waitFor({ timeout: 60000 });
+  await page.locator(editor).first().waitFor({ state: 'attached', timeout: 60000 });
   await expect
     .poll(async () => {
       const text = await editorText(page);
