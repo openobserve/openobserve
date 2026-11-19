@@ -1923,6 +1923,7 @@ import {
 import {
   isAutoRunActive,
   sameSignature,
+  type LogsSignature,
   type PersistAction,
   type PersistSurface,
   type PersistReasonCode,
@@ -4815,14 +4816,27 @@ export default defineComponent({
       emit("buildModeToggle", false); // isCustomMode = false
     };
 
+    const GRID_TABS = ["logs", "drilldown"];
+    const AWAY_TABS = ["visualize", "build", "patterns"];
+    let scopeWhenGridLeft: LogsSignature | null = null;
+
     // Build writes its own SQL and SQL/quick mode into the search, which is not a scope move.
-    const scopeMovedSinceGridRun = (from: string) => {
-      const ran = searchObj.meta.executed?.signature;
-      if (!ran) return false;
-      const live = autoRun.readSignature();
-      if (from !== "build") return !sameSignature(live, ran);
-      const { query, sqlMode, quickMode, quickModeFields } = ran;
-      return !sameSignature({ ...live, query, sqlMode, quickMode, quickModeFields }, ran);
+    const absorbBuildRewrite = (baseline: LogsSignature): LogsSignature => {
+      const { query, sqlMode, quickMode, quickModeFields } = autoRun.readSignature();
+      return { ...baseline, query, sqlMode, quickMode, quickModeFields };
+    };
+
+    const trackScopeAwayFromGrid = (from: string, to: string): boolean => {
+      if (GRID_TABS.includes(from) && AWAY_TABS.includes(to)) {
+        scopeWhenGridLeft = autoRun.readSignature();
+        return false;
+      }
+      if (!scopeWhenGridLeft || !AWAY_TABS.includes(from)) return false;
+      if (from === "build") scopeWhenGridLeft = absorbBuildRewrite(scopeWhenGridLeft);
+      if (!GRID_TABS.includes(to)) return false;
+      const baseline = scopeWhenGridLeft;
+      scopeWhenGridLeft = null;
+      return !sameSignature(autoRun.readSignature(), baseline);
     };
 
     const onLogsVisualizeToggleUpdate = async (value: any) => {
@@ -4960,10 +4974,8 @@ export default defineComponent({
         }
       }
       if (
-        (value === "logs" || value === "drilldown") &&
-        ["visualize", "build", "patterns"].includes(searchObj.meta.logsVisualizeToggle) &&
-        isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta) &&
-        scopeMovedSinceGridRun(searchObj.meta.logsVisualizeToggle)
+        trackScopeAwayFromGrid(searchObj.meta.logsVisualizeToggle, value) &&
+        isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta)
       )
         tabRunPending = "tab";
       searchObj.meta.logsVisualizeToggle = value;

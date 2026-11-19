@@ -657,25 +657,53 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(functionRuns()).toBe(1);
     });
 
+    const BUILD_SQL =
+      'SELECT histogram(_timestamp) AS "x_axis_1", count(_timestamp) AS "y_axis_1" FROM "default" GROUP BY x_axis_1';
+
+    const switchTab = async (tab: string, edit: (() => void) | null = null) => {
+      await wrapper!.vm.onLogsVisualizeToggleUpdate(tab);
+      edit?.();
+      await vi.advanceTimersByTimeAsync(3000);
+    };
+
+    const changeTime = () => {
+      wrapper!.vm.searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    };
+
+    const buildRewritesQuery = () => {
+      const { searchObj } = wrapper!.vm;
+      searchObj.meta.sqlMode = true;
+      searchObj.meta.quickMode = !searchObj.meta.quickMode;
+      searchObj.data.query = BUILD_SQL;
+      searchObj.data.editorValue = BUILD_SQL;
+    };
+
+    const startTrip = async ({ liveMode = true, sqlMode = false } = {}) => {
+      config.isEnterprise = "true";
+      vi.useFakeTimers();
+      const { searchObj, logs } = await setup({ liveMode });
+      searchObj.meta.sqlMode = sqlMode;
+      if (sqlMode) searchObj.data.query = 'SELECT * FROM "default"';
+      markExecuted();
+      // Drains the date-change the mounted date picker emits, so it cannot land mid-trip.
+      await vi.advanceTimersByTimeAsync(3000);
+      logs.mockClear();
+      return logs;
+    };
+
     const returnToLogs = async (
       from: string,
       change: "time" | "query" | null,
       { to = "logs", liveMode = true } = {},
     ) => {
-      const { searchObj, logs } = await setup({ liveMode });
-      searchObj.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
-      markExecuted();
-      searchObj.meta.logsVisualizeToggle = from;
-      searchObj.meta.logsVisualizeDirtyFlag = false;
-      if (change === "time")
-        searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
-      if (change === "query") searchObj.data.query = 'SELECT count(*) FROM "app"';
-      await flushPromises();
+      const logs = await startTrip({ liveMode });
+      await switchTab(from, () => {
+        wrapper!.vm.searchObj.meta.logsVisualizeDirtyFlag = false;
+        if (change === "time") changeTime();
+        if (change === "query") wrapper!.vm.searchObj.data.query = 'SELECT count(*) FROM "app"';
+      });
       logs.mockClear();
-
-      vi.useFakeTimers();
-      await wrapper!.vm.onLogsVisualizeToggleUpdate(to);
-      await vi.advanceTimersByTimeAsync(3000);
+      await switchTab(to);
       return logs;
     };
 
@@ -708,6 +736,49 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
 
     it("keeps Search's rows when Build only rewrote the query", async () => {
       const logs = await returnToLogs("build", "query");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("keeps Search's rows when Build flipped SQL mode, quick mode and the query", async () => {
+      const logs = await startTrip();
+      await switchTab("build", buildRewritesQuery);
+      await switchTab("logs");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("keeps Search's rows after a SQL Build round trip followed by an unchanged Patterns visit", async () => {
+      const logs = await startTrip({ sqlMode: true });
+      await switchTab("build", buildRewritesQuery);
+      await switchTab("logs");
+      await switchTab("patterns");
+      await switchTab("logs");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("keeps Search's rows when Build rewrote the query before a Patterns visit", async () => {
+      const logs = await startTrip({ sqlMode: true });
+      await switchTab("build", buildRewritesQuery);
+      await switchTab("patterns");
+      await switchTab("logs");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("re-runs SQL Search on return from Build when the time changed there", async () => {
+      const logs = await startTrip({ sqlMode: true });
+      await switchTab("build", () => {
+        buildRewritesQuery();
+        changeTime();
+      });
+      await switchTab("logs");
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "tab", op: "full" });
+    });
+
+    it("keeps Search's rows when only an unrun Search edit differs from the last run", async () => {
+      const logs = await startTrip();
+      wrapper!.vm.searchObj.data.query = 'level = "error"';
+      await switchTab("visualize");
+      await switchTab("logs");
       expect(logs).not.toHaveBeenCalled();
     });
 
