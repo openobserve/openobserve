@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { computed, onBeforeUnmount, ref } from "vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type {
   SelectModelValue,
@@ -23,7 +24,7 @@ import type {
 } from "@/lib/forms/Select/OSelect.types";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     modelValue: readonly string[];
     /** The stream's fields or labels, already in ranking order; nothing is ticked for being ranked. */
@@ -45,16 +46,31 @@ withDefaults(
 const emit = defineEmits<{ (e: "update:modelValue", value: string[]): void }>();
 const { t } = useI18nTyped();
 
-const onPick = (value: SelectModelValue) =>
-  emit(
-    "update:modelValue",
-    (Array.isArray(value) ? value : []).map(String).filter((label) => label.trim()),
-  );
+// A pick re-renders the form around the picker, so picks wait for the list to close.
+const draft = ref<string[] | null>(null);
+const shown = computed(() => draft.value ?? [...props.modelValue]);
+const labels = (value: SelectModelValue) =>
+  (Array.isArray(value) ? value : []).map(String).filter((label) => label.trim());
+
+const onOpen = () => {
+  draft.value = [...props.modelValue];
+};
+const onPick = (value: SelectModelValue) => {
+  if (draft.value) draft.value = labels(value);
+  else emit("update:modelValue", labels(value));
+};
+const onClose = () => {
+  const picked = draft.value;
+  draft.value = null;
+  if (picked && picked.join("\n") !== props.modelValue.join("\n"))
+    emit("update:modelValue", picked);
+};
+onBeforeUnmount(onClose);
 </script>
 
 <template>
   <OSelect
-    :model-value="[...modelValue]"
+    :model-value="shown"
     :options="options"
     multiple
     searchable
@@ -66,5 +82,7 @@ const onPick = (value: SelectModelValue) =>
     class="max-w-full min-w-50"
     :data-test="dataTest"
     @update:model-value="onPick"
+    @open="onOpen"
+    @close="onClose"
   />
 </template>
