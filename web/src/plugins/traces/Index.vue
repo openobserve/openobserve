@@ -2738,7 +2738,11 @@ const tracesShortcuts = [
     id: "tracesCopyUrl",
     // The shortcut copies without the Share button, so it applies the button's gate itself.
     handler: () => {
-      if (!tracesQueryNotRun(searchObj)) copyTracesUrl(t);
+      if (tracesQueryNotRun(searchObj)) {
+        toast({ variant: "warning", message: t("search.autoRunPersistNeedsRun") });
+        return;
+      }
+      copyTracesUrl(t);
     },
   },
   {
