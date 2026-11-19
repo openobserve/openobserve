@@ -23,7 +23,7 @@ pub mod starters;
 use std::collections::HashSet;
 
 use arrow_schema::DataType;
-use config::meta::alerts::{QueryType, alert::Alert};
+use config::meta::alerts::{Condition, Operator, QueryType, TriggerCondition, alert::Alert};
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -54,14 +54,6 @@ pub enum SuggestionKind {
     Starter,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MatchedBy {
-    LibraryId,
-    Query,
-    PackTag,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, ToSchema)]
 pub struct StreamRef {
     #[serde(rename = "type")]
@@ -89,7 +81,6 @@ pub struct StreamSwap {
 pub struct AlreadySetUp {
     pub alert_id: String,
     pub name: String,
-    pub matched_by: MatchedBy,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, ToSchema)]
@@ -142,31 +133,64 @@ pub struct SuggestResponse {
 pub struct ExistingAlert {
     pub id: String,
     pub name: String,
-    pub library_id: Option<String>,
     pub query_key: Option<String>,
-    pub tags: Vec<String>,
+    pub condition: Option<Threshold>,
 }
 
 impl ExistingAlert {
     pub fn of(alert: &Alert) -> Self {
         let qc = &alert.query_condition;
-        let query_key = match qc.query_type {
-            QueryType::PromQL => qc.promql.as_deref().map(|q| query_key(q, None)),
-            QueryType::SQL => qc
-                .sql
-                .as_deref()
-                .map(|q| query_key(q, Some(&alert.stream_name))),
-            _ => None,
+        let (query_key, condition) = match qc.query_type {
+            QueryType::PromQL => (
+                qc.promql.as_deref().map(|q| query_key(q, None)),
+                qc.promql_condition.as_ref().map(Threshold::of_promql),
+            ),
+            QueryType::SQL => (
+                qc.sql
+                    .as_deref()
+                    .map(|q| query_key(q, Some(&alert.stream_name))),
+                Some(Threshold::of_trigger(&alert.trigger_condition)),
+            ),
+            _ => (None, None),
         };
         Self {
             id: alert.id.map(|id| id.to_string()).unwrap_or_default(),
             name: alert.name.clone(),
-            library_id: alert
-                .context_attributes
-                .as_ref()
-                .and_then(|attrs| attrs.get("library_id").cloned()),
             query_key,
-            tags: alert.tags.clone(),
+            condition,
+        }
+    }
+}
+
+/// When an alert fires: SQL compares its row count, PromQL each series value.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Threshold {
+    pub operator: Operator,
+    pub value: f64,
+}
+
+impl Threshold {
+    /// NaN equals nothing, so an unreadable value never ties two alerts.
+    const UNREADABLE: Self = Self {
+        operator: Operator::EqualTo,
+        value: f64::NAN,
+    };
+
+    fn of_trigger(trigger: &TriggerCondition) -> Self {
+        Self {
+            operator: trigger.operator,
+            value: trigger.threshold as f64,
+        }
+    }
+
+    fn of_promql(condition: &Condition) -> Self {
+        let value = &condition.value;
+        let number = value
+            .as_f64()
+            .or_else(|| value.as_str().and_then(|s| s.trim().parse().ok()));
+        Self {
+            operator: condition.operator,
+            value: number.unwrap_or(Self::UNREADABLE.value),
         }
     }
 }
@@ -344,27 +368,36 @@ fn str_of<'a>(value: Option<&'a Value>, key: &str) -> Option<&'a str> {
     value?.get(key)?.as_str()
 }
 
-/// How the caller's alerts on this stream tie to `e`, first rule that holds per alert.
+/// The entry's firing rule as an installed alert stores it.
+/// A PromQL entry without one compares inside its query, which the query key holds.
+fn entry_condition(e: &IndexedEntry) -> Option<Threshold> {
+    let qc = e.file.get("query_condition");
+    if str_of(qc, "type") == Some("promql") {
+        let condition = qc?.get("promql_condition").filter(|c| !c.is_null())?;
+        let parsed = serde_json::from_value::<Condition>(condition.clone());
+        return Some(parsed.map_or(Threshold::UNREADABLE, |c| Threshold::of_promql(&c)));
+    }
+    let trigger = e.file.get("trigger_condition")?;
+    serde_json::from_value::<TriggerCondition>(trigger.clone())
+        .ok()
+        .map(|t| Threshold::of_trigger(&t))
+}
+
+/// The caller's alerts on this stream with the entry's query and firing rule.
 fn already_set_up(e: &IndexedEntry, existing: &[ExistingAlert]) -> Vec<AlreadySetUp> {
+    // Anomaly configs are not in the alert list, and a learned band has no threshold to compare.
+    if e.anomaly || existing.is_empty() {
+        return Vec::new();
+    }
     let key = entry_query_key(e);
-    let pack_tag = format!("pack:{}", e.entry.pack);
+    let condition = entry_condition(e);
     existing
         .iter()
-        .filter_map(|alert| {
-            let matched_by = if alert.library_id.as_deref() == Some(e.entry.id.as_str()) {
-                MatchedBy::LibraryId
-            } else if alert.query_key.as_deref() == Some(key.as_str()) {
-                MatchedBy::Query
-            } else if alert.tags.contains(&pack_tag) && alert.name == e.entry.name {
-                MatchedBy::PackTag
-            } else {
-                return None;
-            };
-            Some(AlreadySetUp {
-                alert_id: alert.id.clone(),
-                name: alert.name.clone(),
-                matched_by,
-            })
+        .filter(|alert| alert.query_key.as_deref() == Some(key.as_str()))
+        .filter(|alert| alert.condition == condition)
+        .map(|alert| AlreadySetUp {
+            alert_id: alert.id.clone(),
+            name: alert.name.clone(),
         })
         .collect()
 }

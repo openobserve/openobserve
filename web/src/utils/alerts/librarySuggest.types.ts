@@ -38,8 +38,6 @@ export type StarterShape = "rare_value" | "more_than_usual" | "percentile" | "pe
 export interface AlreadySetUp {
   alert_id: string;
   name: string;
-  /** `pack_tag`: only the pack tag ties them and the query was edited. */
-  matched_by: "library_id" | "query" | "pack_tag";
 }
 
 export interface StarterSlot {

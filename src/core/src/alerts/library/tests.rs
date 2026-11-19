@@ -16,7 +16,10 @@
 use std::sync::Arc;
 
 use arrow_schema::DataType;
-use config::meta::stream::StreamType;
+use config::meta::{
+    alerts::{Condition, Operator},
+    stream::StreamType,
+};
 use serde_json::json;
 
 use super::{
@@ -41,7 +44,8 @@ fn library() -> IndexState {
             ..Default::default()
         };
         let file = json!({"name": name, "stream_type": t, "stream_name": stream, "destinations": ["x"],
-            "query_condition": {"type": "sql", "sql": q}});
+            "query_condition": {"type": "sql", "sql": q},
+            "trigger_condition": {"period": 10, "operator": ">=", "threshold": 1, "frequency": 5}});
         IndexedEntry::new(entry, false, file)
     };
     let anomaly = IndexedEntry::new(
@@ -72,7 +76,8 @@ fn library() -> IndexState {
         },
         false,
         json!({"query_condition": {"type": "promql",
-            "promql": "sum by (load_balancer) (alb_5xx_count) / sum by (load_balancer) (alb_request_count) > 0.05"}}),
+            "promql": "sum by (load_balancer) (alb_5xx_count) / sum by (load_balancer) (alb_request_count)",
+            "promql_condition": {"column": "value", "operator": ">", "value": 0.05}}}),
     );
     let entries = vec![
         sql(
@@ -251,74 +256,103 @@ fn suggestions_reproduce_the_hit_rate_study_shapes() {
 }
 
 #[test]
-fn already_set_up_ranks_last_and_names_the_rule_that_tied_it() {
+fn already_set_up_needs_the_same_query_and_condition_and_ranks_last() {
+    use Operator::{GreaterThan, GreaterThanEquals};
     let lib = library();
-    let mut req = request(
-        StreamType::Logs,
-        "cluster_events",
-        &[
-            "k8s_cluster",
-            "k8s_resource_name",
-            "body_object_type",
-            "body_object_reason",
-        ],
+    let k8s_cols = [
+        "k8s_cluster",
+        "k8s_resource_name",
+        "body_object_type",
+        "body_object_reason",
+    ];
+    let logs = request(StreamType::Logs, "cluster_events", &k8s_cols, true, false);
+    let metrics = request(
+        StreamType::Metrics,
+        "alb_request_count",
+        &["load_balancer"],
         true,
         false,
     );
-    let edited = |sql: &str| Some(query_key(sql, Some("cluster_events")));
-    req.existing = vec![
-        ExistingAlert {
-            id: "a1".into(),
-            name: "mine".into(),
-            query_key: edited(
-                "select COUNT(*) as event_count, k8s_cluster from cluster_events\n where body_object_type = 'Warning' and str_match(body_object_reason, 'OOMKilling') group by k8s_cluster",
-            ),
-            ..Default::default()
-        },
-        ExistingAlert {
-            id: "a2".into(),
-            name: "high_warning_event_rate".into(),
-            query_key: edited("SELECT 1 FROM cluster_events"),
-            tags: vec!["pack:k8s".into()],
-            ..Default::default()
-        },
-    ];
-    req.limit = 1;
-    let resp = suggest_with(&lib, &req);
-    let shown: Vec<_> = resp
-        .suggestions
-        .iter()
-        .filter(|s| s.kind == SuggestionKind::Library)
-        .collect();
-    assert_eq!(shown.len(), 1, "limit caps the library matches");
-    assert_eq!((resp.counts.total, resp.counts.already_set_up), (2, 2));
-
-    req.limit = DEFAULT_LIMIT;
-    req.existing[1].library_id = Some("k8s/oom_killing_events".into());
-    let resp = suggest_with(&lib, &req);
-    let tied: Vec<_> = resp
-        .suggestions
-        .iter()
-        .filter(|s| s.kind == SuggestionKind::Library)
-        .map(|s| {
-            (
-                s.id.as_str(),
-                s.already_set_up
-                    .iter()
-                    .map(|a| a.matched_by)
-                    .collect::<Vec<_>>(),
-            )
+    let oom = "select COUNT(*) as event_count, k8s_cluster from cluster_events\n where body_object_type = 'Warning' and str_match(body_object_reason, 'OOMKilling') group by k8s_cluster";
+    let alert = |edit: &dyn Fn(&mut Alert)| {
+        let mut a = Alert::default();
+        edit(&mut a);
+        a
+    };
+    let sql = |query: &str, operator: Operator, threshold: i64| {
+        let query = query.to_string();
+        alert(&move |a| {
+            a.stream_name = "cluster_events".into();
+            a.query_condition.query_type = QueryType::SQL;
+            a.query_condition.sql = Some(query.clone());
+            a.trigger_condition.operator = operator;
+            a.trigger_condition.threshold = threshold;
         })
-        .collect();
+    };
+    let promql = |value: serde_json::Value| {
+        alert(&move |a| {
+            a.query_condition.query_type = QueryType::PromQL;
+            a.query_condition.promql = Some(
+                "sum by (load_balancer) (alb_5xx_count)  /  sum by (load_balancer) (alb_request_count)"
+                    .into(),
+            );
+            a.query_condition.promql_condition = Some(Condition {
+                column: "value".into(),
+                operator: GreaterThan,
+                value: value.clone(),
+                ignore_case: false,
+                case_insensitive: None,
+            });
+        })
+    };
+    let mut library_id_only = sql("SELECT 1 FROM cluster_events", GreaterThanEquals, 1);
+    library_id_only.context_attributes =
+        Some([("library_id".into(), "k8s/oom_killing_events".into())].into());
+    let mut pack_tag_only = sql("SELECT 1 FROM cluster_events", GreaterThanEquals, 1);
+    pack_tag_only.name = "oom_killing_events".into();
+    pack_tag_only.tags = vec!["pack:k8s".into()];
+    let cases = [
+        (
+            &logs,
+            sql(oom, GreaterThanEquals, 1),
+            vec!["k8s/oom_killing_events"],
+        ),
+        (&logs, sql(oom, GreaterThanEquals, 2), vec![]),
+        (&logs, sql(oom, GreaterThan, 1), vec![]),
+        (&logs, library_id_only, vec![]),
+        (&logs, pack_tag_only, vec![]),
+        (
+            &metrics,
+            promql(json!("0.050")),
+            vec!["cloud/alb_5xx_ratio"],
+        ),
+        (&metrics, promql(json!(0.1)), vec![]),
+    ];
+    for (i, (req, alert, expected)) in cases.into_iter().enumerate() {
+        let mut req = req.clone();
+        req.existing = vec![ExistingAlert::of(&alert)];
+        let resp = suggest_with(&lib, &req);
+        let tied: Vec<_> = resp
+            .suggestions
+            .iter()
+            .filter(|s| !s.already_set_up.is_empty())
+            .map(|s| s.id.as_str())
+            .collect();
+        assert_eq!(tied, expected, "case {i}");
+        assert_eq!(resp.counts.already_set_up, expected.len(), "case {i}");
+        let last = library_ids(&resp).pop().map(|(id, ..)| id);
+        assert!(
+            expected.is_empty() || last.as_deref() == Some(expected[0]),
+            "case {i}"
+        );
+    }
+    let mut capped = logs.clone();
+    capped.limit = 1;
+    let resp = suggest_with(&lib, &capped);
     assert_eq!(
-        tied,
-        vec![
-            (
-                "k8s/oom_killing_events",
-                vec![MatchedBy::Query, MatchedBy::LibraryId]
-            ),
-            ("k8s/high_warning_event_rate", vec![MatchedBy::PackTag]),
-        ]
+        (library_ids(&resp).len(), resp.counts.total),
+        (1, 2),
+        "limit caps rows, not counts"
     );
 }
 
