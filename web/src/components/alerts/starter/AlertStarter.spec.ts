@@ -73,8 +73,8 @@ describe("AlertStarter", () => {
     const aiItem = q("create-starter-pane-ai");
     expect({
       items,
-      ai: !aiItem ? "hidden" : aiItem.hasAttribute("data-disabled") ? "locked" : "on",
-      picked: document.body.querySelector("[data-test^=create-starter-pane-][data-state=on]"),
+      ai: !aiItem ? "hidden" : (aiItem as HTMLButtonElement).disabled ? "locked" : "on",
+      picked: document.body.querySelector("[data-test^=create-starter-pane-][aria-pressed=true]"),
       body: document.body.querySelector("[data-test^=create-starter-body-]"),
       count: q("create-starter-pane-library-count")?.textContent,
     }).toEqual({

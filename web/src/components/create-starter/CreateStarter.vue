@@ -46,23 +46,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{ 'border-b': activePane || $slots.resume }"
           data-test="create-starter-switch-row"
         >
-          <OTooltip
+          <div
             v-if="listed.length"
-            :content="t('createStarter.switchHint')"
-            shortcut-id="createStarterSwitchPane"
-            :disabled="switchable.length < 2"
+            class="flex flex-wrap items-center gap-2"
+            role="group"
+            :aria-label="label"
           >
-            <OToggleGroup :model-value="activePane" @update:model-value="selectPane">
-              <OToggleGroupItem
-                v-for="pane in listed"
-                :key="pane.id"
-                :value="pane.id"
+            <OTooltip
+              v-for="pane in listed"
+              :key="pane.id"
+              :content="
+                pane.availability === 'locked' ? pane.lockedReason : t('createStarter.switchHint')
+              "
+              :shortcut-id="pane.availability === 'locked' ? undefined : 'createStarterSwitchPane'"
+              :disabled="pane.availability !== 'locked' && switchable.length < 2"
+            >
+              <OButton
+                :variant="activePane === pane.id ? 'outline-primary' : 'outline'"
                 size="sm"
                 :icon-left="pane.availability === 'locked' ? 'lock' : PANE_ICON[pane.id]"
                 :disabled="pane.availability === 'locked'"
-                :focusable-unavailable="pane.availability === 'locked'"
-                :tooltip="pane.availability === 'locked' ? pane.lockedReason : undefined"
+                :aria-pressed="activePane === pane.id"
                 :data-test="`create-starter-pane-${pane.id}`"
+                @click="selectPane(pane.id)"
               >
                 {{ pane.label }}
                 <span
@@ -73,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("createStarter.matchCount", { count: formatCount(pane.count) }, pane.count)
                   }}</span
                 >
-              </OToggleGroupItem>
-            </OToggleGroup>
-          </OTooltip>
+              </OButton>
+            </OTooltip>
+          </div>
           <span
             v-if="listed.length"
             class="bg-border-default h-5 w-px shrink-0 max-sm:hidden"
@@ -121,8 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
