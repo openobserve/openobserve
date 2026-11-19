@@ -262,3 +262,23 @@ fn a_scheduled_chart_with_a_lone_point_matches_main() {
         "the PNG differs from main"
     );
 }
+
+#[test]
+fn a_scheduled_chart_with_two_points_in_one_second_matches_main() {
+    let t = 1_793_610_000u64;
+    let payload: ChartPayload = serde_json::from_value(serde_json::json!({
+        "v": 1,
+        "exp": 2_000_000_000u64,
+        "title": "error rate on web-logs",
+        "points": [(t, 1.0), (t, 2.0)],
+        "crit": 5.0,
+        "warn": 3.0,
+        "trigger_ts": t,
+    }))
+    .unwrap();
+    let got = render_png(&payload).unwrap();
+    assert!(
+        got == fixture("scheduled_chart_same_second.png", &got),
+        "the PNG differs from main"
+    );
+}

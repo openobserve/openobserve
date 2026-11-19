@@ -171,14 +171,19 @@ fn axis_ranges(p: &ChartPayload) -> Option<((u64, u64), (f64, f64))> {
     }
     let band = p.band.iter().flatten().flatten();
     let marks: &[(u64, f64)] = if anomaly { &p.marks } else { &[] };
-    let times = p.points.iter().chain(marks).map(|(t, _)| *t);
-    let x_min = times.clone().min()?;
-    let x_max = times.max()?;
-    // One timestamp gives an empty range; centre it in an hour.
-    let (x_min, x_max) = if x_max > x_min {
-        (x_min, x_max)
+    let (x_min, x_max) = if anomaly {
+        let times = p.points.iter().chain(marks).map(|(t, _)| *t);
+        let (lo, hi) = (times.clone().min()?, times.max()?);
+        // One timestamp gives an empty range; centre it in an hour.
+        if hi > lo {
+            (lo, hi)
+        } else {
+            (lo.saturating_sub(1800), hi + 1800)
+        }
     } else {
-        (x_min.saturating_sub(1800), x_max + 1800)
+        // Main's range: first to last point, at least one second wide.
+        let lo = p.points.first()?.0;
+        (lo, p.points.last()?.0.max(lo + 1))
     };
     let values = p
         .points
