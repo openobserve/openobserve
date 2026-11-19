@@ -999,8 +999,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
                   size="sm-toolbar"
-                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
-                  :class="panelRunPending ? 'border-e-button-pending-hover-bg!' : runButtonTone"
+                  class="rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  :class="
+                    panelRunPending
+                      ? 'border-e-button-pending-hover-bg!'
+                      : [
+                          runButtonTone,
+                          'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                        ]
+                  "
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
@@ -1064,8 +1071,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
                   size="sm-toolbar"
-                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
-                  :class="panelRunPending ? 'border-e-button-pending-hover-bg!' : runButtonTone"
+                  class="rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  :class="
+                    panelRunPending
+                      ? 'border-e-button-pending-hover-bg!'
+                      : [
+                          runButtonTone,
+                          'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                        ]
+                  "
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}

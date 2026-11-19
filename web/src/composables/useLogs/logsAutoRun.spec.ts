@@ -724,6 +724,20 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(run().isPanelScopeStale()).toBe(true);
   });
 
+  it("a cancelled panel run keeps the scope the chart last showed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().panelLoadingChanged(true, false);
+    run().cancelPanelLoad();
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
   it("a dispatched panel run notes its scope even when its loading is not reported to the logs page", () => {
     run().setPanelConfigReader(() => ({ type: "bar" }));
     fakeSearchObj.value.meta.logsVisualizeToggle = "build";
