@@ -42,7 +42,8 @@ const NAVIGATION_TOOL: &str = "create_navigation";
 const FIRST_PARTY_MCP_PREFIX: &str = "o2_";
 const O2_DELETE_TOOL: &str = "o2_delete";
 const MCP_SERVER_PREFIXES: [&str; 1] = ["o2"];
-pub(crate) const TOOLSET_CALL: &str = "toolset_tool_call";
+const TOOLSET_CALL: &str = "toolset_tool_call";
+const TOOLSET_CLI_RUN: &str = "toolset_cli_run";
 const SEARCH_SQL_MAX_HITS: usize = 10;
 const TEST_FUNCTION_MAX_INPUT_EVENTS: usize = 5;
 const TEST_FUNCTION_MAX_OUTPUT_RESULTS: usize = 5;
@@ -50,10 +51,11 @@ const ERROR_DUMP_CHARS: usize = 500;
 const FIRST_ERR_CHARS: usize = 200;
 
 /// Tools no projection shows; the sentinels at the end are RCA thread structure.
-pub(crate) const HIDDEN_TOOLS: [&str; 27] = [
+pub(crate) const HIDDEN_TOOLS: [&str; 28] = [
     "tool_search",
     "toolset_list",
     "toolset_list_tools",
+    "toolset_read_output",
     "convert_time_to_microseconds",
     "calculate_time_range",
     "format_timestamp_for_display",
@@ -547,6 +549,19 @@ impl Folded {
     }
 }
 
+/// A vendor call through the toolset gateway (`toolset_tool_call` or `toolset_cli_run`).
+pub(crate) struct GatewayCall<'a> {
+    /// `toolset · tool`, or `toolset · run <first arg>` for a CLI, whose binary the part doesn't
+    /// carry.
+    pub(crate) label: String,
+    /// `<toolset>_<tool>`; `cli_<toolset>` for a CLI so the shell rules (exit code, signal) apply.
+    pub(crate) key: String,
+    /// The vendor tool's `args`; a CLI call's own input, which holds its `command`.
+    pub(crate) args: Option<&'a Map<String, Value>>,
+    /// A `toolset_cli_run`, whose stdout is data: its outcome is the part status and `metadata`.
+    pub(crate) cli: bool,
+}
+
 /// o2-ai's `project_events` output for ascending events, plus each turn's `first_seq`/`last_seq`.
 pub fn project(events: &[DurableEvent]) -> Value {
     let folded = Folded::fold(events);
@@ -720,30 +735,46 @@ pub(crate) fn strip_mcp_prefix(tool_name: &str) -> &str {
     }
 }
 
-/// The `(toolset, tool)` a `toolset_tool_call` names; `None` for any other tool or a blank name.
-pub(crate) fn toolset_call_target<'a>(
+pub(crate) fn is_gateway_call(tool_name: &str) -> bool {
+    tool_name == TOOLSET_CALL || tool_name == TOOLSET_CLI_RUN
+}
+
+/// `None` for a non-gateway tool or a gateway call missing the names it needs.
+pub(crate) fn gateway_call<'a>(
     tool_name: &str,
     input: Option<&'a Map<String, Value>>,
-) -> Option<(&'a str, &'a str)> {
-    if tool_name != TOOLSET_CALL {
-        return None;
-    }
+) -> Option<GatewayCall<'a>> {
     let field = |key| {
         input?
             .get(key)
             .and_then(Value::as_str)
-            .filter(|s| !s.is_empty())
+            .filter(|s| !s.trim().is_empty())
     };
-    Some((field("toolset_name")?, field("tool_name")?))
-}
-
-pub(crate) fn toolset_call_label(toolset: &str, tool: &str) -> String {
-    format!("{toolset} · {tool}")
-}
-
-/// The `<server>_<tool>` shape signal classes key toolset calls on.
-pub(crate) fn toolset_call_key(toolset: &str, tool: &str) -> String {
-    format!("{toolset}_{tool}")
+    let toolset = field("toolset_name")?;
+    match tool_name {
+        TOOLSET_CALL => {
+            let tool = field("tool_name")?;
+            Some(GatewayCall {
+                label: format!("{toolset} · {tool}"),
+                key: format!("{toolset}_{tool}"),
+                args: input.and_then(|i| obj(i.get("args"))),
+                cli: false,
+            })
+        }
+        TOOLSET_CLI_RUN => {
+            let first = field("command").and_then(|c| c.split_whitespace().next());
+            Some(GatewayCall {
+                label: match first {
+                    Some(arg) => format!("{toolset} · run {arg}"),
+                    None => format!("{toolset} · run"),
+                },
+                key: format!("cli_{toolset}"),
+                args: input,
+                cli: true,
+            })
+        }
+        _ => None,
+    }
 }
 
 fn resolve_tool_call(
@@ -762,10 +793,9 @@ fn resolve_tool_call(
         let inner = obj(args.get("args")).cloned().unwrap_or_default();
         return Some((actual.to_string(), inner));
     }
-    if tool_name == TOOLSET_CALL {
-        let (toolset, tool) = toolset_call_target(tool_name, Some(args))?;
-        let inner = obj(args.get("args")).cloned().unwrap_or_default();
-        return Some((toolset_call_label(toolset, tool), inner));
+    if is_gateway_call(tool_name) {
+        let call = gateway_call(tool_name, Some(args))?;
+        return Some((call.label, call.args.cloned().unwrap_or_default()));
     }
     Some((tool_name.to_string(), args.clone()))
 }
@@ -1534,6 +1564,34 @@ mod tests {
     }
 
     #[test]
+    fn a_toolset_cli_run_projects_as_toolset_run_and_its_first_argument() {
+        let input = json!({"toolset_name": "k8s-prod", "command": "get pods -n checkout"});
+        let frames = frames_of(&[
+            tool_part("p1", "toolset_cli_run", "running", input.clone(), ""),
+            tool_part(
+                "p1",
+                "toolset_cli_run",
+                "completed",
+                input.clone(),
+                "NAME READY",
+            ),
+        ]);
+        assert_eq!(frames.len(), 2, "{frames:?}");
+        assert_eq!(frames[0]["tool"], "k8s-prod · run get");
+        assert_eq!(frames[0]["context"], input);
+        assert_eq!(frames[1]["tool"], "k8s-prod · run get");
+        assert_eq!(frames[1]["success"], true);
+        let hidden = frames_of(&[tool_part(
+            "p2",
+            "toolset_cli_run",
+            "running",
+            json!({"command": "get pods"}),
+            "",
+        )]);
+        assert!(hidden.is_empty(), "no toolset name: {hidden:?}");
+    }
+
+    #[test]
     fn toolset_listings_and_nameless_toolset_calls_are_hidden() {
         let frames = frames_of(&[
             tool_part("p1", "toolset_list", "running", json!({}), ""),
@@ -1551,6 +1609,20 @@ mod tests {
                 "completed",
                 json!({"toolset_name": "dd"}),
                 "[]",
+            ),
+            tool_part(
+                "p4",
+                "toolset_read_output",
+                "running",
+                json!({"ref": "r1", "offset": 0}),
+                "",
+            ),
+            tool_part(
+                "p4",
+                "toolset_read_output",
+                "completed",
+                json!({"ref": "r1", "offset": 0}),
+                "{\"text\":\"x\"}",
             ),
             tool_part(
                 "p3",
