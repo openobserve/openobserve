@@ -34,9 +34,9 @@ import router from "@/test/unit/helpers/router";
 const field = (wrapper: any, key: string) =>
   wrapper.find(`[data-test="alerts-alertconfigsummary-${key}"]`);
 
-/** The read-only input that shows a short value. */
-const input = (wrapper: any, key: string) =>
-  field(wrapper, key).find(`[data-test="alerts-alertconfigsummary-${key}-input-field"]`);
+/** The plain-text div that shows a short value. */
+const text = (wrapper: any, key: string) =>
+  field(wrapper, key).find(`[data-test="alerts-alertconfigsummary-${key}-value"]`);
 
 /** Just the VALUE, so neither the label's words nor a raw JSON dump can satisfy an assertion. */
 const value = (wrapper: any, key: string): string => {
@@ -44,7 +44,13 @@ const value = (wrapper: any, key: string): string => {
     `[data-test="alerts-alertconfigsummary-${key}-code-pre"] code`,
   );
   if (code.exists()) return code.text().trim();
-  if (input(wrapper, key).exists()) return (input(wrapper, key).element as HTMLInputElement).value;
+  if (text(wrapper, key).exists()) {
+    // An unset value renders the "Not set" text; its value is empty.
+    return text(wrapper, key).classes().includes("text-text-muted") &&
+      text(wrapper, key).text().trim() === i18n.global.t("alerts.configNotSet")
+      ? ""
+      : text(wrapper, key).text().trim();
+  }
   return field(wrapper, key).findComponent(OTag).text().trim();
 };
 
@@ -92,11 +98,11 @@ const translated = (key: string, params?: Record<string, any>, plural?: number) 
   return out;
 };
 
-/** An unset value stays empty, so the input's "Not set" placeholder is what reads. */
+/** An unset value reads "Not set" in the muted style. */
 const expectNotSet = (wrapper: any, key: string) => {
-  expect(input(wrapper, key).exists(), `${key} is not a read-only input`).toBe(true);
-  expect(value(wrapper, key)).toBe("");
-  expect(input(wrapper, key).attributes("placeholder")).toBe(translated("alerts.configNotSet"));
+  expect(text(wrapper, key).exists(), `${key} is not a plain-text value`).toBe(true);
+  expect(text(wrapper, key).text().trim()).toBe(translated("alerts.configNotSet"));
+  expect(text(wrapper, key).classes()).toContain("text-text-muted");
 };
 
 afterEach(() => {});
@@ -345,7 +351,7 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     // ways — and so it is localized rather than showing the wire token.
     expect(value(wrapper, "status")).toBe(translated("components.badge.alertStatus.ready"));
     expect(field(wrapper, "status").findComponent(OTag).exists()).toBe(true);
-    expect(input(wrapper, "status").exists()).toBe(false);
+    expect(text(wrapper, "status").exists()).toBe(false);
     expect(value(wrapper, "model-version")).toBe("3");
     expect(value(wrapper, "last-trained")).toBe("2026-08-31 00:00:00");
     // A permanent empty row would imply a slot worth watching.
@@ -531,31 +537,33 @@ describe("AlertConfigSummary — layout", () => {
     const block = field(wrapper, key).findComponent(OCodeBlock);
     expect(block.exists(), `${key} is not a code block`).toBe(true);
     expect(block.props("lang")).toBe(lang);
-    expect(input(wrapper, key).exists()).toBe(false);
+    expect(text(wrapper, key).exists()).toBe(false);
     expect(field(wrapper, key).classes()).toContain("col-span-full");
     // After the short fields, so it never splits a row of them.
     const { before, after } = rowsBeside(wrapper, key);
     expect(before.some((row) => !row.querySelector(CODE))).toBe(true);
     expect(after.every((row) => row.querySelector(CODE))).toBe(true);
   };
-  const expectShortInput = (wrapper: any, key: string) => {
-    expect(input(wrapper, key).exists(), `${key} is not a read-only input`).toBe(true);
+  const expectShortText = (wrapper: any, key: string) => {
+    expect(text(wrapper, key).exists(), `${key} is not a plain-text value`).toBe(true);
     expect(field(wrapper, key).findComponent(OCodeBlock).exists()).toBe(false);
     expect(field(wrapper, key).classes()).not.toContain("col-span-full");
     expect(field(wrapper, key).classes()).not.toContain("sm:col-span-2");
   };
 
-  it("shows each short value in a read-only input under its own label", () => {
+  it("shows each short value as plain text under its own label", () => {
     const wrapper = mountSummary(generic({ type: "sql", sql: SQL }));
 
     for (const key of ["stream-type", "stream", "period", "frequency", "silence"]) {
-      expect(input(wrapper, key).attributes("readonly"), `${key} is editable`).toBeDefined();
+      expect(text(wrapper, key).exists(), `${key} is not plain text`).toBe(true);
+      expect(field(wrapper, key).find("input").exists(), `${key} is an input`).toBe(false);
     }
-    expect(field(wrapper, "stream").find("label").text()).toBe(translated("alerts.streamName"));
+    expect(field(wrapper, "stream").find("label").exists()).toBe(false);
+    expect(field(wrapper, "stream").text()).toContain(translated("alerts.streamName"));
     expect(value(wrapper, "stream")).toBe("default");
   });
 
-  it("leaves an unset value empty so the Not set placeholder reads, not a dash", () => {
+  it("shows Not set for an unset value, not a dash", () => {
     const wrapper = mountSummary(generic({ type: "sql", sql: SQL }, { stream_name: "" }));
     expectNotSet(wrapper, "stream");
     expect(value(wrapper, "stream")).not.toBe("—");
@@ -576,7 +584,7 @@ describe("AlertConfigSummary — layout", () => {
     expect(field(long, "stream").classes()).toContain("sm:col-span-2");
 
     const short = mountSummary(generic({ type: "sql", sql: SQL }));
-    expectShortInput(short, "stream");
+    expectShortText(short, "stream");
   });
 
   it("renders raw SQL as a full-row code block after the short fields, with no empty Warning", () => {
@@ -586,14 +594,14 @@ describe("AlertConfigSummary — layout", () => {
     expect(field(wrapper, "warning").exists()).toBe(false);
   });
 
-  it("keeps a builder threshold beside its warning, both short inputs", () => {
+  it("keeps a builder threshold beside its warning, both short text values", () => {
     const wrapper = mountSummary(
       builder({ having: { column: "latency", operator: ">", value: 500 }, warning_value: 200 }),
     );
     expect(value(wrapper, "condition")).toBe("avg(latency) > 500");
     expect(value(wrapper, "warning")).toBe("avg(latency) > 200");
-    expectShortInput(wrapper, "condition");
-    expectShortInput(wrapper, "warning");
+    expectShortText(wrapper, "condition");
+    expectShortText(wrapper, "warning");
   });
 
   it("keeps a builder threshold's unset Warning, which says no warning level is set", () => {
@@ -617,7 +625,7 @@ describe("AlertConfigSummary — layout", () => {
         promql_warning_value: 0.5,
       }),
     );
-    expectShortInput(threshold, "condition");
+    expectShortText(threshold, "condition");
     expect(value(threshold, "warning")).toBe("> 0.5");
   });
 
@@ -628,6 +636,6 @@ describe("AlertConfigSummary — layout", () => {
 
     const filters = mountSummary(anomalyConfig());
     expectQueryRow(filters, "filters", "sql");
-    expectShortInput(filters, "detection-function");
+    expectShortText(filters, "detection-function");
   });
 });
