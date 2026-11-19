@@ -1557,6 +1557,7 @@ mod tests {
             closes: false,
             thread_headline: Some("checkout rose 50.0% above expected".into()),
             model_version: Some(7),
+            recovered_at_us: None,
         };
         let anomaly = NotificationContext {
             kind: NotificationKind::Anomaly,

@@ -493,6 +493,9 @@ pub struct AnomalyThreadInfo {
     pub closes: bool,
     pub thread_headline: Option<String>,
     pub model_version: Option<i64>,
+    /// Recovery only: when the value came back, for the reply text; older events omit it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recovered_at_us: Option<i64>,
 }
 
 /// The `slack_alert_messages.content` JSON, kept so a re-render can rebuild the message.

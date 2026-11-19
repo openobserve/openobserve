@@ -4918,6 +4918,7 @@ fn anomaly_thread_hint(
         closes: actx.kind == AnomalyAlertKind::Recovery,
         thread_headline: Some(anomaly_headline(actx)),
         model_version: actx.model_version,
+        recovered_at_us: actx.recovered_at_us,
     })
 }
 
@@ -8488,6 +8489,7 @@ mod tests {
                 judged_end_us: 0,
                 model_version: None,
                 current_points: Vec::new(),
+                recovered_at_us: None,
             }
         }
 
