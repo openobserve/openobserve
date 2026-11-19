@@ -620,7 +620,7 @@ const valueOptions = computed<SelectOption[]>(() => {
     }));
   const typed = (slots.values ?? [])
     .filter((v) => !seen.some((s) => s.value === v))
-    .map((v) => ({ label: raw(patternText(v)), value: v }));
+    .map((v) => ({ label: raw(patternText(v, slots.patterns)), value: v }));
   return [...patternOptions.value, ...typed, ...listed];
 });
 
@@ -652,7 +652,10 @@ const valueHelp = computed(() =>
 // The picked values read as words in the sentence, so the picker sizes to them like the other slots.
 const valuesText = computed<I18nText>(() =>
   slots.values?.length
-    ? joinListOrMore(slots.values.map(patternText), t)
+    ? joinListOrMore(
+        slots.values.map((v) => patternText(v, slots.patterns)),
+        t,
+      )
     : t("alerts.intent.slots.valuePrompt"),
 );
 
@@ -781,6 +784,7 @@ const setSlot = async (slot: "field" | "group" | "measure" | "label", value: Sel
   slots[slot] = next && next !== NO_GROUP ? next : undefined;
   if (slot === "field" || slot === "label") {
     slots.values = [];
+    slots.patterns = [];
     if (props.active) await seedValues(props.active);
   }
   if (isMetrics.value) await Promise.all(siblings.value.map(loadSeries));
@@ -793,6 +797,13 @@ const addGroup = () => {
   else slots.group = "";
 };
 
+// Only a regex the picker made from a typed "5xx" stays a pattern; a value the series carry is matched literally.
+const keepPatterns = (added: string[]) => {
+  slots.patterns = [...new Set([...(slots.patterns ?? []), ...added])].filter((p) =>
+    slots.values?.includes(p),
+  );
+};
+
 /** A newly picked value brings its case variants, so ERROR also counts error; the form follows on close. */
 const setValues = (value: SelectModelValue) => {
   const picked = (Array.isArray(value) ? value : [value]).map(asText).filter(Boolean);
@@ -800,6 +811,8 @@ const setValues = (value: SelectModelValue) => {
   const added = picked.filter((v) => !previous.includes(v));
   const variants = isMetrics.value ? [] : withCaseVariants(added, fieldValues.value);
   slots.values = [...new Set([...pickedValues(picked, previous, seeded), ...variants])];
+  const offered = patternOptions.value.map((o) => String(o.value));
+  keepPatterns(added.filter((v) => offered.includes(v)));
   seeded = [];
 };
 
@@ -814,6 +827,7 @@ const addValue = (value: string) => {
   if (!text) return;
   const previous = slots.values ?? [];
   slots.values = [...new Set(pickedValues([...previous, text], previous, seeded))];
+  keepPatterns(text === typed ? [] : [text]);
   seeded = [];
 };
 

@@ -59,6 +59,8 @@ export interface FieldShape {
 export interface IntentSlots {
   field?: string;
   values?: string[];
+  /** The values typed as a pattern such as "5xx"; every other value matches literally. */
+  patterns?: string[];
   group?: string;
   measure?: string;
   factor?: number;
@@ -665,6 +667,7 @@ export function buildMetricFill(
             ? slots.family
             : [{ metric: slots.metric, labels: slots.label ? [slots.label] : [], whole: true }],
           values: slots.values ?? [],
+          patterns: slots.patterns,
           group: slots.group,
           counter: slots.counter ?? true,
           windowMinutes: ctx.periodMinutes,
@@ -823,10 +826,11 @@ const DIGIT_REGEX = /^(?=.*\d)(?=.*\.)[\d.]+$/;
 export const labelPattern = (typed: string, seen: readonly string[]): string =>
   DIGIT_PATTERN.test(typed) && !seen.includes(typed) ? typed.replace(/x/gi, ".") : typed;
 
-/** A digit regex read back the way it was typed: "5.." as "5xx". */
-export const patternText = (value: string): string =>
-  DIGIT_REGEX.test(value) ? value.replace(/\./g, "x") : value;
+/** A pattern read back the way it was typed: "5.." as "5xx"; a literal value reads as itself. */
+export const patternText = (value: string, patterns: readonly string[] = []): string =>
+  patterns.includes(value) && DIGIT_REGEX.test(value) ? value.replace(/\./g, "x") : value;
 
+const regexLiteral = (value: string) => value.replace(/[\\.+*?()|[\]{}^$]/g, "\\$&");
 const promLabelValue = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
 /** The matching share in percent, summed over every family member so a group reporting under either
@@ -834,12 +838,16 @@ const promLabelValue = (value: string) => value.replace(/\\/g, "\\\\").replace(/
 export function ratioPromql(input: {
   members: MetricFamilyMember[];
   values: string[];
+  patterns?: readonly string[];
   group?: string;
   counter: boolean;
   windowMinutes: number;
 }): string {
   const window = `${Math.max(1, Math.round(input.windowMinutes))}m`;
-  const pattern = input.values.filter(Boolean).map(promLabelValue).join("|");
+  const pattern = input.values
+    .filter(Boolean)
+    .map((v) => promLabelValue(input.patterns?.includes(v) ? v : regexLiteral(v)))
+    .join("|");
   const rate = (selector: string) => (input.counter ? `rate(${selector}[${window}])` : selector);
   // A series carrying none of the spellings cannot be split, so it stays out of the denominator too.
   const reads = (m: MetricFamilyMember, filtered: boolean) => {

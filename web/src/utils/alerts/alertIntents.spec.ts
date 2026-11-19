@@ -34,6 +34,7 @@ import {
   rankMetricCategory,
   rankMetricGroup,
   pickedValues,
+  ratioPromql,
   starterValue,
   readFieldShapes,
   shapeQuerySql,
@@ -370,6 +371,7 @@ describe("alertIntents", () => {
       {
         metric: "http_server_request_duration_count",
         values: ["5.."],
+        patterns: ["5.."],
         group: "service_name",
         counter: true,
         family: [
@@ -452,11 +454,31 @@ describe("label value patterns", () => {
   });
 
   it.each([
-    ["5..", "5xx"],
-    ["50.", "50x"],
-    ["a.b", "a.b"],
-    ["500", "500"],
-  ])("%s reads as %s", (value, text) => {
-    expect(patternText(value)).toBe(text);
+    ["5..", ["5.."], "5xx"],
+    ["50.", ["50."], "50x"],
+    ["1.2", [], "1.2"],
+    ["500", [], "500"],
+  ])("%s with patterns %j reads as %s", (value, patterns, text) => {
+    expect(patternText(value, patterns)).toBe(text);
+  });
+
+  it.each([
+    [["api"], [], "api"],
+    [["api.v1"], [], "api\\\\.v1"],
+    [["a+b"], [], "a\\\\+b"],
+    [["f(x)"], [], "f\\\\(x\\\\)"],
+    [["a|b"], [], "a\\\\|b"],
+    [["C:\\tmp"], [], "C:\\\\\\\\tmp"],
+    [['it"s'], [], 'it\\"s'],
+    [["5..", "1.2"], ["5.."], "5..|1\\\\.2"],
+  ])("%j with patterns %j matches %s", (values, patterns, matcher) => {
+    const promql = ratioPromql({
+      members: [{ metric: "m", labels: ["code"], whole: true }],
+      values,
+      patterns,
+      counter: false,
+      windowMinutes: 5,
+    });
+    expect(promql).toBe(`sum (m{code=~"${matcher}"}) / sum (m) * 100`);
   });
 });
