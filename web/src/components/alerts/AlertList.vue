@@ -632,47 +632,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-actions="{ row }">
                 <div class="actions-container flex items-center">
                   <OTooltip
-                    v-if="anomalyRowLocked(row)"
-                    side="bottom"
-                    :content="anomalyLockedReason"
-                  >
-                    <span class="ms-1 inline-flex max-md:hidden">
-                      <OButton
-                        :data-row-action="row.enabled ? 'pause' : 'resume'"
-                        :data-test="`alert-list-${row.name}-pause-start-alert`"
-                        :aria-label="row.enabled ? t('alerts.pause') : t('alerts.resume')"
-                        variant="ghost"
-                        size="icon-sm"
-                        icon-left="lock"
-                        disabled
-                      />
-                    </span>
-                  </OTooltip>
-                  <OButton
-                    v-else
-                    :data-row-action="row.enabled ? 'pause' : 'resume'"
-                    :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ms-1 max-md:hidden"
-                    :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                    size="icon-xs-sq"
-                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                    :aria-label="row.enabled ? t('alerts.pause') : t('alerts.resume')"
-                    :loading="!!alertStateLoadingMap[row.uuid]"
-                    @click.stop="toggleAlertState(row)"
-                  >
-                    <OTooltip
-                      side="bottom"
-                      exclusive
-                      :content="row.enabled ? t('alerts.pause') : t('alerts.resume')"
-                      :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
-                    />
-                  </OButton>
-                  <OTooltip
                     v-if="rowAnomalyLocked(row)"
                     side="bottom"
                     :content="anomalyLockedReason"
                   >
-                    <span class="inline-flex max-md:hidden">
+                    <span class="ms-1 inline-flex max-md:hidden">
                       <OButton
                         data-row-action="edit"
                         :data-test="`alert-list-${row.name}-update-alert`"
@@ -691,7 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-xs-sq"
                     icon-left="edit"
-                    class="max-md:hidden"
+                    class="ms-1 max-md:hidden"
                     @click.stop="editAlert(row)"
                   >
                     <OTooltip
@@ -737,6 +701,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </OButton>
                   </span>
+                  <OTooltip
+                    v-if="anomalyRowLocked(row)"
+                    side="bottom"
+                    :content="anomalyLockedReason"
+                  >
+                    <span class="inline-flex max-md:hidden">
+                      <OButton
+                        :data-row-action="row.enabled ? 'pause' : 'resume'"
+                        :data-test="`alert-list-${row.name}-pause-start-alert`"
+                        :aria-label="row.enabled ? t('alerts.pause') : t('alerts.resume')"
+                        variant="ghost"
+                        size="icon-sm"
+                        icon-left="lock"
+                        disabled
+                      />
+                    </span>
+                  </OTooltip>
+                  <OButton
+                    v-else
+                    :data-row-action="row.enabled ? 'pause' : 'resume'"
+                    :data-test="`alert-list-${row.name}-pause-start-alert`"
+                    class="max-md:hidden"
+                    :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+                    size="icon-xs-sq"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :aria-label="row.enabled ? t('alerts.pause') : t('alerts.resume')"
+                    :loading="!!alertStateLoadingMap[row.uuid]"
+                    @click.stop="toggleAlertState(row)"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      exclusive
+                      :content="row.enabled ? t('alerts.pause') : t('alerts.resume')"
+                      :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
+                    />
+                  </OButton>
                   <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
                          teleported out of the row DOM): x = export, Del = delete. -->
@@ -767,25 +767,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`alert-list-${row.name}-more-options`"
                       />
                     </template>
-                    <ODropdownItem
-                      class="md:hidden"
-                      :disabled="!!alertStateLoadingMap[row.uuid] || anomalyRowLocked(row)"
-                      :focusable-unavailable="anomalyRowLocked(row)"
-                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
-                      :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
-                      @select="toggleAlertState(row)"
-                    >
-                      <template #icon-left>
-                        <OIcon
-                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
-                          :name="
-                            anomalyRowLocked(row) ? 'lock' : row.enabled ? 'pause' : 'play-arrow'
-                          "
-                          size="sm"
-                        />
-                      </template>
-                      {{ row.enabled ? t("alerts.pause") : t("alerts.resume") }}
-                    </ODropdownItem>
                     <ODropdownItem
                       class="md:hidden"
                       :disabled="rowAnomalyLocked(row)"
@@ -819,6 +800,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </template>
                       {{ t("alerts.clone") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="!!alertStateLoadingMap[row.uuid] || anomalyRowLocked(row)"
+                      :focusable-unavailable="anomalyRowLocked(row)"
+                      :description="anomalyRowLocked(row) ? anomalyLockedReason : undefined"
+                      :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
+                      @select="toggleAlertState(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon
+                          :class="anomalyRowLocked(row) ? 'lock-chip' : undefined"
+                          :name="
+                            anomalyRowLocked(row) ? 'lock' : row.enabled ? 'pause' : 'play-arrow'
+                          "
+                          size="sm"
+                        />
+                      </template>
+                      {{ row.enabled ? t("alerts.pause") : t("alerts.resume") }}
                     </ODropdownItem>
                     <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
