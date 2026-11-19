@@ -15,8 +15,9 @@
 
 //! AI memory: scopes, settings, authors, edits and the pure rules every writer shares.
 
-use std::{fmt, str::FromStr};
+use std::{fmt, str::FromStr, sync::LazyLock};
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -26,6 +27,43 @@ pub const USER_DEFAULT_MAX_BYTES: i64 = 2 * 1024;
 pub const SHARED_MAX_BYTES_LIMIT: i64 = 256 * 1024;
 pub const USER_MAX_BYTES_LIMIT: i64 = 16 * 1024;
 pub const PROMPT_BUDGET_BYTES: i64 = 24 * 1024;
+/// o2-ai's `memory_secret_patterns.json`, copied unchanged, so both sides refuse the same text.
+const SECRET_PATTERNS_JSON: &str = include_str!("memory_secret_patterns.json");
+
+/// Credential shapes no memory may hold, by name.
+static SECRET_RES: LazyLock<Vec<(String, Regex)>> = LazyLock::new(|| {
+    #[derive(Deserialize)]
+    struct Pattern {
+        name: String,
+        pattern: String,
+    }
+    // The file is a constant covered by a test, so it parses and every pattern compiles.
+    let patterns: Vec<Pattern> =
+        serde_json::from_str(SECRET_PATTERNS_JSON).expect("valid secret pattern file");
+    patterns
+        .into_iter()
+        .map(|p| {
+            (
+                p.name,
+                Regex::new(&p.pattern).expect("valid secret pattern"),
+            )
+        })
+        .collect()
+});
+
+static SUPPRESSION_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)\b(?:ignore[sd]?|mute[sd]?|suppress(?:es|ed)?|silence[sd]?|disregard|(?:do not|don't|never) (?:alert|page|investigate|look into|escalate))\b",
+    )
+    .expect("valid suppression pattern")
+});
+
+static ABSENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)\b(?:no|not|never|none|without|absent|missing|doesn't|isn't|aren't|hasn't|haven't)\b",
+    )
+    .expect("valid absence pattern")
+});
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
@@ -294,6 +332,18 @@ pub enum EditError {
 pub enum ContentError {
     #[error("the memory would be {size_bytes} bytes, over its {max_bytes} byte cap")]
     TooLarge { size_bytes: i64, max_bytes: i64 },
+    #[error("the text looks like a secret ({pattern}); memory may not hold credentials")]
+    LooksLikeSecret { pattern: &'static str },
+}
+
+/// Why a pending edit may need a closer look from the memory admin who reviews it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EditFlag {
+    /// The edit says something is absent ("has no traces"), which a wrong edit can hide.
+    StatesAbsence,
+    /// The edit tells the agent to ignore, mute or not investigate something.
+    SuppressionText,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -357,7 +407,40 @@ pub fn validate_content(
             max_bytes,
         });
     }
-    Ok(())
+    match secret_pattern(content) {
+        Some(pattern) => Err(ContentError::LooksLikeSecret { pattern }),
+        None => Ok(()),
+    }
+}
+
+/// The name of the first secret pattern `text` matches.
+pub fn secret_pattern(text: &str) -> Option<&'static str> {
+    SECRET_RES
+        .iter()
+        .find(|(_, re)| re.is_match(text))
+        .map(|(name, _)| name.as_str())
+}
+
+/// The flags of the text an edit adds; removing text raises none.
+pub fn edit_flags(edits: &[MemoryEdit]) -> Vec<EditFlag> {
+    let mut flags = Vec::new();
+    for edit in edits {
+        // An add may also write a new `## <section>` heading, so the section counts as added text.
+        let added = match edit {
+            MemoryEdit::Add { section, text } => format!("{section}\n{text}"),
+            MemoryEdit::Replace { new, .. } => new.clone(),
+            MemoryEdit::Remove { .. } => continue,
+        };
+        for (flag, re) in [
+            (EditFlag::StatesAbsence, &*ABSENCE_RE),
+            (EditFlag::SuppressionText, &*SUPPRESSION_RE),
+        ] {
+            if !flags.contains(&flag) && re.is_match(&added) {
+                flags.push(flag);
+            }
+        }
+    }
+    flags
 }
 
 /// The toolset setting falls back to the org's; `org_setting` is ignored for other scopes.
@@ -725,6 +808,87 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(serde_json::to_value(&skipped).unwrap()["not_loaded"], true);
+    }
+
+    #[test]
+    fn credential_shaped_text_is_refused_for_every_writer() {
+        assert_eq!(
+            SECRET_RES.len(),
+            12,
+            "every pattern of the shared file compiles"
+        );
+        let token = format!("ghp_{}", "a".repeat(36));
+        let cases = [
+            ("key AKIAABCDEFGHIJKLMNOP here", Some("AWS access key")),
+            (token.as_str(), Some("GitHub token")),
+            ("xoxb-1234567890-abcdef", Some("Slack token")),
+            ("-----BEGIN RSA PRIVATE KEY-----", Some("private key")),
+            (
+                "eyJhbGciOiJIUzI1.eyJzdWIiOiIxMjM0.SflKxwRJSMeKKF2Q",
+                Some("JWT"),
+            ),
+            (
+                "https://bob:hunter2@db.example.com",
+                Some("credentials in a URL"),
+            ),
+            (
+                "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+                Some("bearer or Api-Token credential"),
+            ),
+            (
+                "api_key: 0123456789abcdef0123",
+                Some("key, token or password value"),
+            ),
+            ("Use `service:<name> status:error` for error rate", None),
+            (
+                "tokens are rotated weekly; password policy is 90 days",
+                None,
+            ),
+        ];
+        for (text, expected) in cases {
+            assert_eq!(secret_pattern(text), expected, "{text}");
+        }
+        assert_eq!(
+            validate_content(MemoryScope::Org, "AKIAABCDEFGHIJKLMNOP", None),
+            Err(ContentError::LooksLikeSecret {
+                pattern: "AWS access key"
+            })
+        );
+    }
+
+    #[test]
+    fn added_text_is_flagged_for_absence_and_suppression() {
+        assert_eq!(
+            edit_flags(&[add("S", "payments has no O2 traces")]),
+            [EditFlag::StatesAbsence]
+        );
+        assert_eq!(
+            edit_flags(&[replace("x", "Ignore 5xx alerts from checkout")]),
+            [EditFlag::SuppressionText]
+        );
+        assert_eq!(
+            edit_flags(&[
+                add("S", "do not investigate disk alerts"),
+                add("S", "never paged")
+            ]),
+            [EditFlag::StatesAbsence, EditFlag::SuppressionText]
+        );
+        assert!(
+            edit_flags(&[
+                add("S", "checkout calls payments (http)"),
+                remove("not here")
+            ])
+            .is_empty()
+        );
+        assert_eq!(
+            edit_flags(&[add("Do not investigate checkout alerts", "- owned by web")]),
+            [EditFlag::StatesAbsence, EditFlag::SuppressionText],
+            "a pending add whose new heading carries the suppression"
+        );
+        assert_eq!(
+            serde_json::to_string(&[EditFlag::StatesAbsence, EditFlag::SuppressionText]).unwrap(),
+            r#"["states_absence","suppression_text"]"#
+        );
     }
 
     #[test]

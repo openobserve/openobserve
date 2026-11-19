@@ -22,6 +22,8 @@ pub struct Model {
     pub origin_region: String,
     pub op_id: String,
     pub created_at: i64,
+    /// JSON list of `EditFlag`s of a pending edit; NULL when it raised none.
+    pub flags: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

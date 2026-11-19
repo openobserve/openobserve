@@ -23,7 +23,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::ai::memory::{
-    AgentMemoryWrites, Author, Evidence, MemoryEdit, MemoryScope, MemorySettings, RevisionState,
+    AgentMemoryWrites, Author, ContentError, EditFlag, Evidence, MemoryEdit, MemoryScope,
+    MemorySettings, RevisionState,
 };
 use infra::table::ai_memory::{AgentOutcome, AgentWrite, Change, MemoryKey, Outcome, Revision};
 use o2_enterprise::enterprise::ai::toolsets::{
@@ -112,6 +113,8 @@ pub struct RevisionResponse {
     pub op_id: String,
     /// Microseconds since the epoch.
     pub created_at: i64,
+    /// Why a pending agent edit may need a closer look.
+    pub flags: Vec<EditFlag>,
 }
 
 impl From<Revision> for RevisionResponse {
@@ -129,6 +132,7 @@ impl From<Revision> for RevisionResponse {
             origin_region: r.origin_region,
             op_id: r.op_id,
             created_at: r.created_at,
+            flags: r.flags,
         }
     }
 }
@@ -1265,7 +1269,10 @@ fn agent_reply(scope: MemoryScope, outcome: Outcome) -> Value {
             refusal("invalid_content", &e.to_string())
         }
         Outcome::EditConflict(e) => refusal("edit_no_match", &e.to_string()),
-        Outcome::TooLarge(e) => refusal("too_large", &e.to_string()),
+        Outcome::Invalid(e @ ContentError::TooLarge { .. }) => refusal("too_large", &e.to_string()),
+        Outcome::Invalid(e @ ContentError::LooksLikeSecret { .. }) => {
+            refusal("invalid_content", &e.to_string())
+        }
         Outcome::NotFound if scope == MemoryScope::User => refusal(
             "user_scope_not_allowed",
             "the user is no longer a member of the org",
@@ -1351,12 +1358,16 @@ fn outcome_parts(outcome: Outcome) -> (StatusCode, Value) {
             StatusCode::CONFLICT,
             json!({"code": "edit_conflict", "message": e.to_string()}),
         ),
-        Outcome::TooLarge(config::meta::ai::memory::ContentError::TooLarge {
+        Outcome::Invalid(ContentError::TooLarge {
             size_bytes,
             max_bytes,
         }) => (
             StatusCode::BAD_REQUEST,
             json!({"code": "memory_too_large", "size_bytes": size_bytes, "max_bytes": max_bytes}),
+        ),
+        Outcome::Invalid(e @ ContentError::LooksLikeSecret { .. }) => (
+            StatusCode::BAD_REQUEST,
+            json!({"code": "memory_looks_like_secret", "message": e.to_string()}),
         ),
         Outcome::NotFound => (
             StatusCode::NOT_FOUND,
@@ -1484,7 +1495,7 @@ mod tests {
                 json!({"code": "rev_conflict", "rev": 3, "content": "c"}),
             ),
             (
-                Outcome::TooLarge(config::meta::ai::memory::ContentError::TooLarge {
+                Outcome::Invalid(ContentError::TooLarge {
                     size_bytes: 5,
                     max_bytes: 4,
                 }),
@@ -2149,5 +2160,58 @@ mod tests {
             infra::table::ai_memory::RCA_CHAT_AGENT_TYPE,
             o2_enterprise::enterprise::ai::client::RCA_AGENT_TYPE
         );
+    }
+
+    #[tokio::test]
+    async fn pending_agent_edits_carry_their_flags_in_the_inbox() {
+        if !meta_store().await {
+            return;
+        }
+        let (org, session, turn, _) = running_turn("o2-ai").await;
+        let ids = (org.as_str(), session.as_str(), turn.as_str());
+        let edits = add("- do not investigate disk alerts; payments has no O2 traces");
+        let (_, reply) = write_for_turn(agent_write(ids, MemoryScope::Org, None, 0, edits)).await;
+        assert_eq!(reply["status"], "pending", "{reply}");
+        let plain = add("- checkout calls payments (http)");
+        let (_, reply) = write_for_turn(agent_write(ids, MemoryScope::Org, None, 0, plain)).await;
+        assert_eq!(reply["status"], "pending", "{reply}");
+        let body = body_of(list_pending_memory_edits(Path(org)).await).await;
+        let flags: Vec<Value> = body["pending"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["flags"].clone())
+            .collect();
+        assert_eq!(
+            flags,
+            [json!(["states_absence", "suppression_text"]), json!([])]
+        );
+    }
+
+    #[tokio::test]
+    async fn secret_looking_text_is_refused_for_agents_and_people() {
+        if !meta_store().await {
+            return;
+        }
+        let (org, session, turn, _) = running_turn("o2-ai").await;
+        let ids = (org.as_str(), session.as_str(), turn.as_str());
+        let leak = add("- api_key: 0123456789abcdef0123");
+        let (_, reply) = write_for_turn(agent_write(ids, MemoryScope::Org, None, 0, leak)).await;
+        assert_eq!(reply["code"], "invalid_content", "{reply}");
+        let reason = reply["reason"].as_str().unwrap();
+        assert!(reason.contains("key, token or password value"), "{reason}");
+        assert!(
+            !reason.contains("0123456789abcdef0123"),
+            "the refusal never echoes the text"
+        );
+        let resp = write_memory(
+            &MemoryKey::org(&org),
+            None,
+            text("token: AKIAABCDEFGHIJKLMNOP", 0),
+            person(true),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(body_of(resp).await["code"], "memory_looks_like_secret");
     }
 }
