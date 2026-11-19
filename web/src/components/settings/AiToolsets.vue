@@ -25,6 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
     >
       <template #actions>
+        <OButton
+          v-if="store.state.zoConfig?.super_cluster_enabled"
+          variant="outline"
+          size="sm"
+          data-test="ai-toolsets-resync-btn"
+          @click="confirmResync = true"
+        >
+          {{ t("aiToolset.resync") }}
+        </OButton>
         <ODropdown align="end">
           <template #trigger>
             <OButton
@@ -137,6 +146,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :saved-at="toolsetDrafts.savedAt(row.id)"
                 :data-test="`ai-toolsets-${row.name}-draft-dot`"
               />
+              <OBadge
+                v-if="row.needs_credentials"
+                variant="warning-outline"
+                size="sm"
+                :data-test="`ai-toolsets-${row.name}-needs-credentials`"
+              >
+                {{ t("aiToolset.needsCredentials") }}
+              </OBadge>
               <span v-if="row.rename_needed" class="relative inline-flex">
                 <OBadge
                   variant="warning-outline"
@@ -228,6 +245,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:ok="deleteToolset"
     @update:cancel="cancelDelete"
     v-model="confirmDelete.visible"
+  />
+  <ConfirmDialog
+    v-model="confirmResync"
+    :title="t('aiToolset.resync')"
+    :message="t('aiToolset.resyncMessage')"
+    @update:ok="resync"
+    @update:cancel="confirmResync = false"
   />
 </template>
 
@@ -354,6 +378,7 @@ export default defineComponent({
         kind: item.kind,
         description: item.description || "",
         rename_needed: !!item.rename_needed,
+        needs_credentials: !!item.needs_credentials,
         badges: item.kind === "mcp" ? toolsetBadges(item.data) : [],
         failing: failingSince(item.health, nowMs.value * 1000),
         presetBadge: presetBadge(item.data, presets.value),
@@ -615,6 +640,23 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Delete
     // -----------------------------------------------------------------------
+    const confirmResync = ref(false);
+    const resync = async () => {
+      confirmResync.value = false;
+      try {
+        const res = await aiToolsetsService.resync(store.state.selectedOrganization.identifier);
+        toast({
+          variant: "success",
+          message: t("aiToolset.resynced", { count: res.data.published }),
+        });
+      } catch (err: any) {
+        toast({
+          variant: "error",
+          message: err?.response?.data?.message || t("aiToolset.resyncFailed"),
+        });
+      }
+    };
+
     const confirmDeleteToolset = (row: any) => {
       confirmDelete.value = { visible: true, data: row };
     };
@@ -668,6 +710,8 @@ export default defineComponent({
     };
 
     return {
+      confirmResync,
+      resync,
       refreshData,
       toolsetDrafts,
       t,

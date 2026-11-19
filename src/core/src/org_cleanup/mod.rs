@@ -1382,6 +1382,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     ai_toolset_health::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_toolset_health: {e}"))?;
+    org_ai_toolsets::delete_tombstones_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_toolset_tombstones: {e}"))?;
     // Before the rows: the purge lists the chats from them, and a retry skips confirmed ones.
     #[cfg(feature = "enterprise")]
     crate::ai_chat::purge_org_replicas(org_id)

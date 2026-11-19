@@ -291,6 +291,7 @@ describe("AddAiToolset.schema", () => {
         name: "",
         kind: "mcp",
         description: "",
+        region_only: false,
         mcp: {
           url: "",
           timeout_seconds: 30,

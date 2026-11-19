@@ -155,6 +155,7 @@ pub const COVERAGE: &[Coverage] = &[
     table("online_eval_jobs", DB),
     table("org_ai_toolsets", DB),
     table("ai_toolset_health", DB),
+    table("ai_toolset_tombstones", DB),
     exempt(Kind::Table, "org_cleanup_tasks", "deleted last by step 900"),
     table("org_ingestion_tokens", DB),
     table("org_invites", CLOUD),

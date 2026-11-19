@@ -21,11 +21,12 @@
 
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, QuerySelect, Set,
-    SqlErr, TransactionTrait, sea_query::Expr,
+    SqlErr, TransactionTrait,
+    sea_query::{Expr, OnConflict},
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
-use super::entity::org_ai_toolsets::*;
+use super::entity::{ai_toolset_tombstones as tombstones, org_ai_toolsets::*};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
@@ -57,6 +58,23 @@ pub struct OrgToolset {
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Never sent to, nor overwritten from, another region.
+    pub region_only: bool,
+    /// The region whose write this row holds; `None` for this region's own.
+    pub origin_region: Option<String>,
+}
+
+/// How long a tombstone is kept; each write and re-sync drops older ones.
+pub const TOMBSTONE_KEEP_MICROS: i64 = 30 * 24 * 3600 * 1_000_000;
+
+/// A deleted toolset's key, kept 30 days so a re-sync can't bring it back.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tombstone {
+    pub org: String,
+    /// The toolset's normalized name.
+    pub key: String,
+    pub deleted_at: i64,
+    pub region: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +113,8 @@ fn model_to_toolset(model: Model, dek: &[u8]) -> Result<OrgToolset, errors::Erro
         created_by: model.created_by,
         created_at: model.created_at,
         updated_at: model.updated_at,
+        region_only: model.region_only,
+        origin_region: model.origin_region,
     })
 }
 
@@ -268,6 +288,29 @@ pub async fn remove(org: &str, id: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Keeps the later of the stored and the given delete for the key, and drops expired ones.
+pub async fn put_tombstone(tombstone: Tombstone) -> Result<(), errors::Error> {
+    put_tombstone_with(get_orm_client_rw().await, tombstone).await
+}
+
+pub async fn get_tombstone(org: &str, key: &str) -> Result<Option<Tombstone>, errors::Error> {
+    get_tombstone_with(get_orm_client_rw().await, org, key).await
+}
+
+/// Org cleanup: a reused org name must not inherit the old org's deletes.
+pub async fn delete_tombstones_by_org(org: &str) -> Result<(), errors::Error> {
+    tombstones::Entity::delete_many()
+        .filter(tombstones::Column::Org.eq(org))
+        .exec(get_orm_client_rw().await)
+        .await?;
+    Ok(())
+}
+
+/// Drops tombstones older than `before`, then returns the org's remaining ones.
+pub async fn live_tombstones(org: &str, before: i64) -> Result<Vec<Tombstone>, errors::Error> {
+    live_tombstones_with(get_orm_client_rw().await, org, before).await
+}
+
 /// Credentials are ciphertext under the org DEK, so they must go before the DEK does.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
     Entity::delete_many()
@@ -275,6 +318,76 @@ pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
         .exec(get_orm_client_rw().await)
         .await?;
     Ok(())
+}
+
+async fn put_tombstone_with<C: ConnectionTrait>(
+    conn: &C,
+    t: Tombstone,
+) -> Result<(), errors::Error> {
+    tombstones::Entity::delete_many()
+        .filter(tombstones::Column::DeletedAt.lt(t.deleted_at - TOMBSTONE_KEEP_MICROS))
+        .exec(conn)
+        .await?;
+    if let Some(stored) = get_tombstone_with(conn, &t.org, &t.key).await?
+        && stored.deleted_at >= t.deleted_at
+    {
+        return Ok(());
+    }
+    let record = tombstones::ActiveModel {
+        org: Set(t.org),
+        key: Set(t.key),
+        deleted_at: Set(t.deleted_at),
+        region: Set(t.region),
+    };
+    tombstones::Entity::insert(record)
+        .on_conflict(
+            OnConflict::columns([tombstones::Column::Org, tombstones::Column::Key])
+                .update_columns([tombstones::Column::DeletedAt, tombstones::Column::Region])
+                .to_owned(),
+        )
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+async fn get_tombstone_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    key: &str,
+) -> Result<Option<Tombstone>, errors::Error> {
+    Ok(tombstones::Entity::find()
+        .filter(tombstones::Column::Org.eq(org))
+        .filter(tombstones::Column::Key.eq(key))
+        .one(conn)
+        .await?
+        .map(to_tombstone))
+}
+
+async fn live_tombstones_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    before: i64,
+) -> Result<Vec<Tombstone>, errors::Error> {
+    tombstones::Entity::delete_many()
+        .filter(tombstones::Column::DeletedAt.lt(before))
+        .exec(conn)
+        .await?;
+    Ok(tombstones::Entity::find()
+        .filter(tombstones::Column::Org.eq(org))
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(to_tombstone)
+        .collect())
+}
+
+fn to_tombstone(m: tombstones::Model) -> Tombstone {
+    Tombstone {
+        org: m.org,
+        key: m.key,
+        deleted_at: m.deleted_at,
+        region: m.region,
+    }
 }
 
 async fn encrypt_entry_data(entry: &OrgToolset) -> Result<Option<String>, errors::Error> {
@@ -302,6 +415,8 @@ async fn insert_with<C: ConnectionTrait>(
         created_by: Set(entry.created_by),
         created_at: Set(entry.created_at),
         updated_at: Set(entry.updated_at),
+        region_only: Set(entry.region_only),
+        origin_region: Set(entry.origin_region),
     };
     match Entity::insert(record).exec(conn).await {
         Ok(_) => Ok(()),
@@ -344,7 +459,14 @@ async fn write_if_unchanged<C: ConnectionTrait>(
     read_updated_at: i64,
 ) -> Result<bool, errors::Error> {
     let res = Entity::update_many()
+        .col_expr(Column::Name, Expr::value(entry.name.clone()))
+        .col_expr(Column::Kind, Expr::value(entry.kind.clone()))
         .col_expr(Column::Description, Expr::value(entry.description.clone()))
+        .col_expr(Column::RegionOnly, Expr::value(entry.region_only))
+        .col_expr(
+            Column::OriginRegion,
+            Expr::value(entry.origin_region.clone()),
+        )
         .col_expr(Column::Data, Expr::value(encrypted_data))
         .col_expr(Column::UpdatedAt, Expr::value(entry.updated_at))
         .filter(Column::Org.eq(&entry.org))
@@ -376,6 +498,44 @@ mod tests {
 
         let rows = list_with(&db, "org", ListFilter::default(), Some(u64::MAX)).await;
         assert!(rows.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_tombstone_keeps_the_later_delete_and_old_ones_expire() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(tombstones::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let at = |deleted_at, region: &str| Tombstone {
+            org: "o".into(),
+            key: "dd".into(),
+            deleted_at,
+            region: region.into(),
+        };
+        put_tombstone_with(&db, at(5, "us")).await.unwrap();
+        put_tombstone_with(&db, at(3, "eu")).await.unwrap();
+        assert_eq!(
+            get_tombstone_with(&db, "o", "dd").await.unwrap(),
+            Some(at(5, "us"))
+        );
+        put_tombstone_with(&db, at(9, "eu")).await.unwrap();
+        assert_eq!(
+            live_tombstones_with(&db, "o", 6).await.unwrap(),
+            [at(9, "eu")]
+        );
+        assert!(live_tombstones_with(&db, "o", 10).await.unwrap().is_empty());
+        let other = |deleted_at| Tombstone {
+            key: "gh".into(),
+            ..at(deleted_at, "eu")
+        };
+        put_tombstone_with(&db, other(1)).await.unwrap();
+        put_tombstone_with(&db, at(TOMBSTONE_KEEP_MICROS + 2, "us"))
+            .await
+            .unwrap();
+        assert!(
+            get_tombstone_with(&db, "o", "gh").await.unwrap().is_none(),
+            "expired on write"
+        );
     }
 
     #[test]
@@ -472,6 +632,8 @@ mod tests {
             created_by: Set("u".to_string()),
             created_at: Set(1),
             updated_at: Set(1),
+            region_only: Set(false),
+            origin_region: Set(None),
         }
         .insert(db)
         .await
@@ -489,6 +651,8 @@ mod tests {
             created_by: "u".to_string(),
             created_at: 1,
             updated_at,
+            region_only: false,
+            origin_region: None,
         }
     }
 

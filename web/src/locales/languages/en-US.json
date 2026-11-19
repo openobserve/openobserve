@@ -18052,7 +18052,14 @@
     "addCredFile": "Add credential file",
     "skillConfig": "Skill configuration",
     "skillContent": "Skill definition (Markdown)",
-    "skillContentRequired": "Skill content is required"
+    "skillContentRequired": "Skill content is required",
+    "needsCredentials": "Add this region's credentials",
+    "regionOnly": "This region only",
+    "regionOnlyHint": "Don't copy this toolset to other regions or take their changes to it",
+    "resync": "Re-sync AI settings",
+    "resyncMessage": "Send this org's AI toolsets and recent deletes to the other regions again? Nothing is deleted that another region still has.",
+    "resynced": "Sent {count} updates to the other regions",
+    "resyncFailed": "Could not re-sync AI settings"
   },
   "cipherKey": {
     "configuration": "Configuration",

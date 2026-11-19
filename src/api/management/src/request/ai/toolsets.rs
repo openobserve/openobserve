@@ -193,6 +193,8 @@ pub async fn create(
         created_by: user_email.user_id.clone(),
         created_at: now,
         updated_at: now,
+        region_only: body.region_only,
+        origin_region: None,
     };
 
     let id = entry.id.clone();
@@ -221,6 +223,7 @@ pub async fn create(
         Ok(None) => return MetaHttpResponse::internal_error("toolset not found after insert"),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
+    db::ai_toolsets::published_put(&saved).await;
 
     let mut toolsets = [ToolsetResponse::from_toolset(saved)];
     flag_renames(&org_id, &mut toolsets).await;
@@ -383,6 +386,7 @@ pub async fn update(
         Ok(t) => t,
         Err(resp) => return resp,
     };
+    db::ai_toolsets::published_put(&updated).await;
 
     let mut toolsets = [ToolsetResponse::from_toolset(updated)];
     flag_renames(&org_id, &mut toolsets).await;
@@ -506,14 +510,18 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     let (org_id, id) = path;
 
     // Verify existence before deleting.
-    let name = match infra::table::org_ai_toolsets::get(&org_id, &id).await {
-        Ok(Some(row)) => row.name,
+    let row = match infra::table::org_ai_toolsets::get(&org_id, &id).await {
+        Ok(Some(row)) => row,
         Ok(None) => return MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
     if let Err(e) = infra::table::org_ai_toolsets::remove(&org_id, &id).await {
         return MetaHttpResponse::internal_error(e);
+    }
+    let name = row.name.clone();
+    if let Err(e) = db::ai_toolsets::published_delete(&row, now_micros()).await {
+        log::error!("[SUPER_CLUSTER:sync] toolset '{name}' in org={org_id} wasn't replicated: {e}");
     }
     // A later toolset of the same name starts with no health history.
     if let Err(e) =
@@ -530,6 +538,39 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
         )),
     )
         .into_response()
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct ResyncResponse {
+    /// Messages sent: one per replicated toolset, plus one per delete of the last 30 days.
+    pub published: usize,
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/toolsets/_resync",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "ResyncAiToolsets",
+    summary = "Re-send the org's AI toolsets to the other regions",
+    description = "Republishes every toolset not marked \"this region only\", without secret \
+                   values, plus the deletes of the last 30 days, so a region that missed changes \
+                   catches up. Adds and updates only; never deletes a row another region lacks. \
+                   Only available in enterprise deployments with super cluster enabled.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "Messages sent", content_type = "application/json", body = ResyncResponse),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn resync(Path(org_id): Path<String>) -> Response {
+    match db::ai_toolsets::resync(&org_id, now_micros()).await {
+        Ok(published) => Json(ResyncResponse { published }).into_response(),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
 }
 
 /// An MCP URL can carry its key in the userinfo, path or query; only toolset writers see it whole.
@@ -596,6 +637,8 @@ async fn write_update(
             description: body.description.clone().or(existing.description),
             data,
             updated_at: now_micros().max(read_updated_at + 1),
+            region_only: body.region_only.unwrap_or(existing.region_only),
+            origin_region: None,
             ..existing
         };
         match infra::table::org_ai_toolsets::update_if_unchanged(updated.clone(), read_updated_at)
@@ -859,6 +902,8 @@ mod tests {
             updated_at: 0,
             rename_needed: false,
             health: None,
+            region_only: false,
+            needs_credentials: false,
         }
     }
 
@@ -896,6 +941,7 @@ mod tests {
                     kind: ToolsetKind::Skill,
                     description: None,
                     data: Some(json!({"content": "x"})),
+                    region_only: false,
                 }),
             )
             .await;
@@ -1078,6 +1124,18 @@ mod tests {
     }
 
     #[test]
+    fn every_write_handler_replicates_its_change() {
+        let source = include_str!("toolsets.rs");
+        let body = |name: &str| {
+            let rest = &source[source.find(&format!("pub async fn {name}(")).unwrap()..];
+            &rest[..rest.find("\n}\n").unwrap()]
+        };
+        assert!(body("create").contains("db::ai_toolsets::published_put(&saved)"));
+        assert!(body("update").contains("db::ai_toolsets::published_put(&updated)"));
+        assert!(body("delete").contains("db::ai_toolsets::published_delete(&row, "));
+    }
+
+    #[test]
     fn health_is_attached_by_the_name_the_agent_uses() {
         use infra::table::ai_toolset_health::ToolsetHealth as Row;
         let rows = std::collections::HashMap::from([(
@@ -1129,6 +1187,8 @@ mod tests {
             created_by: "u".to_string(),
             created_at: 1,
             updated_at: 1,
+            region_only: false,
+            origin_region: None,
         }
     }
 

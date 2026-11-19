@@ -1307,6 +1307,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::ai::toolsets::create,
     openobserve_api_management::request::ai::toolsets::delete,
     openobserve_api_management::request::ai::toolsets::discover,
+    openobserve_api_management::request::ai::toolsets::resync,
     openobserve_api_management::request::ai::toolsets::prebuilt,
     openobserve_api_management::request::ai::toolsets::get,
     openobserve_api_management::request::ai::toolsets::list,

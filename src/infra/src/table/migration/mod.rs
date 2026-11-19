@@ -276,6 +276,7 @@ mod m20261219_000001_add_historical_to_alert_incidents;
 mod m20261220_000001_create_service_identity_tables;
 mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 mod m20261223_000001_create_ai_toolset_health;
+mod m20261224_000001_ai_toolsets_replication;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -915,6 +916,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261220_000001_create_service_identity_tables::Migration),
             Box::new(m20261221_000001_add_last_detection_at_to_alert_incidents::Migration),
             Box::new(m20261223_000001_create_ai_toolset_health::Migration),
+            Box::new(m20261224_000001_ai_toolsets_replication::Migration),
         ]
     }
 }
@@ -1049,6 +1051,7 @@ mod tests {
             "m20261221_000001_add_last_detection_at_to_alert_incidents",
         ),
         (157, "m20261223_000001_create_ai_toolset_health"),
+        (158, "m20261224_000001_ai_toolsets_replication"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

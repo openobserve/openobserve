@@ -37,6 +37,7 @@ vi.mock("@/services/ai_toolsets", () => ({
       },
     })),
     update: vi.fn(async () => ({ data: {} })),
+    resync: vi.fn(async () => ({ data: { published: 3 } })),
   },
 }));
 
@@ -192,6 +193,66 @@ describe("AiToolsets rename needed badge", () => {
       "Another toolset has the same name once normalized; delete and re-create one of them";
     const hints = w.findAllComponents(OTooltip).filter((c) => c.props("content") === hint);
     expect(hints).toHaveLength(2);
+    w.unmount();
+  });
+});
+
+describe("AiToolsets across regions", () => {
+  afterEach(() => {
+    store.state.zoConfig.features = {};
+    store.state.zoConfig.super_cluster_enabled = false;
+  });
+
+  const mountList = () =>
+    mount(AiToolsets, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: {
+          AddAiToolset: true,
+          OTable: {
+            props: ["data"],
+            template:
+              "<div><div v-for='row in data' :key='row.id'><slot name='cell-name' :row='row' /></div></div>",
+          },
+        },
+      },
+    });
+
+  it("asks for this region's credentials on a replicated row that lacks them", async () => {
+    resetListViewState();
+    queryClient.clear();
+    store.state.zoConfig.features = { ai_toolsets: "enabled" };
+    vi.mocked(aiToolsetsService.list).mockResolvedValueOnce({
+      data: {
+        toolsets: [
+          { id: "a", name: "dd", kind: "mcp", needs_credentials: true },
+          { id: "b", name: "gh", kind: "mcp", needs_credentials: false },
+        ],
+      },
+    } as any);
+    const w = mountList();
+    await flushPromises();
+    const badges = w.findAll("[data-test$='-needs-credentials']");
+    expect(badges.map((b) => b.text())).toEqual(["Add this region's credentials"]);
+    expect(w.find('[data-test="ai-toolsets-resync-btn"]').exists()).toBe(false);
+    w.unmount();
+  });
+
+  it("re-syncs only after the admin confirms, on a super cluster", async () => {
+    resetListViewState();
+    queryClient.clear();
+    store.state.zoConfig.features = { ai_toolsets: "enabled" };
+    store.state.zoConfig.super_cluster_enabled = true;
+    const w = mountList();
+    await flushPromises();
+    await w.find('[data-test="ai-toolsets-resync-btn"]').trigger("click");
+    await flushPromises();
+    expect(aiToolsetsService.resync).not.toHaveBeenCalled();
+    const ok = document.body.querySelector('[data-test="o-dialog-primary-btn"]') as HTMLElement;
+    ok.click();
+    await flushPromises();
+    expect(aiToolsetsService.resync).toHaveBeenCalledTimes(1);
     w.unmount();
   });
 });

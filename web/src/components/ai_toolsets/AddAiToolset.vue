@@ -70,6 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="showLabelOnTop w-full"
             />
           </div>
+          <div v-if="superCluster" class="mb-4">
+            <OFormSwitch
+              name="region_only"
+              :label="t('aiToolset.regionOnly')"
+              data-test="ai-toolset-region-only"
+            />
+            <div class="text-text-secondary text-xs">{{ t("aiToolset.regionOnlyHint") }}</div>
+          </div>
 
           <!-- MCP fields -->
           <template v-if="selectedKind === 'mcp'">
@@ -497,6 +505,8 @@ export default defineComponent({
   emits: ["cancel:hideform", "update:list"],
   setup(_, { emit }) {
     const store = useStore();
+    // Replication exists only on a super cluster, so the switch means nothing elsewhere.
+    const superCluster = computed(() => !!store.state.zoConfig?.super_cluster_enabled);
     const router = useRouter();
     const { t } = useI18nTyped();
 
@@ -652,6 +662,7 @@ export default defineComponent({
           await aiToolsetsService.update(org, editingId.value, {
             description: value.description ? raw(value.description) : undefined,
             data,
+            region_only: !!value.region_only,
           });
           toast({
             variant: "success",
@@ -663,6 +674,7 @@ export default defineComponent({
             kind: value.kind as ToolsetKind,
             description: value.description ? raw(value.description) : undefined,
             data,
+            region_only: !!value.region_only,
           });
           toast({
             variant: "success",
@@ -919,6 +931,7 @@ export default defineComponent({
           name: toolset.name,
           kind: toolset.kind,
           description: toolset.description || "",
+          region_only: !!toolset.region_only,
         };
         if (toolset.kind === "mcp") {
           const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : null);
@@ -1209,6 +1222,7 @@ export default defineComponent({
     });
 
     return {
+      superCluster,
       raw,
       t,
       // Exposed for the theme-aware footer background (`store.state.theme`).

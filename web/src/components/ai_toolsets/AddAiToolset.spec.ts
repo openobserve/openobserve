@@ -749,6 +749,22 @@ describe("AddAiToolset", () => {
   });
 
   describe("presets from the server", () => {
+    it("offers the region-only switch on a super cluster and saves it", async () => {
+      store.state.zoConfig.super_cluster_enabled = true;
+      mockQuery = { action: "add", preset: "dynatrace" };
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="ai-toolset-region-only"]').exists()).toBe(true);
+      getForm().setFieldValue("name", "dt-eu");
+      getForm().setFieldValue("region_only", true);
+      getForm().setFieldValue("mcp.headers[0].value", "Bearer t");
+      await getForm().handleSubmit();
+      await flushPromises();
+      const body = vi.mocked(aiToolsetsService.create).mock.calls.at(-1)![1];
+      expect(body.region_only).toBe(true);
+      store.state.zoConfig.super_cluster_enabled = false;
+    });
+
     it("fills an MCP toolset from a preset and stores the preset with its tool classes", async () => {
       mockQuery = { action: "add", preset: "dynatrace" };
       wrapper = createWrapper();

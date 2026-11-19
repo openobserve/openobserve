@@ -15,6 +15,7 @@
 
 #![cfg(feature = "enterprise")]
 
+mod ai_toolsets;
 mod alert_acks;
 mod alert_states;
 mod alerts;
@@ -143,6 +144,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_service_identity_msg: service_identity_msg,
         on_rum_analytics_msg: rum_analytics::process,
         on_system_settings_msg: system_settings::process,
+        on_ai_toolsets_msg: ai_toolsets::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,

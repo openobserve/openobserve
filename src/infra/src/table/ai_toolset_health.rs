@@ -189,6 +189,8 @@ mod tests {
             created_by: Set("u".to_string()),
             created_at: Set(1),
             updated_at: Set(1),
+            region_only: Set(false),
+            origin_region: Set(None),
         }
         .insert(&db)
         .await
