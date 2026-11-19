@@ -15507,7 +15507,7 @@
       "targetsMore": "{first} and {count} more",
       "workflow": "a workflow",
       "eventsIn": "{condition} match in {window}",
-      "sqlRows": "the query returns {op} {value} rows in {window}",
+      "sqlRows": "the query returns {op} {value} row in {window} | the query returns {op} {value} rows in {window}",
       "sqlRowValue": "the query returns a row where {field} is {op} {value} in {window}",
       "promql": "the value is {op} {value}",
       "realtime": "a matching event arrives",
@@ -15519,7 +15519,15 @@
       "cooldown": ", at most once every {duration}",
       "composite": "{who} when its alerts match {expression}{hold}{cooldown}.",
       "measureIs": "{measure} is {op} {value} over {window}",
-      "condition": "Fires when {what}{hold}, {schedule}{cooldown}."
+      "condition": "Fires when {what}{hold}, {schedule}{cooldown}.",
+      "firesAnyRow": "Fires when this query returns a row",
+      "firesRows": "Fires when this query returns {op} {value} row | Fires when this query returns {op} {value} rows",
+      "firesAnySeries": "Fires when this query returns a series",
+      "firesSeries": "Fires when this query returns {op} {value} series | Fires when this query returns {op} {value} series",
+      "firesValue": "Fires when this query's value is {op} {value}",
+      "checksEvery": "Checks every {every} over the last {window}{cooldown}",
+      "checksCron": "Checks on the cron schedule {cron} over the last {window}{cooldown}",
+      "checksCooldown": " · at most once every {duration}"
     },
     "editMode": {
       "muteFor": "Mute for",

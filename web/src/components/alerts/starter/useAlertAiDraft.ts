@@ -26,7 +26,11 @@ import type { AiConfirmAnswer } from "@/composables/useAiChat";
 import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { dayVerdict, type DayVerdict } from "@/utils/alerts/alertTestRun";
 import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
-import { describeConditionInPlainWords, type ReadBackAlert } from "@/utils/alerts/alertReadBack";
+import {
+  describeConditionInPlainWords,
+  describeQueryAlert,
+  type ReadBackAlert,
+} from "@/utils/alerts/alertReadBack";
 import {
   buildPrefillFromAssistant,
   makeAlertProposalSchema,
@@ -50,6 +54,8 @@ export interface AlertAiDraft {
   testRun: AlertTestRun;
   verdict: ComputedRef<DayVerdict | null>;
   condition: ComputedRef<I18nText>;
+  /** An SQL or PromQL proposal's test, query and schedule; the query decides firing, so it is shown as written. */
+  queryReadBack: ComputedRef<ReturnType<typeof describeQueryAlert>>;
   /** Who to tell, seeded from the proposal and editable; Create and Edit in form both use this list. */
   destinations: Ref<string[]>;
   setDestinations: (names: string[]) => void;
@@ -157,12 +163,20 @@ export function useAlertAiDraft(folder: () => string = () => "default"): AlertAi
   });
 
   // The payload's flags are booleans where the form's read-back expects strings.
-  const condition = computed<I18nText>(() => {
+  const readBackAlert = computed<ReadBackAlert | null>(() => {
     const proposal = ai.result.value?.draft;
-    if (!proposal) return raw("");
-    const alert = { ...proposal, is_real_time: String(!!proposal.is_real_time) };
-    return describeConditionInPlainWords(alert as unknown as ReadBackAlert, t);
+    if (!proposal) return null;
+    return {
+      ...proposal,
+      is_real_time: String(!!proposal.is_real_time),
+    } as unknown as ReadBackAlert;
   });
+  const condition = computed<I18nText>(() =>
+    readBackAlert.value ? describeConditionInPlainWords(readBackAlert.value, t) : raw(""),
+  );
+  const queryReadBack = computed(() =>
+    readBackAlert.value ? describeQueryAlert(readBackAlert.value, t) : null,
+  );
 
   // The check already sent back any name the org lacks, so the seed holds only real destinations.
   const destinations = ref<string[]>([]);
@@ -191,6 +205,7 @@ export function useAlertAiDraft(folder: () => string = () => "default"): AlertAi
     testRun,
     verdict,
     condition,
+    queryReadBack,
     destinations,
     setDestinations,
     folderId: folder,

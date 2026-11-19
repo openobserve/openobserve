@@ -56,8 +56,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-heading m-0 text-sm font-medium"
             data-test="alert-starter-ai-condition"
           >
-            {{ controller.condition.value }}
+            {{ queryReadBack?.test ?? controller.condition.value }}
           </p>
+          <template v-if="queryReadBack">
+            <OTruncatedText
+              as="pre"
+              :lines="4"
+              class="bg-surface-subtle rounded-default text-text-body m-0 px-2 py-1.5 font-mono text-xs break-words whitespace-pre-wrap"
+              tooltip-class="font-mono whitespace-pre-wrap"
+              data-test="alert-starter-ai-query"
+              >{{ queryReadBack.query }}</OTruncatedText
+            >
+            <p class="text-text-secondary m-0 text-sm" data-test="alert-starter-ai-schedule">
+              {{ queryReadBack.schedule }}
+            </p>
+          </template>
           <p
             v-if="dayLine"
             class="m-0 flex items-center gap-2 text-sm"
@@ -168,6 +181,9 @@ const dayLine = computed(() => {
 });
 
 const proposal = computed(() => props.controller.ai.result.value?.draft ?? null);
+
+// An SQL or PromQL test lives in the query, so the card shows it as written instead of a row count.
+const queryReadBack = computed(() => props.controller.queryReadBack.value);
 
 const refusalText = computed(() => props.controller.ai.refused.value);
 

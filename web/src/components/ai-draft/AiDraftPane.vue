@@ -38,14 +38,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
 
-      <AiDraftStatus v-if="phase === 'drafting'" :lines="draft.statusLines.value" />
-      <p
+      <!-- Above the progress, so the words stay put when the read-back replaces the progress. -->
+      <OTruncatedText
         v-if="said"
+        as="p"
+        :lines="4"
         class="text-text-body m-0 text-sm break-words whitespace-pre-line"
+        tooltip-class="whitespace-pre-line"
         data-test="ai-draft-said"
+        >{{ said }}</OTruncatedText
       >
-        {{ said }}
-      </p>
+      <AiDraftStatus v-if="phase === 'drafting'" :lines="draft.statusLines.value" />
 
       <form
         v-if="phase === 'reply'"

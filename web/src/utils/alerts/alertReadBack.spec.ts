@@ -7,6 +7,7 @@ import {
   CONDITION_GAP_KEYS,
   describeAlertInPlainWords,
   describeCompositeInPlainWords,
+  describeQueryAlert,
   filterPhrase,
   limitText,
   previewVerdictSentence,
@@ -180,13 +181,19 @@ describe("describeAlertInPlainWords", () => {
     );
   });
 
-  it("reads SQL rows after a switch from a builder measure", () => {
+  it.each([
+    [3, "when the query returns ≥ 3 rows in 10 minutes"],
+    [1, "when the query returns ≥ 1 row in 10 minutes"],
+  ])("reads SQL rows after a switch from a builder measure: %s", (threshold, words) => {
     const text = describeAlertInPlainWords(
-      alert({ query_condition: { type: "sql", sql: SQL, aggregation: leftoverMeasure } }),
+      alert({
+        query_condition: { type: "sql", sql: SQL, aggregation: leftoverMeasure },
+        trigger_condition: { ...alert().trigger_condition, threshold },
+      }),
       t,
       { aggregationEnabled: true },
     );
-    expect(text).toContain("when the query returns ≥ 3 rows in 10 minutes");
+    expect(text).toContain(words);
     expect(text).not.toContain("latency_ms");
   });
 
@@ -207,6 +214,50 @@ describe("describeAlertInPlainWords", () => {
     );
     expect(text).toContain("when the query returns a row where cpu_percent is > 90 in 10 minutes");
     expect(text).not.toContain("rows in");
+  });
+});
+
+describe("describeQueryAlert", () => {
+  const tc = { operator: ">=", threshold: 1, period: 5, frequency: 1, silence: 10 };
+  it.each([
+    {
+      name: "SQL firing on any row",
+      over: { query_condition: { type: "sql", sql: SQL }, trigger_condition: tc },
+      test: "Fires when this query returns a row",
+      query: SQL,
+    },
+    {
+      name: "SQL firing on a row count",
+      over: {
+        query_condition: { type: "sql", sql: SQL },
+        trigger_condition: { ...tc, threshold: 3 },
+      },
+      test: "Fires when this query returns ≥ 3 rows",
+      query: SQL,
+    },
+    {
+      name: "PromQL with a value test",
+      over: {
+        query_condition: {
+          type: "promql",
+          promql: "up == 0",
+          promql_condition: { operator: ">", value: 80 },
+        },
+        trigger_condition: tc,
+      },
+      test: "Fires when this query's value is > 80",
+      query: "up == 0",
+    },
+  ])("states the test, the query and the schedule: $name", (c) => {
+    expect(describeQueryAlert(alert(c.over as Partial<ReadBackAlert>), t)).toEqual({
+      test: c.test,
+      query: c.query,
+      schedule: "Checks every 1 minute over the last 5 minutes · at most once every 10 minutes",
+    });
+  });
+
+  it("leaves a builder alert to the condition sentence", () => {
+    expect(describeQueryAlert(alert(), t)).toBeNull();
   });
 });
 

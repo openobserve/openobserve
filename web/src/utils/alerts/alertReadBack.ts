@@ -316,11 +316,11 @@ function whatText(alert: ReadBackAlert, t: TranslateFn, aggregationEnabled: bool
     });
   }
   if (qc.type === "sql") {
-    return t("alerts.readBack.sqlRows", {
-      op: operatorSymbol(tc.operator),
-      value: tc.threshold ?? "",
-      window,
-    });
+    return t(
+      "alerts.readBack.sqlRows",
+      { op: operatorSymbol(tc.operator), value: tc.threshold ?? "", window },
+      num(tc.threshold),
+    );
   }
   return t("alerts.readBack.eventsIn", {
     condition: eventCountText(tc, t, alert.stream_type),
@@ -367,6 +367,53 @@ export function describeAlertInPlainWords(
     schedule: scheduleText(alert, t),
     cooldown: cooldownText(alert.trigger_condition?.silence, t),
   });
+}
+
+/** An SQL or PromQL alert as what it fires on, its query and its schedule; null for one the builder states in words. */
+export function describeQueryAlert(
+  alert: ReadBackAlert,
+  t: TranslateFn,
+): { test: I18nText; query: string; schedule: I18nText } | null {
+  const qc = alert.query_condition ?? {};
+  const query = (qc.type === "sql" ? qc.sql : qc.type === "promql" ? qc.promql : "")?.trim();
+  if (!query || alert.is_real_time === "true") return null;
+  const tc = alert.trigger_condition ?? {};
+  const window = durationText(num(tc.period), t);
+  const cooldown = num(tc.silence)
+    ? t("alerts.readBack.checksCooldown", { duration: durationText(num(tc.silence), t) })
+    : "";
+  const schedule =
+    tc.frequency_type === "cron"
+      ? t("alerts.readBack.checksCron", { cron: tc.cron ?? "", window, cooldown })
+      : t("alerts.readBack.checksEvery", {
+          every: durationText(num(tc.frequency), t),
+          window,
+          cooldown,
+        });
+  return { test: queryTestText(alert, t), query, schedule };
+}
+
+// The trigger's row or series count matters only past its default of one.
+function queryTestText(alert: ReadBackAlert, t: TranslateFn): I18nText {
+  const qc = alert.query_condition ?? {};
+  const pc = qc.promql_condition;
+  if (qc.type === "promql" && pc && !isBlank(pc.value)) {
+    return t("alerts.readBack.firesValue", {
+      op: operatorSymbol(pc.operator),
+      value: pc.value ?? "",
+    });
+  }
+  const tc = alert.trigger_condition ?? {};
+  const threshold = num(tc.threshold);
+  if ((tc.operator ?? ">=") === ">=" && threshold <= 1) {
+    return t(
+      qc.type === "promql" ? "alerts.readBack.firesAnySeries" : "alerts.readBack.firesAnyRow",
+    );
+  }
+  const params = { op: operatorSymbol(tc.operator), value: tc.threshold ?? "" };
+  return qc.type === "promql"
+    ? t("alerts.readBack.firesSeries", params, threshold)
+    : t("alerts.readBack.firesRows", params, threshold);
 }
 
 /** The same sentence without who hears, for a read-back that shows its own Who to tell line. */

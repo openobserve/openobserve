@@ -152,6 +152,37 @@ describe("useAiDraft", () => {
     ]).toEqual([true, 600, undefined]);
   });
 
+  it("keeps the prose across tool calls, a paragraph per step, and marks a paused tail unfinished", async () => {
+    // Trimmed from a live run: the agent's steps arrive joined, and the pause holds back the last words.
+    chat.fetchAiChat.mockResolvedValueOnce(
+      stream(
+        sse(
+          { type: "message_delta", content: "I need to see the streams before " },
+          { type: "tool_call", tool: "StreamList", message: "Listing streams" },
+          { type: "tool_result", tool: "StreamList", success: true },
+          { type: "usage", usage: { llm_calls: 1 } },
+          { type: "message_delta", content: "creating the alert.`k8s_events` has `object.Type` " },
+          { type: "message_delta", content: "and `k8s_cluster`. Now compare windows:Query " },
+          { type: "tool_call", tool: "SearchSQL", message: "Querying logs" },
+          { type: "message_delta", content: "syntax valid; the recent window " },
+          {
+            type: "confirmation_required",
+            tool: "CreateAlert",
+            args: { request_body: { name: "k8s_warnings" } },
+          },
+        ),
+        afterAnswer,
+      ),
+    );
+    const ai = run();
+    void ai.start("k8s warnings above 100 in 5 minutes");
+    await flushPromises();
+    expect([ai.phase.value, ai.text.value]).toEqual([
+      "ready",
+      "I need to see the streams before creating the alert.\n\n`k8s_events` has `object.Type` and `k8s_cluster`. Now compare windows:\n\nQuery syntax valid; the recent window…",
+    ]);
+  });
+
   it("a create that fails after approval says why and keeps the proposal for the form", async () => {
     chat.fetchAiChat.mockResolvedValueOnce(stream(proposal("nginx_5xx"), createFails));
     const ai = run();

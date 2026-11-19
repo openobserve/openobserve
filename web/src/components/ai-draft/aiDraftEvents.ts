@@ -39,6 +39,11 @@ export type AiDraftEvent =
 
 const IGNORED = new Set(["title", "logs", "usage", "sync", "sync_state", "cancelled"]);
 
+// The agent's steps reach the stream joined ("first.Warning"); code spans are matched first so "os.Getenv" stays whole.
+const GLUED_STEP = /(`[^`\n]*`)|(?<=[\p{Ll}\d)\]*'"`])([.!?:])(?=\p{Lu}\p{Ll}|`)/gu;
+const ENDS_SENTENCE = /[.!?…]["')*`\]]*$/;
+const DANGLING = /[\s,;:–—-]+$/;
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -91,6 +96,15 @@ export function readDraftEvent(data: any): AiDraftEvent {
   if (IGNORED.has(type)) return { kind: "ignored" };
   const text = extractStreamText(data);
   return typeof text === "string" ? { kind: "text", text } : { kind: "ignored" };
+}
+
+/** The assistant's words as paragraphs, one per step; `unfinished` ends a cut sentence with "…" while the turn runs. */
+export function draftProse(text: string, unfinished = false): string {
+  const prose = text
+    .replace(GLUED_STEP, (match, code: string | undefined) => (code ? match : `${match}\n\n`))
+    .trim();
+  if (!unfinished || !prose || ENDS_SENTENCE.test(prose)) return prose;
+  return `${prose.replace(DANGLING, "")}…`;
 }
 
 /** Schema issues as path + message, the shape the follow-up turn and the pane both read. */

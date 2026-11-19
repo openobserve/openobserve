@@ -24,6 +24,7 @@ import {
   type NavigationRoute,
 } from "@/components/O2AIChat.navigation";
 import {
+  draftProse,
   followUpMessage,
   readDraftEvent,
   schemaIssues,
@@ -268,7 +269,7 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
     if (event.kind === "status") addStatus(event.text);
     else if (event.kind === "text") {
       turn.text += event.text;
-      text.value = turn.text;
+      text.value = draftProse(turn.text, true);
     } else if (event.kind === "final") turn.finalText = event.text;
     else if (event.kind === "error") {
       turn.streamError = isAuthError(event.text, event.errorType)
@@ -342,7 +343,7 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
 
   /** Decides what the pane shows once a turn's stream has ended. */
   const finishTurn = async (turn: TurnState) => {
-    const said = (turn.finalText ?? turn.text).trim();
+    const said = draftProse(turn.finalText ?? turn.text);
     text.value = said;
     if (turn.created) {
       createdRoute.value = turn.created.route ?? turn.navigation;
