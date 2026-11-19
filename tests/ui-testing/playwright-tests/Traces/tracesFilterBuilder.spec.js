@@ -1,4 +1,4 @@
-// Traces with the filter builder turned on; every other spec runs on the default query editor.
+// The chip bar is the traces filter input; the query editor behind it still holds the query text.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -8,7 +8,6 @@ const { EDITOR_HOSTS, openTracesStream, seedEditor, editorText } = require('../u
 
 const HOST = EDITOR_HOSTS.traces;
 const PREFIX = 'traces-search-bar-filter-builder';
-const TOGGLE = '[data-test="traces-search-bar-filter-builder-toggle"]';
 const FIELD = 'service_name';
 const VALUE = 'api-gateway';
 const UNPARSABLE_QUERY = `${FIELD} = upper(${FIELD})`;
@@ -21,15 +20,6 @@ test.describe('Traces filter builder', () => {
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        // Once per tab, so a toggle the test makes survives its own reloads; the fixture only fills an unset key.
-        await page.addInitScript(() => {
-            try {
-                if (!sessionStorage.getItem('e2e.tracesBuilderSeeded')) {
-                    localStorage.setItem('o2.traces.queryInput', 'builder');
-                    sessionStorage.setItem('e2e.tracesBuilderSeeded', '1');
-                }
-            } catch (_) {}
-        });
         await navigateToBase(page);
         if (!ingested) {
             const result = await ingestTraces(page, 10);
@@ -55,45 +45,28 @@ test.describe('Traces filter builder', () => {
         await expect.poll(() => editorText(page, HOST)).toBe(`${FIELD} = '${VALUE}'`);
     });
 
-    test('the toggle switches between the builder and the query editor, keeping the filter', {
+    test('a typed word is offered as a search function, which then asks for the field', {
         tag: ['@all', '@traces', '@filterBuilder', '@P1'],
     }, async ({ page }) => {
-        await builder.addCondition(FIELD, '=', VALUE);
-        await builder.expectChipCount(1);
-
-        await page.locator(TOGGLE).click();
-        await expect(page.locator(HOST)).toBeVisible();
-        await expect(builder.barInput).toBeHidden();
-        await expect(page.locator(TOGGLE)).toHaveAttribute('aria-pressed', 'false');
-        await expect.poll(() => editorText(page, HOST)).toBe(`${FIELD} = '${VALUE}'`);
-
-        await page.locator(TOGGLE).click();
-        await expect(builder.barInput).toBeVisible();
-        await expect(page.locator(TOGGLE)).toHaveAttribute('aria-pressed', 'true');
-        await builder.expectChipCount(1);
+        // Trace streams have no full-text field, so the word fills the field functions instead of match_all.
+        await builder.barInput.click();
+        await builder.barInput.pressSequentially(VALUE);
+        const contains = page.locator(`[data-test^="${PREFIX}-bar-suggest-item-"][data-test$="fn:contains"]`);
+        await expect(contains).toContainText(`str_match(…, '${VALUE}')`);
+        await contains.click();
+        await builder.suggestion(FIELD).click();
         await builder.expectChip(FIELD, VALUE);
+        await expect.poll(() => editorText(page, HOST)).toBe(`str_match(${FIELD}, '${VALUE}')`);
     });
 
-    test('a query the builder cannot draw shows the unparsable banner', {
+    test('a query the bar cannot draw is kept whole as a locked chip', {
         tag: ['@all', '@traces', '@filterBuilder', '@P1'],
     }, async ({ page }) => {
-        const banner = page.locator(`[data-test="${PREFIX}-unparsable"]`);
-
-        await page.locator(TOGGLE).click();
         await seedEditor(page, HOST, UNPARSABLE_QUERY);
-        await page.locator(TOGGLE).click();
-        await expect(banner).toBeVisible();
-        await expect(builder.barInput).toBeHidden();
-
-        await page.locator(`[data-test="${PREFIX}-keep-query"]`).click();
-        await expect(page.locator(HOST)).toBeVisible();
-        await expect.poll(() => editorText(page, HOST)).toBe(UNPARSABLE_QUERY);
-
-        await page.locator(TOGGLE).click();
-        await expect(banner).toBeVisible();
-        await page.locator(`[data-test="${PREFIX}-clear-and-build"]`).click();
-        await expect(banner).toBeHidden();
-        await expect(builder.barInput).toBeVisible();
-        await expect.poll(() => editorText(page, HOST)).toBe('');
+        await builder.expectChip('locked');
+        await builder.expectChipCount(1);
+        await builder.addCondition(FIELD, '=', VALUE);
+        await builder.expectChipCount(2);
+        await expect.poll(() => editorText(page, HOST)).toBe(`(${UNPARSABLE_QUERY}) AND ${FIELD} = '${VALUE}'`);
     });
 });
