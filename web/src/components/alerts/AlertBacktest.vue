@@ -61,7 +61,7 @@ const props = defineProps<{
   /** The alert's schedule; read by the replay of real check times. */
   triggerCondition?: {
     frequency: number;
-    frequency_type: string;
+    frequency_type?: string;
     cron?: string;
     timezone?: string;
     silence: number;
@@ -72,6 +72,8 @@ const props = defineProps<{
   compares?: boolean;
   /** Test it's panel passes the answer it shows; the day is then drawn from it alone, without a row. */
   tested?: EvaluateAlertResponse | null;
+  /** Keep firing for, in seconds; once set, flapping advice has nothing to offer. */
+  keepFiringFor?: number;
 }>();
 
 /** The advice under the day; its action opens a setting by name, or else the element it targets. */
@@ -359,6 +361,27 @@ const hint = computed<DayHint | null>(() => {
     setting: "holdFor",
   };
 });
+// With no 24-hour row in the form, no step 3 card can say it, so the panel offers Keep firing for itself.
+const flapHint = computed(() => {
+  const refires = serverDay.value?.refires ?? 0;
+  if (
+    !inPanel.value ||
+    props.realTime ||
+    signal?.value ||
+    !refires ||
+    (props.keepFiringFor ?? 0) > 0
+  )
+    return null;
+  return {
+    text: t(
+      "alerts.form.suggest.keepFiring",
+      { count: formatNumber(refires), minutes: formatNumber(2 * frequencyMinutes.value) },
+      refires,
+    ),
+    action: formContext?.openSetting ? t("alerts.sections.backtest.changeKeepFiring") : null,
+  };
+});
+const openKeepFiring = () => formContext?.openSetting?.("keepFiring");
 const openHintTarget = async () => {
   const setting = hint.value?.setting;
   // Must last can sit under More options, which only the setting search opens.
@@ -460,6 +483,14 @@ const hourTitle = (hour: number, fired: boolean) => {
         :action="hint.action"
         data-test="add-alert-backtest-hint"
         @action="openHintTarget"
+      />
+      <AlertLinkNote
+        v-if="flapHint"
+        class="mt-2"
+        :text="flapHint.text"
+        :action="flapHint.action"
+        data-test="add-alert-backtest-flap"
+        @action="openKeepFiring"
       />
     </template>
   </component>

@@ -288,6 +288,11 @@ describe("AlertBacktest", () => {
     // Must last may sit under More options, so its advice opens it by name.
     await panel.find('[data-test="add-alert-backtest-hint-action"]').trigger("click");
     expect(formContext.openSetting).toHaveBeenCalledWith("holdFor");
+    // With no row feeding step 3, the panel itself offers Keep firing for, until it is set.
+    await panel.find('[data-test="add-alert-backtest-flap-action"]').trigger("click");
+    expect(formContext.openSetting).toHaveBeenCalledWith("keepFiring");
+    await panel.setProps({ keepFiringFor: 600 });
+    expect(panel.find('[data-test="add-alert-backtest-flap"]').exists()).toBe(false);
     panel.unmount();
     wrapper.unmount();
   });

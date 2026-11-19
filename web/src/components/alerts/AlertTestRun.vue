@@ -247,6 +247,8 @@ const send = async () => {
         :period="Number(body.trigger_condition.period)"
         :operator="body.trigger_condition.operator"
         :threshold="Number(body.trigger_condition.threshold)"
+        :trigger-condition="body.trigger_condition"
+        :keep-firing-for="Number(body.keep_firing_for) || 0"
         :real-time="body.is_real_time"
         :compares="!!body.query_condition.multi_time_range?.length"
       />
