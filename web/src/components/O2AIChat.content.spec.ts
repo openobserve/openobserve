@@ -176,6 +176,16 @@ describe("parseLogEntries", () => {
       "log_entry",
     ]);
   });
+
+  it("labels the starter pack digest with its first line only, and any other block as before", () => {
+    const digest =
+      "Starter packs for your data: Kubernetes, Hosts\n\nPack: Kubernetes (id: kubernetes)";
+    const [block] = parseLogEntries(`--- Starter packs for your data  ---\n${digest}\n--- end ---`);
+    expect(block.preview).toBe("Starter packs for your data: Kubernetes, Hosts");
+    const [other] = parseLogEntries(`--- Log Entry ---\n${digest}\n--- end ---`);
+    expect(other.preview).toBe(createPreview(digest, 60));
+    expect(other.preview).toContain("Pack: Kuberne");
+  });
 });
 
 describe("getLanguageDisplay", () => {

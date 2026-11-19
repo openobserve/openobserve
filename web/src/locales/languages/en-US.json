@@ -10896,6 +10896,11 @@
       "tryOneOfThese": "Or try one of these"
     },
     "capabilities": {
+      "starter": {
+        "title": "Set up Starter Packs",
+        "description": "Dashboards, alerts and saved views built for your {packs} data.",
+        "prompt": "Which starter packs fit my data, and what will each one create?"
+      },
       "query": {
         "title": "Write a Query",
         "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
@@ -10924,6 +10929,17 @@
       "promqlCpu": "Write PromQL for pods using > 80% CPU",
       "datadogToO2": "Convert this Datadog query to OpenObserve SQL",
       "lastAlertFired": "Why was my last alert fired?"
+    },
+    "starterSuggestions": {
+      "whichPacks": "Which starter packs fit my data?",
+      "setUpPack": "Set up the {pack} pack",
+      "whatInPack": "What is in the {pack} pack?",
+      "errorsLastHour": "Show me errors from the last hour"
+    },
+    "starter": {
+      "checking": "Checking your data for starter packs…",
+      "contextNote": "O2 Assistant has your matched starter packs as context.",
+      "readyWhenYouAre": "Ready when you are:"
     },
     "placeholderRotation": {
       "one": "Show me errors from the last hour…",

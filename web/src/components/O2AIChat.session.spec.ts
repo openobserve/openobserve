@@ -1367,6 +1367,162 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     });
   });
 
+  describe("welcome starter context", () => {
+    const NAME = "Starter packs for your data";
+    const A = {
+      name: NAME,
+      text: "Starter packs for your data: Kubernetes\n\nPack: Kubernetes (id: kubernetes)",
+    };
+    const B = { name: NAME, text: "Starter packs for your data: Hosts\n\nPack: Hosts (id: hosts)" };
+    const prepended: any[] = [];
+    const removed: string[] = [];
+    const focusSpy = vi.fn();
+    let insertChipSpy = vi.fn();
+    const settle = async () => {
+      vi.useFakeTimers();
+      await vi.advanceTimersByTimeAsync(60);
+      await nextTick();
+      vi.useRealTimers();
+    };
+    // Props lag a tick, so the stub reads the live list the real input keeps its own copy of.
+    const currentRefs = (): any[] => vm.contextReferences;
+    const welcomeStubs = () => ({
+      ...chipStubs,
+      StarterPackCatalogGate: { template: "<div><slot /></div>" },
+      StarterPackChatRows: {
+        name: "StarterPackChatRows",
+        props: ["org", "packIds"],
+        template: '<div data-test="chat-rows-stub" />',
+      },
+      RichTextInput: {
+        ...chipStubs.RichTextInput,
+        methods: {
+          ...chipStubs.RichTextInput.methods,
+          focusInput: focusSpy,
+          insertChip(chip: any) {
+            insertChipSpy(chip);
+            insertedChips.push(chip);
+          },
+          prependText() {},
+          prependChip(this: any, chip: any) {
+            prepended.push(chip);
+            this.$emit("update:references", [...currentRefs(), chip]);
+          },
+          removeChip(this: any, id: string) {
+            removed.push(id);
+            this.$emit(
+              "update:references",
+              currentRefs().filter((chip: any) => chip.id !== id),
+            );
+          },
+        },
+      },
+    });
+
+    beforeEach(async () => {
+      prepended.length = 0;
+      removed.length = 0;
+      focusSpy.mockClear();
+      insertChipSpy = vi.fn();
+      wrapper?.unmount();
+      wrapper = mountO2AIChat({}, welcomeStubs());
+      vm = wrapper.vm;
+      await flushPromises();
+      await wait(150);
+      focusSpy.mockClear();
+    });
+
+    it("puts the digest chip first without focusing or inserting at the caret", async () => {
+      vm.setWelcomeContext(A);
+      await nextTick();
+      expect(prepended).toHaveLength(1);
+      expect(prepended[0]).toMatchObject({ filename: NAME, fullContent: A.text, type: "context" });
+      expect(insertChipSpy).not.toHaveBeenCalled();
+      expect(focusSpy).not.toHaveBeenCalled();
+      expect(vm.welcomeNoteShown).toBe(true);
+      await turn(vm, [], "which packs fit?");
+      expect(lastCall(mockFetchAiChat)[4]).toBeUndefined();
+    });
+
+    it("swaps the chip for a newer digest and drops it when starter mode ends", async () => {
+      vm.setWelcomeContext(A);
+      await nextTick();
+      vm.setWelcomeContext(B);
+      await nextTick();
+      expect(removed).toEqual([prepended[0].id]);
+      expect(vm.contextReferences.map((chip: any) => chip.fullContent)).toEqual([B.text]);
+      vm.setWelcomeContext(null);
+      await nextTick();
+      expect(vm.contextReferences).toEqual([]);
+      expect(vm.welcomeNoteShown).toBe(false);
+    });
+
+    it("leaves a chip the user removed out, until a new chat", async () => {
+      vm.setWelcomeContext(A);
+      await nextTick();
+      vm.contextReferences = [];
+      vm.setWelcomeContext(B);
+      await nextTick();
+      expect(prepended).toHaveLength(1);
+      vm.addNewChat();
+      vm.setWelcomeContext(B);
+      await nextTick();
+      expect(prepended).toHaveLength(2);
+    });
+
+    it("drops the old org's chip on an org switch", async () => {
+      vm.setWelcomeContext(A);
+      await nextTick();
+      await switchOrg("other");
+      expect(removed).toEqual([prepended[0].id]);
+      expect(vm.contextReferences).toEqual([]);
+      vm.setWelcomeContext(B);
+      await nextTick();
+      expect(vm.contextReferences.map((chip: any) => chip.fullContent)).toEqual([B.text]);
+    });
+
+    it("a card click puts its question before the chip and sends nothing", async () => {
+      vm.selectWelcomeContext("Which starter packs fit my data?", A);
+      await settle();
+      await flushPromises();
+      expect(insertedChips).toHaveLength(1);
+      expect(insertedChips[0].id).toBe(vm.welcomeChipId);
+      expect(mockFetchAiChat).not.toHaveBeenCalled();
+    });
+
+    it("keeps one digest chip when a new chat's welcome meets a leftover hand-off chip", async () => {
+      vm.selectWelcomeContext("Set up the Kubernetes pack", A);
+      vm.setWelcomeContext(null);
+      await settle();
+      await flushPromises();
+      const handOff = insertedChips[insertedChips.length - 1];
+      vm.contextReferences = [handOff];
+      vm.addNewChat();
+      vm.setWelcomeContext(B);
+      await nextTick();
+      expect(removed).toContain(handOff.id);
+      const digests = vm.contextReferences.filter((chip: any) => chip.filename === NAME);
+      expect(digests.map((chip: any) => chip.fullContent)).toEqual([B.text]);
+    });
+
+    it("draws the pack rows only under a reply to a message carrying the digest", async () => {
+      const block = `Which packs fit? \n\n--- ${NAME}  ---\n${A.text}\n--- end ---`;
+      vm.chatMessages = [
+        { role: "user", content: block },
+        { role: "assistant", content: "Kubernetes fits your data." },
+        { role: "user", content: "and logs?" },
+        { role: "assistant", content: "Use the Logs page." },
+      ];
+      await flushPromises();
+      const rows = wrapper!.findAllComponents({ name: "StarterPackChatRows" });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].props("packIds")).toEqual(["kubernetes"]);
+      const replies = wrapper!.findAll(".message.assistant");
+      expect(replies[0].find('[data-test="chat-rows-stub"]').exists()).toBe(true);
+      expect(replies[1].find('[data-test="chat-rows-stub"]').exists()).toBe(false);
+    });
+  });
+
   describe("loading chats", () => {
     const chat = (id: number, text: string) => ({
       id,

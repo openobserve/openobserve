@@ -4,7 +4,7 @@
 
 export interface CapabilityCard {
   /** i18n key — under aiAssistant.capabilities.<id>.{title,description,prompt} */
-  id: "query" | "incident" | "dashboard" | "alert";
+  id: "starter" | "query" | "incident" | "dashboard" | "alert";
   /** OIcon registry name */
   icon: string;
   /** Tailwind text color class for the icon (token-based) */
@@ -38,6 +38,16 @@ export const CAPABILITY_CARDS: CapabilityCard[] = [
     iconColorClass: "text-[#EF4444]",
     iconBgClass: "bg-[#EF4444]/10",
   },
+];
+
+export const STARTER_CARDS: CapabilityCard[] = [
+  {
+    id: "starter",
+    icon: "package-2",
+    iconColorClass: "text-accent",
+    iconBgClass: "bg-accent/10",
+  },
+  ...CAPABILITY_CARDS.filter(({ id }) => id !== "incident"),
 ];
 
 export interface PromptSuggestion {

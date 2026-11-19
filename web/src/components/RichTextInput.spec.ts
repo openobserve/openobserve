@@ -90,3 +90,40 @@ describe("RichTextInput prependText", () => {
     wrapper.unmount();
   });
 });
+
+describe("RichTextInput prependChip", () => {
+  it("puts the chip first and leaves the user's caret, selection and typed text alone", async () => {
+    const wrapper = mount(RichTextInput, {
+      props: { modelValue: "" },
+      global: { plugins: [i18n] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const div = wrapper.vm.editableDiv as HTMLElement;
+    const typed = document.createTextNode("half typed");
+    div.appendChild(typed);
+    const range = document.createRange();
+    range.setStart(typed, 4);
+    range.setEnd(typed, 9);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    const focused = document.activeElement;
+
+    wrapper.vm.prependChip(chip("auto"));
+    await flushPromises();
+
+    expect(div.firstElementChild?.getAttribute("data-chip-id")).toBe("auto");
+    expect(typed.textContent).toBe("half typed");
+    const selection = window.getSelection()!.getRangeAt(0);
+    expect([selection.startContainer, selection.startOffset, selection.endOffset]).toEqual([
+      typed,
+      4,
+      9,
+    ]);
+    expect(document.activeElement).toBe(focused);
+    const refs = wrapper.emitted("update:references") ?? [];
+    expect((refs[refs.length - 1]?.[0] as { id: string }[]).map(({ id }) => id)).toEqual(["auto"]);
+    wrapper.unmount();
+    window.getSelection()?.removeAllRanges();
+  });
+});
