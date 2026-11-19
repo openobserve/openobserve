@@ -22,6 +22,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use config::meta::{
+    anomaly_detection::{LEGACY_VALUE_COLUMNS, TIMESTAMP_COLUMNS},
     histogram_origin::divides_histogram_origin,
     search::{Request, Response, SearchPartitionRequest, SearchPartitionResponse},
     stream::StreamType,
@@ -37,8 +38,6 @@ use sqlparser::{
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
-
-use super::{LEGACY_VALUE_COLUMNS, TIMESTAMP_COLUMNS};
 
 /// The filter builder's bucket and metric aliases; custom SQL names its own.
 const BUCKET_COLUMN: &str = "time_bucket";

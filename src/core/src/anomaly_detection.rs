@@ -26,6 +26,8 @@ use std::{
 
 use anyhow::Result;
 use chrono::Utc;
+#[cfg(feature = "enterprise")]
+use config::meta::anomaly_detection::{LEGACY_VALUE_COLUMNS, TIMESTAMP_COLUMNS};
 use config::{
     meta::{
         folder::{DEFAULT_FOLDER, FolderType},
@@ -58,22 +60,6 @@ const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 /// The web form states the same floor through its own i18n key; the two are kept in step by hand.
 const WINDOW_FLOOR_RULE: &str =
     "detection_window_seconds must be at least schedule_interval plus histogram_interval";
-
-/// Value column names tried when a config declares none. Kept so configs created before
-/// `value_column` existed keep resolving exactly as they did.
-#[cfg(feature = "enterprise")]
-const LEGACY_VALUE_COLUMNS: [&str; 5] = ["value", "count", "_count", "metric", "result"];
-
-/// Timestamp column names a result row is read from, in priority order. `zo_sql_timestamp`
-/// is the histogram alias the Logs page generates, so queries copied from there train as-is.
-#[cfg(feature = "enterprise")]
-const TIMESTAMP_COLUMNS: [&str; 5] = [
-    "_timestamp",
-    "timestamp",
-    "time",
-    "time_bucket",
-    "zo_sql_timestamp",
-];
 
 /// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
 #[cfg(feature = "enterprise")]
