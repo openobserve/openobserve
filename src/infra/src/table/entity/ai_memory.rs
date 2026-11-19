@@ -20,6 +20,10 @@ pub struct Model {
     pub agent_memory_writes: Option<String>,
     pub max_bytes: Option<i64>,
     pub user_max_bytes: Option<i64>,
+    /// When the settings last changed (microseconds); `None` if never.
+    pub settings_at: Option<i64>,
+    /// The region whose settings change this row holds; `None` for this region's own.
+    pub settings_region: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
