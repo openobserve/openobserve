@@ -1836,10 +1836,12 @@ import {
   clearPermalink,
   noteUserScopeChange,
 } from "@/composables/useLogs/useLogPermalink";
-import type {
-  PersistAction,
-  PersistSurface,
-  PersistReasonCode,
+import {
+  isAutoRunActive,
+  sameSignature,
+  type PersistAction,
+  type PersistSurface,
+  type PersistReasonCode,
 } from "@/composables/useLogs/useAutoRun";
 import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transientSearchKeys";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -4618,6 +4620,16 @@ export default defineComponent({
       emit("buildModeToggle", false); // isCustomMode = false
     };
 
+    // Build writes its own SQL and SQL/quick mode into the search, which is not a scope move.
+    const scopeMovedSinceGridRun = (from: string) => {
+      const ran = searchObj.meta.executed?.signature;
+      if (!ran) return false;
+      const live = autoRun.readSignature();
+      if (from !== "build") return !sameSignature(live, ran);
+      const { query, sqlMode, quickMode, quickModeFields } = ran;
+      return !sameSignature({ ...live, query, sqlMode, quickMode, quickModeFields }, ran);
+    };
+
     const onLogsVisualizeToggleUpdate = async (value: any) => {
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // here is what keeps the locked Patterns view from becoming active —
@@ -4752,6 +4764,13 @@ export default defineComponent({
           }
         }
       }
+      if (
+        (value === "logs" || value === "drilldown") &&
+        ["visualize", "build", "patterns"].includes(searchObj.meta.logsVisualizeToggle) &&
+        isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta) &&
+        scopeMovedSinceGridRun(searchObj.meta.logsVisualizeToggle)
+      )
+        tabRunPending = "tab";
       searchObj.meta.logsVisualizeToggle = value;
       patchUrlViewState();
       if (tabRunPending) autoRun.request(tabRunPending);
