@@ -45,14 +45,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="xs"
         class="me-1.5 align-middle"
         :label="
-          needsChoice ? t('alerts.intent.needsChoice') : t('alerts.librarySuggest.suggestedStarter')
+          needsChoice
+            ? t('alerts.intent.needsChoice')
+            : thresholdMissing
+              ? t('alerts.sections.condition.noThreshold')
+              : t('alerts.librarySuggest.suggestedStarter')
         "
         data-test="add-alert-intent-sentence-state"
       />
       <i18n-t :keypath="sentenceKey" tag="span" scope="global">
         <template #noun>{{ active === "anyEvent" ? nounOne : noun }}</template>
         <template #field>
-          <span class="-me-1.5 inline-flex align-middle">
+          <span class="inline-flex align-middle">
             <OSelect
               :model-value="slots.field ?? ''"
               :options="fieldOptions"
@@ -68,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #value>
-          <span class="-me-1.5 inline-flex align-middle">
+          <span class="inline-flex align-middle">
             <OSelect
               :model-value="slots.values ?? []"
               :options="valueOptions"
@@ -101,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #group>
-          <span class="-me-1.5 inline-flex align-middle">
+          <span class="inline-flex align-middle">
             <OSelect
               :model-value="slots.group ?? ''"
               :options="groupOptions"
@@ -117,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #measure>
-          <span class="-me-1.5 inline-flex align-middle">
+          <span class="inline-flex align-middle">
             <OSelect
               :model-value="slots.measure ?? ''"
               :options="measureOptions"
@@ -133,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template #label>
-          <span class="-me-1.5 inline-flex align-middle">
+          <span class="inline-flex align-middle">
             <OSelect
               :model-value="slots.label ?? ''"
               :options="labelOptions"
@@ -174,6 +178,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:minutes="setWindow"
           />
         </template>
+        <template #agg>
+          <span class="inline-flex align-middle">
+            <OSelect
+              :model-value="formAgg"
+              :options="aggOptions"
+              appearance="inline"
+              size="xs"
+              :searchable="false"
+              :aria-label="t('alerts.queryConfig.aggregationFunction')"
+              :dropdown-style="SLOT_MENU"
+              data-test="add-alert-intent-slot-agg"
+              @update:model-value="setSlot('agg', $event)"
+            />
+          </span>
+        </template>
+        <template #threshold>
+          <span
+            v-if="threshold && guide"
+            class="inline-flex items-center gap-1.5 align-middle"
+            data-test="add-alert-intent-slot-threshold"
+          >
+            <span class="inline-flex">
+              <OFormSelect
+                :name="threshold.operator"
+                :options="guide.operators.value"
+                appearance="inline"
+                size="xs"
+                :searchable="false"
+                :aria-label="t('alerts.form.names.comparison')"
+                :dropdown-style="SLOT_MENU"
+                data-test="add-alert-intent-slot-operator"
+                @update:model-value="guide.change(threshold.operator, $event)"
+              />
+            </span>
+            <span class="inline-flex" data-error-focus>
+              <OFormInput
+                :name="guide.spanDuration.value ? DURATION_PATH : threshold.value"
+                type="number"
+                size="xs"
+                fit-content
+                :placeholder="t('alerts.placeholders.value')"
+                :aria-label="t('alerts.alertIfNoOfEvents')"
+                data-test="add-alert-intent-slot-threshold-input"
+                @update:model-value="
+                  typeThreshold(guide.spanDuration.value ? DURATION_PATH : threshold.value, $event)
+                "
+              >
+                <template #error />
+              </OFormInput>
+            </span>
+            <span v-if="guide.spanDuration.value" class="inline-flex">
+              <OSelect
+                :model-value="guide.durationUnit.value"
+                :options="guide.durationUnits.value"
+                appearance="inline"
+                size="xs"
+                :searchable="false"
+                :aria-label="t('common.unitFor', { label: t('alerts.alertIfNoOfEvents') })"
+                data-test="add-alert-intent-slot-threshold-unit-select"
+                @update:model-value="guide.setDurationUnit($event)"
+              />
+            </span>
+            <span v-else-if="unitWord" data-test="add-alert-intent-slot-threshold-unit">{{
+              unitWord
+            }}</span>
+          </span>
+        </template>
       </i18n-t>
       <OButton
         v-if="offersGroup && slots.group === undefined && groupCandidates.all.length"
@@ -211,6 +282,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="addSpellings"
         >{{ t("alerts.intent.alsoMatch", { values: joinListMore(otherSpellings, t) }) }}</OButton
       >
+      <AlertMessageLine
+        v-if="thresholdKind"
+        class="leading-4"
+        :error="threshold ? thresholdError : null"
+        error-data-test="add-alert-intent-threshold-error"
+        :note="threshold ? guide?.note.value : null"
+        :help="threshold ? guide?.help.value : null"
+        data-test="add-alert-intent-threshold-message"
+      />
+      <slot v-if="offersDefaults" name="defaults" />
     </div>
     <p
       v-if="active === 'ratio' && familyText.length"
@@ -305,17 +386,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { get } from "lodash-es";
 import { useStore } from "vuex";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import LibraryDrawer from "@/components/alertLibrary/LibraryDrawer.vue";
 import AlertSuggestionCard from "./AlertSuggestionCard.vue";
 import AlertWindowPhrase from "./AlertWindowPhrase.vue";
+import AlertMessageLine from "./AlertMessageLine.vue";
+import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
+import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { librarySuggestionsQuery } from "@/services/alert_library.queries";
@@ -345,6 +433,7 @@ import {
 import {
   ANOMALY_BUCKET_MINUTES,
   DEFAULT_FACTOR,
+  METRIC_AGGS,
   SHAPE_NUMBER_CAP,
   SHAPE_STRING_CAP,
   SHAPE_WINDOW_US,
@@ -374,6 +463,7 @@ import {
   readFieldShapes,
   shapeQuerySql,
   slotFields,
+  thresholdPaths,
   withCaseVariants,
   hasCaseVariants,
   without,
@@ -418,6 +508,8 @@ const emit = defineEmits<{
   (e: "browse-library"): void;
   /** The sentence's window is the alert's look back. */
   (e: "update:period", minutes: number | ""): void;
+  /** The user typed a threshold in the sentence, so it is theirs as if typed in step 2. */
+  (e: "threshold"): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -789,6 +881,26 @@ const RATE_SENTENCES: [I18nKey, I18nKey] = [
   "alerts.intent.metricAbove.rateSentencePer",
   "alerts.intent.metricAbove.rateSentenceAll",
 ];
+// The same sentences ending in the threshold, for a starter whose threshold is typed here.
+const THRESHOLD_SENTENCES: Partial<Record<IntentId, [I18nKey, I18nKey]>> = {
+  countWhere: [
+    "alerts.intent.countWhere.sentenceAbove",
+    "alerts.intent.countWhere.sentenceAllAbove",
+  ],
+  percentile: [
+    "alerts.intent.percentile.sentencePerAbove",
+    "alerts.intent.percentile.sentenceAllAbove",
+  ],
+  metricAbove: [
+    "alerts.intent.metricAbove.sentencePerAbove",
+    "alerts.intent.metricAbove.sentenceAllAbove",
+  ],
+  ratio: ["alerts.intent.ratio.sentenceWhereAbove", "alerts.intent.ratio.sentenceWhereAllAbove"],
+};
+const RATE_THRESHOLD_SENTENCES: [I18nKey, I18nKey] = [
+  "alerts.intent.metricAbove.rateSentencePerAbove",
+  "alerts.intent.metricAbove.rateSentenceAllAbove",
+];
 // Only a type the metric declares turns "above a value" into a rate; an unknown one keeps the average.
 const isCounter = computed(
   () =>
@@ -798,8 +910,13 @@ const isCounter = computed(
 );
 // An empty group ("") is one the user asked for but has not picked yet.
 const sentenceKey = computed<I18nKey>(() => {
-  const pair =
-    props.active === "metricAbove" && isCounter.value
+  const rate = props.active === "metricAbove" && isCounter.value;
+  const typed = threshold.value && THRESHOLD_SENTENCES[props.active ?? "countWhere"];
+  const pair = typed
+    ? rate
+      ? RATE_THRESHOLD_SENTENCES
+      : typed
+    : rate
       ? RATE_SENTENCES
       : SENTENCES[props.active ?? "countWhere"];
   if (props.active === "unusualVolume") return scoped.value ? pair[0] : pair[1];
@@ -833,6 +950,58 @@ const missingFor = (id: IntentId) =>
   (id === "unusualVolume" && !!slots.field && !slots.values?.length) ||
   (id === "percentile" && !slots.measure);
 const needsChoice = computed(() => !!props.active && missingFor(props.active));
+
+// ── The threshold: step 2's own form fields, typed at the end of the sentence ──
+const form = inject(FORM_CONTEXT_KEY, null);
+const guide = inject(ALERT_FORM_CONTEXT_KEY, null)?.thresholdGuide;
+const formValues = form?.useStore((s: { values: unknown }) => s.values);
+const read = (path: string) => get(formValues?.value, path);
+const DURATION_PATH = "_ui.durationValue";
+const VALUE_PATHS = [
+  "trigger_condition.threshold",
+  "query_condition.aggregation.having.value",
+  "query_condition.promql_condition.value",
+];
+const errors = Object.fromEntries(VALUE_PATHS.map((path) => [path, shownFieldError(form, path)]));
+/** Where the active starter keeps its threshold, held while the sentence still waits for a choice. */
+const thresholdKind = computed(() => (props.active ? thresholdPaths(fillFor(props.active)) : null));
+// Bound only while the form holds what the starter wrote; a query rebuilt in step 2 is edited there.
+const threshold = computed(() => {
+  const paths = thresholdKind.value;
+  if (!paths || needsChoice.value || !guide?.value) return null;
+  const type = fillFor(props.active!).values["query_condition.type"];
+  if (read("query_condition.type") !== type) return null;
+  if (type === "promql") return paths;
+  const aggregated = paths.value.startsWith("query_condition.aggregation");
+  return aggregated === !!read("query_condition.aggregation") ? paths : null;
+});
+const thresholdValue = computed(() => (threshold.value ? read(threshold.value.value) : undefined));
+const thresholdMissing = computed(
+  () => !!threshold.value && (thresholdValue.value === "" || thresholdValue.value == null),
+);
+const thresholdError = computed(() =>
+  threshold.value ? errors[threshold.value.value]?.value : undefined,
+);
+// A count names what it counts; any other value takes the unit step 2 shows beside its field.
+const unitWord = computed(() =>
+  props.active === "countWhere"
+    ? dataNoun(props.streamType, "custom", Number(thresholdValue.value) === 1 ? 1 : 2, t)
+    : (guide?.value?.unit.value ?? ""),
+);
+const formAgg = computed(() => String(read("query_condition.aggregation.function") ?? "avg"));
+const aggOptions = computed<SelectOption[]>(() =>
+  [...new Set<string>([...METRIC_AGGS, formAgg.value])].map((fn) => ({
+    label: t(`alerts.queryConfig.functions.${fn}` as I18nKey),
+    value: fn,
+  })),
+);
+const typeThreshold = (path: string, value: unknown) => {
+  guide?.value?.change(path, value);
+  emit("threshold");
+};
+const offersDefaults = computed(
+  () => !!props.active && props.active !== "unusualVolume" && props.active !== "unusualChange",
+);
 
 const apply = (id: IntentId) => {
   const label = intentLabel(id);
@@ -900,7 +1069,10 @@ const reapply = () => props.active && apply(props.active);
 const asText = (value: SelectModelValue): string =>
   typeof value === "string" || typeof value === "number" ? String(value) : "";
 
-const setSlot = async (slot: "field" | "group" | "measure" | "label", value: SelectModelValue) => {
+const setSlot = async (
+  slot: "field" | "group" | "measure" | "label" | "agg",
+  value: SelectModelValue,
+) => {
   const next = asText(value);
   slots[slot] = next && next !== NO_GROUP ? next : undefined;
   if (slot === "field" || slot === "label") {
