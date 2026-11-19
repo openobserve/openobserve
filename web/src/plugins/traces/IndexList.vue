@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <template v-else-if="hasDurationPercentiles">
                     <div
-                      v-for="p in PERCENTILE_LABELS"
+                      v-for="p in durationPercentileRows"
                       :key="p.key"
                       class="flex items-center justify-between py-[0.15rem] ps-2"
                     >
@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="flex-1 pe-1 text-right text-xs">
                         {{ formatPercentile(durationPercentiles[p.key]) }}
                       </span>
+                      <!-- Filters use the raw microseconds: a bound cut to the label's two decimals drops the slowest span. -->
                       <div class="flex w-12">
                         <OButton
                           v-if="p.key !== 'max'"
@@ -118,11 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               value: formatPercentile(durationPercentiles[p.key]),
                             })
                           "
-                          @click.stop="
-                            addSearchTerm(
-                              `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
-                            )
-                          "
+                          @click.stop="addSearchTerm(`duration>=${durationPercentiles[p.key]}`)"
                           class="o2-custom-button-hover border-card-glass-border! ms-1! border!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
@@ -135,11 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               value: formatPercentile(durationPercentiles[p.key]),
                             })
                           "
-                          @click.stop="
-                            addSearchTerm(
-                              `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
-                            )
-                          "
+                          @click.stop="addSearchTerm(`duration<=${durationPercentiles[p.key]}`)"
                           class="o2-custom-button-hover border-card-glass-border! ms-auto! me-2.5! border!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
@@ -208,7 +201,7 @@ import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
-import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
+import { removeConditions } from "@/utils/query/sqlFilterBuilder";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -394,9 +387,11 @@ export default defineComponent({
       { key: "max", label: t("traces.max") },
     ] as const;
 
-    const hasDurationPercentiles = computed(() =>
-      PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
+    // A percentile the server left out has no bound to filter on, so it gets no row.
+    const durationPercentileRows = computed(() =>
+      PERCENTILE_LABELS.filter((p) => durationPercentiles.value[p.key] !== null),
     );
+    const hasDurationPercentiles = computed(() => durationPercentileRows.value.length > 0);
 
     const formatPercentile = (value: number | null) =>
       value === null ? "" : formatTimeWithSuffix(value);
@@ -409,13 +404,11 @@ export default defineComponent({
 
     const removeFieldFromWhereStr = (whereClause: string, fieldName: string): string => {
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
-      const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
-      const remaining = splitOnAnd(whereClause).filter((cond) => {
-        const trimmed = cond.trim();
-        return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
-      });
-      return remaining.join(" AND ");
+      const fieldPattern = new RegExp(
+        `^"?${escaped}"?\\s*(?:[=!<>]|is\\s+(?:not\\s+)?null\\b)`,
+        "i",
+      );
+      return removeConditions(whereClause, (condition) => fieldPattern.test(condition));
     };
 
     const buildFieldValuesSql = (fieldName: string): string => {
@@ -553,11 +546,12 @@ export default defineComponent({
 
     const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
       const joinOp = action === "include" ? " or " : " and ";
-      const expressions = values.map((v) =>
-        action === "include"
-          ? `${fieldName}='${escapeSingleQuotes(v)}'`
-          : `${fieldName}!='${escapeSingleQuotes(v)}'`,
-      );
+      // useFieldValuesStream keys the row of missing values "null".
+      const condition = (v: string) => {
+        if (v === "null") return `${fieldName} ${action === "include" ? "is" : "is not"} null`;
+        return `${fieldName}${action === "include" ? "=" : "!="}'${escapeSingleQuotes(v)}'`;
+      };
+      const expressions = values.map(condition);
       const combined = expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
       addSearchTerm(combined);
     };
@@ -632,7 +626,7 @@ export default defineComponent({
       durationPercentilesLoading,
       durationPercentileErrMsg,
       hasDurationPercentiles,
-      PERCENTILE_LABELS,
+      durationPercentileRows,
       formatTimeWithSuffix,
       formatPercentile,
       getValueMapper,

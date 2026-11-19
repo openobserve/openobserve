@@ -213,6 +213,7 @@ export const useSearchStream = (t: TranslateFn) => {
     shouldGetPageCount: paginationManager.shouldGetPageCount,
 
     // Utility methods
+    resolveFilterForStreams: queryBuilder.resolveFilterForStreams,
     validateFilterForMultiStream: queryBuilder.validateFilterForMultiStream,
     extractFilterColumns: queryBuilder.extractFilterColumns,
     constructErrorMessage: responseProcessor.constructErrorMessage,
