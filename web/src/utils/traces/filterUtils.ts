@@ -212,7 +212,8 @@ export const dropDanglingConnectors = (query: string): string => {
   do {
     before = text;
     text = text
-      .replace(/(^|[^\w\uE000])\(\s*\)/g, "$1")
+      // A name before the brackets, even across a space, makes them a call: `now ()`.
+      .replace(/(^|[^\w\s\uE000]|\b(?:and|or))(\s*)\(\s*\)/gi, "$1$2")
       .replace(/\(\s*(?:and|or)\b\s*/gi, "(")
       .replace(/\s*\b(?:and|or)\s*\)/gi, ")")
       // The cut condition was ANDed to one side, so where an AND meets an OR the OR is the one that stays.

@@ -939,6 +939,11 @@ describe("dropDanglingConnectors — tidying a filter after a condition is cut o
       "msg = '( )' -- and (\nAND b = 1",
     );
   });
+
+  it("keeps the brackets of a zero-argument call written with a space", () => {
+    expect(dropDanglingConnectors("t > now () AND a = 1")).toBe("t > now () AND a = 1");
+    expect(dropDanglingConnectors("t > now ( ) and")).toBe("t > now ( )");
+  });
 });
 
 describe("removeRequiredCondition — turning errors-only off", () => {
@@ -964,6 +969,10 @@ describe("removeRequiredCondition — turning errors-only off", () => {
     ],
   ])("removes %s", (_name, query, expected) => {
     expect(off(query)).toBe(expected);
+  });
+
+  it("leaves the rest of the filter as written", () => {
+    expect(off("t > now () and span_status = 'ERROR'")).toBe("t > now ()");
   });
 
   it("leaves a filter that does not require it untouched", () => {
