@@ -209,11 +209,11 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-card-row-savedView")).toBe(false);
   });
 
-  it("opens the setup popup from Review and set up and never installs from the card", async () => {
+  it("opens the setup popup from Review pack and never installs from the card", async () => {
     const wrapper = await render();
     const setUp = wrapper.get('[data-test="home-pack-card-setup-btn"]');
-    expect(setUp.text()).toBe("Review and set up");
-    expect(setUp.attributes("aria-label")).toBe("Review and set up Kubernetes");
+    expect(setUp.text()).toBe("Review pack");
+    expect(setUp.attributes("aria-label")).toBe("Review the Kubernetes pack");
     expect(has(wrapper, "home-pack-card-details-btn")).toBe(false);
     expect(wrapper.text()).not.toContain("What gets created");
     await setUp.trigger("click");
@@ -548,7 +548,7 @@ describe("StarterPackHomeSection", () => {
       "border-border-default",
     );
     const buttons = rows.findAll('[data-test$="card-setup-btn"]');
-    expect(buttons.map((btn) => btn.text())).toEqual(["Review and set up", "Review and set up"]);
+    expect(buttons.map((btn) => btn.text())).toEqual(["Review pack", "Review pack"]);
     expect(buttons.map((btn) => btn.attributes("data-o2-variant"))).toEqual(["primary", "outline"]);
   });
 
