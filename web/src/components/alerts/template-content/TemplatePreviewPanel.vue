@@ -594,7 +594,15 @@ const footerLabel = computed<I18nText>(() =>
 // Authored links the real Slack message shows in its context block, read from the rendered payload.
 const slackHiddenLinks = computed<string[]>(() => {
   if (channel.value !== "slack" || !previewModel.value || !previewData.value) return [];
-  const blocks = (previewData.value.payload as { blocks?: unknown[] } | null)?.blocks ?? [];
+  const payload = previewData.value.payload as {
+    blocks?: unknown[];
+    attachments?: { blocks?: unknown[] }[];
+  } | null;
+  // The default Slack body puts its blocks in colored attachments; a custom body may use either.
+  const blocks = [
+    ...(payload?.blocks ?? []),
+    ...(payload?.attachments ?? []).flatMap((a) => a.blocks ?? []),
+  ];
   // Buttons are counted per URL, so a second link to a URL already shown still counts as hidden.
   const shown = new Map<string, number>();
   for (const block of blocks as { type?: string; elements?: { url?: string }[] }[]) {

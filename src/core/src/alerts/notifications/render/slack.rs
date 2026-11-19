@@ -23,7 +23,7 @@ use super::{
 };
 use crate::alerts::notifications::{
     NotificationContext,
-    resolve::{Link, LinkRole, RenderedContent},
+    resolve::{Link, LinkRole, RenderedContent, status_color},
 };
 
 /// Block Kit's hard cap on `fields` per section block.
@@ -132,7 +132,6 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         }
     }
 
-    // The title's status dot carries severity, so every block sits at the top level, unstriped.
     let mut tail_blocks: Vec<Value> = Vec::new();
 
     // Slack validates every button `url` server-side and rejects the WHOLE
@@ -196,8 +195,13 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         }));
     }
 
-    blocks.extend(tail_blocks);
-    json!({ "blocks": blocks })
+    // The bar repeats the title dot's color; Slack drops an attachment whose blocks are empty.
+    let color = status_color(ctx);
+    let mut attachments = vec![json!({"color": color, "blocks": blocks})];
+    if !tail_blocks.is_empty() {
+        attachments.push(json!({"color": color, "blocks": tail_blocks}));
+    }
+    json!({ "attachments": attachments })
 }
 
 /// Authored links that found no button slot, one mrkdwn element each, never cut.

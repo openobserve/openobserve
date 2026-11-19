@@ -668,6 +668,16 @@ pub(crate) fn status_dot(ctx: &NotificationContext) -> &'static str {
     }
 }
 
+/// The Slack webhook bar color, read from `status_dot` so the dot and the bar never differ.
+pub(crate) fn status_color(ctx: &NotificationContext) -> &'static str {
+    match status_dot(ctx) {
+        "🟢" => "#2EB67D",
+        "🟠" => "#F2952F",
+        "🔵" => "#4A90D9",
+        _ => "#E01E5A",
+    }
+}
+
 /// `critical` reads `Critical` and `no_data` reads `No data`; a priority such as `P1` is kept.
 pub(crate) fn level_label(level: &str) -> String {
     let words = level.replace('_', " ");
@@ -1271,20 +1281,26 @@ mod tests {
     fn status_dot_colors_by_event_and_level() {
         use NotificationEvent::{Firing, Informational, Resolved};
         use NotificationKind::{Alert, Downtime, Incident, OnCall, Synthetics};
-        for (kind, event, level, expected) in [
-            (Alert, Resolved, Some(AlertLevel::Critical), "🟢"),
+        for (kind, event, level, expected, bar) in [
+            (Alert, Resolved, Some(AlertLevel::Critical), "🟢", "#2EB67D"),
             // A P4 incident and a P3 page carry no level: informational, not urgent.
-            (Incident, Firing, None, "🔵"),
-            (OnCall, Firing, None, "🔵"),
-            (Incident, Firing, Some(AlertLevel::Warning), "🟠"),
-            (OnCall, Firing, Some(AlertLevel::Critical), "🔴"),
-            (Incident, Resolved, None, "🟢"),
-            (Alert, Firing, Some(AlertLevel::Ok), "🟢"),
-            (Synthetics, Informational, Some(AlertLevel::Warning), "🟠"),
-            (Alert, Informational, None, "🔵"),
-            (Downtime, Firing, None, "🔵"),
-            (Alert, Firing, Some(AlertLevel::Critical), "🔴"),
-            (Alert, Firing, None, "🔴"),
+            (Incident, Firing, None, "🔵", "#4A90D9"),
+            (OnCall, Firing, None, "🔵", "#4A90D9"),
+            (Incident, Firing, Some(AlertLevel::Warning), "🟠", "#F2952F"),
+            (OnCall, Firing, Some(AlertLevel::Critical), "🔴", "#E01E5A"),
+            (Incident, Resolved, None, "🟢", "#2EB67D"),
+            (Alert, Firing, Some(AlertLevel::Ok), "🟢", "#2EB67D"),
+            (
+                Synthetics,
+                Informational,
+                Some(AlertLevel::Warning),
+                "🟠",
+                "#F2952F",
+            ),
+            (Alert, Informational, None, "🔵", "#4A90D9"),
+            (Downtime, Firing, None, "🔵", "#4A90D9"),
+            (Alert, Firing, Some(AlertLevel::Critical), "🔴", "#E01E5A"),
+            (Alert, Firing, None, "🔴", "#E01E5A"),
         ] {
             let ctx = NotificationContext {
                 kind,
@@ -1293,6 +1309,7 @@ mod tests {
                 ..Default::default()
             };
             assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
+            assert_eq!(status_color(&ctx), bar, "bar {kind:?} {event:?} {level:?}");
         }
     }
 
