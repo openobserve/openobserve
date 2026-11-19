@@ -30,7 +30,7 @@ const props = defineProps<{
   streamType?: string;
   dialect: string;
   dataTest: string;
-  /** Renders as a setting row, with Change and Remove in its actions column. */
+  /** Renders as a full-width setting row; Change and Remove stay inline after the sentence. */
   label?: I18nText;
 }>();
 
@@ -74,7 +74,9 @@ const SentenceActions = () => [actionButton("change"), actionButton("remove")];
 <template>
   <component
     :is="props.label ? OSettingRow : 'div'"
-    v-bind="props.label ? { label: props.label, dataTest: `${props.dataTest}-row` } : {}"
+    v-bind="
+      props.label ? { label: props.label, dataTest: `${props.dataTest}-row`, wide: true } : {}
+    "
   >
     <div
       class="flex flex-wrap items-center gap-x-2 gap-y-1"
@@ -98,7 +100,7 @@ const SentenceActions = () => [actionButton("change"), actionButton("remove")];
         </OButton>
       </template>
       <template v-else>
-        <p class="text-text-body m-0 min-w-0 text-sm leading-6">
+        <p class="text-text-body m-0 text-sm leading-6">
           <span class="text-text-secondary">{{ t("alerts.form.filter.where") }}</span>
           <template v-for="part in parts" :key="`${part.kind}-${part.id}`"
             >{{ SPACE
@@ -142,14 +144,11 @@ const SentenceActions = () => [actionButton("change"), actionButton("remove")];
             ></template
           >
         </p>
-        <span v-if="!props.label" class="flex shrink-0 items-center gap-1"
-          ><SentenceActions
-        /></span>
+        <span class="flex shrink-0 items-center gap-1"><SentenceActions /></span>
       </template>
       <div v-if="$slots.trail" class="ms-auto flex shrink-0 items-center">
         <slot name="trail" />
       </div>
     </div>
-    <template v-if="props.label && !empty" #actions><SentenceActions /></template>
   </component>
 </template>
