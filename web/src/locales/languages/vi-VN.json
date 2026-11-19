@@ -2149,27 +2149,7 @@
       "view": "Lượt xem",
       "frustration": "Bực bội",
       "failedRequest": "Yêu cầu thất bại",
-      "noResponse": "Không có phản hồi",
-      "noResponseStatus": "0 — Không phản hồi",
-      "failedRequestDetails": "Chi tiết yêu cầu thất bại",
-      "browserStatus": "Trạng thái trình duyệt",
-      "serverStatus": "Trạng thái máy chủ",
-      "noServerSpanFound": "Không tìm thấy span máy chủ",
-      "noServerSpanHint": "Span bị thiếu cũng có thể là do lấy mẫu, độ trễ tiếp nhận dữ liệu, một tuyến chưa được đo hoặc thời gian lưu giữ.",
-      "unknownNoTrace": "Không xác định (không có trace)",
-      "unknown": "Không xác định",
-      "abortedByApp": "bị ứng dụng hủy",
-      "method": "Phương thức",
-      "url": "URL",
-      "duration": "Thời lượng",
-      "timing": "Thời gian",
-      "timingDns": "DNS",
-      "timingConnect": "Kết nối",
-      "timingSsl": "SSL",
-      "timingFirstByte": "Byte đầu tiên",
-      "timingDownload": "Tải xuống",
-      "size": "Kích thước",
-      "initiatedBy": "Khởi tạo bởi"
+      "noResponse": "Không có phản hồi"
     },
     "replayCanvasNotRecorded": "Nội dung canvas không được ghi lại",
     "actionOnTarget": "{action} trên \"{target}\"",
@@ -2213,6 +2193,7 @@
       "pageLabel": "Trang",
       "noDeviceData": "Không có lượt nhấp nào được ghi nhận trên loại thiết bị này cho trang này.",
       "noReplay": "Không có bản phát lại phiên nào được ghi cho trang này, nên không có ảnh chụp màn hình để vẽ lên. Hãy bật tính năng phát lại phiên cho ứng dụng.",
+      "noReplayLegacySdk": "Ảnh chụp trang cần RUM SDK mới hơn. Bản phát lại phiên được ghi ở đây đến từ SDK cũ hơn, nên không có ảnh chụp màn hình để vẽ lên.",
       "loadFailed": "Không thể tải dữ liệu lượt nhấp.",
       "snapshotFailed": "Không thể tải ảnh chụp nhanh trang.",
       "noPosition": "Không có lượt nhấp nào trong khoảng thời gian này cho trang này.",
@@ -2278,8 +2259,7 @@
       "showElements": "Hiện phần tử",
       "markerLabel": "Hạng {rank}, {name}, {count} lượt nhấp | Hạng {rank}, {name}, {count} lượt nhấp",
       "markerLabelFrustrated": "Hạng {rank}, {name}, {count} lượt nhấp, {frustrated} bực bội | Hạng {rank}, {name}, {count} lượt nhấp, {frustrated} bực bội",
-      "markerClicks": "{count} lượt nhấp | {count} lượt nhấp",
-      "noReplayLegacySdk": "Ảnh chụp trang cần RUM SDK mới hơn. Bản phát lại phiên được ghi ở đây đến từ SDK cũ hơn, nên không có ảnh chụp màn hình để vẽ lên."
+      "markerClicks": "{count} lượt nhấp | {count} lượt nhấp"
     },
     "analytics": {
       "title": "Phân tích sản phẩm",
@@ -3361,7 +3341,6 @@
     "licenseAndUsage": "Giấy phép & Sử dụng",
     "copyLicenseId": "Sao chép ID giấy phép",
     "editionLbl": "Phiên bản",
-    "limitPrefix": "· giới hạn",
     "gbPerDay": "GB / ngày",
     "ofDailyLimitUsedToday": "của hạn mức hàng ngày đã sử dụng hôm nay",
     "gbToday": "GB hôm nay",
@@ -3385,6 +3364,7 @@
     "usage_limits": "Giới hạn sử dụng",
     "feature_comparison_lbl": "So sánh tính năng",
     "feature_comparision_ent_msg": "Bạn đang sử dụng OpenObserve Enterprise Edition với quyền truy cập tất cả các tính năng nâng cao được liệt kê bên dưới.",
+    "feature_comparision_ent_partial_msg": "Bạn đang dùng OpenObserve Enterprise Edition. Một số tính năng không có trong giấy phép của bạn; xem danh sách ở trên.",
     "feature_comparision_plan_detail": "Gói của bạn: Enterprise Edition miễn phí cho tối đa 50 GB/ngày (~1.5 TB/tháng) dữ liệu tiếp nhận.",
     "feature_comparision_os_msg": "Bạn hiện đang sử dụng OpenObserve Open Source Edition. Nâng cấp lên Enterprise Edition để mở khóa các tính năng nâng cao được liệt kê trong bảng so sánh bên dưới.",
     "feature_comparision_good_news": "Tin tốt: OpenObserve Enterprise Edition hoàn toàn miễn phí cho tối đa 50 GB/ngày (~1.5 TB/tháng) dữ liệu tiếp nhận.",
@@ -3465,6 +3445,7 @@
     "features_no_match": "Không có tính năng nào khớp với tìm kiếm của bạn",
     "features_none": "Không có tính năng nào trong nhóm này",
     "features_free_heading": "Miễn phí, có trong mọi giấy phép",
+    "features_free_not_included": "Miễn phí, không có trong giấy phép của bạn",
     "features_new": "Mới sau giấy phép của bạn",
     "features_filter_new": "Mới",
     "request_new_license": "Yêu cầu giấy phép mới",
@@ -3527,6 +3508,13 @@
     "license_already_active_msg": "Giấy phép của bạn vẫn còn hiệu lực. Bạn có muốn cập nhật nó với khóa giấy phép mới không?",
     "yes_update_license": "Có, cập nhật giấy phép",
     "no_keep_current": "Không, giữ nguyên",
+    "license_downgrade_title": "Áp dụng khóa giấy phép này?",
+    "license_downgrade_intro": "Khóa này sẽ thay thế giấy phép hiện tại của bạn.",
+    "license_downgrade_expired": "Khóa này đã hết hạn vào {date}. Giới hạn miễn phí 50 GB/ngày sẽ được áp dụng.",
+    "license_downgrade_lose": "Bạn sẽ mất: {names}",
+    "license_downgrade_limit": "Giới hạn hằng ngày thay đổi từ {old} thành {new}",
+    "license_downgrade_expiry": "Ngày hết hạn thay đổi từ {old} thành {new}",
+    "license_limit_per_day": "{gb} GB/ngày",
     "header_button": {
       "cloud_features": "Tính năng {product}",
       "enterprise_edition": "Phiên bản: Enterprise",
@@ -4890,6 +4878,8 @@
       "reasonExpired": "chưa từng chạy · trong hàng đợi hơn 1 giờ",
       "reasonWorkerLost": "mất worker · không chạy lại",
       "reasonWorkflowDisabled": "quy trình làm việc đã bị tắt",
+      "reasonEndpointDisabled": "chưa từng chạy · endpoint HTTP đã bị tắt",
+      "reasonCredentialRevoked": "chưa từng chạy · thông tin xác thực của nó đã bị thu hồi",
       "reasonRunTimeout": "hết thời gian chờ sau 15 phút",
       "allTriggers": "Tất cả trình kích hoạt",
       "triggerFilter": "Trình kích hoạt",
@@ -5638,8 +5628,8 @@
     "periodInfoLine1": "Khoảng thời gian mà truy vấn sẽ chạy.",
     "periodInfoLine2": "Ví dụ: 10 phút nghĩa là khi truy vấn chạy, nó sẽ sử dụng dữ liệu của 10 phút gần nhất. Nếu truy vấn chạy lúc 4:00 chiều thì nó sẽ sử dụng dữ liệu từ 3:50 chiều đến 4:00 chiều.",
     "periodShouldMatchFrequency": "Lưu ý: Khoảng thời gian phải giống với tần suất.",
-    "delayInfoLine1": "Độ trễ mà pipeline được lên lịch chạy.",
-    "delayInfoLine2": "Ví dụ: độ trễ 10 phút nghĩa là pipeline sẽ chạy sau 10 phút so với thời gian đã lên lịch.",
+    "delayInfoLine1": "Thời gian chờ sau thời điểm đã lên lịch để dữ liệu đến muộn có thể tới.",
+    "delayInfoLine2": "Ví dụ: với độ trễ 10 phút, pipeline chạy hằng giờ sẽ chạy lúc 10:10 và đọc dữ liệu từ 9:00 đến 10:00.",
     "closeDrawer": "Đóng ngăn kéo",
     "conditionValueGuidelines": "Hướng dẫn giá trị điều kiện:",
     "customColumnGuideline": "Để thêm cột tùy chỉnh, nhập tên cột và nhấn",
@@ -6254,14 +6244,7 @@
       "askAiRejected": "các yêu cầu bị từ chối với {status} {reason} trên {path}.",
       "askAiNoRequests": "chưa có gì đến và không có yêu cầu nào bị từ chối.",
       "askAiUnavailable": "không thể đọc các yêu cầu bị từ chối, nên không xác định được nguyên nhân.",
-      "thisGuide": "một nguồn dữ liệu",
-      "hintWaitingAfter": "Mục này tự chuyển xanh khi bản ghi đầu tiên đến. Nếu không có gì đến trong {elapsed}, mục này hiển thị lỗi; Khắc phục sự cố sẽ kiểm tra ngay.",
-      "idleInPrompt": "{stream} đã nhận dữ liệu. Quá trình kiểm tra sẽ bắt đầu khi bạn sao chép lời nhắc.",
-      "idleMatchesPrompt": "Các stream khớp đã nhận dữ liệu. Quá trình kiểm tra sẽ bắt đầu khi bạn sao chép lời nhắc.",
-      "idleNewPrompt": "Quá trình kiểm tra sẽ bắt đầu khi bạn sao chép lời nhắc.",
-      "fixInvalidCredentialsPrompt": "Token trong tệp .env của bạn không khớp với token tổ chức {token}. Hãy tải lại tệp .env và yêu cầu coding agent chạy lại yêu cầu.",
-      "fixInvalidCredentialsPromptUnnamed": "Token trong tệp .env của bạn không khớp với token hiện tại của tổ chức này. Hãy tải lại tệp .env và yêu cầu coding agent chạy lại yêu cầu.",
-      "copyPrompt": "Sao chép lời nhắc"
+      "thisGuide": "một nguồn dữ liệu"
     },
     "firstDataNotice": {
       "pill": "Dữ liệu đầu tiên của bạn đã đến",
@@ -6414,17 +6397,7 @@
         "promptTitle": "Dán nội dung này vào {client1}, {client2} hoặc {client3}",
         "promptLabel": "Prompt",
         "promptCopied": "Đã sao chép prompt",
-        "health": {
-          "title": "Tình trạng dữ liệu AI",
-          "scopeAgent": "Các span từ agent {agent} trong {stream} kể từ khi bắt đầu kiểm tra",
-          "scopeStream": "Các span trong {stream} kể từ khi bắt đầu kiểm tra",
-          "checking": "Đang kiểm tra tình trạng dữ liệu AI…",
-          "checkAgain": "Kiểm tra lại",
-          "checkAgainHint": "Sau khi coding agent của bạn sửa mã và chạy một yêu cầu khác, hãy kiểm tra lại.",
-          "unsupported": "Phiên bản OpenObserve này không kiểm tra tình trạng dữ liệu AI. Span đầu tiên của bạn đã đến, nên quá trình trace hoạt động.",
-          "error": "Không thể chạy kiểm tra tình trạng dữ liệu AI. Span đầu tiên của bạn đã đến, nên quá trình trace hoạt động.",
-          "noGenAiSpans": "Các span đã đến, nhưng không có span nào là cuộc gọi LLM, nên ứng dụng khách LLM chưa được gắn công cụ đo. Hãy yêu cầu coding agent của bạn gắn công cụ đo cho ứng dụng khách LLM, chạy một yêu cầu rồi kiểm tra lại."
-        }
+        "health": {}
       }
     },
     "header": "Nguồn dữ liệu",
@@ -10344,7 +10317,10 @@
     "contractManagedMessage": "Việc thanh toán được xử lý qua hợp đồng của bạn — liên hệ với người quản lý tài khoản để thay đổi",
     "upgradeToPlanMessage": "Nâng cấp lên gói để tiếp tục sử dụng các dịch vụ của OpenObserve.",
     "creditsUsedLabel": "tín dụng đã sử dụng",
-    "licenseExpiryContactAdmin": "Vui lòng cập nhật giấy phép của bạn bằng cách liên hệ với quản trị viên.",
+    "licenseExpiredOn": "Giấy phép của bạn đã hết hạn vào {date}. Các tính năng của bạn vẫn được bật.",
+    "licenseExpiredLimit": "Giới hạn miễn phí {limit} GB/ngày hiện được áp dụng: nếu vượt quá giới hạn này hơn {allowed} ngày trong một tháng, tìm kiếm sẽ tạm dừng cho đến khi bạn gia hạn.",
+    "licenseAskAdminToRenew": "Hãy yêu cầu quản trị viên giấy phép của bạn gia hạn.",
+    "renewLicense": "Gia hạn giấy phép",
     "subscribed": "Đã đăng ký",
     "invoiceHistory": "Lịch sử hóa đơn",
     "amount": "Số tiền",
@@ -10488,7 +10464,6 @@
     "failedToLinkAwsSubscription": "Liên kết gói đăng ký AWS thất bại",
     "failedToLinkAzureSubscription": "Liên kết gói đăng ký Azure thất bại",
     "last15Minutes": "15 phút qua",
-    "licenseHasExpired": "Giấy phép của bạn đã hết hạn",
     "numberOfPipelines": "Số lượng pipeline",
     "oneDayUntilLicenseExpires": "Còn 1 ngày trước khi giấy phép của bạn hết hạn",
     "pleaseWaitProcessingRequest": "Vui lòng đợi trong khi chúng tôi xử lý yêu cầu của bạn...",
@@ -12213,6 +12188,8 @@
       "noDestinationNote": "Tùy chọn. Cảnh báo vẫn chạy và ghi lại lịch sử, nhưng không có đích nào được thông báo.",
       "sendsToStatus": "Gửi đến {targets} mỗi khi cảnh báo kích hoạt.",
       "oncallTeamTarget": "một nhóm trực",
+      "lockedWorkflowFallback": "Quy trình làm việc bị khóa",
+      "lockedTargetBadge": "Bị khóa",
       "createsIncident": "Tạo sự cố",
       "createsIncidentTooltip": "Nếu cảnh báo có thể tạo sự cố, nó sẽ không gửi thông báo riêng. Thay vào đó, thông báo về sự cố được gửi khi sự cố mới được tạo hoặc loại cảnh báo mới tham gia vào sự cố hiện có.",
       "helpTemplateTitle": "Ghi đè mẫu",
@@ -12303,13 +12280,7 @@
       "suppressRepeats": "Chặn thông báo lặp lại",
       "suppressRepeatsTooltip": "Chỉ thông báo một lần khi cảnh báo bắt đầu kích hoạt hoặc thay đổi mức độ, không phải ở mỗi lần đánh giá. Giữ tùy chọn này ở trạng thái tắt để tiếp tục nhận nhắc nhở sau mỗi khoảng thời gian im lặng.",
       "keepFiringForInvalid": "Nhập 0 giây hoặc nhiều hơn",
-      "keepFiringForTooLong": "Nhập tối đa 86400 giây (24 giờ)",
-      "helpApplyToObject": "Dùng mẫu này",
-      "helpTemplateExplainObject": "Mẫu là thông điệp được gửi đi: văn bản cùng các biến. Chọn một mẫu ở đây sẽ thay thế mẫu riêng của từng đích, chỉ cho cấu hình này.",
-      "helpTemplateWhenDescObject": "Để trống mục này và mỗi đích sẽ dùng mẫu riêng của nó nếu mẫu đó áp dụng cho loại này, nếu không thì dùng thông điệp tích hợp. Đặt ghi đè để gửi một thông điệp đến mọi đích phù hợp.",
-      "helpCurrentHeadingObject": "Nội dung gửi hiện tại",
-      "helpCurrentOverrideSome": "Các đích phù hợp dùng mẫu này:",
-      "helpCurrentResolved": "Chưa đặt ghi đè. Mỗi đích sẽ dùng:"
+      "keepFiringForTooLong": "Nhập tối đa 86400 giây (24 giờ)"
     },
     "advanced": {
       "addVariable": "Thêm biến",
@@ -12449,6 +12420,9 @@
       "lastTrained": "Lần huấn luyện cuối",
       "level": "Mức",
       "lookBackWindow": "Cửa sổ nhìn lại",
+      "scheduleIntervalFloor": "Tần suất kiểm tra phải ít nhất là {min}.",
+      "lookBackWindowCap": "Cửa sổ xem lại tối đa là {max} với Độ phân giải phát hiện này: cửa sổ dài hơn sẽ chứa hơn 100.000 bucket. Hãy rút ngắn cửa sổ hoặc dùng Độ phân giải phát hiện dài hơn.",
+      "retrainOnEditNote": "Thay đổi truy vấn, hàm hoặc Độ phân giải phát hiện sẽ huấn luyện lại bộ phát hiện này. Quá trình phát hiện tạm dừng cho đến khi huấn luyện kết thúc.",
       "lookBackWindowFloor": "Cửa sổ nhìn lại phải tối thiểu {min} — Kiểm tra mỗi cộng một Độ phân giải phát hiện. Cửa sổ ngắn hơn không thể chứa trọn một bucket khi lần chạy đầu tiên kích hoạt, nên lần chạy đó sẽ bỏ qua các bucket.",
       "lookBackWindowLegacy": "Cửa sổ đã lưu này thấp hơn mức tối thiểu {min} (Kiểm tra mỗi cộng một Độ phân giải phát hiện). Nó vẫn được lưu nguyên trạng, nhưng lần chạy đầu tiên có thể bỏ qua các bucket cho đến khi cửa sổ được tăng lên.",
       "lookBackWindowMinimum": "Tối thiểu {min}; nên dùng {recommended} trở lên cho các cài đặt này.",
@@ -12542,6 +12516,7 @@
       "summaryTrainingDays": "{days} ngày",
       "summaryWindowShare": "✓ Tỷ lệ trong cửa sổ: {rule}",
       "timestampAliasBanned": "{column} không thể được sử dụng làm bí danh cột. Sử dụng {timeBucket} thay thế.",
+      "valueColumnMissing": "Cảnh báo này đọc giá trị từ cột {column}. Hãy giữ nguyên tên cột đó trong truy vấn SQL.",
       "tooltipAnomalyAbove": "Bất thường: cao hơn khoảng dự kiến",
       "tooltipAnomalyBelow": "Bất thường: thấp hơn khoảng dự kiến",
       "trainingSpan": "Khoảng thời gian huấn luyện",
@@ -12737,6 +12712,7 @@
     "oncallTeamPlaceholder": "Định tuyến từ quy tắc sở hữu",
     "oncallTeamTooltip": "Nhóm trực nào mà cảnh báo này gọi. Để trống để hệ thống xác định nhóm từ các chiều nhận dạng của cảnh báo — đây là trường hợp thông thường — chỉ đặt khi các chiều đó không thể biểu diễn chủ sở hữu.",
     "oncallTeamNoTeams": "Chưa có nhóm trực nào. Hãy tạo một nhóm trong mục Nhóm trực.",
+    "lockedTeamFallback": "Nhóm bị khóa",
     "oncallTeamAtFireTime": "Từ quyền sở hữu",
     "oncallTeamFromRules": "Không có nhóm nào được đặt trên cảnh báo này, vì vậy chủ sở hữu được xác định từ các chiều danh tính của dòng kích hoạt. Những chiều đó chỉ được biết khi cảnh báo kích hoạt.",
     "tags": "Thẻ",
@@ -13049,6 +13025,10 @@
         "onceFor": "Một lần, {duration}"
       },
       "validation": {
+        "groupLimitLost": "Xóa cảnh báo này cũng sẽ xóa giới hạn nhóm. Dùng Tắt tiếng tất cả nhóm để xác nhận.",
+        "endInPast": "Thời gian kết thúc đã qua. Hãy chọn thời gian kết thúc sau hiện tại.",
+        "pastSloOnly": "Cửa sổ này đã qua. Nó chỉ hiệu chỉnh dữ liệu SLO.",
+        "neverProducesWindow": "Lịch này không bao giờ tạo ra cửa sổ.",
         "conditionRequired": "Thêm điều kiện hoặc xóa khối điều kiện.",
         "pairKey": "Chọn một chiều cho mỗi hàng.",
         "pairOperator": "Dùng = hoặc != trong điều kiện thời gian bảo trì.",
@@ -13122,7 +13102,9 @@
       "confirmEndNow": {
         "title": "Kết thúc thời gian bảo trì này ngay?",
         "message": "Thông báo sẽ tiếp tục ngay. Thời gian bảo trì vẫn ở trong danh sách với trạng thái kết thúc sớm.",
+        "recurringMessage": "Thời gian bảo trì này lặp lại. Kết thúc ngay bây giờ cũng sẽ dừng mọi cửa sổ trong tương lai và các phần mở rộng của nó. Các thời gian bảo trì khác bao phủ cùng các mục vẫn tiếp tục tắt tiếng. Để tắt tiếng các cửa sổ trong tương lai lần nữa, hãy nhân bản nó.",
         "ok": "Kết thúc ngay",
+        "recurringOk": "Kết thúc ngay và dừng các cửa sổ trong tương lai",
         "keep": "Tiếp tục chạy"
       },
       "extend": {
@@ -13155,6 +13137,8 @@
       "confirmCancel": {
         "title": "Hủy thời gian bảo trì",
         "message": "Thông báo sẽ tiếp tục ngay lập tức. Thời gian bảo trì vẫn ở trong danh sách để lưu lịch sử.",
+        "recurringMessage": "Thời gian bảo trì này lặp lại. Hủy nó sẽ dừng mọi cửa sổ trong tương lai.",
+        "bulkRecurringNote": "Ít nhất một thời gian bảo trì đã chọn lặp lại. Hủy nó sẽ dừng mọi cửa sổ trong tương lai.",
         "bulkMessage": "Hủy {count} thời gian bảo trì? Thông báo sẽ tiếp tục ngay lập tức. | Hủy {count} thời gian bảo trì? Thông báo sẽ tiếp tục ngay lập tức.",
         "confirm": "Hủy thời gian bảo trì | Hủy thời gian bảo trì",
         "keep": "Giữ thời gian bảo trì | Giữ thời gian bảo trì"
@@ -13192,6 +13176,11 @@
         "cardCaption": "Thư mục trước, sau đó các khối tùy chọn thu hẹp thêm. Điều kiện chiều ở trên cũng áp dụng cho mô-đun này.",
         "noConditionForChecks": "Điều kiện chiều ở trên không áp dụng cho các kiểm tra.",
         "appliesTo": "Áp dụng cho",
+        "groupScope": "Chỉ tắt tiếng {count} nhóm của {alert}: {labels}. | Chỉ tắt tiếng {count} nhóm của {alert}: {labels}.",
+        "groupScopeNoLabels": "Chỉ tắt tiếng {count} nhóm của {alert}. | Chỉ tắt tiếng {count} nhóm của {alert}.",
+        "groupScopeEndsOnGroupClear": "Kết thúc khi nhóm này ngừng kích hoạt.",
+        "groupScopeEndsOnAlertClear": "Kết thúc khi cảnh báo này ngừng kích hoạt.",
+        "groupScopeClear": "Tắt tiếng tất cả nhóm cho đến thời điểm kết thúc đã lên lịch",
         "tabTargets": "Mục tiêu",
         "tabSchedule": "Lịch trình",
         "tabAdvanced": "Nâng cao",
@@ -13354,6 +13343,12 @@
         "bannerOn": "Hiển thị cho tổ chức khi đang hoạt động",
         "bannerOff": "Không có biểu ngữ",
         "occurrences": "Số lần xuất hiện",
+        "plannedSchedule": "Lịch dự kiến",
+        "endedEarlyAt": "Kết thúc sớm lúc",
+        "cancelledAt": "Đã hủy lúc",
+        "endedEarlyAtTime": "Kết thúc sớm lúc {time}",
+        "cancelledAtTime": "Đã hủy lúc {time}",
+        "stoppedTime": "{time} ({zone})",
         "nextWindow": "Cửa sổ tiếp theo: {window}. Giờ của bạn: {local}.",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "Khớp theo",
@@ -13508,8 +13503,7 @@
             "ended": "Đã kết thúc",
             "cancelled": "Đã hủy",
             "extended": "Đã gia hạn"
-          },
-          "template": "Mẫu"
+          }
         },
         "test": {
           "send": "Gửi thử",
@@ -13580,42 +13574,8 @@
       "incident": "Sự cố"
     },
     "priorityUnsetPagesAs": "Chưa đặt (cảnh báo ở mức P2)",
-    "notificationKinds": {
-      "alert": "Cảnh báo",
-      "incident": "Sự cố",
-      "anomaly": "Bất thường",
-      "synthetics": "Synthetics",
-      "downtime": "Thời gian bảo trì",
-      "on_call": "Trực"
-    },
-    "templateOverride": {
-      "label": "Ghi đè mẫu",
-      "placeholder": "Dùng template của đích",
-      "help": "Ghi đè template của đích cho tin nhắn {kind}. Không thể chọn template dựng sẵn; hãy sao chép một template trước.",
-      "empty": "Chưa có template nào áp dụng cho {kind}.",
-      "create": "Tạo template",
-      "loadFailed": "Không thể tải template",
-      "forbidden": "Liệt kê template cần quyền đọc template",
-      "mismatch": "Không phù hợp với {count} đích của bạn ({names}); các đích đó sẽ quay về template riêng của chúng.",
-      "groupContent": "Nội dung",
-      "groupCustom": "Tùy chỉnh",
-      "webhookOnly": "(chỉ webhook)",
-      "emailOnly": "(chỉ email)",
-      "snsOnly": "(chỉ SNS)",
-      "stale": "Template {name} không còn tồn tại. Hãy chọn template khác hoặc xóa trường này.",
-      "willUse": "Sẽ dùng: {template}",
-      "willUsePerDestination": "Sẽ dùng, theo từng đích:",
-      "willUseRow": "{destination}: {template}",
-      "templateWithSource": "{name} ({source})",
-      "builtIn": "Tin nhắn {kind} dựng sẵn",
-      "sourceExplicit": "ghi đè này",
-      "sourceDestination": "template của đích",
-      "sourceOrgDefault": "mặc định của tổ chức",
-      "sourceCompiled": "dựng sẵn",
-      "sourcePlatformResolve": "nền tảng phân giải",
-      "sourceLegacy": "payload kiểu cũ",
-      "sourceLegacyPayload": "payload JSON riêng của loại này (webhook chung)"
-    }
+    "notificationKinds": {},
+    "templateOverride": {}
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -13935,26 +13895,7 @@
     "testSendConfirm": "Thao tác này sẽ đăng một tin nhắn thực tế tới kênh đã chọn, được đánh dấu [TEST].",
     "testSendSuccess": "Tin nhắn kiểm tra đã được gửi",
     "testSendRateLimited": "Quá nhiều lần gửi kiểm tra — vui lòng chờ một lát và thử lại",
-    "testSendNoDestination": "Chọn một đích trước",
-    "playgroundLabel": "Playground",
-    "playgroundHelp": "Không có gì ở đây được gửi đi.",
-    "emptyVariables": "Trống cho {kind}: {names}",
-    "appliesTo": "Áp dụng cho",
-    "appliesToAll": "Tất cả các loại",
-    "appliesToAny": "Mọi loại",
-    "allKindsNotice": "Số template áp dụng cho mọi loại: {count}. Các đích của chúng cũng dùng chúng cho tin nhắn bất thường, synthetics, trực, thời gian bảo trì và sự cố. Hãy xem lại.",
-    "allKindsNoticeReview": "Xem lại",
-    "appliesToInferred": "Suy ra từ các biến trong nội dung",
-    "appliesToManual": "Do bạn chọn",
-    "appliesToReset": "Đặt lại về suy luận",
-    "previewKind": "Loại",
-    "previewForbidden": "Bạn không có quyền xem trước template",
-    "previewFailed": "Xem trước thất bại: {message}",
-    "severityFailed": "Thất bại",
-    "severityDegraded": "Suy giảm",
-    "severityFlaky": "Chập chờn",
-    "severityRecovered": "Đã phục hồi",
-    "variableGroupCommon": "Chung"
+    "testSendNoDestination": "Chọn một đích trước"
   },
   "alert_sources": {
     "header": "Nguồn cảnh báo bên ngoài",
@@ -14210,12 +14151,7 @@
     "severityErrorDescription": "Sự cố lỗi tiêu chuẩn",
     "severityWarningDescription": "Sự cố mức cảnh báo",
     "severityInfoDescription": "Sự cố thông tin",
-    "urlRecipientsChannel": "URL / người nhận / kênh",
-    "payloadFormat": "Định dạng payload",
-    "payloadFormatAuto": "Tự động",
-    "payloadFormatLegacy": "JSON kiểu cũ",
-    "payloadFormatRendered": "Template đã kết xuất",
-    "payloadFormatHelp": "Tự động gửi nội dung JSON cũ cho tin nhắn bất thường, synthetics và trực cho đến khi có template được gắn. Được lưu dưới khóa metadata payload_format."
+    "urlRecipientsChannel": "URL / người nhận / kênh"
   },
   "pipeline_destinations": {
     "header": "Đích Pipeline",
@@ -14733,6 +14669,7 @@
     "generalDesc": "Chủ đề, mặc định truy vấn và tùy chọn cốt lõi",
     "orgDesc": "Tham số và định danh tổ chức",
     "cipherKeysDesc": "Khóa mã hóa cho trường nhạy cảm",
+    "aiToolsetsDesc": "Máy chủ MCP và công cụ CLI mà Trợ lý AI có thể sử dụng",
     "regexPatternsDesc": "Mẫu regex tái sử dụng cho việc làm rõ",
     "domainManagementDesc": "Giới hạn đăng nhập vào tên miền SSO được phép",
     "passwordPolicy": "Chính sách mật khẩu",
@@ -15068,9 +15005,7 @@
     },
     "licensePage": {
       "unexpectedError": "lỗi không mong đợi",
-      "daysRemaining": "Còn {days} ngày cho đến khi giấy phép hết hạn",
-      "oneDayRemaining": "Còn 1 ngày cho đến khi giấy phép hết hạn",
-      "licenseExpired": "Giấy phép của bạn đã hết hạn"
+      "daysRemaining": "Còn {days} ngày cho đến khi giấy phép hết hạn"
     },
     "nodesPage": {
       "subtitle": "Các nút cụm và trạng thái của chúng",
@@ -23421,19 +23356,6 @@
     "exportSucceeded": "Đã xuất {count} SLO | Đã xuất {count} SLO",
     "moved": "Đã di chuyển {count} SLO sang {folder}",
     "moveFailed": "Di chuyển thất bại",
-    "import": {
-      "title": "Nhập SLO",
-      "results": "Kết quả nhập",
-      "noResults": "Kết quả của từng SLO sẽ xuất hiện ở đây sau khi bạn nhập.",
-      "jsonEmpty": "Thêm JSON SLO từ tệp, URL hoặc trình soạn thảo trước khi nhập.",
-      "invalidJson": "Không thể phân tích cú pháp JSON SLO.",
-      "notAnObject": "SLO #{index} không phải là đối tượng JSON và đã bị bỏ qua.",
-      "nameRequired": "SLO #{index} không có tên và đã bị bỏ qua.",
-      "created": "Đã nhập SLO #{index} \"{name}\".",
-      "failed": "Không nhập được SLO #{index} \"{name}\": {reason}",
-      "unknownError": "Lỗi không xác định",
-      "succeeded": "Đã nhập {count} SLO | Đã nhập {count} SLO"
-    },
     "preview": {
       "goodEvents": "Sự kiện tốt",
       "badEvents": "Sự kiện xấu",
@@ -27476,9 +27398,7 @@
     "claimSignalsFailedPaths": "Không thể nhận {paths}",
     "claimSignalsMorePaths": "{paths} và {count} mục khác",
     "toastSignalsClaimedPartly": "{claimed} trong {count} tín hiệu giờ được gửi đến {team}; không thể nhận {paths} | {claimed} trong {count} tín hiệu giờ được gửi đến {team}; không thể nhận {paths}",
-    "scopeNotSeenYet": "Chưa thấy trong dữ liệu của bạn",
-    "deliveryTemplate": "Template: {templates}",
-    "policyMailBanner": "Các đích Email và SNS nhận thông báo trực từ phiên bản này: {names}."
+    "scopeNotSeenYet": "Chưa thấy trong dữ liệu của bạn"
   },
   "paidUsage": {
     "consentTitle": "Bật sử dụng AI trả phí?",
