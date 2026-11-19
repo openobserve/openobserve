@@ -287,6 +287,7 @@ mod tests {
                 detected_us: to,
                 recovered_us: None,
                 shadow: false,
+                source: None,
             })
             .collect();
         ChangeAsk {
