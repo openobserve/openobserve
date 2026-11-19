@@ -65,5 +65,6 @@ const props = defineProps<{
     <span v-else-if="props.help" class="text-text-secondary flex min-w-0">
       <OTruncatedText as="span">{{ props.help }}</OTruncatedText>
     </span>
+    <slot v-else />
   </div>
 </template>

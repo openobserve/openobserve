@@ -42,6 +42,7 @@ import {
   triggerAnomalyTrainingMutation,
 } from "@/services/anomaly_detection.queries";
 import { useMutation, useQuery as useServerQuery } from "@tanstack/vue-query";
+import { alertsListQuery } from "@/services/alerts.queries";
 import { useOrgId } from "@/composables/query";
 import analytics from "@/services/product_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -687,7 +688,7 @@ export function useAlertForm(
   };
 
   // i18n-driven validation schema (messages resolve via `t` — see AddAlert.schema).
-  const addAlertSchema = makeAddAlertSchema(t);
+  const addAlertSchema = makeAddAlertSchema(t, { nameTakenIn: (name) => nameTakenIn(name) });
   const form = useOForm<AlertFormValues>({
     defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
@@ -1008,6 +1009,16 @@ export function useAlertForm(
     props.folderId || (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
   );
   const alertType = ref(router.currentRoute.value.query.alert_type || "all");
+  // One name per folder, the rule the name suggestion and AutoObserve's duplicate check use.
+  const folderAlerts = useServerQuery(() => ({
+    ...alertsListQuery(store.state.selectedOrganization.identifier, activeFolderId.value),
+    enabled: !props.isUpdated,
+  }));
+  const nameTakenIn = (name: string): string | null => {
+    if (props.isUpdated) return null;
+    const hit = (folderAlerts.data.value ?? []).find((a: { name?: string }) => a.name === name);
+    return hit ? String(hit.folder_name || activeFolderId.value) : null;
+  };
 
   // ── Wizard State (kept for anomaly flow) ────────────────────────────────
 

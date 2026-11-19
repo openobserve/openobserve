@@ -100,6 +100,28 @@ export const multiTimeRangeRowSchema = z.object({
 });
 export const multiTimeRangeSchema = z.array(multiTimeRangeRowSchema);
 
+/** Page facts a static schema cannot know. */
+export interface AddAlertSchemaOptions {
+  /** The folder already holding an alert of this name, or null; the server keys alerts by id only. */
+  nameTakenIn?: (name: string) => string | null;
+}
+
+const addNameTaken = (
+  opts: AddAlertSchemaOptions,
+  t: Translator,
+  name: string,
+  ctx: z.RefinementCtx,
+): void => {
+  const folder = opts.nameTakenIn?.(name.trim());
+  if (folder) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["name"],
+      message: t("alerts.validation.nameTaken", { name: name.trim(), folder }),
+    });
+  }
+};
+
 /**
  * Full alert form schema. `looseObject` so all the non-form alert fields
  * (template, context_attributes, enabled, description, row_template*, folder_id,
@@ -109,7 +131,7 @@ export const multiTimeRangeSchema = z.array(multiTimeRangeRowSchema);
  * `is_real_time` discriminates; the QueryConfig `_meta` discriminators (bridged
  * into this form by QueryConfig's syncMeta watcher) gate the QueryConfig rules.
  */
-export const makeAddAlertSchema = (t: Translator) =>
+export const makeAddAlertSchema = (t: Translator, opts: AddAlertSchemaOptions = {}) =>
   z
     .looseObject({
       name: z.string().optional(),
@@ -165,7 +187,7 @@ export const makeAddAlertSchema = (t: Translator) =>
             path: ["name"],
             message: t("alerts.nameNoSpecialChars"),
           });
-        }
+        } else addNameTaken(opts, t, String(val.name), ctx);
 
         const localValidation = validateExpression(
           String(val.composite_condition?.expression ?? ""),
@@ -219,7 +241,7 @@ export const makeAddAlertSchema = (t: Translator) =>
           path: ["name"],
           message: t("alerts.nameNoSpecialChars"),
         });
-      }
+      } else addNameTaken(opts, t, String(val.name), ctx);
       if (isBlank(val.stream_type)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

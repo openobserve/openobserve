@@ -122,6 +122,19 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
     expect(issuesByPath(validScheduled({ name: "a%b" }))["name"]).toBeTruthy();
   });
 
+  it("blocks a name another alert in the folder already has", () => {
+    const taken = makeAddAlertSchema(t, {
+      nameTakenIn: (name) => (name === "cpu_high" ? "default" : null),
+    });
+    const issues = (name: string, mode = "false") =>
+      taken.safeParse(validScheduled({ name, is_real_time: mode })).error?.issues ?? [];
+    expect(issues("cpu_high").map((i) => i.message)).toEqual([
+      t("alerts.validation.nameTaken", { name: "cpu_high", folder: "default" }),
+    ]);
+    expect(issues("cpu_high", "composite").some((i) => i.path[0] === "name")).toBe(true);
+    expect(issues("cpu_other")).toEqual([]);
+  });
+
   it("blocks an empty stream_type and stream_name", () => {
     const m = issuesByPath(validScheduled({ stream_type: "", stream_name: "" }));
     expect(m["stream_type"]).toContain(STREAM_TYPE_REQUIRED_MESSAGE);
