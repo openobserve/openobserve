@@ -216,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="xs"
+          :tabindex="applied ? -1 : undefined"
           data-test="add-alert-start-from-scratch"
           @click="emit('scratch')"
           >{{ t("alerts.librarySuggest.startFromScratch") }}</OButton
@@ -250,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="xs"
+        :tabindex="applied ? -1 : undefined"
         data-test="add-alert-start-from-scratch"
         @click="emit('scratch')"
         >{{ t("alerts.librarySuggest.startFromScratch") }}</OButton
@@ -352,6 +354,8 @@ const props = defineProps<{
   showLibrary: boolean;
   /** The intent the form was last filled from; null once the user starts from scratch. */
   active: IntentId | null;
+  /** An intent or card wrote the form, so Start from scratch undoes it and leaves the Tab order. */
+  applied?: boolean;
   /** The type picked above the chips (`is_real_time`): "false", "true" or "anomaly". */
   howItChecks?: string;
 }>();

@@ -2286,9 +2286,13 @@ describe("AddAlert (OForm owner)", () => {
       });
       await flushPromises();
       expect(wrapper.vm.form.getFieldValue("tags")).toEqual(["pack:k8s"]);
+      // Tab from the card's last field never lands on the button that undoes it.
+      const scratch = () => wrapper.find('[data-test="add-alert-start-from-scratch"]');
+      expect(scratch().attributes("tabindex")).toBe("-1");
       wrapper.vm.startFromScratch();
       await flushPromises();
       expect(wrapper.vm.form.getFieldValue("tags")).toEqual([]);
+      expect(scratch().attributes("tabindex")).toBeUndefined();
     });
 
     it.each([

@@ -2506,7 +2506,10 @@ describe("QueryConfig.vue", () => {
       remount({ ...sectioned, ...sql }, sqlForm, tiersFor(false));
       await host.find('[data-test="alert-add-warning-button"]').trigger("click");
       expect(shown("alert-warning-threshold-input-1020")).toBe(true);
-      await host.find('[data-test="alert-remove-warning-button"]').trigger("click");
+      const remove = host.find('[data-test="alert-remove-warning-button"]');
+      // Tab from the value never lands on Remove, where Enter would drop the warning.
+      expect(remove.attributes("tabindex")).toBe("-1");
+      await remove.trigger("click");
       expect(shown("alert-warning-threshold-input-1020")).toBe(false);
       expect(hostForm().state.values.trigger_condition.warning_threshold).toBe("");
     });

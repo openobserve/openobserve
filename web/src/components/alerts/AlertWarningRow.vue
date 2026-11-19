@@ -36,7 +36,8 @@ const emit = defineEmits<{ (e: "remove"): void }>();
 const { t } = useI18nTyped();
 </script>
 
-<!-- A warning level shares the alert's comparison, so the row echoes it rather than offering a picker. -->
+<!-- A warning level shares the alert's comparison, so the row echoes it rather than offering a picker.
+     Remove is a convenience like an input's clear button (emptying the field does the same), so Tab skips it. -->
 <template>
   <OSettingRow
     :label="t('alerts.form.warning.label')"
@@ -61,6 +62,7 @@ const { t } = useI18nTyped();
         variant="ghost-primary"
         size="sm"
         :aria-label="t('alerts.removeWarning')"
+        tabindex="-1"
         data-test="alert-remove-warning-button"
         @click="emit('remove')"
       >

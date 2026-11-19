@@ -409,6 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :org-alert-count="orgAlertCount"
                 :show-library="showsLibraryLink"
                 :active="appliedIntent?.fill?.intent ?? pendingIntent"
+                :applied="!!appliedIntent"
                 :how-it-checks="String(formData.is_real_time)"
                 data-snap-stop
                 @apply="applyIntent"
