@@ -15466,7 +15466,12 @@
       "now": "Now: {count} {label} in the last {window}.",
       "promqlQuietAbove": "Quiet now: no series is over the threshold. | Quiet now: {count} series is over the threshold (needs {limit}). | Quiet now: {count} series are over the threshold (needs {limit}).",
       "promqlQuietBelow": "Quiet now: no series is under the threshold. | Quiet now: {count} series is under the threshold (needs {limit}). | Quiet now: {count} series are under the threshold (needs {limit}).",
-      "promqlQuietMatched": "Quiet now: no series matches the condition. | Quiet now: {count} series matches the condition (needs {limit}). | Quiet now: {count} series match the condition (needs {limit})."
+      "promqlQuietMatched": "Quiet now: no series matches the condition. | Quiet now: {count} series matches the condition (needs {limit}). | Quiet now: {count} series match the condition (needs {limit}).",
+      "perGroupFires": "Would fire for {count} of {total} {groups} now.",
+      "perGroupFiresCount": "Would fire for {count} {groups} now.",
+      "perGroupQuiet": "Would not fire now for any {groups}.",
+      "labelGroups": "{labels} group | {labels} groups",
+      "groups": "group | groups"
     },
     "readBack": {
       "sentence": "{who} when {what}{hold}, {schedule}{cooldown}.",

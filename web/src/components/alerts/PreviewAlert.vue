@@ -414,6 +414,7 @@ const evaluationStatus = ref<{
   atLeast?: boolean;
   label?: string;
   grouped?: boolean;
+  total?: number;
   value?: number;
   windowMinutes?: number;
   /** The preview cannot judge this alert, so the reason is said as it is, in this tone. */
@@ -1189,6 +1190,7 @@ const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) =>
   let resultCount = 0;
   let atLeast = false;
   let measured: number | undefined;
+  let groupsSeen: number | undefined;
 
   try {
     if (Array.isArray(resultMetaData) && resultMetaData.length > 0) {
@@ -1263,6 +1265,7 @@ const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) =>
             }
 
             // Re-apply the aggregation function across time buckets per group, then check having
+            groupsSeen = groupMap.size;
             for (const values of groupMap.values()) {
               let aggVal: number;
               switch (aggFunction) {
@@ -1342,6 +1345,7 @@ const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) =>
           const rows = firstQueryMetadata.flatMap((p: any) =>
             Array.isArray(p?.hits) ? p.hits.filter(inWindow) : [],
           );
+          groupsSeen = rows.length;
           resultCount = Number.isFinite(limit)
             ? rows.filter((row: any) =>
                 promqlSampleMatches(Number(row?.[having.column]), having.operator, limit),
@@ -1462,7 +1466,7 @@ const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) =>
         //
         // A derived count of ZERO is still a verdict and is still written — the
         // guard is on the payload being usable, never on the count being nonzero.
-        evaluateAndSetStatus(resultCount, atLeast, measured);
+        evaluateAndSetStatus(resultCount, atLeast, measured, groupsSeen);
       }
     }
   } catch (error) {
@@ -1734,6 +1738,7 @@ const setEvaluationStatus = (verdict: {
   comparison: string;
   level?: PreviewLevel | null;
   value?: number;
+  total?: number;
 }) => {
   const args = {
     count: previewCountText(verdict.count, verdict.atLeast, t),
@@ -1751,6 +1756,7 @@ const setEvaluationStatus = (verdict: {
     atLeast: verdict.atLeast,
     label: args.label,
     ...(verdict.value === undefined ? {} : { value: verdict.value }),
+    ...(verdict.total === undefined ? {} : { total: verdict.total }),
     grouped:
       sqlPerGroup() ||
       (props.selectedTab === "custom" &&
@@ -1770,7 +1776,12 @@ const setEvaluationStatus = (verdict: {
 
 // Evaluate and set status based on a result count already gated on value
 // (rows, groups, data points). PromQL goes through evaluatePromqlSeries instead.
-const evaluateAndSetStatus = (resultCount: number, atLeast = false, value?: number) => {
+const evaluateAndSetStatus = (
+  resultCount: number,
+  atLeast = false,
+  value?: number,
+  total?: number,
+) => {
   if (writeRealTimeStatus(resultCount)) return;
   // Any one group past its threshold fires; the saved row-count gate is always "at least 1".
   if (sqlPerGroup()) {
@@ -1779,6 +1790,7 @@ const evaluateAndSetStatus = (resultCount: number, atLeast = false, value?: numb
       atLeast,
       wouldTrigger: resultCount > 0,
       comparison: "",
+      total,
     });
     return;
   }
@@ -1800,6 +1812,7 @@ const evaluateAndSetStatus = (resultCount: number, atLeast = false, value?: numb
     wouldTrigger: gate.passes,
     comparison: gate.comparison,
     value,
+    total,
   });
 };
 

@@ -353,6 +353,55 @@ describe("previewVerdictSentence", () => {
       {},
       "Quiet now: 1 group is over the threshold (needs 3).",
     ],
+    ...(
+      [
+        [
+          "one per group firing for some",
+          120,
+          1616,
+          false,
+          ["k8s_pod_name"],
+          "Would fire for 120 of 1,616 k8s_pod_name groups now.",
+        ],
+        [
+          "one per group capped at the row limit",
+          1000,
+          1000,
+          true,
+          ["pod"],
+          "Would fire for at least 1,000 pod groups now.",
+        ],
+        [
+          "one per group with its only group firing",
+          1,
+          1,
+          false,
+          ["pod", "cluster"],
+          "Would fire for 1 of 1 pod and cluster group now.",
+        ],
+        ["one per group quiet", 0, 1616, false, ["pod"], "Would not fire now for any pod group."],
+        ["one per group with no label named", 2, 9, false, [], "Would fire for 2 of 9 groups now."],
+      ] as const
+    ).map(
+      ([name, count, total, atLeast, labels, sentence]) =>
+        [
+          name,
+          { wouldTrigger: count > 0, reason: "", count, total, atLeast, grouped: true },
+          alert({
+            query_condition: {
+              type: "custom",
+              aggregation: {
+                function: "avg",
+                having: { column: "value", operator: ">", value: 1 },
+                group_by: [...labels],
+                multi_alert: true,
+              },
+            },
+          }),
+          {},
+          sentence,
+        ] as const,
+    ),
     [
       "PromQL with no series past the value, never as if the query returned nothing",
       { wouldTrigger: false, reason: "", count: 0 },

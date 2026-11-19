@@ -20,6 +20,7 @@ import {
   dataNoun,
   formatNumber,
   joinList,
+  joinListMore,
   measureWords,
   thresholdSide,
   valueWithUnit,
@@ -99,6 +100,8 @@ export interface PreviewVerdict {
   atLeast?: boolean;
   label?: string;
   grouped?: boolean;
+  /** How many groups the preview saw, so a per-group alert says how many of them fire. */
+  total?: number;
   /** The measured aggregate of an ungrouped builder measure, when the preview computed one. */
   value?: number;
   /** The minutes a real-time count covers (the chart's range). */
@@ -381,6 +384,30 @@ export function describeCompositeInPlainWords(
   });
 }
 
+/** An alert that fires per group says for how many of the groups it would fire; a lower bound drops the total. */
+function perGroupVerdict(
+  verdict: PreviewVerdict & { count: number },
+  alert: ReadBackAlert,
+  t: TranslateFn,
+): I18nText {
+  const { count, atLeast } = verdict;
+  const total = atLeast ? undefined : verdict.total;
+  const labels = [...new Set(groupsOf(alert).filter((g): g is string => !!g))];
+  const groups = (n: number) =>
+    labels.length
+      ? t("alerts.verdict.labelGroups", { labels: joinListMore(labels, t) }, n)
+      : t("alerts.verdict.groups", n);
+  if (count === 0) return t("alerts.verdict.perGroupQuiet", { groups: groups(1) });
+  const shown = previewCountText(count, atLeast, t);
+  if (total === undefined)
+    return t("alerts.verdict.perGroupFiresCount", { count: shown, groups: groups(count) });
+  return t("alerts.verdict.perGroupFires", {
+    count: shown,
+    total: formatNumber(total),
+    groups: groups(total),
+  });
+}
+
 /** The rail's verdict as a sentence, from the counts the preview already computed. */
 export function previewVerdictSentence(
   verdict: PreviewVerdict,
@@ -415,6 +442,8 @@ export function previewVerdictSentence(
       ? limitText(pc.operator, pc.value)
       : limitText(tc.operator, tc.threshold ?? 0);
   const count = previewCountText(verdict.count, verdict.atLeast, t);
+  if (verdict.grouped && qc.aggregation?.multi_alert)
+    return perGroupVerdict({ ...verdict, count: verdict.count }, alert, t);
   if (verdict.grouped) {
     if (verdict.wouldTrigger) {
       return t("alerts.verdict.groupsFire", { count }, verdict.count);
