@@ -55,7 +55,8 @@ const ANOMALY_CHART_TTL: Duration = Duration::from_secs(60);
 const ANOMALY_BUILD_TIMEOUT: Duration = Duration::from_secs(5);
 /// An anomaly send waits this long for a render permit, then goes out without the chart.
 const ANOMALY_RENDER_WAIT: Duration = Duration::from_secs(2);
-/// A 24 h lookback of 1-minute buckets is 1,440 rows; this leaves room for event rows.
+/// A 24 h lookback of 1-minute buckets is 1,440 rows. Smaller buckets keep the newest rows
+/// (newest first), which hold the alert's moment; the chart shows about 60 points anyway.
 const ANOMALY_SERIES_ROWS: i64 = 5000;
 
 /// Built anomaly charts keyed by (org, anomaly id, window end, judged end).
@@ -735,7 +736,7 @@ fn anomaly_series_sql(
     };
     format!(
         "SELECT {} FROM \"{ANOMALY_STREAM}\" WHERE anomaly_id = '{anomaly_id}'{model} \
-         GROUP BY zo_sql_key ORDER BY zo_sql_key ASC",
+         GROUP BY zo_sql_key ORDER BY zo_sql_key DESC",
         select.join(", ")
     )
 }
@@ -806,6 +807,8 @@ fn parse_series_hits(hits: &[serde_json::Value]) -> Vec<StoredPoint> {
             });
         }
     }
+    // The read is newest first, so the limit drops the oldest rows; the merge wants oldest first.
+    out.sort_by_key(|r| r.point.ts_us);
     out
 }
 
@@ -996,7 +999,7 @@ mod tests {
              END, judged_end_us ASC NULLS FIRST, created_at) END AS partial_drop_value"
         ));
         assert!(sql.contains(" AS absence_value_judged"));
-        assert!(sql.ends_with("GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"));
+        assert!(sql.ends_with("GROUP BY zo_sql_key ORDER BY zo_sql_key DESC"));
     }
 
     #[test]
@@ -1048,6 +1051,39 @@ mod tests {
         assert_eq!(rows[0].judged_end_us, Some(T0 + B));
         assert!(rows[1].point.is_absence && rows[1].point.is_anomaly);
         assert_eq!(rows[1].judged_end_us, None);
+    }
+
+    #[test]
+    fn one_second_buckets_keep_the_newest_rows_and_the_anomaly() {
+        let end = T0 + 6 * 3_600_000_000;
+        let anomaly = end - 600_000_000;
+        // The read returns the newest rows first, so a 6 h lookback of 1 s buckets loses its
+        // oldest.
+        let hits: Vec<serde_json::Value> = (0..ANOMALY_SERIES_ROWS)
+            .map(|i| {
+                let ts = end - (i + 1) * 1_000_000;
+                serde_json::json!({"zo_sql_key": ts, "value": 1.0, "flagged": i64::from(ts == anomaly)})
+            })
+            .collect();
+        let rows = parse_series_hits(&hits);
+        assert!(rows.windows(2).all(|w| w[0].point.ts_us < w[1].point.ts_us));
+        assert_eq!(
+            rows.last().unwrap().point.ts_us,
+            end - 1_000_000,
+            "the newest bucket"
+        );
+        assert!(
+            rows.iter()
+                .any(|r| r.point.ts_us == anomaly && r.point.is_anomaly),
+            "the anomaly 10 min back"
+        );
+        let points: Vec<AnomalySeriesPoint> = rows.into_iter().map(|r| r.point).collect();
+        let p = anomaly_payload("t".into(), &points, end - 900_000_000, end).unwrap();
+        assert!(p.points.len() <= 120, "{}", p.points.len());
+        assert!(
+            !p.marks.is_empty(),
+            "the downsampled chart keeps the anomaly mark"
+        );
     }
 
     #[test]
