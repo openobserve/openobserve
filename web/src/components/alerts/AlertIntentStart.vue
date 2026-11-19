@@ -38,8 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="choosing === id"
         :data-test="`add-alert-intent-${id}`"
         @click="choose(id)"
-        >{{ intentLabel(id) }}</OButton
-      >
+        >{{ intentLabel(id)
+        }}<OTooltip v-if="intentTip(id)" side="bottom" :content="intentTip(id)!"
+      /></OButton>
       <OButton
         variant="outline"
         size="chip"
@@ -442,6 +443,7 @@ import { get } from "lodash-es";
 import { useStore } from "vuex";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -957,10 +959,23 @@ const WINDOWED = new Set<IntentId>([
   "ratio",
 ]);
 const showsWindow = computed(() => !!props.active && WINDOWED.has(props.active));
-const intentLabel = (id: IntentId) =>
+// A chip keeps to a few words so the row fits one line; its full meaning is the tooltip.
+const SHORT: Partial<Record<IntentId, I18nKey>> = {
+  countWhere: "alerts.intent.countWhere.short",
+  percentile: "alerts.intent.percentile.short",
+  anyEvent: "alerts.intent.anyEvent.short",
+  ratio: "alerts.intent.ratio.short",
+};
+const fullLabel = (id: IntentId) =>
   id === "percentile" && isMetrics.value
     ? t("alerts.intent.percentile.labelMetric")
     : t(`alerts.intent.${id}.label` as I18nKey, { noun: noun.value });
+const shortKey = (id: IntentId) => (id === "percentile" && isMetrics.value ? undefined : SHORT[id]);
+const intentLabel = (id: IntentId) => {
+  const short = shortKey(id);
+  return short ? t(short, { noun: noun.value }) : fullLabel(id);
+};
+const intentTip = (id: IntentId) => (shortKey(id) ? fullLabel(id) : undefined);
 
 // ── Filling the form ─────────────────────────────────────────────────────────
 const fillFor = (id: IntentId): IntentFill =>

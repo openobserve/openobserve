@@ -15984,14 +15984,17 @@
       "question": "What do you want to know about {stream}?",
       "fromIntent": "from {intent}",
       "countWhere": {
-        "label": "Count matching {noun}"
+        "label": "Count matching {noun}",
+        "short": "Count {noun}"
       },
       "percentile": {
         "label": "Percentile of a field",
-        "labelMetric": "Percentile of this histogram"
+        "labelMetric": "Percentile of this histogram",
+        "short": "Percentile"
       },
       "anyEvent": {
-        "label": "Any matching event (as it happens)"
+        "label": "Any matching event (as it happens)",
+        "short": "Each event"
       },
       "unusualVolume": {
         "label": "Unusual volume"
@@ -16009,7 +16012,8 @@
       "ratio": {
         "label": "Share of one metric over another (error rate)",
         "alsoCovers": "Also covers {metrics}",
-        "memberReads": "{metric} (reads {labels})"
+        "memberReads": "{metric} (reads {labels})",
+        "short": "Error rate"
       },
       "unusualChange": {
         "label": "Unusual change"
