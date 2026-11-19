@@ -476,20 +476,28 @@ export const logsUtils = () => {
     freeTextScan: searchObj.meta.freeTextScan,
   });
 
-  const writeShownTime = (query: any, shown: ShownEntry | null, isShareLink: boolean) => {
+  const isAutoRefreshOn = () => Number(searchObj.meta.refreshInterval ?? 0) > 0;
+
+  const writeShownTime = (
+    query: any,
+    shown: ShownEntry | null,
+    isShareLink: boolean,
+    livePeriod: boolean,
+  ) => {
     const date = searchObj.data.datetime;
     if (!shown) {
-      if (date.type === "relative" && !isShareLink) query["period"] = date.relativeTimePeriod;
+      if (date.type === "relative" && (!isShareLink || livePeriod))
+        query["period"] = date.relativeTimePeriod;
       else if (date.type === "relative" || date.type === "absolute") {
         query["from"] = date.startTime;
         query["to"] = date.endTime;
       }
       return;
     }
-    if (isShareLink && shown.bounds) {
+    if (isShareLink && shown.bounds && !(livePeriod && shown.period.type === "relative")) {
       query["from"] = shown.bounds.start_time;
       query["to"] = shown.bounds.end_time;
-    } else if (shown.period.type === "relative" && !isShareLink) {
+    } else if (shown.period.type === "relative" && (!isShareLink || livePeriod)) {
       query["period"] = shown.period.period;
     } else if (shown.period.type === "absolute") {
       query["from"] = shown.period.startUs;
@@ -527,8 +535,12 @@ export const logsUtils = () => {
     isShareLink: boolean = false,
     dashboardPanelData: any = null,
     buildPanelData: any = null,
+    // false pins a share to the executed bounds (log-line links), even with auto refresh on.
+    liveShare: boolean = true,
   ) => {
     const query: any = {};
+    // A live share carries the relative period; a frozen window never gets new data.
+    const livePeriod = isShareLink && liveShare && isAutoRefreshOn();
     const shown = shownEntryFor(activeUrlSurface());
     const inputs = shown?.inputs ?? liveInputs();
 
@@ -537,9 +549,17 @@ export const logsUtils = () => {
     }
     query["stream"] = inputs.streams.join(",");
 
-    writeShownTime(query, shown, isShareLink);
+    writeShownTime(query, shown, isShareLink, livePeriod);
+    // A calendar period resolves to a different day in another timezone.
+    if (isShareLink && query["period"] && livePeriod && store.state.timezone)
+      query["timezone"] = store.state.timezone;
 
-    query["refresh"] = searchObj.meta.refreshInterval;
+    const shownType = shown ? shown.period.type : searchObj.data.datetime.type;
+    // A fixed range shared with refresh on would re-run the same past window forever.
+    query["refresh"] =
+      isShareLink && isAutoRefreshOn() && (shownType !== "relative" || !liveShare)
+        ? 0
+        : searchObj.meta.refreshInterval;
 
     if (inputs.query) {
       query["sql_mode"] = inputs.sqlMode;

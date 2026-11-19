@@ -21635,6 +21635,7 @@
       "noFunctionDefinition": "No function definition found.",
       "noStreamSaveView": "No stream available to save view.",
       "viewAppliedSuccess": "{name} view applied successfully.",
+      "viewAppliedRangeShortened": "{name} view applied. The time range was shortened to the last {hours} hours of the saved range, the maximum query range for this stream.",
       "errorApplyingSavedView": "Error while applying saved view.",
       "provideValidViewName": "Please provide valid view name.",
       "errorSavingView": "Error while saving view: {e}",
