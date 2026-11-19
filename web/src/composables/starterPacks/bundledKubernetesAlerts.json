@@ -1,0 +1,290 @@
+[
+  {
+    "entry": {
+      "id": "k8s/apiserver_high_latency",
+      "name": "apiserver_high_latency",
+      "pack": "k8s",
+      "category": "cluster",
+      "title": "Apiserver High Latency",
+      "severity": "warning",
+      "description": "Warning: API server P99 request latency exceeds 1 second. Investigate API server load and etcd performance.",
+      "stream": "apiserver_request_duration_seconds_bucket",
+      "stream_type": "metrics",
+      "alert_type": "scheduled",
+      "query_type": "promql",
+      "required_streams": ["apiserver_request_duration_seconds_bucket"],
+      "path": "packs/k8s/alerts/cluster/apiserver_high_latency.json",
+      "content_hash": "768f29c44f5e"
+    },
+    "file": {
+      "id": "3Dnk8onv657uuAyQsP8vtsOiYES",
+      "name": "apiserver_high_latency",
+      "org_id": "default",
+      "alert_type": "scheduled",
+      "stream_type": "metrics",
+      "stream_name": "apiserver_request_duration_seconds_bucket",
+      "is_real_time": false,
+      "query_condition": {
+        "type": "promql",
+        "conditions": {
+          "version": 2,
+          "conditions": {
+            "filterType": "group",
+            "logicalOperator": "AND",
+            "conditions": []
+          }
+        },
+        "sql": null,
+        "promql": "histogram_quantile(0.99, sum by(k8s_cluster, verb, resource, le) (rate(apiserver_request_duration_seconds_bucket[5m])))",
+        "promql_condition": {
+          "column": "value",
+          "operator": ">=",
+          "value": 1,
+          "ignore_case": false
+        },
+        "aggregation": null,
+        "vrl_function": null,
+        "search_event_type": null,
+        "multi_time_range": []
+      },
+      "trigger_condition": {
+        "period": 5,
+        "operator": ">=",
+        "threshold": 1,
+        "frequency": 5,
+        "cron": "",
+        "frequency_type": "minutes",
+        "silence": 30,
+        "timezone": "UTC",
+        "tolerance_in_secs": null,
+        "align_time": true
+      },
+      "destinations": ["k8s_alert"],
+      "context_attributes": {},
+      "row_template": "*ClusterName:* {k8s_cluster} | Verb: {verb} | Resource: {resource} | P99 Latency: {value}s",
+      "row_template_type": "String",
+      "description": "Warning: API server P99 request latency exceeds 1 second. Investigate API server load and etcd performance.",
+      "enabled": true,
+      "tz_offset": 0,
+      "last_triggered_at": 1778932335265251,
+      "last_satisfied_at": 1778932335265251,
+      "creates_incident": false
+    }
+  },
+  {
+    "entry": {
+      "id": "k8s/cluster_cpu_capacity_high",
+      "name": "cluster_cpu_capacity_high",
+      "pack": "k8s",
+      "category": "cluster",
+      "title": "Cluster Cpu Capacity High",
+      "severity": "warning",
+      "description": "Warning: Cluster-wide CPU requests exceed 80% of allocatable. Uses clamp_max(100) to guard against telemetry unit mismatches (some clusters report CPU in millicores vs cores).",
+      "stream": "kube_pod_container_resource_requests",
+      "stream_type": "metrics",
+      "alert_type": "scheduled",
+      "query_type": "promql",
+      "required_streams": ["kube_pod_container_resource_requests"],
+      "path": "packs/k8s/alerts/cluster/cluster_cpu_capacity_high.json",
+      "content_hash": "2ae67249e375"
+    },
+    "file": {
+      "id": "3Dnk7h5xMJj4xWg21QiEWtguGGh",
+      "name": "cluster_cpu_capacity_high",
+      "org_id": "default",
+      "alert_type": "scheduled",
+      "stream_type": "metrics",
+      "stream_name": "kube_pod_container_resource_requests",
+      "is_real_time": false,
+      "query_condition": {
+        "type": "promql",
+        "conditions": {
+          "version": 2,
+          "conditions": {
+            "filterType": "group",
+            "logicalOperator": "AND",
+            "conditions": []
+          }
+        },
+        "sql": null,
+        "promql": "clamp_max(floor(sum by(k8s_cluster)(kube_pod_container_resource_requests{resource='cpu'}) / on(k8s_cluster) sum by(k8s_cluster)(kube_node_status_allocatable{resource='cpu'}) * 10000) / 100, 100)",
+        "promql_condition": {
+          "column": "value",
+          "operator": ">=",
+          "value": 80,
+          "ignore_case": false
+        },
+        "aggregation": null,
+        "vrl_function": null,
+        "search_event_type": null,
+        "multi_time_range": []
+      },
+      "trigger_condition": {
+        "period": 5,
+        "operator": ">=",
+        "threshold": 1,
+        "frequency": 10,
+        "cron": "",
+        "frequency_type": "minutes",
+        "silence": 60,
+        "timezone": "UTC",
+        "tolerance_in_secs": null,
+        "align_time": true
+      },
+      "destinations": ["k8s_alert"],
+      "context_attributes": {},
+      "row_template": "*ClusterName:* {k8s_cluster} | CPU Requested: {value}% of allocatable",
+      "row_template_type": "String",
+      "description": "Warning: Cluster-wide CPU requests exceed 80% of allocatable. Uses clamp_max(100) to guard against telemetry unit mismatches (some clusters report CPU in millicores vs cores).",
+      "enabled": true,
+      "tz_offset": 0,
+      "last_triggered_at": 1778929825265378,
+      "last_satisfied_at": 1778929825265378,
+      "creates_incident": false
+    }
+  },
+  {
+    "entry": {
+      "id": "k8s/cluster_memory_capacity_high",
+      "name": "cluster_memory_capacity_high",
+      "pack": "k8s",
+      "category": "cluster",
+      "title": "Cluster Memory Capacity High",
+      "severity": "warning",
+      "description": "Warning: Cluster-wide memory requests exceed 80% of allocatable. Uses clamp_max(100) to guard against telemetry unit mismatches.",
+      "stream": "kube_pod_container_resource_requests",
+      "stream_type": "metrics",
+      "alert_type": "scheduled",
+      "query_type": "promql",
+      "required_streams": ["kube_pod_container_resource_requests"],
+      "path": "packs/k8s/alerts/cluster/cluster_memory_capacity_high.json",
+      "content_hash": "365e8535bb94"
+    },
+    "file": {
+      "id": "3Dnk84YAjzZtZkmOZ0GsBcgenum",
+      "name": "cluster_memory_capacity_high",
+      "org_id": "default",
+      "alert_type": "scheduled",
+      "stream_type": "metrics",
+      "stream_name": "kube_pod_container_resource_requests",
+      "is_real_time": false,
+      "query_condition": {
+        "type": "promql",
+        "conditions": {
+          "version": 2,
+          "conditions": {
+            "filterType": "group",
+            "logicalOperator": "AND",
+            "conditions": []
+          }
+        },
+        "sql": null,
+        "promql": "clamp_max(floor(sum by(k8s_cluster)(kube_pod_container_resource_requests{resource='memory'}) / on(k8s_cluster) sum by(k8s_cluster)(kube_node_status_allocatable{resource='memory'}) * 10000) / 100, 100)",
+        "promql_condition": {
+          "column": "value",
+          "operator": ">=",
+          "value": 80,
+          "ignore_case": false
+        },
+        "aggregation": null,
+        "vrl_function": null,
+        "search_event_type": null,
+        "multi_time_range": []
+      },
+      "trigger_condition": {
+        "period": 5,
+        "operator": ">=",
+        "threshold": 1,
+        "frequency": 10,
+        "cron": "",
+        "frequency_type": "minutes",
+        "silence": 60,
+        "timezone": "UTC",
+        "tolerance_in_secs": null,
+        "align_time": true
+      },
+      "destinations": ["k8s_alert"],
+      "context_attributes": {},
+      "row_template": "*ClusterName:* {k8s_cluster} | Memory Requested: {value}% of allocatable",
+      "row_template_type": "String",
+      "description": "Warning: Cluster-wide memory requests exceed 80% of allocatable. Uses clamp_max(100) to guard against telemetry unit mismatches.",
+      "enabled": true,
+      "tz_offset": 0,
+      "last_triggered_at": 1778929825265378,
+      "last_satisfied_at": 1778929825265378,
+      "creates_incident": false
+    }
+  },
+  {
+    "entry": {
+      "id": "k8s/cluster_pod_count_high",
+      "name": "cluster_pod_count_high",
+      "pack": "k8s",
+      "category": "cluster",
+      "title": "Cluster Pod Count High",
+      "severity": "warning",
+      "description": "Warning: Cluster pod count exceeds 90% of max pod capacity. Review pod density and plan scaling.",
+      "stream": "kube_pod_info",
+      "stream_type": "metrics",
+      "alert_type": "scheduled",
+      "query_type": "promql",
+      "required_streams": ["kube_pod_info"],
+      "path": "packs/k8s/alerts/cluster/cluster_pod_count_high.json",
+      "content_hash": "f9b3afda1f5d"
+    },
+    "file": {
+      "id": "3Dnk8Zgh4FCqj6ogJ6BF1m2EoYS",
+      "name": "cluster_pod_count_high",
+      "org_id": "default",
+      "alert_type": "scheduled",
+      "stream_type": "metrics",
+      "stream_name": "kube_pod_info",
+      "is_real_time": false,
+      "query_condition": {
+        "type": "promql",
+        "conditions": {
+          "version": 2,
+          "conditions": {
+            "filterType": "group",
+            "logicalOperator": "AND",
+            "conditions": []
+          }
+        },
+        "sql": null,
+        "promql": "floor(count by(k8s_cluster) (kube_pod_info) / sum by(k8s_cluster) (kube_node_status_allocatable{resource='pods'}) * 10000) / 100",
+        "promql_condition": {
+          "column": "value",
+          "operator": ">=",
+          "value": 90,
+          "ignore_case": false
+        },
+        "aggregation": null,
+        "vrl_function": null,
+        "search_event_type": null,
+        "multi_time_range": []
+      },
+      "trigger_condition": {
+        "period": 5,
+        "operator": ">=",
+        "threshold": 1,
+        "frequency": 10,
+        "cron": "",
+        "frequency_type": "minutes",
+        "silence": 60,
+        "timezone": "UTC",
+        "tolerance_in_secs": null,
+        "align_time": true
+      },
+      "destinations": ["k8s_alert"],
+      "context_attributes": {},
+      "row_template": "*ClusterName:* {k8s_cluster} | Pod Capacity Used: {value}%",
+      "row_template_type": "String",
+      "description": "Warning: Cluster pod count exceeds 90% of max pod capacity. Review pod density and plan scaling.",
+      "enabled": true,
+      "tz_offset": 0,
+      "last_triggered_at": 1778932325265095,
+      "last_satisfied_at": 1778932325265095,
+      "creates_incident": false
+    }
+  }
+]

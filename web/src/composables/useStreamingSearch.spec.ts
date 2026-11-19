@@ -153,6 +153,35 @@ describe("useHttpStreaming", () => {
       searchType: "ui",
       pageType: "logs",
     };
+    const requestedUrl = async (data: any) => {
+      mockFetch.mockResolvedValueOnce({ ok: true, body: new MockReadableStream() as any });
+      httpStreaming.fetchQueryDataWithHttpStream(data, mockHandlers);
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return String(mockFetch.mock.calls.at(-1)?.[0]);
+    };
+
+    it("sends use_cache=false on a search when skipCache is set", async () => {
+      expect(await requestedUrl({ ...mockData, skipCache: true })).toContain(
+        "/_search_stream?type=logs&search_type=ui&use_cache=false",
+      );
+    });
+
+    it("sends use_cache=false on PromQL when skipCache is set", async () => {
+      const url = await requestedUrl({
+        type: "promql",
+        traceId: "promql-trace",
+        org_id: "test-org",
+        skipCache: true,
+        queryReq: { query: "up", start_time: 1, end_time: 2, step: "60s" },
+      });
+      expect(url).toContain("/prometheus/api/v1/query_range?use_streaming=true&use_cache=false");
+    });
+
+    it("keeps the cache by default", async () => {
+      expect(await requestedUrl(mockData)).toContain("use_cache=true");
+    });
+
     // TODO: Fix Worker mocking - the module-scoped streamWorker variable makes it difficult to properly mock
     it.skip("should successfully initiate a stream connection", async () => {
       vi.spyOn(httpStreaming, "onError");

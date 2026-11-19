@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Stated before the query, not after: an alert that cannot fire is the
            first thing worth knowing about it. -->
       <OBanner
-        v-if="availability.callout"
+        v-if="availability.callout && !installed"
         variant="warning"
         icon="sensors-off"
         dense
@@ -202,10 +202,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </section>
       </template>
+
+      <slot v-if="installed" name="in-org" />
     </div>
 
     <template #footer>
-      <div class="flex w-full justify-end gap-2">
+      <div v-if="installed" class="flex w-full justify-end gap-2">
+        <slot name="installed-footer" />
+      </div>
+      <div v-else class="flex w-full justify-end gap-2">
         <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
           v-if="!isAnomaly"
@@ -249,7 +254,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamDataState } from "@/types/alertLibrary";
 import { formatDistanceToNowStrict } from "date-fns";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 import {
   alertTypeOf,
@@ -268,16 +273,26 @@ const props = defineProps<{
   entry: AlertLibraryEntry | null;
   /** Whether every stream this alert queries exists in the org. */
   ready: boolean;
-  /** What those streams would actually give it — see streamDataState. */
-  dataState?: StreamDataState;
+  /** What those streams would actually give it — see streamDataState; unknown when the read failed. */
+  dataState?: StreamDataState | "unknown";
   /** Microsecond epoch of their oldest last-ingest, when they have one. */
   lastIngestedMicros?: number | null;
+  /** The alert already exists in this org, so the install-only warning and footer give way to slots. */
+  installed?: boolean;
+  /** Replaces the Library's id · category · pack line, e.g. with the org's folder. */
+  subtitle?: I18nText;
 }>();
 
 const emit = defineEmits<{
   (e: "update:open", value: boolean): void;
   /** The wizard owns install; this hands it the file the drawer fetched. */
   (e: "install", payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }): void;
+}>();
+defineSlots<{
+  /** Facts about the copy in this org, shown after the preview in installed mode. */
+  "in-org"?: () => unknown;
+  /** Replaces Customize and Add in installed mode. */
+  "installed-footer"?: () => unknown;
 }>();
 
 const { t } = useI18nTyped();
@@ -345,6 +360,7 @@ const drawerTitle = computed(() => raw(props.entry?.title ?? ""));
 const drawerSubtitle = computed(() => {
   const entry = props.entry;
   if (!entry) return raw("");
+  if (props.subtitle) return props.subtitle;
   return raw(`${entry.id} · ${categoryLabel(entry.category)} · ${packLabel(entry.pack)}`);
 });
 
@@ -456,9 +472,17 @@ const thresholdText = computed(() => {
  * blames the alert for a gap in ingestion.
  */
 const availability = computed(() => {
-  const state: StreamDataState = props.ready ? (props.dataState ?? "fresh") : "missing";
+  const state = props.ready ? (props.dataState ?? "fresh") : "missing";
   const stream = props.entry?.stream ?? "";
 
+  if (state === "unknown") {
+    return {
+      variant: "default-soft" as const,
+      icon: "help-outline",
+      label: t("alert_library.drawer.dataUnchecked"),
+      callout: null,
+    };
+  }
   if (state === "missing") {
     return {
       variant: "default-soft" as const,

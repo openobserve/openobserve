@@ -20,8 +20,12 @@ import { routerKey } from "vue-router";
 import i18n from "@/locales";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import Header from "@/components/Header.vue";
+import StarterPackHeaderChip from "@/components/starterPacks/StarterPackHeaderChip.vue";
 import * as cookies from "@/utils/cookies";
 import { chartColor } from "@/utils/chartTheme";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const breakpoint = vi.hoisted(() => ({ lgUp: true }));
 vi.mock("@/composables/useBreakpoint", () => ({
@@ -46,6 +50,13 @@ vi.mock("@/composables/security/useSecurityAccess", async () => {
   };
 });
 
+const starterPacks = vi.hoisted(() => ({ enabled: true }));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return starterPacks.enabled;
+  },
+}));
+
 // Mock the cookies module
 vi.mock("@/utils/cookies", () => ({
   getLanguage: vi.fn(() => "en-us"),
@@ -62,6 +73,21 @@ vi.mock("@/utils/cookies", () => ({
 const ASSISTANT_BUTTON = '[data-test="assistant-header-button-stub"]';
 
 describe("Header Component", () => {
+  describe("starter packs header chip", () => {
+    afterEach(() => (starterPacks.enabled = true));
+
+    it("mounts the chip for the selected org when starter packs are on", () => {
+      const header = createWrapper({ stubsOverrides: { StarterPackCatalogGate: false } });
+      expect(header.findComponent(StarterPackHeaderChip).exists()).toBe(true);
+    });
+
+    it("does not mount the chip at all when starter packs are off", () => {
+      starterPacks.enabled = false;
+      const header = createWrapper();
+      expect(header.findComponent(StarterPackHeaderChip).exists()).toBe(false);
+    });
+  });
+
   let wrapper: any;
   let mockStore: any;
   let mockRouter: any;
