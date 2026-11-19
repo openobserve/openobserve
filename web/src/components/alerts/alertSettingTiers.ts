@@ -165,9 +165,10 @@ export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
   tierDef("compositeExpression", "condition", "add", "alerts.tiers.add.compositeExpression", {
     inline: true,
   }),
-  tierDef("recovery", "notify", "smart", "alerts.tiers.names.recovery"),
   tierDef("keepFiring", "notify", "smart", "alerts.tiers.names.keepFiring"),
   tierDef("suppressRepeats", "notify", "more", "alerts.tiers.names.suppressRepeats"),
+  // Turning recovery on inserts its destination row, so it comes after the toggles a user clicks next.
+  tierDef("recovery", "notify", "smart", "alerts.tiers.names.recovery"),
   tierDef("oncall", "notify", "smart", "alerts.tiers.names.oncall"),
   tierDef("anomalyRecordOnly", "notify", "more", "alerts.tiers.names.anomalyRecordOnly", {
     noteKey: "alerts.tiers.notes.anomalyRecordOnly",

@@ -284,14 +284,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex flex-col gap-1">
                   <!-- A recovery closes what a firing delivered; with no target nothing is
                    delivered, so it cannot be turned on. It can still be turned off. -->
-                  <OFormSwitch
-                    name="notify_on_recovery"
-                    off-tone="neutral"
-                    state-text
-                    :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
-                    :disabled="notifiesNobody && !formData?.notify_on_recovery"
-                    data-test="alert-notify-on-recovery-toggle"
-                  />
+                  <!-- The switch holds a control's height, so the lines it reveals never re-centre it. -->
+                  <div class="flex min-h-8.5 items-center">
+                    <OFormSwitch
+                      name="notify_on_recovery"
+                      off-tone="neutral"
+                      state-text
+                      :aria-label="t('alerts.alertSettings.notifyOnRecovery')"
+                      :disabled="notifiesNobody && !formData?.notify_on_recovery"
+                      data-test="alert-notify-on-recovery-toggle"
+                    />
+                  </div>
                   <span
                     v-if="notifiesNobody && !formData?.notify_on_recovery"
                     class="text-text-secondary text-xs"

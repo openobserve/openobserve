@@ -54,10 +54,10 @@ describe("sectionTierView: the More options line per mockup screen", () => {
     ["B0/B1 SQL", "condition", { shape: "sql" }, ["holdFor", "compareWithPast", "vrl"]],
     ["DRY-C2 PromQL", "condition", { shape: "promql" }, ["holdFor", "ruleExpression"]],
     [
-      "A3 notify, with the alert's tags and priority",
+      "A3 notify: recovery after the toggles, so its inserted destination row moves none of them",
       "notify",
       ALL_ON,
-      ["recovery", "keepFiring", "suppressRepeats", "oncall", "tags", "priority"],
+      ["keepFiring", "suppressRepeats", "recovery", "oncall", "tags", "priority"],
     ],
     [
       "E1 anomaly",
