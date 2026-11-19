@@ -539,6 +539,51 @@ describe("SettingsIndex.vue", () => {
     });
   });
 
+  // Clustering ships in OSS (nodes register through NATS with no edition check),
+  // and the node list API answers in OSS, so the page is meta-org-only, not
+  // enterprise-only.
+  describe("nodes section", () => {
+    const findEntry = (w: any) =>
+      w.vm.sectionGroups
+        .flatMap((group: any) => group.items)
+        .find((item: any) => item.key === "nodes");
+
+    afterEach(() => {
+      isMetaOrgRef.value = false;
+      config.isEnterprise = "false";
+      mockRouter.currentRoute.value.name = "settings";
+    });
+
+    it("is offered unlocked in the meta org of an OSS build", () => {
+      config.isEnterprise = "false";
+      isMetaOrgRef.value = true;
+      wrapper = createWrapper();
+
+      expect(findEntry(wrapper)?.visible).toBe(true);
+      expect(findEntry(wrapper)?.locked).toBe(false);
+    });
+
+    it("keeps an OSS meta org on the page", () => {
+      config.isEnterprise = "false";
+      isMetaOrgRef.value = true;
+      mockRouter.currentRoute.value.name = "nodes";
+      mockPush.mockClear();
+      wrapper = createWrapper({ zoConfig: { meta_org: "_meta" } });
+
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("sends a non-meta org back to General", () => {
+      config.isEnterprise = "false";
+      isMetaOrgRef.value = false;
+      mockRouter.currentRoute.value.name = "nodes";
+      mockPush.mockClear();
+      wrapper = createWrapper({ zoConfig: { meta_org: "_meta" } });
+
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
+    });
+  });
+
   describe("Template Rendering", () => {
     it("should render without errors", () => {
       mockRouter.currentRoute.value.name = "general";
