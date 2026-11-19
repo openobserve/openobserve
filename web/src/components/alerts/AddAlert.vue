@@ -759,6 +759,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSettingRow
                   :label="t('alerts.sections.details.name')"
                   fill
+                  wide
                   data-test="add-alert-details-name-row"
                   data-snap-stop
                 >
@@ -774,7 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-else
                       ref="step1Ref"
-                      class="flex max-w-120 min-w-0 flex-1 basis-64 flex-col gap-1.5"
+                      class="flex max-w-full min-w-64 flex-col gap-1.5"
                       @input="onNameInput"
                       @focusin="onNameFocus"
                       @blur.capture="applySavedName"
@@ -783,6 +784,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OFormInput
                         name="name"
+                        fit-content
+                        class="min-w-full"
                         :placeholder="
                           isAnomalyMode
                             ? t('alerts.anomalyNamePlaceholder')
