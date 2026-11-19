@@ -2856,7 +2856,9 @@ export default defineComponent({
               return s.replace(/\s+/g, " ").trim().toLowerCase();
             };
             const queryMatchesResults =
-              !!lastRunSql && normalizeSQL(currentSql) === normalizeSQL(lastRunSql);
+              !!lastRunSql &&
+              normalizeSQL(currentSql) === normalizeSQL(lastRunSql) &&
+              autoRun.executedTimeMatches();
 
             // Only reuse cached search results when the current query
             // matches the query that produced them. When they differ (e.g.
@@ -2978,6 +2980,7 @@ export default defineComponent({
               dashboardPanelData.data.config.table_dynamic_columns = true;
             }
 
+            autoRun.notePanelScopeApplied();
             // run query
             await copyDashboardDataToVisualize();
 
@@ -3822,12 +3825,15 @@ export default defineComponent({
     };
 
     // Listen to global cancelQuery event (fired by useCancelQuery composable)
+    const cancelPanelLoad = () => autoRun.cancelPanelLoad();
     onMounted(() => {
       window.addEventListener("cancelQuery", cancelFieldExtraction);
+      window.addEventListener("cancelQuery", cancelPanelLoad);
     });
 
     onBeforeUnmount(() => {
       window.removeEventListener("cancelQuery", cancelFieldExtraction);
+      window.removeEventListener("cancelQuery", cancelPanelLoad);
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components
