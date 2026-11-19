@@ -1869,7 +1869,7 @@ import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
 import { getConsumableRelativeTime } from "@/utils/date";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { pageValuesWindow } from "@/composables/fieldValueStore";
+import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
@@ -2578,6 +2578,11 @@ export default defineComponent({
     const currentValuesWindow = () =>
       pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
     setValuesTimeRange(currentValuesWindow);
+    // A lookup keeps the function it began with, so a new one tells a lookup in flight the range changed.
+    watch(
+      () => pageValuesSetting(searchObj.data.datetime ?? {}),
+      () => setValuesTimeRange(() => currentValuesWindow()),
+    );
     // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
     const valuesWindow = computed(currentValuesWindow);
 
