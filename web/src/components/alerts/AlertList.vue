@@ -723,7 +723,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
                     class="max-md:hidden"
-                    :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+                    variant="ghost"
                     size="icon-xs-sq"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                     :aria-label="row.enabled ? t('alerts.pause') : t('alerts.resume')"
