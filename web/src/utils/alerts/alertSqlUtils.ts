@@ -431,3 +431,42 @@ export function sqlHavingToCondition(
   const order = condition.operator.startsWith(">") ? "DESC" : "ASC";
   return { sql: `${kept} ORDER BY ${condition.column} ${order}`, condition };
 }
+
+const SQL_OPERATORS = new Set([">", ">=", "<", "<=", "=", "!="]);
+
+/** The per-group condition put back into the grouped query's HAVING, so one alert fires on the same
+ * groups; drops the sort `sqlHavingToCondition` added, so the two round-trip. */
+export function sqlConditionToHaving(
+  sql: string,
+  condition: { column?: string; operator?: string; value?: unknown },
+): string | null {
+  const { column = "", operator = "" } = condition;
+  const value = Number(condition.value);
+  if (condition.value === "" || condition.value === null || !Number.isFinite(value)) return null;
+  if (!column || !SQL_OPERATORS.has(operator)) return null;
+  const text = (sql ?? "").trim();
+  if (!/\bgroup\s+by\b/i.test(maskNested(text))) return null;
+  const list = clauseOf(text, /^\s*select\b(?:\s+distinct\b)?/i, /\bfrom\b/i) ?? "";
+  const expr = splitTop(list, /,/g)
+    .map((item) => /^([\s\S]+?)\s+as\s+([\w"`]+)$/i.exec(item) ?? [item, item, item])
+    .find((match) => squash(match[2]) === squash(column))?.[1]
+    .trim();
+  if (!expr) return null;
+  const name = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sort = new RegExp(`\\s+order\\s+by\\s+["\`]?${name}["\`]?\\s+(?:asc|desc)$`, "i");
+  const body = text.replace(sort, "");
+  const masked = maskNested(body);
+  const having = /\bhaving\b/i.exec(masked);
+  const from = having ? having.index + having[0].length : /\bgroup\s+by\b/i.exec(masked)!.index;
+  const stop = HAVING_END.exec(masked.slice(from));
+  const at = stop ? from + stop.index : body.length;
+  const tail = body.slice(at).trim();
+  const term = `${expr} ${operator} ${value}`;
+  const kept = body.slice(from, at).trim();
+  // AND binds tighter than OR, so an existing OR keeps its own parentheses.
+  const guarded = /\bor\b/i.test(maskNested(kept)) ? `(${kept})` : kept;
+  const head = having
+    ? `${body.slice(0, from).trimEnd()} ${guarded} AND ${term}`
+    : `${body.slice(0, at).trimEnd()} HAVING ${term}`;
+  return tail ? `${head} ${tail}` : head;
+}

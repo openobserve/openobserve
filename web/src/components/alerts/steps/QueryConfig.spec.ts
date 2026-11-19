@@ -2735,6 +2735,39 @@ describe("QueryConfig.vue", () => {
       expect([v.trigger_condition.operator, v.trigger_condition.threshold]).toEqual([">", 5]);
     });
 
+    it("one alert takes the per-group condition into HAVING, and one per group takes it back out", async () => {
+      const perGroup = "SELECT k, avg(x) AS a FROM t GROUP BY k ORDER BY a DESC";
+      remount(
+        { ...sectioned, tab: "sql", sqlQuery: perGroup, sqlAggColumnOptions: ["k", "a"] },
+        {
+          query_condition: {
+            ...hostDefaults().query_condition,
+            type: "sql",
+            sql: perGroup,
+            aggregation: {
+              multi_alert: true,
+              function: "count",
+              group_by: [],
+              having: { column: "a", operator: ">", value: 500 },
+            },
+          },
+        },
+      );
+      await flushPromises();
+      wrapper.vm.onGroupAnswer("one");
+      expect(wrapper.emitted("update:sqlQuery")!.at(-1)).toEqual([
+        "SELECT k, avg(x) AS a FROM t GROUP BY k HAVING avg(x) > 500",
+      ]);
+      expect(hostForm().state.values.query_condition.aggregation.having.column).toBe("");
+      wrapper.vm.onGroupAnswer("each");
+      expect(wrapper.emitted("update:sqlQuery")!.at(-1)).toEqual([perGroup]);
+      expect(hostForm().state.values.query_condition.aggregation.having).toMatchObject({
+        column: "a",
+        operator: ">",
+        value: 500,
+      });
+    });
+
     it("with VRL on, the plain row limit is the only limit drawn", async () => {
       remount(
         { ...sectioned, tab: "sql", sqlQuery: "SELECT * FROM t" },

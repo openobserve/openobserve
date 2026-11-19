@@ -5,6 +5,7 @@ import {
   oneRowMeetsLimit,
   sqlHavingCondition,
   sqlHavingToCondition,
+  sqlConditionToHaving,
   sqlWhereText,
 } from "./alertSqlUtils";
 
@@ -396,6 +397,49 @@ describe("alertSqlUtils", () => {
     [`${P95} HAVING COUNT(*) <> 3`, null],
   ])("sqlHavingToCondition(%s)", (sql, expected) => {
     expect(sqlHavingToCondition(sql)).toEqual(expected);
+  });
+
+  // A row whose SQL came from sqlHavingToCondition must take the same condition back out (round trip).
+  it.each([
+    [
+      `${P95} HAVING COUNT(*) >= 50 ORDER BY p95_ms DESC`,
+      { column: "p95_ms", operator: ">", value: 500 },
+      `${P95} HAVING COUNT(*) >= 50 AND approx_percentile_cont(duration, 0.95) / 1000.0 > 500`,
+      true,
+    ],
+    [
+      "SELECT k, avg(x) AS a FROM t GROUP BY k ORDER BY a ASC",
+      { column: "a", operator: "<=", value: "5" },
+      "SELECT k, avg(x) AS a FROM t GROUP BY k HAVING avg(x) <= 5",
+      true,
+    ],
+    [
+      "SELECT k, count(*) AS n FROM t GROUP BY k HAVING n > 1 OR k = 'a' LIMIT 10",
+      { column: "n", operator: ">=", value: 3 },
+      "SELECT k, count(*) AS n FROM t GROUP BY k HAVING (n > 1 OR k = 'a') AND count(*) >= 3 LIMIT 10",
+      false,
+    ],
+    [
+      "SELECT k, count(*) AS n FROM t GROUP BY k",
+      { column: "x", operator: ">", value: 1 },
+      null,
+      false,
+    ],
+    [
+      "SELECT k, count(*) AS n FROM t GROUP BY k",
+      { column: "n", operator: ">", value: "" },
+      null,
+      false,
+    ],
+    ["SELECT * FROM t", { column: "n", operator: ">", value: 1 }, null, false],
+  ])("sqlConditionToHaving(%s, %o)", (sql, condition, expected, roundTrip) => {
+    expect(sqlConditionToHaving(sql, condition)).toBe(expected);
+    if (roundTrip) {
+      expect(sqlHavingToCondition(expected!)).toEqual({
+        sql,
+        condition: { ...condition, value: Number(condition.value) },
+      });
+    }
   });
 
   it.each([

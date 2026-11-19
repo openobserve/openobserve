@@ -1907,7 +1907,13 @@ import {
   SPAN_DURATION_FIELD,
   UNIT_KEEPING_FUNCTIONS,
 } from "@/utils/alerts/alertReadBack";
-import { alwaysOneRow, oneRowMeetsLimit, sqlHavingCondition } from "@/utils/alerts/alertSqlUtils";
+import {
+  alwaysOneRow,
+  oneRowMeetsLimit,
+  sqlConditionToHaving,
+  sqlHavingCondition,
+  sqlHavingToCondition,
+} from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
 import { promqlScaledToPercent, promqlWithMetric } from "@/utils/alerts/promqlMetrics";
 import { groupRanking } from "@/composables/alerts/groupRanking";
@@ -3206,14 +3212,26 @@ export default defineComponent({
      * dropdown to be filled in.
      */
     // The one-alert limit stays as typed: the payload pins SQL multi-alert to >= 1 (M-10) on save.
+    // One alert has no per-row condition, so its threshold goes back into HAVING to fire on the same groups.
+    const conditionIntoSql = () => {
+      const having = fv("query_condition.aggregation.having");
+      const sql = having?.column ? sqlConditionToHaving(localSqlQuery.value ?? "", having) : null;
+      if (!sql) return;
+      updateSqlQuery(sql);
+      writeAggregation((agg) => {
+        agg.having = { ...agg.having, column: "", value: "" };
+      });
+    };
     const onSqlMultiAlertChange = (value: unknown) => {
-      if (!value) return;
+      if (!value) return conditionIntoSql();
+      // The query's HAVING already states the per-row rule, so the condition starts from it.
+      const moved = sqlHavingToCondition(localSqlQuery.value ?? "");
+      let takeOut = false;
       writeAggregation((agg) => {
         agg.function = "count";
         agg.group_by = [];
         if (!props.sqlAggColumnOptions.includes(agg.having.column)) agg.having.column = "";
-        // The query's HAVING already states the per-row rule, so the condition starts from it.
-        const fromHaving = sqlHavingCondition(localSqlQuery.value ?? "");
+        const fromHaving = moved?.condition ?? sqlHavingCondition(localSqlQuery.value ?? "");
         const known =
           !props.sqlAggColumnOptions.length ||
           props.sqlAggColumnOptions.includes(fromHaving?.column ?? "");
@@ -3224,8 +3242,10 @@ export default defineComponent({
           ["", null, undefined].includes(agg.having.value)
         ) {
           agg.having = { ...agg.having, ...fromHaving };
+          takeOut = !!moved;
         }
       });
+      if (takeOut) updateSqlQuery(moved!.sql);
     };
 
     /**
