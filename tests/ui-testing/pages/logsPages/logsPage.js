@@ -575,7 +575,7 @@ export class LogsPage {
         this.runQueryInFlight = `${this.queryButton}[class*="bg-cancel-query-bg"]`;
         this.runQueryPending = `${this.queryButton}[data-run-pending="true"]`;
         this.noQueryAppliedText = '[data-test="logs-search-apply-search-text"]';
-        this.filterBuilderToggle = '[data-test="logs-search-bar-filter-builder-toggle"]';
+        this.filterBuilder = '[data-test="logs-search-bar-filter-builder"]';
         this.recentSearchesButton = '[data-test="logs-search-bar-recent-searches-btn"]';
         this.recentSearchesDrawer = '[data-test="recent-searches-drawer"]';
         this.recentSearchesDrawerSearch = `${this.recentSearchesDrawer} [data-test="recent-searches-search"] input`;
@@ -1358,9 +1358,9 @@ export class LogsPage {
 
     // Helper method to ensure query editor is ready
     async ensureQueryEditorReady() {
-        // Wait for the query editor to be visible and ready
+        // Filter mode keeps the editor mounted behind the chip bar, so it only has to be attached.
         await this.page.locator(this.queryEditor).waitFor({
-            state: 'visible',
+            state: 'attached',
             timeout: 10000
         });
 
@@ -1575,6 +1575,7 @@ export class LogsPage {
     }
 
     async typeQuery(query) {
+        if (await this._editHiddenQueryEditor('set', query)) return;
         await this.page.locator(this.queryEditor).click();
         await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
     }
@@ -3002,6 +3003,7 @@ export class LogsPage {
         // Dismiss any lingering Reka popper / tooltip / dropdown content that could
         // intercept pointer events.
         await this.page.keyboard.press('Escape').catch(() => {});
+        if (await this._editHiddenQueryEditor('focus')) return;
 
         // Focus the Monaco editor through its public API. Clicking the outer wrapper
         // doesn't reliably focus the editor's hidden inputarea — focus() does.
@@ -3021,6 +3023,7 @@ export class LogsPage {
     }
 
     async clickQueryEditorTextbox() {
+        if (await this._editHiddenQueryEditor('focus')) return;
         // Monaco does not expose a stable [role="code"] — click the editor wrapper directly
         return await this.page.locator(this.queryEditor).click();
     }
@@ -3047,6 +3050,7 @@ export class LogsPage {
     }
 
     async clearQueryEditor() {
+        if (await this._editHiddenQueryEditor('set', '')) return;
         // Monaco editor keyboard approach: click the wrapper, then Ctrl+A + Backspace
         await this.page.locator(this.queryEditor).click();
         await this.page.keyboard.press('ControlOrMeta+a');
@@ -3054,7 +3058,35 @@ export class LogsPage {
     }
 
     async typeInQueryEditor(text) {
+        if (await this._editHiddenQueryEditor('type', text)) return;
         return await this.page.keyboard.type(text);
+    }
+
+    // Filter mode keeps the editor mounted behind the chip bar, so raw text goes in through Monaco as a URL would fill it.
+    // False when the editor is on screen, or when typing while something else has focus.
+    async _editHiddenQueryEditor(action, text = '') {
+        const applies = await this.page.evaluate(({ selector, action }) => {
+            const host = document.querySelector(selector);
+            if (!host || host.checkVisibility()) return false;
+            const focus = document.activeElement;
+            if (action === 'type' && focus && focus !== document.body) return false;
+            return Boolean(window.monaco?.editor?.getEditors?.().some((e) => host.contains(e.getDomNode())));
+        }, { selector: this.queryEditor, action }).catch(() => false);
+        if (!applies) return false;
+        // The search bar drops editor changes while the stream loads, which typing by hand used to outlast.
+        await expect.poll(() => this._mutateSearchObj((searchObj) => Boolean(searchObj.loadingStream)), { timeout: 30000 })
+            .toBe(false).catch(() => {});
+        const value = await this.page.evaluate(({ selector, action, text }) => {
+            const host = document.querySelector(selector);
+            const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+            if (action === 'set') ed.setValue(text);
+            else if (action === 'type') ed.trigger('e2e', 'type', { text });
+            ed.setPosition(ed.getModel().getFullModelRange().getEndPosition());
+            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+            return ed.getValue();
+        }, { selector: this.queryEditor, action, text });
+        if (action !== 'focus') await this.waitForSearchQueryCommitted(value);
+        return true;
     }
 
     /**
@@ -3733,7 +3765,11 @@ export class LogsPage {
     }
 
     async waitForQueryEditorTextbox() {
-        return await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor));
+        const host = this.page.locator(this.queryEditor);
+        if (await host.isVisible()) return await this.getMonacoEditorHelper().waitForReady(host);
+        // Filter mode keeps the editor mounted behind the chip bar.
+        await host.locator('.monaco-editor').first().waitFor({ state: 'attached', timeout: 30000 });
+        await this.getQueryInput().waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async getQueryEditorText() {
@@ -5090,7 +5126,7 @@ export class LogsPage {
     }
 
     async expectQueryEditorVisible() {
-        return await expect(this.page.locator(this.queryEditor)).toBeVisible();
+        return await expect(this.getQueryInput()).toBeVisible();
     }
 
     async expectQueryEditorContainsText(text) {
@@ -7137,6 +7173,7 @@ export class LogsPage {
     }
 
     async fillQueryEditorWithRole(text) {
+        if (await this._editHiddenQueryEditor('set', text)) return;
         // Wait for query editor to be visible and ready (Firefox needs longer)
         const queryEditorContainer = this.page.locator(this.queryEditor);
         await queryEditorContainer.waitFor({ state: 'visible', timeout: 30000 });
@@ -9272,11 +9309,10 @@ export class LogsPage {
      * @param {number} timeout - Timeout in milliseconds (default 30000)
      */
     async waitForQueryEditorVisible(timeout = 30000) {
-        await this.page.locator(this.queryEditor).waitFor({
-            state: 'visible',
-            timeout: timeout
-        });
-        testLogger.info('Monaco query editor is visible');
+        // Filter mode keeps the editor mounted behind the chip bar; SQL put into it switches the page to SQL mode.
+        await this.page.locator(this.queryEditor).waitFor({ state: 'attached', timeout });
+        await this.getQueryInput().waitFor({ state: 'visible', timeout });
+        testLogger.info('Query input is visible');
     }
 
     /**
@@ -9358,8 +9394,8 @@ export class LogsPage {
      */
     async setQueryEditorContent(query) {
         // Drive value via window.monaco.editor (AGENT_RULES §5) — no class scraping
-        // Wait for the editor host AND the monaco model to be available
-        await this.page.locator(this.queryEditor).first().waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for the editor host AND the monaco model to be available; filter mode keeps it mounted but hidden.
+        await this.page.locator(this.queryEditor).first().waitFor({ state: 'attached', timeout: 10000 });
         await this.page.waitForFunction((selector) => {
             const host = document.querySelector(selector);
             if (!host) return false;
@@ -12449,6 +12485,11 @@ export class LogsPage {
         return this.page.locator('[data-test="logs-search-bar-query-editor"]');
     }
 
+    /** The query input on screen: the chip bar in filter mode, the editor in SQL mode. */
+    getQueryInput() {
+        return this.page.locator(`${this.queryEditor}:visible, ${this.filterBuilder}:visible`).first();
+    }
+
     /**
      * Get time picker (fallback when absolute tab time input not available)
      * @returns {import('@playwright/test').Locator}
@@ -14019,6 +14060,12 @@ export class LogsPage {
      */
     async openSuggestWidget() {
         await this.focusQueryEditorMonaco();
+        // At the end, since a quote typed ahead of SELECT stops the text reading as SQL and the page leaves SQL mode.
+        await this.page.evaluate((selector) => {
+            const host = document.querySelector(selector);
+            const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
+            ed.setPosition(ed.getModel().getFullModelRange().getEndPosition());
+        }, this.queryEditor);
         await this.page.keyboard.type("'");
         if (!(await this.isSuggestionsWidgetVisible())) {
             await this.getMonacoEditorHelper().triggerSuggestions();
@@ -14058,14 +14105,6 @@ export class LogsPage {
     async runPendingQuery(timeout = 10000) {
         await expect(this.page.locator(this.runQueryPending)).toBeVisible({ timeout });
         await this.page.locator(this.runQueryPending).click();
-    }
-
-    /** The query input mode is remembered per browser, so turn the filter builder off when a previous test left it on. */
-    async ensureQueryEditorMode() {
-        const toggle = this.page.locator(this.filterBuilderToggle);
-        if ((await toggle.getAttribute('aria-pressed').catch(() => null)) !== 'true') return;
-        await toggle.click();
-        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     }
 
     async openRecentSearchesDrawer() {

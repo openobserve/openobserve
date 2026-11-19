@@ -1822,11 +1822,9 @@ describe("SearchBar", () => {
 
     afterEach(() => {
       rectSpy?.mockRestore();
-      localStorage.removeItem("o2.traces.queryInput");
     });
 
-    it("reports how far the builder grew past one line, and null once the editor is back", async () => {
-      localStorage.setItem("o2.traces.queryInput", "builder");
+    it("reports how far the builder grew past one line, and null once SQL mode shows the editor", async () => {
       rectSpy = vi
         .spyOn(HTMLElement.prototype, "getBoundingClientRect")
         .mockImplementation(function (this: HTMLElement) {
@@ -1840,9 +1838,23 @@ describe("SearchBar", () => {
 
       // Three 1.875rem lines measure 84px; one line is the pane's own height.
       expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([54]);
-      await wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').trigger("click");
+      searchObjInstance.meta.sqlMode = true;
       await flushPromises();
       expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
+    });
+  });
+
+  describe("focusing the query from the / shortcut", () => {
+    it("focuses the filter builder when it is the input shown", async () => {
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+      (wrapper.vm as unknown as { focusQuery: () => void }).focusQuery();
+      await flushPromises();
+      expect(document.activeElement?.getAttribute("data-test")).toBe(
+        "traces-search-bar-filter-builder-bar-input",
+      );
     });
   });
 
@@ -1906,34 +1918,25 @@ describe("SearchBar", () => {
       });
     });
 
-    it("keeps the builder toggle beside the AI button in both modes, and hides it in AI mode", async () => {
+    it("filter mode always shows the chip bar with its AI button, and AI mode hides the bar", async () => {
       store.state.zoConfig.ai_enabled = true;
       searchObjInstance.meta.showQuery = true;
       searchObjInstance.meta.sqlMode = false;
-      localStorage.setItem("o2.traces.queryInput", "query");
-      try {
-        wrapper = mountSearchBar();
-        await flushPromises();
-        const toggle = () => wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]');
-        expect(toggle().attributes("style")).toContain("right: 2.375rem");
+      wrapper = mountSearchBar();
+      await flushPromises();
+      const bar = () => wrapper.find('[data-test="traces-search-bar-filter-builder"]');
+      const aiButton = () => wrapper.find('[data-test="traces-search-bar-filter-builder-ai-btn"]');
+      expect(bar().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-search-bar-filter-builder-toggle"]').exists()).toBe(
+        false,
+      );
 
-        await toggle().trigger("click");
-        await flushPromises();
-        expect(toggle().attributes("style")).toContain("right: 2.375rem");
-        expect(wrapper.find('[data-test="traces-search-bar-filter-builder-ai-btn"]').exists()).toBe(
-          true,
-        );
-
-        await wrapper
-          .find('[data-test="traces-search-bar-filter-builder-ai-btn"]')
-          .trigger("click");
-        await flushPromises();
-        editor().vm.$emit("update:nlpMode", true);
-        await flushPromises();
-        expect(toggle().exists()).toBe(false);
-      } finally {
-        localStorage.removeItem("o2.traces.queryInput");
-      }
+      await aiButton().trigger("click");
+      await flushPromises();
+      editor().vm.$emit("update:nlpMode", true);
+      await flushPromises();
+      expect(bar().exists()).toBe(false);
+      expect(aiButton().exists()).toBe(false);
     });
   });
 
@@ -3078,6 +3081,11 @@ describe("SearchBar", () => {
   });
 
   describe("recent-searches dropdown and the editor placeholder", () => {
+    // Filter mode shows the chip bar, so the editor and its placeholder belong to SQL mode.
+    beforeEach(() => {
+      searchObjInstance.meta.sqlMode = true;
+    });
+
     it("hides the typing placeholder while the dropdown is open, so only one list changes", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
@@ -3160,12 +3168,14 @@ describe("SearchBar", () => {
         >);
       store.state.zoConfig.query_history_enabled = true;
       queryClient.clear();
-      localStorage.setItem("o2.traces.queryInput", "builder");
       searchObjInstance.data.editorValue = "";
       wrapper = mountSearchBar();
       await flushPromises();
 
-      document.body.querySelector<HTMLInputElement>(`[data-test="${DT}-input"]`)!.click();
+      // A click only places the caret; ArrowDown opens the list without typing.
+      const caret = document.body.querySelector<HTMLInputElement>(`[data-test="${DT}-input"]`)!;
+      caret.click();
+      caret.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
       await vi.waitFor(() => expect(row("extra-recent-a")).not.toBeNull());
       row("extra-recent-a")!.click();
       await flushPromises();
@@ -3174,7 +3184,6 @@ describe("SearchBar", () => {
         expect.objectContaining({ id: "a" }),
       ]);
       expect(wrapper.emitted("recent-restore")![0][2]).toBe(true);
-      localStorage.removeItem("o2.traces.queryInput");
       delete store.state.zoConfig.query_history_enabled;
       list.mockRestore();
       count.mockRestore();

@@ -107,6 +107,8 @@ export interface FilterEditorConfig {
   operators: Record<FilterFieldType, FilterOperatorId[]>;
   /** Names a page used before the shared builder, shown instead of the dashboard names. */
   operatorNames?: Partial<Record<FilterOperatorId, I18nKey>>;
+  /** What each operator does on this page's backend, shown under the list for the highlighted one. */
+  operatorHints?: Partial<Record<FilterOperatorId, I18nKey>>;
   /** Where a format takes a list for an operator that usually takes one value. */
   arity?: Partial<Record<FilterOperatorId, FilterArity>>;
   /** Group levels allowed, the root included; 1 is a flat list, null is unlimited. */
@@ -114,6 +116,8 @@ export interface FilterEditorConfig {
   connectors: FilterConnectorMode;
   /** Offer a "search all text" row (SQL `match_all`). */
   freeText: boolean;
+  /** A typed word also offers the search functions filled with it, each becoming a chip. */
+  searchFunctions?: boolean;
   /** Let the user name a field that is not in `fields`. */
   allowCustomFields: boolean;
   /** What a custom field name may look like, when the dialect's identifier rule is too strict. */
@@ -152,13 +156,17 @@ const SQL_STRING: FilterOperatorId[] = [
   "contains_ci",
   "not_contains",
   "starts_with",
+  "not_starts_with",
   "ends_with",
+  "not_ends_with",
   "in",
   "not_in",
   "regex",
   "not_regex",
   "is_null",
   "is_not_null",
+  "is_empty",
+  "is_not_empty",
 ];
 
 const SQL_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
@@ -167,7 +175,169 @@ const SQL_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
   boolean: ["eq", "neq", "is_null", "is_not_null"],
 };
 
-const PROMQL_OPERATORS = forAll(["eq", "neq", "regex", "not_regex", "in", "not_in"]);
+// Logs, traces and the other pages whose filter runs as SQL search.
+const SEARCH_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  eq: "filterBar.hints.search.eq",
+  neq: "filterBar.hints.search.neq",
+  gt: "filterBar.hints.search.compare",
+  gte: "filterBar.hints.search.compare",
+  lt: "filterBar.hints.search.compare",
+  lte: "filterBar.hints.search.compare",
+  contains: "filterBar.hints.search.contains",
+  contains_ci: "filterBar.hints.search.containsIgnoreCase",
+  not_contains: "filterBar.hints.search.notContains",
+  starts_with: "filterBar.hints.search.startsWith",
+  not_starts_with: "filterBar.hints.search.notStartsWith",
+  ends_with: "filterBar.hints.search.endsWith",
+  not_ends_with: "filterBar.hints.search.notEndsWith",
+  in: "filterBar.hints.search.in",
+  not_in: "filterBar.hints.search.notIn",
+  regex: "filterBar.hints.search.regex",
+  not_regex: "filterBar.hints.search.notRegex",
+  is_null: "filterBar.hints.search.isNull",
+  is_not_null: "filterBar.hints.search.isNotNull",
+  is_empty: "filterBar.hints.search.isEmpty",
+  is_not_empty: "filterBar.hints.search.isNotEmpty",
+};
+
+// Panels write LIKE without escaping, so % and _ in those values are wildcards.
+const PANEL_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  ...SEARCH_HINTS,
+  gt: "filterBar.hints.dashboard.compare",
+  gte: "filterBar.hints.dashboard.compare",
+  lt: "filterBar.hints.dashboard.compare",
+  lte: "filterBar.hints.dashboard.compare",
+  not_contains: "filterBar.hints.dashboard.notContains",
+  starts_with: "filterBar.hints.dashboard.startsWith",
+  not_starts_with: "filterBar.hints.dashboard.notStartsWith",
+  ends_with: "filterBar.hints.dashboard.endsWith",
+  not_ends_with: "filterBar.hints.dashboard.notEndsWith",
+  match_all: "filterBar.hints.dashboard.matchAll",
+};
+
+// Variables and anomaly filters still run regexes through re_match, which drops escapes.
+const QUOTED_SQL_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  ...PANEL_HINTS,
+  regex: "filterBar.hints.dashboard.regex",
+  not_regex: "filterBar.hints.dashboard.notRegex",
+};
+
+const ENGINE_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  eq: "filterBar.hints.engine.eq",
+  neq: "filterBar.hints.engine.neq",
+  gt: "filterBar.hints.engine.compare",
+  gte: "filterBar.hints.engine.compare",
+  lt: "filterBar.hints.engine.compare",
+  lte: "filterBar.hints.engine.compare",
+  contains: "filterBar.hints.engine.contains",
+  contains_ci: "filterBar.hints.engine.containsIgnoreCase",
+  not_contains: "filterBar.hints.engine.notContains",
+  starts_with: "filterBar.hints.engine.startsWith",
+  ends_with: "filterBar.hints.engine.endsWith",
+  in: "filterBar.hints.engine.in",
+  not_in: "filterBar.hints.engine.notIn",
+  regex: "filterBar.hints.engine.regex",
+  not_regex: "filterBar.hints.engine.notRegex",
+  is_null: "filterBar.hints.engine.isNull",
+  is_not_null: "filterBar.hints.engine.isNotNull",
+  is_empty: "filterBar.hints.engine.isEmpty",
+  is_not_empty: "filterBar.hints.engine.isNotEmpty",
+};
+
+// Annotations compile contains to LIKE without escaping.
+const ANNOTATION_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  ...ENGINE_HINTS,
+  contains: "filterBar.hints.engine.annotationContains",
+  not_contains: "filterBar.hints.engine.annotationNotContains",
+};
+
+const PROMQL_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  eq: "filterBar.hints.promql.eq",
+  neq: "filterBar.hints.promql.neq",
+  contains: "filterBar.hints.promql.contains",
+  contains_ci: "filterBar.hints.promql.containsIgnoreCase",
+  not_contains: "filterBar.hints.promql.notContains",
+  starts_with: "filterBar.hints.promql.startsWith",
+  not_starts_with: "filterBar.hints.promql.notStartsWith",
+  ends_with: "filterBar.hints.promql.endsWith",
+  not_ends_with: "filterBar.hints.promql.notEndsWith",
+  regex: "filterBar.hints.promql.regex",
+  not_regex: "filterBar.hints.promql.notRegex",
+  in: "filterBar.hints.promql.in",
+  not_in: "filterBar.hints.promql.notIn",
+  is_empty: "filterBar.hints.promql.isEmpty",
+  is_not_empty: "filterBar.hints.promql.isNotEmpty",
+};
+
+const PROFILES_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  eq: "filterBar.hints.profiles.eq",
+  neq: "filterBar.hints.profiles.neq",
+  regex: "filterBar.hints.profiles.regex",
+  not_regex: "filterBar.hints.profiles.notRegex",
+  in: "filterBar.hints.profiles.in",
+  not_in: "filterBar.hints.profiles.notIn",
+};
+
+const RUM_FUNNEL_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  in: "filterBar.hints.rumFunnel.in",
+  not_in: "filterBar.hints.rumFunnel.notIn",
+  contains: "filterBar.hints.rumFunnel.contains",
+  not_contains: "filterBar.hints.rumFunnel.notContains",
+  starts_with: "filterBar.hints.rumFunnel.startsWith",
+  not_starts_with: "filterBar.hints.rumFunnel.notStartsWith",
+  ends_with: "filterBar.hints.rumFunnel.endsWith",
+  not_ends_with: "filterBar.hints.rumFunnel.notEndsWith",
+  regex: "filterBar.hints.rumFunnel.regex",
+  not_regex: "filterBar.hints.rumFunnel.notRegex",
+};
+
+const RUM_EXCLUSION_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  in: "filterBar.hints.rumExclusion.in",
+  contains: "filterBar.hints.rumExclusion.contains",
+  starts_with: "filterBar.hints.rumExclusion.startsWith",
+  ends_with: "filterBar.hints.rumExclusion.endsWith",
+  regex: "filterBar.hints.rumExclusion.regex",
+};
+
+const SYNTHETICS_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  eq: "filterBar.hints.synthetics.eq",
+  neq: "filterBar.hints.synthetics.neq",
+  lt: "filterBar.hints.synthetics.lt",
+  gt: "filterBar.hints.synthetics.gt",
+  contains: "filterBar.hints.synthetics.contains",
+  not_contains: "filterBar.hints.synthetics.notContains",
+};
+
+const MODEL_PRICING_HINTS: Partial<Record<FilterOperatorId, I18nKey>> = {
+  gt: "filterBar.hints.modelPricing.compare",
+  gte: "filterBar.hints.modelPricing.compare",
+  lt: "filterBar.hints.modelPricing.compare",
+  lte: "filterBar.hints.modelPricing.compare",
+  eq: "filterBar.hints.modelPricing.eq",
+  neq: "filterBar.hints.modelPricing.neq",
+  in: "filterBar.hints.modelPricing.in",
+  not_in: "filterBar.hints.modelPricing.notIn",
+  is_null: "filterBar.hints.modelPricing.isNull",
+  is_not_null: "filterBar.hints.modelPricing.isNotNull",
+};
+
+const PROMQL_OPERATORS = forAll([
+  "eq",
+  "neq",
+  "contains",
+  "contains_ci",
+  "not_contains",
+  "starts_with",
+  "not_starts_with",
+  "ends_with",
+  "not_ends_with",
+  "regex",
+  "not_regex",
+  "in",
+  "not_in",
+  "is_empty",
+  "is_not_empty",
+]);
 
 const ENGINE_LIST: FilterOperatorId[] = [
   "eq",
@@ -191,21 +361,33 @@ const ENGINE_LIST: FilterOperatorId[] = [
   "is_not_empty",
 ];
 
-// The backend builds these only on a text column; the operators alerts had before them stay on every column.
+// The backend builds these only on a text column; on a number or boolean one they fail or never match.
 const ENGINE_TEXT_ONLY = new Set<FilterOperatorId>([
+  "contains",
   "contains_ci",
+  "not_contains",
   "starts_with",
   "ends_with",
   "regex",
   "not_regex",
 ]);
 
+const ORDERING = new Set<FilterOperatorId>(["gt", "gte", "lt", "lte"]);
+const BLANK_CHECKS = new Set<FilterOperatorId>(["is_empty", "is_not_empty"]);
+
 const ENGINE_NON_TEXT = ENGINE_LIST.filter((id) => !ENGINE_TEXT_ONLY.has(id));
 
 const ENGINE_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
   string: ENGINE_LIST,
   number: ENGINE_NON_TEXT,
-  boolean: ENGINE_NON_TEXT,
+  boolean: ENGINE_NON_TEXT.filter((id) => !ORDERING.has(id)),
+};
+
+// Annotations compile to SQL without column types, so `= ''` would be cast to the number or boolean column.
+const ANNOTATION_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
+  string: ENGINE_LIST,
+  number: ENGINE_OPERATORS.number.filter((id) => !BLANK_CHECKS.has(id)),
+  boolean: ENGINE_OPERATORS.boolean.filter((id) => !BLANK_CHECKS.has(id)),
 };
 
 const DASHBOARD_LIST: FilterOperatorId[] = [
@@ -229,11 +411,38 @@ const DASHBOARD_LIST: FilterOperatorId[] = [
   "is_not_null",
 ];
 
-// `= ''` fails on a number or boolean column in SQL, so the blank checks are offered on text only.
+// LIKE, regex and text functions fail on a number or boolean column once the value is not a number.
+const DASHBOARD_NUMBER: FilterOperatorId[] = [
+  "eq",
+  "neq",
+  "gte",
+  "lte",
+  "gt",
+  "lt",
+  "in",
+  "not_in",
+  "is_null",
+  "is_not_null",
+];
+
 const DASHBOARD_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
-  string: [...DASHBOARD_LIST, "is_empty", "is_not_empty"],
-  number: DASHBOARD_LIST,
-  boolean: DASHBOARD_LIST,
+  string: [
+    ...DASHBOARD_LIST.flatMap((id): FilterOperatorId[] => {
+      if (id === "starts_with") return [id, "not_starts_with"];
+      return id === "ends_with" ? [id, "not_ends_with"] : [id];
+    }),
+    "is_empty",
+    "is_not_empty",
+  ],
+  number: DASHBOARD_NUMBER,
+  boolean: ["eq", "neq", "is_null", "is_not_null"],
+};
+
+// Variables and anomaly filters quote every value, so a boolean column only takes the null checks.
+const QUOTED_SQL_OPERATORS: Record<FilterFieldType, FilterOperatorId[]> = {
+  string: DASHBOARD_LIST,
+  number: DASHBOARD_NUMBER,
+  boolean: ["is_null", "is_not_null"],
 };
 
 const RUM_FUNNEL_LIST: FilterOperatorId[] = [
@@ -287,6 +496,7 @@ const horizontalSql = {
   layout: "horizontal",
   dialect: "sql",
   operators: SQL_OPERATORS,
+  operatorHints: SEARCH_HINTS,
   maxDepth: null,
   connectors: "per-item",
   freeText: true,
@@ -302,6 +512,7 @@ const promql = {
   layout: "horizontal",
   dialect: "promql",
   operators: PROMQL_OPERATORS,
+  operatorHints: PROMQL_HINTS,
   maxDepth: 2,
   connectors: "any-of-groups",
   freeText: false,
@@ -316,6 +527,7 @@ const engine = {
   layout: "vertical",
   dialect: "sql",
   operators: ENGINE_OPERATORS,
+  operatorHints: ENGINE_HINTS,
   maxDepth: null,
   connectors: "per-item",
   freeText: false,
@@ -457,6 +669,8 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
   annotation: {
     ...engine,
     name: "annotation",
+    operators: ANNOTATION_OPERATORS,
+    operatorHints: ANNOTATION_HINTS,
     allowCustomFields: false,
     startWithEmptyRow: false,
     validation: "dropIncomplete",
@@ -467,6 +681,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     layout: "vertical",
     dialect: "sql",
     operators: forAll(["eq", "neq"]),
+    operatorHints: { eq: "filterBar.hints.downtime.eq", neq: "filterBar.hints.downtime.neq" },
     maxDepth: MAX_DOWNTIME_DEPTH,
     connectors: "per-group",
     freeText: false,
@@ -483,6 +698,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     layout: "horizontal",
     dialect: "sql",
     operators: DASHBOARD_OPERATORS,
+    operatorHints: PANEL_HINTS,
     maxDepth: null,
     connectors: "per-item",
     freeText: false,
@@ -497,7 +713,8 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     ...flat,
     name: "dashboard-variable",
     layout: "vertical",
-    operators: forAll(DASHBOARD_LIST),
+    operators: QUOTED_SQL_OPERATORS,
+    operatorHints: QUOTED_SQL_HINTS,
     codec: dashboardVariableCodec(),
     validation: "requireComplete",
   },
@@ -505,7 +722,8 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     ...flat,
     name: "anomaly",
     layout: "vertical",
-    operators: forAll(DASHBOARD_LIST),
+    operators: QUOTED_SQL_OPERATORS,
+    operatorHints: QUOTED_SQL_HINTS,
     codec: anomalyCodec(),
     validation: "requireComplete",
   },
@@ -515,6 +733,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     layout: "horizontal",
     dialect: "promql",
     operators: forAll(["eq", "neq", "regex", "not_regex", "in", "not_in"]),
+    operatorHints: PROFILES_HINTS,
     // The server ANDs label filters, so a second value of one label would match nothing.
     limits: { uniqueFields: true, maxValues: MAX_PROFILE_VALUES },
     codec: profilesCodec(),
@@ -527,6 +746,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     layout: "horizontal",
     operators: forAll(RUM_FUNNEL_LIST),
     operatorNames: RUM_FUNNEL_NAMES,
+    operatorHints: RUM_FUNNEL_HINTS,
     arity: RUM_MANY,
     allowCustomFields: true,
     limits: { maxConditions: MAX_RUM_FILTERS, maxValues: MAX_RUM_VALUES, uniqueFields: true },
@@ -540,6 +760,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     layout: "horizontal",
     operators: forAll(["in", "contains", "starts_with", "ends_with", "regex"]),
     operatorNames: RUM_EXCLUSION_NAMES,
+    operatorHints: RUM_EXCLUSION_HINTS,
     arity: RUM_MANY,
     limits: { maxConditions: MAX_RUM_EXCLUSIONS, maxValues: MAX_RUM_VALUES },
     codec: rumExclusionCodec(),
@@ -551,6 +772,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     name: "synthetics",
     layout: "vertical",
     operators: forAll(["eq", "neq", "lt", "gt", "contains", "not_contains"]),
+    operatorHints: SYNTHETICS_HINTS,
     codec: syntheticsCodec(),
     validation: "requireComplete",
   },
@@ -565,6 +787,7 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
       boolean: TIER_RULE_OPERATORS,
     },
     allowCustomFields: true,
+    operatorHints: MODEL_PRICING_HINTS,
     // A rule may name fallback keys, read in order: `a.b, c.d`.
     customFieldPattern: /^[A-Za-z_@][\w.@-]*(\s*,\s*[A-Za-z_@][\w.@-]*)*$/,
     limits: { maxConditions: MAX_TIER_RULES + 1 },
@@ -585,7 +808,8 @@ export const dialectConfig = (
   dialect: FilterDialect,
   freeText: boolean,
   allowCustomFields: boolean,
+  searchFunctions = false,
 ): FilterEditorConfig => {
   const base = dialect === "promql" ? FILTER_PROFILES.metrics : FILTER_PROFILES.logs;
-  return { ...base, freeText, allowCustomFields };
+  return { ...base, freeText, allowCustomFields, searchFunctions };
 };

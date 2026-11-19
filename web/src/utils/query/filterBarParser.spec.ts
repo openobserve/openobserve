@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { filterTreeToSql, type FilterCondition, type FilterField } from "./filterBar";
-import { parseShorthand, parseSqlFilter } from "./filterBarParser";
+import { parseShorthand, parseSqlFilter, parseSqlFilterLocking } from "./filterBarParser";
 
 const fields: FilterField[] = [
   { name: "level", type: "string" },
@@ -44,8 +44,8 @@ describe("parseSqlFilter", () => {
       "level NOT LIKE '%x%'",
       "level LIKE 'x%'",
       "level LIKE '%x'",
-      "re_match(level, 'x')",
-      "re_not_match(level, 'x')",
+      "regexp_like(level, 'x')",
+      "NOT regexp_like(level, 'x')",
       "level IN ('a', 'b')",
       "status NOT IN (1, 2)",
       "level IS NULL",
@@ -54,6 +54,14 @@ describe("parseSqlFilter", () => {
       "status >= 500 AND (level = 'error' OR level = 'warn')",
     ];
     for (const sql of samples) expect(roundTrip(sql)).toBe(sql);
+  });
+
+  it("reads queries saved with re_match, writing them back with regexp_like", () => {
+    expect(roundTrip("re_match(level, 'x') AND re_not_match(service, 'y')")).toBe(
+      "regexp_like(level, 'x') AND NOT regexp_like(service, 'y')",
+    );
+    expect(roundTrip("not regexp_like(level, 'x')")).toBe("NOT regexp_like(level, 'x')");
+    expect(parseSqlFilter("NOT str_match(level, 'x')")).toBeNull();
   });
 
   it("accepts hand-typed lowercase keywords and <> / ==", () => {
@@ -184,6 +192,64 @@ describe("parseSqlFilter", () => {
     expect(parseSqlFilter(`level = 'a' "AND" level = 'b'`)).toBeNull();
     expect(parseSqlFilter(`"re_match"(level, 'x')`)).toBeNull();
     expect(parseSqlFilter("level = TRUE")!.items[0]).toMatchObject({ values: ["true"] });
+  });
+});
+
+describe("parseSqlFilterLocking", () => {
+  const shape = (sql: string) =>
+    parseSqlFilterLocking(sql).items.map((item) =>
+      item.kind === "raw"
+        ? `${item.connector} [${item.sql}]`
+        : item.kind === "condition"
+          ? `${item.connector} ${item.field} ${item.operator} ${item.values.join(",")}`
+          : `${item.connector} group(${item.items.length})`,
+    );
+
+  it("draws what it can and locks only the parts it cannot, as typed", () => {
+    expect(shape("level = 'error' AND lower(host) = 'x' OR status > 500")).toEqual([
+      "AND level eq error",
+      "AND [lower(host) = 'x']",
+      "OR status gt 500",
+    ]);
+  });
+
+  it("keeps BETWEEN's AND and a CASE expression inside one locked part", () => {
+    expect(shape("status BETWEEN 200 AND 299 AND level = 'a'")).toEqual([
+      "AND [status BETWEEN 200 AND 299]",
+      "AND level eq a",
+    ]);
+    expect(shape("CASE WHEN a = 1 AND b = 2 THEN true END OR ok = true")).toEqual([
+      "AND [CASE WHEN a = 1 AND b = 2 THEN true END]",
+      "OR ok eq true",
+    ]);
+  });
+
+  it("locks a part with trailing text or an unknown character, and keeps groups drawn", () => {
+    expect(shape("status + 1 > 2 AND (level = 'a' OR NOT level = 'b')")).toEqual([
+      "AND [status + 1 > 2]",
+      "AND group(2)",
+    ]);
+    const group = parseSqlFilterLocking("(level = 'a' OR NOT level = 'b')").items[0];
+    expect(group).toMatchObject({ kind: "group" });
+    expect(group.kind === "group" && group.items[1]).toMatchObject({
+      kind: "raw",
+      connector: "OR",
+      sql: "NOT level = 'b'",
+    });
+  });
+
+  it("locks the whole text when its brackets or quotes do not close", () => {
+    expect(shape("(level = 'a'")).toEqual(["AND [(level = 'a']"]);
+    expect(shape("level = 'a")).toEqual(["AND [level = 'a]"]);
+    expect(shape("level = 'a' AND")).toEqual(["AND [level = 'a' AND]"]);
+  });
+
+  it("matches the strict parse wherever that one succeeds, and compiles locked parts back", () => {
+    const sql = "level = 'a' AND (status >= 500 OR str_match(level, 'x'))";
+    expect(parseSqlFilterLocking(sql).items.length).toBe(parseSqlFilter(sql)!.items.length);
+    expect(filterTreeToSql(parseSqlFilterLocking("t.level = 'x' AND ok = true"), fields)).toBe(
+      "(t.level = 'x') AND ok = true",
+    );
   });
 });
 

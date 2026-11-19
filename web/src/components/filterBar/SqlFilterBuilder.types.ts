@@ -34,13 +34,15 @@ export interface SqlFilterBuilderProps {
 export interface SqlFilterBuilderExpose {
   /** Focuses the bar and opens its list, as a click on it does. */
   activate: () => void;
+  /** Undo, redo or clear the filter; false when there was nothing to do. */
+  undo: () => boolean;
+  redo: () => boolean;
+  clear: () => boolean;
 }
 
 export interface SqlFilterBuilderEmits {
   (_e: "update:query", _value: string): void;
   (_e: "submit"): void;
-  /** The user chose to keep editing an unparsable query as text. */
-  (_e: "exit"): void;
   /** The field list is about to be shown. */
   (_e: "focus"): void;
   (_e: "extra-select", _key: string, _event: MouseEvent | KeyboardEvent): void;

@@ -16,7 +16,10 @@
 import {
   escapePromRegexLiteral,
   OPERATORS,
+  operatorOfPromMatcher,
+  promMatcherFor,
   splitPromRegexLiterals,
+  unescapePromRegexLiteral,
   type FilterOperatorId,
 } from "@/utils/query/filterBar";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
@@ -141,6 +144,10 @@ const readMatcher = (label: unknown, op: unknown, value: unknown): FlatCondition
   const operator = PROM_OPERATORS[symbol];
   if (!operator) return null;
   const text = String(value ?? "");
+  const shaped = operatorOfPromMatcher(symbol, text, (part) =>
+    hasVariable(part) ? part : unescapePromRegexLiteral(part),
+  );
+  if (shaped) return { field: String(label ?? ""), ...shaped };
   const list = PROM_LIST[symbol] ? splitPromListText(text) : null;
   const resolved = list ? PROM_LIST[symbol] : operator;
   // `label=""` is a real PromQL matcher (label absent), so an empty value is kept for = and !=.
@@ -153,6 +160,8 @@ const readMatcher = (label: unknown, op: unknown, value: unknown): FlatCondition
 };
 
 const writeMatcher = (condition: FlatCondition): { op: string; value: string } => {
+  const shaped = promMatcherFor(condition.operator, promListItem(firstValue(condition)));
+  if (shaped) return shaped;
   switch (condition.operator) {
     case "neq":
       return { op: "!=", value: firstValue(condition) };

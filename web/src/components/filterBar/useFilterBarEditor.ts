@@ -22,6 +22,7 @@ import {
   findNode,
   findParent,
   groupLevel,
+  groupNodes,
   insertNode,
   makeCondition,
   newFilterId,
@@ -90,7 +91,17 @@ const SHORTHAND_KEY = "\u0000shorthand";
 const CUSTOM_KEY = "\u0000custom";
 const CUSTOM_FIELD_KEY = "\u0000custom-field";
 const GROUP_KEY = "\u0000group";
+const FUNCTION_KEY_PREFIX = "\u0000fn:";
+const FUNCTION_START_PREFIX = "\u0000fn-start:";
+const JOIN_KEY_PREFIX = "\u0000join:";
 const EXTRA_KEY_PREFIX = "extra-";
+// The search functions a typed word offers, and the chip operator each becomes.
+const SEARCH_FUNCTIONS: [string, FilterOperatorId][] = [
+  ["str_match", "contains"],
+  ["str_match_ignore_case", "contains_ci"],
+  ["re_match", "regex"],
+  ["re_not_match", "not_regex"],
+];
 const PROMQL_LABEL_NAME = /^[A-Za-z_]\w*$/;
 // Engine pages take dotted payload paths (a workflow's `meta.severity`), so SQL names allow what the shorthand parser does.
 const SQL_FIELD_NAME = /^[A-Za-z_@][\w.@-]*$/;
@@ -237,15 +248,62 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return node?.kind === "condition" ? node : undefined;
   });
 
+  const quoted = (value: string) => `'${value.replace(/'/g, "''")}'`;
+
+  // A word that starts a function's name is that function, offered empty; any other word fills each one.
+  function searchFunctionRows(needle: string): ChipInputSuggestion[] {
+    const section = t("filterBar.functions");
+    const offered: [string, FilterOperatorId][] = [
+      ...(config.value.freeText ? [["match_all", "match_all"] as [string, FilterOperatorId]] : []),
+      ...SEARCH_FUNCTIONS.filter(([, id]) => fields.value.some((field) => allows(field.name, id))),
+    ];
+    const word = needle.toLowerCase();
+    const named = offered.filter(([fn]) => fn.startsWith(word));
+    const icon = (id: FilterOperatorId): IconName => (id === "match_all" ? "search" : "function");
+    if (named.length) {
+      return named.map(([fn, id]) => ({
+        key: `${FUNCTION_START_PREFIX}${id}`,
+        label: raw(id === "match_all" ? `${fn}(…)` : `${fn}(…, …)`),
+        detail: t(OPERATORS[id].labelKey),
+        icon: icon(id),
+        section,
+      }));
+    }
+    return offered.map(([fn, id]) => ({
+      key: id === "match_all" ? FREE_TEXT_KEY : `${FUNCTION_KEY_PREFIX}${id}`,
+      label: raw(id === "match_all" ? `${fn}(${quoted(needle)})` : `${fn}(…, ${quoted(needle)})`),
+      detail: t(OPERATORS[id].labelKey),
+      icon: icon(id),
+      section,
+    }));
+  }
+
+  // Typed `and` / `or` switch the next join once Space follows; this row says so, and picking it does the same.
+  function joinRow(needle: string): ChipInputSuggestion | null {
+    const word = needle.toLowerCase();
+    if ((word !== "and" && word !== "or") || !advanced.value || step.value !== "field") return null;
+    if (editingId.value || draft.value || !targetGroup.value.items.length) return null;
+    const connector = word.toUpperCase();
+    return {
+      key: `${JOIN_KEY_PREFIX}${connector}`,
+      label: t("filterBar.joinWith", { connector }),
+      detail: t("filterBar.joinKey"),
+    };
+  }
+
   const fieldSuggestions = computed<ChipInputSuggestion[]>(() => {
     const needle = text.value.trim();
     const rows: ChipInputSuggestion[] = [];
     if (!editingId.value && atConditionLimit.value) return rows;
+    const join = joinRow(needle);
+    if (join) rows.push(join);
     const editedField = editedNode.value?.field;
     const unique = config.value.limits.uniqueFields;
     // Every way to name a field honours one-condition-per-field, not just the picked list.
     const taken = (name: string) => unique && name !== editedField && usedFields.value.has(name);
-    const shorthand = parseShorthand(needle);
+    // A picked search function waits for its field, so only fields that take its operator are listed.
+    const pending = !editingId.value ? (draft.value?.operator ?? null) : null;
+    const shorthand = pending ? null : parseShorthand(needle);
     if (shorthand && fieldMap.value.has(shorthand.field) && !taken(shorthand.field)) {
       rows.push({
         key: SHORTHAND_KEY,
@@ -259,7 +317,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const names = rankByMatch(
       fields.value
         .map((field) => field.name)
-        .filter((name) => !taken(name))
+        .filter((name) => !taken(name) && (!pending || allows(name, pending)))
         // A label typed in full stays reachable, for matchers like job!="a", job!="b".
         .filter((name) => name === editedField || name === needle || !usedInGroup.value.has(name)),
       needle,
@@ -293,7 +351,9 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
         icon: "add",
       });
     }
-    if (needle && config.value.freeText && dialect.value === "sql" && !shorthand) {
+    if (needle && config.value.searchFunctions && !editingId.value && !shorthand) {
+      if (!pending) rows.push(...searchFunctionRows(needle));
+    } else if (needle && config.value.freeText && dialect.value === "sql" && !shorthand) {
       const row: ChipInputSuggestion = {
         key: FREE_TEXT_KEY,
         label: t("filterBar.searchText", { text: needle }),
@@ -512,7 +572,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const current = draft.value!;
     if (current.operator && allows(field, current.operator)) {
       draft.value = { ...current, field };
-      return commitDraft();
+      if (current.values.length || arityOf(current.operator) === "none") return commitDraft();
+      // A function picked by name still needs its value.
+      editPart.value = null;
+      text.value = "";
+      step.value = "value";
+      return;
     }
     editPart.value = null;
     startDraft(field);
@@ -559,7 +624,22 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function selectField(key: string) {
     if (key === GROUP_KEY) return startGroup();
+    if (key.startsWith(JOIN_KEY_PREFIX))
+      return chooseConnector(key.slice(JOIN_KEY_PREFIX.length) as FilterConnector);
     if (key === SHORTHAND_KEY) return addShorthand();
+    const named = key.startsWith(FUNCTION_START_PREFIX);
+    if (named || key.startsWith(FUNCTION_KEY_PREFIX)) {
+      dropValues();
+      const prefix = named ? FUNCTION_START_PREFIX : FUNCTION_KEY_PREFIX;
+      const operator = key.slice(prefix.length) as FilterOperatorId;
+      draft.value = { field: "", operator, values: named ? [] : [text.value.trim()] };
+      text.value = "";
+      // match_all takes no field, so its text comes next.
+      if (operator === "match_all") step.value = "value";
+      // Picking the field then goes through changeField, which keeps the operator and value.
+      else editPart.value = "field";
+      return;
+    }
     if (key === FREE_TEXT_KEY) {
       draft.value = { field: "", operator: "match_all", values: [text.value.trim()] };
       return commitDraft();
@@ -594,6 +674,20 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function applyValues() {
     if (multiValue.value && draft.value?.values.length) commitDraft();
+  }
+
+  /** Ctrl/Cmd+Enter: what is typed or ticked becomes a condition, so the run that follows includes it. */
+  function commitPending() {
+    const typed = text.value.trim();
+    if (step.value === "value" && draft.value) {
+      if (typed && !draft.value.values.includes(typed)) addValue(typed);
+      if (multiValue.value && draft.value?.values.length) commitDraft();
+    } else if (step.value === "field" && typed && !draft.value) {
+      const offered = fieldSuggestions.value.map((row) => row.key);
+      if (offered.includes(SHORTHAND_KEY)) addShorthand();
+      else if (offered.includes(FREE_TEXT_KEY)) selectField(FREE_TEXT_KEY);
+    }
+    open.value = false;
   }
 
   function onSeparator() {
@@ -775,16 +869,22 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       return closeGroup();
     }
     const connector = /^(and|or)\s$/.exec(typed)?.[1];
-    if (connector && advanced.value && targetGroup.value.items.length) {
-      text.value = "";
-      const chosen = connector.toUpperCase() as FilterConnector;
-      if (groupConnector(targetGroup.value) && chosen !== nextConnector.value)
-        togglePendingConnector();
-      else pendingConnector.value = chosen;
-    }
+    if (connector && advanced.value && targetGroup.value.items.length)
+      chooseConnector(connector.toUpperCase() as FilterConnector);
+  }
+
+  function chooseConnector(chosen: FilterConnector) {
+    text.value = "";
+    if (groupConnector(targetGroup.value) && chosen !== nextConnector.value)
+      togglePendingConnector();
+    else pendingConnector.value = chosen;
   }
 
   function backspaceDraft(): boolean {
+    if (step.value === "value" && draft.value?.operator === "match_all") {
+      reset();
+      return true;
+    }
     if (step.value === "value") {
       if (multiValue.value && draft.value?.values.length) {
         draft.value = { ...draft.value, values: draft.value.values.slice(0, -1) };
@@ -799,6 +899,12 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       const wasEditing = editingId.value;
       reset();
       if (!wasEditing) text.value = field;
+      return true;
+    }
+    if (draft.value && !editingId.value) {
+      const typed = draft.value.values[0] ?? "";
+      reset();
+      text.value = typed;
       return true;
     }
     return false;
@@ -898,6 +1004,53 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return canUngroupNode(tree.value, id, perGroup.value);
   }
 
+  // The node joined by connector `id`'s AND/OR and the one before it; null when nothing precedes it.
+  function joinedPair(id: string) {
+    const parent = findParent(tree.value, id);
+    const index = parent?.items.findIndex((item) => item.id === id) ?? -1;
+    if (!parent || index < 1) return null;
+    return { parent, index, before: parent.items[index - 1], after: parent.items[index] };
+  }
+
+  /** What the ( ) on the AND/OR before node `id` does: join a group already there, or make a new one. */
+  function canGroupAround(id: string): "group" | "join" | null {
+    if (config.value.connectors === "any-of-groups") return null;
+    const pair = joinedPair(id);
+    if (!pair) return null;
+    if ((pair.before.kind === "group") !== (pair.after.kind === "group")) return "join";
+    return canGroupIn(pair.parent.id === tree.value.id ? null : pair.parent.id) ? "group" : null;
+  }
+
+  /** Brackets the two nodes either side of node `id`'s AND/OR; one already a group takes the other in. */
+  function groupAround(id: string) {
+    const pair = joinedPair(id);
+    const mode = canGroupAround(id);
+    if (!pair || !mode) return;
+    const { parent, index, before, after } = pair;
+    reset();
+    if (mode === "group")
+      return options.commit(groupNodes(tree.value, parent.id, index - 1, index + 1));
+    // The joining node keeps the AND/OR it had with its neighbour, now inside the group.
+    const group = (before.kind === "group" ? before : after) as FilterGroup;
+    const items =
+      before.kind === "group"
+        ? [...group.items, after]
+        : [
+            { ...before, connector: after.connector },
+            ...group.items.map((item, at) =>
+              at === 0 ? { ...item, connector: after.connector } : item,
+            ),
+          ];
+    const joined: FilterGroup = { ...group, connector: before.connector, items };
+    const siblings = [
+      ...parent.items.slice(0, index - 1),
+      joined,
+      ...parent.items.slice(index + 1),
+    ];
+    const next = { ...parent, items: siblings };
+    options.commit(parent.id === tree.value.id ? next : replaceNode(tree.value, parent.id, next));
+  }
+
   function ungroup(id: string) {
     if (!canUngroup(id)) return;
     const parent = findParent(tree.value, id);
@@ -941,6 +1094,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     onEnter,
     onSeparator,
     applyValues,
+    commitPending,
     onTextChange,
     onBackspace,
     onDelete,
@@ -954,6 +1108,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     addAfter,
     moveCaret,
     moveCaretTo,
+    groupAround,
+    canGroupAround,
     ungroup,
     canUngroup,
     canGroupIn,

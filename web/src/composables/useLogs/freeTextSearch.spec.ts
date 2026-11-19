@@ -25,6 +25,7 @@ import {
   isFilterHeld,
   loadPendingFreeTextSchemas,
   noFtsStreams,
+  allowsMatchAll,
   noFtsRecoveryTerm,
   noFtsRecoveryStreams,
   rewrittenFilter,
@@ -345,6 +346,22 @@ describe("freeTextWhereByStream and filterForParsing", () => {
     expect(filterForParsing("match_all('timeout') and level='error'", new Set(["level"]))).toBe(
       "match_all('timeout') and level='error'",
     );
+  });
+});
+
+describe("allowsMatchAll", () => {
+  it("allows it while any selected stream has a full-text field", () => {
+    expect(allowsMatchAll(makeSearchObj("", [fts("app")]), zoConfig)).toBe(true);
+    expect(allowsMatchAll(makeSearchObj("", [noFts("raw"), fts("app")]), zoConfig)).toBe(true);
+  });
+
+  it("refuses it once every selected stream's schema has none", () => {
+    expect(allowsMatchAll(makeSearchObj("", [noFts("raw"), zeroText("m")]), zoConfig)).toBe(false);
+  });
+
+  it("keeps allowing it while no stream is picked or a schema has not loaded", () => {
+    expect(allowsMatchAll(makeSearchObj("", []), zoConfig)).toBe(true);
+    expect(allowsMatchAll(makeSearchObj("", [{ name: "pending" }]), zoConfig)).toBe(true);
   });
 });
 

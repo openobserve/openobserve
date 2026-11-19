@@ -97,6 +97,11 @@ export const TIER_USAGE_OPERATORS: FilterOperatorId[] = Object.values(CONDITION_
 /** Operators a rule takes; the server's RuleOp has no `eq`/`neq`, equality on an attribute is IN / NOT IN. */
 export const TIER_RULE_OPERATORS: FilterOperatorId[] = Object.values(RULE_OPERATORS);
 
+/** A rule on `usage.<key>`: the server refuses exists / not_exists there, since a missing count reads as 0. */
+export const TIER_USAGE_RULE_OPERATORS: FilterOperatorId[] = TIER_RULE_OPERATORS.filter(
+  (id) => id !== "is_null" && id !== "is_not_null",
+);
+
 /** Field payload marking a plain usage key (`input`), as opposed to an attribute key. */
 export const TIER_USAGE_PAYLOAD = { target: "usage" } as const;
 

@@ -57,6 +57,9 @@ test.describe("Query Editor Keyboard Accessibility testcases", () => {
     await page.goto(LOGS_URL);
     await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
     await pm.logsPage.ensureQueryEditorReady();
+    // Filter mode shows the chip bar, so the editor these keys belong to is the SQL one.
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await expect(pm.logsPage.getQueryEditor()).toBeVisible();
     await pm.logsPage.clickRefreshButton();
     await expect(pm.logsPage.logResultsRow(0)).toBeAttached({ timeout: 60000 });
     testLogger.info("Test setup completed");

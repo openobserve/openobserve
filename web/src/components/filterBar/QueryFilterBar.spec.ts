@@ -75,8 +75,8 @@ async function type(text: string) {
   await flushPromises();
 }
 
-async function press(key: string) {
-  input()!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+async function press(key: string, init: KeyboardEventInit = {}) {
+  input()!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, ...init }));
   await flushPromises();
   await nextTick();
 }
@@ -143,6 +143,126 @@ describe("QueryFilterBar", () => {
     await type("s");
     expect(rowKeys()).toEqual(["status"]);
     expect(document.body.querySelector('[data-test="query-filter-bar-search"]')).toBeNull();
+  });
+
+  describe("open on typing", () => {
+    it("a click only places the caret; typing or ArrowDown opens the list", async () => {
+      mountBar({ openOnType: true });
+      await openBar();
+      expect(rows()).toEqual([]);
+      await press("ArrowDown");
+      expect(rowKeys()).toContain("level");
+      await press("Escape");
+      expect(rows()).toEqual([]);
+      await type("sta");
+      expect(rowKeys()).toEqual(["status"]);
+    });
+
+    it("the exposed activate focuses without opening", async () => {
+      mountBar({ openOnType: true });
+      (wrapper!.vm as unknown as { activate: () => void }).activate();
+      await flushPromises();
+      expect(document.activeElement).toBe(input());
+      expect(rows()).toEqual([]);
+    });
+  });
+
+  describe("search functions filled with the typed word", () => {
+    const FN = "\u0000fn:";
+    const START = "\u0000fn-start:";
+
+    it("lists match_all and the field search functions under Functions, after the fields", async () => {
+      mountBar({ searchFunctions: true, freeText: true });
+      await openBar();
+      await type("lev");
+      expect(rowKeys()).toEqual([
+        "level",
+        "\u0000free-text",
+        `${FN}contains`,
+        `${FN}contains_ci`,
+        `${FN}regex`,
+        `${FN}not_regex`,
+      ]);
+      expect(rows()[1].textContent).toContain("match_all('lev')");
+      expect(rows()[2].textContent).toContain("str_match(…, 'lev')");
+      const heading = document.body.querySelector('[data-test="query-filter-bar-suggest-section"]');
+      expect(heading?.textContent).toContain("Functions");
+    });
+
+    it("leaves match_all out without full-text search, and offers nothing extra when off", async () => {
+      mountBar({ searchFunctions: true, freeText: false });
+      await openBar();
+      await type("err");
+      expect(rowKeys()).toEqual([
+        `${FN}contains`,
+        `${FN}contains_ci`,
+        `${FN}regex`,
+        `${FN}not_regex`,
+      ]);
+      wrapper!.unmount();
+      mountBar({ freeText: true });
+      await openBar();
+      await type("err");
+      expect(rowKeys()).toEqual(["\u0000free-text"]);
+    });
+
+    it("asks for a text field next, then adds the condition with the word as its value", async () => {
+      const state = mountBar({ searchFunctions: true });
+      await openBar();
+      await type("err");
+      await clickRow(`${FN}contains`);
+      expect(rowKeys()).toEqual(["level"]);
+      expect(wrapper!.find('[data-test="query-filter-bar-draft"]').text()).toContain("err");
+      await clickRow("level");
+      expect(sql(state)).toBe("str_match(level, 'err')");
+    });
+
+    it("a word that starts a function's name offers that function empty, not filled with the word", async () => {
+      mountBar({ searchFunctions: true, freeText: true });
+      await openBar();
+      await type("mat");
+      expect(rowKeys()).toEqual([`${START}match_all`]);
+      expect(rows()[0].textContent).toContain("match_all(…)");
+      expect(rows()[0].textContent).not.toContain("'mat'");
+      await type("re_n");
+      expect(rowKeys()).toEqual([`${START}not_regex`]);
+      await type("str");
+      expect(rowKeys()).toEqual([`${START}contains`, `${START}contains_ci`]);
+    });
+
+    it("match_all picked by name asks for the text to search", async () => {
+      const state = mountBar({ searchFunctions: true, freeText: true });
+      await openBar();
+      await type("mat");
+      await clickRow(`${START}match_all`);
+      expect(wrapper!.find('[data-test="query-filter-bar-draft"]').text()).toContain("Text");
+      await type("timeout");
+      await press("Enter");
+      expect(sql(state)).toBe("match_all('timeout')");
+    });
+
+    it("str_match picked by name asks for the field, then its value", async () => {
+      const state = mountBar({ searchFunctions: true });
+      await openBar();
+      await type("str_m");
+      await clickRow(`${START}contains`);
+      expect(rowKeys()).toEqual(["level"]);
+      await clickRow("level");
+      expect(rowKeys()).toEqual(["error", "warn", "info"]);
+      await clickRow("warn");
+      expect(sql(state)).toBe("str_match(level, 'warn')");
+    });
+
+    it("Backspace on the waiting function puts the word back to type on", async () => {
+      const state = mountBar({ searchFunctions: true });
+      await openBar();
+      await type("err");
+      await clickRow(`${FN}regex`);
+      await press("Backspace");
+      expect(input()!.value).toBe("err");
+      expect(wrapper!.find('[data-test="query-filter-bar-draft"]').exists()).toBe(false);
+      expect(state.tree.items).toEqual([]);
+    });
   });
 
   it("only offers operators that fit the field type", async () => {
@@ -242,6 +362,77 @@ describe("QueryFilterBar", () => {
       .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await flushPromises();
     expect(sql(state)).toBe("level IN ('error', 'info')");
+  });
+
+  describe("Ctrl+Enter commits what is typed and leaves the run to the page", () => {
+    it("commits a typed value without picking a row", async () => {
+      const onSubmit = vi.fn();
+      const state = mountBar({ onSubmit });
+      await openBar();
+      await type("level");
+      await press("Enter");
+      await press("Enter");
+      await type("err");
+      await press("Enter", { ctrlKey: true });
+      expect(sql(state)).toBe("level = 'err'");
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(rows()).toHaveLength(0);
+    });
+
+    it("commits field=value shorthand, and free text as a text search", async () => {
+      const state = mountBar({ freeText: true });
+      await openBar();
+      await type("level=warn");
+      await press("Enter", { metaKey: true });
+      expect(sql(state)).toBe("level = 'warn'");
+      await openBar();
+      await type("timeout");
+      await press("Enter", { ctrlKey: true });
+      expect(sql(state)).toBe("level = 'warn' AND match_all('timeout')");
+    });
+
+    it("commits ticked values with the one being typed", async () => {
+      const state = mountBar();
+      await openBar();
+      await type("level");
+      await press("Enter");
+      await clickRow("in");
+      await clickRow("error");
+      await type("fatal");
+      await press("Enter", { ctrlKey: true });
+      expect(sql(state)).toBe("level IN ('error', 'fatal')");
+    });
+
+    it("does not submit from an empty box, so the page shortcut runs once", async () => {
+      const onSubmit = vi.fn();
+      const state = mountBar({ onSubmit });
+      await openBar();
+      await press("Enter", { ctrlKey: true });
+      await openBar();
+      await press("Escape");
+      expect(rows()).toHaveLength(0);
+      await press("Enter", { metaKey: true });
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(sql(state)).toBe("");
+      await press("Enter");
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("explains the highlighted operator under the list, and only while operators show", async () => {
+    mountBar();
+    await openBar();
+    const hint = () =>
+      document.body.querySelector('[data-test="query-filter-bar-operator-hint"]')?.textContent;
+    expect(hint()).toBeUndefined();
+    await type("level");
+    await press("Enter");
+    expect(rowKeys()[0]).toBe("eq");
+    expect(hint()).toBe("Exact value, case-sensitive. The fastest filter on indexed fields.");
+    await press("ArrowDown");
+    expect(hint()).toBe("Any other value. Rows without this field are left out too.");
+    await press("Enter");
+    expect(hint()).toBeUndefined();
   });
 
   it("emits submit on Enter in an empty search box", async () => {
@@ -445,8 +636,7 @@ describe("QueryFilterBar", () => {
     it("inserts at the front, where the old first chip takes the typed connector", async () => {
       const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
       await openBar();
-      await press("ArrowLeft");
-      await press("ArrowLeft");
+      await press("Home");
       await type("or ");
       await type("level=c");
       await press("Enter");
@@ -515,7 +705,21 @@ describe("QueryFilterBar", () => {
     it("keeps the caret where it is on Escape", async () => {
       const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
       await openBar();
-      await press("ArrowLeft");
+      input()!.focus();
+      // The arrows walk b's parts and the AND before the caret reaches the gap ahead of b.
+      const walkLeft = async () => {
+        const at = document.activeElement as HTMLElement;
+        at.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+        await flushPromises();
+        await nextTick();
+      };
+      for (let i = 0; i < 10; i++) {
+        if (document.activeElement?.getAttribute("data-test") === "query-filter-bar-connector-1")
+          break;
+        await walkLeft();
+      }
+      await walkLeft();
+      expect(document.activeElement).toBe(input());
       await press("Escape");
       await type("level=c");
       await press("Enter");
@@ -764,6 +968,22 @@ describe("QueryFilterBar", () => {
     await openBar();
     await type("level");
     await press("Enter");
-    expect(rowKeys()).toEqual(["eq", "neq", "regex", "not_regex", "in", "not_in"]);
+    expect(rowKeys()).toEqual([
+      "eq",
+      "neq",
+      "contains",
+      "contains_ci",
+      "not_contains",
+      "starts_with",
+      "not_starts_with",
+      "ends_with",
+      "not_ends_with",
+      "regex",
+      "not_regex",
+      "in",
+      "not_in",
+      "is_empty",
+      "is_not_empty",
+    ]);
   });
 });

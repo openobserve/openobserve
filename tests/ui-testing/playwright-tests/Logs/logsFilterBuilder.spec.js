@@ -1,4 +1,4 @@
-// Logs with the filter builder turned on; every other spec runs on the default query editor.
+// The chip bar is the only filter-mode input on logs; SQL mode shows the query editor.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -10,8 +10,8 @@ const { EDITOR_HOSTS, seedEditor, editorText } = require('../utils/suggest-menu-
 
 const HOST = EDITOR_HOSTS.logs;
 const PREFIX = 'logs-search-bar-filter-builder';
-const TOGGLE = '[data-test="logs-search-bar-filter-builder-toggle"]';
 const FIELD = 'kubernetes_namespace_name';
+const VALUE = 'ziox';
 const UNPARSABLE_QUERY = `${FIELD} = upper(${FIELD})`;
 
 test.describe('Logs filter builder', () => {
@@ -23,15 +23,6 @@ test.describe('Logs filter builder', () => {
 
     test.beforeEach(async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        // Once per tab, so a toggle the test makes survives its own reloads; the fixture only fills an unset key.
-        await page.addInitScript(() => {
-            try {
-                if (!sessionStorage.getItem('e2e.logsBuilderSeeded')) {
-                    localStorage.setItem('o2.logs.queryInput', 'builder');
-                    sessionStorage.setItem('e2e.logsBuilderSeeded', '1');
-                }
-            } catch (_) {}
-        });
         await navigateToBase(page);
         pm = new PageManager(page);
         await ingestTestData(page);
@@ -51,52 +42,34 @@ test.describe('Logs filter builder', () => {
     test('builds a chip and writes it to the query', {
         tag: ['@all', '@logs', '@filterBuilder', '@P0'],
     }, async ({ page }) => {
-        await builder.addCondition(FIELD, '=', 'ziox');
+        await builder.addCondition(FIELD, '=', VALUE);
         await builder.expectChipCount(1);
-        await builder.expectChip(FIELD, 'ziox');
+        await builder.expectChip(FIELD, VALUE);
         await builder.expectOperator(0, '=');
-        await expect.poll(() => editorText(page, HOST)).toBe(`${FIELD} = 'ziox'`);
+        await expect.poll(() => editorText(page, HOST)).toBe(`${FIELD} = '${VALUE}'`);
     });
 
-    test('the toggle switches between the builder and the query editor, keeping the filter', {
+    test('a typed word is offered as a search function and becomes a chip', {
         tag: ['@all', '@logs', '@filterBuilder', '@P1'],
     }, async ({ page }) => {
-        await builder.addCondition(FIELD, '=', 'ziox');
-        await builder.expectChipCount(1);
-
-        await page.locator(TOGGLE).click();
-        await expect(page.locator(HOST)).toBeVisible();
-        await expect(builder.barInput).toBeHidden();
-        await expect(page.locator(TOGGLE)).toHaveAttribute('aria-pressed', 'false');
-        await expect.poll(() => editorText(page, HOST)).toBe(`${FIELD} = 'ziox'`);
-
-        await page.locator(TOGGLE).click();
-        await expect(builder.barInput).toBeVisible();
-        await expect(page.locator(TOGGLE)).toHaveAttribute('aria-pressed', 'true');
-        await builder.expectChipCount(1);
-        await builder.expectChip(FIELD, 'ziox');
+        await builder.barInput.click();
+        await builder.barInput.pressSequentially(VALUE);
+        const fullText = page.locator(`[data-test^="${PREFIX}-bar-suggest-item-"][data-test$="free-text"]`);
+        await expect(fullText).toContainText(`match_all('${VALUE}')`);
+        await fullText.click();
+        await builder.expectChip('text', VALUE);
+        await expect.poll(() => editorText(page, HOST)).toBe(`match_all('${VALUE}')`);
     });
 
-    test('a query the builder cannot draw shows the unparsable banner', {
+    test('a query the bar cannot draw is kept whole as a locked chip', {
         tag: ['@all', '@logs', '@filterBuilder', '@P1'],
     }, async ({ page }) => {
-        const banner = page.locator(`[data-test="${PREFIX}-unparsable"]`);
-
-        await page.locator(TOGGLE).click();
         await seedEditor(page, HOST, UNPARSABLE_QUERY);
-        await page.locator(TOGGLE).click();
-        await expect(banner).toBeVisible();
-        await expect(builder.barInput).toBeHidden();
-
-        await page.locator(`[data-test="${PREFIX}-keep-query"]`).click();
-        await expect(page.locator(HOST)).toBeVisible();
-        await expect.poll(() => editorText(page, HOST)).toBe(UNPARSABLE_QUERY);
-
-        await page.locator(TOGGLE).click();
-        await expect(banner).toBeVisible();
-        await page.locator(`[data-test="${PREFIX}-clear-and-build"]`).click();
-        await expect(banner).toBeHidden();
-        await expect(builder.barInput).toBeVisible();
-        await expect.poll(() => editorText(page, HOST)).toBe('');
+        await pm.logsPage.waitForSearchQueryCommitted(UNPARSABLE_QUERY);
+        await builder.expectChip('locked');
+        await builder.expectChipCount(1);
+        await builder.addCondition(FIELD, '=', VALUE);
+        await builder.expectChipCount(2);
+        await expect.poll(() => editorText(page, HOST)).toBe(`(${UNPARSABLE_QUERY}) AND ${FIELD} = '${VALUE}'`);
     });
 });

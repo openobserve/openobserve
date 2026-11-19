@@ -118,7 +118,23 @@ describe("LabelFilterBar", () => {
     await focus();
     await type("job");
     await press("Enter");
-    expect(rowKeys()).toEqual(["eq", "neq", "regex", "not_regex", "in", "not_in"]);
+    expect(rowKeys()).toEqual([
+      "eq",
+      "neq",
+      "contains",
+      "contains_ci",
+      "not_contains",
+      "starts_with",
+      "not_starts_with",
+      "ends_with",
+      "not_ends_with",
+      "regex",
+      "not_regex",
+      "in",
+      "not_in",
+      "is_empty",
+      "is_not_empty",
+    ]);
     await press("Enter");
     await vi.waitFor(() => expect(rowKeys()).toContain("api"));
     expect(loadValues).toHaveBeenCalledWith("job");
@@ -219,7 +235,7 @@ describe("LabelFilterBar", () => {
 
   it("shows a plain alternation as IN, and keeps a real pattern as a regex", () => {
     createWrapper({
-      filters: [filter("job", "a\\.b|c", "=~"), filter("pod", "api-.*", "=~")],
+      filters: [filter("job", "a\\.b|c", "=~"), filter("pod", "api-[0-9]+", "=~")],
     });
     const job = wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').text();
     expect(job).toContain("IN");
@@ -246,6 +262,25 @@ describe("LabelFilterBar", () => {
       operator: "=~",
       value: "a\\.b|c",
     });
+  });
+
+  it("writes a text operator as an anchored regex around the escaped value, and reads it back", async () => {
+    createWrapper({ loadValues: vi.fn().mockResolvedValue([]) });
+    await focus();
+    await type("job");
+    await press("Enter");
+    await type("starts");
+    await press("Enter");
+    await type("a.b");
+    await press("Enter");
+    expect(wrapper!.emitted("add")![0][0]).toEqual({
+      label: "job",
+      operator: "=~",
+      value: "a\\.b.*",
+    });
+    wrapper!.unmount();
+    createWrapper({ filters: [filter("job", "a\\.b.*", "=~")] });
+    expect(wrapper!.find('[data-test="metrics-explorer-label-chip-job"]').text()).toContain("a.b");
   });
 
   it("still adds a typed value when loadValues rejects", async () => {

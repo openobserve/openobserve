@@ -85,8 +85,9 @@ test.describe("Logs Query Builder - Filter Operators (Advanced)", () => {
         const filterCount = await pm.logsPage.getFilterConditionCount();
         expect(filterCount).toBe(1);
 
+        // The builder writes regex as regexp_like, since re_match strips escapes such as \b.
         const editorText = await pm.logsPage.getQueryEditorText();
-        expect(editorText).toContain('re_match');
+        expect(editorText).toContain("WHERE regexp_like(kubernetes_container_name, '^prom.*')");
     });
 
     // --- re_not_match (regex not match) ---
@@ -103,7 +104,7 @@ test.describe("Logs Query Builder - Filter Operators (Advanced)", () => {
         expect(filterCount).toBe(1);
 
         const editorText = await pm.logsPage.getQueryEditorText();
-        expect(editorText).toContain('re_not_match');
+        expect(editorText).toContain("WHERE NOT regexp_like(kubernetes_container_name, '^zinc.*')");
     });
 
     // --- Multiple AND conditions ---

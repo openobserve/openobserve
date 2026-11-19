@@ -16,11 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import { useI18nTyped } from "@/types/i18n";
 import { emptyFilterGroup, filterTreeToSql, type FilterGroup } from "@/utils/query/filterBar";
-import { parseSqlFilter } from "@/utils/query/filterBarParser";
+import { parseSqlFilterLocking } from "@/utils/query/filterBarParser";
 import QueryFilterBar from "./QueryFilterBar.vue";
 import type { QueryFilterBarExpose } from "./QueryFilterBar.types";
 import type {
@@ -39,11 +36,8 @@ const props = withDefaults(defineProps<SqlFilterBuilderProps>(), {
 });
 const emit = defineEmits<SqlFilterBuilderEmits>();
 
-const { t } = useI18nTyped();
-
 const tree = ref<FilterGroup>(emptyFilterGroup());
 const barRef = ref<QueryFilterBarExpose | null>(null);
-const unparsable = ref(false);
 let lastEmitted: string | null = null;
 
 // The query can change outside the bar (a field-list click, a saved view, the URL); re-read it unless it is our own echo.
@@ -54,10 +48,7 @@ watch(
     const echo = query === lastEmitted;
     lastEmitted = null;
     if (echo) return;
-    const parsed = parseSqlFilter(query ?? "");
-    unparsable.value = !parsed;
-    if (!parsed) return;
-    tree.value = parsed;
+    tree.value = parseSqlFilterLocking(query ?? "");
   },
   { immediate: true },
 );
@@ -70,68 +61,34 @@ function onTreeChange(next: FilterGroup) {
   emit("update:query", sql);
 }
 
-function clearAndBuild() {
-  unparsable.value = false;
-  onTreeChange(emptyFilterGroup());
-}
-
-defineExpose<SqlFilterBuilderExpose>({ activate: () => barRef.value?.activate() });
+defineExpose<SqlFilterBuilderExpose>({
+  activate: () => barRef.value?.activate(),
+  undo: () => barRef.value?.undo() ?? false,
+  redo: () => barRef.value?.redo() ?? false,
+  clear: () => barRef.value?.clear() ?? false,
+});
 </script>
 
 <template>
   <div class="flex w-full min-w-0 flex-col gap-1" :data-test="dataTest">
-    <OBanner
-      v-if="unparsable"
-      variant="warning"
-      icon="warning"
-      dense
-      inline-actions
-      :data-test="`${dataTest}-unparsable`"
-    >
-      <div class="flex min-w-0 items-baseline gap-1.5">
-        <span class="shrink-0">{{ t("filterBar.queryNotParsableShort") }}</span>
-        <code
-          class="min-w-0 truncate font-mono"
-          :title="query"
-          :data-test="`${dataTest}-unparsable-query`"
-          >{{ query }}</code
-        >
-      </div>
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          :data-test="`${dataTest}-keep-query`"
-          @click="emit('exit')"
-          >{{ t("filterBar.query") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm"
-          :data-test="`${dataTest}-clear-and-build`"
-          @click="clearAndBuild"
-          >{{ t("filterBar.clearAndBuild") }}</OButton
-        >
-      </template>
-    </OBanner>
-    <template v-else>
-      <QueryFilterBar
-        ref="barRef"
-        :model-value="tree"
-        :fields="fields"
-        :free-text="freeText"
-        :extra-suggestions="extraSuggestions"
-        :load-values="loadValues"
-        :fields-loading="fieldsLoading"
-        size="sm"
-        appearance="plain"
-        :max-rows="maxRows"
-        :data-test="`${dataTest}-bar`"
-        @update:model-value="onTreeChange"
-        @submit="emit('submit')"
-        @focus="emit('focus')"
-        @extra-select="(key, event) => emit('extra-select', key, event)"
-      />
-    </template>
+    <QueryFilterBar
+      ref="barRef"
+      :model-value="tree"
+      :fields="fields"
+      :free-text="freeText"
+      search-functions
+      open-on-type
+      :extra-suggestions="extraSuggestions"
+      :load-values="loadValues"
+      :fields-loading="fieldsLoading"
+      size="sm"
+      appearance="plain"
+      :max-rows="maxRows"
+      :data-test="`${dataTest}-bar`"
+      @update:model-value="onTreeChange"
+      @submit="emit('submit')"
+      @focus="emit('focus')"
+      @extra-select="(key, event) => emit('extra-select', key, event)"
+    />
   </div>
 </template>

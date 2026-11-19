@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :fields="fields"
         :load-values="loadValues"
         :placeholder="t('metrics.labelFilterEditor.addLabelFilter')"
+        open-on-type
         data-test="profiles-filter-builder"
         @update:model-value="(next) => emit('update:filters', next as ProfileFilter[])"
       />

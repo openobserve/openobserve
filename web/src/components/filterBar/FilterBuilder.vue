@@ -40,6 +40,7 @@ const props = withDefaults(defineProps<FilterBuilderProps>(), {
   disabled: false,
   size: "sm",
   appearance: "field",
+  openOnType: false,
   dataTest: "filter-builder",
 });
 const emit = defineEmits<FilterBuilderEmits>();
@@ -133,6 +134,7 @@ defineExpose<FilterBuilderExpose>({ focus, validate });
       :disabled="disabled"
       :size="size"
       :appearance="appearance"
+      :open-on-type="openOnType"
       :data-test="dataTest"
       @update:model-value="onTreeChange"
       @submit="emit('submit')"

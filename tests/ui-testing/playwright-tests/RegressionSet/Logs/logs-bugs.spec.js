@@ -1765,7 +1765,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     // PRIMARY ASSERTION: Query editor must remain visible and functional after include action
-    const queryEditor = pm.logsPage.getQueryEditor();
+    const queryEditor = pm.logsPage.getQueryInput();
     await expect(queryEditor, 'Bug #11606: Query editor must remain visible after include action').toBeVisible({ timeout: 5000 });
 
     testLogger.info('Bug #11606 verification complete');
@@ -1871,7 +1871,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     // UNCONDITIONAL: Query editor must remain visible regardless of column state
-    const queryEditor = pm.logsPage.getQueryEditor();
+    const queryEditor = pm.logsPage.getQueryInput();
     await expect(queryEditor, 'Bug #5277: Query editor must remain visible').toBeVisible({ timeout: 5000 });
 
     testLogger.info('Bug #5277 verification complete');
@@ -1959,7 +1959,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     // UNCONDITIONAL: Query editor must remain visible regardless of visualize toggle state
-    const queryEditor = pm.logsPage.getQueryEditor();
+    const queryEditor = pm.logsPage.getQueryInput();
     await expect(queryEditor, 'Bug #4091: Query editor must remain visible on logs page').toBeVisible({ timeout: 5000 });
 
     testLogger.info('Bug #4091 verification complete');

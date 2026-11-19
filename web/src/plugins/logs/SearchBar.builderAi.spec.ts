@@ -32,13 +32,11 @@ describe("SearchBar — Ask AI while the filter builder shows", () => {
 
   beforeEach(() => {
     resetLogsAutoRunForTests(store);
-    localStorage.setItem("o2.logs.queryInput", "builder");
   });
 
   afterEach(() => {
     wrapper?.unmount();
     wrapper = undefined;
-    localStorage.removeItem("o2.logs.queryInput");
     vi.restoreAllMocks();
   });
 

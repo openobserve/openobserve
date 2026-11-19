@@ -50,7 +50,7 @@ export interface TextSegment {
 
 /** Groups: 1 function, 2 field (quoted or bare), 3 single-quoted literal, 4 double-quoted literal. */
 const FIELD_FILTER_REGEX =
-  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match|fuzzy_match)\s*\(\s*("(?:[^"]|"")*"|`(?:[^`]|``)*`|[^,()"`\s]+)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")(?:\s*,\s*\d+)?\s*\)/gi;
+  /\b(str_match_ignore_case|match_field_ignore_case|str_match|match_field|re_match|regexp_like|fuzzy_match)\s*\(\s*("(?:[^"]|"")*"|`(?:[^`]|``)*`|[^,()"`\s]+)\s*,\s*(?:'((?:[^']|'')*)'|"([^"]*)")(?:\s*,\s*\d+)?\s*\)/gi;
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -483,7 +483,7 @@ export function useTextHighlighter() {
     return regex;
   }
 
-  /** Extracts field-filter patterns, skipping re_not_match and regexes JS cannot run safely. */
+  /** Extracts field-filter patterns, skipping negated regexes and regexes JS cannot run safely. */
   function extractHighlightPatterns(queryString: string): RegExp[] {
     if (!queryString?.trim()) return [];
     const cached = patternCache.get(queryString);
@@ -498,9 +498,10 @@ export function useTextHighlighter() {
 
     for (const filter of queryString.matchAll(FIELD_FILTER_REGEX)) {
       const name = filter[1].toLowerCase();
+      if (name === "regexp_like" && /\bNOT\s*$/i.test(queryString.slice(0, filter.index))) continue;
       const value = filter[3]?.replace(/''/g, "'") ?? filter[4] ?? "";
       const regex =
-        name === "re_match"
+        name === "re_match" || name === "regexp_like"
           ? compileHighlightRegex(value)
           : value
             ? literalPattern(value, name.endsWith("_ignore_case") || name === "fuzzy_match")

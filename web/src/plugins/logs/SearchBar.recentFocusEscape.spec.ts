@@ -82,6 +82,9 @@ describe("logs recent-searches focus dropdown and the editor's Escape", () => {
     const vm = wrapper.vm as unknown as FocusDropdownVm & {
       searchObj: { data: { editorValue: string }; meta: Record<string, unknown> };
     };
+    // Filter mode shows the chip bar, so the editor and its placeholder belong to SQL mode.
+    vm.searchObj.meta.sqlMode = true;
+    await nextTick();
     vm.searchObj.data.editorValue = "";
     vm.searchObj.meta.queryEditorPlaceholderFlag = true;
     vm.searchObj.meta.nlpMode = false;

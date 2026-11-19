@@ -187,6 +187,17 @@ describe("CheckHttpConfig", () => {
       expect(builder.props("profile")).toBe("synthetics");
       expect(builder.props("modelValue")).toEqual(mockHttpConfig.assertions);
     });
+
+    it("offers number comparisons on the numeric fields and text checks on the body", () => {
+      const fields = wrapper.findComponent({ name: "FilterBuilder" }).props("fields") as {
+        name: string;
+        operators?: string[];
+      }[];
+      const byName = Object.fromEntries(fields.map((field) => [field.name, field.operators]));
+      expect(byName.status_code).toEqual(["eq", "neq", "lt", "gt"]);
+      expect(byName.response_time_ms).toEqual(["eq", "neq", "lt", "gt"]);
+      expect(byName.body).toEqual(["eq", "neq", "contains", "not_contains"]);
+    });
   });
 
   // ── Method change ─────────────────────────────────────────────────────────────

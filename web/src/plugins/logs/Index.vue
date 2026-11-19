@@ -4150,14 +4150,11 @@ export default defineComponent({
       },
       {
         id: "logsFocusQuery",
-        handler: () => {
-          // The logs query editor is Monaco — focus its inner textarea.
-          const el = document.querySelector<HTMLElement>(
-            '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea',
-          );
-          el?.focus();
-        },
+        handler: () => searchBarRef.value?.focusQuery?.(),
       },
+      { id: "logsFilterUndo", handler: () => searchBarRef.value?.filterHistory?.("undo") },
+      { id: "logsFilterRedo", handler: () => searchBarRef.value?.filterHistory?.("redo") },
+      { id: "logsFilterClear", handler: () => searchBarRef.value?.filterHistory?.("clear") },
       {
         id: "logsRefresh",
         handler: () => {

@@ -44,9 +44,12 @@ import {
   TIER_USAGE_PAYLOAD,
   type CodecContext,
   type FilterCodec,
+  TIER_RULE_OPERATORS,
+  TIER_USAGE_RULE_OPERATORS,
 } from "./index";
 import { pruneIncomplete } from "../filterValidation";
 import { FILTER_PROFILES } from "../filterProfiles";
+import enUS from "@/locales/languages/en-US.json";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 
@@ -748,7 +751,7 @@ describe("flat codecs", () => {
     const codec = promqlLabelsCodec();
     const saved = [
       { label: "job", op: "=~", value: "api|web" },
-      { label: "pod", op: "=~", value: "api-.*" },
+      { label: "pod", op: "=~", value: "api-[0-9]+" },
       { label: "env", op: "!=", value: "$env" },
     ];
     expectRoundTrip(codec, saved);
@@ -771,6 +774,39 @@ describe("flat codecs", () => {
     expect(leaves(metrics.parse(clone(filters), context))[0].operator).toBe("not_in");
   });
 
+  it("reads and writes the text operators as anchored matchers around one literal", () => {
+    const codec = promqlLabelsCodec();
+    const saved = [
+      { label: "a", op: "=~", value: ".*x\\.y.*" },
+      { label: "b", op: "=~", value: "(?i).*x.*" },
+      { label: "c", op: "!~", value: ".*x.*" },
+      { label: "d", op: "=~", value: "x.*" },
+      { label: "e", op: "!~", value: "x.*" },
+      { label: "f", op: "=~", value: ".*x" },
+      { label: "g", op: "!~", value: ".*x" },
+      { label: "h", op: "!=", value: "" },
+      { label: "i", op: "=~", value: ".*$var.*" },
+    ];
+    expectRoundTrip(codec, saved);
+    const tree = codec.parse(clone(saved), context);
+    expect(leaves(tree).map((c) => [c.operator, c.values])).toEqual([
+      ["contains", ["x.y"]],
+      ["contains_ci", ["x"]],
+      ["not_contains", ["x"]],
+      ["starts_with", ["x"]],
+      ["not_starts_with", ["x"]],
+      ["ends_with", ["x"]],
+      ["not_ends_with", ["x"]],
+      ["is_not_empty", []],
+      ["contains", ["$var"]],
+    ]);
+    const added = codec.serialize(
+      appendNode(tree, makeCondition("j", "contains", ["a|b"])),
+      context,
+    );
+    expect(added.at(-1)).toEqual({ label: "j", op: "=~", value: ".*a\\|b.*" });
+  });
+
   it('keeps a saved `label=""` matcher through an unrelated edit', () => {
     const codec = promqlLabelsCodec();
     const saved = [
@@ -778,7 +814,7 @@ describe("flat codecs", () => {
       { label: "a", op: "=", value: "x" },
     ];
     const tree = codec.parse(clone(saved), context);
-    expect(leaves(tree)[0]).toMatchObject({ operator: "eq", values: [""] });
+    expect(leaves(tree)[0]).toMatchObject({ operator: "is_empty", values: [] });
     const next = appendNode(tree, makeCondition("b", "neq", ["y"]));
     expect(codec.serialize(pruneIncomplete(next), context)).toEqual([
       ...saved,
@@ -1153,18 +1189,69 @@ describe("anomaly codec, IN values and the V2 group", () => {
 });
 
 describe("engine profiles' operators by column type", () => {
-  const TEXT_ONLY = ["contains_ci", "starts_with", "ends_with", "regex", "not_regex"];
-  const OLD = ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "not_contains"];
-  const UNARY = ["is_null", "is_not_null", "is_empty", "is_not_empty"];
+  const TEXT_ONLY = [
+    "contains",
+    "contains_ci",
+    "not_contains",
+    "starts_with",
+    "ends_with",
+    "regex",
+    "not_regex",
+  ];
+  const ORDERING = ["gt", "gte", "lt", "lte"];
+  const NULLS = ["is_null", "is_not_null"];
+  const BLANKS = ["is_empty", "is_not_empty"];
 
   it.each(["alert", "pipeline", "workflow", "eval", "annotation"] as const)(
-    "%s offers the text operators on text columns only",
+    "%s offers the text operators on text columns only, and no ordering on booleans",
     (name) => {
       const { operators } = FILTER_PROFILES[name];
-      expect(operators.string).toEqual(expect.arrayContaining([...OLD, ...TEXT_ONLY, ...UNARY]));
-      for (const type of ["number", "boolean"] as const) {
-        expect(operators[type]).toEqual([...OLD, "in", "not_in", ...UNARY]);
-      }
+      expect(operators.string).toEqual(
+        expect.arrayContaining(["eq", "neq", ...ORDERING, ...TEXT_ONLY, ...NULLS, ...BLANKS]),
+      );
+      const blanks = name === "annotation" ? [] : BLANKS;
+      expect(operators.number).toEqual([
+        "eq",
+        "neq",
+        ...ORDERING,
+        "in",
+        "not_in",
+        ...NULLS,
+        ...blanks,
+      ]);
+      expect(operators.boolean).toEqual(["eq", "neq", "in", "not_in", ...NULLS, ...blanks]);
+    },
+  );
+});
+
+describe("dashboard profiles' operators by column type", () => {
+  it("offers only comparisons and lists on numbers, and equality on booleans, in panels", () => {
+    const { operators } = FILTER_PROFILES["dashboard-panel"];
+    expect(operators.number).toEqual([
+      "eq",
+      "neq",
+      "gte",
+      "lte",
+      "gt",
+      "lt",
+      "in",
+      "not_in",
+      "is_null",
+      "is_not_null",
+    ]);
+    expect(operators.boolean).toEqual(["eq", "neq", "is_null", "is_not_null"]);
+    expect(operators.string).toEqual(
+      expect.arrayContaining(["not_starts_with", "not_ends_with", "is_empty", "is_not_empty"]),
+    );
+  });
+
+  it.each(["dashboard-variable", "anomaly"] as const)(
+    "%s quotes every value, so a boolean column only takes the null checks",
+    (name) => {
+      const { operators } = FILTER_PROFILES[name];
+      expect(operators.boolean).toEqual(["is_null", "is_not_null"]);
+      expect(operators.number).not.toContain("contains");
+      expect(operators.string).not.toContain("not_starts_with");
     },
   );
 });
@@ -1234,4 +1321,31 @@ describe("model pricing validation", () => {
     );
     expect(issuesFor(tree)).toEqual([]);
   });
+});
+
+describe("model pricing usage rules", () => {
+  it("never offers exists or not exists on a usage. key, which the server refuses", () => {
+    expect(TIER_USAGE_RULE_OPERATORS).not.toContain("is_null");
+    expect(TIER_USAGE_RULE_OPERATORS).not.toContain("is_not_null");
+    expect(TIER_USAGE_RULE_OPERATORS).toEqual(
+      TIER_RULE_OPERATORS.filter((id) => id !== "is_null" && id !== "is_not_null"),
+    );
+  });
+});
+
+describe("operator guide lines", () => {
+  const lookup = (key: string) =>
+    key.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown>)?.[part], enUS);
+
+  it.each(Object.keys(FILTER_PROFILES) as (keyof typeof FILTER_PROFILES)[])(
+    "%s explains every operator it offers, so the line never comes and goes while moving",
+    (name) => {
+      const { operators, operatorHints } = FILTER_PROFILES[name];
+      for (const id of new Set(Object.values(operators).flat())) {
+        const key = operatorHints?.[id];
+        expect(key, `${name} ${id}`).toBeDefined();
+        expect(typeof lookup(key!), `${name} ${id} ${key}`).toBe("string");
+      }
+    },
+  );
 });
