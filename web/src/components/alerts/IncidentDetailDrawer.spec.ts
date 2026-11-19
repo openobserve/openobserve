@@ -2061,7 +2061,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(rows).toEqual([
         "Finding: Stopped sending data",
         "Stream Name: checkout",
-        "Stream type: logs",
+        "Stream Type: logs",
       ]);
       expect(rows.join(" ")).not.toMatch(RAW);
     });
@@ -2157,7 +2157,7 @@ describe("IncidentDetailDrawer.vue", () => {
             .map((chip) => chip.text()),
         );
       expect(labels).toEqual([
-        ["Finding=Stopped sending data", "Stream Name=checkout", "Stream type=logs"],
+        ["Finding=Stopped sending data", "Stream Name=checkout", "Stream Type=logs"],
         ["env=prod"],
       ]);
     });

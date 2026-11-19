@@ -12691,7 +12691,7 @@
     "alertTriggeredSuccess": "Alert triggered successfully",
     "column": "Field",
     "alertType": "Alert Type",
-    "streamType": "Stream type",
+    "streamType": "Stream Type",
     "realTime": "Realtime",
     "scheduled": "Scheduled",
     "anomalyDetection": "Anomaly",
