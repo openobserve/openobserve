@@ -193,6 +193,24 @@ const emitResultMetadata = async (w: VueWrapper<any>, payload: any) => {
   await nextTick();
 };
 
+/** Answer the latest verdict search: a builder alert is judged from its own window, not the chart. */
+const answerVerdict = async (frames: Record<string, any>[]) => {
+  const call = streaming.calls[streaming.calls.length - 1];
+  for (const { hits, total, ...flags } of frames) {
+    call.handlers.data(call.data, {
+      type: "search_response_metadata",
+      content: { ...flags, results: { total } },
+    });
+    if (hits)
+      call.handlers.data(call.data, {
+        type: "search_response_hits",
+        content: { results: { hits } },
+      });
+  }
+  call.handlers.complete(call.data, {});
+  await nextTick();
+};
+
 describe("PreviewAlert - rendering", () => {
   let wrapper: VueWrapper<any>;
 
@@ -295,21 +313,6 @@ describe("PreviewAlert - PanelSchemaRenderer integration", () => {
     await nextTick();
     const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
     expect(renderer.props("variablesData")).toEqual({});
-    w.unmount();
-  });
-
-  it("passes is_ui_histogram=true when isUsingBackendSql=true and custom+noAgg", async () => {
-    const w = await mountComp({
-      query: "SELECT * FROM logs",
-      isUsingBackendSql: true,
-      selectedTab: "custom",
-      isAggregationEnabled: false,
-    });
-    w.vm.chartData = { type: "line" };
-    await nextTick();
-    const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
-    // shouldUseHistogram = isUsingBackendSql when tab=custom and !aggregation
-    expect(renderer.props("is_ui_histogram")).toBe(true);
     w.unmount();
   });
 
@@ -1565,7 +1568,7 @@ describe("PreviewAlert - PromQL verdict", () => {
     });
     await flushPromises();
 
-    await emitResultMetadata(w, [[{ hits: [{ zo_sql_num: 7 }] }]]);
+    await answerVerdict([{ hits: [{ zo_sql_num: 7 }] }]);
 
     expectVerdict(w, { matched: 7, gate: "7 >= 5", trigger: true, label: "dataPoints" });
     w.unmount();
@@ -1877,15 +1880,13 @@ describe("PreviewAlert - PromQL verdict", () => {
     });
     await flushPromises();
 
-    await emitResultMetadata(w, [
-      [
-        {
-          hits: [
-            { k8s_node: "a", zo_sql_num: 12 },
-            { k8s_node: "b", zo_sql_num: 3 },
-          ],
-        },
-      ],
+    await answerVerdict([
+      {
+        hits: [
+          { k8s_node: "a", zo_sql_num: 12 },
+          { k8s_node: "b", zo_sql_num: 3 },
+        ],
+      },
     ]);
 
     // Only group "a" clears HAVING >= 10, and the count gate wants >= 1.
@@ -2216,7 +2217,7 @@ describe("PreviewAlert - SQL verdict under streaming aggregates", () => {
     await flushPromises();
 
     // No hits anywhere, so the branch reaches its Σ total fallback.
-    await emitResultMetadata(w, [[plain(4), plain(3)]]);
+    await answerVerdict([plain(4), plain(3)]);
 
     expectVerdict(w, { matched: 7, gate: "7 >= 7", trigger: true, label: "groups" });
   });
@@ -3086,8 +3087,9 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
   });
 
   it.each([
-    ["custom", 10, "checks", 30],
-    ["custom", 1, "checks", 5],
+    ["custom", 10, "checks", 120],
+    ["custom", 1, "checks", 12],
+    ["custom", 240, "checks", 1440],
     ["sql", 10, "checks", 10],
     ["custom", 10, "12h", 720],
     ["custom", 10, "24h", 1440],
@@ -3099,44 +3101,6 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
     w.vm.refreshData();
     await flushPromises();
     expect(spanMinutes(w)).toBe(minutes);
-    w.unmount();
-  });
-
-  it("judges the verdict on the alert's own window, however many checks the chart shows", async () => {
-    const w = await mountComp({
-      query: "SELECT * FROM logs",
-      selectedTab: "custom",
-      isAggregationEnabled: false,
-      formData: baseFormData(),
-    });
-    w.vm.refreshData();
-    await flushPromises();
-    const at = (minutesAgo: number) => (Date.now() - minutesAgo * 60_000) * 1000;
-    await emitResultMetadata(w, [
-      [
-        {
-          hits: [
-            { zo_sql_key: at(600), zo_sql_num: 90 },
-            { zo_sql_key: at(12), zo_sql_num: 40 },
-            { zo_sql_key: at(6), zo_sql_num: 2 },
-            { zo_sql_key: at(4), zo_sql_num: 3 },
-          ],
-        },
-      ],
-    ]);
-    expect(w.vm.evaluationStatus?.count).toBe(5);
-    // Buckets coarser than the window cannot say what the latest window held.
-    await emitResultMetadata(w, [
-      [
-        {
-          hits: [
-            { zo_sql_key: at(64), zo_sql_num: 9 },
-            { zo_sql_key: at(34), zo_sql_num: 4 },
-          ],
-        },
-      ],
-    ]);
-    expect(w.vm.evaluationStatus).toBeNull();
     w.unmount();
   });
 
@@ -3177,15 +3141,13 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
         isAggregationEnabled: true,
         formData,
       });
-      await emitResultMetadata(w, [
-        [
-          {
-            hits: [
-              { host: "a", zo_sql_num: 3 },
-              { host: "b", zo_sql_num: 4 },
-            ],
-          },
-        ],
+      await answerVerdict([
+        {
+          hits: [
+            { host: "a", zo_sql_num: 3 },
+            { host: "b", zo_sql_num: 4 },
+          ],
+        },
       ]);
       expect(w.vm.evaluationStatus).toMatchObject({ grouped: true, count: 2, atLeast: true });
       w.unmount();
@@ -3195,9 +3157,9 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
   });
 
   it.each([
-    ["custom", 10, "30 min"],
-    ["custom", 60, "3 h"],
-    ["custom", 1, "5 min"],
+    ["custom", 10, "2 h"],
+    ["custom", 60, "12 h"],
+    ["custom", 1, "12 min"],
     ["sql", 10, "10 min"],
   ])("names a %s alert's default range from its %s min window", async (tab, period, label) => {
     const formData = baseFormData();
@@ -3208,13 +3170,13 @@ describe("PreviewAlert - one run per real change, over a chosen range", () => {
   });
 
   it.each([
-    ["checks back to back", { period: 10, frequency: 10 }, "false", "Last 3 checks (30 minutes)"],
-    ["checks with gaps", { period: 5, frequency: 30 }, "false", "Last 15 minutes"],
+    ["checks back to back", { period: 10, frequency: 10 }, "false", "Last 12 checks (120 minutes)"],
+    ["checks with gaps", { period: 5, frequency: 30 }, "false", "Last 60 minutes"],
     [
       "a cron schedule",
       { period: 10, frequency: 10, frequency_type: "cron" },
       "false",
-      "Last 30 minutes",
+      "Last 120 minutes",
     ],
     ["a real-time alert", { period: 10, frequency: 10 }, "true", "Last 30 minutes"],
   ])("names the default range of %s by what it covers", async (_, trigger, realTime, tooltip) => {
@@ -3277,20 +3239,20 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
   };
 
   it.each([
-    ["builder", "custom", "checks", 0],
+    ["builder", "custom", "checks", 1],
     ["SQL", "sql", "checks", 0],
-    ["builder", "custom", "24h", 1],
+    ["builder", "custom", "24h", 2],
     ["SQL", "sql", "12h", 1],
-  ])("a %s alert (%s tab) over %s runs %s extra search", async (_, tab, range, extra) => {
+  ])("a %s alert (%s tab) shown over %s has run %s verdict searches", async (_, tab, range, n) => {
     const w = await mountRange(tab, range);
-    expect(streaming.calls).toHaveLength(extra);
+    expect(streaming.calls).toHaveLength(n);
     w.unmount();
   });
 
   const AGG_SQL =
     "SELECT histogram(_timestamp) AS zo_sql_key, avg(x) AS zo_sql_val FROM logs GROUP BY zo_sql_key";
   it.each([
-    ["an aggregation", "checks", true, AGG_SQL, null],
+    ["an aggregation", "checks", true, AGG_SQL, "10 minute"],
     ["an aggregation", "24h", true, AGG_SQL, "10 minute"],
     ["a count", "24h", false, "SELECT * FROM logs WHERE level = 'error'", "10 minute"],
   ])(
@@ -3310,6 +3272,7 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
   it("a click on 12h draws 12 hours and adds the one verdict search", async () => {
     const w = await mountComp({ query: "SELECT * FROM logs", selectedTab: "custom" });
     await flushPromises();
+    streaming.calls.length = 0;
     await w.find('[data-test="alert-preview-range-12h"]').trigger("click");
     await flushPromises();
     const { start_time, end_time } = w
@@ -3321,15 +3284,18 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
   });
 
   it.each([
-    ["builder", "custom", [{ hits: [{ zo_sql_num: 4 }, { zo_sql_num: 3 }] }], 7, true],
-    ["SQL", "sql", [{ total: 2 }], 2, false],
+    ["builder", "custom", "checks", [{ hits: [{ zo_sql_num: 4 }, { zo_sql_num: 3 }] }], 7, true],
+    ["builder", "custom", "24h", [{ hits: [{ zo_sql_num: 4 }, { zo_sql_num: 3 }] }], 7, true],
+    ["SQL", "sql", "24h", [{ total: 2 }], 2, false],
   ])(
-    "judges a %s alert (%s tab) from that window, not the chart",
-    async (_, tab, frames, count, fires) => {
-      const w = await mountRange(tab, "24h");
-      const [call] = streaming.calls;
-      const { start_time, end_time } = call.data.queryReq.query;
+    "judges a %s alert (%s tab, %s) from that window, not the chart",
+    async (_, tab, range, frames, count, fires) => {
+      const w = await mountRange(tab, range);
+      const call = streaming.calls[streaming.calls.length - 1];
+      const { start_time, end_time, sql } = call.data.queryReq.query;
       expect(end_time - start_time).toBe(10 * 60_000_000);
+      // One row per group over the whole window, as the check computes it.
+      expect(atob(sql)).not.toMatch(/histogram/i);
       await emitResultMetadata(w, [[{ total: 99, hits: [{ zo_sql_num: 99 }] }]]);
       expect(w.vm.evaluationStatus).toBeNull();
 
@@ -3338,6 +3304,47 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
       w.unmount();
     },
   );
+
+  it("judges a new threshold against the window already fetched, before any new search", async () => {
+    const formData: any = baseFormData();
+    formData.trigger_condition.threshold = 1;
+    formData.query_condition.aggregation = {
+      function: "count",
+      group_by: ["svc"],
+      having: { column: "svc", operator: ">", value: 50 },
+    };
+    const w = await mountComp({
+      query: 'SELECT count(svc) AS zo_sql_val, svc FROM "a" GROUP BY svc',
+      selectedTab: "custom",
+      isAggregationEnabled: true,
+      formData,
+    });
+    await flushPromises();
+    answer(streaming.calls[streaming.calls.length - 1], [
+      {
+        hits: [
+          { svc: "a", zo_sql_num: 60 },
+          { svc: "b", zo_sql_num: 3 },
+        ],
+      },
+    ]);
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 1, wouldTrigger: true });
+    const calls = streaming.calls.length;
+    await w.setProps({
+      formData: {
+        ...formData,
+        query_condition: {
+          aggregation: {
+            ...formData.query_condition.aggregation,
+            having: { column: "svc", operator: ">", value: 1 },
+          },
+        },
+      },
+    });
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 2, wouldTrigger: true });
+    expect(streaming.calls).toHaveLength(calls);
+    w.unmount();
+  });
 
   it.each([
     ["has no data", [], "warn"],

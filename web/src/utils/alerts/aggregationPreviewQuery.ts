@@ -240,6 +240,24 @@ export const withHistogramMinutes = (query: string, minutes: number): string =>
     (column) => `histogram(${column}, '${Math.max(1, Math.floor(minutes))} minute')`,
   );
 
+/** A chart query whose first column is its time bucket, as one row per group over its whole range; null for any other shape. */
+export const withoutTimeBucket = (query: string): string | null => {
+  const bucket = /^\s*SELECT\s+histogram\([^()]*\)\s+AS\s+zo_sql_key\s*,\s*/i.exec(
+    maskStringLiterals(query),
+  );
+  if (!bucket) return null;
+  const unbucketed = `SELECT ${query.slice(bucket[0].length)}`;
+  const groupBy = /\s*\bGROUP\s+BY\s+(?:1|zo_sql_key)\b(\s*,\s*)?/i.exec(
+    maskForKeywordSearch(unbucketed),
+  );
+  if (!groupBy) return null;
+  const rest = unbucketed.slice(groupBy.index + groupBy[0].length);
+  const out = groupBy[1]
+    ? `${unbucketed.slice(0, groupBy.index)} GROUP BY ${rest}`
+    : `${unbucketed.slice(0, groupBy.index)}${rest ? ` ${rest}` : ""}`;
+  return /\bzo_sql_key\b/i.test(maskStringLiterals(out)) ? null : out.trim();
+};
+
 export default cleanAggregationQuery;
 
 /**

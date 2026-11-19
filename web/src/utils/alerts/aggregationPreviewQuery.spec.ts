@@ -19,6 +19,7 @@ import {
   cleanAggregationQuery,
   withCompositeGroupLabel,
   withHistogramMinutes,
+  withoutTimeBucket,
 } from "./aggregationPreviewQuery";
 
 /** Quote count must stay even, or the SQL parser hits "Unterminated string literal". */
@@ -47,6 +48,34 @@ describe("withHistogramMinutes", () => {
     ],
   ])("buckets %s by the given minutes", (_case, query, expected) => {
     expect(withHistogramMinutes(query, 5)).toBe(expected);
+  });
+});
+
+describe("withoutTimeBucket", () => {
+  it.each([
+    [
+      "a count",
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "a" WHERE x = 1 GROUP BY 1',
+      'SELECT count(*) AS zo_sql_num FROM "a" WHERE x = 1',
+    ],
+    [
+      "a grouped measure",
+      'SELECT histogram(_timestamp) AS zo_sql_key, approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY "d") AS zo_sql_num, "svc" FROM "t" GROUP BY 1, "svc"',
+      'SELECT approx_percentile_cont(0.95) WITHIN GROUP (ORDER BY "d") AS zo_sql_num, "svc" FROM "t" GROUP BY "svc"',
+    ],
+    [
+      "a bucket grouped by its name",
+      "SELECT histogram(_timestamp) AS zo_sql_key, avg(x) AS zo_sql_num, host FROM logs GROUP BY zo_sql_key, host",
+      "SELECT avg(x) AS zo_sql_num, host FROM logs GROUP BY host",
+    ],
+    [
+      "a bucket that is not the first column",
+      "SELECT avg(x) AS zo_sql_num, histogram(_timestamp) AS zo_sql_key FROM logs GROUP BY 2",
+      null,
+    ],
+    ["a query without a bucket", "SELECT count(*) AS zo_sql_num FROM logs", null],
+  ])("turns %s into one row per group", (_case, query, expected) => {
+    expect(withoutTimeBucket(query)).toBe(expected);
   });
 });
 

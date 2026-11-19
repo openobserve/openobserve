@@ -183,6 +183,7 @@ import {
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
   withHistogramMinutes,
+  withoutTimeBucket,
 } from "@/utils/alerts/aggregationPreviewQuery";
 import { comparisonOffsetText, comparisonWindows } from "@/utils/alerts/previewCompare";
 import { getIntlLocale } from "@/locales";
@@ -521,25 +522,29 @@ watch(previewRange, (range) => {
 // An org-wide preview range set by the admin replaces "the last 3 checks".
 const orgPreviewMinutes = (): number =>
   Number(store.state.zoConfig?.alert_preview_timerange_minutes) || 0;
-// A SQL verdict counts the rows the query returns, which only one window can give.
-const previewChecks = computed(() => (props.selectedTab === "sql" ? 1 : 3));
 const alertWindowMinutes = (): number => Number(props.formData.trigger_condition?.period) || 0;
+// A SQL verdict counts the rows the query returns, which only one window can give; a builder
+// chart draws one point per window, so it shows a dozen of them, never more than a day.
+const previewChecks = computed(() => {
+  if (props.selectedTab === "sql") return 1;
+  if (props.selectedTab !== "custom" || props.formData.is_real_time === "true") return 3;
+  return Math.min(12, Math.max(3, Math.floor(1440 / Math.max(alertWindowMinutes(), 1))));
+});
 const previewMinutesFor = (range: PreviewRange): number => {
   if (range !== "checks") return PREVIEW_RANGE_MINUTES[range];
   if (orgPreviewMinutes() > 0) return orgPreviewMinutes();
   return Math.max(previewChecks.value * alertWindowMinutes(), 5);
 };
 const previewMinutes = (): number => previewMinutesFor(shownRange.value);
-// A wider range cannot give the latest window's count (SQL counts rows, wide buckets straddle it),
-// so the verdict then comes from one extra search over that window alone.
+// The chart's buckets never line up with the latest window (SQL counts rows, a builder point is one
+// clock-aligned window), so the verdict comes from one extra search over that window alone.
 const verdictNeedsOwnSearch = (): boolean => {
   if (props.formData.is_real_time === "true" || props.selectedTab === "promql") return false;
   if (alertWindowMinutes() <= 0) return false;
-  return props.selectedTab === "sql"
-    ? previewMinutes() > alertWindowMinutes()
-    : shownRange.value !== "checks";
+  if (props.selectedTab === "sql") return previewMinutes() > alertWindowMinutes();
+  return props.selectedTab === "custom";
 };
-// An automatic bucket on a wide range spans several alert windows, so its points read above a threshold no check crossed.
+// Any other bucket puts the chart on another scale than the threshold: a point is what one check sees.
 const chartBucketMinutes = (): number =>
   props.selectedTab === "custom" && verdictNeedsOwnSearch() ? alertWindowMinutes() : 0;
 // A count chart the server would bucket itself is rewritten into one that names its bucket.
@@ -1300,9 +1305,8 @@ const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) =>
           for (const partition of firstQueryMetadata) {
             if (Array.isArray(partition?.hits)) {
               for (const hit of partition.hits) {
-                if (hit.zo_sql_num !== undefined && inWindow(hit)) {
-                  resultCount += hit.zo_sql_num;
-                }
+                const value = hit.zo_sql_num ?? hit.zo_sql_val;
+                if (value !== undefined && inWindow(hit)) resultCount += Number(value) || 0;
               }
             }
           }
@@ -2103,15 +2107,34 @@ const cancelVerdictSearch = () => {
   verdictTraceId = "";
 };
 
+// A builder verdict is one row per group over the whole window, as the check computes it;
+// re-adding bucket values would average a percentile or drop a bucket that straddles the window.
+const verdictQuery = (): string | null => {
+  if (props.selectedTab !== "custom") return props.query;
+  const bucketed = props.isAggregationEnabled
+    ? cleanAggregationQuery(props.query)
+    : /\bhistogram\(/i.test(props.query)
+      ? props.query
+      : buildCountChartQuery(props.query);
+  return bucketed ? (withoutTimeBucket(bucketed) ?? bucketed) : null;
+};
+// The latest window's answer, kept so a new threshold is judged at once against the same rows.
+let verdictFrames: any[] | null = null;
+const judgeVerdictFrames = () => {
+  if (verdictFrames && !previewError.value?.message)
+    evaluateResultMetadata([verdictFrames], () => true);
+};
+
 /** The alert's own query over its latest window alone, for a range the chart cannot judge. */
 const runVerdictSearch = (endMicros: number) => {
   cancelVerdictSearch();
+  verdictFrames = null;
   const { stream_name, stream_type } = props.formData;
-  if (!verdictNeedsOwnSearch() || !stream_name || !stream_type) {
+  const sql = verdictNeedsOwnSearch() ? verdictQuery() : null;
+  if (!sql || !stream_name || !stream_type) {
     verdictSearchError.value = null;
     return;
   }
-  const aggregate = props.selectedTab === "custom" && props.isAggregationEnabled;
   const vrl = props.selectedTab === "sql" ? getDecodedVrlFunction() : null;
   const traceId = generateTraceContext().traceId;
   verdictTraceId = traceId;
@@ -2120,7 +2143,7 @@ const runVerdictSearch = (endMicros: number) => {
     {
       queryReq: {
         query: {
-          sql: b64EncodeUnicode(aggregate ? cleanAggregationQuery(props.query) : props.query),
+          sql: b64EncodeUnicode(sql),
           ...(vrl ? { query_fn: b64EncodeUnicode(vrl) } : {}),
           start_time: endMicros - alertWindowMinutes() * 60_000_000,
           end_time: endMicros,
@@ -2133,9 +2156,12 @@ const runVerdictSearch = (endMicros: number) => {
       org_id: store.state.selectedOrganization?.identifier,
       pageType: stream_type,
       searchType: searchTypeForPanel.value,
-      meta: shouldUseHistogram.value
-        ? { is_ui_histogram: true, fallback_order_by_col: "zo_sql_key" }
-        : {},
+      meta:
+        props.selectedTab === "custom"
+          ? {}
+          : shouldUseHistogram.value
+            ? { is_ui_histogram: true, fallback_order_by_col: "zo_sql_key" }
+            : {},
     },
     {
       data: (_request: unknown, response: any) => {
@@ -2161,7 +2187,13 @@ const runVerdictSearch = (endMicros: number) => {
         if (traceId !== verdictTraceId) return;
         verdictTraceId = "";
         verdictSearchError.value = null;
-        if (!previewError.value?.message) evaluateResultMetadata([frames], () => true);
+        // A streaming aggregate's every frame is the whole answer so far, so only the last one counts.
+        const cumulative = frames.some((frame) => frame?.streaming_aggs === true);
+        verdictFrames =
+          cumulative && props.selectedTab === "custom"
+            ? frames.filter((frame) => Array.isArray(frame?.hits)).slice(-1)
+            : frames;
+        judgeVerdictFrames();
       },
     },
   );
@@ -2381,6 +2413,17 @@ watch(
       config: { ...config, mark_line, y_axis_min, y_axis_max, unit, unit_custom, decimals },
     };
   },
+);
+
+// The query never carries the limit, so a new limit is judged against the window already fetched.
+watch(
+  () =>
+    JSON.stringify([
+      props.formData.query_condition?.aggregation?.having,
+      props.formData.trigger_condition?.threshold,
+      props.formData.trigger_condition?.operator,
+    ]),
+  judgeVerdictFrames,
 );
 
 // Refresh data on mount if we already have a query
