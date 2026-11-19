@@ -978,6 +978,16 @@ describe("IndexList Component", () => {
     ])("keeps the brackets balanced when the values of %s load", async (field, where) => {
       expect(await valuesSql(clause, field)).toBe(`SELECT * FROM "test_stream" WHERE ${where}`);
     });
+
+    it.each([
+      "(code is null or code='200') and service_name='a'",
+      "(code is not null and code!='200') and service_name='a'",
+      "code is null and service_name='a'",
+    ])("drops the field's own null check from %s when its values load", async (editor) => {
+      expect(await valuesSql(editor, "code")).toBe(
+        `SELECT * FROM "test_stream" WHERE service_name='a'`,
+      );
+    });
   });
 
   // ─── onStreamChange side-effects ──────────────────────────────────────────
