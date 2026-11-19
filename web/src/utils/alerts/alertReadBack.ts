@@ -15,7 +15,14 @@
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { hasDeliveryTarget } from "./deliveryTarget";
-import { dataNoun, formatNumber, joinList, measureWords, valueWithUnit } from "./alertCopy";
+import {
+  dataNoun,
+  formatNumber,
+  joinList,
+  measureWords,
+  thresholdSide,
+  valueWithUnit,
+} from "./alertCopy";
 import { describeFilterNode, filterSentenceParts } from "./filterSentence";
 import {
   nameResolvedExpression,
@@ -125,6 +132,11 @@ const CONDITION_KEYS: Record<string, I18nKey> = {
   "!=": "alerts.summary.plainEnglish.conditionNot",
 };
 
+const PROMQL_QUIET_KEYS: Record<"above" | "below" | "none", I18nKey> = {
+  above: "alerts.verdict.promqlQuietAbove",
+  below: "alerts.verdict.promqlQuietBelow",
+  none: "alerts.verdict.promqlQuietMatched",
+};
 const FILTER_CONDITIONS_SHOWN = 3;
 // Span duration is microseconds by the traces contract, whatever unit the user typed it in.
 const SPAN_DURATION_FIELD = "duration";
@@ -442,12 +454,15 @@ export function previewVerdictSentence(
       ? dataNoun(alert.stream_type, qc.type, verdict.count, t)
       : raw(verdict.label ?? "");
   // A PromQL query sets its own range ([5m]); the look-back plays no part in what it returns now.
-  if (qc.type === "promql")
-    return t(verdict.wouldTrigger ? "alerts.verdict.promqlFires" : "alerts.verdict.promqlQuiet", {
-      count,
-      label,
-      limit,
-    });
+  if (qc.type === "promql") {
+    if (verdict.wouldTrigger) return t("alerts.verdict.promqlFires", { count, label, limit });
+    // "0 series" reads as an empty query, so a quiet count says how many are past the line and how many it takes.
+    return t(
+      PROMQL_QUIET_KEYS[thresholdSide(pc?.operator ?? tc.operator) ?? "none"],
+      { count, limit: limitText(tc.operator, tc.threshold ?? 0) },
+      verdict.count,
+    );
+  }
   if (opts.undecided) return t("alerts.verdict.now", { count, label, window });
   return t(verdict.wouldTrigger ? "alerts.verdict.fires" : "alerts.verdict.quiet", {
     count,

@@ -925,7 +925,8 @@ describe("PreviewAlert - PromQL verdict", () => {
             ? { column: "value", operator: ">=", value: 80 }
             : opts.condition,
         promql_warning_value: opts.warningValue,
-        promql_multi_alert: opts.multiAlert ?? false,
+        // One per series classifies the last sample, which is what most cases below pin.
+        promql_multi_alert: opts.multiAlert ?? true,
       },
     };
     return mountComp({ query: "k8s_node_memory_usage", selectedTab: "promql", formData });
@@ -973,13 +974,45 @@ describe("PreviewAlert - PromQL verdict", () => {
     w.unmount();
   });
 
-  it("judges a series by its LAST sample, not by whether it ever crossed", async () => {
-    const w = await mountPromql({ condition: { column: "value", operator: ">=", value: 80 } });
+  // One per series reads the last sample; one alert filters at the threshold over the 10-minute look-back.
+  it.each([
+    [
+      "one per series, by its last sample",
+      true,
+      [
+        [0, "85"],
+        [1, "40"],
+      ],
+      0,
+    ],
+    [
+      "one alert, by a crossing inside the look-back",
+      false,
+      [
+        [0, "85"],
+        [1, "40"],
+      ],
+      1,
+    ],
+    [
+      "one alert, not by a crossing before the look-back",
+      false,
+      [
+        [0, "85"],
+        [44, "40"],
+      ],
+      0,
+    ],
+  ])("judges a spike that came back down: %s", async (_case, multiAlert, points, matched) => {
+    const w = await mountPromql({
+      condition: { column: "value", operator: ">=", value: 80 },
+      multiAlert: multiAlert as boolean,
+    });
+    const data = (points as [number, string][]).map(([step, v]) => [T0 + step * 15000, v]);
 
-    // Spiked to 85, now back down to 40 — not currently over the line.
-    await emitSeries(w, seriesPayload(series("node-a", ["85", "40"])));
+    await emitSeries(w, seriesPayload({ name: "node-a", data }));
 
-    expectVerdict(w, { matched: 0, gate: "0 >= 1", trigger: false });
+    expectVerdict(w, { matched: matched as number, gate: `${matched} >= 1`, trigger: !!matched });
     w.unmount();
   });
 
@@ -1609,9 +1642,7 @@ describe("PreviewAlert - PromQL verdict", () => {
   });
 
   it("gives the same verdict whether or not promql_multi_alert is set", async () => {
-    // The flag changes which QUERY the backend runs (raw expression per series vs
-    // one pre-filtered query); the preview always charts the raw expression and
-    // filters in JS, so the badge must not move.
+    // Series that stay on one side of the line get the same answer from both queries.
     const payload = () =>
       seriesPayload(series("node-b", ["82", "85"]), series("node-c", ["12", "10"]));
 
@@ -3475,6 +3506,9 @@ describe("PreviewAlert - a chart with many series", () => {
     await flushPromises();
     expect(w.vm.evaluationStatus).toMatchObject({ count: 85, wouldTrigger: true });
     expect(w.vm.evaluationStatus.atLeast).toBeFalsy();
+    // One alert counts the series that crossed anywhere in the look-back, like its filtered query.
+    const sent = vi.mocked(searchService.metrics_query).mock.calls.map((c: any) => c[0].query);
+    expect(decodeURIComponent(sent.at(-1))).toBe("last_over_time(((mem) > 0.85)[10m:]) > 0.85");
     vi.mocked(searchService.metrics_query).mockReset();
     w.unmount();
   });

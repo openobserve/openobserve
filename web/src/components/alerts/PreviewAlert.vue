@@ -166,7 +166,7 @@ import {
   isSpanDurationMeasure,
   previewCountText,
 } from "@/utils/alerts/alertReadBack";
-import { durationText, durationWords, formatNumber } from "@/utils/alerts/alertCopy";
+import { durationText, durationWords, formatNumber, thresholdSide } from "@/utils/alerts/alertCopy";
 import { filterNotSeenText } from "@/composables/alerts/useStreamDiscovery";
 import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
 import { evaluateAlertBody, testRunKey, testValueText } from "@/utils/alerts/alertTestRun";
@@ -1413,6 +1413,57 @@ const classifiableSample = (data: unknown): number | null => {
   return null;
 };
 
+// The converter writes zoned dates or UTC strings; either way the gaps between points are true.
+const pointMs = (point: unknown): number | null => {
+  const x = Array.isArray(point) ? point[0] : null;
+  const ms =
+    x instanceof Date ? x.getTime() : typeof x === "string" ? Date.parse(x) : Number(x ?? NaN);
+  return Number.isFinite(ms) ? ms : null;
+};
+
+/** One alert queries `(expr) op threshold` over the look-back, so a series counts by its last sample past it there. */
+const windowedSample = (
+  data: unknown,
+  fromMs: number,
+  passes: (value: number) => boolean,
+): number | null => {
+  if (!Array.isArray(data)) return null;
+  for (let i = data.length - 1; i >= 0; i--) {
+    const at = pointMs(data[i]);
+    if (at !== null && at < fromMs) return null;
+    const rawValue = Array.isArray(data[i]) ? data[i][1] : data[i];
+    if (rawValue === null || rawValue === undefined || rawValue === "") continue;
+    const value = Number(rawValue);
+    if (Number.isFinite(value) && passes(value)) return value;
+  }
+  return null;
+};
+
+/** The backend queries one alert at the less severe band, so the warning series come back too. */
+const widenedPromqlThreshold = (
+  operator: string | undefined,
+  critical: number,
+  warning: number | null,
+) => {
+  if (warning === null) return critical;
+  const side = thresholdSide(operator);
+  if (side === "above") return Math.min(critical, warning);
+  return side === "below" ? Math.max(critical, warning) : critical;
+};
+
+/** The end of the newest sample on the chart, which the look-back counts back from. */
+const latestSampleMs = (dataSeries: any[]): number => {
+  let latest = -Infinity;
+  for (const series of dataSeries) {
+    for (const point of Array.isArray(series?.data) ? series.data : []) {
+      const value = Array.isArray(point) ? point[1] : point;
+      if (value === null || value === undefined || value === "") continue;
+      latest = Math.max(latest, pointMs(point) ?? -Infinity);
+    }
+  }
+  return latest;
+};
+
 /** One sample against one threshold — mirrors `compare` (config/meta/alerts/level.rs:209). */
 const promqlSampleMatches = (
   value: number,
@@ -1634,7 +1685,7 @@ const evaluateAndSetStatus = (resultCount: number, atLeast = false, value?: numb
  * The PromQL verdict, mirroring `evaluate_level_over_items`
  * (config/meta/alerts/aggregation_level.rs:146):
  *
- *  1. classify each series by its last sample — critical first, most severe wins
+ *  1. classify each series by its sample — critical first, most severe wins
  *  2. gate `criticalCount`; a pass fires CRITICAL and the warning count is never
  *     consulted
  *  3. otherwise gate `firingCount` (warning-or-worse, so a critical series counts
@@ -1645,11 +1696,8 @@ const evaluateAndSetStatus = (resultCount: number, atLeast = false, value?: numb
  * backend's `warning_threshold.unwrap_or(threshold)` collapses to `threshold`.
  * `widened_threshold` only ever widens the backend's QUERY, never the counts.
  *
- * Last sample, not "ever crossed": that matches multi-alert mode exactly. In
- * single-alert mode the backend pre-filters the query, so a series that crossed
- * and came back down still counts there while the preview says it does not —
- * the safe direction for a preview, which never claims an alert would fire on a
- * series that is currently healthy.
+ * One per series runs the raw query and reads the last sample. One alert filters the query
+ * at the threshold over the look-back, so a series that crossed and came back still counts.
  */
 const evaluatePromqlSeries = (dataSeries: any[]) => {
   if (writeRealTimeStatus()) return;
@@ -1701,8 +1749,14 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   let criticalCount = 0;
   let firingCount = 0; // warning-or-worse
 
+  const single = !props.formData.query_condition?.promql_multi_alert;
+  const widened = widenedPromqlThreshold(operator, critical, warning);
+  const periodMs = (Number(props.formData.trigger_condition?.period) || 0) * 60_000;
+  const fromMs = latestSampleMs(dataSeries) - periodMs;
   for (const series of dataSeries) {
-    const value = classifiableSample(series?.data);
+    const value = single
+      ? windowedSample(series?.data, fromMs, (v) => promqlSampleMatches(v, operator, widened))
+      : classifiableSample(series?.data);
     if (value === null) continue;
     if (promqlSampleMatches(value, operator, critical)) {
       criticalCount++;
@@ -1791,10 +1845,14 @@ const countAllSeries = async (critical: number, warning: number | null, operator
   if (!op) return;
   const query = props.query;
   const org = store.state.selectedOrganization.identifier;
+  const period = Number(props.formData.trigger_condition?.period) || 0;
+  // One alert counts a series that crossed anywhere in the look-back, as its filtered query does.
+  const series =
+    props.formData.query_condition?.promql_multi_alert || period <= 0
+      ? `(${query})`
+      : `last_over_time(((${query}) ${op} ${widenedPromqlThreshold(operator, critical, warning)})[${period}m:])`;
   const past = (limit: number) =>
-    queryClient.fetchQuery(
-      promRulePreviewQuery(org, `(${query}) ${op} ${limit}`, promqlEndSeconds),
-    );
+    queryClient.fetchQuery(promRulePreviewQuery(org, `${series} ${op} ${limit}`, promqlEndSeconds));
   try {
     const [criticalCount, firingCount] = await Promise.all([
       past(critical),
