@@ -157,8 +157,9 @@ const useManagementRoutes = () => {
   // even locked): Cloud users can't "upgrade" into managing their own nodes,
   // license, or cipher keys, so a pure-cloud build keeps excluding it
   // entirely, exactly as it did before this gating existed. OSS keeps
-  // registering it (redirects to the locked page); self-hosted enterprise
-  // gets the real pages.
+  // registering it (redirects to the locked page, except Nodes, which OSS
+  // opens: see the `nodes` feature gate); self-hosted enterprise gets the
+  // real pages.
   if (config.isEnterprise == "true" || config.isCloud != "true") {
     routes[0].children.push(
       ...[
