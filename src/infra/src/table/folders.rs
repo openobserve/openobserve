@@ -436,6 +436,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, i16)>, errors::E
             publish_delete(org_id, folder_type, folder_id).await;
         }
     }
+    crate::coordinator::folders::purge_org(org_id).await?;
     Ok(deleted)
 }
 

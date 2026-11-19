@@ -40,9 +40,12 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
                 true,
             )
             .await?;
-            // Watchers on this region only learn of a replicated write from this event.
-            if let Some(id) = dashboard.dashboard_id() {
-                infra::coordinator::dashboards::emit_put_event(&org_id, id).await?;
+            // Logged, not returned: a redelivered move would recreate the dashboard in its old
+            // folder.
+            if let Some(id) = dashboard.dashboard_id()
+                && let Err(e) = infra::coordinator::dashboards::emit_put_event(&org_id, id).await
+            {
+                log::error!("[SUPER_CLUSTER:dashboards] put event failed for {org_id}/{id}: {e}");
             }
         }
         DashboardMessage::Delete {
@@ -51,7 +54,13 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
             dashboard_id,
         } => {
             table::dashboards::delete_from_folder(&org_id, &folder_id, &dashboard_id).await?;
-            infra::coordinator::dashboards::emit_delete_event(&org_id, &dashboard_id).await?;
+            if let Err(e) =
+                infra::coordinator::dashboards::emit_delete_event(&org_id, &dashboard_id).await
+            {
+                log::error!(
+                    "[SUPER_CLUSTER:dashboards] delete event failed for {org_id}/{dashboard_id}: {e}"
+                );
+            }
         }
         DashboardMessage::TimedAnnotationCreate {
             dashboard_id,

@@ -31,6 +31,12 @@ pub async fn emit_delete_event(org_id: &str, composite_id: &str) -> Result<(), E
     super::emit_delete(&key(org_id, composite_id)).await
 }
 
+/// Removes every key of the org; teardown runs it on each attempt, clearing keys a failed delete
+/// left.
+pub async fn purge_org(org_id: &str) -> Result<(), Error> {
+    super::purge_prefix(&format!("{ALERT_COMPOSITES_WATCH_PREFIX}{org_id}/")).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

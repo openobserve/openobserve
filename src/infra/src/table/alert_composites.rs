@@ -619,7 +619,9 @@ where
     for id in &ids {
         publish_delete(org, id).await;
     }
-    Ok(())
+    crate::coordinator::alert_composites::purge_org(org)
+        .await
+        .map_err(|e| sea_orm::DbErr::Custom(e.to_string()))
 }
 
 pub async fn resolve_by_id<C: ConnectionTrait>(

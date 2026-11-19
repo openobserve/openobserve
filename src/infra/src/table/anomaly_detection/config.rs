@@ -328,7 +328,7 @@ pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result
     for id in &ids {
         publish_delete(org_id, id).await;
     }
-    Ok(())
+    crate::coordinator::anomaly_detection::purge_org(org_id).await
 }
 
 // ---------------------------------------------------------------------------

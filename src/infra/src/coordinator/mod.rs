@@ -47,3 +47,11 @@ pub async fn emit_put(key: &str) -> Result<(), crate::errors::Error> {
 pub async fn emit_delete(key: &str) -> Result<(), crate::errors::Error> {
     get_coordinator().await.delete(key, false, true, None).await
 }
+
+/// Removes every key under `prefix` without events, so a retry clears keys a failed delete left.
+pub async fn purge_prefix(prefix: &str) -> Result<(), crate::errors::Error> {
+    get_coordinator()
+        .await
+        .delete(prefix, true, false, None)
+        .await
+}
