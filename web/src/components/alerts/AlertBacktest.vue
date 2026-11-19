@@ -339,6 +339,8 @@ const waitAction = computed(() =>
       )
     : null,
 );
+// A noisy day puts its fix on the verdict line, so the folded strip still says what to do.
+const waitInline = computed(() => !!waitAction.value && (props.realTime || !!volume.value?.noisy));
 const openWait = () =>
   formContext?.openSetting
     ? formContext.openSetting("cooldown")
@@ -358,11 +360,11 @@ const resultText = computed(() => {
       });
 });
 
-const hint = computed<DayHint | null>(() => {
+const hintKey = computed(() => {
   if (props.realTime) return null;
   // A value or PromQL alert compares with its own operator, not the count gate's.
   const operator = server.value?.checks[0]?.operator ?? props.operator;
-  const key = backtestHintKey(counts.value.alerts, counts.value.total, operator, {
+  return backtestHintKey(counts.value.alerts, counts.value.total, operator, {
     events: counts.value.events,
     filtered: filtered.value,
     pending: serverDay.value?.pending,
@@ -370,6 +372,9 @@ const hint = computed<DayHint | null>(() => {
     baselineEmpty: !!props.baselineEmpty,
     sustained: !!props.sustainedFn,
   });
+});
+const hint = computed<DayHint | null>(() => {
+  const key = hintKey.value;
   if (!key) return null;
   // Test it's own lines already say the day matched nothing or Must last held it; its action stays.
   if (inPanel.value && SAID_BY_TEST_IT.includes(key)) {
@@ -404,6 +409,11 @@ const hint = computed<DayHint | null>(() => {
     setting: "holdFor",
   };
 });
+// In the form the advice's action rides on the verdict line and its words open with Show.
+const hintInline = computed(() => !inPanel.value && !!hint.value?.action);
+const noisyDay = computed(
+  () => !!volume.value?.noisy || !!hintKey.value?.startsWith("alerts.sections.backtest.noisy"),
+);
 // With no 24-hour row in the form, no step 3 card can say it, so the panel offers Keep firing for itself.
 const flapHint = computed(() => {
   const refires = serverDay.value?.refires ?? 0;
@@ -489,18 +499,27 @@ const hourTitle = (hour: number, fired: boolean) => {
       <p
         v-if="!inPanel"
         class="m-0 text-sm"
-        :class="realTime && volume?.noisy ? 'text-status-warning-text' : 'text-text-body'"
+        :class="noisyDay ? 'text-status-warning-text' : 'text-text-body'"
         data-test="add-alert-backtest-result"
       >
         <span data-test="add-alert-backtest-result-text">{{ resultText }}</span>
         <OButton
-          v-if="realTime && waitAction"
+          v-if="waitInline"
           variant="link"
           class="ms-1"
           data-test="add-alert-backtest-wait-action"
           @click="openWait"
         >
           {{ waitAction }}
+        </OButton>
+        <OButton
+          v-if="hintInline"
+          variant="link"
+          class="ms-1"
+          data-test="add-alert-backtest-hint-action"
+          @click="openHintTarget"
+        >
+          {{ hint?.action }}
         </OButton>
         <OButton
           variant="link"
@@ -536,19 +555,19 @@ const hourTitle = (hour: number, fired: boolean) => {
         <span>{{ t("alerts.sections.backtest.lastHour") }}</span>
       </div>
       <AlertLinkNote
-        v-if="!inPanel && !realTime && volumeText && (detailsOpen || volume?.noisy)"
+        v-if="!inPanel && !realTime && volumeText && detailsOpen"
         class="mt-2"
         :text="volumeText"
-        :action="waitAction"
+        :action="waitInline ? null : waitAction"
         :warning="volume?.noisy"
         data-test="add-alert-backtest-volume"
         @action="openWait"
       />
       <AlertLinkNote
-        v-if="hint"
+        v-if="hint && (!hintInline || detailsOpen)"
         class="mt-2"
         :text="hint.text"
-        :action="hint.action"
+        :action="hintInline ? null : hint.action"
         data-test="add-alert-backtest-hint"
         @action="openHintTarget"
       />

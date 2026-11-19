@@ -137,6 +137,29 @@ describe("AlertBacktest", () => {
     wrapper.unmount();
   });
 
+  it("a noisy day reads as one amber line whose action opens Must last; the advice opens with Show", async () => {
+    const formContext = { goToSection: vi.fn(), openSetting: vi.fn() };
+    const wrapper = mountBacktest(SQL("default"), ref(null), { formContext });
+    await vi.advanceTimersByTimeAsync(700);
+    const hits = Array.from({ length: 300 }, (_, i) => ({
+      zo_sql_key: (NOW - i * 5 * 60_000) * 1000,
+      zo_sql_val: 9,
+    }));
+    respond(calls[0], hits);
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-alert-backtest-result"]').classes()).toContain(
+      "text-status-warning-text",
+    );
+    expect(wrapper.find('[data-test="add-alert-backtest-hint"]').exists()).toBe(false);
+    await wrapper.find('[data-test="add-alert-backtest-hint-action"]').trigger("click");
+    expect(formContext.openSetting).toHaveBeenCalledWith("holdFor");
+    await wrapper.find('[data-test="add-alert-backtest-toggle"]').trigger("click");
+    expect(wrapper.find('[data-test="add-alert-backtest-hint"]').text()).toBe(
+      i18n.global.t("alerts.sections.backtest.noisyMustLast"),
+    );
+    wrapper.unmount();
+  });
+
   it("says the filters matched nothing instead of advising a threshold", async () => {
     const wrapper = mountBacktest(
       SQL("default").replace("GROUP BY", "WHERE k8s_reason = 'OOMKilled' GROUP BY"),
