@@ -10642,11 +10642,12 @@ export class LogsPage {
      * page.reload() actually exercises URL restoration instead of reloading a URL
      * that has not been synced yet (updateUrlQueryParams runs asynchronously after
      * the chart renders).
-     * @param {{ requireVisualizationData?: boolean, requireFunctionContent?: boolean, timeout?: number }} options
+     * @param {{ requireVisualizationData?: boolean, requireFunctionContent?: boolean, requireQuery?: boolean, timeout?: number }} options
      */
     async waitForVisualizeUrlState({
         requireVisualizationData = true,
         requireFunctionContent = false,
+        requireQuery = false,
         timeout = 20000,
     } = {}) {
         await expect
@@ -10660,13 +10661,16 @@ export class LogsPage {
                     // AND tempFunctionContent is non-empty, so requiring it proves a VRL
                     // body really is part of the restorable state before we reload.
                     const hasVrl = !requireFunctionContent || url.includes('functionContent=');
-                    return hasToggle && hasConfig && hasVrl;
+                    // query is only written once the shown inputs hold it; a reload without it restores an empty editor
+                    const hasQuery = !requireQuery || !!new URL(url).searchParams.get('query');
+                    return hasToggle && hasConfig && hasVrl && hasQuery;
                 },
                 {
                     timeout,
                     message:
                         'URL never picked up logs_visualize_toggle=visualize / visualization_data' +
-                        (requireFunctionContent ? ' / functionContent' : ''),
+                        (requireFunctionContent ? ' / functionContent' : '') +
+                        (requireQuery ? ' / query' : ''),
                 }
             )
             .toBe(true);
