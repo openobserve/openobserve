@@ -40,7 +40,8 @@ vi.mock("@/utils/commons.ts", () => ({
   getDashboard: vi.fn(),
 }));
 
-vi.mock("@/utils/date", () => ({
+vi.mock("@/utils/date", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/date")>()),
   parseDuration: vi.fn((duration) => {
     const durations = {
       "5m": 5,
@@ -185,7 +186,7 @@ describe("AppPerformance.vue", () => {
             props: ["modelValue", "minRefreshInterval", "trigger"],
             emits: ["trigger", "update:modelValue"],
           },
-          DateTimePickerDashboard: {
+          DateTime: {
             template: '<div data-test="date-time-picker" ref="dateTimePicker"></div>',
             props: ["modelValue"],
             emits: ["update:modelValue"],
@@ -309,7 +310,7 @@ describe("AppPerformance.vue", () => {
             OToggleGroup: { template: "<div></div>" },
             OToggleGroupItem: { template: "<div></div>" },
             OButton: { template: "<button></button>" },
-            DateTimePickerDashboard: { template: "<div></div>" },
+            DateTime: { template: "<div></div>" },
             "router-view": { template: "<div></div>" },
             "keep-alive": { template: "<div></div>" },
           },
@@ -383,7 +384,7 @@ describe("AppPerformance.vue", () => {
             OToggleGroup: { template: "<div></div>" },
             OToggleGroupItem: { template: "<div></div>" },
             OButton: { template: "<button></button>" },
-            DateTimePickerDashboard: { template: "<div></div>" },
+            DateTime: { template: "<div></div>" },
             "router-view": { template: "<div></div>" },
             "keep-alive": { template: "<div></div>" },
           },
@@ -534,7 +535,7 @@ describe("AppPerformance.vue", () => {
       expect(routerView.exists()).toBe(true);
     });
 
-    it("should pass correct props to DateTimePickerDashboard", () => {
+    it("should render the time picker", () => {
       const dateTimePicker = wrapper.find('[data-test="date-time-picker"]');
       expect(dateTimePicker.exists()).toBe(true);
     });

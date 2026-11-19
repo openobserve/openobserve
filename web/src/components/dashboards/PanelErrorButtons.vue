@@ -5,6 +5,7 @@
       error ||
       exemplarError ||
       maxQueryRangeWarning ||
+      rangeLimitText ||
       sparklineWarning ||
       xAliasInconsistencyWarning ||
       isCachedDataDifferWithCurrentTimeRange ||
@@ -164,9 +165,29 @@
         </template>
       </OTooltip>
     </OButton>
+    <!-- Dashboards run wide ranges, so only the panel its stream limits says so, quietly. -->
+    <OTag
+      v-if="rangeLimitText"
+      variant="default-soft"
+      size="sm"
+      icon="lock"
+      clickable
+      class="me-1 shrink-0"
+      :aria-label="rangeLimitDetail"
+      data-test="panel-max-duration-chip"
+    >
+      {{ rangeLimitText }}
+      <OTooltip side="bottom" align="end" max-width="26.25rem">
+        <template #content
+          ><div class="whitespace-pre-wrap" data-test="panel-max-duration-warning-content">
+            {{ rangeLimitDetail }}
+          </div></template
+        >
+      </OTooltip>
+    </OTag>
     <OButton
       :aria-label="t('dashboard.panelWarning')"
-      v-if="maxQueryRangeWarning"
+      v-else-if="maxQueryRangeWarning"
       variant="ghost-warning"
       size="icon"
       icon-left="warning"
@@ -256,9 +277,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import PanelNoticeContent from "@/components/dashboards/PanelNoticeContent.vue";
-import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
+import { isRangeClamp, type SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
+import { formatLimitShorthand } from "@/utils/timeRangeList";
 import {
   buildPanelNotices,
   seriesTotalBoundOf,
@@ -284,6 +306,9 @@ const COLLAPSE_CLASSES = {
   },
 };
 
+// The server's clamp notice names the stream's limit; any other function error keeps the warning button.
+const RANGE_LIMIT_HOURS = /query range restriction of (\d+) hours/i;
+
 export default defineComponent({
   name: "PanelErrorButtons",
   components: { RelativeTime, OButton, OIcon, OTag, OTooltip, PanelNoticeContent },
@@ -295,6 +320,16 @@ export default defineComponent({
     maxQueryRangeWarning: {
       type: String,
       default: "",
+    },
+    /** The panel streams' query-range limit in hours, for a clamp notice that names none. */
+    rangeLimitHours: {
+      type: Number,
+      default: 0,
+    },
+    /** The panel's window is over `rangeLimitHours`, so the server clipped it even if it said nothing. */
+    rangeOverLimit: {
+      type: Boolean,
+      default: false,
     },
     limitNumberOfSeriesWarningMessage: {
       type: String,
@@ -407,6 +442,19 @@ export default defineComponent({
       ),
     );
 
+    const rangeLimitText = computed(() => {
+      const named = Number(RANGE_LIMIT_HOURS.exec(props.maxQueryRangeWarning)?.[1]);
+      const clamped = isRangeClamp(props.maxQueryRangeWarning) || props.rangeOverLimit;
+      const hours = named || (clamped ? props.rangeLimitHours : 0);
+      return hours > 0 ? t("dateTime.maxLimit", { limit: raw(formatLimitShorthand(hours)) }) : "";
+    });
+
+    const rangeLimitDetail = computed(
+      () =>
+        props.maxQueryRangeWarning ||
+        t("common.timeRangeOverLimit", { count: props.rangeLimitHours }),
+    );
+
     const collapsedTone = computed(() =>
       notices.value.some((notice) => notice.tone === "error") ? "error" : "warning",
     );
@@ -453,6 +501,8 @@ export default defineComponent({
       raw,
       t,
       notices,
+      rangeLimitText,
+      rangeLimitDetail,
       collapsedTone,
       collapsedLabel,
       collapseClasses,

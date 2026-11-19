@@ -354,6 +354,8 @@ describe("OrganizationSettings", () => {
         toggle_ingestion_logs: false,
         cross_links: [],
         usage_stream_enabled: false,
+        fiscal_year_start_month: 0,
+        range_guard_days: 0,
       });
     });
 
@@ -376,6 +378,80 @@ describe("OrganizationSettings", () => {
     });
   });
 
+  describe("Time range settings", () => {
+    it("seeds unset settings as not set and off", () => {
+      const wrapper = createWrapper();
+      expect(getForm(wrapper).vm.form.state.values).toMatchObject({
+        fiscalYearStartMonth: 0,
+        rangeGuardDays: "",
+      });
+      expect(wrapper.find('[data-test="settings-fiscal-year-start-month"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="settings-range-guard-days"]').exists()).toBe(true);
+    });
+
+    it("seeds stored settings and saves them unchanged", async () => {
+      mockStore.state.organizationData.organizationSettings = {
+        trace_id_field_name: "trace_id",
+        span_id_field_name: "span_id",
+        fiscal_year_start_month: 4,
+        range_guard_days: 90,
+      };
+      const wrapper = createWrapper();
+      const form = getForm(wrapper);
+      expect(form.vm.form.state.values).toMatchObject({
+        fiscalYearStartMonth: 4,
+        rangeGuardDays: 90,
+      });
+
+      await form.vm.form.handleSubmit();
+      await flushPromises();
+
+      expect(mockPostOrganizationSettings).toHaveBeenCalledWith(
+        "test-org-123",
+        expect.objectContaining({ fiscal_year_start_month: 4, range_guard_days: 90 }),
+      );
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setOrganizationSettings",
+        expect.objectContaining({ fiscal_year_start_month: 4, range_guard_days: 90 }),
+      );
+    });
+
+    it("sends the typed guard as a number and an emptied guard as 0", async () => {
+      const wrapper = createWrapper();
+      const form = getForm(wrapper);
+      form.vm.form.setFieldValue("fiscalYearStartMonth", 7);
+      form.vm.form.setFieldValue("rangeGuardDays", "30");
+      await form.vm.form.handleSubmit();
+      await flushPromises();
+      expect(mockPostOrganizationSettings).toHaveBeenLastCalledWith(
+        "test-org-123",
+        expect.objectContaining({ fiscal_year_start_month: 7, range_guard_days: 30 }),
+      );
+
+      form.vm.form.setFieldValue("rangeGuardDays", "");
+      await form.vm.form.handleSubmit();
+      await flushPromises();
+      expect(mockPostOrganizationSettings).toHaveBeenLastCalledWith(
+        "test-org-123",
+        expect.objectContaining({ range_guard_days: 0 }),
+      );
+    });
+
+    it("blocks a guard outside 1 to 3650 days, a typed 0 included", async () => {
+      for (const days of ["3651", "-1", "1.5", "0", 0, "-0"]) {
+        vi.clearAllMocks();
+        const wrapper = createWrapper();
+        const form = getForm(wrapper);
+        form.vm.form.setFieldValue("rangeGuardDays", days);
+        await form.vm.form.handleSubmit();
+        await flushPromises();
+        expect(form.vm.form.state.isValid, days).toBe(false);
+        expect(mockPostOrganizationSettings, days).not.toHaveBeenCalled();
+        wrapper.unmount();
+      }
+    });
+  });
+
   describe("saveOrgSettings handler", () => {
     const validValue = {
       traceIdFieldName: "custom_trace_id",
@@ -394,6 +470,8 @@ describe("OrganizationSettings", () => {
         toggle_ingestion_logs: true,
         cross_links: [],
         usage_stream_enabled: false,
+        fiscal_year_start_month: 0,
+        range_guard_days: 0,
       });
     });
 
@@ -408,6 +486,8 @@ describe("OrganizationSettings", () => {
         toggle_ingestion_logs: true,
         cross_links: [],
         usage_stream_enabled: false,
+        fiscal_year_start_month: 0,
+        range_guard_days: 0,
       });
     });
 

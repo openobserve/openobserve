@@ -36,7 +36,10 @@ use config::{
         folder::Folder,
         self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
     },
-    utils::time::now_micros,
+    utils::{
+        report_period::{CalendarPeriod, ReportZone, is_calendar_period, relative_range_params},
+        time::now_micros,
+    },
 };
 use cron::Schedule;
 use db::{
@@ -130,6 +133,9 @@ pub enum ReportError {
     #[error("Report frequency interval cannot be negative")]
     NegativeInterval,
 
+    #[error("Report time range period '{0}' is not a calendar period this server can read")]
+    InvalidCalendarPeriod(String),
+
     #[error(transparent)]
     DbError(anyhow::Error),
 
@@ -198,6 +204,7 @@ pub async fn prepare_save(
     }
 
     validate_schedule(&mut report)?;
+    validate_calendar_periods(&report)?;
 
     match db::dashboards::reports::get(conn, org_id, folder_id, &report.name).await {
         Ok(old_report) => {
@@ -563,6 +570,7 @@ pub async fn prepare_update_by_id(
     }
 
     validate_schedule(&mut report)?;
+    validate_calendar_periods(&report)?;
 
     if report.dashboards.is_empty() {
         return Err(ReportError::NoDashboards);
@@ -763,7 +771,10 @@ impl SendReport for Report {
                 .build()
                 .unwrap()
                 .put(url)
-                .query(&[("timezone", &self.timezone)])
+                .query(&[
+                    ("timezone", self.timezone.clone()),
+                    ("timezone_offset", self.tz_offset.to_string()),
+                ])
                 .header("Content-Type", "application/json");
             if !cfg.report_server.secret.is_empty() {
                 req = req.header(REPORT_SECRET_HEADER, &cfg.report_server.secret);
@@ -793,7 +804,10 @@ impl SendReport for Report {
                 &self.org_id,
                 &cfg.common.report_user_name,
                 &cfg.common.report_user_password,
-                &self.timezone,
+                ReportZone {
+                    name: &self.timezone,
+                    offset_minutes: self.tz_offset,
+                },
                 no_of_recipients,
                 &self.name,
             )
@@ -877,8 +891,8 @@ pub enum GenerateReportError {
     #[error(transparent)]
     ChromiumOxideError(#[from] chromiumoxide::error::CdpError),
 
-    #[error(transparent)]
-    ParseTimeDurationError(std::num::ParseIntError),
+    #[error("Report time range period '{0}' cannot be read")]
+    InvalidPeriod(String),
 
     #[error(transparent)]
     BrowserCloseWaitError(std::io::Error),
@@ -918,11 +932,12 @@ async fn generate_report(
     org_id: &str,
     user_id: &str,
     user_pass: &str,
-    timezone: &str,
+    zone: ReportZone<'_>,
     no_of_recipients: usize,
     report_name: &str,
 ) -> Result<(Vec<u8>, String, bool), GenerateReportError> {
     let cfg = get_config();
+    let timezone = zone.name;
     // Check if Chrome is enabled, otherwise don't save the report
     if !cfg.chrome.chrome_enabled {
         return Err(GenerateReportError::ChromeNotEnabled);
@@ -1000,55 +1015,13 @@ async fn generate_report(
     let (dashb_url, email_dashb_url) = match timerange.range_type {
         ReportTimerangeType::Relative => {
             let period = &timerange.period;
-            let (time_duration, time_unit) = period.split_at(period.len() - 1);
+            let (range_params, window) = relative_range_params(period, zone, now_micros())
+                .ok_or_else(|| GenerateReportError::InvalidPeriod(period.clone()))?;
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&{range_params}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
-
-            let time_duration: i64 = time_duration
-                .parse()
-                .map_err(GenerateReportError::ParseTimeDurationError)?;
-            let end_time = now_micros();
-            let start_time = match time_unit {
-                "m" => {
-                    end_time
-                        - chrono::Duration::try_minutes(time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-                "h" => {
-                    end_time
-                        - chrono::Duration::try_hours(time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-                "d" => {
-                    end_time
-                        - chrono::Duration::try_days(time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-                "w" => {
-                    end_time
-                        - chrono::Duration::try_weeks(time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-                _ => {
-                    end_time
-                        - chrono::Duration::try_days(30 * time_duration)
-                            .unwrap()
-                            .num_microseconds()
-                            .unwrap()
-                }
-            };
-
             let email_dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&from={start_time}&to={end_time}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{window}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
             (dashb_url, email_dashb_url)
         }
@@ -1302,6 +1275,21 @@ fn validate_schedule(report: &mut Report) -> Result<(), ReportError> {
     Ok(())
 }
 
+/// Rejects a `calendar:` period the run could not resolve, so it fails at save, not at send.
+fn validate_calendar_periods(report: &Report) -> Result<(), ReportError> {
+    let bad = report.dashboards.iter().find(|d| {
+        d.timerange.range_type == ReportTimerangeType::Relative
+            && is_calendar_period(&d.timerange.period)
+            && CalendarPeriod::parse(&d.timerange.period).is_none()
+    });
+    match bad {
+        Some(d) => Err(ReportError::InvalidCalendarPeriod(
+            d.timerange.period.clone(),
+        )),
+        None => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::Datelike;
@@ -1445,6 +1433,39 @@ mod tests {
         report
     }
 
+    fn with_period(period: &str) -> Report {
+        let mut dashboard = dashboard(ReportMediaType::default());
+        dashboard.timerange.range_type = ReportTimerangeType::Relative;
+        dashboard.timerange.period = period.to_string();
+        Report {
+            dashboards: vec![dashboard],
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn validate_calendar_periods_accepts_tokens_and_rolling_periods() {
+        for period in ["calendar:month:-1", "calendar:day:0", "1w", "15m"] {
+            assert!(
+                validate_calendar_periods(&with_period(period)).is_ok(),
+                "{period}"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_calendar_periods_rejects_a_token_it_cannot_resolve() {
+        for period in ["calendar:month:1", "calendar:fortnight:-1", "calendar:"] {
+            assert!(
+                matches!(
+                    validate_calendar_periods(&with_period(period)),
+                    Err(ReportError::InvalidCalendarPeriod(p)) if p == period
+                ),
+                "{period}"
+            );
+        }
+    }
+
     #[test]
     fn validate_schedule_rejects_a_full_day_tz_offset() {
         for tz_offset in [1440, -1440, i32::MAX, i32::MIN] {
@@ -1545,6 +1566,23 @@ mod tests {
             assert!(created.is_err(), "{created:?}");
             assert_eq!(created, updated);
         }
+    }
+
+    #[tokio::test]
+    async fn update_by_id_rejects_a_calendar_period_it_cannot_resolve() {
+        let saved = config::CONFIG.load_full();
+        let mut cfg = config::config::init();
+        cfg.common.report_server_url = "http://report-server.example".to_string();
+        config::CONFIG.store(std::sync::Arc::new(cfg));
+        let mut report = with_period("calendar:fortnight:-1");
+        report.name = "weekly".to_string();
+        let updated = update_by_id("org_a", "r1", None, report).await;
+        config::CONFIG.store(saved);
+        assert!(
+            matches!(&updated, Err(ReportError::InvalidCalendarPeriod(p)) if p == "calendar:fortnight:-1"),
+            "{:?}",
+            updated.map_err(|e| e.to_string())
+        );
     }
 
     #[test]

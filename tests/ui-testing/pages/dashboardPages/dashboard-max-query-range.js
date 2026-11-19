@@ -13,7 +13,8 @@ export default class DashboardMaxQueryRange {
    */
   constructor(page) {
     this.page = page;
-    this.warningIcon = page.locator('[data-test="panel-max-duration-warning"]');
+    // A limit in hours shows the "Max 1d" lock chip; other range warnings keep the warning icon.
+    this.warningIcon = page.locator('[data-test="panel-max-duration-chip"], [data-test="panel-max-duration-warning"]');
     this.tooltip = page.locator('[data-test="o-tooltip-content"]');
   }
 

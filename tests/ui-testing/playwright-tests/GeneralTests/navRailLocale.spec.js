@@ -101,7 +101,7 @@ test.describe("Nav rail: locales and language reload", () => {
     await pm.logsPage.selectStream("e2e_automate");
     await pm.logsPage.typeQuery("match_all('language-reload-probe')");
     await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
+    await page.locator('[data-test="date-time-chip-1h"]').click();
     await expect(page.locator('[data-test="date-time-btn"]')).toContainText(/1 Hour/i);
 
     testLogger.step("Change language and wait for the reload");

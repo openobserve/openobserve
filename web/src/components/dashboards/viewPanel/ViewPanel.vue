@@ -43,14 +43,14 @@
         />
 
         <DateTimePickerDashboard
+          preset="dashboard"
           :model-value="pickedDate ?? selectedDate"
-          :auto-apply-dashboard="true"
           ref="dateTimePickerRef"
           class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
+          :panel-time-mark="panelOwnTime"
           :disable="disable"
-          calendar-presets
-          @update:model-value="timeGate.onPick"
+          @update:model-value="timeGate.onApply"
           @show="timeGate.onShow"
           @hide="onTimePickerHide"
           @timezone-change="timeGate.flush"
@@ -59,6 +59,7 @@
           v-model="refreshInterval"
           trigger
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+          :range-span-us="refreshRangeSpanUs"
           @trigger="refreshData"
           class="hover:bg-interactive-hover-bg h-7.5 transition-all duration-200"
           data-test="dashboard-viewpanel-refresh-interval"
@@ -163,6 +164,12 @@
       </div>
     </div>
     <OSeparator />
+    <TimeRangeGuardStrip
+      :guard="rangeGuard"
+      data-test="dashboard-viewpanel-range-guard"
+      @run="timeGate.confirmGuard"
+      @back="timeGate.dismissGuard"
+    />
     <div class="flex flex-1 overflow-hidden">
       <div class="flex h-full w-full flex-col">
         <div class="flex h-full w-full">
@@ -303,13 +310,16 @@ import PanelViewToggle from "@/components/dashboards/PanelViewToggle.vue";
 import { usePanelDataView } from "@/composables/dashboard/usePanelDataView";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import useTimeRangeContext from "@/composables/useTimeRangeContext";
+import { heldGuard } from "@/composables/usePageTimeRange";
 import { parseDuration } from "@/utils/date";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
 import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalReplacer";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
-import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import { panelQueryStreams, usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 import {
   PANEL_EDITOR_FOCUS_PARAM,
   type PanelEditorFocusTarget,
@@ -324,7 +334,11 @@ import {
   freshTimeFromAppliedRange,
 } from "@/composables/dashboard/dashboardFreshPanelTime";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
-import { pickerValueToTimeObj, toPickerSavedDate } from "@/utils/dashboard/panelTimeUtils";
+import {
+  hasPanelTime,
+  pickerValueToTimeObj,
+  toPickerSavedDate,
+} from "@/utils/dashboard/panelTimeUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -351,6 +365,7 @@ const PanelErrorButtons = defineAsyncComponent(() => {
 export default defineComponent({
   name: "ViewPanel",
   components: {
+    TimeRangeGuardStrip,
     OSeparator,
     DateTimePickerDashboard,
     DashboardErrorsComponent,
@@ -440,6 +455,7 @@ export default defineComponent({
     // The applied range the chart loads with; the picker's own value is `timeGate.picked`.
     const selectedDate: any = ref(props.selectedDateForViewPanel);
     const dateTimePickerRef: any = ref(null);
+    const panelOwnTime = computed(() => hasPanelTime(dashboardPanelData.data));
     const errorData: any = reactive({
       errors: [],
     });
@@ -501,7 +517,9 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
-    } = usePanelNotices(() => store.state.timezone);
+    } = usePanelNotices(() => store.state.timezone, {
+      streams: () => panelQueryStreams(dashboardPanelData.data),
+    });
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
     const errorMessage = ref("");
@@ -709,11 +727,20 @@ export default defineComponent({
 
     const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
 
+    const timeRangeContext = useTimeRangeContext();
     const timeGate = useDashboardTimeGate({
       applied: selectedDate,
       isAutoRunOn: () => isAutoRunOn.value,
       showInPicker: (value) =>
         dateTimePickerRef.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone)),
+      guardDays: () => timeRangeContext.rangeGuardDays.value,
+    });
+    const rangeGuard = computed(() =>
+      heldGuard(timeGate.held.value, timeRangeContext.rangeGuardDays.value, 1),
+    );
+    const refreshRangeSpanUs = computed(() => {
+      const span = Number(selectedDate.value?.endTime) - Number(selectedDate.value?.startTime);
+      return Number.isFinite(span) && span > 0 ? span : null;
     });
 
     const showApplyHint = computed(
@@ -1032,6 +1059,8 @@ export default defineComponent({
     });
 
     return {
+      rangeGuard,
+      refreshRangeSpanUs,
       t,
       isMobile,
       isCancelShown,
@@ -1076,6 +1105,7 @@ export default defineComponent({
       refreshTooltip,
       timeGate,
       pickedDate: timeGate.picked,
+      panelOwnTime,
       onTimePickerHide,
       isAutoRunAvailable,
       isAutoRunOn,

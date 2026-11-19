@@ -64,6 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <SearchBar
               data-test="logs-search-bar"
               ref="searchBarRef"
+              :context-view="tracesContextOn"
+              @leave-context-view="tracesContext = null"
               :fieldValues="fieldValues"
               :isLoading="searchObj.loading"
               :activeTab="activeTab"
@@ -195,6 +197,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @pick-stream="onPickTracesStream"
                       />
                     </div>
+                    <RangeLimitStrip
+                      v-else-if="tracesRangeLink.refusal"
+                      :refusal="tracesRangeLink.refusal"
+                      :timezone="store.state.timezone"
+                      data-test="traces-range-limit-strip"
+                      nothing-run-test="traces-nothing-run"
+                      @show="(period: string) => searchBarRef?.dateTimeRef?.pickChip?.(period)"
+                      @pick="() => searchBarRef?.dateTimeRef?.openMenu?.()"
+                    />
                     <div
                       v-else-if="
                         !searchObj.loadingStream &&
@@ -218,14 +229,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @action="() => searchData()"
                       />
                     </div>
-                    <div v-else data-test="logs-search-search-result" class="h-full!">
+                    <div v-else data-test="logs-search-search-result" class="flex h-full! flex-col">
+                      <StaleRangeStrip
+                        v-if="staleRangeText"
+                        :text="staleRangeText"
+                        data-test="traces-search-bar-stale-range-strip"
+                        @run="() => searchData()"
+                      />
+                      <TracesArrivalStrip
+                        v-if="arrivalRangeText"
+                        :range="arrivalRangeText"
+                        :page="t('menu.search')"
+                        @apply="applyArrival"
+                        @close="arrivalDismissed = true"
+                      />
+                      <StaleRangeStrip
+                        v-if="tracesContextText"
+                        :text="tracesContextText"
+                        :run-label="t('timeRangeHost.applyFilter')"
+                        :back-label="t('timeRangeHost.backToResults')"
+                        back-shortcut-id="timeRangeUndo"
+                        data-test="traces-search-around-context-strip"
+                        @run="applyTracesContextFilter"
+                        @back="backFromTracesContext"
+                      />
                       <SearchResult
+                        class="min-h-0 flex-1"
                         ref="searchResultRef"
                         :pending="searchObj.loadingStream"
                         :show-error-only="showErrorOnly"
                         :ai-enabled="isAiEnabled"
                         :stream-doc-time-range="streamDocTimeRange"
                         :query-window-us="queryWindowUs"
+                        :chart-filter="chartFilter"
                         @update:datetime="setHistogramDate"
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
@@ -239,6 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @ask-ai="onAskAiTracing"
                         @send-to-ai-chat="sendToAiChat"
                         @open-mobile-fields="mobileFieldsOpen = true"
+                        @search:around="onTracesSearchAround"
                       />
                     </div>
                   </div>
@@ -294,6 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 // @ts-nocheck
 import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { getIntlLocale } from "@/locales";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
   ref,
@@ -320,7 +358,26 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
-import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
+import {
+  TRACES_APPLY_RANGE,
+  tracesRangeLink,
+  tracesRunIsStaged,
+  tracesRunTimeSelection,
+  tracesQueryEdited,
+  tracesSearchRunSignature,
+} from "./tracesSearchBar.utils";
+import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import TracesArrivalStrip from "./TracesArrivalStrip.vue";
+import RangeLimitStrip from "@/plugins/logs/RangeLimitStrip.vue";
+import { linkRangeRefusal } from "@/utils/logs/rangeLimitRefusal";
+import useTimeRangeHistory, {
+  arrivalFromPage,
+  isRelativeHistoryEntry,
+  type TimeRangeHistoryEntry,
+} from "@/composables/useTimeRangeHistory";
+import { formatRangeLabel } from "@/utils/timeRangeLabel";
+import { rangeFromToken, type TimeRange } from "@/utils/timeRangeModel";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -331,7 +388,7 @@ import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
-import { computed } from "vue";
+import { computed, provide } from "vue";
 import useStreams from "@/composables/useStreams";
 import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
@@ -374,6 +431,14 @@ import { isBareTracesQuery, tracesQueryKey } from "@/plugins/traces/tracesPageRe
 import { openRecentOnItsPage, takeRecentLanding } from "@/utils/queryHistory/routes";
 import { isLeavingRoute, trackPendingNavigation } from "@/utils/pendingNavigation";
 import type { HistoryTime, QueryHistoryEntry } from "@/services/query_history";
+import { searchAroundPickerRange } from "@/composables/useLogs/searchAround";
+import { searchAroundWindow } from "@/utils/searchAroundWindow";
+import {
+  contextViewOn,
+  contextViewStripText,
+  rowAnchorUs,
+  type TracesContextView,
+} from "@/plugins/traces/tracesContextView";
 
 interface TracesSavedView {
   version?: number;
@@ -440,6 +505,7 @@ correlationFilters.watchQuery();
 
 const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
+const tracesContext = ref<TracesContextView | null>(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
@@ -711,7 +777,7 @@ const canWriteTracesUrl = () =>
 
 function buildSearch(reuseLastWindow = false) {
   try {
-    let query = searchObj.data.editorValue.trim();
+    let query = tracesContextOn.value ? "" : searchObj.data.editorValue.trim();
     var req = getDefaultRequest();
     req.query.from = searchObj.data.resultGrid.currentPage * searchObj.meta.resultGrid.rowsPerPage;
     req.query.size = parseInt(searchObj.meta.resultGrid.rowsPerPage, 10);
@@ -893,6 +959,7 @@ function resultsViewKey() {
 
 // The whole editor value is the where clause; a "|" split is quote-unaware and would cut match_all('a | b').
 function buildEditorFilter() {
+  if (tracesContextOn.value) return "";
   return resolveTracesFilter(
     searchObj.data.editorValue,
     tracesParser.value,
@@ -1417,6 +1484,14 @@ async function extractFields() {
               : searchObj.data.datetime.queryRangeRestrictionInHour + " hour",
         });
       }
+      // O1: a linked range over the stream limit runs nothing; the page shows the guard strip instead.
+      tracesRangeLink.refusal = tracesRangeLink.fromLink
+        ? linkRangeRefusal(
+            searchObj.data.datetime,
+            searchObj.data.datetime.queryRangeRestrictionInHour,
+            stream.name,
+          )
+        : null;
       schema.push(...stream.schema);
       ftsKeys = new Set([...stream.settings.full_text_search_keys]);
 
@@ -1609,6 +1684,16 @@ const sortNeedsSchema = () => {
   return !!sortBy && sortBy !== "start_time" && sortBy !== "duration";
 };
 
+// The fields load sets the link refusal, so a link that may hit a range limit must not run before it.
+const linkMayBeRefused = () => {
+  if (!tracesRangeLink.fromLink) return false;
+  if (Number(store.state.zoConfig.max_query_range) > 0) return true;
+  const entry = searchObj.data.streamResults?.list?.find(
+    (s: any) => s.name === searchObj.data.stream.selectedStream.value,
+  );
+  return !entry?.settings || Number(entry.settings.max_query_range) > 0;
+};
+
 /** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
 async function loadPageData({ leftOrg = "" } = {}) {
   const generation = pageGeneration;
@@ -1637,7 +1722,7 @@ async function loadPageData({ leftOrg = "" } = {}) {
   if (generation !== pageGeneration) return;
   await parserReady;
   if (generation !== pageGeneration) return;
-  if (fields && sortNeedsSchema()) await fields.fieldsReady;
+  if (fields && (sortNeedsSchema() || linkMayBeRefused())) await fields.fieldsReady;
   if (generation !== pageGeneration) return;
   pageLoaded = true;
   pendingLanding = null;
@@ -1761,6 +1846,9 @@ onUnmounted(() => {
 
 onActivated(async () => {
   pageActive.value = true;
+  arrivedWithoutRange.value = !urlHasRange();
+  arrivalDismissed.value = false;
+  tracesRangeLink.fromLink = urlHasRange();
   setupContextProvider();
 
   const savedAutoRun = localStorage.getItem("oo_toggle_auto_run");
@@ -1845,6 +1933,7 @@ onActivated(async () => {
 
 /** Runs the search; `record` is false for runs no user asked for, such as a page landing. */
 const runQueryFn = (record = true) => {
+  if (tracesRangeLink.refusal) return;
   searchObj.data.resultGrid.currentPage = pendingUrlPage ?? 0;
   pendingUrlPage = null;
   searchObj.runQuery = false;
@@ -2035,6 +2124,151 @@ const onFiltersReset = () => {
   searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
+// §4 context view: the unfiltered window around a row, on screen while the typed query is unchanged.
+const tracesContextOn = computed(() =>
+  contextViewOn(tracesContext.value, searchObj.data.editorValue),
+);
+const chartFilter = computed(() =>
+  tracesContextOn.value ? "" : String(searchObj.data.editorValue ?? ""),
+);
+const tracesContextText = computed(() =>
+  tracesContextOn.value && tracesContext.value
+    ? contextViewStripText(tracesContext.value, store.state.timezone, t)
+    : null,
+);
+type ContextBar = {
+  dateTimeRef?: {
+    setRelativeTime: (period: string) => void;
+    setAbsoluteTime: (startUs: number, endUs: number) => void;
+    setDateType: (type: string) => void;
+  };
+  enterContextWindow?: (range: { start: number; end: number }) => boolean;
+  undoToResults?: (run: () => void) => boolean;
+};
+const onTracesSearchAround = (request: { row: any; seconds: number; keepFilters: boolean }) => {
+  const anchorUs = rowAnchorUs(request.row, searchObj.meta.searchMode);
+  const bar = searchBarRef.value as ContextBar | null;
+  if (anchorUs === null || !bar?.enterContextWindow) return;
+  const range = searchAroundPickerRange(
+    searchAroundWindow(anchorUs, request.seconds),
+    store.state.timezone,
+  );
+  // Keep filters is no context view: the range moves and runs like any drag-zoom.
+  if (request.keepFilters) {
+    tracesContext.value = null;
+    bar.enterContextWindow(range);
+    return;
+  }
+  const datetime = searchObj.data.datetime;
+  tracesContext.value = {
+    typedQuery: String(searchObj.data.editorValue ?? ""),
+    anchorUs,
+    seconds: request.seconds,
+    previous: {
+      type: String(datetime.type ?? "relative"),
+      startTime: Number(datetime.startTime),
+      endTime: Number(datetime.endTime),
+      relativeTimePeriod: String(datetime.relativeTimePeriod ?? ""),
+    },
+  };
+  if (!bar.enterContextWindow(range)) tracesContext.value = null;
+};
+const applyTracesContextFilter = () => {
+  tracesContext.value = null;
+  searchData();
+};
+const backFromTracesContext = async () => {
+  const previous = tracesContext.value?.previous;
+  tracesContext.value = null;
+  const bar = searchBarRef.value as ContextBar | null;
+  if (bar?.undoToResults?.(() => searchData())) return;
+  if (previous && bar?.dateTimeRef) {
+    if (previous.type === "relative" && previous.relativeTimePeriod) {
+      // setRelativeTime leaves the picker on the context window's dates, so the type is switched too.
+      bar.dateTimeRef.setRelativeTime(previous.relativeTimePeriod);
+      bar.dateTimeRef.setDateType("relative");
+    } else bar.dateTimeRef.setAbsoluteTime(previous.startTime, previous.endTime);
+    await nextTick();
+  }
+  searchData();
+};
+
+// Unrun query edits wait for Run, so say which range the shown results are for (decision a).
+const staleRangeText = computed(() => {
+  if (searchObj.loading) return null;
+  if (tracesContextOn.value) return null;
+  if (!tracesQueryEdited(searchObj.meta.lastRunSignature, searchObj)) return null;
+  const queried = tracesRunTimeSelection(searchObj.meta.lastRunSignature);
+  if (!queried) return null;
+  const range =
+    queried.type === "relative"
+      ? String(formatPeriodLabel(queried.period, store.state.timezone, t, getIntlLocale()))
+      : formatRangeLabel(
+          { startUs: queried.startUs, endUs: queried.endUs },
+          { timezone: store.state.timezone, surface: "summary", locale: getIntlLocale() },
+        );
+  return t("search.resultsAreForRange", { range });
+});
+
+// O2: Traces opened without a range in its URL offers the range Logs applied last.
+const rangeHistory = useTimeRangeHistory();
+const urlHasRange = () => {
+  const query = router.currentRoute.value.query;
+  return !!(query.period || query.from || query.to);
+};
+const arrivedWithoutRange = ref(!urlHasRange());
+tracesRangeLink.fromLink = urlHasRange();
+const arrivalDismissed = ref(false);
+const arrival = computed<TimeRangeHistoryEntry | null>(() => {
+  if (!arrivedWithoutRange.value || arrivalDismissed.value) return null;
+  const dt = searchObj.data.datetime ?? {};
+  const current: TimeRangeHistoryEntry | null =
+    dt.type === "absolute"
+      ? { startUs: Number(dt.startTime), endUs: Number(dt.endTime) }
+      : dt.relativeTimePeriod
+        ? { relative: dt.relativeTimePeriod }
+        : null;
+  return arrivalFromPage(rangeHistory.entries.value, String(t("menu.search")), current);
+});
+const arrivalRangeText = computed(() => {
+  const entry = arrival.value;
+  if (!entry) return null;
+  if (isRelativeHistoryEntry(entry))
+    return formatPeriodLabel(entry.relative, store.state.timezone, t, getIntlLocale());
+  return raw(
+    formatRangeLabel(
+      { startUs: entry.startUs, endUs: entry.endUs },
+      { timezone: store.state.timezone, surface: "summary", locale: getIntlLocale() },
+    ),
+  );
+});
+// setRange moves the trigger too without searching, so the one run below is the only search.
+const applyArrival = () => {
+  const entry = arrival.value;
+  arrivalDismissed.value = true;
+  if (!entry) return;
+  tracesRangeLink.fromLink = false;
+  tracesRangeLink.refusal = null;
+  const picker = searchBarRef.value?.dateTimeRef as {
+    setRange?: (range: TimeRange | null) => void;
+  } | null;
+  if (isRelativeHistoryEntry(entry)) {
+    const resolved = getConsumableRelativeTime(entry.relative);
+    if (!resolved) return;
+    picker?.setRange?.(rangeFromToken(entry.relative));
+    searchObj.data.datetime.startTime = resolved.startTime;
+    searchObj.data.datetime.endTime = resolved.endTime;
+    searchObj.data.datetime.relativeTimePeriod = entry.relative;
+    searchObj.data.datetime.type = "relative";
+  } else {
+    picker?.setRange?.({ kind: "fixed", startUs: entry.startUs, endUs: entry.endUs });
+    searchObj.data.datetime.startTime = entry.startUs;
+    searchObj.data.datetime.endTime = entry.endUs;
+    searchObj.data.datetime.type = "absolute";
+  }
+  runQueryFn();
+};
+
 const isStreamSelected = computed(() => {
   return searchObj.data.stream?.selectedStream?.value?.trim()?.length > 0;
 });
@@ -2044,6 +2278,11 @@ const onRemoveTracesFilter = () => {
   searchBarRef.value?.updateQuery?.();
   searchObj.runQuery = true;
 };
+
+// Applied as a chip pick, so it runs, takes an undo step and lands in Recent like one.
+provide(TRACES_APPLY_RANGE, (period: string) =>
+  searchBarRef.value?.dateTimeRef?.pickChip?.(period),
+);
 
 const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
   searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
@@ -2408,6 +2647,9 @@ const onApplySavedView = async (view: TracesSavedView) => {
 /** Applies a stream, filter, window and mode in place, then runs unless only loading. */
 const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   const seq = ++savedViewApplySeq;
+  // A view or Recent entry is a range the user chose, so a refused link no longer holds the page.
+  tracesRangeLink.fromLink = false;
+  tracesRangeLink.refusal = null;
   const streamName = view.stream?.value;
   const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
   if (

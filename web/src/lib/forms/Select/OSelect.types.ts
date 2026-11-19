@@ -75,6 +75,10 @@ export interface SelectOption {
   listLabel?: I18nText;
   /** Listbox mode: small muted detail right-aligned in the list row, such as a UTC offset. */
   suffix?: I18nText;
+  /** Renders a non-selectable rule between options instead of a row; a search keeps it only between matches. */
+  divider?: boolean;
+  /** Divider only: its data-test, which defaults to `<select data-test>-divider`. */
+  dataTest?: string;
   [key: string]: unknown;
 }
 

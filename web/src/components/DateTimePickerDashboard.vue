@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DateTime
     ref="dateTimePicker"
-    :auto-apply="autoApplyDashboard"
     :default-type="modelValue.valueType"
     :default-absolute-time="{
       startTime: modelValue.startTime,
@@ -31,7 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :hide-range-shift="hideRangeShift"
     :menu-align="menuAlign"
     :variant="variant"
-    :calendar-presets="calendarPresets"
+    :preset="preset"
+    :capabilities="capabilities"
+    :host-name="hostName"
+    :panel-time-mark="panelTimeMark"
+    :limit-refused="limitRefused"
+    @apply="onApply"
     @hide="onHide"
     @show="onShow"
   >
@@ -39,9 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, onUnmounted, type PropType } from "vue";
+import { ref, computed, defineComponent, onUnmounted, type PropType } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
+import type {
+  TimeRange,
+  TimeRangeApplyMeta,
+  TimeRangeCapabilities,
+  TimeRangeHostPreset,
+} from "@/utils/timeRangeModel";
 
 export default defineComponent({
   name: "DateTimePickerDashboard",
@@ -66,10 +76,6 @@ export default defineComponent({
       required: false,
       default: false,
     },
-    autoApplyDashboard: {
-      required: false,
-      default: false,
-    },
     hideRelativeTimezone: {
       required: false,
       default: false,
@@ -82,7 +88,7 @@ export default defineComponent({
     },
     menuAlign: {
       required: false,
-      default: "end",
+      default: "start",
       type: String as PropType<"center" | "start" | "end">,
     },
     variant: {
@@ -90,16 +96,41 @@ export default defineComponent({
       default: "outline",
       type: String as PropType<ButtonVariant>,
     },
-    calendarPresets: {
+    preset: {
+      required: false,
+      default: "dashboard",
+      type: String as PropType<TimeRangeHostPreset>,
+    },
+    capabilities: {
+      required: false,
+      default: () => ({}),
+      type: Object as PropType<TimeRangeCapabilities>,
+    },
+    hostName: {
+      required: false,
+      default: "",
+      type: String,
+    },
+    /** A panel on the dashboard keeps its own time; the trigger marks it. */
+    panelTimeMark: {
+      required: false,
+      default: false,
+      type: Boolean,
+    },
+    /** The page refused this range as over its limit; the trigger keeps it with a lock. */
+    limitRefused: {
       required: false,
       default: false,
       type: Boolean,
     },
   },
-  emits: ["update:modelValue", "hide", "show", "timezone-change"],
+  emits: ["update:modelValue", "hide", "show", "timezone-change", "apply"],
 
   setup(props, { emit }) {
     const dateTimePicker: any = ref(null);
+
+    // DateTime emits `apply` just before its `on:date-change`; the gate needs that apply's source.
+    let applySource: TimeRangeApplyMeta["source"] | undefined;
 
     const updateDateTime = (date: any) => {
       const newValue = {
@@ -111,7 +142,18 @@ export default defineComponent({
           : "absolute",
       };
 
-      emit("update:modelValue", newValue);
+      // The second argument tells a page the picker's own corrections apart from a user's pick.
+      const source = applySource;
+      applySource = undefined;
+      emit("update:modelValue", newValue, {
+        userChanged: date.userChangedValue !== false,
+        ...(source ? { source } : {}),
+      });
+    };
+
+    const onApply = (range: TimeRange, meta: TimeRangeApplyMeta) => {
+      applySource = meta?.source;
+      emit("apply", range, meta);
     };
 
     const refresh = () => {
@@ -132,6 +174,11 @@ export default defineComponent({
       dateTimePicker.value.setSavedDate(dateObj);
     };
 
+    // The picker's own undo, for a page control that goes back a step; false before mount or with nothing to undo.
+    const undo = (): boolean => dateTimePicker.value?.undo() ?? false;
+    const canUndo = computed(() => dateTimePicker.value?.undoAvailable === true);
+    const undoLabel = computed((): string => dateTimePicker.value?.undoTooltip ?? "");
+
     const onHide = () => {
       emit("hide");
     };
@@ -144,12 +191,7 @@ export default defineComponent({
       emit("timezone-change");
     };
 
-    // Clean up resources on unmount to prevent memory leaks
     onUnmounted(() => {
-      // If you add intervals, listeners, or subscriptions, clean them up here.
-      // Example:
-      // if (someInterval) clearInterval(someInterval);
-      // if (someListener) someListener.off();
       if (dateTimePicker.value) {
         dateTimePicker.value = null;
       }
@@ -157,11 +199,15 @@ export default defineComponent({
 
     return {
       updateDateTime,
+      onApply,
       refresh,
       dateTimePicker,
       setCustomDate,
       getConsumableDateTime,
       setSavedDate,
+      undo,
+      canUndo,
+      undoLabel,
       onShow,
       onHide,
       onTimezoneChange,

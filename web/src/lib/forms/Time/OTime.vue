@@ -2,11 +2,12 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { TimeProps, TimeEmits, TimeSlots } from "./OTime.types";
-import { computed, ref, useAttrs, useId, watch } from "vue";
+import { computed, nextTick, ref, useAttrs, useId, watch } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { formatTypedTime, parseTypedTime } from "./parseTypedTime";
 
 const { t } = useI18nTyped();
 
@@ -31,7 +32,11 @@ const props = withDefaults(defineProps<TimeProps>(), {
   readonly: false,
   clearable: false,
   withSeconds: false,
+  optionalSeconds: false,
   format24: false,
+  hideIcon: false,
+  revertRefused: false,
+  hideMessage: false,
 });
 
 const emit = defineEmits<TimeEmits>();
@@ -43,15 +48,28 @@ const inputId = computed(() => props.id ?? _fallbackId);
 
 // A typed time the field can't read stays on screen with this message until it is fixed.
 const typedError = ref<I18nText | null>(null);
+const dropsSeconds = computed(() => props.withSeconds && props.optionalSeconds);
+const shownTime = (val: string | null | undefined): string =>
+  dropsSeconds.value && /^\d{2}:\d{2}:00$/.test(val ?? "")
+    ? (val as string).slice(0, 5)
+    : (val ?? "");
 // What the 24-hour field shows: the model, or the unreadable text the user typed.
-const text24 = ref(props.modelValue ?? "");
+const text24 = ref(shownTime(props.modelValue));
 watch(
   () => props.modelValue,
   (val) => {
-    text24.value = val ?? "";
+    text24.value = shownTime(val);
     typedError.value = null;
   },
 );
+// Room for typed milliseconds, so the parent can say where they belong instead of the field cutting them off.
+const text24MaxLength = computed(() => (!props.withSeconds ? 5 : dropsSeconds.value ? 12 : 8));
+const text24Size = computed(() => {
+  if (!props.withSeconds) return 5;
+  if (!dropsSeconds.value) return 8;
+  const length = text24.value.length;
+  return length <= 5 ? 5 : length <= 8 ? 8 : 12;
+});
 // A form must not save the previous value while the field shows a refused entry.
 watch(
   () => !!typedError.value,
@@ -62,8 +80,9 @@ const effectiveError = computed(
 );
 const hasError = computed(() => !!effectiveError.value);
 const messageId = computed(() => `${inputId.value}-message`);
+const shownError = computed(() => (props.hideMessage ? null : effectiveError.value));
 const hasMessage = computed(
-  () => !!(effectiveError.value && effectiveError.value.trim()) || !!props.helpText,
+  () => !!(shownError.value && shownError.value.trim()) || !!props.helpText,
 );
 
 // ── Popover state ──────────────────────────────────────────────
@@ -78,29 +97,23 @@ const internalSecond = ref(0); // 0-59
 
 const isAM = computed(() => internalHour.value < 12);
 
-watch(popoverOpen, (open) => {
-  if (!open) return;
-  clockMode.value = "hour";
-  if (!props.modelValue) {
-    internalHour.value = 0;
-    internalMinute.value = 0;
-    internalSecond.value = 0;
-    return;
-  }
-  const parts = props.modelValue.split(":").map(Number);
+function syncClockToModel() {
+  const parts = props.modelValue ? props.modelValue.split(":").map(Number) : [];
   internalHour.value = parts[0] ?? 0;
   internalMinute.value = parts[1] ?? 0;
   internalSecond.value = parts[2] ?? 0;
+}
+
+watch(popoverOpen, (open) => {
+  if (!open) return;
+  clockMode.value = "hour";
+  syncClockToModel();
 });
 
 watch(
   () => props.modelValue,
   (val) => {
-    if (!popoverOpen.value || !val) return;
-    const parts = val.split(":").map(Number);
-    internalHour.value = parts[0] ?? 0;
-    internalMinute.value = parts[1] ?? 0;
-    internalSecond.value = parts[2] ?? 0;
+    if (popoverOpen.value && val) syncClockToModel();
   },
 );
 
@@ -254,19 +267,11 @@ function handleClear(e: Event) {
 }
 
 // ── 24-hour text input handler ──────────────────────────────
-// Reads `H:M`, `HH:MM` (seconds optional) or `HMM`/`HHMM`.
-function parseTyped(val: string): { h: number; min: number; s: number } | null {
-  const colon = /^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/.exec(val);
-  const m = colon ?? /^(\d{1,2})(\d{2})$/.exec(val);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  const s = Number(colon?.[3] ?? 0);
-  return h > 23 || min > 59 || s > 59 ? null : { h, min, s };
-}
 
 const typedErrorText = (): I18nText =>
-  t("components.time.invalid", { format: raw(props.withSeconds ? "HH:MM:SS" : "HH:MM") });
+  t("components.time.invalid", {
+    format: raw(props.withSeconds && !props.optionalSeconds ? "HH:MM:SS" : "HH:MM"),
+  });
 
 // On commit; an entry it can't read stays as typed with a message, and nothing is emitted.
 function handleText24Change(e: Event) {
@@ -279,7 +284,7 @@ function handleText24Change(e: Event) {
     emit("change", "");
     return;
   }
-  const parsed = parseTyped(val);
+  const parsed = parseTypedTime(val);
   if (!parsed) {
     text24.value = el.value;
     typedError.value = typedErrorText();
@@ -290,13 +295,21 @@ function handleText24Change(e: Event) {
   internalHour.value = h;
   internalMinute.value = min;
   internalSecond.value = s;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const str = props.withSeconds ? `${pad(h)}:${pad(min)}:${pad(s)}` : `${pad(h)}:${pad(min)}`;
+  const full = formatTypedTime(parsed);
+  const str = props.withSeconds ? full : full.slice(0, 5);
   // Normalise the visible text too ("7:5" → "07:05").
-  el.value = str;
-  text24.value = str;
+  el.value = shownTime(str);
+  text24.value = shownTime(str);
   emit("update:modelValue", str);
   emit("change", str);
+  if (!props.revertRefused) return;
+  // A parent that refuses the value leaves the model as it was, so the field shows the model again.
+  nextTick(() => {
+    if ((props.modelValue ?? "") === str) return;
+    el.value = shownTime(props.modelValue);
+    text24.value = el.value;
+    syncClockToModel();
+  });
 }
 
 // ── Native time input handler ───────────────────────────────
@@ -316,6 +329,15 @@ function handleNativeTimeChange(e: Event) {
   emit("update:modelValue", val);
   emit("change", val);
 }
+
+// Beside a prefix the time never shrinks below its content, which includes the AM/PM field on a 12-hour clock, so only the prefix ellipsizes.
+const inputClasses = computed(() => [
+  "text-datepicker-text bg-transparent outline-none",
+  props.prefix ? "min-w-max flex-auto shrink-0 ps-1" : "min-w-0 flex-1 ps-2",
+  props.clearable || props.hideIcon ? "pe-2" : "pe-3",
+]);
+
+const prefixClasses = computed(() => ["text-datepicker-text", props.hideIcon ? "ps-2" : "ps-1.5"]);
 
 // ── Field wrapper classes ──────────────────────────────────────
 const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
@@ -374,6 +396,7 @@ const fieldClasses = computed(() => [
         :data-test="parentDataTest"
       >
         <PopoverTrigger
+          v-if="!hideIcon"
           as="button"
           type="button"
           tabindex="-1"
@@ -384,6 +407,13 @@ const fieldClasses = computed(() => [
           <OIcon name="schedule" size="sm" />
         </PopoverTrigger>
 
+        <span
+          v-if="prefix"
+          class="min-w-0 truncate tabular-nums"
+          :class="prefixClasses"
+          :data-test="parentDataTest ? `${parentDataTest}-prefix` : undefined"
+          >{{ prefix }}</span
+        >
         <!-- 24h mode: a plain text field, because the native time input renders
              in the OS locale's clock (often 12-hour AM/PM) with no override. -->
         <input
@@ -397,13 +427,12 @@ const fieldClasses = computed(() => [
           :aria-invalid="hasError || undefined"
           :aria-describedby="hasMessage ? messageId : undefined"
           :placeholder="placeholder ?? raw('HH:MM')"
-          :maxlength="withSeconds ? 8 : 5"
+          :maxlength="text24MaxLength"
+          :size="prefix ? text24Size : undefined"
           :disabled="isDisabled || undefined"
           :readonly="readonly || undefined"
-          :class="[
-            'text-datepicker-text min-w-0 flex-1 bg-transparent ps-2 outline-none',
-            clearable ? 'pe-2' : 'pe-3',
-          ]"
+          :class="inputClasses"
+          @input="text24 = ($event.target as HTMLInputElement).value"
           @change="handleText24Change"
           @focus="emit('focus', $event)"
           @blur="emit('blur', $event)"
@@ -419,10 +448,7 @@ const fieldClasses = computed(() => [
           :step="withSeconds ? 1 : 60"
           :disabled="isDisabled || undefined"
           :readonly="readonly || undefined"
-          :class="[
-            'text-datepicker-text min-w-0 flex-1 bg-transparent ps-2 outline-none',
-            clearable ? 'pe-2' : 'pe-3',
-          ]"
+          :class="inputClasses"
           @input="handleNativeTimeChange"
           @focus="emit('focus', $event)"
           @blur="emit('blur', $event)"
@@ -674,14 +700,14 @@ const fieldClasses = computed(() => [
       </PopoverPortal>
     </PopoverRoot>
 
-    <div v-if="effectiveError || helpText" class="flex items-center gap-2">
+    <div v-if="shownError || helpText" class="flex items-center gap-2">
       <span
-        v-if="effectiveError && effectiveError.trim()"
+        v-if="shownError && shownError.trim()"
         :id="messageId"
         class="text-datepicker-error-text text-xs leading-snug"
         role="alert"
       >
-        {{ effectiveError }}
+        {{ shownError }}
       </span>
       <span v-else-if="helpText" :id="messageId" class="text-datepicker-label text-xs leading-snug">
         {{ helpText }}

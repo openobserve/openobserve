@@ -50,6 +50,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DbmPageChrome title-data-test="dbm-queries-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="dbm-queries-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <!-- Blocked queries emit no span until they finish, so a lock storm makes
            QPS FALL — and a falling line reads as recovery at the worst possible
            moment. When volume collapses while failures climb, say so before the
@@ -173,13 +179,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @reset:column-sizes="tableRef?.resetColumnSizes?.()"
         />
         <DateTime
-          auto-apply
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           menu-align="end"
           :default-type="range.type"
           :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
           :default-relative-time="range.relativeTimePeriod ?? undefined"
           data-test-name="dbm-queries-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
+          class="h-8"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
           @on:date-change="onDateChange"
         />
         <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
@@ -688,6 +697,7 @@ import {
   type DbmInsight,
   type DbmInsightId,
 } from "@/utils/dbm/insights";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -724,6 +734,7 @@ const {
   run,
   onRefresh,
   onDateChange,
+  timeHost,
 } = useDbmListPage({
   load: () => load(),
   syncUrl: () => syncUrl(),

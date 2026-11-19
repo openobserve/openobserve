@@ -22,8 +22,7 @@ import store from "@/test/unit/helpers/store";
 const START = Date.parse("2026-11-04T00:00:00Z") * 1000;
 const END = Date.parse("2026-11-05T00:00:00Z") * 1000;
 const ABSOLUTE = {
-  disableRelative: true,
-  autoApply: true,
+  capabilities: { kinds: ["fixed"] },
   defaultAbsoluteTime: { startTime: START, endTime: END },
 };
 
@@ -63,7 +62,7 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
   });
 
   /// A zone picked here changes this range only, never the timezone every other page reads.
-  it("re-reads the shown times in a newly picked zone without touching the app's", async () => {
+  it("redraws the same instants in a newly picked zone without touching the app's", async () => {
     const dispatch = store.dispatch;
     const calls: unknown[][] = [];
     store.dispatch = ((...args: unknown[]) => {
@@ -77,7 +76,8 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
       await wrapper!.vm.onTimezoneChange();
       await flushPromises();
 
-      expect(lastEmit().startTime).toBe(START + 5.5 * 3_600_000_000);
+      expect(wrapper!.vm.getConsumableDateTime().startTime).toBe(START);
+      expect(wrapper!.vm.selectedTime.startTime).toBe("00:00:00");
       expect(wrapper!.emitted("on:timezone-change")!.at(-1)).toEqual(["UTC"]);
       expect(store.state.timezone).toBe("UTC");
       expect(calls.some((call) => call[0] === "setTimezone")).toBe(false);
@@ -86,13 +86,48 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
     }
   });
 
-  it("drops the copy and paste row but keeps the zone select and the hint", async () => {
+  it("keeps the applied range when the zone changes and the panel closes without Apply", async () => {
+    createWrapper({ pickerTimezone: "Asia/Calcutta" });
+    await flushPromises();
+    wrapper!.vm.onMenuOpenChange(true);
+    wrapper!.vm.menuOpen = true;
+    await flushPromises();
+    wrapper!.vm.timezone = "UTC";
+    await wrapper!.vm.onTimezoneChange();
+    await flushPromises();
+    wrapper!.vm.menuOpen = false;
+    wrapper!.vm.onMenuOpenChange(false);
+    await flushPromises();
+
+    const range = wrapper!.vm.getConsumableDateTime();
+    expect(range.startTime).toBe(START);
+    expect(range.endTime).toBe(END);
+    expect(wrapper!.vm.selectedTime.startTime).toBe("00:00:00");
+  });
+
+  it("re-emits a linked fixed range as fixed when the link also names a zone", async () => {
+    createWrapper({
+      defaultType: "absolute",
+      initialTimezone: "Asia/Calcutta",
+    });
+    await flushPromises();
+    const events = wrapper!.emitted("on:date-change") as Record<string, unknown>[][];
+    expect(events.length).toBeGreaterThan(0);
+    for (const [payload] of events) {
+      expect(payload.valueType).toBe("absolute");
+      expect(payload.startTime).toBe(START);
+    }
+  });
+
+  it("drops the text input, copy and paste but keeps the zone select and the resolved range", async () => {
     createWrapper({ pickerTimezone: "Asia/Calcutta", hideClipboard: true, defaultOpen: true });
     await flushPromises();
+    expect(inMenu("date-time-input")).toBeNull();
     expect(inMenu("date-time-copy-btn")).toBeNull();
     expect(inMenu("date-time-paste-btn")).toBeNull();
     expect(inMenu("datetime-timezone-select")).not.toBeNull();
-    expect(document.body.textContent).toContain("You can choose multiple dates");
+    expect(inMenu("date-time-resolved")).not.toBeNull();
+    expect(document.body.textContent).not.toContain("You can choose multiple dates");
   });
 
   it("keeps copy and paste and reads the app's zone by default", async () => {
@@ -102,5 +137,56 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
     expect(wrapper!.vm.selectedTime.startTime).toBe("05:30:00");
     expect(inMenu("date-time-copy-btn")).not.toBeNull();
     expect(inMenu("date-time-paste-btn")).not.toBeNull();
+  });
+
+  describe("zone menu (R12, O3)", () => {
+    const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tr = (key: string, params: Record<string, unknown> = {}) =>
+      String((i18n.global.t as unknown as (k: string, p: object) => string)(key, params));
+
+    it("pins UTC and the browser zone above a divider", async () => {
+      createWrapper();
+      await flushPromises();
+      const [utc, browser, divider] = wrapper!.vm.timezoneSelectOptions;
+      expect(utc.value).toBe("UTC");
+      expect(browser.label).toBe(tr("dateTime.browserTimeZone", { zone: browserZone }));
+      expect(browser.testId).toBe("datetime-timezone-browser");
+      expect(divider).toMatchObject({ divider: true, testId: "datetime-timezone-divider" });
+    });
+
+    it.each(["browser", "local"])("finds the browser row by %s", async (term) => {
+      createWrapper();
+      await flushPromises();
+      wrapper!.vm.zoneQuery = term;
+      await flushPromises();
+      expect(wrapper!.vm.timezoneSelectOptions[0].testId).toBe("datetime-timezone-browser");
+    });
+
+    it("offers the as-UTC reading in the zone menu, not in the summary", async () => {
+      store.state.timezone = "Asia/Calcutta";
+      createWrapper({ capabilities: {}, defaultOpen: true });
+      await flushPromises();
+      const field = document.querySelector<HTMLInputElement>(
+        "[data-test='date-time-input-field']",
+      )!;
+      field.value = "2026-11-04 09:00";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await flushPromises();
+      expect(wrapper!.vm.asUtcLabel).not.toBeNull();
+      const summary = inMenu("date-time-resolved")!;
+      expect(summary.querySelector("[data-test='date-time-as-utc-toggle']")).toBeNull();
+
+      document
+        .querySelector<HTMLElement>("[data-test='datetime-timezone-select-trigger']")!
+        .click();
+      await flushPromises();
+      const toggle = document.querySelector<HTMLElement>("[data-test='date-time-as-utc-toggle']")!;
+      expect(toggle.textContent?.trim()).toBe(String(wrapper!.vm.asUtcLabel!.full));
+      toggle.click();
+      await flushPromises();
+      expect(wrapper!.vm.inputAsUtc).toBe(true);
+    });
   });
 });

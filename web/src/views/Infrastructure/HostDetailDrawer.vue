@@ -29,6 +29,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { durationParts } from "./curated/resolve";
@@ -218,6 +220,15 @@ const onDateChange = (date: { startTime: number; endTime: number; userChangedVal
   void resolveMetrics(false);
 };
 
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("menu.hosts"),
+  url: false,
+  initial: () => ({ kind: "fixed", startUs: props.range.from, endUs: props.range.to }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: (value) => onDateChange(value as Parameters<typeof onDateChange>[0]),
+});
+
 onMounted(() => void resolveMetrics(false));
 
 // A ?host= edit while open reuses this instance, so the panels must be rebuilt for the new host.
@@ -269,16 +280,25 @@ const statusLabel = computed(() =>
           }}</OTag>
         </div>
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           ref="dateTimePicker"
-          auto-apply
           menu-align="end"
           default-type="absolute"
           :default-absolute-time="{ startTime: range.from, endTime: range.to }"
           data-test-name="host-drawer-date-time"
-          @on:date-change="onDateChange"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
       </div>
 
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="host-detail-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <div class="border-border-default min-h-0 flex-1 overflow-y-auto border-t pt-2">
         <div
           v-if="curated.face.value === 'unknown' && curated.loadError.value"

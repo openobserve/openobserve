@@ -51,11 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Absolute only, as Cover a shift: an absence is forward-looking. -->
       <div>
         <OFormDateTimeRange
+          :capabilities="{ kinds: ['fixed'], future: true }"
           name="window"
           :label="t('oncall.coverWhen')"
           required
-          disable-relative
-          auto-apply
           :trigger-text="windowLabel"
           :picker-timezone="pickedZone"
           hide-clipboard

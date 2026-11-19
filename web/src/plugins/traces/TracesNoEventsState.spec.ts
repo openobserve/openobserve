@@ -50,6 +50,7 @@ vi.mock("@/composables/useTraces", () => ({
 }));
 
 import TracesNoEventsState from "./TracesNoEventsState.vue";
+import { TRACES_APPLY_RANGE } from "./tracesSearchBar.utils";
 
 // ---------------------------------------------------------------------------
 // Stubs
@@ -153,12 +154,122 @@ describe("TracesNoEventsState", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("names a calendar period in the no-events message, never as a NaN count", async () => {
+    it("dates a calendar period in the no-events message, never as a NaN count (R6)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:00:00Z"));
+      try {
+        wrapper.unmount();
+        mockSearchObj.data.datetime.relativeTimePeriod = "calendar:month:-1";
+        wrapper = mountComponentWithStore();
+        expect(wrapper.text()).toContain("No traces in Oct 1 – 31");
+        expect(wrapper.text()).not.toContain("NaN");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("dates the empty range in the user's locale", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:00:00Z"));
+      const locale = i18n.global.locale;
+      (i18n.global as any).locale = "fr";
+      try {
+        wrapper.unmount();
+        mockSearchObj.data.datetime.relativeTimePeriod = "calendar:month:-1";
+        wrapper = mountComponentWithStore();
+        expect(wrapper.text()).toMatch(/oct\./);
+        expect(wrapper.text()).not.toContain("Oct ");
+      } finally {
+        (i18n.global as any).locale = locale;
+        vi.useRealTimers();
+      }
+    });
+
+    it("offers the next longer quick range through the page's apply (R6, O4)", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));
+      try {
+        wrapper.unmount();
+        const applyRange = vi.fn();
+        wrapper = mount(TracesNoEventsState, {
+          global: {
+            plugins: [i18n, store],
+            provide: { [TRACES_APPLY_RANGE as symbol]: applyRange },
+            stubs: { OEmptyState: OEmptyStateStub, EmptyStateActionCard: EmptyStateActionCardStub },
+          },
+        });
+        expect(wrapper.text()).toContain("No traces in Nov 16, 03:04 – 03:19");
+        const btn = wrapper.find('[data-test="traces-no-events-try-range-btn"]');
+        expect(btn.text()).toBe("Try Last 1 hour");
+        await btn.trigger("click");
+        expect(applyRange).toHaveBeenCalledWith("1h");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("rounds a live range's bounds to the minute (R5)", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:19:48Z"));
+      try {
+        wrapper.unmount();
+        wrapper = mountComponentWithStore();
+        expect(wrapper.text()).toContain("No traces in Nov 16, 03:04 – 03:19");
+        expect(wrapper.text()).not.toContain(":48");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("keeps the dated message and Try beside the jump card (B10, R6/R7)", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-16T03:19:00Z"));
+      try {
+        wrapper.unmount();
+        wrapper = mount(TracesNoEventsState, {
+          props: { streamDocTimeRange: { min: 1_000_000, max: 10_000_000 } },
+          global: {
+            plugins: [i18n, store],
+            provide: { [TRACES_APPLY_RANGE as symbol]: vi.fn() },
+            stubs: { OEmptyState: OEmptyStateStub, EmptyStateActionCard: EmptyStateActionCardStub },
+          },
+        });
+        expect(wrapper.find('[data-test="traces-no-events-jump-to-data-card"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.text()).toContain("No traces in Nov 16, 03:04 – 03:19");
+        expect(wrapper.text()).not.toContain("doesn't contain any data");
+        expect(wrapper.find('[data-test="traces-no-events-try-range-btn"]').text()).toBe(
+          "Try Last 1 hour",
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("offers no longer range when it is over the stream's query-range limit", () => {
       wrapper.unmount();
-      mockSearchObj.data.datetime.relativeTimePeriod = "calendar:month:-1";
-      wrapper = mountComponent();
-      expect(wrapper.text()).toContain("Last month");
-      expect(wrapper.text()).not.toContain("NaN");
+      const dt = mockSearchObj.data.datetime as Record<string, unknown>;
+      const saved = { ...dt };
+      Object.assign(dt, {
+        startTime: (Date.now() - 24 * 3600000) * 1000,
+        endTime: Date.now() * 1000,
+        relativeTimePeriod: "24h",
+        queryRangeRestrictionInHour: 24,
+      });
+      try {
+        wrapper = mount(TracesNoEventsState, {
+          global: {
+            plugins: [i18n, store],
+            provide: { [TRACES_APPLY_RANGE as symbol]: vi.fn() },
+            stubs: { OEmptyState: OEmptyStateStub, EmptyStateActionCard: EmptyStateActionCardStub },
+          },
+        });
+        expect(wrapper.find('[data-test="traces-no-events-try-range-btn"]').exists()).toBe(false);
+      } finally {
+        Object.keys(dt).forEach((k) => delete dt[k]);
+        Object.assign(dt, saved);
+      }
     });
 
     it("should NOT render any expand range card (feature removed)", () => {

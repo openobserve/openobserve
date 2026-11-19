@@ -542,4 +542,151 @@ describe("useDashboardTimeGate", () => {
     expect(gate.applied.value).toEqual(START);
     expect(onAutoApply).not.toHaveBeenCalled();
   });
+
+  describe("apply from the picker", () => {
+    it("runs an applied range at once with Auto Run off", () => {
+      autoRun.value = false;
+      const gate = createGate();
+
+      gate.onApply(relative("7d"));
+
+      expect(gate.applied.value).toEqual(relative("7d"));
+      expect(gate.needsRefresh.value).toBe(false);
+    });
+
+    it("runs a range applied in the open panel at once, since drafts never reach the page", () => {
+      autoRun.value = false;
+      const gate = createGate();
+      gate.onShow();
+
+      gate.onApply(absolute(10, 30));
+
+      expect(gate.applied.value).toEqual(absolute(10, 30));
+      gate.onHide();
+      expect(gate.applied.value).toEqual(absolute(10, 30));
+    });
+
+    it("applies an absolute range at once while the panel is closed", () => {
+      autoRun.value = false;
+      const gate = createGate();
+
+      gate.onApply(absolute(10, 20));
+
+      expect(gate.applied.value).toEqual(absolute(10, 20));
+    });
+
+    it("runs a chip picked in the open panel at once, dropping an earlier field edit", () => {
+      autoRun.value = false;
+      const gate = createGate();
+      gate.onShow();
+
+      gate.onApply(absolute(10, 20));
+      gate.onApply(relative("7d"));
+      expect(gate.applied.value).toEqual(relative("7d"));
+
+      gate.onHide();
+      expect(gate.applied.value).toEqual(relative("7d"));
+    });
+
+    it("treats the picker's own corrections as picks, not applies", () => {
+      autoRun.value = false;
+      const gate = createGate();
+
+      gate.onApply(relative("1h"), { userChanged: false });
+
+      expect(gate.applied.value).toEqual(START);
+      expect(gate.needsRefresh.value).toBe(true);
+    });
+
+    it("keeps the applied range when the picker reports a broken one", () => {
+      autoRun.value = false;
+      const gate = createGate();
+
+      gate.onApply(absolute(20, 10));
+
+      expect(gate.applied.value).toEqual(START);
+    });
+  });
+
+  describe("org range guard", () => {
+    const DAY_US = 86_400_000_000;
+    const guarded = (days: number | null, applied = ref<any>(null)) => {
+      const showInPicker = vi.fn();
+      const gate = scope.run(() =>
+        useDashboardTimeGate({
+          applied,
+          isAutoRunOn: () => false,
+          guardDays: () => days,
+          showInPicker,
+        }),
+      )!;
+      gate.onPick(START);
+      return { gate, showInPicker };
+    };
+
+    it("holds an applied range longer than the guard and keeps the old one running", () => {
+      const { gate } = guarded(30);
+
+      gate.onApply(absolute(0, 31 * DAY_US));
+
+      expect(gate.applied.value).toEqual(START);
+      expect(gate.held.value).toEqual({ from: START, to: absolute(0, 31 * DAY_US) });
+    });
+
+    it("runs a range within the guard at once", () => {
+      const { gate } = guarded(30);
+
+      gate.onApply(absolute(0, 30 * DAY_US));
+
+      expect(gate.applied.value).toEqual(absolute(0, 30 * DAY_US));
+      expect(gate.held.value).toBeNull();
+    });
+
+    it("never holds when the org has no guard", () => {
+      const { gate } = guarded(null);
+
+      gate.onApply(absolute(0, 400 * DAY_US));
+
+      expect(gate.applied.value).toEqual(absolute(0, 400 * DAY_US));
+    });
+
+    it("runs the held range on confirm", () => {
+      const { gate } = guarded(30);
+      gate.onApply(absolute(0, 90 * DAY_US));
+
+      gate.confirmGuard();
+
+      expect(gate.applied.value).toEqual(absolute(0, 90 * DAY_US));
+      expect(gate.held.value).toBeNull();
+    });
+
+    it("puts the picker back on the old range on dismiss", () => {
+      const { gate, showInPicker } = guarded(30);
+      gate.onApply(absolute(0, 90 * DAY_US));
+
+      gate.dismissGuard();
+
+      expect(gate.applied.value).toEqual(START);
+      expect(gate.held.value).toBeNull();
+      expect(showInPicker).toHaveBeenCalledWith(START);
+    });
+
+    it("does not hold an undo, which only returns to a range that already ran", () => {
+      const { gate } = guarded(30);
+
+      gate.onApply(absolute(0, 90 * DAY_US), { source: "undo" });
+
+      expect(gate.applied.value).toEqual(absolute(0, 90 * DAY_US));
+    });
+
+    it("drops a held range when a shorter one is applied", () => {
+      const { gate } = guarded(30);
+      gate.onApply(absolute(0, 90 * DAY_US));
+
+      gate.onApply(relative("1h"));
+
+      expect(gate.held.value).toBeNull();
+      expect(gate.applied.value).toEqual(relative("1h"));
+    });
+  });
 });

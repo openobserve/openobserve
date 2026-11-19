@@ -44,8 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           ref="dateTimeRef"
-          auto-apply
           :default-type="dateTimeType"
           :default-absolute-time="{
             startTime: absoluteTime.startTime,
@@ -53,7 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :default-relative-time="relativeTime"
           data-test="workflow-runs-date-picker"
-          @on:date-change="updateDateTime"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
         <OButton
           v-if="testRunCount > 0"
@@ -79,6 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="workflow-runs-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
       <!-- Offered only once the workflow has or had an endpoint; every other workflow keeps today's list. -->
       <div v-if="showTriggerFilter" class="flex shrink-0 flex-wrap items-center gap-2">
@@ -316,6 +325,10 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import useTimeRangeContext from "@/composables/useTimeRangeContext";
+import { rangeToLegacy } from "@/utils/timeRangeModel";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -369,6 +382,7 @@ const triggerFilter = defineModel<RunTriggerFilter>("triggerFilter", { default: 
 
 const { t } = useI18nTyped();
 const store = useStore();
+const timeContext = useTimeRangeContext();
 const dash = raw("—");
 
 // Loading + the runs list live in SHARED state (workflowObj.runsHistory) so the
@@ -599,6 +613,14 @@ const columns = computed<OTableColumnDef[]>(() => [
 // `force` for the refresh and retry buttons; a mount or window change reads the cache.
 const fetchHistory = async (force = false) => {
   if (!props.workflowId) return;
+  // A rolling range resolves at query time; the picker's instants trail the clock.
+  if (dateTimeType.value === "relative") {
+    const { startTime, endTime } = rangeToLegacy(
+      { kind: "rolling", span: relativeTime.value },
+      timeContext.now(),
+    );
+    dateTimeValues.value = { startTime, endTime };
+  }
   const res = await loadRunsHistory({
     orgId: props.orgId,
     workflowId: props.workflowId,
@@ -662,6 +684,15 @@ const updateDateTime = (value: any) => {
   }
   fetchHistory();
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("workflow.runs.title"),
+  url: false,
+  initial: () => ({ kind: "rolling", span: relativeTime.value }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: updateDateTime,
+});
 
 const openRun = (row: any) => {
   if (!row?.run_id) return;

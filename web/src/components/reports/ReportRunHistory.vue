@@ -16,6 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-test="reports-reportrunhistory">
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="report-run-history-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <OBanner
       v-if="linkedRunMessage"
       variant="warning"
@@ -77,12 +83,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
           </OToggleGroup>
           <DateTime
+            preset="explorer-auto"
+            :capabilities="{ kinds: ['rolling', 'fixed'] }"
             v-if="range === 'custom'"
-            auto-apply
             default-type="absolute"
             :default-absolute-time="{ startTime: customRange.start, endTime: customRange.end }"
             data-test="reports-reportrunhistory-date-picker"
-            @on:date-change="onCustomRange"
+            :range="timeHost.range.value"
+            @apply="timeHost.onApply"
+            @on:date-change="timeHost.onDateChange"
           />
           <OToggleGroup
             :model-value="triggerSource"
@@ -243,6 +252,8 @@ import { useQuery, useQueries } from "@tanstack/vue-query";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import ReportRunDrawer from "@/components/reports/ReportRunDrawer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -516,6 +527,19 @@ const onCustomRange = (value: { startTime: number; endTime: number }) => {
   customRange.value = { start: value.startTime, end: value.endTime };
   currentPage.value = 1;
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("reports.history.tab"),
+  url: false,
+  initial: () => ({
+    kind: "fixed",
+    startUs: customRange.value.start,
+    endUs: customRange.value.end,
+  }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: (value) => onCustomRange(value as { startTime: number; endTime: number }),
+});
 
 const onTriggerChange = (value: unknown) => {
   if (!value) return;

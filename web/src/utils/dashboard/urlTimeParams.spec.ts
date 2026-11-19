@@ -19,7 +19,24 @@ import {
   selectedDateToQueryParams,
   refreshLabelToInterval,
   refreshIntervalToLabel,
+  urlTimeToMicros,
 } from "./urlTimeParams";
+
+describe("urlTimeParams · urlTimeToMicros", () => {
+  it("reads an ISO stamp in a link as microseconds, as Logs does", () => {
+    expect(urlTimeToMicros("2026-11-12T03:30:00Z")).toBe(Date.parse("2026-11-12T03:30:00Z") * 1000);
+  });
+
+  it("keeps an epoch number as written, for the picker to read its unit", () => {
+    expect(urlTimeToMicros("1794454200000")).toBe(1794454200000);
+    expect(urlTimeToMicros(1794454200000000)).toBe(1794454200000000);
+  });
+
+  it("gives NaN for text that is no time, so the picker refuses it", () => {
+    expect(urlTimeToMicros("banana")).toBeNaN();
+    expect(urlTimeToMicros(undefined)).toBeNaN();
+  });
+});
 
 describe("urlTimeParams · queryParamsToSelectedDate", () => {
   it("maps `period` to a relative selection", () => {

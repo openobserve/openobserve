@@ -23,7 +23,10 @@ import EvalJobDetail from "./EvalJobDetail.vue";
 
 const { push } = vi.hoisted(() => ({ push: vi.fn(() => Promise.resolve()) }));
 
-vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push, replace: vi.fn() }),
+  useRoute: () => ({ query: {} }),
+}));
 
 const run = { id: "span-1", evaluatorTraceId: "eval-1", timestampMs: 1000, status: "ok" };
 

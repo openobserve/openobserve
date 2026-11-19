@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="toolbarLeftRef"
         class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 max-md:w-full max-md:flex-none"
+        :style="{ minWidth: `${toolbarLeftMinWidth}px` }"
       >
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
@@ -563,7 +564,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         ref="toolbarRightRef"
-        class="flex flex-shrink-0 items-center gap-2 max-md:w-full max-md:justify-end"
+        class="flex min-w-0 items-center gap-2 max-md:w-full max-md:flex-wrap max-md:justify-end max-md:gap-x-1 max-md:gap-y-1"
       >
         <OPageHeaderStatus />
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
@@ -601,8 +602,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="p-2"
             data-test="logs-search-bar-menu-share-link-btn"
           >
+            <!-- A caret menu would nest inside this menu, so the narrow layout copies the fixed link only. -->
             <ShareButton
               :url="shareURL"
+              :fixed-label="shareFixedLabel"
               variant="outline"
               size="sm-action"
               :show-label="true"
@@ -848,6 +851,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!shouldMoveShareToMenu"
           data-test="logs-search-bar-share-link-btn"
           :url="shareURL"
+          :live-url="shareRollingURL"
+          :fixed-label="shareFixedLabel"
+          :live-label="shareRollingLabel"
+          :range-context="shareRangeContext"
           variant="outline"
           size="icon-md"
           :disabled="!!shareReason"
@@ -874,11 +881,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 max-md:me-auto">
+        <div class="order-1 min-w-0 max-md:me-auto max-md:shrink-0">
           <DateTime
+            preset="explorer-auto"
+            :host-name="t('menu.search')"
             ref="dateTimeRef"
-            auto-apply
             menu-align="end"
+            shortcuts
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
@@ -886,18 +895,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
-            calendar-presets
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"
+            @apply="onRangeApply"
             @on:timezone-change="updateTimezone"
+            :retention-days="retentionDays"
+            :narrowed-by-query="narrowedByQuery"
+            :limit-refused="!!searchObj.meta.rangeLimitRefusal"
             :disable="disable"
             class="h-8.5!"
           />
         </div>
 
         <div class="search-time order-2">
-          <div class="flex gap-2">
+          <div class="flex gap-2 max-md:gap-1">
             <OTooltip
               v-if="
                 config.isEnterprise == 'true' &&
@@ -966,7 +978,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </OButtonGroup>
             <RecentSearchesButton
-              class="me-1 size-[2.125rem]!"
+              class="size-[2.125rem]! md:me-1"
               data-test="logs-search-bar-recent-searches-btn"
               @view-all="openRecentSearches"
             />
@@ -1133,7 +1145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="showRunQueryPending ? 'pending' : 'primary'"
                 :title="t('search.runQuery')"
                 size="sm-toolbar"
-                class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                class="rounded-s-default! relative rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] md:min-w-[5.875rem]"
                 :class="[
                   showRunQueryPending
                     ? ''
@@ -1166,7 +1178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="xs"
                   class="me-1"
                 />
-                {{ t("search.runQuery") }}
+                <OIcon
+                  v-if="!(searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled)"
+                  name="play-arrow"
+                  size="sm"
+                  class="md:hidden"
+                />
+                <span class="max-md:sr-only">{{ t("search.runQuery") }}</span>
               </OButton>
               <OSeparator
                 v-if="!showRunQueryPending || isRunQueryCancelShown"
@@ -1238,13 +1256,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
-                class="ms-2"
+                class="ms-1 md:ms-2"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
                 :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval ?? 0"
+                :range-end-us="refreshRangeEndUs"
+                :range-start-us="refreshRangeStartUs"
+                :range-span-us="refreshRangeSpanUs"
                 @update:model-value="onRefreshIntervalUpdate"
                 @trigger="$emit('onAutoIntervalTrigger')"
+                @live="goLiveRange"
               />
             </div>
           </div>
@@ -1371,11 +1393,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 />
               </OButton>
+              <OBadge
+                v-if="contextViewOn"
+                variant="default-soft"
+                size="sm"
+                class="absolute end-2 top-1 z-10"
+                data-test="logs-search-bar-context-view-chip"
+                >{{ t("timeRangeHost.filterOff") }}</OBadge
+              >
               <!-- Unified Query Editor (with built-in AI bar) -->
               <UnifiedQueryEditor
                 v-if="router.currentRoute.value.name === 'logs'"
                 v-show="!showFilterBuilder"
                 ref="queryEditorRef"
+                :class="{ 'opacity-60': contextViewOn }"
                 :query="searchObj.data.query"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
@@ -1785,6 +1816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import { saveFunctionMutation } from "@/services/jstransform.queries";
+import { getIntlLocale } from "@/locales";
 import {
   createSavedViewMutation,
   updateSavedViewMutation,
@@ -1815,6 +1847,10 @@ import { useTheme } from "@/composables/useTheme";
 import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { fixedShareLabel, withRollingPeriod } from "@/utils/shareTimeRange";
+import { queryNarrowedRange } from "@/utils/queryTimeNarrowing";
+import { fixedRangeEnd } from "@/utils/autoRefreshPause";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -1844,6 +1880,7 @@ import type { HistoryStatus, QueryHistoryEntry } from "@/services/query_history"
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useLogs from "@/composables/useLogs";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
+import { pickerSlack, toggleGroupWidths } from "@/plugins/logs/logsToolbarLayout";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -1929,6 +1966,9 @@ import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transien
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { contextViewKeeps } from "@/utils/searchAroundWindow";
+import type { TimeRangeApplyMeta } from "@/utils/timeRangeModel";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -2041,6 +2081,7 @@ export default defineComponent({
     UnifiedQueryEditor,
     QueryPlanDialog,
     OIcon,
+    OBadge,
     OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,
@@ -2175,6 +2216,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    retentionDays: {
+      type: Number,
+      default: undefined,
+    },
   },
   setup(props, { emit }) {
     const router = useRouter();
@@ -2224,6 +2269,7 @@ export default defineComponent({
       updatedLocalLogFilterField,
       patchUrlViewState,
       generateURLQuery,
+      shownPeriod,
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, cancelQuery } = useSearchBar(t);
@@ -2613,7 +2659,10 @@ export default defineComponent({
     const shouldMoveShareToMenu = computed(() => windowWidth.value <= 1100);
 
     // Responsive toolbar — width tracking via shared composable
-    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive();
+    // V1: the picker trigger walks its own forms first, so the budget counts it at its shortest.
+    const { toolbarLeftRef, toolbarRightRef, availableLeftWidth } = useToolbarResponsive({
+      rightSlack: () => pickerSlack(dateTimeRef.value),
+    });
 
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
@@ -2636,8 +2685,11 @@ export default defineComponent({
 
     // Rendered widths (px) of the left-section controls at the 34px toolbar size; collapse
     // thresholds derive from them so they cannot drift apart when a control is resized.
-    const TOGGLE_LABELS_WIDTH = computed(() => (isNarrowToolbar.value ? 367 : 383));
-    const TOGGLE_ICONS_WIDTH = 168;
+    const toggleWidths = computed(() =>
+      toggleGroupWidths(isNarrowToolbar.value, !!store.state.zoConfig.timechart_enabled),
+    );
+    const TOGGLE_LABELS_WIDTH = computed(() => toggleWidths.value.labels);
+    const TOGGLE_ICONS_WIDTH = computed(() => toggleWidths.value.icons);
     const TOGGLE_DROPDOWN_WIDTH = 120;
     const RESET_LABEL_WIDTH = computed(() => (isNarrowToolbar.value ? 77 : 81));
     const RESET_ICON_WIDTH = 34;
@@ -2662,15 +2714,22 @@ export default defineComponent({
       () =>
         availableLeftWidth.value < leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_ICON_WIDTH),
     );
-    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
-    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
+    const iconsExtra = computed(
+      () => TOGGLE_ICONS_WIDTH.value - toggleGroupWidths(true, false).icons,
+    );
+    const toolbarMoveResetToMenu = computed(
+      () => availableLeftWidth.value < 288 + iconsExtra.value,
+    );
+    const toolbarToggleAsDropdown = computed(
+      () => availableLeftWidth.value < 216 + iconsExtra.value,
+    );
 
     // Width consumed by the always-present left content (toggle group in its
     // current collapse state, reset) plus the reserved More button.
     const baseReservedWidth = computed(() => {
       let w = 0;
       if (toolbarToggleAsDropdown.value) w += TOGGLE_DROPDOWN_WIDTH;
-      else if (toolbarToggleIconOnly.value) w += TOGGLE_ICONS_WIDTH;
+      else if (toolbarToggleIconOnly.value) w += TOGGLE_ICONS_WIDTH.value;
       else w += TOGGLE_LABELS_WIDTH.value;
       if (!toolbarMoveResetToMenu.value) {
         w +=
@@ -2697,6 +2756,7 @@ export default defineComponent({
         savedViews: false,
         syntaxGuide: false,
         syntaxGuideIconOnly: false,
+        used: 0,
       };
       const tryFit = (width: number) => {
         const need = (used > 0 ? PIN_ITEM_GAP : 0) + width;
@@ -2718,8 +2778,13 @@ export default defineComponent({
           res.syntaxGuideIconOnly = true;
         }
       }
+      res.used = used;
       return res;
     });
+    // The left keeps the room its collapse stage needs, so the picker trigger walks its forms instead (V1).
+    const toolbarLeftMinWidth = computed(() =>
+      Math.min(availableLeftWidth.value, baseReservedWidth.value + pinnedVisibility.value.used),
+    );
 
     // Function editor lives on the right toolbar (next to the date picker), so it
     // is not part of the left-section budget.
@@ -3213,10 +3278,15 @@ export default defineComponent({
       return matches;
     };
 
-    const requestTimeRun = (valueType: string, isZoom: boolean) => {
-      let reason: "zoom" | "time-typed" | "time" = "time";
+    // Any range the user applies runs like a zoom; only non-picker callers keep the auto-run rules.
+    const requestTimeRun = (
+      value: { valueType?: string; userChangedValue?: boolean; rerun?: boolean },
+      isZoom: boolean,
+    ) => {
+      let reason: "zoom" | "range" | "time-typed" | "time" = "time";
       if (isZoom) reason = "zoom";
-      else if (valueType === "absolute") reason = "time-typed";
+      else if (value.userChangedValue === true || value.rerun === true) reason = "range";
+      else if (value.valueType === "absolute") reason = "time-typed";
       autoRun.request(reason);
     };
 
@@ -3244,12 +3314,44 @@ export default defineComponent({
       );
     };
 
+    const contextViewOn = computed(() => {
+      const around = searchObj.data.searchAround.windowQuery;
+      return (
+        !!around &&
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        String(searchObj.data.query ?? "").trim() === around.typedQuery.trim()
+      );
+    });
+    // A range picked in the panel leaves the context view; moves of its own window keep it.
+    // Moves of the context view's own window; Back to results is one undo step only while there are none.
+    let contextMoves = 0;
+    const onRangeApply = (_range: unknown, meta: TimeRangeApplyMeta) => {
+      if (!contextViewKeeps(meta.source)) searchObj.data.searchAround.windowQuery = null;
+      else if (searchObj.data.searchAround.windowQuery) contextMoves += 1;
+    };
+    const enteredContextView = () => (contextMoves = 0);
+    // Back to results runs the restored range itself, so the undo's own apply must not run it too.
+    let runAfterUndo: (() => void) | null = null;
+    const undoToResults = (run: () => void): boolean => {
+      const picker = dateTimeRef.value as { undo?: () => boolean } | null;
+      if (contextMoves > 0 || !picker?.undo) return false;
+      runAfterUndo = run;
+      if (picker.undo()) return true;
+      runAfterUndo = null;
+      return false;
+    };
+
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
       const isZoom = takeZoom(value);
-      if (value.userChangedValue === true) noteUserScopeChange();
+      if (value.userChangedValue === true) {
+        noteUserScopeChange();
+        searchObj.meta.rangeFromLink = false;
+        searchObj.meta.rangeLimitRefusal = null;
+      }
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
+        !searchObj.meta.rangeLimitRefusal &&
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
         searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
@@ -3264,13 +3366,14 @@ export default defineComponent({
           searchObj.data.datetime.queryRangeRestrictionInHour * 60 * 60 * 1000000;
 
         if (parseInt(newStartTime) > parseInt(value.startTime)) {
-          // User-visible warning so the silent rewrite isn't invisible.
-          toast({
-            variant: "warning",
-            message: t("logs.searchBar.rangeExceedsLimit", {
-              hours: searchObj.data.datetime.queryRangeRestrictionInHour,
-            }),
-          });
+          // The picker names the limit on a user's pick, so only a URL or view clamp needs the toast.
+          if (value.userChangedValue !== true)
+            toast({
+              variant: "warning",
+              message: t("logs.searchBar.rangeExceedsLimit", {
+                hours: searchObj.data.datetime.queryRangeRestrictionInHour,
+              }),
+            });
 
           value.startTime = newStartTime;
 
@@ -3319,6 +3422,13 @@ export default defineComponent({
       await nextTick();
       await nextTick();
 
+      if (runAfterUndo) {
+        const run = runAfterUndo;
+        runAfterUndo = null;
+        run();
+        return;
+      }
+
       if (
         value.userChangedValue !== false &&
         searchObj.loading == false &&
@@ -3351,15 +3461,12 @@ export default defineComponent({
         ignoreAutoTrigger === false &&
         (isLogsResultsMode() || searchObj.meta.logsVisualizeToggle === "patterns")
       ) {
-        requestTimeRun(value.valueType, isZoom);
+        requestTimeRun(value, isZoom);
       }
     };
 
-    const updateTimezone = () => {
-      if (store.state.zoConfig.query_on_stream_selection == false) {
-        emit("onChangeTimezone");
-      }
-    };
+    // A zone change keeps the instants, so nothing re-runs and the page must redraw its rows.
+    const updateTimezone = () => emit("onChangeTimezone");
 
     const updateQuery = () => {
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(searchObj.data.query);
@@ -4158,6 +4265,7 @@ export default defineComponent({
                 searchObj.meta.refreshHistogram = true;
                 // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
                 searchObj.communicationMethod = "streaming";
+                searchObj.meta.rangeFromLink = true;
                 await extractFields();
                 autoRun.engine.requestRun("saved-view", { op: "full" });
                 store.dispatch("setSavedViewFlag", false);
@@ -4473,6 +4581,55 @@ export default defineComponent({
 
       return url;
     });
+
+    // The shared link holds the shown results' range, which can differ from the picker until the next run.
+    const sharePeriod = computed<string | null>(() => shownPeriod());
+    const shareRollingURL = computed(
+      () => withRollingPeriod(shareURL.value, sharePeriod.value) ?? "",
+    );
+    // The fixed link holds the shown results' bounds, which the share URL already resolved.
+    const shareBoundsUs = computed(() => {
+      const params = new URLSearchParams(shareURL.value.slice(shareURL.value.indexOf("?") + 1));
+      return { start: Number(params.get("from")), end: Number(params.get("to")) };
+    });
+    const shareFixedLabel = computed(() =>
+      fixedShareLabel(shareBoundsUs.value.start, shareBoundsUs.value.end, store.state.timezone),
+    );
+    const shareRangeContext = computed(() =>
+      [t("menu.search"), searchObj.data.stream.selectedStream.join(", ")]
+        .filter(Boolean)
+        .join(" · "),
+    );
+    const shareRollingLabel = computed(() =>
+      sharePeriod.value
+        ? String(formatPeriodLabel(sharePeriod.value, store.state.timezone, t, getIntlLocale()))
+        : "",
+    );
+    // Logs keep a stale relativeTimePeriod on absolute ranges, so only type and end decide.
+    const refreshRangeEndUs = computed(() => {
+      const { type, endTime } = searchObj.data.datetime;
+      return fixedRangeEnd({ type, endTime: Number(endTime) });
+    });
+    const narrowedByQuery = computed(() => {
+      if (!searchObj.meta.sqlMode) return null;
+      const { startTime, endTime } = searchObj.data.datetime;
+      return queryNarrowedRange(
+        searchObj.data.query,
+        store.state.zoConfig?.timestamp_column || "_timestamp",
+        { startUs: Number(startTime), endUs: Number(endTime) },
+      );
+    });
+    const refreshRangeStartUs = computed(() =>
+      refreshRangeEndUs.value === null ? null : Number(searchObj.data.datetime.startTime) || null,
+    );
+    const refreshRangeSpanUs = computed(() => {
+      const span =
+        Number(searchObj.data.datetime?.endTime) - Number(searchObj.data.datetime?.startTime);
+      return Number.isFinite(span) && span > 0 ? span : null;
+    });
+    const goLiveRange = () => {
+      (dateTimeRef.value as { goLive?: () => void } | null)?.goLive?.();
+    };
     const showSearchHistoryfn = () => {
       emit("showSearchHistory");
     };
@@ -4779,6 +4936,8 @@ export default defineComponent({
 
     const handleRunQueryFn = (clear_cache = false) => {
       flushEditorValue();
+      // Run query always sends what the query bar shows, so it leaves the context view.
+      searchObj.data.searchAround.windowQuery = null;
 
       if (
         searchObj.meta.logsVisualizeToggle == "visualize" ||
@@ -5417,6 +5576,19 @@ export default defineComponent({
       functionUpdateConfirm,
       executeFunctionUpdate,
       shareURL,
+      shareRollingURL,
+      shareFixedLabel,
+      shareRangeContext,
+      refreshRangeStartUs,
+      refreshRangeSpanUs,
+      contextViewOn,
+      enteredContextView,
+      undoToResults,
+      onRangeApply,
+      narrowedByQuery,
+      shareRollingLabel,
+      refreshRangeEndUs,
+      goLiveRange,
       showSearchHistoryfn,
       getImageURL,
       resetFilters,
@@ -5523,6 +5695,7 @@ export default defineComponent({
       shouldMoveShareToMenu,
       toolbarLeftRef,
       toolbarRightRef,
+      toolbarLeftMinWidth,
       shouldHideToolbarButtonText,
       toolbarToggleIconOnly,
       toolbarMoveResetToMenu,

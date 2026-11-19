@@ -120,6 +120,48 @@
         :loading="!settingsLoaded"
       />
 
+      <OFormSection
+        variant="plain"
+        class="mt-4"
+        :title="t('settings.timeRangesHeading')"
+        data-test="settings-time-ranges"
+      >
+        <OSettingRow
+          control-at="end"
+          name="fiscalYearStartMonth"
+          :label="t('settings.fiscalYearStartLabel')"
+          :description="t('settings.fiscalYearStartHelp')"
+          :loading="!settingsLoaded"
+          data-test="settings-fiscal-year-start-month-row"
+        >
+          <OFormSelect
+            data-test="settings-fiscal-year-start-month"
+            name="fiscalYearStartMonth"
+            :options="fiscalYearMonthOptions"
+            :aria-label="t('settings.fiscalYearStartLabel')"
+          />
+        </OSettingRow>
+
+        <OSettingRow
+          control-at="end"
+          name="rangeGuardDays"
+          :label="t('settings.rangeGuardDaysLabel')"
+          :description="t('settings.rangeGuardDaysHelp')"
+          :loading="!settingsLoaded"
+          data-test="settings-range-guard-days-row"
+        >
+          <OFormInput
+            data-test="settings-range-guard-days"
+            name="rangeGuardDays"
+            type="number"
+            :min="1"
+            :max="MAX_RANGE_GUARD_DAYS"
+            :placeholder="t('settings.rangeGuardDaysOff')"
+            :aria-label="t('settings.rangeGuardDaysLabel')"
+          />
+        </OSettingRow>
+      </OFormSection>
+
       <template v-if="store.state.zoConfig?.enable_cross_linking">
         <OSeparator class="mt-6 mb-4" />
         <CrossLinkManager
@@ -157,6 +199,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -172,6 +215,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 import {
   makeOrganizationSettingsSchema,
+  rangeGuardDaysPayload,
   type OrganizationSettingsForm,
 } from "./OrganizationSettings.schema";
 import {
@@ -180,8 +224,9 @@ import {
   toRetentionPayload,
 } from "./DataRetentionDefaults.schema";
 import { SAVE_BAR_SLOT } from "./saveBarSlot";
+import { MAX_RANGE_GUARD_DAYS, readOrgTimeRangeSettings } from "@/utils/orgTimeRangeSettings";
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 
 const store = useStore();
 const orgId = useOrgId();
@@ -208,6 +253,8 @@ const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
     redInsightsEnabled: s?.red_insights_enabled ?? false,
     aiRcaThreadToolOutput: s?.ai_rca_thread_tool_output ?? false,
     ...toRetentionFormValues(s?.data_retention),
+    fiscalYearStartMonth: readOrgTimeRangeSettings(s).fiscalYearStartMonth ?? 0,
+    rangeGuardDays: readOrgTimeRangeSettings(s).rangeGuardDays ?? "",
   };
 });
 
@@ -224,6 +271,18 @@ const crossLinks = ref(savedCrossLinks.value);
 const formDirty = computed(
   () => JSON.stringify(crossLinks.value) !== JSON.stringify(savedCrossLinks.value),
 );
+
+// 0 is "not set" on the server; 1 = January is a deliberate choice, not the default.
+const fiscalYearMonthOptions = computed(() => {
+  const monthName = new Intl.DateTimeFormat(locale.value, { month: "long", timeZone: "UTC" });
+  return [
+    { label: t("settings.fiscalYearNotSet"), value: 0 },
+    ...Array.from({ length: 12 }, (_, i) => ({
+      label: raw(monthName.format(Date.UTC(2026, i, 1))),
+      value: i + 1,
+    })),
+  ];
+});
 
 // A stream-type row registers several fields; the bar counts one change per stream type instead.
 const isRetentionRowField = (name: string) => name === "types" || name.startsWith("types[");
@@ -284,6 +343,8 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       toggle_ingestion_logs: value.toggleIngestionLogs,
       cross_links: sentCrossLinks,
       usage_stream_enabled: value.usageStreamEnabled,
+      fiscal_year_start_month: Number(value.fiscalYearStartMonth) || 0,
+      range_guard_days: rangeGuardDaysPayload(value.rangeGuardDays),
     };
 
     // A hidden enterprise-only field must not overwrite the stored one.
@@ -315,6 +376,8 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       toggle_ingestion_logs: value.toggleIngestionLogs,
       cross_links: sentCrossLinks,
       usage_stream_enabled: value.usageStreamEnabled,
+      fiscal_year_start_month: payload.fiscal_year_start_month,
+      range_guard_days: payload.range_guard_days,
       ...(showRedInsights
         ? {
             red_insights_enabled: value.redInsightsEnabled,

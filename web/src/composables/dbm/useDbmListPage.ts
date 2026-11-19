@@ -46,6 +46,8 @@ import { useDbmScopeSyncScope } from "@/composables/dbm/useDbmScopeSync";
 import { useDbmTabCountsContext, type DbmTabCountsContext } from "@/composables/dbm/dbmTabCounts";
 import type { BadgeCount, DbmTabCountKey } from "@/composables/dbm/useDbmTabCounts";
 import analytics from "@/services/product_analytics";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
+import { gt } from "@/types/i18n";
 import { claimedCount, dbmHttpError } from "@/utils/dbm/format";
 import { forbiddenState, licenseDeniedFeatures, type ForbiddenState } from "@/utils/featureGate";
 
@@ -241,7 +243,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
 
   const syncUrl = options.syncUrl === null ? null : (options.syncUrl ?? defaultSyncUrl);
 
-  const onDateChange = (value: DbmDateChange) => {
+  const applyDate = (value: DbmDateChange) => {
     // The window is adopted either way — it is the picker's resolved state.
     scope.setRange(value);
     syncUrl?.();
@@ -256,6 +258,14 @@ export function useDbmListPage(options: DbmListPageOptions) {
       });
     }
   };
+  const timeHost = usePageTimeRange({
+    preset: "explorer-auto",
+    source: gt("menu.databases"),
+    url: false,
+    initial: () => pageRange(scope.range.value),
+    capabilities: { kinds: ["rolling", "fixed"] },
+    onRange: (value) => applyDate(value as DbmDateChange),
+  });
 
   onMounted(() => {
     const context = options.context?.();
@@ -321,6 +331,7 @@ export function useDbmListPage(options: DbmListPageOptions) {
     databaseCount,
     run,
     onRefresh,
-    onDateChange,
+    onDateChange: timeHost.onDateChange,
+    timeHost,
   };
 }

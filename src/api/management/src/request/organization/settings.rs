@@ -49,6 +49,8 @@ use crate::common::meta::{
     organization::{OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse},
 };
 
+const MAX_RANGE_GUARD_DAYS: u32 = 3650;
+
 // Only documents the multipart body: the handler concatenates every part it receives.
 #[derive(utoipa::ToSchema)]
 #[allow(dead_code)]
@@ -469,6 +471,18 @@ fn validate_settings_payload(settings: &OrganizationSettingPayload) -> Result<()
     {
         return Err("max_series_per_query must be between 1,000 and 1,000,000");
     }
+    if settings
+        .fiscal_year_start_month
+        .is_some_and(|month| month > 12)
+    {
+        return Err("fiscal_year_start_month must be 0 (not set) or 1 to 12");
+    }
+    if settings
+        .range_guard_days
+        .is_some_and(|days| days > MAX_RANGE_GUARD_DAYS)
+    {
+        return Err("range_guard_days must be 0 (off) or 1 to 3650");
+    }
     #[cfg(feature = "enterprise")]
     if let Some(data_retention) = &settings.data_retention
         && data_retention.validate().is_err()
@@ -748,6 +762,13 @@ fn apply_settings_payload(
     if merge_red_insights_enabled(data, settings.red_insights_enabled) {
         field_found = true;
     }
+    if merge_time_range_settings(
+        data,
+        settings.fiscal_year_start_month,
+        settings.range_guard_days,
+    ) {
+        field_found = true;
+    }
     if let Some(ai_rca_thread_tool_output) = settings.ai_rca_thread_tool_output {
         field_found = true;
         data.ai_rca_thread_tool_output = ai_rca_thread_tool_output;
@@ -787,6 +808,20 @@ fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool
     };
     data.red_insights_enabled = enabled;
     true
+}
+
+fn merge_time_range_settings(
+    data: &mut OrganizationSetting,
+    fiscal_year_start_month: Option<u32>,
+    range_guard_days: Option<u32>,
+) -> bool {
+    if let Some(month) = fiscal_year_start_month {
+        data.fiscal_year_start_month = month;
+    }
+    if let Some(days) = range_guard_days {
+        data.range_guard_days = days;
+    }
+    fiscal_year_start_month.is_some() || range_guard_days.is_some()
 }
 
 #[cfg(test)]
@@ -865,6 +900,62 @@ mod tests {
         assert!(data.red_insights_enabled);
         assert!(merge_red_insights_enabled(&mut data, Some(false)));
         assert!(!data.red_insights_enabled);
+    }
+
+    #[test]
+    fn test_time_range_settings_validate_set_and_clear() {
+        let payload = |json: serde_json::Value| -> OrganizationSettingPayload {
+            serde_json::from_value(json).unwrap()
+        };
+        for (json, ok) in [
+            (serde_json::json!({"fiscal_year_start_month": 0}), true),
+            (serde_json::json!({"fiscal_year_start_month": 4}), true),
+            (serde_json::json!({"fiscal_year_start_month": 12}), true),
+            (serde_json::json!({"fiscal_year_start_month": 13}), false),
+            (serde_json::json!({"range_guard_days": 0}), true),
+            (serde_json::json!({"range_guard_days": 3650}), true),
+            (serde_json::json!({"range_guard_days": 3651}), false),
+        ] {
+            assert_eq!(
+                validate_settings_payload(&payload(json.clone())).is_ok(),
+                ok,
+                "{json}"
+            );
+        }
+
+        let mut data = OrganizationSetting::default();
+        assert_eq!(data.fiscal_year_start_month, 0);
+        assert_eq!(data.range_guard_days, 0);
+        let set =
+            payload(serde_json::json!({"fiscal_year_start_month": 4, "range_guard_days": 90}));
+        assert!(apply_settings_payload(&mut data, set));
+        assert_eq!(
+            (data.fiscal_year_start_month, data.range_guard_days),
+            (4, 90)
+        );
+
+        let other = payload(serde_json::json!({"scrape_interval": 30}));
+        assert!(apply_settings_payload(&mut data, other));
+        assert_eq!(
+            (data.fiscal_year_start_month, data.range_guard_days),
+            (4, 90)
+        );
+
+        let clear =
+            payload(serde_json::json!({"fiscal_year_start_month": 0, "range_guard_days": 0}));
+        assert!(apply_settings_payload(&mut data, clear));
+        assert_eq!(
+            (data.fiscal_year_start_month, data.range_guard_days),
+            (0, 0)
+        );
+    }
+
+    #[test]
+    fn test_time_range_settings_default_when_absent_from_stored_json() {
+        let stored: OrganizationSetting =
+            serde_json::from_value(serde_json::json!({"scrape_interval": 15})).unwrap();
+        assert_eq!(stored.fiscal_year_start_month, 0);
+        assert_eq!(stored.range_guard_days, 0);
     }
 
     #[test]

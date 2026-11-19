@@ -19,6 +19,7 @@ import { mount } from "@vue/test-utils";
 import PanelErrorButtons from "./PanelErrorButtons.vue";
 import { createStore } from "vuex";
 import i18n from "@/locales";
+import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 
 // Create a mock Vuex store with timezone state
 const mockStore = createStore({
@@ -681,6 +682,88 @@ describe("PanelErrorButtons", () => {
         wrapper.find('[data-test="panel-notice-chip-collapsed"]').attributes("aria-label"),
       ).toBe("1 issue");
       wrapper.unmount();
+    });
+  });
+  describe("stream range limit (R2)", () => {
+    // The server's own clamp text, through the notices composable the panel hosts use.
+    const clampWarning = (hours: number) => {
+      const notices = usePanelNotices(() => "UTC");
+      notices.handleResultMetadataUpdate([
+        [
+          {
+            function_error: [
+              `Query duration is modified due to query range restriction of ${hours} hours`,
+            ],
+          },
+        ],
+      ]);
+      return notices.maxQueryRangeWarning.value;
+    };
+
+    it("shows a lock chip with the stream's limit instead of the warning button", () => {
+      const wrapper = mountComponent({ props: { maxQueryRangeWarning: clampWarning(24) } });
+      const chip = wrapper.find('[data-test="panel-max-duration-chip"]');
+      expect(chip.exists()).toBe(true);
+      expect(chip.text()).toBe("Max 1d");
+      expect(chip.findComponent({ name: "OIcon" }).props("name")).toBe("lock");
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
+    });
+
+    it("spells a limit under a day in hours", () => {
+      const wrapper = mountComponent({ props: { maxQueryRangeWarning: clampWarning(6) } });
+      expect(wrapper.find('[data-test="panel-max-duration-chip"]').text()).toBe("Max 6h");
+    });
+
+    it("keeps the warning button for a function error that names no limit", () => {
+      const wrapper = mountComponent({ props: { maxQueryRangeWarning: "error[E203]: syntax" } });
+      expect(wrapper.find('[data-test="panel-max-duration-chip"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(true);
+    });
+
+    // A result-cache hit clamps with a notice that names no hours (B4: histogram panels).
+    const cachedClampWarning = () => {
+      const notices = usePanelNotices(() => "UTC");
+      notices.handleResultMetadataUpdate([
+        [
+          {
+            is_partial: true,
+            function_error: [
+              "Please be aware that the response is based on partial data \n reached max query range limit",
+            ],
+          },
+        ],
+      ]);
+      return notices.maxQueryRangeWarning.value;
+    };
+
+    it("takes the stream's limit from the host when the clamp notice names no hours", () => {
+      const wrapper = mountComponent({
+        props: { maxQueryRangeWarning: cachedClampWarning(), rangeLimitHours: 24 },
+      });
+      expect(wrapper.find('[data-test="panel-max-duration-chip"]').text()).toBe("Max 1d");
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
+    });
+
+    it("prefers the hours the server names over the host's limit", () => {
+      const wrapper = mountComponent({
+        props: { maxQueryRangeWarning: clampWarning(6), rangeLimitHours: 24 },
+      });
+      expect(wrapper.find('[data-test="panel-max-duration-chip"]').text()).toBe("Max 6h");
+    });
+
+    it("shows the chip for a panel over its stream's limit that the server clipped silently", () => {
+      const wrapper = mountComponent({ props: { rangeLimitHours: 24, rangeOverLimit: true } });
+      const chip = wrapper.find('[data-test="panel-max-duration-chip"]');
+      expect(chip.text()).toBe("Max 1d");
+      expect(chip.attributes("aria-label")).toBe("This range is longer than the 24-hour limit");
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
+    });
+
+    it("does not show the host's limit for a warning that is not a range clamp", () => {
+      const wrapper = mountComponent({
+        props: { maxQueryRangeWarning: "error[E203]: syntax", rangeLimitHours: 24 },
+      });
+      expect(wrapper.find('[data-test="panel-max-duration-chip"]').exists()).toBe(false);
     });
   });
 });

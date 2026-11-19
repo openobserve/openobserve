@@ -840,6 +840,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add:searchterm="addSearchTerm"
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
+          @search:aroundwindow="onSearchAroundWindow"
           @add:table="addFieldToTable"
           @close="onDetailUserClose"
           @view-trace="redirectToTraces(detailRow)"
@@ -937,6 +938,7 @@ import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtil
 import {
   convertLogData,
   convertStackedLogData,
+  histogramZoomWindow,
   formatDate,
   formatCount,
 } from "@/utils/logs/convertLogData";
@@ -1075,6 +1077,7 @@ export default defineComponent({
     "update:datetime",
     "remove:searchTerm",
     "search:timeboxed",
+    "search:aroundwindow",
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
@@ -1221,8 +1224,20 @@ export default defineComponent({
       this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
     },
-    onChartUpdate({ start, end }: { start: any; end: any }) {
+    onChartUpdate(range: { start: any; end: any }) {
       this.searchObj.meta.showDetailTab = false;
+      const snapped =
+        range.start && range.end
+          ? histogramZoomWindow(
+              Number(range.start),
+              Number(range.end),
+              this.plotChart,
+              Number(this.searchObj.data.histogramInterval),
+              this.searchObj.data.histogram?.chartParams?.timezone,
+            )
+          : null;
+      const start = snapped?.start ?? range.start;
+      const end = snapped?.end ?? range.end;
 
       // Store the original time range BEFORE updating datetime (for volume analysis baseline)
       if (start && end && !this.originalTimeRangeBeforeSelection) {
@@ -1263,6 +1278,12 @@ export default defineComponent({
       this.searchObj.data.searchAround.indexTimestamp = obj.key;
       // this.$emit("search:timeboxed", obj);
       this.searchAroundData(obj);
+    },
+    onSearchAroundWindow(range: { startUs: number; endUs: number }) {
+      clearPermalink();
+      this.searchObj.meta.showDetailTab = false;
+      resetRowSelection(this.searchObj);
+      this.$emit("search:aroundwindow", range);
     },
     toggleErrorDetails() {
       this.disableMoreErrorDetails = !this.disableMoreErrorDetails;

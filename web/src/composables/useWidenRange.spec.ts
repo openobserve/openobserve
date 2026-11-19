@@ -29,12 +29,12 @@ describe("useWidenRange", () => {
   });
 
   it("labels rolling periods as before", () => {
-    expect(periodToLabel("15m")).toBe("Past 15 Minutes");
+    expect(periodToLabel("15m")).toBe("Last 15 minutes");
     expect(periodToLabel("absolute")).toBe("");
   });
 
   it("labels a calendar period by its name, never as a NaN count", () => {
-    expect(periodToLabel("calendar:month:-1")).toBe("Last month");
+    expect(periodToLabel("calendar:month:-1")).toBe("Previous month");
     expect(periodToLabel("calendar:day:0")).toBe("Today");
     expect(periodToLabel("calendar:quarter:-2")).toBe("Q2 2026");
     expect(periodToLabel("calendar:month:-1")).not.toContain("NaN");

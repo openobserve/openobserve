@@ -5,6 +5,7 @@ import {
 } from "@/utils/dashboard/colorPalette";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
+import { snapZoomToBuckets } from "@/utils/timeRangeZoom";
 import { resolveSeverityFieldValue } from "@/utils/logs/statusParser";
 import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
 import { getDefaultTheme } from "@/constants/themes";
@@ -113,6 +114,25 @@ export const convertLogData = (
     ],
   };
   return { options };
+};
+
+/** A histogram drag in the chart's own (zoned) ms, widened to the buckets of the bars under its edges. */
+export const histogramZoomWindow = (
+  startMs: number,
+  endMs: number,
+  chart: { options?: { series?: { data?: unknown[][] }[] } } | null | undefined,
+  intervalUs: number,
+  timezone?: string,
+): { start: number; end: number } => {
+  const first = chart?.options?.series?.[0]?.data?.[0]?.[0];
+  const origin = Number(first instanceof Date ? first.getTime() : first);
+  return snapZoomToBuckets(
+    startMs,
+    endMs,
+    Number(intervalUs) / 1000,
+    Number.isFinite(origin) ? origin : 0,
+    timezone && timezone != "UTC" ? timezone : undefined,
+  );
 };
 
 export const formatDate = (date: any) => {

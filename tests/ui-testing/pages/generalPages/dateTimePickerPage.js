@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { pickRelativePeriodCode } from './relativePeriod.js';
 
 /**
  * Page object for the shared DateTime picker (web/src/components/DateTime.vue),
@@ -27,12 +28,20 @@ export class DateTimePickerPage {
         // Picker panel — an id, not a data-test, in the component source.
         this.panel = page.locator('#date-time-menu');
 
-        // Tab pair — absent when the host passes `disable-relative`.
-        this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
-        this.absoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
+        // Relative and Absolute share one view; Live is enabled only while the selection is absolute.
+        this.liveBtn = page.locator('[data-test="date-time-live-btn"]');
+        this.zoomOutBtn = page.locator('[data-test="date-time-zoom-out-btn"]');
+        this.textInput = page.locator('[data-test="date-time-input-field"]');
+        this.inputError = page.locator('[data-test="date-time-input-error"]');
+        this.resolvedLine = page.locator('[data-test="date-time-resolved"]');
+        // The as-UTC toggle sits at the top of the zone menu, so open the zone select first.
+        this.timezoneSelect = page.locator('[data-test="datetime-timezone-select"]');
+        this.timezoneDivider = page.locator('[data-test="datetime-timezone-divider"]');
+        this.asUtcToggle = page.locator('[data-test="date-time-as-utc-toggle"]');
 
-        // Copy / paste controls — added by PR #13374.
-        this.copyBtn = page.locator('[data-test="date-time-copy-btn"]');
+        // Copy / paste controls. Copy swaps its id to -done (check icon, no toast) for 1.5 s.
+        this.copyBtn = page.locator('[data-test="date-time-copy-btn"], [data-test="date-time-copy-btn-done"]');
+        this.copyDoneBtn = page.locator('[data-test="date-time-copy-btn-done"]');
         this.pasteBtn = page.locator('[data-test="date-time-paste-btn"]');
 
         // Shift buttons — Previous / Next flank the trigger (rendered when
@@ -42,38 +51,19 @@ export class DateTimePickerPage {
         this.prevShiftBtn = page.locator('[data-test="date-time-prev-btn"]');
         this.nextShiftBtn = page.locator('[data-test="date-time-next-btn"]');
 
-        // Absolute panel fields. OTime renders the data-test on a role=group
-        // wrapper; the value lives on the descendant input[type=time].
+        // Calendar Start / End fields: OInput text fields (e.g. "Jul 23 10:00"); a bare clock time keeps the field's day.
         this.startTimeInput = page.locator('[data-test="datetime-start-time"] input');
         this.endTimeInput = page.locator('[data-test="datetime-end-time"] input');
 
-        // OTabPanels is used without `keep-alive`, so the inactive panel is
-        // unmounted (v-if). Presence of these is therefore a reliable signal of
-        // which tab is active — more robust than reading variant-driven classes.
-        // OTime stamps the forwarded data-test on BOTH its outer wrapper and its
-        // inner role=group element, so scope to the first to stay strict-mode safe.
-        this.absolutePanelMarker = page.locator('[data-test="datetime-start-time"]').first();
-        this.relativePanelMarker = page.locator('[data-test="date-time-relative-15-m-btn"]');
 
         // Apply button — rendered only when the host sets autoApply=false.
         this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
 
-        // Custom relative row — value input + unit select. The product DateTime.vue
-        // renders these controls WITHOUT a data-test (testability-only), so scope
-        // structurally: the custom row is the `.relative-row` that holds the native
-        // number input; the unit select is the single combobox inside that row.
-        this.customRow = page
-            .locator('#date-time-menu .relative-row')
-            .filter({ has: page.locator('input[type="number"]') });
-        this.customValueInput = this.customRow.locator('input[type="number"]');
-        this.customPeriodTrigger = this.customRow.locator('[role="combobox"]');
+        // What Enter would apply, or why it cannot, while text is typed in the bar.
+        this.previewNote = page.locator('[data-test="date-time-preview-note"]');
+        this.tooltipContent = page.locator('[data-test="o-tooltip-content"]');
 
-        // ==================== Expected toast messages ====================
-        // Values of common.dateRangeCopied / dateRangePasted / dateRangePasteError / dateRangePasteEmpty
-        // in web/src/locales/languages/en-US.json.
-        this.copiedToastMessage = 'Date range copied';
-        this.pastedToastMessage = 'Date range pasted';
-        this.pasteErrorToastMessage = 'Could not parse date range';
+        // common.dateRangePasteEmpty in web/src/locales/languages/en-US.json; the only paste toast left.
         this.pasteEmptyToastMessage = 'Clipboard is empty. Copy a date range first.';
     }
 
@@ -84,19 +74,14 @@ export class DateTimePickerPage {
         return this.page.locator(`[data-test-message="${message}"]`);
     }
 
+    /** The chip for a "15-m" style code; only 15m 1h 4h 24h 7d 30d have one. */
     relativePeriodBtn(suffix) {
-        return this.page.locator(`[data-test="date-time-relative-${suffix}-btn"]`);
+        return this.page.locator(`[data-test="date-time-chip-${String(suffix).replace('-', '')}"]`);
     }
 
-    /**
-     * Unit option in the custom period select; unit is one of s/m/h/d/w/M.
-     * The OSelect renders each option (ListboxItem/OSelectItem) with the option
-     * value mirrored onto `data-test-value`, so the option is addressable without
-     * the (absent) parent data-test. Only one select's dropdown is open at a time,
-     * so a bare `data-test-value` match is unambiguous.
-     */
-    customPeriodOption(unit) {
-        return this.page.locator(`[data-test-value="${unit}"]`);
+    /** A calendar row of the list, e.g. "yesterday" -> date-time-list-calendar-yesterday. */
+    calendarRow(id) {
+        return this.page.locator(`[data-test="date-time-list-calendar-${id}"]`);
     }
 
     // ==================== Panel open / close ====================
@@ -117,23 +102,23 @@ export class DateTimePickerPage {
         await expect(this.panel).toBeHidden();
     }
 
-    // ==================== Tabs ====================
+    // ==================== Relative periods ====================
 
     async selectRelativePeriod(suffix) {
-        const btn = this.relativePeriodBtn(suffix);
-        await expect(btn).toBeVisible();
-        await btn.click();
+        await pickRelativePeriodCode(this.page, suffix);
         // An auto-apply picker closes on a chip pick; reopen it so the panel controls stay reachable.
         const closed = await this.panel.waitFor({ state: 'hidden', timeout: 1500 }).then(() => true, () => false);
         if (closed) await this.openPicker();
     }
 
+    /** The selection is absolute: Live can turn it back into a rolling period. */
     async expectAbsolutePanelActive() {
-        await expect(this.absolutePanelMarker).toBeVisible();
+        await expect(this.liveBtn).toBeEnabled();
     }
 
+    /** The selection is relative: the panel offers Freeze instead, so there is no Live button at all. */
     async expectRelativePanelActive() {
-        await expect(this.relativePanelMarker).toBeVisible();
+        await expect(this.liveBtn).toHaveCount(0);
     }
 
     // ==================== Copy / paste controls ====================
@@ -166,8 +151,12 @@ export class DateTimePickerPage {
     }
 
     async expectShiftAriaLabels() {
-        await expect(this.prevShiftBtn).toHaveAttribute('aria-label', 'Previous');
-        await expect(this.nextShiftBtn).toHaveAttribute('aria-label', 'Next');
+        // Labels name the step: "Previous 15m", "Back one hour", "Next 15m", "Already at now".
+        await expect(this.prevShiftBtn).toHaveAttribute('aria-label', /^(Previous|Back one) \S.*$/);
+        await expect(this.nextShiftBtn).toHaveAttribute(
+            'aria-label',
+            /^((Next|Forward one|Back to) \S.*|Already at now)$/,
+        );
     }
 
     async expectNextEnabled() {
@@ -209,54 +198,57 @@ export class DateTimePickerPage {
     }
 
     /**
-     * Reads the clipboard and parses the {"start_date":micros,"end_date":micros}
-     * payload that Copy writes. Fails loudly if the payload is not that shape.
+     * Reads the text Copy writes, `[name (]YYYY-MM-DD HH:MM[:SS[.mmm]] – [YYYY-MM-DD ]HH:MM… UTC±hh:mm[)]`,
+     * into epoch micros. Each stamp carries its zone offset, so this is exact in any runner timezone.
      */
     async readCopiedRange() {
-        const raw = await this.readClipboard();
-        let payload;
-        try {
-            payload = JSON.parse(raw);
-        } catch {
-            throw new Error(`Clipboard did not contain JSON. Got: ${raw}`);
-        }
-        expect(typeof payload.start_date, `start_date in ${raw}`).toBe('number');
-        expect(typeof payload.end_date, `end_date in ${raw}`).toBe('number');
-        return payload;
+        const text = await this.readClipboard();
+        const parsed = parseCopyText(text);
+        expect(parsed, `Clipboard did not hold a copied range. Got: ${text}`).not.toBeNull();
+        return parsed;
     }
 
-    /**
-     * Pastes `text` and returns the range the picker resolved it to, read back
-     * through Copy. Copy resolves the selection through the picker's own timezone,
-     * so this round-trip is exact for second-aligned epoch input and free of any
-     * dependence on the runner's timezone.
-     */
+    /** Pastes `text`, applies it with Enter, and returns the applied range read back through Copy. */
     async pasteAndReadBackRange(text) {
         await this.seedClipboard(text);
         await this.clickPaste();
-        await this.expectPasteSuccessToast();
+        await this.applyPaste();
         await this.expectAbsolutePanelActive();
         await this.clickCopy();
         return await this.readCopiedRange();
     }
 
-    // ==================== Toast assertions ====================
+    // ==================== Paste and copy states ====================
 
-    async expectCopySuccessToast() {
-        await expect(this.toastByMessage(this.copiedToastMessage)).toBeVisible();
+    /** Copy confirms in place: the button shows a check under date-time-copy-btn-done. */
+    async expectCopyConfirmed() {
+        await expect(this.copyDoneBtn).toBeVisible();
     }
 
-    async expectPasteSuccessToast() {
-        await expect(this.toastByMessage(this.pastedToastMessage)).toBeVisible();
+    /** A paste only fills the bar and previews it; Enter applies, and a panel that closes is reopened. */
+    async applyPaste() {
+        await expect(this.resolvedLine).toHaveAttribute('data-preview', 'true');
+        await this.textInput.press('Enter');
+        const closed = await this.panel.waitFor({ state: 'hidden', timeout: 1500 }).then(() => true, () => false);
+        if (closed) await this.openPicker();
     }
 
-    async expectPasteErrorToast() {
-        await expect(this.toastByMessage(this.pasteErrorToastMessage)).toBeVisible();
+    /** Pasted text that reads as no range shows the bar's error (common.timeRangeInputError) and applies nothing. */
+    async expectPasteUnreadable() {
+        await expect(this.inputError).toBeVisible();
+        await expect(this.inputError).toContainText(/Didn.t catch that/);
     }
 
     async expectPasteEmptyToast() {
         await expect(this.toastByMessage(this.pasteEmptyToastMessage)).toBeVisible();
-        await expect(this.toastByMessage(this.pasteErrorToastMessage)).toHaveCount(0);
+    }
+
+    /** Escape backs out of typed text one step at a time before it closes the panel. */
+    async closePickerDiscardingInput() {
+        for (let i = 0; i < 4 && await this.panel.isVisible(); i++) {
+            await this.page.keyboard.press('Escape');
+        }
+        await expect(this.panel).toBeHidden();
     }
 
     // ==================== Value readers ====================
@@ -269,75 +261,63 @@ export class DateTimePickerPage {
         return await this.endTimeInput.inputValue();
     }
 
+    /** Matches the clock part of each field; the field drops ":00" seconds and leads with the day. */
     async expectAbsoluteTimeFields(expectedStart, expectedEnd) {
-        await expect(this.startTimeInput).toHaveValue(expectedStart);
-        await expect(this.endTimeInput).toHaveValue(expectedEnd);
+        await expect(this.startTimeInput).toHaveValue(clockTail(expectedStart));
+        await expect(this.endTimeInput).toHaveValue(clockTail(expectedEnd));
     }
 
     async getTriggerLabel() {
         return (await this.triggerBtn.innerText()).trim();
     }
 
-    // ==================== Custom relative value ====================
+    // ==================== Typed input and range limits ====================
 
-    /** Fills the custom value input and blurs so the clamp commits. */
-    async setCustomValue(value) {
-        await expect(this.customValueInput).toBeVisible();
-        await this.customValueInput.fill(String(value));
-        await this.customValueInput.blur();
+    /** Types text into the bar and presses Enter, which applies a readable range. */
+    async typeAndEnter(text) {
+        await expect(this.textInput).toBeVisible();
+        await this.textInput.fill(text);
+        await this.textInput.press('Enter');
     }
 
-    /** Focuses (snapshots lastValidCustomValue), empties, then blurs to restore. */
-    async clearCustomValue() {
-        await expect(this.customValueInput).toBeVisible();
-        await this.customValueInput.fill('');
-        await this.customValueInput.blur();
+    async typeText(text) {
+        await expect(this.textInput).toBeVisible();
+        await this.textInput.fill(text);
     }
 
-    async expectCustomValue(expected) {
-        await expect(this.customValueInput).toHaveValue(String(expected));
+    /** Escape clears typed text before it closes the panel, so empty the bar first. */
+    async clearInputAndClose() {
+        await this.textInput.fill('');
+        await this.closePickerWithEscape();
     }
 
-    /** Opens the custom period select and picks a unit (s/m/h/d/w/M). */
-    async selectCustomPeriod(unit) {
-        await expect(this.customPeriodTrigger).toBeVisible();
-        await this.customPeriodTrigger.click();
-        await expect(this.customPeriodOption(unit)).toBeVisible();
-        await this.customPeriodOption(unit).click();
+    async expectInputError() {
+        await expect(this.inputError).toBeVisible();
     }
 
-    /**
-     * Opens the period select, asserts which units are offered (present) and
-     * dropped (absent), then selects `unit` — all in one popover open so the
-     * absent checks are never satisfied by a not-yet-open popover. The
-     * `toHaveCount(0)` on dropped units also acts as the deterministic settle
-     * gate while the stream's max_query_range restriction propagates.
-     */
-    async selectCustomPeriodExpectingUnits(unit, presentUnits, absentUnits) {
-        await expect(this.customPeriodTrigger).toBeVisible();
-        await this.customPeriodTrigger.click();
-        for (const u of presentUnits) {
-            await expect(this.customPeriodOption(u)).toHaveCount(1);
-        }
-        for (const u of absentUnits) {
-            await expect(this.customPeriodOption(u)).toHaveCount(0);
-        }
-        await expect(this.customPeriodOption(unit)).toBeVisible();
-        await this.customPeriodOption(unit).click();
+    async expectPreviewNote(pattern) {
+        await expect(this.previewNote).toContainText(pattern);
     }
 
     async expectPresetDisabled(suffix) {
         await expect(this.relativePeriodBtn(suffix)).toBeDisabled();
     }
 
-    /**
-     * Waits for the transient pre-load restriction to clear. Before the selected
-     * stream's fields settle, `queryRangeRestrictionInHour` is seeded at 100000,
-     * which stamps a `max` attribute onto the custom input; once it resolves to
-     * -1 (no restriction) the max is removed.
-     */
-    async waitForNoRestriction() {
-        await expect(this.customValueInput).not.toHaveAttribute('max', /[0-9]+/);
+    async expectPresetEnabled(suffix) {
+        await expect(this.relativePeriodBtn(suffix)).toBeEnabled();
+    }
+
+    /** A disabled chip explains itself only in a tooltip, bound to its wrapper (a disabled button gets no hover). */
+    async expectPresetReason(suffix, pattern) {
+        await this.relativePeriodBtn(suffix).locator('xpath=..').hover();
+        await expect(this.tooltipContent.filter({ hasText: pattern }).first()).toBeVisible();
+    }
+
+    /** An over-limit list row is disabled and carries the reason as its own visible text. */
+    async expectCalendarRowDisabledWithReason(id, pattern) {
+        const row = this.calendarRow(id);
+        await expect(row).toHaveAttribute('aria-disabled', 'true');
+        await expect(row).toContainText(pattern);
     }
 
     // ==================== Manual-apply mode ====================
@@ -350,6 +330,37 @@ export class DateTimePickerPage {
         await expect(this.applyBtn).toBeVisible();
         await this.applyBtn.click();
     }
+}
+
+function clockTail(time) {
+    const shown = String(time).replace(/^(\d{1,2}:\d{2}):00$/, '$1');
+    return new RegExp(`(^|\\s)${shown.replace(/[.]/g, '\\.')}$`);
+}
+
+const STAMP = '(\\d{4}-\\d{2}-\\d{2})';
+const CLOCK = '(\\d{2}:\\d{2}(?::\\d{2}(?:\\.\\d{3})?)?)';
+const OFFSET = '(UTC(?:[+-]\\d{2}:\\d{2})?)';
+const COPY_TEXT = new RegExp(
+    `^(?:(.+) \\()?${STAMP} ${CLOCK}(?: ${OFFSET})? – (?:${STAMP} )?${CLOCK} ${OFFSET}\\)?$`,
+);
+
+const stampMicros = (date, clock, offset) => {
+    const time = clock.length === 5 ? `${clock}:00` : clock;
+    const zone = offset === 'UTC' ? 'Z' : offset.slice(3);
+    return Date.parse(`${date}T${time}${zone}`) * 1000;
+};
+
+/** The copied text as `{ name, start_date, end_date, text }` in epoch micros, or null when it is not one. */
+export function parseCopyText(text) {
+    const m = COPY_TEXT.exec(String(text).trim());
+    if (!m) return null;
+    const [, name, startDate, startClock, startOffset, endDate, endClock, endOffset] = m;
+    return {
+        name: name ?? null,
+        start_date: stampMicros(startDate, startClock, startOffset ?? endOffset),
+        end_date: stampMicros(endDate ?? startDate, endClock, endOffset),
+        text,
+    };
 }
 
 export default DateTimePickerPage;

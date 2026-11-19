@@ -16,33 +16,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    ref="groupEl"
     icon="info"
-    class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
+    class="date-time-container inline-flex max-w-full shrink-0 items-stretch [&_button:focus-visible]:z-1"
     :class="{
-      'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
+      'rounded-default border-button-outline-border min-h-8.5 border': !hideRangeShift,
       'w-full [&>*]:flex-1': fieldAppearance,
     }"
   >
-    <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
+    <OTooltip v-if="!hideRangeShift" shortcut-id="timeRangePrevious" side="bottom">
+      <template #content>
+        <span class="flex flex-col">
+          <span>{{ stepTooltip.prev.title }}</span>
+          <span v-if="stepTooltip.prev.window" class="text-text-secondary text-xs tabular-nums">{{
+            stepTooltip.prev.window
+          }}</span>
+        </span>
+      </template>
       <OButton
         data-test="date-time-prev-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border h-auto! rounded-e-none! border-e!"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! rounded-e-none! border-e! max-md:hidden forced-colors:disabled:text-[color:GrayText]! pointer-coarse:min-w-10"
         icon-left="chevron-left"
-        :aria-label="t('common.previous')"
+        :aria-label="stepTooltip.prev.title"
         :disabled="disable || disablePrevShift"
         @click.prevent.stop="shiftTimeRange('prev')"
       />
     </OTooltip>
     <OPopover
       v-model:open="menuOpen"
+      :anchor="hideRangeShift ? null : groupEl"
       side="bottom"
       :align="menuAlign"
       :z-index="10001"
       :aria-label="t('common.selectDateRange')"
       :collision-padding="POPOVER_COLLISION_PADDING"
-      content-class="border-border-default! overflow-hidden p-0 shadow-lg!"
+      content-class="border-border-default! bg-surface-overlay! rounded-surface! overflow-hidden p-0 shadow-lg!"
       @update:open="onMenuOpenChange"
       @open-auto-focus="onPopoverOpenAutoFocus"
     >
@@ -55,358 +65,759 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="variant"
           :size="fieldAppearance ? 'sm' : 'sm-toolbar'"
           :class="{
-            [selectedType + 'type']: !disableRelative,
-            hideRelative: disableRelative,
-            'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
-            'w-fit': disableRelative,
+            [selectedType + 'type']: !fixedOnly,
+            hideRelative: fixedOnly,
+            'w-fit': fixedOnly,
             'h-auto! rounded-none! border-0!': !hideRangeShift,
+            'enabled:hover:bg-interactive-hover-bg! data-[state=open]:bg-surface-accent-active!':
+              !fieldAppearance,
             'border-select-border! enabled:hover:border-select-border-hover! w-full':
               fieldAppearance,
+            'max-md:rounded-default!': !hideRangeShift,
           }"
-          class="max-md:max-w-full max-md:min-w-0"
+          class="min-w-0 justify-start! max-md:max-w-full pointer-coarse:min-h-10"
+          :aria-label="triggerAriaLabel"
           :disabled="disable"
-          @mouseenter="refreshTooltipNow"
+          @mouseenter="onTriggerHover(true)"
+          @mouseleave="onTriggerHover(false)"
+          @focus="onTriggerFocus"
+          @blur="onTriggerHover(false)"
         >
           <template #icon-left>
-            <OTooltip v-if="triggerTooltip" :content="triggerTooltip" />
-            <OIcon name="schedule" size="sm" />
+            <OIcon
+              v-if="narrowedByQuery"
+              name="filter-alt"
+              size="sm"
+              class="text-text-secondary shrink-0"
+              data-test="date-time-trigger-narrowed"
+            />
+            <OIcon
+              v-else-if="triggerIconShown"
+              name="schedule"
+              size="sm"
+              data-test="date-time-trigger-icon"
+              :class="{ 'max-md:hidden': !fieldAppearance }"
+            />
           </template>
-          <OTruncatedText
-            class="date-time-label flex-1 text-left"
+          <!-- Clipped, never ellipsised: the label steps down to a whole form that fits (§6). -->
+          <span
+            ref="triggerLabelEl"
+            class="date-time-label flex min-w-0 flex-1 overflow-hidden text-start whitespace-pre tabular-nums max-md:min-w-16"
             :class="fieldAppearance ? 'font-normal' : 'font-semibold'"
-            >{{ triggerLabel }}</OTruncatedText
+            data-test="date-time-trigger-label"
+            ><span v-if="triggerParts.name" class="shrink-0" data-test="date-time-trigger-name">{{
+              triggerParts.name
+            }}</span
+            ><span
+              v-if="triggerParts.dates"
+              class="shrink-0 whitespace-pre"
+              data-test="date-time-trigger-dates"
+              >{{ triggerParts.name ? ` · ${triggerParts.dates}` : triggerParts.dates }}</span
+            ></span
+          >
+          <OBadge
+            v-if="triggerEnds"
+            data-test="date-time-trigger-ends"
+            variant="primary-soft"
+            size="sm"
+            class="shrink-0 gap-1 forced-colors:border forced-colors:border-[color:CanvasText]"
+            ><span class="bg-accent size-1.5 rounded-full" aria-hidden="true" />{{
+              triggerEnds
+            }}</OBadge
+          >
+          <span
+            v-if="limitRefused"
+            role="img"
+            :aria-label="t('dateTime.nothingWasRun')"
+            class="inline-flex shrink-0"
+            data-test="date-time-trigger-lock"
+            ><OIcon name="lock" size="sm" class="text-status-warning-text" aria-hidden="true"
+          /></span>
+          <span
+            v-if="panelTimeMark"
+            role="img"
+            :aria-label="t('dashboard.panelTimeEnabled')"
+            class="inline-flex shrink-0"
+            data-test="date-time-panel-time-mark"
+            ><OIcon
+              name="timer"
+              size="sm"
+              class="text-text-secondary"
+              aria-hidden="true" /><OTooltip
+              :content="t('dashboard.panelTimeEnabled')"
+              side="bottom"
+          /></span>
+          <span
+            v-if="zoneBadgeText && triggerParts.zoneDot"
+            data-test="date-time-zone-dot"
+            role="img"
+            :aria-label="zoneBadgeText"
+            class="bg-text-secondary size-1.5 shrink-0 rounded-full forced-colors:bg-[color:CanvasText]"
+            ><OTooltip :content="raw(zoneBadgeText)" side="bottom"
+          /></span>
+          <OBadge
+            v-else-if="zoneBadgeText"
+            data-test="date-time-zone-badge"
+            variant="default-soft"
+            size="sm"
+            class="shrink-0 tabular-nums forced-colors:border forced-colors:border-[color:CanvasText]"
+            >{{ zoneBadgeText }}</OBadge
           >
           <template #icon-right
             ><OIcon
               name="arrow-drop-down"
               size="sm"
               class="date-time-arrow ms-auto text-lg! transition-transform duration-250"
+              :class="{ 'max-md:hidden': !fieldAppearance }"
           /></template>
         </OButton>
       </template>
       <div
         id="date-time-menu"
-        class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] max-w-[calc(100vw-1rem)] flex-col max-sm:overflow-y-auto"
-        :class="showRail ? 'w-158.25 max-sm:w-81.25' : 'w-81.25'"
+        ref="menuEl"
+        class="date-time-dialog time-picker-scope z-10001 flex h-82 max-h-(--reka-popover-content-available-height) w-128 max-w-[min(32rem,calc(100vw-1.5rem))] flex-col"
         @keydown.capture="onPickerKeydown"
         @paste="onPickerPaste"
       >
-        <div
-          class="grid min-h-0 flex-1 max-sm:flex max-sm:flex-col max-sm:overflow-y-auto"
-          :class="
-            showRail ? 'grid-cols-[19.25rem_1fr] grid-rows-[auto_1fr]' : 'grid-rows-[auto_1fr]'
-          "
-        >
-          <div
-            v-if="!(hideClipboard && disableRelative)"
-            class="border-border-default row-start-1 flex min-w-0 items-center gap-1 border-b px-3 py-2"
-            :class="showRail ? 'col-start-2 max-sm:order-2' : 'col-start-1'"
-          >
-            <OToggleGroup
-              v-if="!disableRelative"
-              :model-value="selectedType"
-              type="single"
-              class="flex-1"
-              data-test="date-time-type-toggle"
-              @update:model-value="onTypeToggle"
-            >
-              <OToggleGroupItem
-                value="relative"
-                size="sm"
-                class="flex-1"
-                data-test="date-time-relative-tab"
-              >
-                {{ t("common.relative") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem
-                value="absolute"
-                size="sm"
-                class="flex-1"
-                data-test="date-time-absolute-tab"
-              >
-                {{ t("common.absolute") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <div v-else class="flex-1" />
-            <OTooltip v-if="!hideClipboard" :content="t('common.copyRange')">
-              <OButton
-                data-test="date-time-copy-btn"
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="content-copy"
-                :aria-label="t('common.copyRange')"
-                @click="copyRange"
-              />
-            </OTooltip>
-            <OTooltip v-if="!hideClipboard" :content="t('common.pasteRange')">
-              <OButton
-                data-test="date-time-paste-btn"
-                variant="ghost"
-                size="icon-xs-sq"
-                icon-left="content-paste"
-                :aria-label="t('common.pasteRange')"
-                @click="pasteRange"
-              />
-            </OTooltip>
-          </div>
-          <div
-            v-if="showRail"
-            class="bg-surface-panel border-border-default relative col-span-1 col-start-1 row-span-2 row-start-1 border-e max-sm:static max-sm:order-1 max-sm:border-e-0 max-sm:border-b"
-            data-test="date-time-rail-frame"
-          >
-            <DateTimeRail
-              :recent="recentRailItems"
-              :calendar="calendarRailItems"
-              :restriction-msg="raw(queryRangeRestrictionMsg)"
-              class="absolute inset-0 min-h-0 overflow-y-auto max-sm:static max-sm:overflow-visible"
-              @hover="refreshTooltipNow"
-              @select-recent="applyRecentRange"
-              @remove-recent="removeRecentRange"
-              @select-calendar="applyCalendarItem"
-            />
-          </div>
-          <div
-            class="row-start-2 flex min-h-0 min-w-0 flex-col overflow-hidden max-sm:max-h-none max-sm:overflow-visible"
-            :class="showRail ? 'col-start-2 max-sm:order-3' : 'col-start-1'"
-          >
+        <div class="flex shrink-0 flex-col gap-1.5 px-3 pt-2.5 pb-2" data-test="date-time-top-bar">
+          <div class="flex min-w-0 items-center gap-2">
             <div
-              class="relative grid min-h-0 flex-1 overflow-y-auto max-sm:flex-none max-sm:overflow-visible"
+              v-if="!hideClipboard"
+              class="relative min-w-0 flex-1 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight]"
+              @focusout="onBarFocusOut"
             >
-              <div
-                v-if="!disableRelative"
-                role="tabpanel"
-                class="col-start-1 row-start-1"
-                :class="selectedType === 'relative' ? '' : 'pointer-events-none invisible'"
-                :aria-hidden="selectedType !== 'relative'"
-                :inert="selectedType !== 'relative'"
+              <OInput
+                ref="inputBar"
+                v-model="inputText"
+                data-test="date-time-input"
+                class="min-w-0 [&>div:first-of-type]:h-8!"
+                autocomplete="off"
+                role="combobox"
+                aria-autocomplete="list"
+                :aria-expanded="shownRows.length > 0"
+                :aria-controls="shownRows.length > 0 ? listId : undefined"
+                :aria-activedescendant="cursorRow >= 0 ? `${listId}-${cursorRow}` : undefined"
+                :placeholder="barPlaceholder"
+                :data-placeholder="shortPlaceholder ? 'short' : undefined"
+                :aria-label="t('common.timeRangeInputLabel')"
+                :error="inputError"
+                :aria-describedby="inputError ? inputErrorId : undefined"
+                @update:model-value="onInputEdit"
+                @keydown="onInputKeydown"
               >
-                <div class="date-time-table relative flex flex-col">
-                  <div
-                    class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
-                    v-for="(period, index) in relativePeriods"
-                    :key="'date_' + index"
-                  >
-                    <div class="min-w-18.75 text-sm font-semibold">
-                      {{ period.label }}
-                    </div>
-                    <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
-                      <OButton
-                        :disabled="
-                          relativeDatesInHour[period.value][item_index] >
-                            queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
-                        "
-                        :data-test="`date-time-relative-${item}-${period.value}-btn`"
-                        class="h-8! w-8! font-bold! disabled:opacity-35"
-                        :class="
-                          selectedType == 'relative' &&
-                          calendarToken === null &&
-                          relativePeriod == period.value &&
-                          relativeValue == item
-                            ? 'bg-button-primary! text-button-primary-foreground!'
-                            : `bg-text-heading/7! ${relativePeriod}`
-                        "
-                        variant="ghost"
-                        size="xs"
-                        @click="pickRelativeChip(period.value, item)"
-                        :key="'period_' + item_index"
-                      >
-                        {{ item }}
-                        <OTooltip
-                          v-if="
-                            relativeDatesInHour[period.value][item_index] >
-                              queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
-                          "
-                          side="right"
-                          align="center"
-                          max-width="18.75rem"
-                          :content="raw(queryRangeRestrictionMsg)"
-                        />
-                      </OButton>
-                    </div>
-                  </div>
-
-                  <div
-                    class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
-                  >
-                    <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
-                    <OTooltip
-                      side="right"
-                      align="center"
-                      max-width="18.75rem"
-                      v-if="queryRangeRestrictionInHour > 0"
-                      :content="raw(queryRangeRestrictionMsg)"
-                    />
-
-                    <div class="flex min-w-0 flex-1 gap-2">
-                      <div class="flex w-20 flex-col">
-                        <OInput
-                          v-model.number="relativeValue"
-                          :aria-label="t('common.timeAmount')"
-                          type="number"
-                          :min="1"
-                          :step="1"
-                          :max="
-                            relativePeriodsMaxValue[relativePeriod] > 0
-                              ? relativePeriodsMaxValue[relativePeriod]
-                              : undefined
-                          "
-                          @update:model-value="onCustomPeriodSelect"
-                          @focus="onCustomValueFocus"
-                          @blur="onCustomValueBlur"
-                        />
-                      </div>
-                      <div class="flex min-w-0 flex-1 flex-col">
-                        <OSelect
-                          v-model="relativePeriod"
-                          :aria-label="t('common.timeUnit')"
-                          :options="relativePeriodsSelect"
-                          @update:model-value="onCustomPeriodSelect"
-                        >
-                          <template v-slot:selected-item>
-                            <div>{{ getPeriodLabel }}</div>
-                          </template>
-                        </OSelect>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div
-                role="tabpanel"
-                class="col-start-1 row-start-1"
-                :class="selectedType === 'absolute' ? '' : 'pointer-events-none invisible'"
-                :aria-hidden="selectedType !== 'absolute'"
-                :inert="selectedType !== 'absolute'"
-              >
-                <div class="date-time-table flex flex-col">
-                  <OTooltip
-                    side="right"
-                    align="center"
-                    max-width="18.75rem"
-                    v-if="queryRangeRestrictionInHour > 0"
-                    :content="raw(queryRangeRestrictionMsg)"
+                <template #icon-right>
+                  <OShortcut
+                    v-if="previewLine?.ready && !suggestionsOpen && listCursor < 0"
+                    data-test="date-time-input-enter-hint"
+                    class="me-1"
+                    keys="enter"
+                    size="sm"
                   />
-                  <div class="flex justify-center px-3 py-2">
-                    <ODateRangeCalendar
-                      :start-date="selectedDate.from"
-                      :end-date="selectedDate.to"
-                      :min-date="calendarMinDate"
-                      :max-date="calendarMaxDate"
-                      @update:start-date="selectedDate.from = $event"
-                      @update:end-date="selectedDate.to = $event"
-                      @update:pending-date="pendingDay = $event"
+                  <OTooltip v-else :content="t('common.pasteRange')" side="bottom" align="end">
+                    <OButton
+                      data-test="date-time-paste-btn"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      icon-left="content-paste"
+                      class="text-text-secondary!"
+                      :aria-label="t('common.pasteRange')"
+                      @click="pasteRange"
                     />
-                  </div>
-                  <div class="text-text-secondary ps-6 pe-6 text-xs">
-                    {{ t("common.datetimeMessage") }}
-                  </div>
-                  <OSeparator v-if="!disableRelative" class="my-2" />
-
-                  <table
-                    v-if="!hideRelativeTime"
-                    class="startEndTime mx-[0.4rem] mt-2 mb-[0.3rem] w-[calc(100%-0.8rem)] px-3"
+                  </OTooltip>
+                </template>
+              </OInput>
+            </div>
+            <div v-else class="flex-1" />
+            <OTooltip
+              v-if="!fixedOnly"
+              :content="t('dateTime.pickDates')"
+              side="bottom"
+              align="end"
+            >
+              <OButton
+                data-test="date-time-pick-dates-btn"
+                variant="outline"
+                size="icon-sm"
+                icon-left="calendar-month"
+                :class="{ 'bg-surface-accent-active!': calendarMode }"
+                :aria-label="t('dateTime.pickDates')"
+                :aria-pressed="calendarMode"
+                @click="toggleCalendar"
+              />
+            </OTooltip>
+            <OSelect
+              v-if="!hideRelativeTimezone"
+              data-test="datetime-timezone-select"
+              v-model="timezone"
+              :options="timezoneSelectOptions"
+              searchable
+              :aria-label="t('logStream.timezone')"
+              :search-placeholder="t('dateTime.searchZones')"
+              :search-debounce="0"
+              @search="zoneQuery = $event"
+              :dropdown-style="{ minWidth: 'min(24rem, calc(100vw - 2rem))' }"
+              @update:model-value="onTimezoneChange"
+              @open="isTimezoneSelectOpen = true"
+              @close="
+                isTimezoneSelectOpen = false;
+                zoneQuery = '';
+              "
+              class="w-auto! max-w-36 min-w-0 shrink-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight] [&_[role=combobox]]:h-8!"
+            >
+              <template #trigger>
+                <span
+                  class="text-select-text text-compact flex-1 truncate text-start tabular-nums"
+                  data-test="datetime-timezone-short"
+                  >{{ zoneShortLabel }}</span
+                >
+              </template>
+              <template v-if="asUtcLabel" #before-options>
+                <div class="border-border-subtle border-b p-1">
+                  <OButton
+                    data-test="date-time-as-utc-toggle"
+                    variant="ghost"
+                    size="sm"
+                    class="text-text-link! w-full justify-start!"
+                    @click="toggleAsUtc"
+                    >{{ asUtcLabel.full }}</OButton
                   >
-                    <tbody>
-                      <tr>
-                        <td
-                          class="label o-input-label text-compact text-input-label-text w-1/2 pe-1.5 leading-tight font-medium"
-                        >
-                          {{ t("common.startTime") }}
-                        </td>
-                        <td
-                          class="label o-input-label text-compact text-input-label-text w-1/2 ps-1.5 leading-tight font-medium"
-                        >
-                          {{ t("common.endTime") }}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td class="w-1/2 pe-1.5">
-                          <OTime
-                            class="w-full"
-                            v-model="selectedTime.startTime"
-                            with-seconds
-                            data-test="datetime-start-time"
-                            @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
-                          />
-                        </td>
-                        <td class="w-1/2 ps-1.5">
-                          <OTime
-                            class="w-full"
-                            v-model="selectedTime.endTime"
-                            :with-seconds="true"
-                            data-test="datetime-end-time"
-                            @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
                 </div>
-              </div>
+              </template>
+            </OSelect>
+          </div>
+          <div class="flex h-6 min-w-0 items-center gap-2 pointer-coarse:h-9">
+            <div
+              v-if="summaryError"
+              :id="inputErrorId"
+              data-test="date-time-input-error"
+              role="alert"
+              class="flex min-w-0 flex-1 items-center gap-1.5 text-xs whitespace-nowrap"
+            >
+              <OIcon name="error-outline" size="sm" class="text-input-error-text shrink-0" />
+              <span class="text-input-error-text shrink-0 font-medium">{{
+                summaryError.message
+              }}</span>
+              <span
+                v-if="summaryError.examples"
+                class="text-text-secondary min-w-0 truncate"
+                data-test="date-time-input-examples"
+                >{{ summaryError.examples }}</span
+              >
             </div>
             <div
-              v-if="!hideRelativeTimezone || !autoApply"
-              class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-[0.4rem] py-2"
+              v-else
+              data-test="date-time-resolved"
+              :data-preview="previewLine ? 'true' : undefined"
+              class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap tabular-nums"
             >
-              <OSelect
-                v-if="!hideRelativeTimezone"
-                data-test="datetime-timezone-select"
-                v-model="timezone"
-                :options="timezoneSelectOptions"
-                searchable
-                :aria-label="t('logStream.timezone')"
-                :dropdown-style="{ minWidth: 'min(24rem, calc(100vw - 2rem))' }"
-                @update:model-value="onTimezoneChange"
-                @open="isTimezoneSelectOpen = true"
-                @close="isTimezoneSelectOpen = false"
-                class="min-w-0 italic"
-                :class="autoApply ? 'col-span-2' : ''"
-              />
-              <div v-else />
-              <OButton
-                v-if="!autoApply"
-                data-test="date-time-apply-btn"
-                variant="primary"
-                size="sm"
-                class="justify-self-end px-6!"
-                @click="applyAndClose"
+              <span
+                v-if="shownLine.name"
+                class="text-compact shrink-0 font-semibold"
+                :class="
+                  isDraft
+                    ? 'text-text-link'
+                    : previewLine
+                      ? 'text-toggle-item-active-text'
+                      : 'text-text-heading'
+                "
+                data-test="date-time-resolved-name"
+                >{{ shownLine.name }}</span
               >
-                {{ t("common.apply") }}
-              </OButton>
+              <OBadge
+                v-if="isDraft"
+                variant="primary-soft"
+                size="sm"
+                class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
+                data-test="date-time-draft-tag"
+                >{{ t("dateTime.draft") }}</OBadge
+              >
+              <OBadge
+                v-if="shownLine.live"
+                variant="primary-soft"
+                size="sm"
+                class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
+                data-test="date-time-preview-live"
+                >{{ t("dateTime.tagLive")
+                }}<OTooltip :content="t('dateTime.tagLiveHint')" side="bottom"
+              /></OBadge>
+              <OBadge
+                v-else-if="shownLine.changes"
+                variant="default-soft"
+                size="sm"
+                class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
+                data-test="date-time-preview-changes"
+                >{{ shownLine.changes.tag
+                }}<OTooltip :content="raw(shownLine.changes.hint)" side="bottom"
+              /></OBadge>
+              <OBadge
+                v-else-if="shownLine.fixed"
+                variant="default-soft"
+                size="sm"
+                class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
+                data-test="date-time-preview-fixed"
+                >{{ t("dateTime.fixed")
+                }}<OTooltip
+                  :content="
+                    shownLine.fixedHint ? raw(shownLine.fixedHint) : t('dateTime.tagFixedHint')
+                  "
+                  side="bottom"
+              /></OBadge>
+              <span
+                v-if="shownLine.range"
+                class="text-compact shrink-0"
+                :class="[
+                  previewLine ? 'text-toggle-item-active-text' : 'text-text-secondary',
+                  { 'max-md:hidden': shownRangeShort },
+                ]"
+                data-test="date-time-resolved-range"
+                >{{ shownLine.range }}</span
+              >
+              <span
+                v-if="shownRangeShort"
+                class="text-compact shrink-0 md:hidden"
+                :class="previewLine ? 'text-toggle-item-active-text' : 'text-text-secondary'"
+                data-test="date-time-resolved-range-short"
+                >{{ shownRangeShort }}</span
+              >
+              <!-- The duration gives way first: once its box is narrower than the tag, the tag wraps out of sight. -->
+              <span
+                v-if="shownLine.duration"
+                class="flex h-6 min-w-0 shrink-[64] flex-wrap items-center overflow-hidden max-md:hidden"
+              >
+                <span class="h-6 w-0" aria-hidden="true" />
+                <OBadge
+                  variant="default-soft"
+                  size="sm"
+                  class="shrink-0 forced-colors:border forced-colors:border-[color:CanvasText]"
+                  data-test="date-time-resolved-duration"
+                  >{{ shownLine.duration }}</OBadge
+                >
+              </span>
+              <span
+                v-if="shownLine.note"
+                class="min-w-0 shrink-[4] truncate text-xs"
+                :class="shownLine.warning ? 'text-status-warning-text' : 'text-text-secondary'"
+                :title="shownLine.note"
+                data-test="date-time-preview-note"
+                >{{ shownLine.note }}</span
+              >
+            </div>
+            <div class="flex shrink-0 items-center gap-1">
+              <!-- Copy takes the selection, not a preview, so it steps aside and the preview's note shows in full. -->
+              <OButton
+                v-if="isDraft && !calendarMode"
+                data-test="date-time-summary-apply-btn"
+                variant="primary"
+                size="xs"
+                class="h-6! shrink-0 gap-1.5! px-2! pointer-coarse:h-9!"
+                :disabled="applyDisabled"
+                @click="onApplyClick"
+                >{{ t("common.apply") }}<span aria-hidden="true">{{ raw("↵") }}</span></OButton
+              >
+              <OTooltip
+                v-if="!hideClipboard && !previewLine && !isDraft"
+                :content="copyDisabled ? t('dateTime.nothingToCopy') : t('common.copyRange')"
+                :shortcut="copyShortcut"
+                side="bottom"
+                align="end"
+              >
+                <OButton
+                  :data-test="copied ? 'date-time-copy-btn-done' : 'date-time-copy-btn'"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  :icon-left="copied ? 'check' : 'content-copy'"
+                  class="enabled:text-text-secondary! disabled:text-text-disabled! max-md:hidden pointer-coarse:size-9!"
+                  :aria-label="t('common.copyRange')"
+                  :disabled="copyDisabled"
+                  @click="copyRange"
+                />
+              </OTooltip>
+              <OTooltip
+                v-if="showPinButton"
+                :content="appliedPinned ? t('dateTime.unpin') : t('dateTime.pinThisRange')"
+                shortcut="alt+p"
+                side="bottom"
+                align="end"
+              >
+                <OButton
+                  data-test="date-time-pin-btn"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  :icon-left="appliedPinned ? 'star' : 'star-outline'"
+                  class="pointer-coarse:size-9!"
+                  :class="[
+                    appliedPinned ? 'text-accent!' : 'text-text-secondary!',
+                    { 'max-md:hidden': appliedIsToken },
+                  ]"
+                  :aria-label="t('dateTime.pinThisRange')"
+                  :aria-pressed="appliedPinned"
+                  @click="toggleAppliedPin"
+                />
+              </OTooltip>
+              <OTooltip
+                v-if="showFreezeButton"
+                :content="t('dateTime.freezeAt', { range: freezeLabel })"
+                side="bottom"
+                align="end"
+              >
+                <OButton
+                  data-test="date-time-freeze-btn"
+                  variant="outline"
+                  size="xs"
+                  class="h-6! shrink-0 px-2! pointer-coarse:h-9!"
+                  :aria-label="t('dateTime.freezeAt', { range: freezeLabel })"
+                  @click="freezeRange"
+                  >{{ t("dateTime.freeze") }}</OButton
+                >
+              </OTooltip>
+              <OTooltip
+                v-if="showLiveButton && !isDraft"
+                :content="t('dateTime.goLiveHint', { duration: liveDurationLabel })"
+                side="bottom"
+                align="end"
+              >
+                <OButton
+                  data-test="date-time-live-btn"
+                  variant="outline"
+                  size="xs"
+                  class="text-text-link! h-6! shrink-0 gap-1.5! px-2! pointer-coarse:h-9!"
+                  :aria-label="t('dateTime.goLiveHint', { duration: liveDurationLabel })"
+                  @click="goLive"
+                  ><span class="bg-accent size-1.5 rounded-full" aria-hidden="true" />{{
+                    t("dateTime.live")
+                  }}</OButton
+                >
+              </OTooltip>
             </div>
           </div>
         </div>
+        <div class="border-border-default min-h-0 flex-1 border-y" data-test="date-time-body">
+          <div v-if="calendarMode" class="h-full overflow-y-auto px-3 py-1">
+            <ODateRangeCalendar
+              ref="calendarRef"
+              band-range
+              prevent-deselect
+              fill
+              compact
+              auto-focus
+              :locale="intlLocale"
+              :week-starts-on="weekStart"
+              :calendar-label="t('dateTime.dateRangeGrid')"
+              :prev-label="t('dateTime.calendarPrevMonth')"
+              :next-label="t('dateTime.calendarNextMonth')"
+              :start-date="selectedDate.from"
+              :end-date="selectedDate.to"
+              :min-date="calendarMinDate"
+              :max-date="calendarMaxDate"
+              :unavailable-before="retentionFloorDay ?? undefined"
+              :unavailable-reason="
+                retentionDays ? t('dateTime.outsideRetention', { days: retentionDays }) : undefined
+              "
+              @update:start-date="onCalendarStartDate"
+              @update:end-date="onCalendarEndDate"
+              @update:pending-date="onCalendarPendingDay"
+              @update:preview-date="calendarPreviewDay = $event"
+            />
+          </div>
+          <div v-else class="flex h-full flex-col">
+            <div
+              v-if="narrowedText && !typing"
+              class="border-border-subtle text-text-secondary flex h-8 shrink-0 items-center gap-1.5 border-b px-3 text-xs tabular-nums"
+              data-test="date-time-panel-narrowed"
+            >
+              <OIcon name="filter-alt" size="xs" class="shrink-0" aria-hidden="true" />{{
+                narrowedText
+              }}
+            </div>
+            <div
+              v-if="showChips && !typing"
+              class="border-border-subtle flex h-9 shrink-0 items-center gap-2 border-b px-3 pointer-coarse:h-11"
+              data-test="date-time-chips"
+            >
+              <OToggleGroup
+                :model-value="litChip ?? undefined"
+                @update:model-value="onChipToggle"
+                @reselect="onChipReselect"
+              >
+                <OToggleGroupItem
+                  v-for="chip in chipItems"
+                  :key="chip.value"
+                  :value="chip.value"
+                  size="xs"
+                  :disabled="chip.disabled"
+                  focusable-unavailable
+                  :tooltip="chip.reason ? raw(chip.reason) : undefined"
+                  :aria-label="chip.title"
+                  class="o-time-chip data-[state=on]:bg-accent! data-[state=on]:text-text-inverse! h-6! tabular-nums forced-colors:data-disabled:text-[color:GrayText]! forced-colors:data-[state=on]:bg-[color:Highlight]! forced-colors:data-[state=on]:text-[color:HighlightText]! forced-colors:data-[state=on]:forced-color-adjust-none pointer-coarse:h-8! pointer-coarse:min-w-10"
+                  :data-test="`date-time-chip-${chip.label}`"
+                  >{{ raw(chip.label) }}<OTooltip v-if="!chip.disabled" :content="chip.title"
+                /></OToggleGroupItem>
+              </OToggleGroup>
+              <OTooltip
+                v-for="(note, noteIndex) in chipsNotes"
+                :key="note.testId"
+                :content="note.tooltip"
+                side="right"
+              >
+                <span
+                  class="text-text-secondary inline-flex min-w-0 shrink items-center gap-1 text-xs"
+                  :class="{ 'ms-auto': noteIndex === 0 }"
+                  :data-test="note.testId"
+                >
+                  <OIcon :name="note.icon" size="xs" class="shrink-0" />
+                  <span class="truncate">{{ note.text }}</span>
+                </span>
+              </OTooltip>
+            </div>
+            <div class="min-h-0 flex-1">
+              <DateTimeRangeList
+                v-if="bodyRows.length > 0"
+                :id="listId"
+                :rows="bodyRows"
+                :active="cursorRow"
+                :editing-id="editingPinRowId"
+                :heading="emptyExamples.length > 0 ? t('dateTime.noMatchYet') : listHeading"
+                :head-note="headNote"
+                @pick="pickBodyRow"
+                @cursor="setCursorRow"
+                @pin="pinRecentRow"
+                @unpin="unpinRow"
+                @remove="removeRecentRow"
+                @rename="renamePin"
+                @rename-cancel="cancelPinName"
+              />
+            </div>
+          </div>
+        </div>
+        <div
+          class="flex h-9 shrink-0 items-center gap-1 ps-1 pe-2 pointer-coarse:h-11"
+          data-test="date-time-footer"
+        >
+          <template v-if="calendarMode">
+            <div
+              v-if="!wholeDaysOnly"
+              class="startEndTime grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 ps-1"
+              data-test="date-time-start-end"
+              @keydown.enter="onTimeFieldEnter"
+            >
+              <OInput
+                class="min-w-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight] [&>div:first-of-type]:h-7!"
+                size="sm"
+                autocomplete="off"
+                :aria-label="t('common.timeRangeStart')"
+                :placeholder="t('common.timeRangeStart')"
+                :error="unreadableFields.start || timeFieldError?.field === 'start'"
+                :model-value="startFieldShown"
+                data-test="datetime-start-time"
+                @update:model-value="onFieldInput('start', $event)"
+                @change="onFieldChange('start', $event)"
+                @focus="timeFieldFocused = true"
+                @blur="onTimeFieldBlur"
+              />
+              <span
+                class="text-text-label text-compact"
+                aria-hidden="true"
+                data-test="date-time-start-end-dash"
+                >{{ raw("–") }}</span
+              >
+              <OInput
+                class="min-w-0 forced-colors:focus-within:outline-2 forced-colors:focus-within:outline-offset-2 forced-colors:focus-within:outline-[color:Highlight] [&>div:first-of-type]:h-7!"
+                size="sm"
+                autocomplete="off"
+                :aria-label="t('common.timeRangeEnd')"
+                :placeholder="t('common.timeRangeEnd')"
+                :error="unreadableFields.end || timeFieldError?.field === 'end'"
+                :model-value="endFieldShown"
+                data-test="datetime-end-time"
+                @update:model-value="onFieldInput('end', $event)"
+                @change="onFieldChange('end', $event)"
+                @focus="timeFieldFocused = true"
+                @blur="onTimeFieldBlur"
+              />
+            </div>
+            <div v-else class="flex-1" />
+            <OTooltip :content="applyBlockedReason">
+              <OButton
+                data-test="date-time-apply-btn"
+                variant="primary"
+                size="xs"
+                class="shrink-0 px-3! pointer-coarse:h-9!"
+                :disabled="applyDisabled"
+                @click="onApplyClick"
+              >
+                {{ t("common.apply") }}
+              </OButton>
+            </OTooltip>
+          </template>
+          <template v-else>
+            <div class="flex-1" />
+            <template v-if="!hideRangeShift && !isDraft">
+              <OTooltip shortcut-id="timeRangePrevious">
+                <template #content>
+                  <span class="flex flex-col">
+                    <span>{{ stepTooltip.prev.title }}</span>
+                    <span
+                      v-if="stepTooltip.prev.window"
+                      class="text-text-secondary text-xs tabular-nums"
+                      >{{ stepTooltip.prev.window }}</span
+                    >
+                  </span>
+                </template>
+                <OButton
+                  data-test="date-time-prev-btn-footer"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  icon-left="chevron-left"
+                  class="enabled:text-text-secondary! disabled:text-text-disabled! forced-colors:disabled:text-[color:GrayText]! pointer-coarse:size-9!"
+                  :aria-label="stepTooltip.prev.title"
+                  :disabled="disable || disablePrevShift"
+                  @click="shiftTimeRange('prev')"
+                />
+              </OTooltip>
+              <OTooltip shortcut-id="timeRangeNext">
+                <template #content>
+                  <span class="flex flex-col">
+                    <span>{{ stepTooltip.next.title }}</span>
+                    <span
+                      v-if="stepTooltip.next.window"
+                      class="text-text-secondary text-xs tabular-nums"
+                      >{{ stepTooltip.next.window }}</span
+                    >
+                  </span>
+                </template>
+                <OButton
+                  data-test="date-time-next-btn-footer"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  icon-left="chevron-right"
+                  class="enabled:text-text-secondary! disabled:text-text-disabled! forced-colors:disabled:text-[color:GrayText]! pointer-coarse:size-9!"
+                  :aria-label="stepTooltip.next.title"
+                  :disabled="disable || isNextShiftDisabled()"
+                  @click="shiftTimeRange('next')"
+                />
+              </OTooltip>
+              <OTooltip
+                v-if="!wholeDaysOnly"
+                :content="stepTooltip.zoom"
+                shortcut-id="timeRangeZoomOut"
+              >
+                <OButton
+                  data-test="date-time-zoom-out-btn-footer"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  icon-left="zoom-out"
+                  class="enabled:text-text-secondary! disabled:text-text-disabled! forced-colors:disabled:text-[color:GrayText]! pointer-coarse:size-9!"
+                  :aria-label="stepTooltip.zoom"
+                  :disabled="disable || zoomOutBlocked"
+                  @click="zoomOut"
+                />
+              </OTooltip>
+            </template>
+          </template>
+        </div>
+        <div class="sr-only" aria-live="polite" data-test="date-time-live-region">
+          {{ copiedSpeech || panelSpeech }}
+        </div>
       </div>
     </OPopover>
-    <OTooltip v-if="!hideRangeShift" :content="t('common.next')">
+    <OTooltip
+      v-if="triggerTooltip"
+      :anchor="triggerElement"
+      :open="triggerTooltipOpen && !menuOpen"
+      side="bottom"
+      :align="triggerTooltipAlign"
+    >
+      <template #content>
+        <span class="flex flex-col tabular-nums" data-test="date-time-trigger-tooltip">
+          <span>{{ triggerTooltip.stamps }}</span>
+          <span v-if="triggerTooltip.utc" data-test="date-time-trigger-tooltip-utc">{{
+            triggerTooltip.utc
+          }}</span>
+          <span
+            v-if="triggerTooltip.progress"
+            class="text-text-secondary text-xs"
+            data-test="date-time-trigger-tooltip-progress"
+            >{{ triggerTooltip.progress }}</span
+          >
+          <span class="text-text-secondary text-xs">{{ triggerTooltip.detail }}</span>
+          <span
+            v-if="narrowedText"
+            class="flex items-center gap-1 text-xs"
+            data-test="date-time-trigger-tooltip-narrowed"
+            ><OIcon name="filter-alt" size="xs" aria-hidden="true" />{{ narrowedText }}</span
+          >
+        </span>
+      </template>
+    </OTooltip>
+    <OTooltip v-if="!hideRangeShift" shortcut-id="timeRangeNext" side="bottom">
+      <template #content>
+        <span class="flex flex-col">
+          <span>{{ stepTooltip.next.title }}</span>
+          <span v-if="stepTooltip.next.window" class="text-text-secondary text-xs tabular-nums">{{
+            stepTooltip.next.window
+          }}</span>
+        </span>
+      </template>
       <OButton
         data-test="date-time-next-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border h-auto! rounded-s-none! border-s!"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! rounded-none! border-s! max-md:hidden forced-colors:disabled:text-[color:GrayText]! pointer-coarse:min-w-10"
         icon-left="chevron-right"
-        :aria-label="t('common.next')"
+        :aria-label="stepTooltip.next.title"
         :disabled="disable || isNextShiftDisabled()"
         @click.prevent.stop="shiftTimeRange('next')"
       />
     </OTooltip>
+    <OTooltip
+      v-if="!hideRangeShift && !wholeDaysOnly && !isForm"
+      :content="stepTooltip.zoom"
+      shortcut-id="timeRangeZoomOut"
+      side="bottom"
+    >
+      <OButton
+        data-test="date-time-zoom-out-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! disabled:text-text-disabled! h-auto! border-s! max-md:hidden forced-colors:disabled:text-[color:GrayText]! pointer-coarse:min-w-10"
+        :class="showUndo ? 'rounded-none!' : 'rounded-s-none!'"
+        icon-left="zoom-out"
+        :aria-label="stepTooltip.zoom"
+        :disabled="disable || zoomOutBlocked"
+        @click.prevent.stop="zoomOut"
+      />
+    </OTooltip>
+    <OTooltip v-if="showUndo" :content="undoTooltip" shortcut-id="timeRangeUndo" side="bottom">
+      <OButton
+        data-test="date-time-undo-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border enabled:hover:bg-interactive-hover-bg! h-auto! rounded-s-none! border-s! forced-colors:disabled:text-[color:GrayText]! pointer-coarse:min-w-10"
+        icon-left="undo"
+        :aria-label="undoTooltip"
+        :disabled="disable || !undoAvailable"
+        @click.prevent.stop="undoRange"
+      />
+    </OTooltip>
+    <div class="sr-only" aria-live="polite" data-test="date-time-applied-live-region">
+      {{ appliedSpeech }}
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import DateTimeRail from "@/components/DateTimeRail.vue";
+import DateTimeRangeList from "@/components/DateTimeRangeList.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import {
   ref,
   defineComponent,
@@ -415,68 +826,93 @@ import {
   onBeforeUnmount,
   onDeactivated,
   onMounted,
+  useId,
   watch,
   nextTick,
+  reactive,
+  toRefs,
   type PropType,
 } from "vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
-import {
-  getImageURL,
-  useLocalTimezone,
-  convertToUtcTimestamp,
-  timestampToTimezoneDate,
-} from "../utils/zincutils";
-import { subtractRelativeTime } from "@/utils/date";
+import { getImageURL, useLocalTimezone, convertToUtcTimestamp } from "../utils/zincutils";
 import {
   formatCalendarLabel,
-  formatCalendarTooltip,
-  formatRangeTooltip,
-  formatResolvedCalendarTooltip,
   parseCalendarToken,
   resolveCalendarPeriod,
-  shiftCalendarToken,
 } from "@/utils/dashboard/calendarPeriods";
+import { CALENDAR_RAIL_ITEMS, PAST_PERIOD_KEYS, formatZoneBadge } from "@/utils/timeRangeRail";
 import {
-  CALENDAR_RAIL_ITEMS,
-  exceedsRangeRestriction,
-  formatAbsoluteInstant,
-  formatRecentRange,
-  formatCalendarRailHint,
-  formatRecentDuration,
-  formatRecentRangeLabel,
-  type TimeRangeRailItem,
-} from "@/utils/timeRangeRail";
-import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
-import { localeFileMap } from "@/locales";
+  isRelativeHistoryEntry,
+  sameHistoryEntry,
+  type TimeRangeHistoryEntry,
+} from "@/composables/useTimeRangeHistory";
 import {
-  parseDateRangeString,
-  parseSingleDateTime,
-  type ParsedSingleDateTime,
-} from "@/utils/dateTimeRangeParse";
+  TIME_INPUT_EXAMPLES,
+  type TimeRangeListRow,
+  type TimeRangePreset,
+} from "@/utils/timeRangeList";
+import { instantFromShiftedMs } from "@/utils/timeRangeZoom";
+import {
+  ALL_KINDS,
+  rangeFromLegacy,
+  rangeToken,
+  sameRange,
+  type TimeRange,
+  type TimeRangeApplyMeta,
+  type TimeRangeCapabilities,
+  type TimeRangeContext,
+  type TimeRangeHostPreset,
+  type TimeRangeKind,
+} from "@/utils/timeRangeModel";
+import { readOrgTimeRangeSettings } from "@/utils/orgTimeRangeSettings";
+import { timeRangeEndText, timeRangeEndsNote, timeRangeName } from "@/utils/timeRangeFormat";
+import { rollingShortName, triggerLabelForms, type TriggerLabelForm } from "@/utils/timeRangeForms";
+import {
+  formatRangeCopyText,
+  formatRangeDates,
+  formatRangeDuration,
+  formatRangeLabel,
+  formatRangeStamps,
+  formatRangeStart,
+  formatZoneOffset,
+  type RangeLabelInput,
+} from "@/utils/timeRangeLabel";
+import { weekStartsOn } from "@/utils/weekStart";
+import { searchTimeZones } from "@/utils/timeZoneSearch";
+import type { DateRangeCalendarExposed } from "@/lib/forms/DateTimeRange/ODateRangeCalendar.types";
+import { parseRollingPeriod } from "@/utils/dateTimeRangeParse";
 import { copyToClipboard } from "@/utils/clipboard";
-import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { fromZonedTime } from "date-fns-tz";
+import useTimeRangeZone, {
+  MICROS_PER_MINUTE,
+  MICROS_PER_SECOND,
+  addCivilDays,
+  zoneOffset,
+} from "@/composables/useTimeRangeZone";
+import useTimeRangeLimits, { MAX_CUSTOM_RELATIVE_VALUE } from "@/composables/useTimeRangeLimits";
+import useTimeRangeRail from "@/composables/useTimeRangeRail";
+import useTimeRangeTyping, { type InputPlan } from "@/composables/useTimeRangeTyping";
+import useTimeRangeFields, { type FieldsSnapshot } from "@/composables/useTimeRangeFields";
+import useTimeRangeSummary from "@/composables/useTimeRangeSummary";
+import useTimeRangeStepping from "@/composables/useTimeRangeStepping";
 
-const MICROS_PER_SECOND = 1_000_000;
 const POPOVER_COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
-// Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
-const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
-  s: 315_360_000,
-  m: 5_256_000,
-  h: 87_600,
-  d: 3_650,
-  w: 520,
-  M: 120,
+// Seconds each unit nominally spans, months at their longest; a DST day can still run 25h, so typed periods also check the real span.
+const UNIT_SECONDS: Record<string, number> = {
+  s: 1,
+  m: 60,
+  h: 3_600,
+  d: 86_400,
+  w: 604_800,
+  M: 2_678_400,
 };
-
-interface CalendarPresetState {
-  tooltip: I18nText | undefined;
-  disabled: boolean;
-}
+const TWO_DAYS_US = 2 * 86_400_000_000;
+// Units of a fixed length, largest first; weeks and months keep their own unit when zoomed.
+const EXACT_UNIT_SECONDS: Record<string, number> = { d: 86_400, h: 3_600, m: 60, s: 1 };
 
 interface ConsumableDateTime {
   startTime: number;
@@ -486,26 +922,23 @@ interface ConsumableDateTime {
   selectedTime?: unknown;
   valueType?: string;
   userChangedValue?: boolean;
+  rerun?: boolean;
 }
-
-// One offset lookup per zone for the whole app, not per picker instance.
-const zoneOffsets = new Map<string, string>();
 
 export default defineComponent({
   components: {
-    OSeparator,
     OButton,
     OIcon,
-    OToggleGroup,
-    OToggleGroupItem,
     OTooltip,
-    OTruncatedText,
     OInput,
     OSelect,
-    OTime,
     ODateRangeCalendar,
     OPopover,
-    DateTimeRail,
+    DateTimeRangeList,
+    OBadge,
+    OShortcut,
+    OToggleGroup,
+    OToggleGroupItem,
   },
   props: {
     defaultType: {
@@ -519,14 +952,6 @@ export default defineComponent({
     defaultRelativeTime: {
       type: String,
       default: "15m",
-    },
-    autoApply: {
-      type: Boolean,
-      default: false,
-    },
-    applyPresets: {
-      type: Boolean,
-      default: false,
     },
     initialTimezone: {
       type: String as PropType<string | null>,
@@ -549,14 +974,6 @@ export default defineComponent({
       type: String,
       default: "date-time-btn",
     },
-    disableRelative: {
-      type: Boolean,
-      default: false,
-    },
-    hideRelativeTime: {
-      type: Boolean,
-      default: false,
-    },
     hideRelativeTimezone: {
       type: Boolean,
       default: false,
@@ -566,7 +983,7 @@ export default defineComponent({
       type: String,
       default: "",
     },
-    /** Drops the copy and paste range buttons; a date-only picker then loses its whole top row. */
+    /** Drops the paste box and the copy and paste buttons; a date-only picker then loses its whole top row. */
     hideClipboard: {
       type: Boolean,
       default: false,
@@ -597,11 +1014,6 @@ export default defineComponent({
       type: String as PropType<ButtonVariant>,
       default: "outline",
     },
-    /** Offers Today … Last year; off where the backend only parses rolling `<n><unit>` periods. */
-    calendarPresets: {
-      type: Boolean,
-      default: false,
-    },
     /** Sizes the trigger like a form field (full width, field height and border) instead of a toolbar button. */
     fieldAppearance: {
       type: Boolean,
@@ -622,65 +1034,431 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    /** Days of data the page keeps; rows, chips and dates wholly before it are greyed. Unset greys nothing. */
+    retentionDays: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
+    /** Binds the global time-range keys (T [ ] - Z); only a page's own toolbar picker sets it, never a panel's. */
+    shortcuts: {
+      type: Boolean,
+      default: false,
+    },
+    /** The page's apply contract (§4): chips, steppers, undo and hotkeys follow it; the picker never runs a query. */
+    preset: {
+      type: String as PropType<TimeRangeHostPreset>,
+      default: "explorer-auto",
+    },
+    /** What the host can store; readings of other kinds are greyed, never substituted. */
+    capabilities: {
+      type: Object as PropType<TimeRangeCapabilities>,
+      default: () => ({}),
+    },
+    /** The applied range (v-model:range); wins over the default* props and moves the picker without an apply. */
+    range: {
+      type: Object as PropType<TimeRange | null>,
+      default: null,
+    },
+    /** What the results on screen are for (explorer-manual), so undo can say when it runs the query. */
+    queriedRange: {
+      type: Object as PropType<TimeRange | null>,
+      default: null,
+    },
+    /** Page name for `Not available in {host}` and Recent's `from {page}`. */
+    hostName: {
+      type: String,
+      default: "",
+    },
+    /** The window a query's own `_timestamp` filter keeps inside the picked range, if any. */
+    narrowedByQuery: {
+      type: Object as PropType<{ startUs: number; endUs: number } | null>,
+      default: null,
+    },
+    /** The page refused to run this range as over its limit: the trigger keeps it, with a lock, and the picker never clamps it. */
+    limitRefused: {
+      type: Boolean,
+      default: false,
+    },
+    /** A panel on the page keeps its own time, marked on the trigger. */
+    panelTimeMark: {
+      type: Boolean,
+      default: false,
+    },
   },
 
-  emits: ["on:date-change", "on:timezone-change", "hide", "show"],
+  emits: [
+    "on:date-change",
+    "on:timezone-change",
+    "hide",
+    "show",
+    "on:undo",
+    "apply",
+    "update:range",
+  ],
 
   setup(props, { emit }) {
     const store = useStore();
-    const pickerZone = ref(props.pickerTimezone);
-    const zone = computed<string>(() =>
-      props.pickerTimezone ? pickerZone.value : store.state.timezone,
+    const { t } = useI18nTyped();
+    const clock = useTimeRangeZone(() => props.pickerTimezone);
+    const {
+      pickerZone,
+      zone,
+      intlLocale,
+      tooltipNow,
+      refreshTooltipNow,
+      labelOptions,
+      convertUnixTime,
+      civilDayStart,
+      absoluteToMicros,
+      endFieldToMicros,
+      isZoneMidnight,
+      relativeLabel,
+      resolveRelativePeriod,
+      calendarTooltip,
+    } = clock;
+    const kinds = computed<TimeRangeKind[]>(() => props.capabilities?.kinds ?? [...ALL_KINDS]);
+    // A host that stores no token has no list, chips or live steps: its calendar is the panel.
+    const fixedOnly = computed(
+      () => !kinds.value.includes("rolling") && !kinds.value.includes("calendar"),
     );
-    const { t, locale } = useI18nTyped();
+    const wholeDaysOnly = computed(() => fixedOnly.value && props.capabilities?.wholeDays === true);
+    const calendarAllowed = computed(() => kinds.value.includes("calendar"));
+    const isForm = computed(() => props.preset === "form");
+    const fiscalYearStartMonth = computed(
+      () =>
+        readOrgTimeRangeSettings(store.state.organizationData?.organizationSettings)
+          .fiscalYearStartMonth,
+    );
+    // The composables read the host contract through the flag names they were written against.
+    const flags = {
+      disableRelative: fixedOnly,
+      hideRelativeTime: wholeDaysOnly,
+      calendarPresets: calendarAllowed,
+      futureAllowed: computed(() => props.capabilities?.future === true),
+      undoable: computed(() => !isForm.value),
+      fiscalYearStartMonth,
+    };
+    const view = reactive({ ...toRefs(props), ...flags });
+    const railView = reactive({
+      ...toRefs(props),
+      ...flags,
+      preset: computed(
+        () => (props.preset === "dashboard" ? "dashboard" : "ops") as TimeRangePreset,
+      ),
+    });
+    const typingView = reactive({
+      ...toRefs(props),
+      ...flags,
+      kinds,
+      future: flags.futureAllowed,
+      wholeDays: computed(() => props.capabilities?.wholeDays === true),
+    });
+    const limits = useTimeRangeLimits(view, clock);
+    const { calendarMinDate, calendarMaxDate, trustedRange, calendarExceedsRestriction } = limits;
     const selectedType = ref("relative");
-    const selectedTime = ref({
-      startTime: "00:00:00",
-      endTime: "23:59:59",
-    });
-    const selectedDate = ref({
-      from: "",
-      to: "",
-    });
     const relativePeriod = ref("m");
     const relativeValue = ref(15);
     // A selected calendar period overrides relativePeriod/relativeValue while the type is relative.
     const calendarToken = ref<string | null>(null);
     const appliedCalendarToken = ref<string | null>(null);
-    // Type and relative selection last applied; closing without Apply restores these, not the absolute fields.
+    // A typed running period (`Q4`, `FY26`) keeps its typed name only while its token is the one set by that typing.
+    const calendarName = ref<string | null>(null);
+    const appliedCalendarName = ref<string | null>(null);
+    watch(calendarToken, () => (calendarName.value = null), { flush: "sync" });
+    // A typed period name (`Q4 2026`) stays only on the exact instants it was typed for; a zone redraw keeps them.
+    const namedRange = ref<{ name: string; startUs: number; endUs: number } | null>(null);
+    const rangeContext = (): TimeRangeContext => ({
+      nowUs: tooltipNow.value * 1000,
+      zone: zone.value,
+      weekStart: weekStartsOn(),
+      locale: intlLocale.value,
+      fiscalYearStartMonth: fiscalYearStartMonth.value,
+    });
+    // A fixed range that is exactly a period is named by the formatter, however it was made.
+    const absoluteLabelInput = (startUs: number, endUs: number): RangeLabelInput => {
+      const named = namedRange.value;
+      if (named && named.startUs === startUs && named.endUs === endUs) {
+        return { startUs, endUs, name: named.name, period: true };
+      }
+      const name = timeRangeName({ kind: "fixed", startUs, endUs }, rangeContext());
+      return name ? { startUs, endUs, name, period: true } : { startUs, endUs };
+    };
+    // Type and relative selection last applied; closing without Apply restores these.
     let appliedSelection = {
       selectedType: "relative",
       calendarToken: null as string | null,
       relativePeriod: "m",
       relativeValue: 15,
     };
-    // Offset-0 tooltips end at now, so they read a clock refreshed on hover rather than a stale render time.
-    const tooltipNow = ref(Date.now());
-    const timeRangeHistory = useTimeRangeHistory();
     // A single clicked day the range calendar is still waiting to pair with an end date.
     const pendingDay = ref<string | null>(null);
-    // Fields written by the picker itself (seeding the Absolute tab, a Recent pick) are not user edits for auto-apply.
-    let isSeedingAbsolute = false;
-    let seededEnd: { date: string; time: string } | null = null;
-    // Date-only pickers cannot show the times a recent range carries.
-    const showRail = computed(() => !props.disableRelative);
+    // The day a second calendar pick would end on, under the pointer or focus.
+    const calendarPreviewDay = ref<string | null>(null);
+    const calendarRef = ref<DateRangeCalendarExposed | null>(null);
+    // The Start/End fields as the panel opened, restored when it closes with nothing applied, since showing a relative pick overwrites it.
+    let absoluteAtOpen: FieldsSnapshot | null = null;
+    let appliedSinceOpen = false;
+    // The panel aligns to the whole ‹ trigger › group, not the trigger alone.
+    const groupEl = ref<HTMLElement | null>(null);
+    const menuEl = ref<HTMLElement | null>(null);
+    const inputBar = ref<{ focus: () => void } | null>(null);
+    const menuOpen = ref(false);
+    // Index into the list rows below the suggestions; -1 while the cursor is in the bar.
+    const listCursor = ref(-1);
+    const calendarMode = ref(false);
+    // The rolling period in force, so the one chip equal to it is the only control lit for it.
+    const appliedPeriod = ref<string | null>(null);
     const lastValidCustomValue = ref(15);
+
+    let relativePeriods = [
+      { label: t("common.seconds"), value: "s" },
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+      { label: t("common.days"), value: "d" },
+      { label: t("common.weeks"), value: "w" },
+      { label: t("common.months"), value: "M" },
+    ].filter((period) => !props.hideSeconds || period.value !== "s");
+
+    const inputErrorId = useId();
+    const listId = useId();
+
+    let relativePeriodsMaxValue = ref<Record<string, number>>({
+      s: 0,
+      m: 0,
+      h: 0,
+      d: 0,
+      w: 0,
+      M: 0,
+    });
+
+    const periodUnits = ["s", "m", "h", "d", "w", "M"];
+
+    const pastPeriodKey = computed<I18nKey>(() => PAST_PERIOD_KEYS[relativePeriod.value]);
+
+    const isValidCustomValue = (value: unknown) =>
+      value !== "" && value !== null && Number.isFinite(Number(value));
+
+    // A mid-edit custom value (empty, 2.5, 0) reads as the last whole count, so the label and the emitted range agree.
+    const normalizedCount = (): number => {
+      const count = Math.trunc(Number(relativeValue.value));
+      return isValidCustomValue(relativeValue.value) && count >= 1
+        ? count
+        : lastValidCustomValue.value;
+    };
+
+    const currentRelativePeriod = (): string =>
+      calendarToken.value ?? `${normalizedCount()}${relativePeriod.value}`;
+
+    // A day-only or zone-hidden picker never shows a zone, so its line and the as-UTC chip must not either.
+    const showsZone = computed(() => !props.hideRelativeTimezone && !wholeDaysOnly.value);
+
+    // The applied range is already the summary, so Recent never repeats it.
+    const currentEntry = computed<TimeRangeHistoryEntry | null>(() => {
+      if (selectedType.value === "relative") return { relative: currentRelativePeriod() };
+      const range = pendingRange.value;
+      return range ? { startUs: range.startTime, endUs: range.endTime } : null;
+    });
+
+    const rail = useTimeRangeRail(railView, {
+      clock,
+      limits,
+      currentEntry,
+      appliedPeriod,
+      boundedPeriod,
+      listCursor,
+      inputBar,
+    });
+    const {
+      showRail,
+      editingPinRowId,
+      showChips,
+      chipItems,
+      litChip,
+      chipsNotes,
+      narrowedText,
+      recordEntry,
+      removeRecentRange,
+      pinRecentRow,
+      unpinRow,
+      removeRecentRow,
+      renamePin,
+      cancelPinName,
+    } = rail;
+
+    const typingBar = useTimeRangeTyping(typingView, {
+      clock,
+      limits,
+      relativePeriods,
+      relativePeriodsMaxValue,
+      showsZone,
+      menuOpen,
+      listCursor,
+      inputBar,
+      defaultRows: rail.defaultRows,
+      applyPlan,
+      finish: finishInput,
+      pickListRow,
+      removeRecentRow,
+      pinRecentRow,
+      unpinRow,
+    });
+    const {
+      inputText,
+      inputError,
+      inputRefusal,
+      inputErrorText,
+      inputAsUtc,
+      suggestionsOpen,
+      suggestionRows,
+      activeSuggestion,
+      typing,
+      listRows,
+      shownRows,
+      activeRow,
+      listHeading,
+      asUtcLabel,
+      cancelPendingRead,
+      clearInput,
+      onInputEdit,
+      applyTypedReading,
+      onInputKeydown,
+      onBarFocusOut,
+      escapeInput,
+      setCursorRow,
+      toggleAsUtc,
+      applySuggestion,
+      pickShownRow,
+      pasteRange,
+    } = typingBar;
+
+    const fields = useTimeRangeFields({
+      clock,
+      limits,
+      selectedType,
+      calendarToken,
+      pendingDay,
+      calendarPreviewDay,
+      menuOpen,
+      clearInput,
+      readPastedStamp: typingBar.readPastedStamp,
+    });
+    // A picker with no calendar rows and nothing recent still teaches the grammar instead of a blank body.
+    const emptyExamples = computed<TimeRangeListRow[]>(() =>
+      props.hideClipboard || inputText.value.trim() || shownRows.value.length > 0
+        ? []
+        : TIME_INPUT_EXAMPLES.map((example, index) => ({
+            id: `example-${index}`,
+            kind: "example" as const,
+            label: example.text,
+            meta: String(t(example.description)),
+            disabled: false,
+            testId: `date-time-list-example-${index}`,
+            group: 0,
+          })),
+    );
+    const bodyRows = computed(() =>
+      emptyExamples.value.length > 0 ? emptyExamples.value : shownRows.value,
+    );
+    // Typed text lights the row Enter would take: its reading, else the first list row it filtered to.
+    const cursorRow = computed(() => {
+      if (emptyExamples.value.length > 0) return -1;
+      if (activeRow.value >= 0 || !typing.value) return activeRow.value;
+      // Text with two readings has no default row; Enter waits for the user's pick.
+      if (typingBar.waitsForPick.value) return -1;
+      const rows = shownRows.value;
+      if (rows[0]?.id.startsWith("reading-")) return rows[0].disabled ? -1 : 0;
+      if (typingBar.inputReading.value) return -1;
+      return rows.findIndex((row) => !row.disabled && row.kind !== "example");
+    });
+    const pickBodyRow = (index: number) => {
+      const example = emptyExamples.value[index];
+      if (!example) return pickShownRow(index);
+      inputText.value = example.label;
+      onInputEdit();
+      inputBar.value?.focus();
+    };
+
+    const {
+      selectedTime,
+      selectedDate,
+      timeFieldFocused,
+      timeFieldError,
+      unreadableFields,
+      fieldDrafts,
+      typedFieldTime,
+      writeSeededFields,
+      resetTime,
+      shownEndMicros,
+      writeAbsoluteFields,
+      absoluteFieldsKey,
+      getUTCTimeStamp,
+      holdUnshownInstants,
+      lastInstant,
+      rememberShownEnd,
+      rememberSeededEnd,
+      writeOutsideRange,
+      clearTimeFieldErrors,
+      onCalendarStartDate,
+      onCalendarEndDate,
+      onCalendarPendingDay,
+      commitPendingDay,
+      startFieldText,
+      endFieldText,
+      readFieldText,
+      onFieldInput,
+      commitFieldText,
+      onTimeFieldBlur,
+    } = fields;
+
+    // The pending selection as microseconds, including a clicked day still waiting for its end.
+    const pendingRange = computed<{ startTime: number; endTime: number } | null>(() => {
+      if (selectedType.value === "relative" && !fixedOnly.value) {
+        return resolveRelativePeriod(currentRelativePeriod(), tooltipNow.value);
+      }
+      const pending = menuOpen.value ? pendingDay.value : null;
+      if (pending === null) {
+        const { startUTC, endUTC } = getUTCTimeStamp();
+        return { startTime: startUTC, endTime: endUTC };
+      }
+      return {
+        startTime: absoluteToMicros(pending, selectedTime.value.startTime),
+        endTime: endFieldToMicros(pending, selectedTime.value.endTime),
+      };
+    });
+
+    const { zoneRedrawn, kindText, resolvedLine, previewLine, shownLine, headNote } =
+      useTimeRangeSummary(typingView, {
+        clock,
+        fields,
+        typing: typingBar,
+        selectedType,
+        pendingDay,
+        calendarPreviewDay,
+        calendarMode,
+        menuOpen,
+        pendingRange,
+        currentRelativePeriod,
+      });
+
     const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezone = ref(props.pickerTimezone || currentTimezone);
     let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz) => {
       return tz;
     });
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // The browser row's value is a sentinel other zone selects share, never a zone id.
     const browserTime = raw("Browser Time (" + browserTz + ")");
 
-    // Add the UTC option
+    timezoneOptions = timezoneOptions.filter((tz) => tz !== "UTC");
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
     if (props.pickerTimezone && !timezoneOptions.includes(props.pickerTimezone)) {
       timezoneOptions.unshift(props.pickerTimezone);
     }
 
+    // A fixed range keeps its instants across a zone change and is only redrawn; live ones re-resolve.
     const onTimezoneChange = async () => {
+      const fixed = selectedType.value === "absolute" ? getUTCTimeStamp() : null;
       let selectedTimezone = timezone.value;
       if (selectedTimezone.toLowerCase() == browserTime.toLowerCase()) {
         selectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -692,285 +1470,148 @@ export default defineComponent({
         store.dispatch("setTimezone", selectedTimezone);
       }
       await nextTick();
-      if (props.autoApply) {
-        if (selectedType.value == "absolute") saveDate("absolute");
-        else saveDate("relative");
+      // A pending live pick still closes back to the applied fixed range, so its fields redraw too.
+      redrawAbsoluteAtOpen();
+      if (fixed) {
+        writeAbsoluteFields(fixed.startUTC, fixed.endUTC);
+        holdUnshownInstants(fixed.startUTC, fixed.endUTC);
+        // After the flush in which the redrawn fields settle, or the selection watcher clears it.
+        nextTick(() => (zoneRedrawn.value = true));
+      } else if (!isForm.value && !menuOpen.value) {
+        // Read after the await: a linked fixed range is only set once the picker mounts.
+        // A zone change is an app setting, not an apply: no undo step, no run.
+        markProgrammaticDateChange();
+        saveDate(selectedType.value);
       }
 
       emit("on:timezone-change", selectedTimezone);
     };
 
-    // if initial timezone is provided
+    // An initial timezone matches the offered zones ignoring case, and is written to the store.
     if (props.initialTimezone) {
-      // check if it is a valid timezone
-      // ignore case
       timezone.value =
         timezoneOptions.find((tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase()) ||
         currentTimezone;
-
-      // call onTimezoneChange to set the timezone in the store
       onTimezoneChange();
     }
 
     const filteredTimezone: any = ref(timezoneOptions);
     const isTimezoneSelectOpen = ref(false);
 
-    // longOffset throws on engines that lack it, so the label falls back to no offset.
-    const zoneOffset = (zone: string): string => {
-      const cached = zoneOffsets.get(zone);
-      if (cached !== undefined) return cached;
-      let offset = "";
-      try {
-        const name = new Intl.DateTimeFormat("en-US", {
-          timeZone: zone,
-          timeZoneName: "longOffset",
-        })
-          .formatToParts(new Date())
-          .find((part) => part.type === "timeZoneName")?.value;
-        offset = name?.replace("GMT", "") || "+00:00";
-      } catch {
-        offset = "";
+    // UTC and the browser zone stay pinned above a divider; OSelect filters by substring, so matches carry the query.
+    const zoneQuery = ref("");
+    const zoneOption = (tz: string) => {
+      const isBrowser = tz === browserTime;
+      const offset = zoneOffset(isBrowser ? browserTz : tz, tooltipNow.value);
+      const suffix = offset ? raw(`UTC${offset}`) : undefined;
+      if (isBrowser) {
+        const label = t("dateTime.browserTimeZone", { zone: browserTz });
+        return { label, suffix, value: tz, testId: "datetime-timezone-browser" };
       }
-      zoneOffsets.set(zone, offset);
-      return offset;
+      if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
+      // The label is the name alone, so `utc` matches zone names, not every `UTC+…` offset.
+      return { label: raw(tz), suffix, value: tz, searchText: offset };
     };
-
-    const timezoneSelectOptions = computed(() =>
-      timezoneOptions.map((tz: string) => {
-        const isBrowser = tz === browserTime;
-        const zone = isBrowser ? browserTz : tz;
-        const offset = zoneOffset(zone);
-        const suffix = offset ? raw(`UTC${offset}`) : undefined;
-        if (isBrowser) {
-          return { label: t("common.browserTimeWithZone", { zone: browserTz }), suffix, value: tz };
-        }
-        if (tz === "UTC") return { label: raw(tz), suffix, value: tz };
-        return {
-          label: raw(offset ? `${tz} (UTC${offset})` : tz),
-          listLabel: raw(tz),
-          suffix,
-          value: tz,
-        };
-      }),
-    );
-
-    let relativePeriods = [
-      { label: t("common.seconds"), value: "s" },
-      { label: t("common.minutes"), value: "m" },
-      { label: t("common.hours"), value: "h" },
-      { label: t("common.days"), value: "d" },
-      { label: t("common.weeks"), value: "w" },
-      { label: t("common.months"), value: "M" },
-    ].filter((period) => !props.hideSeconds || period.value !== "s");
-
-    let relativePeriodsSelect = ref([...relativePeriods]);
-
-    const relativeDates: Record<string, number[]> = {
-      s: [1, 5, 10, 15, 30, 45],
-      m: [1, 5, 10, 15, 30, 45],
-      h: [1, 2, 3, 6, 8, 12],
-      d: [1, 2, 3, 4, 5, 6],
-      w: [1, 2, 3, 4, 5, 6],
-      M: [1, 2, 3, 4, 5, 6],
-    };
-
-    const relativeDatesInHour: Record<string, number[]> = {
-      s: [1, 1, 1, 1, 1, 1],
-      m: [1, 1, 1, 1, 1, 1],
-      h: [1, 2, 3, 6, 8, 12],
-      d: [24, 48, 72, 96, 120, 144],
-      w: [168, 336, 504, 672, 840, 1008],
-      M: [744, 1488, 2232, 2976, 3720, 4464],
-    };
-
-    let relativePeriodsMaxValue = ref<Record<string, number>>({
-      s: 0,
-      m: 0,
-      h: 0,
-      d: 0,
-      w: 0,
-      M: 0,
-    });
-
-    const intlLocale = computed(() => localeFileMap[String(locale.value)] ?? "en-US");
-
-    const refreshTooltipNow = () => {
-      tooltipNow.value = Date.now();
-    };
-
-    const calendarTooltip = (token: string | null) =>
-      token === null
-        ? undefined
-        : (formatCalendarTooltip(token, zone.value, tooltipNow.value) ?? undefined);
-
-    const calendarExceedsRestriction = (token: string | null) => {
-      const range = resolveCalendarPeriod(token, zone.value, tooltipNow.value);
-      return (
-        !!range &&
-        exceedsRangeRestriction(range.startTime, range.endTime, props.queryRangeRestrictionInHour)
+    const allTimezoneOptions = computed(() => timezoneOptions.map(zoneOption));
+    const timezoneSelectOptions = computed(() => {
+      const options = allTimezoneOptions.value;
+      const term = zoneQuery.value.trim().toLowerCase();
+      if (term) {
+        return searchTimeZones(
+          options,
+          term,
+          (option) => (option.value === browserTime ? browserTz : option.value),
+          tooltipNow.value,
+          (option) => option.value === browserTime,
+        ).map((option) => ({ ...option, searchText: term }));
+      }
+      const pinned = ["UTC", browserTime].flatMap((value) =>
+        options.filter((option) => option.value === value),
       );
-    };
-
-    // Each token is resolved once; tooltip and restriction both read that one range.
-    const resolvePresetState = (token: string, nowMs: number): CalendarPresetState => {
-      const range = resolveCalendarPeriod(token, zone.value, nowMs);
-      if (!range) return { tooltip: undefined, disabled: false };
-      return {
-        tooltip: formatResolvedCalendarTooltip(token, range, zone.value),
-        disabled: exceedsRangeRestriction(
-          range.startTime,
-          range.endTime,
-          props.queryRangeRestrictionInHour,
-        ),
+      const rest = options.filter((option) => !pinned.includes(option));
+      const divider = {
+        divider: true,
+        label: raw(""),
+        value: "__zone-divider__",
+        dataTest: "datetime-timezone-divider",
+        testId: "datetime-timezone-divider",
       };
-    };
-
-    // A finished period only moves when the picker's day changes, so a hover that bumps the clock keeps it cached.
-    const pickerDay = computed(() =>
-      timestampToTimezoneDate(tooltipNow.value, zone.value, "yyyy/MM/dd"),
-    );
-
-    const pastPresetStates = computed(() => {
-      void pickerDay.value;
-      const now = Date.now();
-      return new Map(
-        CALENDAR_RAIL_ITEMS.filter((preset) => !preset.soFar).map((preset) => [
-          preset.id,
-          resolvePresetState(preset.token, now),
-        ]),
-      );
+      return [...pinned, divider, ...rest];
     });
 
-    const currentPresetStates = computed(
-      () =>
-        new Map(
-          CALENDAR_RAIL_ITEMS.filter((preset) => preset.soFar).map((preset) => [
-            preset.id,
-            resolvePresetState(preset.token, tooltipNow.value),
-          ]),
-        ),
-    );
-
-    const visibleCalendarPresets = computed(() => {
-      if (!props.calendarPresets) return null;
-      return CALENDAR_RAIL_ITEMS.map((preset) => ({ preset, label: t(preset.labelKey) }));
-    });
-
-    const calendarRailItems = computed<TimeRangeRailItem[] | null>(() => {
-      const visible = visibleCalendarPresets.value;
-      if (visible === null) return null;
-      return visible.map(({ preset, label }) => {
-        const state = (preset.soFar ? currentPresetStates : pastPresetStates).value.get(preset.id);
-        return {
-          id: preset.id,
-          label,
-          tooltip: state?.tooltip,
-          hint:
-            formatCalendarRailHint(
-              preset.token,
-              zone.value,
-              tooltipNow.value,
-              intlLocale.value,
-              (quarter) => t("common.calendarQuarterShort", { quarter }),
-            ) ?? undefined,
-          selected: selectedType.value === "relative" && calendarToken.value === preset.token,
-          disabled: state?.disabled ?? false,
-        };
-      });
-    });
-
-    const recentRailItems = computed<TimeRangeRailItem[]>(() => {
-      const current = selectedType.value === "absolute" ? getUTCTimeStamp() : null;
-      return timeRangeHistory.entries.value.map((entry, index) => ({
-        id: String(index),
-        label: formatRecentRange(entry.startUs, entry.endUs, zone.value),
-        compact: {
-          label: formatRecentRangeLabel(
-            entry.startUs,
-            entry.endUs,
-            zone.value,
-            Date.now(),
-            intlLocale.value,
-          ),
-          duration: formatRecentDuration(entry.startUs, entry.endUs),
-        },
-        tooltip: formatRangeTooltip(entry.startUs, entry.endUs, zone.value),
-        selected:
-          current !== null && current.startUTC === entry.startUs && current.endUTC === entry.endUs,
-        disabled: exceedsRangeRestriction(
-          entry.startUs,
-          entry.endUs,
-          props.queryRangeRestrictionInHour,
-        ),
-      }));
-    });
-
-    const periodUnits = ["s", "m", "h", "d", "w", "M"];
-
-    const datetimeBtn = ref(null);
+    const datetimeBtn = ref<unknown>(null);
 
     const displayValue = ref("");
 
-    /**
-     * The label as of the last APPLY, which is what the trigger button shows.
-     * With `autoApply` off, a selection only takes effect when the user presses
-     * Apply, so the trigger renders the range actually in force rather than the
-     * pending selection in `getDisplayValue`. Every path that applies a range
-     * stamps it via `markApplied`.
-     */
+    // The label as of the last apply, which the trigger shows; without autoApply a pending selection is not in force.
     const appliedDisplayValue = ref("");
+    // The applied type and absolute range, so the closed trigger can label them compactly.
+    const appliedType = ref("relative");
+    const appliedRange = ref<{ startTime: number; endTime: number } | null>(null);
 
     const datePayload = ref({});
+    // True while this picker's own change is being emitted, so a page answering it in the handler is not a new range.
+    let emittingOwnChange = false;
 
     const dateLocale = {
       daysShort: ["S", "M", "T", "W", "T", "F", "S"],
     };
 
-    const calendarMinDate = computed(() => {
-      if (props.disableRelative && props.minDate) return props.minDate;
-      return "1999/01/01";
-    });
-
-    const calendarMaxDate = computed(() => {
-      if (props.maxDate) return props.maxDate;
-      return timestampToTimezoneDate(new Date().getTime(), zone.value, "yyyy/MM/dd");
-    });
-
     onMounted(() => {
-      // updateDisplayValue();
       try {
         resetTime("", "");
+        const seed = props.range;
+        const seedType = seed
+          ? seed.kind === "fixed"
+            ? "absolute"
+            : "relative"
+          : props.defaultType;
+        const seedAbsolute =
+          seed?.kind === "fixed"
+            ? { startTime: seed.startUs, endTime: seed.endUs }
+            : props.defaultAbsoluteTime;
+        const seedRelative =
+          seed && seed.kind !== "fixed" ? rangeToken(seed) : props.defaultRelativeTime;
 
         let startTime = (new Date().getTime() - 900000) * 1000;
         let endTime = new Date().getTime() * 1000;
 
-        if (props.defaultAbsoluteTime?.startTime) {
+        if (seedAbsolute?.startTime) {
           startTime =
-            props.defaultAbsoluteTime?.startTime.toString().length > 13
-              ? props.defaultAbsoluteTime?.startTime
-              : props.defaultAbsoluteTime?.startTime * 1000;
+            seedAbsolute?.startTime.toString().length > 13
+              ? seedAbsolute?.startTime
+              : seedAbsolute?.startTime * 1000;
         }
 
-        if (props.defaultAbsoluteTime?.endTime) {
+        if (seedAbsolute?.endTime) {
           endTime =
-            props.defaultAbsoluteTime?.endTime.toString().length > 13
-              ? props.defaultAbsoluteTime?.endTime
-              : props.defaultAbsoluteTime?.endTime * 1000;
+            seedAbsolute?.endTime.toString().length > 13
+              ? seedAbsolute?.endTime
+              : seedAbsolute?.endTime * 1000;
         }
 
-        const initialType = props.disableRelative ? "absolute" : props.defaultType;
+        // A link with an empty period and no readable from/to means the default live range, not a frozen one.
+        const given = (value: unknown) => Number.isFinite(Number(value)) && Number(value) !== 0;
+        const unreadableAbsolute =
+          seedAbsolute != null && !(given(seedAbsolute.startTime) && given(seedAbsolute.endTime));
+        const initialType = fixedOnly.value
+          ? "absolute"
+          : seedType === "absolute" && unreadableAbsolute
+            ? "relative"
+            : seedType;
         selectedType.value = initialType;
 
-        setAbsoluteTime(startTime, endTime);
-
-        setRelativeTime(props.defaultRelativeTime);
+        markProgrammaticDateChange();
+        const rangeOutcome = writeOutsideRange(startTime, endTime);
+        const periodKept = readRelativeTime(seedRelative) !== "refused";
+        if (initialType === "absolute" ? rangeOutcome === "refused" : !periodKept) {
+          fallBackToDefaultPeriod();
+        } else if (initialType === "absolute" && rangeOutcome === "corrected") {
+          toastRangeCut();
+        }
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
-        // displayValue.value = getDisplayValue();
-        // NOTE: the emit below is already stamped programmatic — `setAbsoluteTime`
-        // above calls `markProgrammaticDateChange()`, and its nextTick reset has
-        // not run yet. Consumers must therefore treat `userChangedValue === false`
-        // as "do not fetch": the parent's own `onMounted` covers the first load.
+        // Stamped programmatic, so consumers skip a refetch; the parent's own onMounted covers the first load.
         saveDate(selectedType.value);
       } catch (e) {
         console.log(e);
@@ -986,10 +1627,13 @@ export default defineComponent({
         pendingDay.value;
       },
       () => {
+        // In the open panel only Apply, Enter or a pick applies; a parent's setter still does.
+        if (menuOpen.value && isUserInitiated) return;
+        if (absoluteFieldsKey() === savedFieldsKey) return;
         if (
-          props.autoApply &&
+          !isForm.value &&
           selectedType.value === "absolute" &&
-          !isSeedingAbsolute &&
+          !fields.isSeeding() &&
           pendingDay.value === null &&
           store.state.savedViewFlag == false
         ) {
@@ -1008,149 +1652,144 @@ export default defineComponent({
       },
     );
 
-    const setRelativeDate = (period: string, value: number) => {
+    const setRelativeDate = (
+      period: string,
+      value: number,
+      commit: boolean = !isForm.value && !menuOpen.value,
+      source: TimeRangeApplyMeta["source"] = "panel",
+    ) => {
+      refreshTooltipNow();
       selectedType.value = "relative";
       calendarToken.value = null;
+      pendingDay.value = null;
       relativePeriod.value = period;
       relativeValue.value = value;
-      if (props.autoApply || props.applyPresets) saveDate("relative");
+      if (commit) saveDate("relative", false, source);
     };
 
-    const pickRelativeChip = (period: string, value: number) => {
-      setRelativeDate(period, value);
-      if (props.autoApply || props.applyPresets) closeMenu();
-    };
+    // A period from outside the picker, capped as Custom is and to the calendar's first day; null when it is not a whole-count period.
+    function boundedPeriod(period: string): string | null {
+      if (resolveCalendarPeriod(period, zone.value)) return period;
+      const rolling = parseRollingPeriod(period);
+      if (!rolling || !periodUnits.includes(rolling.unit)) return null;
+      const { unit } = rolling;
+      const nowMs = Date.now();
+      const floorUs = convertToUtcTimestamp(`${calendarMinDate.value} 00:00:00`, zone.value);
+      const reach = Math.floor((nowMs * 1000 - floorUs) / (UNIT_SECONDS[unit] * MICROS_PER_SECOND));
+      let count = Math.min(rolling.value, MAX_CUSTOM_RELATIVE_VALUE[unit], reach);
+      // A 25h DST day can still overshoot the nominal reach by one.
+      while (count > 1 && clock.rollingRange(count, unit, nowMs).startTime < floorUs) count -= 1;
+      if (count < 1) return null;
+      if (count === rolling.value) return period;
+      const [cappedUnit, cappedCount] = largestExactUnit(unit, count);
+      return `${cappedCount}${cappedUnit}`;
+    }
 
-    const isValidCustomValue = (value: unknown) =>
-      value !== "" && value !== null && Number.isFinite(Number(value));
-
-    const onCustomPeriodSelect = () => {
-      // An emptied or non-numeric field is mid-edit: apply nothing until a number is typed.
-      if (!isValidCustomValue(relativeValue.value)) return;
-
-      let value = Math.max(1, Math.trunc(Number(relativeValue.value)));
-      const restrictedMax = relativePeriodsMaxValue.value[relativePeriod.value];
-      if (
-        selectedType.value == "relative" &&
-        props.queryRangeRestrictionInHour > 0 &&
-        value > restrictedMax
-      ) {
-        value = restrictedMax > -1 ? restrictedMax : 15;
-      }
-      relativeValue.value = Math.min(
-        value,
-        MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value,
-      );
-      lastValidCustomValue.value = relativeValue.value;
-      calendarToken.value = null;
-
-      if (props.autoApply) saveDate("relative-custom");
-    };
-
-    const onCustomValueFocus = () => {
-      lastValidCustomValue.value = relativeValue.value;
-    };
-    const onCustomValueBlur = () => {
-      if (!isValidCustomValue(relativeValue.value))
-        relativeValue.value = lastValidCustomValue.value;
-    };
-
-    // A finished calendar period ends at the next one's start; second-precision fields show its last second, as its tooltip does.
-    const lastInstant = (token: string | null, endUs: number) =>
-      (parseCalendarToken(token)?.offset ?? 0) < 0 ? endUs - 1 : endUs;
-
-    // The shown 23:59:59 of a copied calendar end stands for the next period's start until the user edits it.
-    const rememberShownEnd = (exclusiveEndUs: number) => {
-      const shown = convertUnixTime(exclusiveEndUs - 1);
-      seededEnd = { date: shown.date, time: shown.time };
-    };
-    const rememberSeededEnd = (token: string | null, endUs: number) => {
-      if ((parseCalendarToken(token)?.offset ?? 0) >= 0) seededEnd = null;
-      else rememberShownEnd(endUs);
-    };
-
-    const setRelativeTime = (period: string) => {
-      const calendarRange = resolveCalendarPeriod(period, zone.value);
-      if (calendarRange && props.calendarPresets) {
-        calendarToken.value = period;
-        return;
+    // "corrected" and "refused" tell a caller from outside that the range in force is not the one it asked for.
+    const readRelativeTime = (period: unknown): "kept" | "corrected" | "refused" => {
+      const text = typeof period === "string" ? period.trim() : "";
+      if (!text) return "kept";
+      const bounded = boundedPeriod(text);
+      if (bounded === null) return "refused";
+      const calendarRange = resolveCalendarPeriod(bounded, zone.value);
+      if (calendarRange && calendarAllowed.value) {
+        calendarToken.value = bounded;
+        return "kept";
       }
       if (calendarRange) {
         // A stale token beside an applied absolute range is not the range in force, so it must not replace it.
-        if (selectedType.value !== "relative") return;
+        if (selectedType.value !== "relative") return "kept";
         // A picker without calendar presets keeps a shared calendar range as its dates instead of dropping it.
         selectedType.value = "absolute";
         calendarToken.value = null;
-        setAbsoluteTime(calendarRange.startTime, lastInstant(period, calendarRange.endTime));
-        rememberSeededEnd(period, calendarRange.endTime);
-        return;
+        markProgrammaticDateChange();
+        writeOutsideRange(calendarRange.startTime, calendarRange.endTime);
+        return "kept";
       }
-
-      const periodString = period?.match(/(\d+)([smhdwM])/);
-
-      if (periodString) {
+      const rolling = parseRollingPeriod(bounded);
+      if (rolling) {
         calendarToken.value = null;
-        const periodValue = periodString[1];
-        const periodUnit = periodString[2];
-
-        if (periodUnits.includes(periodUnit)) {
-          relativePeriod.value = periodUnit;
-        }
-
-        if (periodValue) {
-          relativeValue.value = parseInt(periodValue);
-        }
+        relativePeriod.value = rolling.unit;
+        relativeValue.value = rolling.value;
       }
+      if (bounded === text) return "kept";
+      // A silently shortened range would read as the one the link asked for.
+      toast({
+        variant: "warning",
+        message: t("common.timeRangeShortened", { label: relativeLabel(bounded) }),
+      });
+      return "corrected";
     };
 
-    const resetTime = (startTime: string, endTime: string) => {
-      if (!startTime || !endTime) {
-        var dateString = new Date().toLocaleDateString("en-ZA");
+    const setRelativeTime = (period: string) => {
+      clearUndoForPageRange({ relativeTimePeriod: period });
+      const outcome = readRelativeTime(period);
+      if (outcome === "kept") return;
+      markProgrammaticDateChange();
+      if (outcome === "refused") fallBackToDefaultPeriod();
+      else if (!fixedOnly.value) selectedType.value = "relative";
+      emitCorrectionLater();
+    };
 
-        if (!selectedDate.value.from) selectedDate.value.from = dateString;
+    // A range the picker cannot show must never reach a query, so the picker says so and shows the default 15 minutes.
+    const fallBackToDefaultPeriod = () => {
+      toast({ variant: "warning", message: t("common.timeRangeOutOfBounds") });
+      const nowUs = Date.now() * 1000;
+      writeAbsoluteFields(nowUs - 15 * MICROS_PER_MINUTE, nowUs);
+      calendarToken.value = null;
+      relativePeriod.value = "m";
+      relativeValue.value = 15;
+      lastValidCustomValue.value = 15;
+      selectedType.value = fixedOnly.value ? "absolute" : "relative";
+    };
 
-        if (!selectedDate.value.to) selectedDate.value.to = dateString;
-
-        if (!startTime) selectedTime.value.startTime = "00:00:00";
-
-        if (!endTime) {
-          const endDateTime = convertUnixTime(new Date().getTime() * 1000);
-
-          // If the selected date is today, set the end time to the current time
-          if (selectedDate.value.to === endDateTime.date) {
-            selectedTime.value.endTime = endDateTime.time;
-          } else selectedTime.value.endTime = "23:59:59";
-        }
-
-        return;
-      }
-      return;
+    // A silently cut range would read as the one the link asked for.
+    const toastRangeCut = () => {
+      const range = getConsumableDateTime();
+      toast({
+        variant: "warning",
+        message: t("common.timeRangeShortened", {
+          label: formatRangeLabel(
+            { startUs: range.startTime, endUs: range.endTime },
+            { ...labelOptions(), surface: "toast" },
+          ),
+        }),
+      });
     };
 
     const setAbsoluteTime = (startTime: number, endTime: number) => {
       // Parent-invoked setter — the resulting auto-apply emit is programmatic.
       markProgrammaticDateChange();
-      seededEnd = null;
-      if (!startTime || !endTime) {
-        var dateString = new Date().toLocaleDateString("en-ZA");
-        selectedDate.value.from = dateString;
-        selectedDate.value.to = dateString;
-        return;
-      }
-
-      const startDateTime = convertUnixTime(startTime);
-      const endDateTime = convertUnixTime(endTime);
-
-      selectedDate.value.from = startDateTime.date;
-      selectedDate.value.to = endDateTime.date;
-
-      selectedTime.value.startTime = startDateTime.time;
-      selectedTime.value.endTime = endDateTime.time;
+      clearUndoForPageRange({ startTime, endTime });
+      const outcome = writeOutsideRange(startTime, endTime);
+      if (outcome === "refused") fallBackToDefaultPeriod();
+      else if (outcome === "corrected") toastRangeCut();
+      // A parent's range set while the panel is open is what closing without Apply returns to.
+      if (menuOpen.value && absoluteAtOpen !== null) absoluteAtOpen = fields.snapshotFields();
+      if (outcome !== "kept") emitCorrectionLater();
     };
 
-    function convertUnixTime(unixTimeMicros: number) {
-      return formatAbsoluteInstant(unixTimeMicros, zone.value);
-    }
+    const getRange = (): TimeRange | null => appliedModel();
+
+    // A range from the page (v-model:range or a ref call) moves the picker without an apply or an undo step.
+    const setRange = (next: TimeRange | null) => {
+      if (!next || sameRange(appliedModel(), next)) return;
+      markProgrammaticDateChange();
+      if (next.kind === "fixed") {
+        selectedType.value = "absolute";
+        setAbsoluteTime(next.startUs, next.endUs);
+      } else {
+        setRelativeTime(rangeToken(next));
+        if (!fixedOnly.value) selectedType.value = "relative";
+      }
+      saveDate(selectedType.value);
+    };
+
+    watch(
+      () => props.range,
+      (next) => setRange(next),
+      { deep: true },
+    );
 
     const refresh = () => {
       // Parent-invoked (e.g. on tab re-activation / auto-refresh) — programmatic.
@@ -1158,150 +1797,195 @@ export default defineComponent({
       saveDate();
     };
 
-    // Distinguishes genuine user-driven date changes from programmatic ones
-    // (parent-invoked setters, mount replay). Stamped onto each `on:date-change`
-    // payload as `userChangedValue` so consumers (e.g. traces live-mode auto-run)
-    // can ignore programmatic changes instead of relying on value-diff heuristics.
+    // Stamped on each emit as `userChangedValue`, so consumers can ignore parent-invoked setters and mount replay.
     let isUserInitiated = true;
+    // Reset after the flush: pre-flush watchers, such as the auto-apply date watcher, still read `false`.
     const markProgrammaticDateChange = () => {
       isUserInitiated = false;
-      // Reset after the current flush. Default ('pre') watchers — including the
-      // deep selectedDate/selectedTime watcher that drives auto-apply — run before
-      // nextTick callbacks, so the watch-triggered saveDate still reads `false`.
       nextTick(() => {
         isUserInitiated = true;
       });
     };
 
-    /**
-     * Promote the pending selection to the applied one, so the trigger button
-     * starts advertising it. Called from every path that actually puts a range
-     * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
-     * NOT called from `onCustomPeriodSelect` / the popup's absolute inputs when
-     * `autoApply` is off: those stay pending until Apply. `setRelativeDate` also
-     * applies under `applyPresets`.
-     */
+    let saveCount = 0;
+    // The fields as last saved, so a step that saves its own write is not saved again by the date watcher.
+    let savedFieldsKey: string | null = null;
+    const appliedSpeech = ref("");
+    // Callers often follow a setter with setDateType or refresh, so a setter's correction is emitted only if no save followed it.
+    const emitCorrectionLater = () => {
+      const seen = saveCount;
+      nextTick(() => {
+        if (saveCount !== seen) return;
+        isUserInitiated = false;
+        saveDate(null);
+        isUserInitiated = true;
+      });
+    };
+
+    let entryAtOpen: TimeRangeHistoryEntry | null = null;
+    // The trigger shows only what is in force, so this runs on every path that applies a range.
+    // Panel edits without autoApply stay pending until Apply.
     const markApplied = () => {
+      const outgoing = appliedHistoryEntry();
+      appliedSinceOpen = true;
+      appliedPeriod.value =
+        selectedType.value === "relative" && calendarToken.value === null
+          ? currentRelativePeriod()
+          : null;
       appliedDisplayValue.value = getDisplayValue.value;
+      appliedType.value = selectedType.value;
+      if (selectedType.value === "absolute") {
+        const { startUTC, endUTC } = getUTCTimeStamp();
+        appliedRange.value = { startTime: startUTC, endTime: endUTC };
+      } else {
+        appliedRange.value = null;
+      }
       appliedCalendarToken.value = selectedType.value === "relative" ? calendarToken.value : null;
+      appliedCalendarName.value = appliedCalendarToken.value ? calendarName.value : null;
       appliedSelection = {
         selectedType: selectedType.value,
         calendarToken: calendarToken.value,
         relativePeriod: relativePeriod.value,
         relativeValue: relativeValue.value,
       };
+      const incoming = appliedHistoryEntry();
+      if (outgoing && incoming && !sameHistoryEntry(outgoing, incoming)) recordOutgoing(outgoing);
+    };
+
+    // A range from a link or a step never passed through the panel, so Recent keeps it once the user replaces it.
+    // Inside the panel only the range in force at open counts, not each auto-applied edit.
+    function recordOutgoing(outgoing: TimeRangeHistoryEntry) {
+      if (!isUserInitiated || !showRail.value) return;
+      if (menuOpen.value && !(entryAtOpen && sameHistoryEntry(outgoing, entryAtOpen))) return;
+      recordEntry(outgoing);
+    }
+
+    function appliedHistoryEntry(): TimeRangeHistoryEntry | null {
+      const range = appliedRange.value;
+      if (appliedType.value === "absolute") {
+        return range ? { startUs: range.startTime, endUs: range.endTime } : null;
+      }
+      const period = appliedCalendarToken.value ?? appliedPeriod.value;
+      return period ? { relative: period } : null;
+    }
+
+    // Closing without Apply restores the fields seen at open, so a zone change redraws them from the applied instants.
+    const redrawAbsoluteAtOpen = () => {
+      const applied = appliedRange.value;
+      if (absoluteAtOpen === null || appliedSinceOpen || applied === null) return;
+      const start = convertUnixTime(applied.startTime);
+      const end = convertUnixTime(shownEndMicros(applied.startTime, applied.endTime));
+      absoluteAtOpen = {
+        date: { from: start.date, to: end.date },
+        time: { startTime: start.time, endTime: end.time },
+        seededEnd: null,
+        instants: { start: applied.startTime, end: applied.endTime },
+      };
     };
 
     const restoreAppliedSelection = () => {
       selectedType.value = appliedSelection.selectedType;
       calendarToken.value = appliedSelection.calendarToken;
+      calendarName.value = appliedCalendarName.value;
       relativePeriod.value = appliedSelection.relativePeriod;
       relativeValue.value = appliedSelection.relativeValue;
+      const atOpen = absoluteAtOpen;
+      if (appliedSinceOpen || atOpen === null) return;
+      fields.restoreFields(atOpen);
     };
 
-    const saveDate = (dateType?: string | null) => {
+    function appliedModel(): TimeRange | null {
+      const entry = appliedHistoryEntry();
+      if (!entry) return null;
+      return isRelativeHistoryEntry(entry)
+        ? rangeFromLegacy({ valueType: "relative", relativeTimePeriod: entry.relative })
+        : { kind: "fixed", startUs: entry.startUs, endUs: entry.endUs };
+    }
+
+    function currentModel(): TimeRange | null {
+      return rangeFromLegacy({ ...getConsumableDateTime(), valueType: selectedType.value });
+    }
+
+    // On explorer-manual only a range whose results were on screen counts as run; elsewhere every apply runs.
+    function appliedRangeRan(): boolean {
+      if (props.preset !== "explorer-manual") return true;
+      return props.queriedRange !== null && sameRange(appliedModel(), props.queriedRange);
+    }
+
+    // `rerun` asks the page to run the range at once, even unchanged: ⌘↵, a drag-zoom, or the undo of a run range.
+    const saveDate = (
+      dateType?: string | null,
+      rerun = false,
+      source: TimeRangeApplyMeta["source"] = "panel",
+    ) => {
+      const userApply = isUserInitiated;
+      const outgoing = appliedModel();
+      const incoming = currentModel();
+      const changed = !sameRange(outgoing, incoming);
+      // Every applied change is one undo step; undo itself and the panel re-applying the same range add none.
+      if (userApply && changed && source !== "undo" && !isForm.value) captureUndo();
+      saveCount += 1;
+      savedFieldsKey = selectedType.value === "absolute" ? absoluteFieldsKey() : null;
+      // The resolved line and the seeded Start/End read this clock, so they match the range emitted now.
+      if (selectedType.value === "relative") refreshTooltipNow();
       markApplied();
       const date = getConsumableDateTime();
-      // if (isNaN(date.endTime) || isNaN(date.startTime)) {
-      //   // return false;
-      // }
       datePayload.value = date;
       date["valueType"] = dateType || selectedType.value;
       date["userChangedValue"] = isUserInitiated;
-      // date["relativeTimePeriod"] = "";
+      if (rerun) date["rerun"] = true;
+      // Re-applying the range in force closes the panel and nothing else: no run, no undo, no Recent.
+      if (userApply && !changed && !rerun) return;
+      if (isUserInitiated) nextTick(() => (appliedSpeech.value = String(triggerLabel.value)));
       if (store.state.savedViewFlag == false) {
-        emit("on:date-change", date);
+        emittingOwnChange = true;
+        try {
+          if (incoming && userApply) {
+            const meta: TimeRangeApplyMeta =
+              source === "undo" ? { source, run: false, undoRuns: rerun } : { source, run: rerun };
+            emit("apply", incoming, meta);
+          }
+          if (incoming) emit("update:range", incoming);
+          emit("on:date-change", date);
+        } finally {
+          emittingOwnChange = false;
+        }
       }
     };
 
-    function formatDate(d: Date) {
-      var year = d.getFullYear();
-      var month = ("0" + (d.getMonth() + 1)).slice(-2); // Months are zero-based
-      var day = ("0" + d.getDate()).slice(-2);
-      var hours = ("0" + d.getHours()).slice(-2);
-      var minutes = ("0" + d.getMinutes()).slice(-2);
-      var seconds = ("0" + d.getSeconds()).slice(-2);
-
-      return {
-        date: year + "/" + month + "/" + day,
-        time: hours + ":" + minutes + ":" + seconds,
-      };
-    }
-
-    const applyCustomDate = (dateType: string, dateobj: { start: number; end: number }) => {
-      var start_date = new Date(Math.floor(dateobj.start));
-      const startObj = formatDate(start_date);
-
-      var end_date = new Date(Math.floor(dateobj.end));
-      const endObj = formatDate(end_date);
-
-      selectedDate.value.from = startObj.date;
-      selectedDate.value.to = endObj.date;
-      selectedTime.value.startTime = startObj.time;
-      selectedTime.value.endTime = endObj.time;
-
+    // Writes true instants in the picker zone, holding them where its civil fields cannot show them.
+    const applyInstants = (dateType: string, startUs: number, endUs: number) => {
+      fields.writeInstants(startUs, endUs);
       selectedType.value = dateType;
       markProgrammaticDateChange();
       markApplied();
     };
 
-    // Parent-invoked setter for a chart drag-zoom — programmatic, but a range the user picked.
-    const setCustomDate = (dateType: string, dateobj: { start: number; end: number }) => {
-      applyCustomDate(dateType, dateobj);
-      recordAbsoluteRange();
+    // Parent-invoked for a chart drag-zoom: a range the user picked, so it applies and asks for a run.
+    const setCustomDate = (dateType: string, dateobj: { start: number; end: number }): boolean => {
+      // Charts hand over `toZonedTime(instant, appZone)` values, so they become instants once, before any bound.
+      const appZone = store.state.timezone || zone.value;
+      const range = trustedRange(
+        instantFromShiftedMs(Math.floor(Number(dateobj.start)), appZone),
+        instantFromShiftedMs(Math.floor(Number(dateobj.end)), appZone),
+      );
+      // A refused zoom (zero width, or past maxDate) keeps the range the user is looking at.
+      if (!range) return false;
+      captureUndo(appliedRangeRan());
+      fields.writeInstants(range.start, range.end);
+      selectedType.value = dateType;
+      // An unchanged window still runs, as the parent's search (e.g. Search around) expects it.
+      saveDate(dateType, true, "drag-zoom");
+      recordSelection();
+      return true;
     };
 
-    const onBeforeShow = () => {
-      // if (props.modelValue) selectedDate.value = cloneDeep(props.modelValue);
-    };
+    const onBeforeShow = () => {};
 
     const onBeforeHide = () => {
       if (selectedType.value === "absolute")
         resetTime(selectedTime.value.startTime, selectedTime.value.endTime);
     };
-
-    // Arithmetic unit consumed by getConsumableDateTime's `subtractObject` —
-    // a code token, never rendered, so it must stay English regardless of locale.
-    const PERIOD_ARITHMETIC_UNIT: Record<string, string> = {
-      s: "seconds",
-      m: "minutes",
-      h: "hours",
-      d: "days",
-      w: "weeks",
-      M: "months",
-    };
-
-    const periodLabelKey = computed<I18nKey>(() => {
-      const keys: Record<string, I18nKey> = {
-        s: "common.seconds",
-        m: "common.minutes",
-        h: "common.hours",
-        d: "common.days",
-        w: "common.weeks",
-        M: "common.months",
-      };
-      return keys[relativePeriod.value];
-    });
-    const getPeriodLabel = computed(() => t(periodLabelKey.value));
-
-    // "Past 15 Minutes" — one whole-sentence pipe-plural key per unit rather than
-    // gluing the period noun onto a translated "Past" fragment (word order is
-    // per-language, and so is the number of plural forms).
-    const pastPeriodKey = computed<I18nKey>(() => {
-      const keys: Record<string, I18nKey> = {
-        s: "common.pastSecond",
-        m: "common.pastMinute",
-        h: "common.pastHour",
-        d: "common.pastDay",
-        w: "common.pastWeek",
-        M: "common.pastMonth",
-      };
-      return keys[relativePeriod.value];
-    });
-
-    function isValidDateTimeString(dateStr: string, timeStr: string): boolean {
-      return !isNaN(Date.parse(`${dateStr} ${timeStr}`));
-    }
 
     const getConsumableDateTime = (): ConsumableDateTime => {
       const calendarRange =
@@ -1312,31 +1996,12 @@ export default defineComponent({
         return { ...calendarRange, relativeTimePeriod: calendarToken.value };
       }
       if (selectedType.value == "relative") {
-        let period = PERIOD_ARITHMETIC_UNIT[relativePeriod.value];
-        let periodValue = relativeValue.value;
-
-        // arithmetic on weeks is not supported; convert to days.
-        if (relativePeriod.value === "w") {
-          period = "days";
-          periodValue = periodValue * 7;
-        }
-
-        const subtractObject: Record<string, number> = {};
-
-        if (period && periodValue) subtractObject[period] = periodValue;
-        else {
-          console.error("getConsumableDateTime: Invalid relative period");
-          subtractObject["Minutes"] = 15;
-        }
-
-        const endTimeStamp = new Date();
-
-        const startTimeStamp = subtractRelativeTime(endTimeStamp, subtractObject);
-
+        const period = `${normalizedCount()}${relativePeriod.value}`;
+        const rolling = parseRollingPeriod(period);
+        if (!rolling) console.error("getConsumableDateTime: Invalid relative period");
         return {
-          startTime: new Date(startTimeStamp).getTime() * 1000,
-          endTime: new Date(endTimeStamp).getTime() * 1000,
-          relativeTimePeriod: relativeValue.value + relativePeriod.value,
+          ...clock.rollingRange(rolling?.value ?? 15, rolling?.unit ?? "m", Date.now()),
+          relativeTimePeriod: period,
         };
       } else {
         if (typeof selectedDate.value === "string") {
@@ -1347,16 +2012,7 @@ export default defineComponent({
         }
 
         const startDateStr = selectedDate.value.from + " " + selectedTime.value.startTime;
-        if (!isValidDateTimeString(selectedDate.value.from, selectedTime.value.startTime)) {
-          // console.warn(`Invalid start date/time: ${startDateStr}`);
-          // return new Date();
-        }
-
         const endDateStr = selectedDate.value.to + " " + selectedTime.value.endTime;
-        if (!isValidDateTimeString(selectedDate.value.to, selectedTime.value.endTime)) {
-          // console.error(`Invalid end date/time: ${endDateStr}`);
-          // return new Date();
-        }
 
         let start, end;
         if (!selectedDate.value?.from && !selectedTime.value?.startTime) {
@@ -1387,27 +2043,18 @@ export default defineComponent({
       }
     };
 
-    const getUTCTimeStamp = () => {
-      let startTime = selectedDate.value.from + " " + selectedTime.value.startTime;
-      let endTime = selectedDate.value.to + " " + selectedTime.value.endTime;
-      const startUTC = convertToUtcTimestamp(startTime, zone.value);
-      const untouchedSeededEnd =
-        seededEnd !== null &&
-        seededEnd.date === selectedDate.value.to &&
-        seededEnd.time === selectedTime.value.endTime;
-      // The shown last second stands for the exclusive end one second later, in whatever zone is now selected.
-      const endUTC =
-        convertToUtcTimestamp(endTime, zone.value) + (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
-      return { startUTC, endUTC };
-    };
-
     const setSavedDate = (dateobj: any) => {
+      clearUndoForPageRange(
+        dateobj.type === "relative"
+          ? { relativeTimePeriod: dateobj.relativeTimePeriod }
+          : { startTime: dateobj.startTime, endTime: dateobj.endTime },
+      );
       timezone.value = zone.value;
       selectedType.value = dateobj.type;
 
       if (dateobj.type === "relative") {
         selectedType.value = "relative";
-        setRelativeTime(dateobj.relativeTimePeriod);
+        readRelativeTime(dateobj.relativeTimePeriod);
       } else {
         if (
           Object.prototype.hasOwnProperty.call(dateobj, "selectedDate") &&
@@ -1420,10 +2067,7 @@ export default defineComponent({
           selectedDate.value = dateobj.selectedDate;
           selectedTime.value = dateobj.selectedTime;
         } else {
-          applyCustomDate(dateobj.type, {
-            start: dateobj.startTime / 1000,
-            end: dateobj.endTime / 1000,
-          });
+          applyInstants(dateobj.type, Number(dateobj.startTime), Number(dateobj.endTime));
         }
       }
 
@@ -1432,67 +2076,287 @@ export default defineComponent({
 
     const { isMobile } = useBreakpoint();
 
-    const compactRangeLabel = (label: string) => {
-      const REL_UNIT: Record<string, string> = {
-        second: "s",
-        minute: "m",
-        hour: "h",
-        day: "d",
-        week: "w",
-        month: "M",
-      };
-      const rel = label.match(/^Past (\d+) ([A-Za-z]+?)s?$/);
-      if (rel) return `Past ${rel[1]}${REL_UNIT[rel[2].toLowerCase()] ?? ` ${rel[2]}`}`;
-      const abs = label.match(
-        /^(\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})? - (\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})?$/,
-      );
-      // The year is only dropped when both ends share it, or a cross-year range would read as same-day.
-      if (!abs || abs[1] !== abs[4]) return label.replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
-      const [, , fromDay, fromTime, , toDay, toTime] = abs;
-      return fromDay === toDay
-        ? `${fromDay} ${fromTime} - ${toTime}`
-        : `${fromDay} ${fromTime} - ${toDay} ${toTime}`;
+    // Width of text in an element's font; 0 where no canvas can measure it.
+    const textWidth = (text: string, el: HTMLElement): number => {
+      try {
+        const context = document.createElement("canvas").getContext("2d");
+        if (!context) return 0;
+        context.font = getComputedStyle(el).font;
+        return context.measureText(text).width;
+      } catch {
+        return 0;
+      }
     };
 
-    /**
-     * What the trigger button renders.
-     *
-     * With `autoApply` the pending selection IS the applied one, so show it live.
-     * Without it, show the live selection while the panel is open (so switching
-     * Relative/Absolute updates the label immediately, like the logs picker), and
-     * fall back to the range in force once closed — so closing without Apply snaps
-     * back to what's actually applied; see `appliedDisplayValue`.
-     * The `||` fallback covers the first paint, before the mount-time apply.
-     */
-    const triggerLabel = computed(() => {
-      if (props.triggerText) return props.triggerText;
-      const showsApplied = !props.autoApply && !menuOpen.value;
-      // A calendar label is re-derived so an older period keeps naming the right day after midnight.
-      const appliedCalendarLabel =
-        showsApplied && appliedCalendarToken.value !== null
-          ? formatCalendarLabel(
-              appliedCalendarToken.value,
-              zone.value,
-              t,
-              intlLocale.value,
-              tooltipNow.value,
-            )
-          : null;
-      const label = showsApplied
-        ? appliedCalendarLabel || appliedDisplayValue.value || getDisplayValue.value
-        : getDisplayValue.value;
-      return isMobile.value ? compactRangeLabel(label) : label;
+    // Per-page examples (§9); the short one only where the long one would be cut.
+    const shortPlaceholder = ref(false);
+    const longPlaceholder = computed<I18nText>(() =>
+      props.preset === "dashboard" || props.preset === "form"
+        ? t("common.timeRangeInputPlaceholder")
+        : t("dateTime.placeholderOps"),
+    );
+    const barPlaceholder = computed<I18nText>(() =>
+      isMobile.value || shortPlaceholder.value
+        ? t("dateTime.placeholderShort")
+        : longPlaceholder.value,
+    );
+    const fitPlaceholder = () => {
+      shortPlaceholder.value = false;
+      nextTick(() => {
+        const box = menuEl.value?.querySelector<HTMLInputElement>(
+          "[data-test='date-time-input-field']",
+        );
+        if (!box || box.value) return;
+        shortPlaceholder.value = box.scrollWidth > box.clientWidth + 1;
+      });
+    };
+
+    const labelSurface = computed(() => (props.preset === "dashboard" ? "dashboard" : "toolbar"));
+    const datesShown = computed(() => props.preset === "dashboard");
+
+    // Panel edits are drafts until applied, so the trigger always names the applied range.
+    const showsApplied = computed(() => true);
+
+    const triggerRange = computed<RangeLabelInput | null>(() => {
+      const shownApplied = showsApplied.value;
+      const shownType = shownApplied ? appliedType.value : selectedType.value;
+      if (shownType === "absolute") {
+        const range = shownApplied ? appliedRange.value : pendingRange.value;
+        if (!range || !Number.isFinite(range.startTime) || !Number.isFinite(range.endTime)) {
+          return null;
+        }
+        return absoluteLabelInput(range.startTime, range.endTime);
+      }
+      const period = shownApplied
+        ? (appliedCalendarToken.value ?? appliedPeriod.value)
+        : currentRelativePeriod();
+      if (!period) return null;
+      const range = resolveRelativePeriod(period, tooltipNow.value);
+      if (!range) return null;
+      const typedName = shownApplied ? appliedCalendarName.value : calendarName.value;
+      return {
+        startUs: range.startTime,
+        endUs: range.endTime,
+        name: typedName ?? String(relativeLabel(period)),
+        live: true,
+        calendar: parseCalendarToken(period) !== null,
+      };
     });
 
-    // Mirrors triggerLabel: the live selection while it is in force or being edited, else the applied one.
+    // A day-only picker names the days its range touches; an exclusive midnight end belongs to the day before.
+    const wholeDaysOf = (range: RangeLabelInput): RangeLabelInput => {
+      const lastUs = isZoneMidnight(range.endUs) ? range.endUs - 1 : range.endUs;
+      return {
+        startUs: civilDayStart(convertUnixTime(range.startUs).date),
+        endUs: civilDayStart(addCivilDays(convertUnixTime(lastUs).date, 1)),
+      };
+    };
+
+    // A fixed range still filling ends at now, or with today when it is whole days (§2).
+    const triggerLabelRange = computed<RangeLabelInput | null>(() => {
+      const range = triggerRange.value;
+      const nowUs = tooltipNow.value * 1000;
+      if (!range || range.live || !(range.endUs > nowUs)) return range;
+      const wholeDays = isZoneMidnight(range.startUs) && nowUs - range.startUs >= TWO_DAYS_US;
+      const endUs = wholeDays ? civilDayStart(addCivilDays(convertUnixTime(nowUs).date, 1)) : nowUs;
+      return { ...range, endUs, period: false };
+    });
+
+    const triggerLabel = computed(() => {
+      if (props.triggerText) return props.triggerText;
+      const range = triggerLabelRange.value;
+      if (!range) {
+        return showsApplied.value
+          ? appliedDisplayValue.value || getDisplayValue.value
+          : getDisplayValue.value;
+      }
+      if (fixedOnly.value) {
+        return formatRangeDates(wholeDaysOnly.value ? wholeDaysOf(range) : range, {
+          ...labelOptions(),
+          surface: labelSurface.value,
+        });
+      }
+      return formatRangeLabel(range, {
+        ...labelOptions(),
+        surface: labelSurface.value,
+        showDates: datesShown.value,
+      });
+    });
+
+    const fullTriggerParts = computed<TriggerLabelForm>(() => {
+      const label = String(triggerLabel.value);
+      const range = triggerRange.value;
+      const name = range?.name && !fixedOnly.value && !props.triggerText ? range.name : "";
+      if (name && label.startsWith(`${name} · `)) {
+        return { name, dates: label.slice(name.length + 3) };
+      }
+      return range && !range.live && !props.triggerText
+        ? { name: "", dates: label }
+        : { name: label, dates: "" };
+    });
+
+    // The label's whole forms, widest first; the trigger shows the first that fits its slot (§6).
+    const triggerForms = computed<TriggerLabelForm[]>(() => {
+      const full = fullTriggerParts.value;
+      const range = triggerLabelRange.value;
+      if (!range || props.triggerText || fixedOnly.value) return [full];
+      const period = appliedCalendarToken.value ?? appliedPeriod.value;
+      const kind = range.live
+        ? range.calendar
+          ? "calendar"
+          : "live"
+        : full.name
+          ? "named"
+          : "fixed";
+      return triggerLabelForms({
+        kind,
+        dashboard: props.preset === "dashboard",
+        name: full.name,
+        shortName: kind === "live" && period ? rollingShortName(period) : null,
+        dates: full.dates,
+        start: formatRangeStart(range, { ...labelOptions(), surface: labelSurface.value }),
+        duration: formatRangeDuration(range.startUs, range.endUs),
+      });
+    });
+    const triggerFormIndex = ref(0);
+    // The clock icon is the first thing to go when the label does not fit (§6).
+    const triggerIconShown = ref(true);
+    const triggerParts = computed<TriggerLabelForm>(() => {
+      const forms = triggerForms.value;
+      return forms[Math.min(triggerFormIndex.value, forms.length - 1)];
+    });
+
+    const triggerLabelEl = ref<HTMLElement | null>(null);
+    let fitRun = 0;
+    // Steps down one whole form at a time until the label no longer overflows its slot.
+    const fitTriggerLabel = async () => {
+      const label = triggerLabelEl.value;
+      if (!label) return;
+      const run = ++fitRun;
+      const overflows = () => label.scrollWidth > label.clientWidth + 1;
+      triggerFormIndex.value = 0;
+      triggerIconShown.value = true;
+      await nextTick();
+      if (run === fitRun && overflows() && !props.narrowedByQuery) {
+        triggerIconShown.value = false;
+        await nextTick();
+      }
+      while (
+        run === fitRun &&
+        triggerFormIndex.value < triggerForms.value.length - 1 &&
+        overflows()
+      ) {
+        triggerFormIndex.value += 1;
+        await nextTick();
+      }
+    };
+    let slotObserver: ResizeObserver | null = null;
+    // Set up once mounted: the forms read state declared further down this setup.
+    onMounted(() => {
+      watch(
+        () => triggerForms.value.map((form) => `${form.name}|${form.dates}`).join("/"),
+        () => fitTriggerLabel(),
+      );
+      document.fonts?.ready?.then(() => fitTriggerLabel());
+      if (typeof ResizeObserver === "undefined") {
+        fitTriggerLabel();
+        return;
+      }
+      // A refit settles inside one frame, so its own size change never notifies again.
+      slotObserver = new ResizeObserver(() => fitTriggerLabel());
+      for (const box of [groupEl.value?.parentElement, groupEl.value, triggerLabelEl.value]) {
+        if (box) slotObserver.observe(box);
+      }
+    });
+    onBeforeUnmount(() => slotObserver?.disconnect());
+
+    // The trigger's width at its narrowest form, so a toolbar can budget for it before dropping its own labels.
+    const shortestFormWidth = (): number => {
+      const button = triggerElement.value;
+      const label = triggerLabelEl.value;
+      if (!button || !label) return 0;
+      const forms = triggerForms.value;
+      const last = forms[forms.length - 1];
+      const text =
+        last.name && last.dates ? `${last.name} · ${last.dates}` : last.name || last.dates;
+      const icon = button.querySelector<HTMLElement>("[data-test='date-time-trigger-icon']");
+      const chrome = button.offsetWidth - label.offsetWidth - (icon?.offsetWidth ?? 0);
+      return Math.max(0, Math.ceil(chrome + textWidth(text, label)));
+    };
+
+    // A fixed range still filling says when it ends, on the trigger and in its tooltip.
+    const appliedEndText = computed(() => {
+      const applied = appliedModel();
+      return applied ? timeRangeEndText(applied, rangeContext()) : null;
+    });
+    const triggerEnds = computed(() => {
+      const applied = appliedModel();
+      const note =
+        applied && !props.triggerText ? timeRangeEndsNote(applied, rangeContext(), t) : null;
+      return note ? String(note) : "";
+    });
+
+    // Line 1 the full stamps, line 2 zone, kind and length; the label alone can round them.
     const triggerTooltip = computed(() => {
-      if (!props.autoApply && !menuOpen.value) return calendarTooltip(appliedCalendarToken.value);
-      return selectedType.value === "relative" ? calendarTooltip(calendarToken.value) : undefined;
+      const range = triggerRange.value;
+      if (!range || fixedOnly.value || props.triggerText) return null;
+      const detail = [
+        formatZoneOffset(zone.value, range.startUs / 1000),
+        kindText(range.live),
+        formatRangeDuration(range.startUs, range.endUs),
+      ].join(" · ");
+      const end = appliedEndText.value;
+      const progress = end ? String(t("dateTime.inProgressRefresh", { end })) : "";
+      const inUtc = formatZoneOffset(zone.value, range.startUs / 1000) === "UTC";
+      const utc = inUtc
+        ? ""
+        : `UTC ${formatRangeStamps(range, { ...labelOptions(), timezone: "UTC" })}`;
+      return { stamps: formatRangeStamps(range, labelOptions()), utc, detail, progress };
+    });
+    const triggerTooltipAlign = computed(() => (props.preset === "dashboard" ? "center" : "start"));
+
+    const triggerAriaLabel = computed(() =>
+      t("dateTime.triggerLabel", {
+        label: triggerEnds.value
+          ? `${String(triggerLabel.value)}, ${triggerEnds.value}`
+          : String(triggerLabel.value),
+        zone: formatZoneOffset(zone.value, tooltipNow.value),
+      }),
+    );
+
+    const triggerTooltipOpen = ref(false);
+    let triggerHoverTimer: ReturnType<typeof setTimeout> | null = null;
+    const onTriggerHover = (on: boolean) => {
+      if (triggerHoverTimer !== null) clearTimeout(triggerHoverTimer);
+      triggerHoverTimer = null;
+      if (!on) {
+        triggerTooltipOpen.value = false;
+        return;
+      }
+      refreshTooltipNow();
+      triggerHoverTimer = setTimeout(() => {
+        triggerTooltipOpen.value = true;
+      }, 400);
+    };
+    // Focus handed back after a mouse pick is not focus-visible, so its tooltip would cover the page.
+    const onTriggerFocus = (event: FocusEvent) => {
+      const target = event.currentTarget;
+      try {
+        if (target instanceof HTMLElement && !target.matches(":focus-visible")) return;
+      } catch {
+        // An engine without :focus-visible keeps the focus tooltip.
+      }
+      onTriggerHover(true);
+    };
+    onBeforeUnmount(() => onTriggerHover(false));
+    const triggerElement = computed<HTMLElement | null>(() => {
+      const button = datetimeBtn.value as { $el?: HTMLElement } | null;
+      return button?.$el ?? null;
     });
 
     const getDisplayValue = computed(() => {
       const calendarLabel =
-        !props.disableRelative && selectedType.value === "relative" && calendarToken.value !== null
+        !fixedOnly.value && selectedType.value === "relative" && calendarToken.value !== null
           ? formatCalendarLabel(
               calendarToken.value,
               zone.value,
@@ -1502,23 +2366,18 @@ export default defineComponent({
             )
           : null;
       if (calendarLabel) return calendarLabel;
-      if (!props.disableRelative && selectedType.value === "relative") {
-        const count = isValidCustomValue(relativeValue.value)
-          ? relativeValue.value
-          : lastValidCustomValue.value;
-        return t(pastPeriodKey.value, { count });
+      if (!fixedOnly.value && selectedType.value === "relative") {
+        return t(pastPeriodKey.value, { count: normalizedCount() });
       } else {
         if (selectedDate.value != null) {
-          // Here as if multiple dates is selected we get object with from and to keys
-          // If single date is selected we get string with date value
-          // So have added check for from and to
-          if (selectedDate.value?.from && selectedDate.value?.to && !props.disableRelative) {
+          // A range selection has from and to keys; a single picked date arrives as a plain string.
+          if (selectedDate.value?.from && selectedDate.value?.to && !fixedOnly.value) {
             // A pending single clicked day is what Apply will use, so the label shows it already.
             const pending = menuOpen.value ? pendingDay.value : null;
             const from = pending ?? selectedDate.value.from;
             const to = pending ?? selectedDate.value.to;
             return `${from} ${selectedTime.value.startTime} - ${to} ${selectedTime.value.endTime}`;
-          } else if (selectedDate.value?.from && selectedDate.value?.to && props.disableRelative) {
+          } else if (selectedDate.value?.from && selectedDate.value?.to && fixedOnly.value) {
             return `${selectedDate.value.from} - ${selectedDate.value.to}`;
           } else {
             return `${selectedDate.value} ${selectedTime.value.startTime} - ${selectedDate.value} ${selectedTime.value.endTime}`;
@@ -1530,126 +2389,116 @@ export default defineComponent({
       }
     });
 
-    // ----- Copy / paste of the selected range ---------------------------------
-    // Copy always resolves the selection (relative OR absolute) to a concrete
-    // absolute window, so the copied value is unambiguous. Paste accepts that
-    // format plus `Past N <Period>` and raw epoch timestamp pairs.
-    const copyRange = () => {
-      // Epoch microseconds side-step timezone ambiguity: pasting this into a
-      // tab with a different selected timezone still lands on the same
-      // instant, unlike a "yyyy/MM/dd HH:mm:ss" string (which paste would
-      // reinterpret using the pasting tab's own timezone).
-      const { startTime, endTime } = getConsumableDateTime();
-      const payload = JSON.stringify({ start_date: startTime, end_date: endTime });
-      copyToClipboard(payload, t, { successMessage: t("common.dateRangeCopied") });
-    };
+    // A clicked day still waiting for its end is the selection the panel shows, so Recent highlights it.
+    const selectionKey = computed<string>(() => {
+      if (selectedType.value === "relative") return `rel:${currentRelativePeriod()}`;
+      const range = pendingRange.value;
+      return range ? `${range.startTime}-${range.endTime}` : "";
+    });
 
-    // Converts a parsed absolute date[+time] string, interpreted as wall-clock
-    // time in the currently selected timezone, to epoch microseconds — the
-    // inverse of convertUnixTime.
-    const absoluteToMicros = (date: string, time: string): number => {
-      const iso = `${date.replace(/\//g, "-")}T${time}`;
-      return fromZonedTime(iso, zone.value).getTime() * 1000;
-    };
+    // Any other pick replaces the selection the bar's text was aimed at, so the text goes with it.
+    watch(selectionKey, () => {
+      timeFieldError.value = null;
+      zoneRedrawn.value = false;
+      if (inputText.value) clearInput();
+    });
 
-    const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
+    function applyPlan(plan: InputPlan) {
+      if (plan.kind === "absolute") {
+        applyAbsoluteRange(plan.start, plan.end, plan.calendarPeriod);
+        const range = pendingRange.value;
+        namedRange.value =
+          plan.name && range
+            ? { name: plan.name, startUs: range.startTime, endUs: range.endTime }
+            : null;
+        return;
+      }
+      if (plan.kind !== "rolling" && plan.kind !== "calendar") return;
+      refreshTooltipNow();
+      selectedType.value = "relative";
+      pendingDay.value = null;
+      if (plan.kind === "calendar") {
+        calendarToken.value = plan.token;
+        calendarName.value = plan.name ?? null;
+        return;
+      }
+      calendarToken.value = null;
+      relativePeriod.value = plan.unit;
+      relativeValue.value = plan.value;
+      lastValidCustomValue.value = plan.value;
+    }
+
+    function finishInput() {
+      applyAndClose();
+    }
+
+    // The selection as the label formatter reads it, for the copied text.
+    const selectionRange = computed<RangeLabelInput | null>(() => {
+      const range = pendingRange.value;
+      if (!range || !Number.isFinite(range.startTime) || !(range.endTime > range.startTime)) {
+        return null;
+      }
+      if (selectedType.value !== "relative" || fixedOnly.value) {
+        return absoluteLabelInput(range.startTime, range.endTime);
+      }
+      const period = currentRelativePeriod();
+      return {
+        startUs: range.startTime,
+        endUs: range.endTime,
+        name: calendarName.value ?? String(relativeLabel(period)),
+        live: true,
+        calendar: parseCalendarToken(period) !== null,
+      };
+    });
+
+    const copyDisabled = computed(() => selectionRange.value === null);
+    const copyShortcut = isMacOS() ? "ctrl+shift+c" : "alt+shift+c";
+
+    // Readable text the bar reads back; it names the zone, so it means the same in every timezone.
+    const copied = ref(false);
+    const copiedSpeech = ref("");
+    let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+    // The icon confirms the copy in place, so no toast covers the range it copied.
+    const copyRange = async () => {
+      const range = selectionRange.value;
+      if (!range) return;
+      const done = await copyToClipboard(formatRangeCopyText(range, labelOptions()), t, {
+        silent: true,
+      });
+      if (!done) return;
+      copied.value = true;
+      copiedSpeech.value = String(t("common.dateRangeCopied"));
+      if (copiedTimer !== null) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => {
+        copied.value = false;
+        copiedSpeech.value = "";
+      }, 1500);
+    };
+    onBeforeUnmount(() => copiedTimer !== null && clearTimeout(copiedTimer));
+
+    const applyAbsoluteRange = (
+      startMicros: number,
+      endMicros: number,
+      calendarPeriod: string | null,
+    ) => {
       selectedType.value = "absolute";
       calendarToken.value = null;
       // A day clicked before the paste would otherwise overwrite the pasted range when the panel closes.
       pendingDay.value = null;
-      // Saved once below, so the auto-apply date watcher must not save it a second time.
-      isSeedingAbsolute = true;
-      setAbsoluteTime(startMicros, endMicros);
-      nextTick(() => {
-        isSeedingAbsolute = false;
-      });
-      // A paste is the user's own change; setAbsoluteTime stamps it programmatic, which pages gating refetch on it ignore.
-      isUserInitiated = true;
-      if (props.autoApply) {
-        saveDate(null);
-        recordAbsoluteRange();
-      }
-    };
-
-    const applyParsedRange = (text: string): boolean => {
-      const parsed = parseDateRangeString(text);
-      if (!parsed) return false;
-      if (parsed.type === "timestamp") {
-        finalizeAbsoluteRange(parsed.startMicros, parsed.endMicros);
-      } else {
-        finalizeAbsoluteRange(
-          absoluteToMicros(parsed.startDate, parsed.startTime),
-          absoluteToMicros(parsed.endDate, parsed.endTime),
-        );
-      }
-      return true;
-    };
-
-    // Applies a single pasted date-time value to whichever side of the current
-    // range it sits closer to — e.g. a range of 5:00-10:00 pasted with 7:00
-    // becomes 7:00-10:00 (closer to start), while 13:00 becomes 5:00-13:00
-    // (closer to end). There's no cursor/selection to anchor a side to
-    // without a text field, so proximity is the next best signal of intent.
-    const applySingleDateTime = (parsed: ParsedSingleDateTime) => {
-      const micros =
-        parsed.type === "timestamp"
-          ? parsed.micros
-          : absoluteToMicros(parsed.date, parsed.time ?? "00:00:00");
-
-      const { startTime: baseStart, endTime: baseEnd } = getConsumableDateTime();
-      const isCloserToStart = Math.abs(micros - baseStart) <= Math.abs(micros - baseEnd);
-      finalizeAbsoluteRange(
-        isCloserToStart ? micros : baseStart,
-        isCloserToStart ? baseEnd : micros,
+      // An exclusive midnight end shows as the day before's 23:59:59, which reads back as that midnight.
+      const midnightEnd = endMicros > startMicros && isZoneMidnight(endMicros);
+      writeAbsoluteFields(
+        startMicros,
+        midnightEnd ? endMicros - MICROS_PER_SECOND : lastInstant(calendarPeriod, endMicros),
       );
+      if (calendarPeriod !== null && !midnightEnd) rememberSeededEnd(calendarPeriod, endMicros);
+      holdUnshownInstants(startMicros, endMicros);
     };
 
-    // Tries a full range first, then a single value applied to both sides.
-    const applyPastedText = (text: string): boolean => {
-      if (applyParsedRange(text)) return true;
-
-      const single = parseSingleDateTime(text);
-      if (!single) return false;
-
-      applySingleDateTime(single);
-      return true;
-    };
-
-    const applyPastedTextWithToast = (text: string) => {
-      if (applyPastedText(text)) {
-        toast({ variant: "success", message: t("common.dateRangePasted") });
-      } else {
-        toast({ variant: "error", message: t("common.dateRangePasteError") });
-      }
-    };
-
-    const pasteRange = async () => {
-      let text = "";
-      try {
-        text = await navigator.clipboard.readText();
-      } catch {
-        toast({
-          variant: "error",
-          message: t("common.dateRangePasteBlocked", {
-            shortcut: isMacOS() ? raw("⌘V") : raw("Ctrl+V"),
-          }),
-        });
-        return;
-      }
-      if (!text.trim()) {
-        toast({ variant: "info", message: t("common.dateRangePasteEmpty") });
-        return;
-      }
-      applyPastedTextWithToast(text);
-    };
-
-    // A native paste event carries the clipboard text without the read permission pasteRange needs.
+    // A stamp pasted into Start or End fills them; any other paste goes to the bar.
     const onPickerPaste = (event: ClipboardEvent) => {
-      if (isInputFocused(event.target)) return;
-      const text = event.clipboardData?.getData("text") ?? "";
-      if (!text.trim()) return;
-      event.preventDefault();
-      applyPastedTextWithToast(text);
+      if (fields.pasteIntoTimeFields(event)) return;
+      typingBar.onBarPaste(event);
     };
 
     const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
@@ -1673,281 +2522,136 @@ export default defineComponent({
 
     const optionsFn = (date: string) => {
       const formattedDate = calendarMaxDate.value;
-      if (props.disableRelative) {
+      if (fixedOnly.value) {
         return date >= props.minDate && date <= formattedDate;
       }
       return date >= "1999/01/01" && date <= formattedDate;
     };
 
+    // Resolved at the resolved line's clock, so the fields and the line show the same instants.
     const seedAbsoluteFromSelection = () => {
-      const { startTime, endTime } = getConsumableDateTime();
+      const range = resolveRelativePeriod(currentRelativePeriod(), tooltipNow.value);
+      if (!range) return;
+      const { startTime, endTime } = range;
       if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return;
       const start = convertUnixTime(startTime);
       const end = convertUnixTime(lastInstant(calendarToken.value, endTime));
       rememberSeededEnd(calendarToken.value, endTime);
-      isSeedingAbsolute = true;
-      selectedDate.value.from = start.date;
-      selectedDate.value.to = end.date;
-      selectedTime.value.startTime = start.time;
-      selectedTime.value.endTime = end.time;
-      nextTick(() => {
-        isSeedingAbsolute = false;
+      writeSeededFields({
+        from: start.date,
+        to: end.date,
+        startTime: start.time,
+        endTime: end.time,
       });
-    };
-
-    // A tab only shows its panel; the range changes once the user picks or edits in it.
-    const selectTab = (type: string) => {
-      if (type === selectedType.value) return;
-      if (type === "absolute" && selectedType.value === "relative") seedAbsoluteFromSelection();
-      selectedType.value = type;
-    };
-
-    // Clicking the active segment deselects it in the group; the picker always keeps one type.
-    const onTypeToggle = (value: unknown) => {
-      if (value === "relative" || value === "absolute") selectTab(value);
     };
 
     const setDateType = (type: string) => {
       selectedType.value = type;
-      // displayValue.value = getDisplayValue();
-      if (props.autoApply) saveDate(type === "absolute" ? "absolute" : "relative-custom");
+      if (isForm.value || menuOpen.value) return;
+      // A ref method, never a user's pick, so pages do not take it for one.
+      markProgrammaticDateChange();
+      saveDate(type === "absolute" ? "absolute" : "relative-custom");
     };
 
-    /**
-     * Shift the applied time window backward (`prev`) or forward (`next`) by its
-     * own duration, then promote the picker to an absolute range and emit the
-     * change so the page re-runs its query. Works from both relative and
-     * absolute modes: `getConsumableDateTime` resolves the current window to
-     * concrete microsecond timestamps first, so shifting across midnight/day
-     * boundaries stays exact and a relative picker is switched to absolute.
-     *
-     * Deliberately does NOT call `markProgrammaticDateChange()`: the change is
-     * user-driven, so `userChangedValue` stays `true` and consumers (e.g.
-     * traces live-mode) re-run their query just like a manual Apply. With
-     * `autoApply` the deep `selectedDate`/`selectedTime` watcher saves the new
-     * range; otherwise we save and emit directly.
-     */
-    const shiftTimeRange = (direction: "prev" | "next") => {
-      if (selectedType.value === "relative" && calendarToken.value !== null) {
-        const shifted = shiftCalendarToken(calendarToken.value, direction === "prev" ? -1 : 1);
-        if (shifted === null || !resolveCalendarPeriod(shifted, zone.value)) return;
-        refreshTooltipNow();
-        // A partial period can step into a full one longer than the page allows, which the rail would have refused.
-        if (calendarExceedsRestriction(shifted)) {
-          if (props.queryRangeRestrictionMsg) {
-            toast({ variant: "warning", message: raw(props.queryRangeRestrictionMsg) });
-          }
-          return;
-        }
-        calendarToken.value = shifted;
-        menuOpen.value = false;
-        saveDate("relative");
-        return;
-      }
-      const { startTime, endTime } = getConsumableDateTime();
-      const duration = endTime - startTime;
-      if (!(duration > 0)) return;
+    // Ctrl+Shift+C opens DevTools off macOS, so there the combo is Alt+Shift+C; the key code survives layouts.
+    const isCopyRangeKey = (event: KeyboardEvent) =>
+      event.shiftKey &&
+      event.code === "KeyC" &&
+      (isMacOS()
+        ? event.metaKey && !event.ctrlKey && !event.altKey
+        : event.altKey && !event.ctrlKey && !event.metaKey);
 
-      let delta = (direction === "prev" ? -1 : 1) * duration;
-      if (direction === "next") {
-        // A forward shift stops where the calendar does: now, or the end of `maxDate`.
-        delta = Math.min(delta, forwardCeilingMicros() - endTime);
-        if (delta < MICROS_PER_SECOND) return;
-      }
-      const startDateTime = convertUnixTime(startTime + delta);
-      const endDateTime = convertUnixTime(endTime + delta);
-
-      selectedDate.value.from = startDateTime.date;
-      selectedDate.value.to = endDateTime.date;
-      selectedTime.value.startTime = startDateTime.time;
-      selectedTime.value.endTime = endDateTime.time;
-      selectedType.value = "absolute";
-
-      menuOpen.value = false;
-      if (!props.autoApply) saveDate("absolute");
-    };
-
-    const forwardCeilingMicros = () =>
-      props.maxDate
-        ? convertToUtcTimestamp(`${props.maxDate} 23:59:59`, zone.value)
-        : Date.now() * 1000;
-
-    const isNextShiftDisabled = () => {
-      if (selectedType.value === "relative") {
-        return (parseCalendarToken(calendarToken.value)?.offset ?? 0) === 0;
-      }
-      const { endUTC } = getUTCTimeStamp();
-      return !(endUTC + MICROS_PER_SECOND <= forwardCeilingMicros());
-    };
-
-    // Rail items in tab order: recent rows, the show-more toggle, then the single-column calendar rows.
-    const railItems = (panel: HTMLElement): HTMLButtonElement[] =>
-      Array.from(
-        panel.querySelectorAll<HTMLButtonElement>(
-          "[data-date-time-rail-recent], [data-test='date-time-rail-recent-toggle'], [data-date-time-rail-calendar]",
-        ),
-      );
-
-    // Arrow-key navigation for the picker panel: Left/Right switch the
-    // Relative/Absolute tabs, and arrows roam the relative preset grid.
-    // stopPropagation keeps reka's dropdown-menu keydown from swallowing them.
+    // Escape backs out one layer: the list cursor or typed text, a pending day, the calendar, then the panel.
     const onPickerKeydown = (event: KeyboardEvent) => {
-      const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
-      if (!arrows.includes(event.key)) return;
-      const panel = event.currentTarget as HTMLElement;
-      const target = event.target as HTMLElement;
-      if (!panel || !target) return;
-
-      const railItem = target.closest<HTMLButtonElement>("[data-date-time-rail-item]");
-      if (railItem) {
-        // A recent row's own listener reaches its × with Left/Right.
-        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      if (isCopyRangeKey(event)) {
+        // Handled on the panel so a page's own copy-URL binding of the same combo never wins while it is open.
         event.preventDefault();
         event.stopPropagation();
-
-        const items = railItems(panel);
-        const dir = event.key === "ArrowDown" ? 1 : -1;
-        let next: HTMLButtonElement | null = null;
-        for (let i = items.indexOf(railItem) + dir; i >= 0 && i < items.length; i += dir) {
-          if (!items[i].disabled) {
-            next = items[i];
-            break;
-          }
-        }
-        next?.focus();
+        copyRange();
         return;
       }
-
-      const tab = target.closest(
-        "[data-test='date-time-relative-tab'], [data-test='date-time-absolute-tab']",
-      );
-      if (tab) {
-        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-          event.preventDefault();
-          event.stopPropagation();
-          const next = event.key === "ArrowRight" ? "absolute" : "relative";
-          selectTab(next);
-          panel.querySelector<HTMLElement>(`[data-test='date-time-${next}-tab']`)?.focus();
-        } else if (event.key === "ArrowDown") {
-          event.preventDefault();
-          event.stopPropagation();
-          panel
-            .querySelector<HTMLElement>(".date-time-table [data-test$='-btn']:not([disabled])")
-            ?.focus();
-        }
+      if (moveListCursorToEnd(event)) return;
+      if (event.altKey && event.code === "KeyP" && listCursor.value < 0 && showPinButton.value) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleAppliedPin();
         return;
       }
-
-      const cell = target.closest<HTMLButtonElement>(
-        "[data-test^='date-time-relative-'][data-test$='-btn']",
-      );
-      if (!cell) return;
-      const rows = Array.from(panel.querySelectorAll(".date-time-table .relative-row"))
-        .map((row) =>
-          Array.from(
-            row.querySelectorAll<HTMLButtonElement>(
-              "[data-test^='date-time-relative-'][data-test$='-btn']",
-            ),
-          ),
-        )
-        .filter((btns) => btns.length > 0);
-      let r = -1;
-      let c = -1;
-      rows.forEach((btns, ri) => {
-        const ci = btns.indexOf(cell);
-        if (ci !== -1) {
-          r = ri;
-          c = ci;
-        }
-      });
-      if (r === -1) return;
-      event.preventDefault();
-      event.stopPropagation();
-
-      const enabled = (btn?: HTMLButtonElement) => !!btn && !btn.disabled;
-      const stepRow = (btns: HTMLButtonElement[], from: number, dir: number) => {
-        for (let i = from + dir; i >= 0 && i < btns.length; i += dir)
-          if (enabled(btns[i])) return btns[i];
-        return null;
-      };
-      const stepCol = (from: number, dir: number) => {
-        for (let ri = from + dir; ri >= 0 && ri < rows.length; ri += dir) {
-          const btns = rows[ri];
-          const col = Math.min(c, btns.length - 1);
-          if (enabled(btns[col])) return btns[col];
-          const back = stepRow(btns, col + 1, -1);
-          if (back) return back;
-          const fwd = stepRow(btns, col - 1, 1);
-          if (fwd) return fwd;
-        }
-        return null;
-      };
-
-      let next: HTMLButtonElement | null = null;
-      if (event.key === "ArrowLeft") next = stepRow(rows[r], c, -1);
-      else if (event.key === "ArrowRight") next = stepRow(rows[r], c, 1);
-      else if (event.key === "ArrowUp") next = stepCol(r, -1);
-      else if (event.key === "ArrowDown") next = stepCol(r, 1);
-      next?.focus();
+      if (event.key !== "Escape") return;
+      const target = event.target;
+      // A pin's name field cancels its own edit.
+      if (
+        target instanceof HTMLElement &&
+        target.closest("[data-test='date-time-list-pin-name']")
+      ) {
+        return;
+      }
+      if (escapeInput(event)) return;
+      // A half-picked day is dropped and the calendar stays; caught here so reka never restores its old range.
+      if (pendingDay.value !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+        calendarRef.value?.clearPending();
+        restoreAppliedSelection();
+        pendingDay.value = null;
+        calendarPreviewDay.value = null;
+        return;
+      }
+      if (calendarMode.value && !fixedOnly.value) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeCalendar();
+        return;
+      }
+      // An open tooltip is the topmost dismissable layer and would take this Escape, so the panel closes itself; the zone list keeps its own Escape.
+      if (!isTimezoneSelectOpen.value) {
+        event.preventDefault();
+        closeMenu();
+      }
     };
 
+    // With the cursor in the list, Home and End go to its first and last row instead of the bar's caret.
+    const moveListCursorToEnd = (event: KeyboardEvent): boolean => {
+      if (listCursor.value < 0 || (event.key !== "Home" && event.key !== "End")) return false;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+      const enabled = listRows.value.flatMap((row, index) => (row.disabled ? [] : [index]));
+      if (enabled.length === 0) return false;
+      event.preventDefault();
+      event.stopPropagation();
+      listCursor.value = event.key === "Home" ? enabled[0] : enabled[enabled.length - 1];
+      return true;
+    };
+
+    // Seconds through days roll up into the largest offered unit that holds the count exactly, so 60m lights the 1h chip.
+    const largestExactUnit = (unit: string, value: number): [string, number] => {
+      if (!(unit in EXACT_UNIT_SECONDS)) return [unit, value];
+      const seconds = value * EXACT_UNIT_SECONDS[unit];
+      const fit = Object.entries(EXACT_UNIT_SECONDS).find(
+        ([candidate, size]) =>
+          seconds % size === 0 && relativePeriods.some((option) => option.value === candidate),
+      );
+      return fit ? [fit[0], seconds / fit[1]] : [unit, value];
+    };
+
+    // The per-unit maxima follow the restriction alone, so a period typed while the selection is absolute is still capped.
+    const computeRelativeMaxima = () => {
+      const limitSeconds = props.queryRangeRestrictionInHour * 3_600;
+      relativePeriodsMaxValue.value = Object.fromEntries(
+        periodUnits.map((unit) => {
+          if (!(limitSeconds > 0)) return [unit, 0];
+          const max = Math.floor(limitSeconds / UNIT_SECONDS[unit]);
+          return [unit, max >= 1 ? max : -1];
+        }),
+      );
+    };
+
+    // Limits arrive after mount, so a clamp here is never the user's pick.
     const computeRelativePeriod = () => {
+      markProgrammaticDateChange();
+      computeRelativeMaxima();
+      if (props.limitRefused) return;
+      const periodBefore = currentRelativePeriod();
       if (selectedType.value === "relative") {
-        if (props.queryRangeRestrictionInHour > 0) {
-          for (let period of relativePeriods) {
-            if (period.value == "s") {
-              relativePeriodsMaxValue.value[period.value] = 60;
-            }
-
-            if (period.value == "m") {
-              relativePeriodsMaxValue.value[period.value] = 60;
-            }
-
-            if (period.value == "h" && props.queryRangeRestrictionInHour > 0) {
-              relativePeriodsMaxValue.value[period.value] = props.queryRangeRestrictionInHour;
-            } else if (period.value == "h") {
-              relativePeriodsMaxValue.value[period.value] = -1;
-            }
-
-            if (period.value == "d" && props.queryRangeRestrictionInHour > 24) {
-              relativePeriodsMaxValue.value[period.value] =
-                Math.round(props.queryRangeRestrictionInHour / 24) || 31;
-            } else if (period.value == "d") {
-              relativePeriodsMaxValue.value[period.value] = -1;
-            }
-
-            if (period.value == "w" && props.queryRangeRestrictionInHour > 24 * 7) {
-              relativePeriodsMaxValue.value[period.value] =
-                Math.round(props.queryRangeRestrictionInHour / (24 * 7)) || 100;
-            } else if (period.value == "w") {
-              relativePeriodsMaxValue.value[period.value] = -1;
-            }
-
-            if (period.value == "M" && props.queryRangeRestrictionInHour > 24 * 30) {
-              relativePeriodsMaxValue.value[period.value] =
-                Math.round(props.queryRangeRestrictionInHour / (24 * 30)) || 100;
-            } else if (period.value == "M") {
-              relativePeriodsMaxValue.value[period.value] = -1;
-            }
-          }
-        } else {
-          relativePeriodsMaxValue.value = {
-            s: 0,
-            m: 0,
-            h: 0,
-            d: 0,
-            w: 0,
-            M: 0,
-          };
-        }
-
-        relativePeriodsSelect.value = relativePeriods.filter((period) => {
-          if (relativePeriodsMaxValue.value[period.value] > -1) {
-            return period;
-          }
-          return undefined;
-        });
-
         if (calendarExceedsRestriction(calendarToken.value)) {
           // Clamped like a too-long rolling range: to the largest window the page allows.
           const unit = [...periodUnits].reverse().find((u) => relativePeriodsMaxValue.value[u] > 0);
@@ -1955,7 +2659,7 @@ export default defineComponent({
             setRelativeDate(unit, relativePeriodsMaxValue.value[unit]);
           } else {
             calendarToken.value = null;
-            if (props.autoApply) saveDate("relative");
+            if (!isForm.value) saveDate("relative");
           }
         }
 
@@ -1964,15 +2668,12 @@ export default defineComponent({
 
           try {
             if (maxRelativeValue !== -1 && relativeValue.value > maxRelativeValue) {
-              setRelativeDate(relativePeriod.value, maxRelativeValue);
+              setRelativeDate(...largestExactUnit(relativePeriod.value, maxRelativeValue));
             } else if (maxRelativeValue === -1) {
               const periodIndex = periodUnits.indexOf(relativePeriod.value);
               for (let i = periodIndex; i >= 0; i--) {
                 if (relativePeriodsMaxValue.value[periodUnits[i]] > -1) {
-                  setRelativeDate(
-                    periodUnits[i],
-                    relativeDates[periodUnits[i]]?.[0] ?? relativeDates["m"][0], // fallback to 15 minutes,
-                  );
+                  setRelativeDate(periodUnits[i], 1);
                   break;
                 }
               }
@@ -1981,11 +2682,12 @@ export default defineComponent({
             console.log("Error while setting relative date", e);
           }
         }
+        if (currentRelativePeriod() !== periodBefore) limits.showRestrictionToast();
       }
     };
 
     const showOnlyAbsolute = () => {
-      if (props.disableRelative) {
+      if (fixedOnly.value) {
         setDateType("absolute");
       }
     };
@@ -1998,101 +2700,150 @@ export default defineComponent({
       emit("show");
     };
 
-    const absoluteRangeKey = () => {
-      if (selectedType.value !== "absolute") return null;
+    const recordSelection = () => {
+      if (!showRail.value) return;
+      if (selectedType.value === "relative") {
+        recordEntry({ relative: currentRelativePeriod() });
+        return;
+      }
       const { startUTC, endUTC } = getUTCTimeStamp();
-      return `${startUTC}-${endUTC}`;
+      recordEntry({ startUs: startUTC, endUs: endUTC });
     };
 
-    const recordAbsoluteRange = () => {
-      if (!showRail.value || selectedType.value !== "absolute") return;
-      const { startUTC, endUTC } = getUTCTimeStamp();
-      timeRangeHistory.add(startUTC, endUTC);
-    };
+    // While the open panel holds a relative selection, Start/End show the range it resolves to.
+    watch(
+      () => [
+        menuOpen.value,
+        selectedType.value,
+        calendarToken.value,
+        relativePeriod.value,
+        relativeValue.value,
+        zone.value,
+        tooltipNow.value,
+      ],
+      () => {
+        if (!menuOpen.value || selectedType.value !== "relative" || timeFieldFocused.value) return;
+        if (calendarToken.value === null && !isValidCustomValue(relativeValue.value)) return;
+        seedAbsoluteFromSelection();
+      },
+    );
 
-    // An auto-applied absolute range is final only when the panel closes, not after every edit.
-    let rangeKeyAtOpen: string | null = null;
-    const menuOpen = ref(false);
-
-    // Calendar labels name a day and the rail ends "so far" ranges at now, so the clock runs only while one is shown.
+    // Calendar labels name a day, the rail ends "so far" ranges at now and a live trigger shows its dates, so the clock runs only then.
     const needsClock = computed(
       () =>
-        props.calendarPresets &&
-        (menuOpen.value || calendarToken.value !== null || appliedCalendarToken.value !== null),
+        menuOpen.value ||
+        (datesShown.value && appliedType.value === "relative") ||
+        (calendarAllowed.value &&
+          (calendarToken.value !== null || appliedCalendarToken.value !== null)),
     );
-    let clockTick: ReturnType<typeof setInterval> | null = null;
+    let clockTick: ReturnType<typeof setTimeout> | null = null;
     const stopClock = () => {
-      if (clockTick !== null) clearInterval(clockTick);
+      if (clockTick !== null) clearTimeout(clockTick);
       clockTick = null;
+    };
+    // Ticks on the minute, so minute-precision dates turn over with the page's now, not up to a minute late.
+    const tickClock = () => {
+      refreshTooltipNow();
+      clockTick = setTimeout(tickClock, 60_000 - (Date.now() % 60_000) + 50);
     };
     const syncClock = () => {
       if (!needsClock.value) return stopClock();
       if (clockTick !== null) return;
-      refreshTooltipNow();
-      clockTick = setInterval(refreshTooltipNow, 60_000);
+      tickClock();
     };
     watch(needsClock, syncClock, { immediate: true });
     onActivated(syncClock);
     onDeactivated(stopClock);
     onBeforeUnmount(stopClock);
+    onBeforeUnmount(cancelPendingRead);
+    // OPopover's content is reka's dialog, which takes no attributes from here.
+    watch(menuEl, (panel) => panel?.closest("[role='dialog']")?.setAttribute("aria-modal", "true"));
+
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
         refreshTooltipNow();
         pendingDay.value = null;
-        rangeKeyAtOpen = absoluteRangeKey();
+        fields.forgetEndCut();
+        clearInput();
+        clearTimeFieldErrors();
+        listCursor.value = -1;
+        editingPinRowId.value = null;
+        calendarPreviewDay.value = null;
+        zoneRedrawn.value = false;
+        // A dates-only picker has no list, so its calendar is the panel.
+        calendarMode.value = fixedOnly.value;
+        appliedSinceOpen = false;
+        absoluteAtOpen = fields.snapshotFields();
+        entryAtOpen = appliedHistoryEntry();
         onBeforeShow();
         onShow();
+        nextTick(fitPlaceholder);
       } else {
-        if (props.autoApply && commitPendingDay()) saveDate("absolute");
         pendingDay.value = null;
-        if (!props.autoApply || selectedType.value !== appliedSelection.selectedType) {
-          restoreAppliedSelection();
-        } else if (absoluteRangeKey() !== rangeKeyAtOpen) {
-          recordAbsoluteRange();
-        }
+        clearInput();
+        listCursor.value = -1;
+        editingPinRowId.value = null;
+        restoreAppliedSelection();
         onBeforeHide();
         onHide();
       }
     };
 
-    // The rail sits after the header band in DOM order, so reka's default autofocus would land on a tab button.
+    // Typing lands in the bar, which leads the Tab order; on a touch screen, where focusing it raises the keyboard, reka's default focus stays.
     const onPopoverOpenAutoFocus = (event: Event) => {
-      if (!showRail.value) return;
-      const firstItem = document.querySelector<HTMLElement>(
-        "#date-time-menu [data-date-time-rail-item]:not([disabled])",
-      );
-      // An empty rail keeps reka's default focus, or focus stays on the trigger and ⌘V never reaches the panel.
-      if (!firstItem) return;
+      const touch = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
+      const box = touch
+        ? null
+        : document.querySelector<HTMLElement>(
+            "#date-time-menu [data-test='date-time-input-field']",
+          );
+      // With no bar, reka's default focus stays inside the panel, or ⌘V would never reach it.
+      if (!box) return;
       event.preventDefault();
-      firstItem.focus();
+      box.focus();
     };
 
     // A pick closes the panel the way a user dismissal does, so listeners waiting on hide still run.
+    // Reka returns focus only on its own dismissals, so focus inside the panel goes back to the trigger here.
     const closeMenu = () => {
       if (!menuOpen.value) return;
+      const hadFocus = !!menuEl.value?.contains(document.activeElement);
       menuOpen.value = false;
       onMenuOpenChange(false);
+      nextTick(() => {
+        if (hadFocus && !menuOpen.value) triggerElement.value?.focus();
+      });
     };
 
-    // A single clicked day applies as that day.
-    const commitPendingDay = (): boolean => {
-      const day = pendingDay.value;
-      pendingDay.value = null;
-      if (!day || selectedType.value !== "absolute") return false;
-      isSeedingAbsolute = true;
-      selectedDate.value.from = day;
-      selectedDate.value.to = day;
-      nextTick(() => {
-        isSeedingAbsolute = false;
-      });
-      return true;
+    const openMenu = () => {
+      if (menuOpen.value || props.disable) return;
+      menuOpen.value = true;
+      onMenuOpenChange(true);
     };
 
     const applyAndClose = () => {
       commitPendingDay();
       saveDate(null);
-      recordAbsoluteRange();
-      menuOpen.value = false;
+      recordSelection();
+      closeMenu();
+    };
+
+    const openCalendar = () => {
+      calendarMode.value = true;
+      listCursor.value = -1;
+      editingPinRowId.value = null;
+    };
+
+    const toggleCalendar = () => (calendarMode.value ? closeCalendar() : openCalendar());
+
+    // Leaving the calendar keeps whatever it applied; a half-picked day is dropped.
+    const closeCalendar = () => {
+      calendarMode.value = false;
+      typedFieldTime.value = null;
+      clearTimeFieldErrors();
+      pendingDay.value = null;
+      calendarPreviewDay.value = null;
+      nextTick(() => inputBar.value?.focus());
     };
 
     const applyCalendarItem = (id: string) => {
@@ -2100,43 +2851,379 @@ export default defineComponent({
       if (!preset) return;
       selectedType.value = "relative";
       calendarToken.value = preset.token;
+      calendarName.value = null;
+      pendingDay.value = null;
       saveDate("relative");
+      recordSelection();
+      closeMenu();
+    };
+
+    // A chip applies at once, like a row, and is the only control that lights for the range it applied.
+    const pickChip = (value: string, rerun = false) => {
+      const rolling = parseRollingPeriod(value);
+      if (!rolling) return;
+      selectedType.value = "relative";
+      calendarToken.value = null;
+      pendingDay.value = null;
+      relativePeriod.value = rolling.unit;
+      relativeValue.value = rolling.value;
+      lastValidCustomValue.value = rolling.value;
+      saveDate("relative", rerun);
+      recordSelection();
+      closeMenu();
+    };
+
+    const onChipToggle = (value: unknown) => {
+      const chip = typeof value === "string" && value ? value : litChip.value;
+      if (chip) pickChip(chip);
+    };
+    // A click on the lit chip applies it again and asks the page to re-run the same range.
+    const onChipReselect = () => {
+      if (litChip.value) pickChip(litChip.value, true);
+    };
+
+    const applyRecentPeriod = (period: string) => {
+      selectedType.value = "relative";
+      pendingDay.value = null;
+      if (parseCalendarToken(period)) {
+        calendarToken.value = period;
+        calendarName.value = null;
+      } else {
+        calendarToken.value = null;
+        readRelativeTime(period);
+      }
+      saveDate("relative");
+      recordEntry({ relative: period });
+      closeMenu();
+    };
+
+    const applyHistoryEntry = (entry: TimeRangeHistoryEntry) => {
+      if (isRelativeHistoryEntry(entry)) {
+        applyRecentPeriod(entry.relative);
+        return;
+      }
+      const range = limits.boundedRange(entry.startUs, entry.endUs);
+      if (!range) return;
+      const start = convertUnixTime(range.start);
+      // An exclusive midnight end shows as the previous day's last second, as the row label does.
+      const endsAtMidnight =
+        range.end % MICROS_PER_SECOND === 0 && convertUnixTime(range.end).time === "00:00:00";
+      const end = convertUnixTime(endsAtMidnight ? range.end - 1 : range.end);
+      if (endsAtMidnight) rememberShownEnd(range.end);
+      else fields.forgetSeededEnd();
+      // Saved once below, so the auto-apply date watcher must not save it a second time.
+      writeSeededFields({
+        from: start.date,
+        to: end.date,
+        startTime: start.time,
+        endTime: end.time,
+      });
+      holdUnshownInstants(range.start, range.end);
+      selectedType.value = "absolute";
+      calendarToken.value = null;
+      saveDate("absolute");
+      recordEntry(entry);
       closeMenu();
     };
 
     const applyRecentRange = (id: string) => {
-      const entry = timeRangeHistory.entries.value[Number(id)];
-      if (!entry) return;
-      const start = convertUnixTime(entry.startUs);
-      // An exclusive midnight end shows as the previous day's last second, as the rail label does.
-      const endsAtMidnight =
-        entry.endUs > entry.startUs &&
-        entry.endUs % MICROS_PER_SECOND === 0 &&
-        convertUnixTime(entry.endUs).time === "00:00:00";
-      const end = convertUnixTime(endsAtMidnight ? entry.endUs - 1 : entry.endUs);
-      if (endsAtMidnight) rememberShownEnd(entry.endUs);
-      else seededEnd = null;
-      // Saved once below, so the auto-apply date watcher must not save it a second time.
-      isSeedingAbsolute = true;
-      selectedDate.value.from = start.date;
-      selectedDate.value.to = end.date;
-      selectedTime.value.startTime = start.time;
-      selectedTime.value.endTime = end.time;
+      const entry = rail.recentEntry(id);
+      if (entry) applyHistoryEntry(entry);
+    };
+
+    // Row ids carry what they apply: a pin id, a Recent index or a calendar preset id.
+    function pickListRow(index: number) {
+      const row = listRows.value[index];
+      if (!row || row.disabled) return;
+      if (row.kind === "pinned") {
+        const pin = rail.pinOf(row.id);
+        if (pin) applyHistoryEntry(pin.range);
+      } else if (row.kind === "recent") applyRecentRange(row.id.slice("recent-".length));
+      else if (row.kind === "calendar") applyCalendarItem(row.id.slice("calendar-".length));
+    }
+
+    const {
+      clearUndoForPageRange,
+      captureUndo,
+      undoRange,
+      shiftTimeRange,
+      isNextShiftDisabled,
+      goLive,
+      zoomOut,
+      zoomOutBlocked,
+      showUndo,
+      undoAvailable,
+      undoTooltip,
+      liveDurationLabel,
+      stepTooltip,
+    } = useTimeRangeStepping(view, {
+      clock,
+      limits,
+      fields,
+      selectedType,
+      calendarToken,
+      relativePeriod,
+      relativeValue,
+      pendingDay,
+      pendingRange,
+      triggerLabel,
+      appliedSelection: () => appliedSelection,
+      appliedRan: appliedRangeRan,
+      appliedBounds: () => appliedRange.value,
+      emittingOwnChange: () => emittingOwnChange,
+      lastPayload: () => datePayload.value as Partial<ConsumableDateTime>,
+      normalizedCount,
+      largestExactUnit,
+      setRelativeDate,
+      saveDate,
+      getConsumableDateTime,
+      openMenu,
+      closeMenu,
+      onUndo: (step) => emit("on:undo", step),
+    });
+
+    // A badge when the zone differs from the browser's, or always where the page asks (dashboards, print).
+    // Offset at the range's start, so a summer range opened in winter still shows its summer offset.
+    const zoneBadgeText = computed(() => {
+      if (!zone.value || props.hideRelativeTimezone) return "";
+      const startUs = triggerRange.value?.startUs;
+      const atMs = startUs !== undefined ? Math.floor(startUs / 1000) : tooltipNow.value;
+      if (props.preset === "dashboard") return formatZoneOffset(zone.value, atMs);
+      return zone.value !== browserTz ? formatZoneBadge(zone.value, atMs) : "";
+    });
+
+    const zoneShortLabel = computed(() => {
+      const offset = zoneOffset(zone.value, tooltipNow.value);
+      if (zone.value === "UTC" || offset === "+00:00") return "UTC";
+      return offset ? `UTC${offset}` : zone.value;
+    });
+
+    const retentionFloorDay = limits.retentionFloorDay;
+
+    const weekStart = computed(() => weekStartsOn());
+
+    // From a live range the calendar has no start yet, so there is nothing to apply.
+    const needsStartDate = computed(
+      () =>
+        calendarMode.value &&
+        !fixedOnly.value &&
+        selectedType.value === "relative" &&
+        pendingDay.value === null,
+    );
+    // From a live range nothing is picked yet, so Start and End stay empty rather than echo the live dates.
+    const fieldsBlank = computed(() => needsStartDate.value);
+    // Text typed while the fields are blank is kept, or each re-render would wipe the keystrokes.
+    const startFieldShown = computed(() =>
+      fieldsBlank.value ? (fieldDrafts.value.start ?? "") : startFieldText.value,
+    );
+    const endFieldShown = computed(() =>
+      fieldsBlank.value ? (fieldDrafts.value.end ?? "") : endFieldText.value,
+    );
+    // The days a calendar pick would apply, and those its pointer or focus previews, against the page's limits.
+    const calendarLimit = computed<{ selection: string | null; preview: string | null }>(() => {
+      if (!calendarMode.value || selectedType.value !== "absolute") {
+        return { selection: null, preview: null };
+      }
+      const range = pendingRange.value;
+      const selection = range ? limits.limitReason(range.startTime, range.endTime) : null;
+      const pending = pendingDay.value;
+      const hovered = calendarPreviewDay.value;
+      if (pending === null || hovered === null) return { selection, preview: null };
+      const [from, to] = pending <= hovered ? [pending, hovered] : [hovered, pending];
+      const preview = limits.limitReason(
+        absoluteToMicros(from, selectedTime.value.startTime),
+        endFieldToMicros(to, "23:59:59"),
+      );
+      return { selection, preview };
+    });
+
+    // Text in the bar is what Apply applies, so a reading Enter would refuse leaves Apply off.
+    const barBlockReason = computed<I18nText | null>(() => {
+      if (!inputText.value.trim()) return null;
+      if (inputError.value) return inputErrorText.value;
+      const plan = typingBar.inputPlan.value;
+      if (plan?.kind === "refused" || plan?.kind === "restricted") return plan.message;
+      if (plan) return null;
+      if (typingBar.inputFuture.value) return t("common.timeRangeStartInFuture");
+      if (typingBar.inputReversed.value) return t("common.timeRangeEndBeforeStart");
+      return t("common.timeRangeInputError");
+    });
+    // A readable bar is what Apply applies, so it needs no calendar pick first.
+    const barApplies = computed(
+      () => inputText.value.trim() !== "" && barBlockReason.value === null,
+    );
+
+    const applyDisabled = computed(
+      () =>
+        barBlockReason.value !== null ||
+        (needsStartDate.value && !barApplies.value) ||
+        unreadableFields.value.start ||
+        unreadableFields.value.end ||
+        calendarLimit.value.selection !== null,
+    );
+
+    const applyBlockedReason = computed<I18nText | undefined>(() => {
+      if (barBlockReason.value) return barBlockReason.value;
+      if (needsStartDate.value && !barApplies.value) return t("dateTime.pickStartDate");
+      const reason = calendarLimit.value.selection;
+      return reason ? raw(reason) : undefined;
+    });
+
+    const onApplyClick = () => {
+      if (inputText.value.trim()) applyTypedReading();
+      else applyAndClose();
+    };
+
+    const fieldOf = (target: EventTarget | null): "start" | "end" | null => {
+      if (!(target instanceof HTMLElement)) return null;
+      if (target.closest("[data-test='datetime-start-time']")) return "start";
+      return target.closest("[data-test='datetime-end-time']") ? "end" : null;
+    };
+
+    const onFieldChange = (field: "start" | "end", event: Event) => {
+      const input = event.target;
+      if (input instanceof HTMLInputElement) commitFieldText(field, input.value);
+    };
+
+    // Enter takes the field's text first, then applies when it read.
+    const onTimeFieldEnter = (event: KeyboardEvent) => {
+      // Focus is back on the trigger before keypress fires, so an unprevented Enter reopens the panel.
+      event.preventDefault();
+      const input = event.target instanceof HTMLInputElement ? event.target : null;
+      const field = fieldOf(input);
+      if (input && field) commitFieldText(field, input.value);
       nextTick(() => {
-        isSeedingAbsolute = false;
+        if (timeFieldError.value === null && !applyDisabled.value) applyAndClose();
+        else input?.focus();
       });
+    };
+
+    const summaryError = computed<{ message: I18nText; examples?: I18nText } | null>(() => {
+      if (inputError.value) {
+        return {
+          message: inputErrorText.value,
+          examples: inputRefusal.value ? undefined : t("common.timeRangeInputExamples"),
+        };
+      }
+      if (timeFieldError.value) return { message: timeFieldError.value.message };
+      if (unreadableFields.value.start || unreadableFields.value.end) {
+        return { message: t("common.timeRangeInputError") };
+      }
+      const limit = calendarLimit.value.preview ?? calendarLimit.value.selection;
+      return limit ? { message: raw(limit) } : null;
+    });
+
+    // On a phone the summary drops this year's year, which the trigger already carries (§6).
+    const shownRangeShort = computed(() => {
+      const range = shownLine.value.range;
+      const year = String(new Date(tooltipNow.value).getFullYear());
+      const short = range.replace(new RegExp(`,? ${year}$`), "");
+      return short !== range ? short : "";
+    });
+
+    // The panel holds a draft while its selection or typed text differs from the applied range.
+    const isDraft = computed(
+      () =>
+        menuOpen.value &&
+        (previewLine.value !== null ||
+          pendingDay.value !== null ||
+          !sameRange(currentModel(), appliedModel())),
+    );
+
+    const showFreezeButton = computed(() => {
+      const applied = appliedModel();
+      // Only a live range freezes; an ended calendar period already names fixed dates (§3).
+      const live =
+        applied?.kind === "rolling" || (applied?.kind === "calendar" && applied.offset === 0);
+      return !isDraft.value && !isForm.value && live;
+    });
+
+    const freezeLabel = computed(() => {
+      const range = triggerRange.value;
+      return range ? formatRangeDates(range, labelOptions()) : "";
+    });
+
+    // Freeze keeps the window the live range resolves to now, as fixed instants.
+    const freezeRange = () => {
+      const range = triggerRange.value;
+      if (!range || !(range.endUs > range.startUs)) return;
+      fields.writeInstants(range.startUs, range.endUs);
       selectedType.value = "absolute";
       calendarToken.value = null;
-      saveDate("absolute");
-      timeRangeHistory.add(entry.startUs, entry.endUs);
-      rangeKeyAtOpen = absoluteRangeKey();
+      pendingDay.value = null;
+      saveDate("absolute", false, "freeze");
+      recordSelection();
       closeMenu();
     };
 
-    const removeRecentRange = (id: string) => {
-      const entry = timeRangeHistory.entries.value[Number(id)];
-      if (entry) timeRangeHistory.remove(entry);
+    // The summary star pins the applied range (§9); a draft has nothing applied to pin yet.
+    const appliedPinned = computed(() => rail.pinIdOf(appliedHistoryEntry()) !== null);
+    const appliedIsToken = computed(() => appliedType.value === "relative");
+    const showPinButton = computed(
+      () =>
+        showRail.value && !isDraft.value && !previewLine.value && appliedHistoryEntry() !== null,
+    );
+    const toggleAppliedPin = () => rail.togglePin(appliedHistoryEntry());
+
+    // The undo button's step for a page's own control, such as Back to results; false when there is none.
+    const undo = (): boolean => {
+      if (!undoAvailable.value || props.disable) return false;
+      undoRange();
+      return true;
     };
+
+    const showLiveButton = computed(
+      () =>
+        !fixedOnly.value &&
+        selectedType.value === "absolute" &&
+        previewLine.value === null &&
+        resolvedLine.value.fixed === true,
+    );
+
+    const rowGroupName = (row: TimeRangeListRow): I18nText => {
+      if (row.kind === "pinned") return t("dateTime.groupPinned");
+      if (row.kind === "recent") return t("common.timeRangeRecent");
+      if (row.kind === "calendar") return t("common.timeRangeCalendar");
+      return t("dateTime.groupSuggestions");
+    };
+
+    // The range a row applies, live when it is a period, for its spoken kind and length.
+    const rowRange = (
+      row: TimeRangeListRow,
+    ): { startUs: number; endUs: number; live: boolean } | null => {
+      let entry: TimeRangeHistoryEntry | null = row.period ? { relative: row.period } : null;
+      if (row.kind === "pinned") entry = rail.pinOf(row.id)?.range ?? null;
+      else if (row.kind === "recent")
+        entry = rail.recentEntry(row.id.slice("recent-".length)) ?? null;
+      if (!entry) return null;
+      if (!isRelativeHistoryEntry(entry)) return { ...entry, live: false };
+      const range = resolveRelativePeriod(entry.relative, tooltipNow.value);
+      return range ? { startUs: range.startTime, endUs: range.endTime, live: true } : null;
+    };
+
+    // Spoken in the panel: the preview, or the cursor row with its kind, length, group and place.
+    const panelSpeech = computed(() => {
+      const row = activeRow.value >= 0 ? shownRows.value[activeRow.value] : null;
+      if (row) {
+        const position = t("dateTime.rowPosition", {
+          n: activeRow.value + 1,
+          total: shownRows.value.length,
+        });
+        const range = rowRange(row);
+        const head = [
+          row.label,
+          range ? kindText(range.live) : "",
+          range ? formatRangeDuration(range.startUs, range.endUs) : "",
+          row.reason ? row.meta : "",
+        ];
+        const place = [String(rowGroupName(row)), String(position)].join(", ");
+        return `${head.filter(Boolean).join(", ")}. ${place}.`;
+      }
+      const line = previewLine.value;
+      if (!line) return "";
+      const kind = line.live ? kindText(true) : line.fixed ? kindText(false) : "";
+      return [line.name, line.range, kind, line.duration, line.note].filter(Boolean).join(", ");
+    });
 
     onMounted(() => {
       if (!props.defaultOpen) return;
@@ -2156,16 +3243,9 @@ export default defineComponent({
       onPopoverOpenAutoFocus,
       datetimeBtn,
       getImageURL,
-      onCustomPeriodSelect,
-      onCustomValueFocus,
-      onCustomValueBlur,
       setRelativeDate,
-      pickRelativeChip,
       relativePeriods,
-      relativeDates,
       showRail,
-      calendarRailItems,
-      recentRailItems,
       applyCalendarItem,
       applyRecentRange,
       removeRecentRange,
@@ -2182,9 +3262,9 @@ export default defineComponent({
       selectedDate,
       relativePeriod,
       relativeValue,
-      getPeriodLabel,
       displayValue,
       triggerLabel,
+      triggerParts,
       copyRange,
       pasteRange,
       onPickerPaste,
@@ -2199,18 +3279,51 @@ export default defineComponent({
       setSavedDate,
       optionsFn,
       setDateType,
-      selectTab,
-      onTypeToggle,
       shiftTimeRange,
+      zoomOut,
+      goLive,
+      inputText,
+      inputError,
+      inputErrorText,
+      inputAsUtc,
+      inputRefusal,
+      onInputEdit,
+      onInputKeydown,
+      onBarFocusOut,
+      inputBar,
+      timeFieldError,
+      unreadableFields,
+      toggleAsUtc,
+      asUtcLabel,
+      resolvedLine,
+      previewLine,
+      shownLine,
+      suggestionsOpen,
+      suggestionRows,
+      activeSuggestion,
+      applySuggestion,
+      startFieldText,
+      endFieldText,
+      readFieldText,
+      onFieldInput,
+      onFieldChange,
+      inputErrorId,
+      onCalendarStartDate,
+      onCalendarEndDate,
+      onCalendarPendingDay,
+      onTimeFieldBlur,
+      typedFieldTime,
+      groupEl,
+      timeFieldFocused,
       isNextShiftDisabled,
       onPickerKeydown,
       getConsumableDateTime,
-      relativeDatesInHour,
+      getRange,
+      setRange,
       setAbsoluteTime,
       setRelativeTime,
       getDisplayValue,
       relativePeriodsMaxValue,
-      relativePeriodsSelect,
       computeRelativePeriod,
       onBeforeHide,
       showOnlyAbsolute,
@@ -2219,7 +3332,99 @@ export default defineComponent({
       calendarMinDate,
       calendarMaxDate,
       timezoneSelectOptions,
+      zoneQuery,
       isTimezoneSelectOpen,
+      listId,
+      calendarMode,
+      openCalendar,
+      closeCalendar,
+      typing,
+      shownRows,
+      activeRow,
+      listCursor,
+      pickShownRow,
+      pinRecentRow,
+      unpinRow,
+      removeRecentRow,
+      renamePin,
+      cancelPinName,
+      editingPinRowId,
+      showChips,
+      chipItems,
+      litChip,
+      onChipToggle,
+      onChipReselect,
+      emptyExamples,
+      bodyRows,
+      cursorRow,
+      pickBodyRow,
+      pickChip,
+      undoRange,
+      showUndo,
+      undoAvailable,
+      undoTooltip,
+      zoneBadgeText,
+      fixedOnly,
+      wholeDaysOnly,
+      isForm,
+      zoneShortLabel,
+      openMenu,
+      isMobile,
+      intlLocale,
+      weekStart,
+      retentionFloorDay,
+      calendarRef,
+      calendarPreviewDay,
+      applyDisabled,
+      applyBlockedReason,
+      needsStartDate,
+      fieldsBlank,
+      startFieldShown,
+      endFieldShown,
+      zoomOutBlocked,
+      menuEl,
+      onTimeFieldEnter,
+      onApplyClick,
+      summaryError,
+      showLiveButton,
+      isDraft,
+      showFreezeButton,
+      freezeLabel,
+      freezeRange,
+      liveDurationLabel,
+      stepTooltip,
+      panelSpeech,
+      appliedSpeech,
+      triggerAriaLabel,
+      triggerElement,
+      triggerTooltipOpen,
+      onTriggerHover,
+      onTriggerFocus,
+      copyDisabled,
+      copyShortcut,
+      chipsNotes,
+      listHeading,
+      setCursorRow,
+      showPinButton,
+      shownRangeShort,
+      appliedPinned,
+      appliedIsToken,
+      toggleAppliedPin,
+      undo,
+      triggerEnds,
+      triggerLabelEl,
+      fitTriggerLabel,
+      triggerFormIndex,
+      triggerIconShown,
+      shortestFormWidth,
+      triggerTooltipAlign,
+      narrowedText,
+      headNote,
+      copied,
+      copiedSpeech,
+      toggleCalendar,
+      barPlaceholder,
+      shortPlaceholder,
     };
   },
   computed: {

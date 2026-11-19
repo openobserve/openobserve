@@ -412,3 +412,47 @@ describe("field list on a cold semantic-groups load", () => {
     expect(loadSemanticGroups).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("extractFields and a linked range over the stream limit (R2, O1)", () => {
+  const sevenDays = () => {
+    const end = Date.now() * 1000;
+    return {
+      type: "absolute",
+      startTime: end - 7 * 24 * 3_600_000_000,
+      endTime: end,
+      queryRangeRestrictionInHour: 0,
+    };
+  };
+
+  it("refuses a linked range longer than the stream's max_query_range", async () => {
+    seedStream();
+    (searchObj.data.streamResults.list[0] as any).settings = { max_query_range: 24 };
+    searchObj.data.datetime = sevenDays() as any;
+    searchObj.meta.rangeFromLink = true;
+    loadSemanticGroups.mockResolvedValue([]);
+    const wrapper = mountConsumer();
+
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+
+    expect(searchObj.meta.rangeLimitRefusal).toMatchObject({
+      stream: "app",
+      allowed: "1d",
+      allowedPeriod: "24h",
+    });
+    searchObj.meta.rangeLimitRefusal = null;
+    searchObj.meta.rangeFromLink = false;
+  });
+
+  it("leaves a range the user picked to the picker's own limit", async () => {
+    seedStream();
+    (searchObj.data.streamResults.list[0] as any).settings = { max_query_range: 24 };
+    searchObj.data.datetime = sevenDays() as any;
+    searchObj.meta.rangeFromLink = false;
+    loadSemanticGroups.mockResolvedValue([]);
+    const wrapper = mountConsumer();
+
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+
+    expect(searchObj.meta.rangeLimitRefusal).toBeNull();
+  });
+});

@@ -178,11 +178,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <div data-test="add-report-timerange-select" class="mt-2 w-full">
                       <OFormDateTimeRange
+                        :capabilities="{ kinds: ['rolling', 'calendar'] }"
+                        :host-name="t('reports.header')"
                         :name="`dashboards[${index}].timerange`"
                         :label="t('reports.timeRange')"
                         required
                         :description="t('reports.timeRangeDescription')"
-                        auto-apply
                         data-test="add-report-timerange-dropdown"
                         menu-align="start"
                       />

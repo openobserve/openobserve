@@ -35,6 +35,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -673,6 +675,18 @@ const onDateChange = (date: {
   rangeTimer = setTimeout(() => void runRefresh(false), 300);
 };
 
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t(manifest.value.titleKey),
+  url: false,
+  initial: () =>
+    selectedWindow.value.kind === "relative"
+      ? { kind: "rolling", span: selectedWindow.value.period }
+      : { kind: "fixed", startUs: selectedWindow.value.from, endUs: selectedWindow.value.to },
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: (value) => onDateChange(value as Parameters<typeof onDateChange>[0]),
+});
+
 const onWindowFocus = () => {
   // Only while the setup face shows, so a healthy page never storms on focus.
   if (face.value === "undetected") void runRefresh(true);
@@ -708,14 +722,17 @@ watch(
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           v-if="showRangeControls"
           ref="dateTimeRef"
-          auto-apply
           menu-align="end"
           :default-type="selectedWindow.kind"
           :default-relative-time="manifest.defaultRelativePeriod"
           data-test-name="curated-date-time"
-          @on:date-change="onDateChange"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
         <!-- Below lg an absolute range label leaves no room for the age, so the button drops to icon-only. -->
         <ORefreshButton
@@ -729,6 +746,12 @@ watch(
       </div>
     </template>
 
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="curated-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <OEmptyState
       v-if="!hasPack"
       size="hero"

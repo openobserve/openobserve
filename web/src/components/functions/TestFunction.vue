@@ -74,23 +74,26 @@
 
           <div class="flex items-center gap-3">
             <DateTime
+              preset="explorer-manual"
               :label="t('alerts.startTime')"
-              auto-apply
               :default-type="dateTime.type"
               :default-absolute-time="{
                 startTime: dateTime.startTime,
                 endTime: dateTime.endTime,
               }"
               :default-relative-time="dateTime.relativeTimePeriod"
+              :range="timeHost.range.value"
+              :queried-range="timeHost.queried.value"
               data-test="logs-search-bar-date-time-dropdown"
-              @on:date-change="updateDateTime"
+              @apply="timeHost.onApply"
+              @on:date-change="timeHost.onDateChange"
             />
             <OButton
               data-test="test-function-run-query-btn"
               variant="primary"
               size="sm-action"
               :disabled="!selectedStream.name || !inputQuery || loading.events"
-              @click="getResults"
+              @click="timeHost.runQuery"
             >
               {{ t("search.runQuery") }}
             </OButton>
@@ -273,6 +276,7 @@ import {
 import { useI18nTyped, raw } from "@/types/i18n";
 import { isJsFunction } from "@/utils/functionLanguage";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -577,7 +581,23 @@ const updateDateTime = (value: any) => {
   dateTime.value = value;
 };
 
+const timeHost = usePageTimeRange({
+  preset: "explorer-manual",
+  source: t("function.header"),
+  url: false,
+  initial: () => pageRange({ ...dateTime.value, valueType: dateTime.value.type }),
+  hasResults: () => !!inputEvents.value,
+  onRange: (value) => updateDateTime({ ...value, type: value.valueType }),
+  run: () => {
+    if (selectedStream.value.name && inputQuery.value) void getResults();
+  },
+});
+
+// A range applied while a query is pending starts another; only the newest may write the events.
+let eventsRequest = 0;
 const getResults = async () => {
+  const request = ++eventsRequest;
+  const isLatest = () => request === eventsRequest;
   loading.value.events = true;
 
   const timestamps: any =
@@ -609,6 +629,7 @@ const getResults = async () => {
       page_type: selectedStream.value.type,
     })
     .then((res: any) => {
+      if (!isLatest()) return;
       expandState.value.stream = false;
       expandState.value.query = false;
       expandState.value.events = true;
@@ -617,6 +638,7 @@ const getResults = async () => {
       sqlErrorRanges.value = [];
     })
     .catch((err: any) => {
+      if (!isLatest()) return;
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
         : t("functions.invalidSqlQuery");
@@ -630,7 +652,7 @@ const getResults = async () => {
         query: inputQuery.value,
         streamName: selectedStream.value?.name,
       }).then((ranges) => {
-        sqlErrorRanges.value = ranges;
+        if (isLatest()) sqlErrorRanges.value = ranges;
       });
 
       // Show error only if it is not real time alert
@@ -643,7 +665,7 @@ const getResults = async () => {
       });
     })
     .finally(() => {
-      loading.value.events = false;
+      if (isLatest()) loading.value.events = false;
     });
 };
 const isInputValid = () => {

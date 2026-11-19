@@ -48,6 +48,7 @@ export type RunReason =
   | "page-size"
   | "sort"
   | "zoom"
+  | "range"
   | "compare"
   | "explicit";
 
@@ -175,6 +176,8 @@ export interface AutoRunMeta {
   autoRunBlocked?: AutoRunBlocked | null;
   consentedScope?: ConsentScope | null;
   runPending?: boolean;
+  /** Set while a linked range over the stream limit waits for the user; nothing runs until it clears. */
+  rangeLimitRefusal?: unknown;
   runOutcome?: Partial<Record<PersistSurface, RunOutcome>>;
   runCancelled?: Partial<Record<PersistSurface, boolean>>;
 }
@@ -331,6 +334,7 @@ export const REASON_KIND: Record<RunReason, RunKind> = {
   "page-size": "explicit",
   sort: "explicit",
   zoom: "explicit",
+  range: "explicit",
   compare: "explicit",
   explicit: "explicit",
 };
@@ -357,6 +361,7 @@ export const REASON_DEBOUNCE_MS: Record<RunReason, number> = {
   "page-size": 0,
   sort: 0,
   zoom: 0,
+  range: 0,
   compare: 0,
   explicit: 0,
 };
@@ -371,7 +376,17 @@ const OP_RANK: Record<RunOperation, number> = {
 
 const CONSENT_IGNORING_REASONS = new Set<RunReason>(["url", "activation", "visualize-restore"]);
 
-const DIRTY_CLEARING_REASONS = new Set<RunReason>(["run", "saved-view", "explicit"]);
+// A picked range can widen the scan, so it re-checks the budget like Narrow to.
+const GUARDED_EXPLICIT_REASONS = new Set<RunReason>(["narrow", "range"]);
+
+// A range change runs the editor's text with it (decision a), so its edits are no longer unrun.
+const DIRTY_CLEARING_REASONS = new Set<RunReason>([
+  "run",
+  "saved-view",
+  "explicit",
+  "zoom",
+  "range",
+]);
 
 const SCAN_GATED_ACTIONS = new Set<PersistAction>([
   "create-alert",
@@ -447,7 +462,7 @@ export function reasonEligibility(
   mode: SearchMode,
 ): Eligibility {
   const kind = REASON_KIND[reason];
-  if (kind === "explicit") return reason === "narrow" ? "guarded" : "unguarded";
+  if (kind === "explicit") return GUARDED_EXPLICIT_REASONS.has(reason) ? "guarded" : "unguarded";
   if (kind === "entry") return config.auto_query_enabled ? "guarded" : "unguarded";
   if (mode === "visualize" || mode === "build") return "skip";
   return isAutoRunActive(config, meta) ? "guarded" : "skip";
@@ -575,6 +590,7 @@ export function createAutoRun(deps: AutoRunDeps) {
   const pending: Record<"grid" | "patterns", PendingEntry | null> = { grid: null, patterns: null };
   let deferredRefresh = false;
   let missedTick = false;
+  let lastRunStartedMs: number | null = null;
   let userCancels = 0;
   let invalidation: string | null = null;
   let hitsTraceId: string | null = null;
@@ -807,6 +823,7 @@ export function createAutoRun(deps: AutoRunDeps) {
       meta.lastRunAttempt = { generation: gen.id, signature: cloneJson(input.signature) };
     }
     if (input.op !== "histogram") {
+      lastRunStartedMs = now();
       recordConsent(input.signature);
       meta.autoRunBlocked = null;
       meta.runPending = false;
@@ -1041,10 +1058,6 @@ export function createAutoRun(deps: AutoRunDeps) {
     options: RequestRunOptions,
   ): RequestRunResult {
     if (reason === "run-anyway") return runAnyway(options);
-    if (reason === "zoom" && meta.editorDirty) {
-      meta.runPending = true;
-      return "pending-dirty";
-    }
     dropPendingForExplicit(reason);
     if (DIRTY_CLEARING_REASONS.has(reason)) meta.editorDirty = false;
     return execute({
@@ -1056,12 +1069,13 @@ export function createAutoRun(deps: AutoRunDeps) {
       origin: options.origin,
       signature: deps.readSignature(),
       target: "live",
-      guarded: reason === "narrow",
+      guarded: GUARDED_EXPLICIT_REASONS.has(reason),
       useConsent: reason !== "narrow",
     });
   }
 
   function requestRun(reason: RunReason, options: RequestRunOptions = {}): RequestRunResult {
+    if (meta.rangeLimitRefusal) return "skipped-ineligible";
     const kind = REASON_KIND[reason];
     if (options.origin === "editor" && kind !== "explicit") return "skipped-editor-origin";
     if (reason === "refresh") return requestRefresh(options);
@@ -1541,6 +1555,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     onRefreshIntervalChanged,
     userCancelCount: () => userCancels,
     hasMissedTick: () => missedTick,
+    lastRunStartedMs: () => lastRunStartedMs,
     hasDeferredRefresh: () => deferredRefresh,
     hasPendingRequest: () => !!pending.grid || !!pending.patterns,
   };

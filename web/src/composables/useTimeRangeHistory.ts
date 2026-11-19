@@ -15,15 +15,27 @@
 
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
+import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
+import { parseRollingPeriod } from "@/utils/dateTimeRangeParse";
 
 export const TIME_RANGE_HISTORY_LIMIT = 15;
 
 const KEY_PREFIX = "o2.timeRangeHistory";
 
-export interface TimeRangeHistoryEntry {
+export interface AbsoluteHistoryEntry {
   startUs: number;
   endUs: number;
 }
+
+/** A rolling `<n><unit>` period or a calendar token, re-resolved against now when picked. */
+export interface RelativeHistoryEntry {
+  relative: string;
+}
+
+/** `source` names the page that applied the range, for Recent's `from {page}`. */
+export type TimeRangeHistoryEntry = (AbsoluteHistoryEntry | RelativeHistoryEntry) & {
+  source?: string;
+};
 
 // Bumped on every write so each mounted picker re-reads the shared list.
 const version = ref(0);
@@ -33,9 +45,18 @@ const memory = new Map<string, TimeRangeHistoryEntry[]>();
 export const timeRangeHistoryKey = (org: string, user: string): string =>
   `${KEY_PREFIX}.${org}.${user}`;
 
+export const isRelativeHistoryEntry = (
+  entry: TimeRangeHistoryEntry,
+): entry is RelativeHistoryEntry => "relative" in entry;
+
+export const isValidRelativePeriod = (period: unknown): period is string =>
+  typeof period === "string" &&
+  (parseRollingPeriod(period) !== null || parseCalendarToken(period) !== null);
+
 export const isValidHistoryEntry = (value: unknown): value is TimeRangeHistoryEntry => {
   if (!value || typeof value !== "object") return false;
-  const { startUs, endUs } = value as Record<string, unknown>;
+  const { startUs, endUs, relative } = value as Record<string, unknown>;
+  if (relative !== undefined) return isValidRelativePeriod(relative);
   return (
     typeof startUs === "number" &&
     typeof endUs === "number" &&
@@ -43,6 +64,15 @@ export const isValidHistoryEntry = (value: unknown): value is TimeRangeHistoryEn
     Number.isFinite(endUs) &&
     startUs < endUs
   );
+};
+
+const normalizeEntry = (entry: TimeRangeHistoryEntry): TimeRangeHistoryEntry => {
+  const range: TimeRangeHistoryEntry = isRelativeHistoryEntry(entry)
+    ? { relative: entry.relative }
+    : { startUs: entry.startUs, endUs: entry.endUs };
+  return typeof entry.source === "string" && entry.source
+    ? { ...range, source: entry.source }
+    : range;
 };
 
 export const readTimeRangeHistory = (key: string): TimeRangeHistoryEntry[] => {
@@ -53,7 +83,7 @@ export const readTimeRangeHistory = (key: string): TimeRangeHistoryEntry[] => {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter(isValidHistoryEntry)
-      .map(({ startUs, endUs }) => ({ startUs, endUs }))
+      .map(normalizeEntry)
       .slice(0, TIME_RANGE_HISTORY_LIMIT);
   } catch {
     return [];
@@ -70,12 +100,39 @@ const writeTimeRangeHistory = (key: string, entries: TimeRangeHistoryEntry[]) =>
   version.value += 1;
 };
 
-const sameRange = (a: TimeRangeHistoryEntry, b: TimeRangeHistoryEntry) =>
-  a.startUs === b.startUs && a.endUs === b.endUs;
+export const sameHistoryEntry = (a: TimeRangeHistoryEntry, b: TimeRangeHistoryEntry): boolean => {
+  if (isRelativeHistoryEntry(a) || isRelativeHistoryEntry(b)) {
+    return isRelativeHistoryEntry(a) && isRelativeHistoryEntry(b) && a.relative === b.relative;
+  }
+  return a.startUs === b.startUs && a.endUs === b.endUs;
+};
 
-/** Recently applied absolute ranges, newest first, shared by every time picker of the current org and user. */
+/** The newest Recent entry when another page applied it and it is not the range in force here, else null. */
+export const arrivalFromPage = (
+  entries: readonly TimeRangeHistoryEntry[],
+  pageName: string,
+  currentRange: TimeRangeHistoryEntry | null,
+): TimeRangeHistoryEntry | null => {
+  const newest = entries[0];
+  if (!newest || !pageName || newest.source !== pageName) return null;
+  return currentRange && sameHistoryEntry(newest, currentRange) ? null : newest;
+};
+
+let watchingOtherTabs = false;
+
+// Another tab's write reaches this one only as a storage event, which the version bump turns into a re-read.
+const watchOtherTabs = () => {
+  if (watchingOtherTabs || typeof window === "undefined") return;
+  watchingOtherTabs = true;
+  window.addEventListener("storage", (event) => {
+    if (event.key === null || event.key.startsWith(KEY_PREFIX)) version.value += 1;
+  });
+};
+
+/** Recently applied ranges and periods, newest first, shared by every time picker of the current org and user. */
 export default function useTimeRangeHistory() {
   const store = useStore();
+  watchOtherTabs();
 
   const storageKey = computed(() =>
     timeRangeHistoryKey(
@@ -89,17 +146,22 @@ export default function useTimeRangeHistory() {
     return readTimeRangeHistory(storageKey.value);
   });
 
-  const add = (startUs: number, endUs: number) => {
-    const entry = { startUs: Math.round(startUs), endUs: Math.round(endUs) };
+  const push = (entry: TimeRangeHistoryEntry) => {
     if (!isValidHistoryEntry(entry)) return;
-    const rest = readTimeRangeHistory(storageKey.value).filter((e) => !sameRange(e, entry));
-    writeTimeRangeHistory(storageKey.value, [entry, ...rest].slice(0, TIME_RANGE_HISTORY_LIMIT));
+    const stored = normalizeEntry(entry);
+    const rest = readTimeRangeHistory(storageKey.value).filter((e) => !sameHistoryEntry(e, stored));
+    writeTimeRangeHistory(storageKey.value, [stored, ...rest].slice(0, TIME_RANGE_HISTORY_LIMIT));
   };
 
+  const add = (startUs: number, endUs: number, source?: string) =>
+    push({ startUs: Math.round(startUs), endUs: Math.round(endUs), source });
+
+  const addRelative = (period: string, source?: string) => push({ relative: period, source });
+
   const remove = (entry: TimeRangeHistoryEntry) => {
-    const rest = readTimeRangeHistory(storageKey.value).filter((e) => !sameRange(e, entry));
+    const rest = readTimeRangeHistory(storageKey.value).filter((e) => !sameHistoryEntry(e, entry));
     writeTimeRangeHistory(storageKey.value, rest);
   };
 
-  return { entries, add, remove };
+  return { entries, add, addRelative, remove };
 }

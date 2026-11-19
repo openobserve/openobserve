@@ -110,6 +110,22 @@ describe("MainLayout — organization settings load", () => {
     ).getOrganizationSettings();
     expect(store.state.organizationData.organizationSettings.red_insights_enabled).toBe(false);
   });
+
+  it.each([
+    [{ fiscal_year_start_month: 4, range_guard_days: 90 }, 4, 90],
+    [{}, 0, 0],
+  ])("copies the time range settings %o into the store", async (data, month, days) => {
+    getOrgSettings.mockResolvedValue({ data: { data } });
+    wrapper = await mountLayout();
+    await flushPromises();
+    queryClient.clear();
+    await (
+      wrapper.vm as unknown as { getOrganizationSettings: () => Promise<void> }
+    ).getOrganizationSettings();
+    const settings = store.state.organizationData.organizationSettings;
+    expect(settings.fiscal_year_start_month).toBe(month);
+    expect(settings.range_guard_days).toBe(days);
+  });
 });
 
 describe("MainLayout — organization selection without an org list", () => {

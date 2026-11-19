@@ -72,6 +72,8 @@ export const ToggleGroupAnimatedKey: InjectionKey<ComputedRef<boolean>> = Symbol
 
 export interface ToggleGroupEmits {
   (e: "update:modelValue", value: AcceptableValue | AcceptableValue[] | boolean): void;
+  /** Single mode: the already-active item was clicked again; carries the active value. */
+  (e: "reselect", value: AcceptableValue | AcceptableValue[] | boolean): void;
   /**
    * Fired when an item is dropped onto another (reorderable mode). `from` is
    * the dragged item's value, `to` is the drop-target item's value, and

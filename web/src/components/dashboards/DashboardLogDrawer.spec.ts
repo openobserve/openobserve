@@ -38,6 +38,9 @@ vi.mock("vue-router", () => ({
 }));
 
 import DashboardLogDrawer from "@/components/dashboards/DashboardLogDrawer.vue";
+import DateTime from "@/components/DateTime.vue";
+import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
+import searchService from "@/services/search";
 
 const mountDrawer = (features: Record<string, string>, streamType?: string) =>
   shallowMount(DashboardLogDrawer, {
@@ -88,5 +91,41 @@ describe("DashboardLogDrawer related telemetry", () => {
     await flushPromises();
     await (wrapper.vm as any).$.setupState.openCorrelationFromLog({ _timestamp: 1 });
     expect(findRelatedTelemetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("DashboardLogDrawer time range", () => {
+  const lastWindow = () => {
+    const calls = vi.mocked(searchService.search).mock.calls;
+    const q = (calls[calls.length - 1][0] as any).query.query;
+    return [q.start_time, q.end_time];
+  };
+
+  it("pages the queried range and resolves a rolling range when Run is pressed", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-03-01T10:00:00Z"));
+    vi.mocked(searchService.search).mockResolvedValue({
+      data: { hits: [{ _timestamp: 1 }], total: 500 },
+    } as any);
+    const wrapper = mountDrawer({});
+    await flushPromises();
+    wrapper.findComponent(DateTime).vm.$emit(
+      "apply",
+      { kind: "rolling", span: "1h" },
+      {
+        source: "panel",
+      },
+    );
+    await flushPromises();
+    wrapper.findComponent(TablePaginationControls).vm.$emit("next-page");
+    await flushPromises();
+    expect(lastWindow()).toEqual([1, 2]);
+
+    vi.setSystemTime(new Date("2026-03-01T10:05:00Z"));
+    await wrapper.find('[data-test="log-explorer-run"]').trigger("click");
+    await flushPromises();
+    const endUs = Date.parse("2026-03-01T10:05:00Z") * 1000;
+    expect(lastWindow()).toEqual([endUs - 3_600_000_000, endUs]);
+    vi.useRealTimers();
   });
 });

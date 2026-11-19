@@ -19,6 +19,10 @@ import { inject, reactive } from "vue";
 import { DASHBOARD_FRESH_ON_OPEN } from "@/composables/dashboard/dashboardFreshOnOpen";
 import { AUTO_RUN_STORAGE_KEY, useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import { panelRefreshTargets } from "@/utils/dashboard/convertCustomChartData";
+import { HEADER_TIME_ROW_QUERY } from "@/composables/dashboard/useHeaderTitleRoom";
+import { buildCalendarToken } from "@/utils/dashboard/calendarPeriods";
+import { dashboardTimeUs } from "@/utils/shareTimeRange";
+import { formatRangeCopyText } from "@/utils/timeRangeLabel";
 
 const MINUTE = 60 * 1_000_000;
 
@@ -43,6 +47,16 @@ vi.mock("vue-router", () => ({
   onBeforeRouteLeave: vi.fn(),
   onBeforeRouteUpdate: vi.fn(),
 }));
+
+const viewport = reactive({ mobile: false });
+vi.mock("@/composables/useBreakpoint", async (importOriginal) => {
+  const { computed } = await import("vue");
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    default: () => ({ ...actual.default(), isMobile: computed(() => viewport.mobile) }),
+  };
+});
 
 const mockState: Record<string, any> = reactive({
   selectedOrganization: { identifier: "test-org" },
@@ -117,15 +131,27 @@ const absolute = (startTime: number, endTime: number) => ({
   endTime,
 });
 
-const pickerCalls = { setSavedDate: vi.fn() };
+const pickerCalls = { setSavedDate: vi.fn(), mounted: 0, mountedIn: "" };
 
-// Stands in for the real picker: it reports its starting range on mount, and any read of its live value fails.
+// Stands in for the real picker: on mount it applies initialTimezone and reports its range; live reads fail.
 const PickerStub = {
   name: "DateTimePickerDashboard",
-  props: ["modelValue", "autoApplyDashboard", "disable", "initialTimezone"],
+  props: {
+    modelValue: null,
+    autoApplyDashboard: Boolean,
+    disable: Boolean,
+    initialTimezone: null,
+    preset: String,
+    zoneBadge: String,
+    shortcuts: Boolean,
+    panelTimeMark: Boolean,
+  },
   emits: ["update:modelValue", "show", "hide", "timezone-change"],
   data: () => ({ zoomed: null as any }),
   mounted(this: any) {
+    pickerCalls.mounted += 1;
+    pickerCalls.mountedIn = this.$el.parentElement?.id ?? "";
+    if (this.initialTimezone) mockState.timezone = this.initialTimezone;
     this.$emit("update:modelValue", { ...relative("15m"), ...this.modelValue });
   },
   methods: {
@@ -168,6 +194,7 @@ describe("ViewDashboard time range gate", () => {
 
   const mountDashboard = async () => {
     wrapper = shallowMount(ViewDashboard, {
+      attachTo: document.body,
       global: {
         plugins: [i18n],
         renderStubDefaultSlot: true,
@@ -176,11 +203,13 @@ describe("ViewDashboard time range gate", () => {
             setup() {
               freshOnOpen = inject(DASHBOARD_FRESH_ON_OPEN, null);
             },
-            template: '<div><slot name="actions" /><slot /></div>',
+            template:
+              '<div><slot name="actions" /><slot name="actions-overflow" /><slot name="subnav" /><slot /></div>',
           },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           DateTimePickerDashboard: PickerStub,
           RenderDashboardCharts: RenderDashboardChartsStub,
+          teleport: false,
         },
       },
     });
@@ -191,6 +220,11 @@ describe("ViewDashboard time range gate", () => {
   const picker = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
   const pick = async (value: any) => {
     picker().vm.$emit("update:modelValue", value);
+    await flushPromises();
+  };
+  // The picker applies at once, so a waiting range now only comes from the gate itself.
+  const hold = async (value: any) => {
+    wrapper.vm.timeGate.onPick(value);
     await flushPromises();
   };
   const refreshButton = () => wrapper.findComponent('[data-test="dashboard-refresh-btn"]');
@@ -204,9 +238,12 @@ describe("ViewDashboard time range gate", () => {
   const globalSpan = () => spanOf(wrapper.vm.currentTimeObjPerPanel.__global);
 
   beforeEach(() => {
+    viewport.mobile = false;
     route.query = { dashboard: "d1", folder: "default", tab: "t1", period: "15m" };
     mockState.printMode = false;
+    mockState.timezone = "UTC";
     pickerCalls.setSavedDate.mockClear();
+    pickerCalls.mounted = 0;
     setAutoRun("off");
   });
 
@@ -215,39 +252,189 @@ describe("ViewDashboard time range gate", () => {
     localStorage.removeItem(AUTO_RUN_STORAGE_KEY);
   });
 
-  it("shows the main picker without an Apply button", async () => {
+  it("runs the main picker as a dashboard host, which always shows dates and zone", async () => {
     await mountDashboard();
 
-    expect(picker().props("autoApplyDashboard")).toBe(true);
+    expect(picker().props("preset")).toBe("dashboard");
+  });
+
+  it("binds the picker's keyboard shortcuts on every width", async () => {
+    await mountDashboard();
+    expect(picker().props("shortcuts")).toBe(true);
+
+    viewport.mobile = true;
+    await flushPromises();
+    expect(picker().props("shortcuts")).toBe(true);
+  });
+
+  it("gives the picker its own row on a phone, and moves it back to the header on a wider screen", async () => {
+    viewport.mobile = true;
+    await mountDashboard();
+    expect(pickerCalls.mountedIn).toBe("dashboard-time-row");
+
+    const row = wrapper.find('[data-test="dashboard-time-row"]');
+    expect(row.findComponent({ name: "DateTimePickerDashboard" }).exists()).toBe(true);
+    expect(wrapper.findAllComponents({ name: "DateTimePickerDashboard" })).toHaveLength(1);
+    expect(picker().props("preset")).toBe("dashboard");
+
+    viewport.mobile = false;
+    await flushPromises();
+    expect(wrapper.find('[data-test="dashboard-time-row"]').isVisible()).toBe(false);
+    expect(
+      wrapper
+        .find('#dashboard-header-time [data-test="dashboard-global-date-time-picker"]')
+        .exists(),
+    ).toBe(true);
+    expect(wrapper.findAllComponents({ name: "DateTimePickerDashboard" })).toHaveLength(1);
+
+    viewport.mobile = true;
+    await flushPromises();
+    expect(
+      wrapper
+        .find('[data-test="dashboard-time-row"] [data-test="dashboard-global-date-time-picker"]')
+        .exists(),
+    ).toBe(true);
+    expect(pickerCalls.mounted).toBe(1);
+  });
+
+  it("keeps a zone picked after opening a ?timezone link when the screen crosses the phone width", async () => {
+    route.query = { ...route.query, timezone: "UTC" };
+    await mountDashboard();
+    const first = picker().vm;
+    mockState.timezone = "Asia/Kolkata";
+    picker().vm.$emit("timezone-change");
+    await flushPromises();
+
+    viewport.mobile = true;
+    await flushPromises();
+    viewport.mobile = false;
+    await flushPromises();
+
+    expect(pickerCalls.mounted).toBe(1);
+    expect(picker().vm).toBe(first);
+    expect(mockState.timezone).toBe("Asia/Kolkata");
+  });
+
+  describe("header (V1, R4, R9)", () => {
+    let realMatchMedia: typeof window.matchMedia;
+    // The 1280px query alone decides where the trigger sits; the title's room no longer does.
+    const viewportWide = (wide: boolean) => {
+      window.matchMedia = ((query: string) => ({
+        matches: query === HEADER_TIME_ROW_QUERY ? wide : /min-width/.test(query),
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+    };
+    const share = () => wrapper.findComponent({ name: "ShareButton" });
+
+    beforeEach(() => {
+      realMatchMedia = window.matchMedia;
+    });
+    afterEach(() => {
+      window.matchMedia = realMatchMedia;
+      dashboard.tabs[0].panels[0].config = {};
+    });
+
+    it("keeps the trigger in the header row from 1280px", async () => {
+      viewportWide(true);
+      await mountDashboard();
+      expect(pickerCalls.mountedIn).toBe("dashboard-header-time");
+      expect(wrapper.vm.hasTimeRow).toBe(false);
+    });
+
+    it("gives the trigger its own row below 1280px", async () => {
+      viewportWide(false);
+      await mountDashboard();
+      expect(pickerCalls.mountedIn).toBe("dashboard-time-row");
+      expect(wrapper.find('[data-test="dashboard-time-row"]').isVisible()).toBe(true);
+    });
+
+    it("marks the global trigger while any panel runs on its own time", async () => {
+      await mountDashboard();
+      expect(picker().props("panelTimeMark")).toBe(false);
+      wrapper.unmount();
+
+      (dashboard.tabs[1].panels[0] as any).config = { panel_time_enabled: true };
+      await mountDashboard();
+      expect(picker().props("panelTimeMark")).toBe(true);
+      (dashboard.tabs[1].panels[0] as any).config = {};
+    });
+
+    it("shares a rolling range live and a finished calendar period as fixed dates", async () => {
+      await mountDashboard();
+      expect(share().props("defaultKind")).toBe("live");
+      wrapper.unmount();
+
+      route.query = { ...route.query, period: buildCalendarToken("day", -1) };
+      await mountDashboard();
+      expect(share().props("defaultKind")).toBe("fixed");
+    });
+
+    it("copies the exact window with its zone offset in the range line", async () => {
+      await mountDashboard();
+      const bounds = dashboardTimeUs(wrapper.vm.currentTimeObj)!;
+      expect(share().props("fixedCopyLabel")).toBe(
+        formatRangeCopyText(bounds, { timezone: mockState.timezone }),
+      );
+      expect(share().props("fixedCopyLabel")).toMatch(/ UTC$/);
+    });
+  });
+
+  it("does not run a correction the picker makes by itself until Refresh", async () => {
+    await mountDashboard();
+
+    picker().vm.$emit("update:modelValue", relative("1h"), { userChanged: false });
+    await flushPromises();
+
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
   });
 
   describe.each(["off", "unavailable"] as const)("Auto Run %s", (state) => {
     beforeEach(() => setAutoRun(state));
 
-    it("keeps a picked range waiting: panels, URL and Share link stay on the applied range", async () => {
+    it("runs a picked range at once: panels, URL and the picker move together", async () => {
       await mountDashboard();
-      const shareBefore = wrapper.vm.dashboardShareURL;
 
       await pick(relative("1h"));
 
-      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
       expect(picker().props("modelValue").relativeTimePeriod).toBe("1h");
-      expect(globalSpan()).toBe(15 * MINUTE);
-      expect(routerReplace).not.toHaveBeenCalled();
-      expect(route.query.period).toBe("15m");
-      expect(wrapper.vm.dashboardShareURL).toBe(shareBefore);
+      expect(globalSpan()).toBe(60 * MINUTE);
+      expect(route.query.period).toBe("1h");
     });
 
-    it("turns Refresh yellow with the time-range tooltip while a range waits", async () => {
+    it("runs a calendar range applied in the open panel at once, since drafts never reach the page", async () => {
       await mountDashboard();
+      const end = Date.parse("2026-11-12T00:00:00Z") * 1000;
+      const range = absolute(end - 2 * 24 * 60 * MINUTE, end);
+
+      picker().vm.$emit("show");
+      await pick(range);
+      await flushPromises();
+      expect(wrapper.vm.selectedDate).toMatchObject({ startTime: range.startTime });
+      expect(globalSpan()).toBe(2 * 24 * 60 * MINUTE);
+      expect(refreshButton().props("variant")).toBe("primary");
+    });
+
+    it("leaves Refresh unflagged after a pick, since nothing waits", async () => {
+      await mountDashboard();
+
+      await pick(relative("1h"));
+
       expect(refreshButton().props("variant")).toBe("primary");
       expect(refreshOptions().props("variant")).toBe("primary");
       expect(refreshButton().text()).toContain("Refresh");
+    });
 
-      await pick(relative("1h"));
+    it("turns Refresh yellow with the time-range tooltip while a range waits in the gate", async () => {
+      await mountDashboard();
+
+      await hold(relative("1h"));
 
       expect(refreshButton().props("variant")).toBe("pending");
-      expect(refreshOptions().props("variant")).toBe("pending");
       expect(refreshTooltip()).toBe("Refresh to apply the time range");
     });
 
@@ -278,7 +465,7 @@ describe("ViewDashboard time range gate", () => {
       await mountDashboard();
       const appliedBefore = wrapper.vm.currentTimeObjPerPanel.__global;
 
-      await pick(relative("1h"));
+      await hold(relative("1h"));
       await pick(relative("15m"));
 
       expect(refreshButton().props("variant")).toBe("primary");
@@ -325,7 +512,7 @@ describe("ViewDashboard time range gate", () => {
     await flushPromises();
     expect(wrapper.vm.isEditingLayout).toBe(true);
 
-    await pick(relative("1h"));
+    await hold(relative("1h"));
     expect(refreshButton().props("variant")).toBe("pending");
 
     refreshButton().vm.$emit("click");
@@ -336,12 +523,70 @@ describe("ViewDashboard time range gate", () => {
     expect(wrapper.vm.isEditingLayout).toBe(true);
   });
 
+  describe("org range guard (O2)", () => {
+    const DAY = 24 * 60 * MINUTE;
+    const strip = () => wrapper.findComponent({ name: "TimeRangeGuardStrip" });
+    const held = () => strip().props("guard");
+
+    beforeEach(() => {
+      mockState.organizationData.organizationSettings = { range_guard_days: 30 };
+    });
+    afterEach(() => {
+      delete mockState.organizationData.organizationSettings;
+    });
+
+    it("keeps the old range and asks before a range over the guard runs", async () => {
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+
+      await pick(absolute(end - 90 * DAY, end));
+
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+      expect(held()).toMatchObject({ days: 30, from: { kind: "rolling", span: "15m" } });
+    });
+
+    it("runs the held range from the strip", async () => {
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+      await pick(absolute(end - 90 * DAY, end));
+
+      strip().vm.$emit("run");
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDate).toEqual(absolute(end - 90 * DAY, end));
+      expect(held()).toBeNull();
+    });
+
+    it("goes back to the old range from the strip", async () => {
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+      await pick(absolute(end - 90 * DAY, end));
+
+      strip().vm.$emit("back");
+      await flushPromises();
+
+      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
+      expect(held()).toBeNull();
+    });
+
+    it("never asks when the org has no guard", async () => {
+      delete mockState.organizationData.organizationSettings;
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+
+      await pick(absolute(end - 90 * DAY, end));
+
+      expect(wrapper.vm.selectedDate).toEqual(absolute(end - 90 * DAY, end));
+      expect(held()).toBeNull();
+    });
+  });
+
   it("names both the time range and variables when both wait", async () => {
     await mountDashboard();
     await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
     expect(refreshTooltip()).toBe("Refresh to apply latest variable changes");
 
-    await pick(relative("1h"));
+    await hold(relative("1h"));
 
     expect(refreshButton().props("variant")).toBe("pending");
     expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
@@ -383,7 +628,7 @@ describe("ViewDashboard time range gate", () => {
   describe("everything that loads data reads the applied range", () => {
     it("a tab switch keeps every panel on the applied range", async () => {
       await mountDashboard();
-      await pick(relative("1h"));
+      await hold(relative("1h"));
 
       route.query = { ...route.query, tab: "t2" };
       await flushPromises();
@@ -393,7 +638,7 @@ describe("ViewDashboard time range gate", () => {
 
     it("a panel's own refresh reloads it on the applied range", async () => {
       await mountDashboard();
-      await pick(relative("1h"));
+      await hold(relative("1h"));
 
       wrapper.vm.refreshPanelRequest("P2", false);
 
@@ -403,7 +648,7 @@ describe("ViewDashboard time range gate", () => {
     it("variables get the applied range when the picker closes", async () => {
       await mountDashboard();
       picker().vm.$emit("show");
-      await pick(relative("1h"));
+      await hold(relative("1h"));
 
       picker().vm.$emit("hide");
       await flushPromises();
@@ -415,7 +660,7 @@ describe("ViewDashboard time range gate", () => {
       route.query = { dashboard: "d1", folder: "default", tab: "t1", from: "1", to: "2" };
       await mountDashboard();
 
-      await pick(relative("1h"));
+      await hold(relative("1h"));
 
       expect(freshOnOpen.isRelativeRange({ id: "P2", config: {} })).toBe(false);
     });
@@ -430,6 +675,14 @@ describe("ViewDashboard time range gate", () => {
     expect(wrapper.vm.selectedDate.valueType).toBe("absolute");
     expect(globalSpan()).toBe(10 * MINUTE);
     expect(refreshButton().props("variant")).toBe("primary");
+  });
+
+  it("keeps the time picker enabled while panels load, so focus can return to its trigger (N2)", async () => {
+    await mountDashboard();
+    wrapper.vm.arePanelsLoading = true;
+    await flushPromises();
+
+    expect(picker().props("disable")).toBe(false);
   });
 
   it("swaps Refresh for a labelled Cancel while enterprise panels load, with the options arrow to match", async () => {
@@ -485,20 +738,26 @@ describe("ViewDashboard time range gate", () => {
       expect(refreshTooltip()).toBe("Runs queries on open and on filter/time changes");
     });
 
-    it("holds an absolute edit while the picker is open and applies it when it closes", async () => {
+    it("runs a range applied in the open picker at once", async () => {
       await mountDashboard();
       const end = 1_700_000_000_000_000;
 
       picker().vm.$emit("show");
       await pick(absolute(end - 30 * MINUTE, end));
-      expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("15m");
-      expect(refreshButton().props("variant")).toBe("primary");
-
-      picker().vm.$emit("hide");
       await flushPromises();
 
       expect(wrapper.vm.selectedDate).toEqual(absolute(end - 30 * MINUTE, end));
       expect(route.query.from).toBe(end - 30 * MINUTE);
+      expect(globalSpan()).toBe(30 * MINUTE);
+    });
+
+    it("applies an absolute range at once while the picker is closed", async () => {
+      await mountDashboard();
+      const end = 1_700_000_000_000_000;
+
+      await pick(absolute(end - 30 * MINUTE, end));
+
+      expect(wrapper.vm.selectedDate).toEqual(absolute(end - 30 * MINUTE, end));
       expect(globalSpan()).toBe(30 * MINUTE);
     });
 
@@ -532,7 +791,7 @@ describe("ViewDashboard time range gate", () => {
 
   it("leaves the picker alone when a reload keeps the same range", async () => {
     await mountDashboard();
-    await pick(relative("1h"));
+    await hold(relative("1h"));
 
     await wrapper.vm.loadDashboard();
     await flushPromises();

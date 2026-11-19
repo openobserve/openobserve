@@ -28,6 +28,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import K8sListView from "./K8sListView.vue";
 import MapView from "./MapView.vue";
@@ -315,6 +317,15 @@ const onDateChange = (date: {
   load();
 };
 
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("menu.kubernetes"),
+  url: false,
+  initial: () => ({ kind: "rolling", span: DEFAULT_RELATIVE_PERIOD }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: (value) => onDateChange(value as Parameters<typeof onDateChange>[0]),
+});
+
 watch(loadKey, () => load());
 
 // An events-only org has nothing for the metric views, so it lands on Events once, on arrival.
@@ -536,17 +547,26 @@ k8s.loadStreams();
           @update:model-value="onCluster"
         />
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           ref="dateTimePickerRef"
-          apply-presets
           menu-align="end"
           default-type="relative"
           :default-relative-time="DEFAULT_RELATIVE_PERIOD"
           data-test-name="k8s2-date-time"
-          @on:date-change="onDateChange"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
       </div>
     </template>
 
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="k8s2-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div v-if="ready" class="flex h-full min-h-0" data-test="k8s2-shell">
       <K8sResourceTree
         class="max-md:hidden"

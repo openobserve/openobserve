@@ -184,12 +184,12 @@ the Free Software Foundation, either version 3 of the License, or
             :loading="qualityBusy"
             data-test="quality-last-refreshed"
           />
-          <DateTimePickerDashboard
+          <DateTime
+            preset="explorer-auto"
             ref="qualityDatePickerRef"
-            v-model="qualitySelectedDate"
-            :auto-apply-dashboard="true"
-            calendar-presets
-            class="max-lg:[&_.date-time-label]:hidden"
+            :range="timeHost.range.value"
+            @apply="timeHost.onApply"
+            @on:date-change="timeHost.onDateChange"
             data-test="quality-time-range-picker"
           />
           <OButton
@@ -205,6 +205,12 @@ the Free Software Foundation, either version 3 of the License, or
           </OButton>
         </template>
         <template #filters>
+          <TimeRangeGuardStrip
+            :guard="timeHost.guard.value"
+            data-test="quality-range-guard"
+            @run="timeHost.confirmGuard"
+            @back="timeHost.dismissGuard"
+          />
           <AgentScopeCascade
             prefix="quality"
             :envs="qualityEnvs"
@@ -481,7 +487,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefreshed.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
 import AgentScopeCascade from "@/enterprise/components/AIObservability/AgentScopeCascade.vue";
 import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 import type { DateWindow } from "./onlineEvals/composables/useQualityList";
@@ -721,6 +729,21 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
 const qualitySelectedDate = ref<AiDateState>(
   qualityRangeFromQuery(route.query) ?? { ...DEFAULT_QUALITY_RANGE },
 );
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("onlineEvals.tabs.quality"),
+  url: false,
+  initial: () => pageRange(qualitySelectedDate.value),
+  onRange: (value) => {
+    qualitySelectedDate.value = {
+      valueType: value.valueType === "absolute" ? "absolute" : "relative",
+      startTime: value.startTime ?? null,
+      endTime: value.endTime ?? null,
+      relativeTimePeriod: value.relativeTimePeriod ?? null,
+    };
+  },
+});
 const initialQualityWindow =
   resolveAiDateWindow(qualitySelectedDate.value) ?? resolveAiDateWindow(DEFAULT_QUALITY_RANGE)!;
 const qualityDateWindow = ref<DateWindow>({

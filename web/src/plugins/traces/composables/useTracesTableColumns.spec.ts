@@ -21,13 +21,13 @@ vi.mock("vue-i18n", () => ({
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
+const mockStoreState = vi.hoisted(() => ({
+  timezone: "UTC",
+  zoConfig: { timestamp_column: "_timestamp" },
+}));
+
 vi.mock("vuex", () => ({
-  useStore: () => ({
-    state: {
-      timezone: "UTC",
-      zoConfig: { timestamp_column: "_timestamp" },
-    },
-  }),
+  useStore: () => ({ state: mockStoreState }),
 }));
 
 vi.mock("@/utils/zincutils", () => ({
@@ -136,6 +136,21 @@ describe("useTracesTableColumns", () => {
   describe("spans mode — empty selectedFields", () => {
     it("should return 1 column with timestamp", () => {
       expect(fieldIds(buildCols(false, "spans", []))).toHaveLength(1);
+    });
+  });
+
+  describe("timestamp header zone (R4)", () => {
+    afterEach(() => {
+      mockStoreState.timezone = "UTC";
+    });
+
+    it("names the zone by its offset, as Logs does", () => {
+      mockStoreState.timezone = "Asia/Kolkata";
+      expect(buildCols(false, "spans", [])[0].header).toBe("traces.timestamp (UTC+05:30)");
+    });
+
+    it("reads UTC for UTC", () => {
+      expect(buildCols(false, "spans", [])[0].header).toBe("traces.timestamp (UTC)");
     });
   });
 

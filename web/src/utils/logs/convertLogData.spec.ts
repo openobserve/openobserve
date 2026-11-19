@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { convertLogData, convertStackedLogData, formatDate, formatCount } from "./convertLogData";
+import {
+  convertLogData,
+  convertStackedLogData,
+  formatDate,
+  formatCount,
+  histogramZoomWindow,
+} from "./convertLogData";
 import { getDefaultTheme } from "@/constants/themes";
 
 // Stub the color-palette module so tests are not coupled to palette values.
@@ -997,5 +1003,61 @@ describe("convertLogData.ts", () => {
     it("handles future dates", () => {
       expect(formatDate(new Date(2030, 11, 25, 15, 30, 45))).toBe("2030-12-25 15:30:45");
     });
+  });
+});
+
+describe("histogramZoomWindow (Bugs 1, 2)", () => {
+  const HOUR_MS = 3_600_000;
+  // Buckets the way the histogram query returns them: UTC-aligned hours, an interval in µs.
+  const xData = [0, 1, 2, 3, 4].map((i) => Date.UTC(2026, 10, 15, 18, 0, 0) + i * HOUR_MS);
+  const yData = [3, 1, 122, 4, 0];
+
+  it.each(["UTC", "Asia/Kolkata"])(
+    "a drag across the bar of bucket 2 yields exactly that bucket (%s)",
+    (timezone) => {
+      const chart = convertLogData(xData, yData, { title: "", unparsed_x_data: [], timezone });
+      const bar = Number(chart.options.series[0].data[2][0]);
+      // ECharts draws the bar centred on its x, so the drag covers half a bucket either side.
+      const win = histogramZoomWindow(
+        bar - HOUR_MS / 3,
+        bar + HOUR_MS / 3 + 0.724,
+        chart,
+        HOUR_MS * 1000,
+      );
+      expect(win).toEqual({ start: bar, end: bar + HOUR_MS });
+    },
+  );
+
+  it("lands on the dragged daily bar past a DST change in the chart zone", () => {
+    const DAY_MS = 24 * HOUR_MS;
+    const timezone = "America/New_York";
+    // New York springs forward on Mar 8, so the Mar 9 bar sits an hour off a uniform zoned grid.
+    const days = Array.from({ length: 12 }, (_, i) => Date.UTC(2026, 2, 1) + i * DAY_MS);
+    const chart = convertLogData(
+      days,
+      days.map(() => 1),
+      {
+        title: "",
+        unparsed_x_data: [],
+        timezone,
+      },
+    );
+    const bar = Number(chart.options.series[0].data[8][0]);
+    const next = Number(chart.options.series[0].data[9][0]);
+    const win = histogramZoomWindow(
+      bar - DAY_MS / 3,
+      bar + DAY_MS / 3,
+      chart,
+      DAY_MS * 1000,
+      timezone,
+    );
+    expect(win).toEqual({ start: bar, end: next });
+  });
+
+  it("drag edges never carry pixel milliseconds", () => {
+    const chart = convertLogData(xData, yData, { title: "", unparsed_x_data: [], timezone: "UTC" });
+    const win = histogramZoomWindow(xData[1] + 1234.5, xData[3] - 99.7, chart, HOUR_MS * 1000);
+    expect(win.start % 1000).toBe(0);
+    expect(win.end % 1000).toBe(0);
   });
 });

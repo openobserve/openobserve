@@ -134,8 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                "auto: 8m" caption per arm instead (so the row height is stable). -->
           <template v-if="align === 'manual'">
             <DateTime
-              auto-apply
-              disable-relative
+              preset="form"
+              :capabilities="{ kinds: ['fixed'] }"
               :default-type="'absolute'"
               :default-absolute-time="manualDefaultA"
               class="h-8"
@@ -143,8 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on:date-change="(v: unknown) => onManualDateChange('a', v)"
             />
             <DateTime
-              auto-apply
-              disable-relative
+              preset="form"
+              :capabilities="{ kinds: ['fixed'] }"
               :default-type="'absolute'"
               :default-absolute-time="manualDefaultB"
               class="h-8"

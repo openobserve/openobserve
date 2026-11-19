@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <SyntaxGuide />
             <DateTime
-              auto-apply
+              preset="explorer-auto"
               menu-align="end"
               :default-type="errorTrackingState.data.datetime?.valueType"
               :default-absolute-time="{
@@ -77,7 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="errorTrackingState.data.datetime.relativeTimePeriod"
               data-test="logs-search-bar-date-time-dropdown"
-              @on:date-change="updateDateChange"
+              :retention-days="rumStreamLimits.retentionDays"
+              :query-range-restriction-in-hour="rumStreamLimits.queryRangeRestrictionInHour"
+              :range="timeHost.range.value"
+              @apply="timeHost.onApply"
+              @on:date-change="timeHost.onDateChange"
             />
             <!-- Run query button (also bound to the refresh shortcut) -->
             <OButton
@@ -117,6 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end bg-card-glass-bg -->
     </div>
     <!-- end toolbar wrapper -->
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="rum-errors-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <ODrawer
       v-if="isMobile"
       v-model:open="mobileFieldsOpen"
@@ -327,7 +337,10 @@ import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
 import { issueKey, formatRelativeTime, escapeSqlString } from "@/utils/rum/errorIssueUtils";
 import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
@@ -457,6 +470,7 @@ watch(lastQueryError, async (err) => {
   });
 });
 const store = useStore();
+const rumStreamLimits = useStreamTimeLimits(() => [{ name: "_rumdata", type: "logs" }]);
 watch(
   () => [store.state.selectedOrganization?.identifier, errorTrackingState.data.stream.errorStream],
   syncSuggestStreamContext,
@@ -770,8 +784,18 @@ const updateDateChange = (date: any) => {
     valueType: date.relativeTimePeriod ? "relative" : "absolute",
   };
   errorTrackingState.data.datetime = dateTime.value;
-  if (!isLoading.value.length && date.valueType === "relative") runQuery();
+  // The picker commits typed and calendar ranges only on Apply, so any user change runs.
+  const userApplied = date.valueType === "relative" || date.userChangedValue === true;
+  if (!isLoading.value.length && userApplied) runQuery();
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("rum.errorTracking"),
+  url: false,
+  initial: () => pageRange(errorTrackingState.data.datetime),
+  onRange: updateDateChange,
+});
 
 const runQuery = () => {
   errorTrackingState.data.resultGrid.currentPage = 0;

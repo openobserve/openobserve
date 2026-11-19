@@ -77,17 +77,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div class="col-auto flex items-center gap-1">
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
+          :host-name="t('alerts.history')"
           :class="activeTab !== 'history' ? 'invisible' : ''"
           ref="dateTimeRef"
-          auto-apply
           :default-type="dateTimeType"
           :default-absolute-time="{
             startTime: absoluteTime.startTime,
             endTime: absoluteTime.endTime,
           }"
           :default-relative-time="relativeTime"
+          :range="timeHost.range.value"
           data-test="alert-history-drawer-date-picker"
-          @on:date-change="updateDateTime"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
       </div>
     </template>
@@ -102,6 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- History Panel -->
         <OTabPanel name="history" layout="flex-col" stretch class="flex-1">
+          <TimeRangeGuardStrip
+            :guard="timeHost.guard.value"
+            data-test="alert-history-drawer-range-guard"
+            @run="timeHost.confirmGuard"
+            @back="timeHost.dismissGuard"
+          />
           <div class="flex h-full flex-1 flex-col overflow-hidden px-2 py-2">
             <!-- Empty state -->
             <OEmptyState
@@ -389,6 +399,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { AlertHistoryQuery } from "@/services/alerts";
@@ -831,6 +843,15 @@ const updateDateTime = (value: any) => {
     });
   }
 };
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("alerts.history"),
+  url: false,
+  initial: () => ({ kind: "rolling", span: relativeTime.value }),
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: updateDateTime,
+});
 
 // Watchers
 watch(

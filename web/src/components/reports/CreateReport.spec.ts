@@ -29,6 +29,7 @@ import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
 import dashboardService from "@/services/dashboards";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
 import CreateReport from "./CreateReport.vue";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
@@ -1011,6 +1012,13 @@ describe("CreateReport", () => {
       await flushPromises();
       const tr = (wrapper.vm as any).form.state.values.dashboards[0].timerange;
       expect(tr).toMatchObject({ type: "relative", period: "30m" });
+    });
+
+    it("offers rolling and calendar ranges, which the report server resolves at run time", async () => {
+      ({ wrapper } = mountComponent());
+      await flushPromises();
+      const picker = wrapper.findComponent(OFormDateTimeRange);
+      expect(picker.vm.$attrs.capabilities).toEqual({ kinds: ["rolling", "calendar"] });
     });
 
     it("exposes frequencyType + selectedTimeTab from the form (OFormToggleGroup)", async () => {

@@ -41,15 +41,18 @@
       <div class="[&_#date-time-button]:h-9!">
         <!-- Without its shift arrows on phones the picker fits beside the title. -->
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
-          auto-apply
           menu-align="end"
           :hide-range-shift="isMobile"
           :default-type="restoredDate.valueType || searchObj.data.datetime.type"
           :default-relative-time="restoredDate.relativeTimePeriod || '15m'"
           :default-absolute-time="restoredDate.absolute"
-          @on:date-change="updateDateTime"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
       </div>
 
@@ -71,6 +74,12 @@
         </OButton>
       </div>
     </template>
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="search-history-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div
       class="text-status-warning-text border-border-default flex shrink-0 items-center border-b px-3 py-1.5 text-xs md:hidden"
     >
@@ -327,6 +336,8 @@ import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useI18nTyped } from "@/types/i18n";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -358,6 +369,7 @@ export default defineComponent({
   components: {
     OEmptyState,
     DateTime,
+    TimeRangeGuardStrip,
     AppTabs,
     QueryEditor,
     OButton,
@@ -619,6 +631,24 @@ export default defineComponent({
       // with userChangedValue=false — so we don't loop or double-fetch.
       if (value.userChangedValue) fetchSearchHistory();
     };
+
+    const timeHost = usePageTimeRange({
+      preset: "explorer-auto",
+      source: t("search_history.title"),
+      url: false,
+      initial: () =>
+        pageRange(
+          {
+            valueType: restoredDate.valueType || "relative",
+            relativeTimePeriod: restoredDate.relativeTimePeriod || "15m",
+            startTime: restoredDate.absolute?.startTime,
+            endTime: restoredDate.absolute?.endTime,
+          },
+          { kind: "rolling", span: "15m" },
+        ),
+      capabilities: { kinds: ["rolling", "fixed"] },
+      onRange: updateDateTime,
+    });
     const formatTime = (took) => {
       return t("logs.searchHistory.tookSeconds", { seconds: took.toFixed(2) });
     };
@@ -824,6 +854,7 @@ export default defineComponent({
       isLoading,
       forbidden,
       updateDateTime,
+      timeHost,
       searchDateTimeRef,
       expandedIds,
       goToLogs,

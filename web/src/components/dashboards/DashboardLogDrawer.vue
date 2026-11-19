@@ -15,6 +15,11 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTime from "@/components/DateTime.vue";
+import StaleRangeStrip from "@/components/StaleRangeStrip.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import useTimeRangeContext from "@/composables/useTimeRangeContext";
+import { formatTimeRange } from "@/utils/timeRangeFormat";
+import { rangeToLegacy, type TimeRange } from "@/utils/timeRangeModel";
 import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -60,26 +65,45 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
 const paramsValid = computed(() => SQL_IDENT.test(props.field) && SQL_IDENT.test(props.stream));
 
-// Editable time range (µs); searches read these refs, not the fixed props.
+// The queried range (µs): searches and paging read it; a picked range lands here only on Run.
 const rangeStart = ref(props.startTime);
 const rangeEnd = ref(props.endTime);
+const timeRangeContext = useTimeRangeContext();
+const fixedProps = (): TimeRange => ({
+  kind: "fixed",
+  startUs: props.startTime,
+  endUs: props.endTime,
+});
+const timeHost = usePageTimeRange({
+  preset: "explorer-manual",
+  source: t("panel.logExplorer.title"),
+  url: false,
+  initial: fixedProps,
+  capabilities: { kinds: ["rolling", "fixed"] },
+  hasResults: () => events.value.length > 0,
+  onRange: () => {},
+  run: () => {
+    const bounds = rangeToLegacy(timeHost.range.value, timeRangeContext.now());
+    rangeStart.value = bounds.startTime;
+    rangeEnd.value = bounds.endTime;
+    void runQuery();
+  },
+});
 watch(
   () => [props.startTime, props.endTime],
   () => {
     rangeStart.value = props.startTime;
     rangeEnd.value = props.endTime;
+    timeHost.range.value = fixedProps();
+    timeHost.markQueried();
   },
 );
-let dateReady = false;
-const onDateChange = (d: { startTime: number; endTime: number }) => {
-  if (!dateReady) return;
-  const s = Number.isFinite(d.startTime) ? Math.trunc(d.startTime) : rangeStart.value;
-  const e = Number.isFinite(d.endTime) ? Math.trunc(d.endTime) : rangeEnd.value;
-  if (s === rangeStart.value && e === rangeEnd.value) return;
-  rangeStart.value = s;
-  rangeEnd.value = e;
-  loadEvents();
-};
+const staleText = computed(() => {
+  const queried = timeHost.stale.value ? timeHost.queried.value : null;
+  if (!queried) return null;
+  const range = formatTimeRange(queried, timeRangeContext.now(), "toast");
+  return t("search.resultsAreForRange", { range });
+});
 
 // ── Search state ──────────────────────────────────────────────────────────────
 const events = ref<any[]>([]);
@@ -713,7 +737,7 @@ async function restoreEventDetail() {
 
 watch(pageSize, () => goToPage(0));
 onMounted(async () => {
-  dateReady = true;
+  timeHost.markQueried();
   await loadEvents();
   await restoreEventDetail();
 });
@@ -793,10 +817,13 @@ function openInLogs() {
         <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
           <div class="flex-1" />
           <DateTime
-            default-type="absolute"
-            :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
+            preset="explorer-manual"
+            :capabilities="{ kinds: ['rolling', 'fixed'] }"
+            :range="timeHost.range.value"
+            :queried-range="timeHost.queried.value"
             data-test-name="dashboard-log-drawer-date-time"
-            @on:date-change="onDateChange"
+            @apply="timeHost.onApply"
+            @on:date-change="timeHost.onDateChange"
           />
           <OButton
             size="sm"
@@ -838,11 +865,17 @@ function openInLogs() {
             icon-left="refresh"
             :loading="loading"
             data-test="log-explorer-run"
-            @click="runQuery"
+            @click="timeHost.runQuery"
           >
             <OTooltip :content="t('panel.logExplorer.runQuery')" />
           </OButton>
         </div>
+        <StaleRangeStrip
+          v-if="staleText"
+          :text="staleText"
+          data-test="dashboard-log-drawer-stale-strip"
+          @run="timeHost.runQuery"
+        />
         <div v-if="showSql" class="px-2 pb-2">
           <div class="border-border-default rounded-default overflow-hidden border">
             <QueryEditor
@@ -852,7 +885,7 @@ function openInLogs() {
               hide-nl-toggle
               data-test-prefix="log-explorer-editor"
               @update:query="customSql = $event"
-              @run-query="runQuery"
+              @run-query="timeHost.runQuery"
             />
           </div>
         </div>

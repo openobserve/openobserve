@@ -40,6 +40,7 @@ const props = withDefaults(defineProps<InlineEditProps>(), {
   readonly: false,
   error: false,
   submitOnEnter: true,
+  fill: false,
 });
 
 const emit = defineEmits<InlineEditEmits>();
@@ -277,7 +278,10 @@ defineExpose({ focus: startEdit });
     <div
       v-if="isEditing"
       ref="editRootEl"
-      class="grid max-w-full grid-cols-[minmax(0,max-content)] items-center"
+      class="grid max-w-full items-center"
+      :class="
+        fill ? 'w-full flex-1 grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,max-content)]'
+      "
     >
       <span
         aria-hidden="true"

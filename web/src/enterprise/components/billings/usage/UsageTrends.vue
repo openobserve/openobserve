@@ -60,9 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- The logs search bar's picker, absolute only, so `min-date` keeps it from reaching before the data; ‹ stops there too. -->
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['fixed'] }"
           ref="picker"
-          auto-apply
-          disable-relative
           :disable-prev-shift="range.start <= oldest"
           menu-align="end"
           class="ms-auto"
@@ -72,7 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :query-range-restriction-msg="historyNote"
           :query-range-restriction-in-hour="historyHours"
           data-test="billings-usagetrends-picker"
-          @on:date-change="onPickerChange"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
         <ORefreshButton
           :last-run-at="lastLoadedAt"
@@ -82,6 +84,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="billings-usagetrends-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <KpiCardRow :columns="4" class="shrink-0" data-test="billings-usagetrends-kpis">
         <UsageKpiCard
           v-for="card in kpiCards"
@@ -220,6 +228,8 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -437,6 +447,20 @@ const onPickerChange = (value: {
 
 /** Usage exists only up to now, so an open cycle's KPIs and labels stop at today, not the cycle end. */
 const measuredEnd = computed(() => Math.min(range.value.end, nowSeconds()));
+
+// Not the spec's form preset: the page has no submit, its loads run on apply.
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("billing.usageLabel"),
+  url: false,
+  initial: () => ({
+    kind: "fixed",
+    startUs: pickerDefault.value.startTime,
+    endUs: pickerDefault.value.endTime,
+  }),
+  capabilities: { kinds: ["fixed"] },
+  onRange: onPickerChange,
+});
 
 const picker = ref<{ setAbsoluteTime: (start: number, end: number) => void } | null>(null);
 

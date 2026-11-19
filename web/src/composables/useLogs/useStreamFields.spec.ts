@@ -35,6 +35,7 @@ const i18n = createI18n({
       search: {
         queryRangeRestrictionMsg: "Query range restricted to {range}",
         streamNotExist: "The following [STREAM_NAME] streams were not found.",
+        timestampWithTimezone: "timestamp ({timezone})",
       },
     },
   },
@@ -352,6 +353,67 @@ describe("useStreamFields Composable", () => {
       wrapper.vm.updateGridColumns();
 
       expect(columnIds()).toEqual(["_timestamp", "_stream_name", "message"]);
+    });
+
+    it("spells the zone in the timestamp header as its offset (R4)", () => {
+      const zone = store.state.timezone;
+      store.state.timezone = "Asia/Kolkata";
+      try {
+        wrapper.vm.updateGridColumns();
+        const ts = searchObj.data.resultGrid.columns.find((c: any) => c.id === "_timestamp");
+        expect(ts.header).toBe("timestamp (UTC+05:30)");
+      } finally {
+        store.state.timezone = zone;
+      }
+    });
+
+    it.each([
+      ["winter rows", [Date.UTC(2026, 0, 10), Date.UTC(2026, 0, 12)], "UTC-05:00"],
+      ["summer rows", [Date.UTC(2026, 6, 10), Date.UTC(2026, 6, 12)], "UTC-04:00"],
+      [
+        "rows across a DST change",
+        [Date.UTC(2026, 2, 7), Date.UTC(2026, 2, 9)],
+        "America/New_York",
+      ],
+    ])("labels %s with the zone in force on their dates", (_name, rowsMs, label) => {
+      const zone = store.state.timezone;
+      store.state.timezone = "America/New_York";
+      searchObj.data.queryResults = {
+        hits: (rowsMs as number[]).map((ms) => ({ _timestamp: ms * 1000, message: "m" })),
+      } as any;
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.UTC(2026, 6, 1));
+      try {
+        wrapper.vm.updateGridColumns();
+        const ts = searchObj.data.resultGrid.columns.find((c: any) => c.id === "_timestamp");
+        expect(ts.header).toBe(`timestamp (${label})`);
+      } finally {
+        vi.useRealTimers();
+        store.state.timezone = zone;
+      }
+    });
+
+    it("labels the header with the rows' offset when fields are selected", () => {
+      const zone = store.state.timezone;
+      store.state.timezone = "America/New_York";
+      searchObj.data.stream.selectedFields = ["message"];
+      searchObj.data.queryResults = {
+        hits: [Date.UTC(2026, 0, 10), Date.UTC(2026, 0, 12)].map((ms) => ({
+          _timestamp: ms * 1000,
+          message: "m",
+        })),
+      } as any;
+      vi.useFakeTimers();
+      vi.setSystemTime(Date.UTC(2026, 6, 1));
+      try {
+        wrapper.vm.updateGridColumns();
+        const ts = searchObj.data.resultGrid.columns.find((c: any) => c.id === "_timestamp");
+        expect(ts.header).toBe("timestamp (UTC-05:00)");
+        expect(ts.label).toBe("timestamp (UTC-05:00)");
+      } finally {
+        vi.useRealTimers();
+        store.state.timezone = zone;
+      }
     });
 
     it("leaves a single-stream result unchanged", () => {

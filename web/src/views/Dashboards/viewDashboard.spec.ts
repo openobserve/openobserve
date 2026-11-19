@@ -1451,10 +1451,20 @@ describe("ViewDashboard", () => {
 
     const mountWithPicker = async () => {
       wrapper = createWrapper({
+        attachTo: document.body,
         global: {
           plugins: [i18n, store],
           stubs: {
-            OPageLayout: { template: '<div><slot name="actions" /></div>' },
+            OPageLayout: { template: '<div><slot name="actions" /><slot /></div>' },
+            RenderDashboardCharts: {
+              methods: {
+                syncAllPanelDateTimePickers: vi.fn(),
+                commitAllVariables: vi.fn(),
+                getUrlParams: () => ({}),
+              },
+              template: "<div />",
+            },
+            teleport: false,
           },
         },
       });
@@ -1473,10 +1483,10 @@ describe("ViewDashboard", () => {
       vi.useRealTimers();
     });
 
-    it("turns the calendar presets on for the header picker", async () => {
+    it("runs the header picker as a dashboard host, which offers calendar periods", async () => {
       await mountWithPicker();
       const picker = wrapper.findComponent({ name: "DateTimePickerDashboard" });
-      expect(picker.props("calendarPresets")).toBe(true);
+      expect(picker.props("preset")).toBe("dashboard");
     });
 
     it("reads a calendar token from the URL period and writes it back", async () => {
@@ -1800,6 +1810,7 @@ describe("ViewDashboard", () => {
         stubs: {
           OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          ShareButton: { template: '<div><slot name="menu-extra" /></div>' },
         },
       },
     });
@@ -1851,6 +1862,7 @@ describe("ViewDashboard", () => {
           stubs: {
             OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            ShareButton: { template: '<div><slot name="menu-extra" /></div>' },
           },
         },
       });
@@ -1877,12 +1889,16 @@ describe("ViewDashboard", () => {
     it.each([
       [false, false],
       [true, true],
-    ])("shows the share options menu only when public links are on (%s)", async (on, shown) => {
-      setPublicDashboards(on);
-      wrapper = mountToolbar();
-      await flushPromises();
-      expect(wrapper.find('[data-test="dashboard-share-options-btn"]').exists()).toBe(shown);
-    });
+    ])(
+      "offers publishing in the share menu only when public links are on (%s)",
+      async (on, shown) => {
+        setPublicDashboards(on);
+        wrapper = mountToolbar();
+        await flushPromises();
+        expect(wrapper.find('[data-test="dashboard-publish-public-btn"]').exists()).toBe(shown);
+        expect(wrapper.find('[data-test="dashboard-share-options-btn"]').exists()).toBe(false);
+      },
+    );
 
     it("disables Scheduled dashboards while reports is locked", async () => {
       const zoConfigs = [mockStoreState.zoConfig, (store.state as any).zoConfig];

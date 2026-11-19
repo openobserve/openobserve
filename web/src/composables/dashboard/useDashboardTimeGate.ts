@@ -15,6 +15,7 @@
 
 import { computed, getCurrentScope, onScopeDispose, ref, watch, type Ref } from "vue";
 import { arePickerValuesEqual, isUsablePickerValue } from "@/utils/dashboard/panelTimeUtils";
+import { rangeExceedsGuard } from "@/utils/orgTimeRangeSettings";
 
 // Same pause Logs gives an absolute edit before it runs (debouncedAutoRunAbsolute).
 export const ABSOLUTE_APPLY_DEBOUNCE_MS = 2500;
@@ -27,12 +28,20 @@ export interface DashboardTimeGateOptions {
   onAutoApply?: (value: any) => void;
   /** Moves the picker to a range, since a mounted picker reads its v-model only once. */
   showInPicker?: (value: any) => void;
+  /** The org's "ask before ranges longer than N days"; null when the org has none. */
+  guardDays?: () => number | null;
+}
+
+export interface DashboardTimeApplyMeta {
+  userChanged?: boolean;
+  source?: string;
 }
 
 /** Keeps what a dashboard time picker shows apart from the range its panels load with. */
 export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
   const applied = options.applied ?? ref<any>(null);
   const picked = ref<any>(null);
+  const held = ref<{ from: any; to: any } | null>(null);
 
   let hasStartingRange = false;
   let isPickerOpen = false;
@@ -94,6 +103,41 @@ export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
     else autoApply();
   };
 
+  const overGuard = (value: any) =>
+    rangeExceedsGuard(
+      Number(value?.startTime),
+      Number(value?.endTime),
+      options.guardDays?.() ?? null,
+    );
+
+  /** A range the user applied runs at once, Auto Run or not, unless it is over the org's guard. */
+  const onApply = (value: any, meta?: DashboardTimeApplyMeta) => {
+    if (meta?.userChanged === false) return onPick(value);
+    held.value = null;
+    if (!isUsablePickerValue(value)) return onPick(value);
+    if (meta?.source !== "undo" && overGuard(value)) {
+      held.value = { from: applied.value, to: value };
+      return;
+    }
+    onPick(value);
+    apply();
+  };
+
+  const confirmGuard = () => {
+    const next = held.value?.to;
+    held.value = null;
+    if (!next) return;
+    onPick(next);
+    apply();
+  };
+
+  const dismissGuard = () => {
+    if (!held.value) return;
+    held.value = null;
+    adopt();
+    if (applied.value) options.showInPicker?.(applied.value);
+  };
+
   const onShow = () => {
     isPickerOpen = true;
   };
@@ -120,15 +164,19 @@ export const useDashboardTimeGate = (options: DashboardTimeGateOptions) => {
   return {
     picked,
     applied,
+    held,
     isWaiting,
     needsRefresh,
     onPick,
+    onApply,
     onShow,
     onHide,
     flush,
     apply,
     refresh,
     adopt,
+    confirmGuard,
+    dismissGuard,
   };
 };
 

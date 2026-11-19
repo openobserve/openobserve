@@ -18,11 +18,12 @@
            above the cards (right-aligned) so it reads as a page-level control,
            not a per-tab filter. Refresh re-queries everything. -->
       <div class="flex items-center justify-end gap-2 px-5 pt-3">
-        <DateTimePickerDashboard
+        <DateTime
+          preset="explorer-auto"
           ref="dateTimePickerRef"
-          v-model="selectedDate"
-          :auto-apply-dashboard="true"
-          calendar-presets
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
           class="flex-none"
           data-test="eval-job-detail-window"
         />
@@ -36,6 +37,12 @@
           @click="refreshAll"
         />
       </div>
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="eval-job-detail-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
 
       <!-- ── KPI strip ── -->
       <!-- KPI strip — identical card layout + text styles to the LLM
@@ -530,7 +537,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import JobWorkloadTab from "./job/JobWorkloadTab.vue";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -800,6 +809,21 @@ const selectedDate = ref<any>({
   startTime: null,
   endTime: null,
   relativeTimePeriod: "24h",
+});
+
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("onlineEvals.tabs.jobs"),
+  url: false,
+  initial: () => pageRange(selectedDate.value),
+  onRange: (value) => {
+    selectedDate.value = {
+      valueType: value.valueType === "absolute" ? "absolute" : "relative",
+      startTime: value.startTime ?? null,
+      endTime: value.endTime ?? null,
+      relativeTimePeriod: value.relativeTimePeriod ?? null,
+    };
+  },
 });
 
 const dateWindow = ref<JobRunsWindow>({

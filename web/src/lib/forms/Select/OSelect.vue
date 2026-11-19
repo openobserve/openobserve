@@ -105,6 +105,9 @@ type NormalizedOption = {
   headerAction?: I18nText;
   headerActionAriaLabel?: I18nText;
   keepOnSearch?: boolean;
+  /** A rule between options; it is also a `header`, so every non-selectable path skips it. */
+  divider?: boolean;
+  dataTest?: string;
   /** The option as passed in: handed back by `header-action`, and to the `#option` slot. */
   source?: SelectOption;
 };
@@ -218,7 +221,7 @@ function toRekaString(v: SelectPrimitiveValue): string {
   return String(v);
 }
 
-function normalizeOption(input: unknown): NormalizedOption | null {
+function normalizeOption(input: unknown, index: number): NormalizedOption | null {
   if (isPrimitiveSelectValue(input)) {
     return {
       label: raw(String(input)),
@@ -232,6 +235,18 @@ function normalizeOption(input: unknown): NormalizedOption | null {
 
   const option = input as Record<string, unknown>;
   const rawLabel = option[props.labelKey];
+
+  if (option["divider"] === true) {
+    return {
+      label: raw(""),
+      value: `__divider__${index}`,
+      disabled: true,
+      header: true,
+      divider: true,
+      dataTest: typeof option["dataTest"] === "string" ? option["dataTest"] : undefined,
+      source: option as SelectOption,
+    };
+  }
 
   // Group header: items with header:true or isTab:true are non-selectable labels
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
@@ -294,7 +309,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
 const normalizedOptions = computed<NormalizedOption[]>(() => {
   if (!props.options?.length) return [];
   return props.options
-    .map((option) => normalizeOption(option))
+    .map((option, index) => normalizeOption(option, index))
     .filter((opt): opt is NormalizedOption => opt !== null);
 });
 
@@ -373,7 +388,10 @@ const baseFilteredOptions = computed(() => {
   const result: NormalizedOption[] = [];
   for (let i = 0; i < options.length; i++) {
     const opt = options[i];
-    if (opt.header && opt.keepOnSearch) {
+    if (opt.divider) {
+      const after = options.slice(i + 1).some((o) => !o.header && matchesTerm(o, term));
+      if (after && result.some((o) => !o.header)) result.push(opt);
+    } else if (opt.header && opt.keepOnSearch) {
       result.push(opt);
     } else if (opt.header) {
       // Include the header only if at least one subsequent non-header item matches
@@ -1001,6 +1019,8 @@ const virtualizer = useVirtualizer(
     estimateSize: (index: number) => {
       const opt = filteredOptions.value[index];
       if (!opt) return 28;
+      // Must equal the divider row's h-2.25 or the virtual rows drift.
+      if (opt.divider) return 9;
       // Must equal the min-h-8 of OSelectHeaderRow or the virtual rows drift.
       if (isRichHeader(opt)) return 32;
       const hasSubLabel = !!opt.subLabel;
@@ -1746,8 +1766,19 @@ const fieldWidthClass = computed(() => {
                         transform: `translateY(${vRow.start}px)`,
                       }"
                     >
+                      <div
+                        v-if="filteredOptions[vRow.index].divider"
+                        role="separator"
+                        :data-test="
+                          filteredOptions[vRow.index].dataTest ??
+                          (parentDataTest ? `${parentDataTest}-divider` : undefined)
+                        "
+                        class="flex h-2.25 w-full items-center px-1"
+                      >
+                        <span class="h-separator bg-separator w-full" />
+                      </div>
                       <OSelectHeaderRow
-                        v-if="isRichHeader(filteredOptions[vRow.index])"
+                        v-else-if="isRichHeader(filteredOptions[vRow.index])"
                         :label="filteredOptions[vRow.index].label"
                         :count="filteredOptions[vRow.index].headerCount"
                         :action="filteredOptions[vRow.index].headerAction"
@@ -2244,8 +2275,8 @@ const fieldWidthClass = computed(() => {
             'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
           ]"
           :style="[
-            dropdownStyle,
             { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' },
+            dropdownStyle,
           ]"
           @click.stop
           @pointerdown.stop
@@ -2268,16 +2299,25 @@ const fieldWidthClass = computed(() => {
 
           <SelectViewport class="p-1">
             <template v-if="normalizedOptions.length && !slots.default">
-              <OSelectItem
-                v-for="opt in normalizedOptions"
-                :key="String(opt.value)"
-                :value="opt.value"
-                :label="opt.label"
-                :disabled="opt.disabled || opt.expandable"
-                :icon="opt.icon"
-                :icon-component="opt.iconComponent"
-                :reserve-icon-space="!!iconKey"
-              />
+              <template v-for="opt in normalizedOptions" :key="String(opt.value)">
+                <div
+                  v-if="opt.divider"
+                  role="separator"
+                  :data-test="
+                    opt.dataTest ?? (parentDataTest ? `${parentDataTest}-divider` : undefined)
+                  "
+                  class="h-separator bg-separator mx-1 my-1"
+                />
+                <OSelectItem
+                  v-else
+                  :value="opt.value"
+                  :label="opt.label"
+                  :disabled="opt.disabled || opt.expandable"
+                  :icon="opt.icon"
+                  :icon-component="opt.iconComponent"
+                  :reserve-icon-space="!!iconKey"
+                />
+              </template>
             </template>
 
             <div v-else-if="!slots.default" class="text-select-placeholder px-3 py-2 text-sm">

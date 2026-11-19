@@ -73,7 +73,7 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);  // Allow page to stabilize
 
-    // Use default time range (Past 15 Minutes) which should capture recent errors
+    // Use default time range (Last 15 minutes) which should capture recent errors
     testLogger.info('Clicking Run Query button with default time range');
     await pm.rumPage.clickRunQuery();
 

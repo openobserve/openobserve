@@ -290,6 +290,12 @@ describe("SearchResult", () => {
     });
   });
 
+  it("hands the RED charts the page's chart filter over the typed one", async () => {
+    const dashboard = () => wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
+    await wrapper.setProps({ chartFilter: "service_name = 'a'" });
+    expect(dashboard().props("filter")).toBe("service_name = 'a'");
+  });
+
   describe("heatmap Ask AI relay", () => {
     it("hands the AI gate to the metrics dashboard", async () => {
       const dashboard = () => wrapper.findComponent('[data-test="traces-metrics-dashboard"]');
@@ -519,6 +525,7 @@ describe("SearchResult", () => {
         "ask-ai",
         "send-to-ai-chat",
         "open-mobile-fields",
+        "search:around",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);

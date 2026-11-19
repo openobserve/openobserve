@@ -9,6 +9,8 @@ export interface TimeProps {
   modelValue?: string;
   /** Enable seconds precision (`HH:MM:SS`) */
   withSeconds?: boolean;
+  /** With `withSeconds` and `format24`: shows `HH:MM` while the seconds are zero and reads a typed `HH:MM` as `HH:MM:00`. */
+  optionalSeconds?: boolean;
   /**
    * Force a 24-hour clock: 00–23 header, a dual-ring hour face (1–12 outer,
    * 13–00 inner), no AM/PM toggle, and a deterministic `HH:MM` text input —
@@ -40,6 +42,14 @@ export interface TimeProps {
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
+  /** Read-only text shown before the time inside the field, e.g. the date the time belongs to. */
+  prefix?: I18nText;
+  /** Drops the clock button and tightens the padding so a narrow field fits the prefix and the time; the time stays typeable. */
+  hideIcon?: boolean;
+  /** In 24h mode, shows the model again after a typed value the parent did not accept. */
+  revertRefused?: boolean;
+  /** Keeps the error border but drops the message line, for a parent that shows the error itself. */
+  hideMessage?: boolean;
   /** Control size */
   size?: TimeSize;
   /** HTML id */

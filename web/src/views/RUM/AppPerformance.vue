@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </FeatureLockExempt>
       <div
-        class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end max-md:[&_.date-time-label]:hidden"
+        class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
         <template v-if="versionsEnabled">
           <DeployMarkersUnavailable @retry="refreshData" />
@@ -56,19 +56,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :version="versionScope.version"
           />
         </template>
-        <DateTimePickerDashboard
+        <DateTime
+          preset="explorer-auto"
           class="rum-date-time-picker"
           ref="dateTimePicker"
-          v-model="selectedDate"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
           menu-align="end"
+          :retention-days="rumStreamLimits.retentionDays"
+          :query-range-restriction-in-hour="rumStreamLimits.queryRangeRestrictionInHour"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
           :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
           trigger
           :is-compact="isMobile"
+          :range-end-us="refreshRangeEndUs"
+          :range-start-us="refreshRangeStartUs"
+          :range-span-us="refreshRangeSpanUs"
           class="app-performance-auto-refresh-interval"
           @trigger="refreshData"
+          @live="goLiveRange"
         />
         <OButtonGroup>
           <OTooltip
@@ -139,6 +148,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="rum-performance-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <router-view v-slot="{ Component }">
       <keep-alive>
         <div class="min-h-0 flex-1">
@@ -180,11 +195,15 @@ import { overviewStateOnly, stateFromQuery } from "@/utils/rum/performanceOvervi
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import { fixedRangeEnd } from "@/utils/autoRefreshPause";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import overviewDashboard from "@/utils/rum/overview.json";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
 import config from "@/aws-exports";
 import { single } from "@/composables/dashboard/deployMarkerScope";
 import {
@@ -217,7 +236,8 @@ export default defineComponent({
     FeatureLockExempt,
     OToggleGroup,
     OToggleGroupItem,
-    DateTimePickerDashboard,
+    DateTime,
+    TimeRangeGuardStrip,
     DeployMarkersUnavailable: defineAsyncComponent(
       () => import("@/enterprise/components/ServiceVersions/DeployMarkersUnavailable.vue"),
     ),
@@ -428,6 +448,20 @@ export default defineComponent({
 
     // holds the date picker v-modal
     const selectedDate = ref(getSelectedDateFromQueryParams(route.query));
+    const timeHost = usePageTimeRange({
+      preset: "explorer-auto",
+      source: t("rum.performance"),
+      url: false,
+      initial: () => pageRange(selectedDate.value),
+      onRange: (value) => {
+        selectedDate.value = {
+          startTime: value.startTime,
+          endTime: value.endTime,
+          relativeTimePeriod: value.relativeTimePeriod ?? null,
+          valueType: value.valueType === "absolute" ? "absolute" : "relative",
+        };
+      },
+    });
     watch(
       () => [
         versionScope.value.env,
@@ -444,6 +478,22 @@ export default defineComponent({
         () => selectedDate.value,
       ),
     );
+
+    const rumStreamLimits = useStreamTimeLimits(() => [{ name: "_rumdata", type: "logs" }]);
+    const refreshRangeEndUs = computed(() =>
+      fixedRangeEnd({
+        valueType: selectedDate.value?.valueType,
+        endTime: Number(selectedDate.value?.endTime),
+      }),
+    );
+    const refreshRangeStartUs = computed(() =>
+      refreshRangeEndUs.value === null ? null : Number(selectedDate.value?.startTime) || null,
+    );
+    const refreshRangeSpanUs = computed(() => {
+      const span = Number(selectedDate.value?.endTime) - Number(selectedDate.value?.startTime);
+      return Number.isFinite(span) && span > 0 ? span : null;
+    });
+    const goLiveRange = () => (dateTimePicker.value as { goLive?: () => void } | null)?.goLive?.();
 
     // holds the current time for the dashboard
     const currentTimeObj = ref({});
@@ -548,12 +598,18 @@ export default defineComponent({
     };
 
     return {
+      timeHost,
       currentDashboardData,
       t,
       getDashboard,
       store,
       // date variables
       dateTimePicker,
+      rumStreamLimits,
+      refreshRangeEndUs,
+      refreshRangeStartUs,
+      refreshRangeSpanUs,
+      goLiveRange,
       selectedDate,
       currentTimeObj,
       refreshInterval,

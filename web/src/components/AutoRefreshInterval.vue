@@ -15,29 +15,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex items-center">
+  <div class="flex items-center gap-1">
     <OPopover
       v-model:open="btnRefreshInterval"
       side="bottom"
       align="center"
       content-class="w-80"
       :aria-label="t('search.autoRefreshTitle')"
+      @close-auto-focus="onCloseAutoFocus"
     >
       <template #trigger>
         <OButton
           v-if="isCompact"
           data-test="logs-search-bar-refresh-interval-btn"
-          size="icon-toolbar"
+          :size="isPausedEnded ? 'sm-toolbar' : 'icon-toolbar'"
           :variant="variant"
           :active="isAnimating"
           :aria-label="triggerAriaLabel"
         >
           <OIcon
-            name="update"
-            :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
+            :name="isPausedEnded ? 'pause' : 'update'"
+            :class="
+              isPausedEnded
+                ? 'text-status-warning-text'
+                : isAnimating
+                  ? 'auto-refresh-icon--spinning'
+                  : ''
+            "
             size="sm"
           />
-          <OTooltip :content="t('search.autoRefreshWithValue', { value: triggerLabel })" />
+          <span
+            v-if="isPausedEnded"
+            class="text-compact ms-1 leading-4 whitespace-nowrap max-md:hidden"
+            data-test="auto-refresh-trigger-label"
+            >{{ t("dateTime.refreshPausedRangeEnded") }}</span
+          >
+          <span
+            v-else-if="floorRaisedText"
+            class="text-compact ms-1 leading-4 whitespace-nowrap"
+            data-test="auto-refresh-floor-raised"
+            >{{ floorRaisedText }}</span
+          >
+          <OTooltip :content="compactTooltip" side="bottom" />
         </OButton>
         <OButton
           v-else
@@ -47,13 +66,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="triggerAriaLabel"
         >
           <div class="flex flex-nowrap items-center">
-            <OIcon name="update" size="sm" class="me-1" />
-            <div class="text-compact text-center leading-4">
-              {{ t("search.autoRefreshTrigger", { interval: triggerLabel }) }}
+            <OIcon
+              :name="isPausedEnded ? 'pause' : 'update'"
+              size="sm"
+              class="me-1"
+              :class="isPausedEnded ? 'text-status-warning-text' : ''"
+            />
+            <div class="text-compact text-center leading-4" data-test="auto-refresh-trigger-label">
+              {{
+                isPausedEnded
+                  ? t("dateTime.refreshPausedRangeEnded")
+                  : floorRaisedText
+                    ? raw(floorRaisedText)
+                    : t("search.autoRefreshTrigger", { interval: triggerLabel })
+              }}
             </div>
             <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
           </div>
-          <OTooltip :content="t('search.autoRefreshTitle')" />
+          <OTooltip
+            :content="caughtUp ? t('dateTime.refreshCaughtUp') : t('search.autoRefreshTitle')"
+          />
         </OButton>
       </template>
       <div data-test="auto-refresh-panel">
@@ -79,6 +111,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <hr class="border-border-default my-0 border-0 border-t border-solid" />
+        <p
+          v-if="floorNote"
+          class="text-text-secondary px-4 pt-3 text-xs"
+          data-test="auto-refresh-floor-note"
+        >
+          {{ floorNote }}
+        </p>
         <div class="flex flex-col gap-3 px-4 py-3">
           <section v-for="section in refreshSections" :key="section.key">
             <h5 class="text-text-secondary mb-2 text-xs font-semibold tracking-wider uppercase">
@@ -102,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   side="right"
                   align="center"
                   max-width="18.75rem"
-                  :content="raw(minRangeRestrictionMessageVal)"
+                  :content="item.reason"
                 />
                 {{ item.shortLabel }}
               </OButton>
@@ -119,6 +158,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPopover>
+    <OButton
+      v-if="isPausedEnded"
+      data-test="auto-refresh-go-live-btn"
+      variant="outline"
+      size="sm-toolbar"
+      class="shrink-0"
+      @click="$emit('live')"
+    >
+      <span
+        class="bg-accent me-1.5 size-2 shrink-0 rounded-full"
+        aria-hidden="true"
+        data-test="auto-refresh-go-live-dot"
+      />{{ t("dateTime.goLive") }}<OTooltip :content="goLiveTooltip" side="bottom" />
+    </OButton>
   </div>
 </template>
 
@@ -130,9 +183,17 @@ import {
   watch,
   onActivated,
   onDeactivated,
+  onMounted,
   onUnmounted,
   type PropType,
 } from "vue";
+import {
+  autoRefreshState,
+  fixedRangeEnded,
+  owesCatchUp,
+  refreshFloorSeconds,
+} from "@/utils/autoRefreshPause";
+import { formatRangeDuration } from "@/utils/timeRangeLabel";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
@@ -180,8 +241,23 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** End (µs) of the page's range when it is fixed; null while it rolls. Refresh pauses once it has passed. */
+    rangeEndUs: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
+    /** Start (µs) of that fixed range, so `Go live` can name the length it switches to. */
+    rangeStartUs: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
+    /** Length (µs) of the page's range; steps faster than a thousandth of it are greyed. */
+    rangeSpanUs: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
   },
-  emits: ["update:modelValue", "trigger"],
+  emits: ["update:modelValue", "trigger", "live"],
   setup(props: any, { emit }) {
     const router = useRouter();
     const { t } = useI18nTyped();
@@ -189,9 +265,23 @@ export default defineComponent({
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
 
+    const minRangeRestrictionMessageVal = computed(() =>
+      t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval }),
+    );
+    const floorSeconds = computed(() =>
+      props.rangeSpanUs && props.rangeSpanUs > 0 ? refreshFloorSeconds(props.rangeSpanUs) : 0,
+    );
+    const isBelowFloor = (value: number) => value < floorSeconds.value;
     const isDisabled = (value: number) => {
-      return value < props.minRefreshInterval;
+      return value < props.minRefreshInterval || isBelowFloor(value);
     };
+    const spanText = computed(() =>
+      props.rangeSpanUs ? formatRangeDuration(0, props.rangeSpanUs) : "",
+    );
+    const itemTooltip = (value: number) =>
+      isBelowFloor(value)
+        ? t("timeRangeHost.refreshTooFast", { span: spanText.value })
+        : minRangeRestrictionMessageVal.value;
 
     const refreshTimes = computed(() =>
       [
@@ -204,6 +294,7 @@ export default defineComponent({
           shortLabel: autoRefreshShortLabel(value, t),
           value: value as number,
           disabled: isDisabled(value),
+          reason: isDisabled(value) ? itemTooltip(value) : undefined,
         })),
       ),
     );
@@ -243,21 +334,10 @@ export default defineComponent({
       return found?.label || generateDurationLabel(selectedValue.value);
     });
 
-    // Check if animation should be active
-    const isAnimating = computed(() => {
-      return props.isCompact && selectedValue.value > 0;
-    });
-
     const isOn = computed(() => selectedValue.value > 0);
 
     const triggerLabel = computed(() =>
       isOn.value ? autoRefreshShortLabel(selectedValue.value, t) : t("common.off"),
-    );
-
-    const triggerAriaLabel = computed(() =>
-      isOn.value
-        ? t("search.autoRefreshAriaOn", { value: triggerLabel.value })
-        : t("search.autoRefreshAriaOff"),
     );
 
     let lastSelectedInterval = 0;
@@ -289,46 +369,156 @@ export default defineComponent({
       }
     };
 
+    // A pointer pick closes the menu without handing focus back, so the trigger is not left ringed beside the lit choice.
+    let closedByPick = false;
     const onPick = (item: { value: number }) => {
       onItemClick(item);
+      closedByPick = true;
       btnRefreshInterval.value = false;
     };
+    const onCloseAutoFocus = (event: Event) => {
+      if (closedByPick) event.preventDefault();
+      closedByPick = false;
+    };
 
-    // watch on the selected value and update the timers
-    watch(selectedValue, () => {
-      resetTimers();
+    const pageHidden = ref(
+      typeof document !== "undefined" && document.visibilityState === "hidden",
+    );
+    const clock = ref(Date.now());
+    const caughtUp = ref(false);
+    let lastTickMs: number | null = null;
+
+    const rangeEnded = computed(() => fixedRangeEnded(props.rangeEndUs, clock.value));
+    const refreshState = computed(() =>
+      autoRefreshState({
+        intervalSeconds: Number(selectedValue.value),
+        hidden: pageHidden.value,
+        rangeEnded: rangeEnded.value,
+      }),
+    );
+    const isPausedEnded = computed(() => refreshState.value === "paused-ended");
+
+    const isAnimating = computed(
+      () => props.isCompact && selectedValue.value > 0 && !isPausedEnded.value,
+    );
+
+    const triggerAriaLabel = computed(() => {
+      if (isPausedEnded.value) return t("dateTime.refreshPausedAria");
+      return isOn.value
+        ? t("search.autoRefreshAriaOn", { value: triggerLabel.value })
+        : t("search.autoRefreshAriaOff");
     });
 
-    const resetTimers = () => {
-      // first reset the current interval callback
-      clearInterval(intervalInstance);
-
-      // return if the interval value is zero
-      if (selectedValue.value == 0 || !props.trigger) {
-        return;
+    const goLiveTooltip = computed(() => {
+      const start = props.rangeStartUs;
+      const end = props.rangeEndUs;
+      if (!(typeof start === "number" && typeof end === "number" && end > start)) {
+        return t("dateTime.goLiveResumeTooltipNoDuration");
       }
+      return t("dateTime.goLiveResumeTooltip", { duration: formatRangeDuration(start, end) });
+    });
 
-      // if we have the value, continue and set the interval
+    const compactTooltip = computed(() => {
+      if (isPausedEnded.value) return t("dateTime.refreshPausedRangeEnded");
+      if (caughtUp.value) return t("dateTime.refreshCaughtUp");
+      return t("search.autoRefreshWithValue", { value: triggerLabel.value });
+    });
+
+    // A kept-alive page in the background must not tick, whatever its range or the tab does.
+    let inactive = false;
+
+    const owesQuery = (nowMs: number) =>
+      owesCatchUp({
+        intervalSeconds: Number(selectedValue.value),
+        lastTickMs,
+        nowMs,
+        rangeEndUs: props.rangeEndUs,
+      });
+
+    const resetTimers = () => {
+      clearInterval(intervalInstance);
+      clock.value = Date.now();
+      if (inactive) return;
+      if (selectedValue.value == 0 || !props.trigger || refreshState.value !== "running") return;
+      lastTickMs = Date.now();
       intervalInstance = window?.setInterval(() => {
+        const now = Date.now();
+        clock.value = now;
+        if (refreshState.value !== "running") {
+          clearInterval(intervalInstance);
+          // The tick that crosses a fixed range's end still fetches the tail since the last query.
+          if (!isPausedEnded.value || !owesQuery(now)) return;
+        }
+        lastTickMs = now;
+        caughtUp.value = false;
         emit("trigger");
       }, selectedValue.value * 1000);
     };
 
-    const minRangeRestrictionMessageVal = computed(() =>
-      t("common.minRefreshIntervalMessage", { interval: props.minRefreshInterval }),
+    // A hidden tab stops the timer; coming back runs one catch-up query if a tick fell due meanwhile.
+    const onVisibilityChange = () => {
+      pageHidden.value = document.visibilityState === "hidden";
+      if (pageHidden.value || inactive) {
+        clearInterval(intervalInstance);
+        return;
+      }
+      const now = Date.now();
+      if (props.trigger && owesQuery(now)) {
+        lastTickMs = now;
+        caughtUp.value = true;
+        emit("trigger");
+      }
+      resetTimers();
+    };
+
+    const FLOOR_NOTICE_MS = 8000;
+    const floorRaisedText = ref("");
+    let floorNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+    // A wider range must not keep a refresh faster than its floor; the change is named once.
+    watch(floorSeconds, (floor) => {
+      const current = Number(selectedValue.value);
+      if (!(current > 0) || current >= floor) return;
+      floorRaisedText.value = `${autoRefreshShortLabel(current, t)} → ${autoRefreshShortLabel(floor, t)}`;
+      clearTimeout(floorNoticeTimer);
+      floorNoticeTimer = setTimeout(() => (floorRaisedText.value = ""), FLOOR_NOTICE_MS);
+      emit("update:modelValue", floor);
+    });
+    const floorNote = computed(() =>
+      floorSeconds.value > AUTO_REFRESH_INTERVALS[0]
+        ? t("timeRangeHost.refreshFastest", {
+            range: spanText.value,
+            interval: autoRefreshShortLabel(floorSeconds.value, t),
+          })
+        : "",
     );
+
+    watch(selectedValue, () => {
+      caughtUp.value = false;
+      resetTimers();
+    });
+
+    watch(
+      () => props.rangeEndUs,
+      () => resetTimers(),
+    );
+
+    onMounted(() => document.addEventListener("visibilitychange", onVisibilityChange));
 
     // on component mount and unmount, update the intervals
     onActivated(() => {
+      inactive = false;
       resetTimers();
     });
 
     onDeactivated(() => {
+      inactive = true;
       clearInterval(intervalInstance);
     });
 
     onUnmounted(() => {
       clearInterval(intervalInstance);
+      clearTimeout(floorNoticeTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     });
 
     return {
@@ -349,6 +539,13 @@ export default defineComponent({
       minRangeRestrictionMessageVal,
       isAnimating,
       selectedValue,
+      isPausedEnded,
+      caughtUp,
+      compactTooltip,
+      goLiveTooltip,
+      onCloseAutoFocus,
+      floorRaisedText,
+      floorNote,
     };
   },
 });
@@ -356,10 +553,12 @@ export default defineComponent({
 
 <style scoped>
 /* keep(keyframes): scoped compiler renames the keyframe and this reference together, which a template utility cannot. */
-.auto-refresh-icon--spinning {
-  display: inline-block !important;
-  transform-origin: center center !important;
-  animation: rotate 2s linear infinite !important;
+@media (prefers-reduced-motion: no-preference) {
+  .auto-refresh-icon--spinning {
+    display: inline-block !important;
+    transform-origin: center center !important;
+    animation: rotate 2s linear infinite !important;
+  }
 }
 
 @keyframes rotate {

@@ -1021,6 +1021,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a filled button's label sits on the button",
   },
   {
+    fg: "--color-button-primary-disabled-foreground",
+    bg: "--color-button-primary-disabled",
+    category: "text",
+    why: "a disabled primary button's label sits on its disabled fill and must stay readable",
+  },
+  {
     fg: "--color-button-warning-foreground",
     bg: "--color-button-warning",
     category: "text",

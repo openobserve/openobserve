@@ -46,6 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             t("dashboard.defaultDuration")
           }}</label>
           <DateTimePickerDashboard
+            preset="form"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
             :key="dateTimePickerKey"
@@ -53,8 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
-            :auto-apply-dashboard="true"
-            calendar-presets
             menu-align="start"
           />
         </div>

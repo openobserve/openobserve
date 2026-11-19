@@ -14,6 +14,8 @@ import { ref, computed, onMounted, onUnmounted } from "vue";
 export interface ToolbarResponsiveOptions {
   /** Keep the last real widths while the bar is detached (a kept-alive page in the cache), so it returns at its old stage. */
   keepWidthWhenDetached?: boolean;
+  /** Width the right section can still shed on its own (a trigger above its shortest form), read on each resize. */
+  rightSlack?: () => number;
 }
 
 export function useToolbarResponsive(options: ToolbarResponsiveOptions = {}) {
@@ -21,6 +23,8 @@ export function useToolbarResponsive(options: ToolbarResponsiveOptions = {}) {
   const toolbarRightRef = ref<HTMLElement | null>(null);
   const toolbarBarWidth = ref(typeof window !== "undefined" ? window.innerWidth : 1200);
   const toolbarRightWidth = ref(0);
+  const toolbarRightSlack = ref(0);
+  const readSlack = () => Math.max(0, options.rightSlack?.() ?? 0);
 
   let leftObserver: ResizeObserver | null = null;
   let rightObserver: ResizeObserver | null = null;
@@ -28,7 +32,10 @@ export function useToolbarResponsive(options: ToolbarResponsiveOptions = {}) {
   // Available width for the left section:
   //   bar container width − right section width − bar padding (14px)
   const availableLeftWidth = computed(() =>
-    Math.max(0, toolbarBarWidth.value - toolbarRightWidth.value - 14),
+    Math.max(
+      0,
+      toolbarBarWidth.value - Math.max(0, toolbarRightWidth.value - toolbarRightSlack.value) - 14,
+    ),
   );
 
   // A detached element measures 0; that is not a width the bar must fit.
@@ -48,10 +55,12 @@ export function useToolbarResponsive(options: ToolbarResponsiveOptions = {}) {
     }
     if (toolbarRightRef.value) {
       toolbarRightWidth.value = toolbarRightRef.value.getBoundingClientRect().width;
+      toolbarRightSlack.value = readSlack();
       const rightEl = toolbarRightRef.value;
       rightObserver = new ResizeObserver((entries) => {
         const width = entries[0]?.contentRect.width ?? 0;
         if (keepsWidth(rightEl, width)) return;
+        toolbarRightSlack.value = readSlack();
         toolbarRightWidth.value = width;
       });
       rightObserver.observe(toolbarRightRef.value);

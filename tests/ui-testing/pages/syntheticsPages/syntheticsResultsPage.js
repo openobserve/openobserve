@@ -17,6 +17,7 @@
 
 import { expect } from '@playwright/test';
 import { selectOSelectOption } from '../alertsPages/oselectHelpers.js';
+import { pickRelativePeriodCode, waitForDateTimePanel } from '../generalPages/relativePeriod.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class SyntheticsResultsPage {
@@ -65,7 +66,6 @@ export class SyntheticsResultsPage {
   kpi(key) { return `[data-test="monitor-runs-kpi-${key}"]`; }
   statusFilter(key) { return `[data-test="monitor-runs-status-filter-${key}"]`; }
   stepErrorCard(rowId) { return `[data-test="synthetics-run-detail-step-error-card-${rowId}"]`; }
-  relativePeriod(suffix) { return `[data-test="date-time-relative-${suffix}-btn"]`; }
 
   // `name` mirrors the list link's `?name=` query, which is what the header and toasts display.
   async gotoResults(orgId, checkId, { name = null } = {}) {
@@ -94,10 +94,8 @@ export class SyntheticsResultsPage {
   // The picker is auto-apply: choosing a period re-queries immediately.
   async setRelativeWindow(suffix) {
     await this.page.locator(this.locators.dateTimeButton).first().click();
-    const btn = this.page.locator(this.relativePeriod(suffix));
-    await btn.waitFor({ state: 'visible', timeout: 15000 });
-    await btn.click();
-    await this.page.keyboard.press('Escape');
+    await waitForDateTimePanel(this.page, 15000);
+    await pickRelativePeriodCode(this.page, suffix);
   }
 
   async clickStatusFilter(key) {

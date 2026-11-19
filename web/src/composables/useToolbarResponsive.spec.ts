@@ -87,4 +87,17 @@ describe("useToolbarResponsive", () => {
     expect(api.availableLeftWidth.value).toBe(0);
     wrapper.unmount();
   });
+
+  it("counts what the right section can still give up, so a long time range does not cost the left its labels (V1)", () => {
+    let slack = 180;
+    const { wrapper, api } = mountBar({ rightSlack: () => slack });
+    const bar = wrapper.element as HTMLElement;
+    resize(bar, 1214);
+    resize(bar.lastElementChild!, 380);
+    expect(api.availableLeftWidth.value).toBe(1000);
+    slack = 0;
+    resize(bar.lastElementChild!, 200);
+    expect(api.availableLeftWidth.value).toBe(1000);
+    wrapper.unmount();
+  });
 });

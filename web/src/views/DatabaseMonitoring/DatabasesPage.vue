@@ -53,6 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DbmPageChrome title-data-test="dbm-databases-title" :tab-counts="tabCounts">
     <div class="flex min-h-0 flex-1 flex-col">
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="dbm-databases-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <OTable
         :data="treeRows"
         :columns="columns"
@@ -119,13 +125,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar-trailing>
           <div class="flex items-center gap-1.5">
             <DateTime
-              auto-apply
+              preset="explorer-auto"
+              :capabilities="{ kinds: ['rolling', 'fixed'] }"
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-databases-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="h-8"
+              :range="timeHost.range.value"
+              @apply="timeHost.onApply"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
@@ -528,6 +537,7 @@ import DbmOverlapValue from "@/components/dbm/DbmOverlapValue.vue";
 import { hasDbmTraceVantage } from "@/composables/dbm/useDbmTraceVantage";
 import { buildDbmPrefill } from "@/utils/alerts/prefill/fromDbm";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -554,6 +564,7 @@ const {
   run,
   onRefresh,
   onDateChange,
+  timeHost,
 } = useDbmListPage({
   load: () => load(),
   syncUrl: () => syncUrl(),

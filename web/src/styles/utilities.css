@@ -224,3 +224,12 @@
   background-image: radial-gradient(var(--color-border-strong) 0.0625rem, transparent 0.0625rem);
   background-size: 1.125rem 1.125rem;
 }
+
+/* Time picker containers: disabled chips, rows and days must stay readable (4.5:1), so the shared 60% dim is undone here only. Consumer: components/DateTime.vue. */
+@utility time-picker-scope {
+  --color-toggle-item-disabled: var(--color-time-range-item-disabled);
+  --color-datepicker-day-disabled-text: var(--color-time-range-item-disabled);
+  & [data-state][data-disabled] {
+    opacity: 1;
+  }
+}

@@ -33,9 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <!-- Applies a picked window at once, as on Logs and Traces: Run query is the apply step. -->
       <DateTimePickerDashboard
+        preset="explorer-manual"
+        :capabilities="{ kinds: ['rolling', 'fixed'] }"
         ref="datePickerRef"
         :model-value="dateState"
-        :auto-apply-dashboard="true"
         @update:model-value="pickInput('date', $event)"
         :hide-range-shift="isMobile"
         class="h-8"

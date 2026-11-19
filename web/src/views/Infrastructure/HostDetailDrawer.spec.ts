@@ -724,7 +724,7 @@ describe("HostDetailDrawer", () => {
       pickerWindow.startTime = slid.startTime;
       pickerWindow.endTime = slid.endTime;
       wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
-        startTime: RANGE.from,
+        startTime: RANGE.from + 1,
         endTime: RANGE.to,
         userChangedValue: true,
       });

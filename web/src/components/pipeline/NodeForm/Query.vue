@@ -52,6 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <DateTime
+        preset="explorer-manual"
+        :capabilities="{ kinds: ['rolling', 'fixed'] }"
         class="h-8.5"
         menu-align="end"
         @on:date-change="(d) => scheduledPipelineRef?.updateDateChange(d)"

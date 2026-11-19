@@ -66,7 +66,7 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.seedClipboard(`${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.applyPaste();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
     await pm.dateTimePickerPage.expectNextEnabled();
 
@@ -85,10 +85,14 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
   });
 
   // TC-03
-  test("forward shift clamps the window so its end never passes the present", {
+  test("forward shift that reaches the present returns to the live range it started from", {
     tag: ['@date-time-next-shift-cap', '@all', '@P0']
   }, async ({ page }) => {
-    testLogger.info('Shifting a window ending just before now and checking the cap');
+    testLogger.info('Shifting a window ending just before now back to its live origin');
+
+    // The Logs picker opens on its default rolling range; that is where the chain begins.
+    await pm.dateTimePickerPage.clickCopy();
+    const origin = await pm.dateTimePickerPage.readCopiedRange();
 
     // Compute the anchor from the page's own clock so the test shares the
     // component's notion of "now" (Date.now() * 1000 is epoch microseconds).
@@ -97,26 +101,24 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
       return { startMicros: now - 90_000_000, endMicros: now - 30_000_000 };
     });
 
-    const before = await pm.dateTimePickerPage.pasteAndReadBackRange(`${startMicros} - ${endMicros}`);
+    await pm.dateTimePickerPage.pasteAndReadBackRange(`${startMicros} - ${endMicros}`);
     await pm.dateTimePickerPage.expectNextEnabled();
 
     await pm.dateTimePickerPage.clickNext();
 
     await pm.dateTimePickerPage.openPicker();
+    await pm.dateTimePickerPage.expectRelativePanelActive();
     await pm.dateTimePickerPage.clickCopy();
     const after = await pm.dateTimePickerPage.readCopiedRange();
 
     const nowMicros = await page.evaluate(() => Date.now() * 1_000);
 
-    // Headline assertion: the clamped end never lands in the future. The shift
-    // clamps its delta to now - end, so after.end_date is at most "now" at the
-    // moment of the click; the +2s slack absorbs normal execution drift.
+    // A step that would pass now goes back to the rolling range instead (design §3), so nothing lands in the future.
+    expect(after.name).toBe(origin.name);
+    expect(after.end_date - after.start_date).toBe(origin.end_date - origin.start_date);
     expect(after.end_date).toBeLessThanOrEqual(nowMicros + 2 * MICROS_PER_SECOND);
-    // The window stays valid and has still moved forward.
-    expect(after.end_date).toBeGreaterThan(after.start_date);
-    expect(after.start_date).toBeGreaterThan(before.start_date);
 
-    testLogger.info('Forward shift clamped at now', { before, after });
+    testLogger.info('Forward shift returned to the live origin', { origin, after });
   });
 
   // TC-04
@@ -127,7 +129,7 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
 
     await pm.dateTimePickerPage.seedClipboard(`${ANCHOR_START_MICROS} - ${ANCHOR_END_MICROS}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.applyPaste();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
 
     await pm.dateTimePickerPage.clickPrev();
@@ -143,25 +145,32 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
   });
 
   // TC-05
-  test("forward shift is disabled when the window end is past the present", {
+  test("a pasted window still in progress keeps its real end, and Next stays disabled", {
     tag: ['@date-time-next-shift-cap', '@all', '@P1']
   }, async ({ page }) => {
-    testLogger.info('Verifying Next is disabled for a window ending past the present');
+    testLogger.info('Verifying a pasted end past the present is kept as an in-progress range');
 
-    // An end exactly at now re-enables Next ~1s later (endUTC + 1s > now), so end in the future.
+    // Whole seconds, as the Start and End fields hold them.
     const { startMicros, endMicros } = await page.evaluate(() => {
-      const now = Date.now() * 1_000;
-      return { startMicros: now - 30_000_000, endMicros: now + 300_000_000 };
+      const nowSeconds = Math.floor(Date.now() / 1_000);
+      return { startMicros: (nowSeconds - 30) * 1_000_000, endMicros: (nowSeconds + 300) * 1_000_000 };
     });
 
     await pm.dateTimePickerPage.seedClipboard(`${startMicros} - ${endMicros}`);
     await pm.dateTimePickerPage.clickPaste();
-    await pm.dateTimePickerPage.expectPasteSuccessToast();
+    await pm.dateTimePickerPage.applyPaste();
     await pm.dateTimePickerPage.expectAbsolutePanelActive();
 
+    await pm.dateTimePickerPage.clickCopy();
+    const pasted = await pm.dateTimePickerPage.readCopiedRange();
+    expect(pasted.start_date).toBe(startMicros);
+    expect(pasted.end_date).toBe(endMicros);
+
+    // The range already ends past now, so there is nothing later to step to.
+    await pm.dateTimePickerPage.closePickerWithEscape();
     await pm.dateTimePickerPage.expectNextDisabled();
 
-    testLogger.info('Next disabled for a window ending past the present');
+    testLogger.info('Pasted in-progress end kept; Next disabled');
   });
 
   // TC-06

@@ -308,6 +308,7 @@ describe("AC4.6 kind table", () => {
     "page-size",
     "sort",
     "zoom",
+    "range",
     "compare",
     "explicit",
   ];
@@ -336,15 +337,18 @@ describe("AC4.6 kind table", () => {
     const meta = { liveMode: setting === "on" };
     const reasons = kind === "refinement" ? refinements : kind === "entry" ? entries : explicit;
     reasons
-      .filter((r) => r !== "narrow")
+      .filter((r) => r !== "narrow" && r !== "range")
       .forEach((r) => expect(reasonEligibility(r, config, meta, "logs")).toBe(expected));
   });
 
-  it("Narrow to runs whatever the Auto Run setting but re-checks the guard", () => {
-    expect(
-      reasonEligibility("narrow", { auto_query_enabled: true }, { liveMode: false }, "logs"),
-    ).toBe("guarded");
-  });
+  it.each(["narrow", "range"] as RunReason[])(
+    "%s runs whatever the Auto Run setting but re-checks the guard",
+    (reason) => {
+      expect(
+        reasonEligibility(reason, { auto_query_enabled: true }, { liveMode: false }, "logs"),
+      ).toBe("guarded");
+    },
+  );
 
   it("refinements never auto-run on Visualize or Build", () => {
     expect(
@@ -395,6 +399,7 @@ describe("J4 debounce and coalescing", () => {
       time: 0,
       "time-typed": 2500,
       zoom: 0,
+      range: 0,
       sort: 0,
       function: 300,
       tab: 0,
@@ -894,13 +899,65 @@ describe("explicit zoom", () => {
     expect(h.hits()).toHaveLength(1);
   });
 
-  it("stays pending when the editor is dirty", () => {
+  it("runs the editor's unrun edits with it (decision a, B12)", () => {
     const h = makeHarness();
     h.engine.markEditorDirty();
-    expect(h.engine.requestRun("zoom")).toBe("pending-dirty");
+    expect(h.engine.requestRun("zoom")).toBe("dispatched");
+    expect(h.hits()).toHaveLength(1);
+    expect(h.store.meta.editorDirty).toBe(false);
+  });
+});
+
+describe("explicit range change", () => {
+  it("runs once with Auto Run off and the editor clean", () => {
+    const h = makeHarness({ liveMode: false, estimateMb: 50 });
+    expect(h.engine.requestRun("range")).toBe("dispatched");
+    vi.runAllTimers();
+    expect(h.hits()).toHaveLength(1);
+    expect(h.hits()[0].ctx.reasons).toEqual(["range"]);
+  });
+
+  it("is held by the scan-budget guard when the new range is over budget", () => {
+    const h = makeHarness({ liveMode: false, estimateMb: 1e9 });
+    expect(h.engine.requestRun("range")).toBe("blocked");
+    vi.runAllTimers();
+    expect(h.hits()).toHaveLength(0);
+    expect(h.store.meta.autoRunBlocked).not.toBeNull();
+  });
+
+  it("a range already covered by consent runs without a new estimate", () => {
+    const h = makeHarness({ liveMode: false, estimateMb: 1e9 });
+    h.engine.requestRun("url");
+    vi.runAllTimers();
+    h.engine.requestRun("run-anyway");
+    vi.runAllTimers();
+    const calls = h.estimate.mock.calls.length;
+    expect(h.engine.requestRun("range")).toBe("dispatched");
+    expect(h.estimate.mock.calls.length).toBe(calls);
+  });
+
+  it("runs over unrun editor edits and runs them too (decision a, B12)", () => {
+    const h = makeHarness({ liveMode: false });
+    h.engine.markEditorDirty();
+    expect(h.engine.requestRun("range")).toBe("dispatched");
+    vi.runAllTimers();
+    expect(h.hits()).toHaveLength(1);
+    expect(h.store.meta.editorDirty).toBe(false);
+  });
+});
+
+describe("refused over-limit link (R2)", () => {
+  it("runs nothing, not even an explicit run, until the refusal clears", () => {
+    const h = makeHarness();
+    h.store.meta.rangeLimitRefusal = { allowed: "1d" };
+    expect(h.engine.requestRun("url")).toBe("skipped-ineligible");
+    expect(h.engine.requestRun("run")).toBe("skipped-ineligible");
+    vi.runAllTimers();
     expect(h.requests).toHaveLength(0);
-    expect(h.store.meta.runPending).toBe(true);
-    expect(h.store.meta.editorDirty).toBe(true);
+    h.store.meta.rangeLimitRefusal = null;
+    h.engine.requestRun("range");
+    vi.runAllTimers();
+    expect(h.hits()).toHaveLength(1);
   });
 });
 
@@ -1508,6 +1565,14 @@ describe("auto-refresh", () => {
     expect(h.hits()).toHaveLength(1);
     expect(h.engine.hasMissedTick()).toBe(true);
     expect(ticks).toEqual([true, true]);
+  });
+
+  it("remembers when the last run began, for the tail of a fixed range", () => {
+    const h = makeHarness();
+    expect(h.engine.lastRunStartedMs()).toBeNull();
+    h.engine.requestRun("run");
+    vi.runAllTimers();
+    expect(h.engine.lastRunStartedMs()).toBe(Date.now());
   });
 
   it("is ineligible without an interval", () => {

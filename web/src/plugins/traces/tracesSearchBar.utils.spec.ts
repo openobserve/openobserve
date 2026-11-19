@@ -13,7 +13,9 @@ import {
   isDatetimeChanged,
   tracesRunIsStaged,
   tracesRunSignature,
+  tracesRunTimeSelection,
   tracesSearchRunSignature,
+  tracesQueryEdited,
   tracesToolbarLayout,
 } from "./tracesSearchBar.utils";
 
@@ -286,6 +288,61 @@ describe("tracesRunIsStaged", () => {
     const obj = searchObj("service_name = 'b'", false);
     obj.meta.lastRunSignature = null;
     expect(tracesRunIsStaged(obj, false)).toBe(false);
+  });
+});
+
+describe("tracesQueryEdited", () => {
+  const searchObj = () => ({
+    meta: { sqlMode: false },
+    data: {
+      editorValue: "service_name = 'a'",
+      stream: { selectedStream: { value: "default" } },
+      datetime: { startTime: 1, endTime: 2, relativeTimePeriod: "15m", type: "relative" },
+    },
+  });
+
+  it("is false before the first Run", () => {
+    expect(tracesQueryEdited(null, searchObj())).toBe(false);
+  });
+
+  it("ignores a range change since the last Run", () => {
+    const obj = searchObj();
+    const ran = tracesSearchRunSignature(obj);
+    obj.data.datetime = { startTime: 5, endTime: 9, relativeTimePeriod: "1h", type: "relative" };
+    expect(tracesQueryEdited(ran, obj)).toBe(false);
+  });
+
+  it("is true once the query text, stream or SQL mode differs from the last Run", () => {
+    const obj = searchObj();
+    const ran = tracesSearchRunSignature(obj);
+    obj.data.editorValue = "service_name = 'b'";
+    expect(tracesQueryEdited(ran, obj)).toBe(true);
+    obj.data.editorValue = "service_name = 'a'";
+    obj.data.stream.selectedStream.value = "other";
+    expect(tracesQueryEdited(ran, obj)).toBe(true);
+    obj.data.stream.selectedStream.value = "default";
+    obj.meta.sqlMode = true;
+    expect(tracesQueryEdited(ran, obj)).toBe(true);
+  });
+});
+
+describe("tracesRunTimeSelection", () => {
+  const sign = (datetime: any) =>
+    tracesRunSignature({ editorValue: "", stream: "s", sqlMode: false, datetime });
+
+  it("reads the period of a relative run", () => {
+    const run = sign({ type: "relative", relativeTimePeriod: "15m", startTime: 1, endTime: 2 });
+    expect(tracesRunTimeSelection(run)).toEqual({ type: "relative", period: "15m" });
+  });
+
+  it("reads the bounds of an absolute run", () => {
+    const run = sign({ type: "absolute", relativeTimePeriod: "15m", startTime: 10, endTime: 20 });
+    expect(tracesRunTimeSelection(run)).toEqual({ type: "absolute", startUs: 10, endUs: 20 });
+  });
+
+  it("reads nothing from a missing or broken signature", () => {
+    expect(tracesRunTimeSelection(null)).toBeNull();
+    expect(tracesRunTimeSelection("not json")).toBeNull();
   });
 });
 

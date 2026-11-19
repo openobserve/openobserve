@@ -93,7 +93,7 @@ export function operatorWhere(t: TranslateFn, model: ProfileModel, op: ProfileOp
   });
 }
 
-/** The logs page time range in words: "Past 1 Day" for a relative period, else start → end. */
+/** The logs page time range in words: "Last 1 day" for a relative period, else start → end. */
 export function timeRangeLabel(
   t: TranslateFn,
   dt: { type?: string; relativeTimePeriod?: string; startTime?: number; endTime?: number } | null,

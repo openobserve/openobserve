@@ -311,13 +311,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog'
           "
-          class="flex items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
+          class="flex min-w-0 items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <OPageHeaderStatus />
           <DateTime
+            preset="explorer-auto"
+            :host-name="t('menu.traces')"
             ref="dateTimeRef"
-            auto-apply
             menu-align="end"
+            shortcuts
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,
@@ -325,11 +327,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
-            calendar-presets
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8.5! max-lg:me-auto max-md:[&_.date-time-label]:hidden"
+            :retention-days="tracesStreamLimits.retentionDays"
+            :limit-refused="!!tracesRangeLink.refusal"
+            class="h-8.5! max-lg:me-auto"
             @on:date-change="updateDateTime"
+            @apply="onRangeApply"
             @on:timezone-change="updateTimezone"
           />
           <RecentSearchesButton
@@ -444,6 +448,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
+            :live-url="shareRollingURL"
+            :fixed-label="shareFixedLabel"
+            :live-label="shareRollingLabel"
+            :range-context="shareRangeContext"
             variant="outline"
             size="icon-md"
             shortcut-id="tracesCopyUrl"
@@ -530,12 +538,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
-        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-lg:ms-0">
+        <div
+          v-if="searchObj.meta.searchMode === 'service-graph'"
+          class="ms-auto min-w-0 max-lg:ms-0"
+        >
           <div class="flex items-center gap-2 max-lg:w-full max-lg:justify-end max-lg:gap-1.5">
             <OPageHeaderStatus />
             <DateTime
+              preset="explorer-auto"
+              :host-name="t('menu.traces')"
               ref="dateTimeRef"
-              auto-apply
               :default-type="searchObj.data.datetime.type"
               :default-absolute-time="{
                 startTime: searchObj.data.datetime.startTime,
@@ -543,9 +555,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
-              calendar-presets
               class="h-8.5!"
               @on:date-change="updateDateTime"
+              @apply="onRangeApply"
             />
             <OButton
               data-test="service-graph-refresh-btn"
@@ -583,12 +595,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Services Catalog right toolbar: DateTime, Refresh -->
-        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto">
+        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto min-w-0">
           <div class="flex items-center gap-2">
             <OPageHeaderStatus />
             <DateTime
+              preset="explorer-auto"
+              :host-name="t('menu.traces')"
               ref="dateTimeRef"
-              auto-apply
               menu-align="end"
               :default-type="searchObj.data.datetime.type"
               :default-absolute-time="{
@@ -597,9 +610,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
-              calendar-presets
               class="h-8.5!"
               @on:date-change="updateDateTime"
+              @apply="onRangeApply"
             />
           </div>
         </div>
@@ -670,9 +683,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTooltip :content="t('nlMode.toggle')" />
         </OButton>
+        <OBadge
+          v-if="contextView"
+          variant="default-soft"
+          size="sm"
+          class="absolute end-10 top-1 z-10"
+          data-test="traces-search-bar-context-view-chip"
+          >{{ t("timeRangeHost.filterOff") }}</OBadge
+        >
         <UnifiedQueryEditor
           v-show="!showFilterBuilder"
           ref="queryEditorRef"
+          :class="{ 'opacity-60': contextView }"
           editor-id="traces-query-editor"
           data-test-prefix="traces-search-bar"
           v-model:query="searchObj.data.editorValue"
@@ -758,6 +780,7 @@ import {
   toRef,
   shallowRef,
 } from "vue";
+import { getIntlLocale } from "@/locales";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
@@ -770,7 +793,13 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import DateTime from "@/components/DateTime.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import { contextViewKeeps } from "@/utils/searchAroundWindow";
+import type { TimeRangeApplyMeta } from "@/utils/timeRangeModel";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { fixedShareLabel, withRollingPeriod } from "@/utils/shareTimeRange";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -796,7 +825,6 @@ import SavedViewsMenu from "@/components/savedViews/SavedViewsMenu.vue";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useFavoriteSavedViews } from "@/composables/useFavoriteSavedViews";
 
-import { debounce } from "lodash-es";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
 import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
@@ -811,6 +839,7 @@ import {
 } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
+  tracesRangeLink,
   tracesRunIsStaged,
   tracesToolbarLayout,
   TRACES_TOOLBAR_WIDTHS,
@@ -853,6 +882,7 @@ import {
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    OBadge,
     OPageHeaderStatus,
     OSeparator,
     DateTime,
@@ -894,8 +924,14 @@ export default defineComponent({
     "apply-saved-view",
     "drill-down",
     "recent-restore",
+    "leave-context-view",
   ],
   props: {
+    /** Search around's context view is on screen: the typed filter is not what the results used. */
+    contextView: {
+      type: Boolean,
+      default: false,
+    },
     fieldValues: {
       type: Object,
       default: () => {},
@@ -911,7 +947,8 @@ export default defineComponent({
   methods: {
     searchData() {
       if (this.searchObj?.loading == false) {
-        // this.searchObj.runQuery = true;
+        // Run query always sends what the query bar shows, so it leaves the context view.
+        this.$emit("leave-context-view");
         this.$emit("searchdata");
       }
     },
@@ -925,6 +962,30 @@ export default defineComponent({
     const store = useStore();
 
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
+    const tracesStreamLimits = useStreamTimeLimits(() => [
+      { name: String(searchObj.data.stream.selectedStream?.value ?? ""), type: "traces" },
+    ]);
+
+    // A rolling range can also be shared as its period; the default click still copies the fixed window.
+    const shareRollingURL = computed(() => {
+      const date = searchObj.data.datetime;
+      if (date.type !== "relative") return "";
+      return withRollingPeriod(tracesShareURL.value, date.relativeTimePeriod) ?? "";
+    });
+    const shareFixedLabel = computed(() => {
+      const { startTime, endTime } = searchObj.data.datetime;
+      return fixedShareLabel(Number(startTime), Number(endTime), store.state.timezone);
+    });
+    const shareRangeContext = computed(() =>
+      [t("menu.traces"), searchObj.data.stream.selectedStream?.value].filter(Boolean).join(" · "),
+    );
+    const shareRollingLabel = computed(() => {
+      const date = searchObj.data.datetime;
+      if (date.type !== "relative" || !date.relativeTimePeriod) return "";
+      return String(
+        formatPeriodLabel(date.relativeTimePeriod, store.state.timezone, t, getIntlLocale()),
+      );
+    });
     const queryEditorRef = ref(null);
 
     const nlpMode = ref(false);
@@ -1192,25 +1253,39 @@ export default defineComponent({
       }
     };
 
-    // Debounced query trigger for absolute time when auto-run is enabled.
-    // Gives the user 2.5s to finish typing start/end time before firing.
-    const triggerAbsoluteQueryDebounced = debounce((value: object) => {
-      if (value.userChangedValue) {
-        analytics.track("traces_time_range_changed", {
-          stream_name: searchObj.data.stream.selectedStream.value,
-          value_type: value.valueType,
-          relative_period: value.relativeTimePeriod,
-        });
-      }
-
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
-        emit("searchdata");
-      }
-    }, 2500);
+    // The context view runs its own window moves at once; Back to results runs the restored range.
+    let runAfterDate: (() => void) | null = null;
+    let contextMoves = 0;
+    const onRangeApply = (_range: unknown, meta: TimeRangeApplyMeta) => {
+      if (!props.contextView || runAfterDate) return;
+      if (!contextViewKeeps(meta.source)) return emit("leave-context-view");
+      contextMoves += 1;
+      runAfterDate = () => emit("searchdata");
+    };
+    const enterContextWindow = (range: { start: number; end: number }): boolean => {
+      contextMoves = 0;
+      runAfterDate = () => emit("searchdata");
+      if (dateTimeRef.value?.setCustomDate("absolute", range) !== false) return true;
+      runAfterDate = null;
+      return false;
+    };
+    const undoToResults = (run: () => void): boolean => {
+      const picker = dateTimeRef.value as { undo?: () => boolean } | null;
+      if (contextMoves > 0 || !picker?.undo) return false;
+      runAfterDate = run;
+      if (picker.undo()) return true;
+      runAfterDate = null;
+      return false;
+    };
 
     const updateDateTime = async (value: object) => {
       if (router.currentRoute.value.name !== "traces") return;
+      if (value.userChangedValue === true) {
+        tracesRangeLink.fromLink = false;
+        tracesRangeLink.refusal = null;
+      }
       if (
+        !tracesRangeLink.refusal &&
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
         searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
@@ -1264,30 +1339,15 @@ export default defineComponent({
       await nextTick();
       await nextTick();
 
-      if (
-        value.valueType === "absolute" &&
-        searchObj.meta.liveMode &&
-        store.state.zoConfig?.auto_query_enabled &&
-        value.userChangedValue === true &&
-        datetimeChanged
-      ) {
-        // Debounce query trigger so user can finish typing the full time value
-        triggerAbsoluteQueryDebounced(value);
+      if (runAfterDate) {
+        const run = runAfterDate;
+        runAfterDate = null;
+        run();
         return;
       }
 
-      // Live mode: auto-trigger search ONLY on a genuine user-driven time-range
-      // change. `userChangedValue` (stamped by DateTime.vue) is the authoritative
-      // signal — programmatic sets (redirect, metrics brush, mount replay) emit
-      // `false` and must never auto-run, since they are owned by an explicit
-      // trigger elsewhere. `datetimeChanged` additionally filters a user toggling
-      // the type tab without actually changing the range.
-      if (
-        store.state.zoConfig?.auto_query_enabled &&
-        searchObj.meta.liveMode &&
-        value.userChangedValue === true &&
-        datetimeChanged
-      ) {
+      // A user's range apply always runs, unrun query edits included (decision a).
+      if (value.userChangedValue === true && (datetimeChanged || value.rerun === true)) {
         emit("searchdata");
       }
 
@@ -1757,6 +1817,9 @@ export default defineComponent({
     const showPinnedSavedViews = computed(() => pinnedFit.value.savedViews);
 
     return {
+      onRangeApply,
+      enterContextWindow,
+      undoToResults,
       t,
       router,
       store,
@@ -1786,6 +1849,7 @@ export default defineComponent({
       emit,
       updateQueryValue,
       updateDateTime,
+      tracesRangeLink,
       downloadLogs,
       createAlertDisabledReason,
       createAlertNote,
@@ -1818,6 +1882,11 @@ export default defineComponent({
       onErrorOnlyToggle,
       updateNewDateTime,
       tracesShareURL,
+      shareRollingURL,
+      shareFixedLabel,
+      shareRangeContext,
+      tracesStreamLimits,
+      shareRollingLabel,
       config,
       applyFilters,
       removeFilterByField,

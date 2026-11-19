@@ -176,6 +176,7 @@
     var(--color-primary-600) 30%,
     var(--color-surface-overlay)
   );
+  --color-button-primary-disabled-foreground: var(--color-grey-300);
 
   /* secondary (darkened surface) */
   --color-button-secondary: var(--color-surface-overlay);
@@ -243,6 +244,7 @@
   --color-toggle-item-active-border: var(--color-primary-400);
   /* The item also dims to 60%, which makes --color-text-disabled vanish on the dark track. */
   --color-toggle-item-disabled: var(--color-grey-500);
+  --color-time-range-item-disabled: var(--color-grey-400);
   /* Accent lightens on dark so the insertion line stays visible on the track */
   --color-toggle-drop-indicator: var(--color-primary-400);
 

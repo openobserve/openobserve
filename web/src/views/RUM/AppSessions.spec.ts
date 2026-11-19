@@ -771,6 +771,27 @@ describe("AppSessions.vue", () => {
       expect(wrapper.vm.dateTime.relativeTimePeriod).toBe(newDate.relativeTimePeriod);
     });
 
+    it.each([
+      ["absolute", true, true],
+      ["relative-custom", true, true],
+      ["absolute", false, false],
+    ])(
+      "runs a %s range only when the user applied it (user: %s) (V16)",
+      (valueType, user, runs) => {
+        wrapper.vm.isMounted = true;
+        const getSessionsSpy = vi.spyOn(searchService, "search");
+        getSessionsSpy.mockClear();
+        wrapper.vm.updateDateChange({
+          startTime: Date.now() - 7_200_000_000,
+          endTime: Date.now() * 1000,
+          relativeTimePeriod: valueType === "absolute" ? null : "2h",
+          valueType,
+          userChangedValue: user,
+        });
+        expect(getSessionsSpy.mock.calls.length > 0).toBe(runs);
+      },
+    );
+
     it("should not update if date is same", () => {
       const currentDate = { ...wrapper.vm.dateTime };
       wrapper.vm.updateDateChange(currentDate);

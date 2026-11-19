@@ -65,7 +65,7 @@ export function shortRange(range: PublicLinkRange, timezone: string): string {
   return `${range.secs / unit.secs}${unit.short}`;
 }
 
-/** `Past 2 weeks`, or the full start and end with times. */
+/** `Last 2 weeks`, or the full start and end with times. */
 export function longRange(range: PublicLinkRange, t: TranslateFn, timezone: string): I18nText {
   if (range.type === "absolute") {
     return raw(printedWindow(range.start / 1000, range.end / 1000, timezone));

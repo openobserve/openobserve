@@ -1683,12 +1683,12 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     if (timeInput) {
-      // Clear existing value and type a decimal.
-      // Use pressSequentially to bypass native input[type=time] validation that
-      // rejects "12.5:00" at the fill() level.
+      // Start is a text field now; unreadable text keeps the field in its error state.
       await timeInput.click();
       await timeInput.fill('');
       await timeInput.pressSequentially('12.5:00');
+      await timeInput.press('Tab');
+      const fieldInvalid = (await timeInput.getAttribute('aria-invalid').catch(() => null)) === 'true';
       await page.waitForTimeout(500);
 
       // Click outside to trigger validation
@@ -1701,7 +1701,7 @@ test.describe("Logs Regression Bug Fixes", () => {
 
       // PRIMARY ASSERTION: Decimal value should be rejected or corrected
       const hasDecimalInValue = inputValue.includes('.');
-      const errorVisible = await pm.logsPage.getLogsSearchErrorMessage()
+      const errorVisible = fieldInvalid || await pm.logsPage.getLogsSearchErrorMessage()
         .isVisible({ timeout: 2000 }).catch(() => false);
 
       testLogger.info(`Decimal in value: ${hasDecimalInValue}, Error visible: ${errorVisible}`);

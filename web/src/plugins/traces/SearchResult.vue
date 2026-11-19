@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             startTime: searchObj.data.datetime.startTime,
             endTime: searchObj.data.datetime.endTime,
           }"
-          :filter="searchObj.data.editorValue"
+          :filter="chartFilter ?? searchObj.data.editorValue"
           :streamFields="searchObj.data.stream.selectedStreamFields"
           :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
           :ai-enabled="aiEnabled"
@@ -226,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :row-href="traceDetailsHref"
           @row-click="expandRowDetail"
           @open-in-new-tab="openTraceInNewTab"
+          @search-around="(request) => $emit('search:around', request)"
           @page-change="(page: number) => changePage(page)"
           @cross-page="(page: number) => changePage(page, { fromCrossing: true })"
           @rows-per-page-change="changeRowsPerPage"
@@ -326,6 +327,11 @@ export default defineComponent({
       type: Object as PropType<{ start: number; end: number }>,
       default: undefined,
     },
+    /** The filter the rows ran with; the context view runs none while the typed query stays. */
+    chartFilter: {
+      type: String,
+      default: undefined,
+    },
   },
   emits: [
     "update:scroll",
@@ -343,6 +349,7 @@ export default defineComponent({
     "ask-ai",
     "send-to-ai-chat",
     "open-mobile-fields",
+    "search:around",
   ],
   methods: {
     toggleErrorOnly() {

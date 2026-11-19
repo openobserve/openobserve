@@ -48,6 +48,7 @@ import { resetTransient } from "@/utils/logs/transientSearchKeys";
 import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
 import { featureState } from "@/utils/featureGate";
+import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import {
   decodeColumns,
   endLogsArrival,
@@ -436,8 +437,8 @@ const useLogs = (t: TranslateFn) => {
     }
 
     const date = {
-      startTime: Number(queryParams.from),
-      endTime: Number(queryParams.to),
+      startTime: urlTimeToMicros(queryParams.from),
+      endTime: urlTimeToMicros(queryParams.to),
       relativeTimePeriod: queryParams.period || null,
       type: queryParams.period ? "relative" : "absolute",
     };

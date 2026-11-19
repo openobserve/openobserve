@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </OTooltip>
         </OButton>
+        <slot name="panel-time" />
         <span
           v-if="titleMeta"
           class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
@@ -784,7 +785,11 @@ import {
   type PanelEditorFocusTarget,
 } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
-import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import {
+  panelQueryStreams,
+  panelRangeHours,
+  usePanelNotices,
+} from "@/composables/dashboard/usePanelNotices";
 import { ANNOTATION_SOURCE_ROW_LIMIT } from "@/utils/dashboard/annotationSources";
 import { hasPanelDraft } from "@/composables/dashboard/usePanelDraft";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -1039,7 +1044,10 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
-    } = usePanelNotices(() => store.state.timezone);
+    } = usePanelNotices(() => store.state.timezone, {
+      streams: () => panelQueryStreams(props.data),
+      rangeHours: () => panelRangeHours(props.selectedTimeDate),
+    });
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -1566,6 +1574,8 @@ export default defineComponent({
       if (props.viewOnly || props.kiosk) return;
       if (!isCurrentlyHoveredPanel.value) return;
       if (isInputFocused()) return;
+      // A key the open picker acted on, or pressed inside its panel, belongs to the picker.
+      if (e.defaultPrevented || (e.target as Element | null)?.closest?.('[role="dialog"]')) return;
       if (isLayoutEditing.value && !["v", "V", "i", "I"].includes(e.key)) return;
       // These are single-letter shortcuts — never fire while a modifier is held.
       // Otherwise combos like Alt+Left (panel-editor "Discard & go back") leaking

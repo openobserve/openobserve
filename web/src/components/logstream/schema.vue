@@ -643,10 +643,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="flex items-center">
                           <span class="font-bold"> {{ t("logStream.selectDate") }}</span>
                           <DateTime
+                            preset="form"
+                            :capabilities="{ kinds: ['fixed'], wholeDays: true }"
                             class="mx-2"
                             @on:date-change="dateChangeValue"
-                            disable-relative
-                            hide-relative-time
                             hide-relative-timezone
                             :minDate="minDate ?? undefined"
                           />

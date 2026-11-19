@@ -236,6 +236,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("logs.cellActions.copy") }}
             </OContextMenuItem>
 
+            <OContextMenuSeparator />
+            <OContextMenuLabel data-test="trace-context-menu-search-around-label">
+              {{ t("common.searchAround") }}
+            </OContextMenuLabel>
+            <OContextMenuItem
+              v-for="option in searchAroundOptions"
+              :key="option.value"
+              icon-left="manage-search"
+              :data-test="`trace-context-menu-search-around-${option.value}`"
+              @select="searchAround(contextCell.row, option.value)"
+            >
+              {{ option.label }}
+            </OContextMenuItem>
+            <OContextMenuItem
+              :icon-left="searchAroundKeepFilters ? 'check-box' : 'filter-alt'"
+              data-test="trace-context-menu-search-around-keep-filters"
+              @select="setSearchAroundKeepFilters(!searchAroundKeepFilters)"
+            >
+              {{ t("timeRangeHost.keepFilters") }}
+            </OContextMenuItem>
+
             <template v-if="contextCellIsStreamField">
               <OContextMenuItem
                 data-test="trace-context-menu-include-term"
@@ -324,6 +345,15 @@ import OContextMenu from "@/lib/overlay/ContextMenu/OContextMenu.vue";
 import OContextMenuItem from "@/lib/overlay/ContextMenu/OContextMenuItem.vue";
 import OContextMenuLabel from "@/lib/overlay/ContextMenu/OContextMenuLabel.vue";
 import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparator.vue";
+import {
+  currentSearchAroundUser,
+  parseSearchAroundChoice,
+  readSearchAroundKeepFilters,
+  searchAroundTimeOptions,
+  writeSearchAroundChoice,
+  writeSearchAroundKeepFilters,
+  type SearchAroundChoice,
+} from "@/utils/searchAroundWindow";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import TracesNoEventsState from "@/plugins/traces/TracesNoEventsState.vue";
@@ -397,6 +427,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   "row-click": [row: any];
   "open-in-new-tab": [row: any];
+  "search-around": [request: { row: any; seconds: number; keepFilters: boolean }];
   "page-change": [page: number];
   "cross-page": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
@@ -474,6 +505,24 @@ interface ContextCell {
 }
 
 const { t } = useI18nTyped();
+
+const searchAroundUser = () => currentSearchAroundUser(store.state);
+const searchAroundOptions = computed(() => searchAroundTimeOptions(t));
+const searchAroundKeepFilters = ref(readSearchAroundKeepFilters(searchAroundUser()));
+const setSearchAroundKeepFilters = (on: boolean) => {
+  searchAroundKeepFilters.value = on;
+  writeSearchAroundKeepFilters(searchAroundUser(), on);
+};
+const searchAround = (row: any, choice: SearchAroundChoice) => {
+  const parsed = parseSearchAroundChoice(choice);
+  if (parsed?.kind !== "time") return;
+  writeSearchAroundChoice(searchAroundUser(), choice);
+  emit("search-around", {
+    row,
+    seconds: parsed.seconds,
+    keepFilters: searchAroundKeepFilters.value,
+  });
+};
 
 const contextCell = ref<ContextCell | null>(null);
 

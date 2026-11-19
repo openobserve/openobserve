@@ -22,13 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     1. The selected range has no data but the stream does — either the window
        misses the data entirely, or (with no filter) it overlaps the stream's
        min/max envelope yet lands in a gap with no records
-       → "Jump to latest data" card (last 15 min around doc_time_max)
+       → dated message + "Jump to latest data" card (last 15 min around
+         doc_time_max) + "Try {range}" (R7)
 
     2. Window overlaps stream data but a filter excluded everything
        → "relax your filters" message (no action card; Ask AI available)
 
     3. No stream stats available (fallback)
-       → generic message (no action card; Ask AI available)
+       → dated message + "Try {range}" with the next longer quick range
 -->
 <template>
   <OEmptyState illustration="trace" size="hero" :hide-action="true">
@@ -40,9 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="windowHasStreamData && hasFilters"
         v-html="DOMPurify.sanitize(t('traces.noEvents.descWithFilters'))"
       />
-      <!-- We know where the stream's last data is: offer to jump to it. -->
-      <span v-else-if="jumpTarget">{{ t("traces.noEvents.descOutOfRange") }}</span>
-      <!-- No stream stats: generic fallback. -->
       <span v-else>{{ t("traces.noEvents.descNoFilters", { range: currentPeriodLabel }) }}</span>
     </template>
 
@@ -64,6 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
+          v-if="tryChip && applyRange"
+          variant="outline"
+          size="sm"
+          data-test="traces-no-events-try-range-btn"
+          @click="applyRange(tryChip.value)"
+        >
+          {{ t("dateTime.tryRange", { range: tryChipLabel }) }}
+        </OButton>
+        <OButton
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
           variant="ghost"
           size="sm"
@@ -81,7 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject } from "vue";
+import { getIntlLocale } from "@/locales";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { DateTime } from "luxon";
@@ -93,6 +101,11 @@ import useWidenRange from "@/composables/useWidenRange";
 import { useAiIcon } from "@/composables/useAiIcon";
 import { getConsumableRelativeTime } from "@/utils/date";
 import DOMPurify from "dompurify";
+import { formatRangeLabel } from "@/utils/timeRangeLabel";
+import { formatPeriodLabel } from "@/utils/timeRangeRail";
+import { nextLongerChip, TIME_RANGE_CHIP_SETS } from "@/utils/timeRangeList";
+import { chipsWithinLimit } from "@/utils/logs/rangeLimitRefusal";
+import { TRACES_APPLY_RANGE } from "./tracesSearchBar.utils";
 
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 const END_NUDGE_US = 1_000_000;
@@ -203,20 +216,51 @@ const jumpTargetSublabel = computed(() => {
   const lastDataUs = streamDocTimeRange.value!.max;
   const formatted = DateTime.fromMillis(lastDataUs / 1000)
     .setZone(zone)
+    .setLocale(getIntlLocale())
     .toFormat("MMM d, yyyy HH:mm:ss");
   return t("traces.tracesNoEventsState.lastData", { formatted, zone });
 });
 
 // --- time-range helpers (via shared composable) -----------------------------
 
-// `currentPeriodLabel` feeds the "descNoFilters" message; the widen-range
-// action card was removed because widening never surfaces more data here.
-const { currentPeriodLabel } = useWidenRange(
+const applyRange = inject(TRACES_APPLY_RANGE, null);
+
+const { currentPeriodLabel: periodLabel } = useWidenRange(
   () => searchObj.data?.datetime?.type ?? "",
   () => searchObj.data?.datetime?.relativeTimePeriod ?? "",
   {
     absoluteRangeLabel: t("traces.noEvents.selectedRange"),
     absoluteExpandDesc: t("traces.noEvents.expandRangeDescAbsolute"),
   },
+);
+
+const currentPeriodLabel = computed(() => {
+  const w = queryWindowUs.value;
+  if (!w) return periodLabel.value;
+  const dt = searchObj.data?.datetime;
+  // A live range ends at now, so its bounds read to the minute like the trigger's (R5).
+  return formatRangeLabel(
+    {
+      startUs: w.start,
+      endUs: w.end,
+      live: dt?.type === "relative",
+      calendar: String(dt?.relativeTimePeriod ?? "").startsWith("calendar:"),
+    },
+    { timezone: store?.state?.timezone, surface: "summary", locale: getIntlLocale() },
+  );
+});
+
+const tryChip = computed(() => {
+  const w = queryWindowUs.value;
+  if (!w) return null;
+  // Index sets the limit on the shared datetime once the stream loads; the declared shape omits it.
+  const datetime = searchObj.data?.datetime as { queryRangeRestrictionInHour?: number } | undefined;
+  const limitHours = Number(datetime?.queryRangeRestrictionInHour ?? 0);
+  return nextLongerChip(w.end - w.start, chipsWithinLimit(TIME_RANGE_CHIP_SETS.ops, limitHours));
+});
+const tryChipLabel = computed(() =>
+  tryChip.value
+    ? formatPeriodLabel(tryChip.value.value, store?.state?.timezone, t, getIntlLocale())
+    : "",
 );
 </script>

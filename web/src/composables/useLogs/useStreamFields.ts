@@ -55,12 +55,17 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import type { FieldAlias } from "@/services/service_streams";
 import { isGuardActive } from "@/composables/useLogs/useAutoRun";
+import { formatZoneOffset } from "@/utils/timeRangeLabel";
+import { linkRangeRefusal } from "@/utils/logs/rangeLimitRefusal";
 import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateScanMb";
 import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import { sqlSources } from "@/utils/logs/sqlSources";
 
 /** How long a cold load keeps the field list loading for the semantic groups before showing it ungrouped. */
 export const FIELD_GROUPS_WAIT_MS = 1000;
+
+// Two DST changes fit in a longer span, so its end offsets can match while the middle differs.
+const ONE_OFFSET_SPAN_MS = 120 * 24 * 60 * 60 * 1000;
 
 let correlationWatcherUsers = 0;
 let correlationWatcherScope: EffectScope | null = null;
@@ -323,6 +328,7 @@ export const useStreamFields = () => {
         };
 
         const interestingFieldsMap: { [key: string]: boolean } = {};
+        let limitStream = "";
 
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
@@ -381,6 +387,7 @@ export const useStreamFields = () => {
                 stream.settings.max_query_range > 0
                   ? stream.settings.max_query_range
                   : store.state.zoConfig.max_query_range;
+              limitStream = stream.name;
 
               searchObj.data.datetime.queryRangeRestrictionMsg = t(
                 "search.queryRangeRestrictionMsg",
@@ -837,6 +844,14 @@ export const useStreamFields = () => {
             searchObj.data.stream.userDefinedSchema = userDefineSchemaSettings || [];
           }
         }
+        // O1: a linked range over the stream limit runs nothing; the page shows the guard strip instead.
+        searchObj.meta.rangeLimitRefusal = searchObj.meta.rangeFromLink
+          ? linkRangeRefusal(
+              searchObj.data.datetime,
+              searchObj.data.datetime.queryRangeRestrictionInHour,
+              limitStream,
+            )
+          : null;
         searchObj.data.stream.interestingFieldList = Object.keys(interestingFieldsMap).filter(
           (field: any) => interestingFieldsMap[field],
         );
@@ -1253,6 +1268,11 @@ export const useStreamFields = () => {
           searchObj.meta.sqlMode == false ||
           selectedFields.includes(store.state.zoConfig.timestamp_column)
         ) {
+          const zoneLabel = rowsZoneLabel(
+            store.state.timezone,
+            searchObj.data.queryResults?.hits ?? [],
+            store.state.zoConfig.timestamp_column,
+          );
           searchObj.data.resultGrid.columns.push({
             name: store.state.zoConfig.timestamp_column,
             id: store.state.zoConfig.timestamp_column,
@@ -1268,8 +1288,12 @@ export const useStreamFields = () => {
                 store.state.timezone,
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
-            label: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
-            header: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
+            label: t("search.timestampWithTimezone", {
+              timezone: zoneLabel,
+            }),
+            header: t("search.timestampWithTimezone", {
+              timezone: zoneLabel,
+            }),
             align: "left",
             sortable: true,
             enableResizing: false,
@@ -1319,6 +1343,11 @@ export const useStreamFields = () => {
           searchObj.data.hasSearchDataTimestampField ||
           selectedFields.includes(store.state.zoConfig.timestamp_column)
         ) {
+          const zoneLabel = rowsZoneLabel(
+            store.state.timezone,
+            searchObj.data.queryResults?.hits ?? [],
+            store.state.zoConfig.timestamp_column,
+          );
           searchObj.data.resultGrid.columns.unshift({
             name: store.state.zoConfig.timestamp_column,
             id: store.state.zoConfig.timestamp_column,
@@ -1334,8 +1363,8 @@ export const useStreamFields = () => {
                 store.state.timezone,
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
-            label: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
-            header: t("search.timestampWithTimezone", { timezone: store.state.timezone }),
+            label: t("search.timestampWithTimezone", { timezone: zoneLabel }),
+            header: t("search.timestampWithTimezone", { timezone: zoneLabel }),
             align: "left",
             sortable: true,
             enableResizing: false,
@@ -1499,6 +1528,23 @@ function retainCorrelationQueryWatcher(watchQuery: () => void): void {
     correlationWatcherScope?.stop();
     correlationWatcherScope = null;
   });
+}
+
+// One offset reads only when every row shares it; rows across a DST change get the zone name instead.
+function rowsZoneLabel(timezone: string, hits: unknown[], column: string): string {
+  let minMs = Infinity;
+  let maxMs = -Infinity;
+  for (const hit of hits) {
+    const ms = Number((hit as Record<string, unknown>)?.[column]) / 1000;
+    if (!Number.isFinite(ms)) continue;
+    minMs = Math.min(minMs, ms);
+    maxMs = Math.max(maxMs, ms);
+  }
+  if (minMs > maxMs) return formatZoneOffset(timezone);
+  const offset = formatZoneOffset(timezone, minMs);
+  const oneOffset =
+    maxMs - minMs <= ONE_OFFSET_SPAN_MS && offset === formatZoneOffset(timezone, maxMs);
+  return oneOffset || !timezone ? offset : timezone;
 }
 
 export default useStreamFields;

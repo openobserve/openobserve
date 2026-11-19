@@ -81,6 +81,8 @@ const organizationObj = {
     usage_stream_enabled: false,
     red_insights_enabled: false,
     ai_rca_thread_tool_output: false,
+    fiscal_year_start_month: 0,
+    range_guard_days: 0,
   },
   isDataIngested: false,
   regexPatterns: [],

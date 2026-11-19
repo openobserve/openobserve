@@ -121,6 +121,15 @@ describe("OButton", () => {
     expect(wrapper.attributes("disabled")).toBeDefined();
   });
 
+  it.each(["primary", "sidebar-button"] as const)(
+    "paints a disabled %s label with the disabled foreground, not the enabled one",
+    (variant) => {
+      const classes = mount(OButton, { props: { variant, disabled: true } }).classes();
+      expect(classes).toContain("disabled:text-button-primary-disabled-foreground");
+      expect(classes).not.toContain("disabled:text-button-primary-foreground");
+    },
+  );
+
   it("keeps a loading button focusable: aria-disabled, no native disabled", () => {
     const wrapper = mount(OButton, { props: { loading: true } });
     expect(wrapper.attributes("disabled")).toBeUndefined();

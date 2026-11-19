@@ -35,9 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="float-left" v-show="queryData.streamType !== 'enrichment_tables'">
           <DateTime
+            preset="explorer-manual"
             data-test="logs-search-bar-date-time-dropdown"
-            auto-apply
-            calendar-presets
             :default-type="searchObj.data.datetime.type"
             :default-absolute-time="{
               startTime: searchObj.data.datetime.startTime,

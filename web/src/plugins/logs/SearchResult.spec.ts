@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { convertLogData } from "@/utils/logs/convertLogData";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -240,6 +241,23 @@ describe("SearchResult Component", () => {
       expect(wrapper.emitted()["update:datetime"]).toEqual([[chartData]]);
     });
 
+    it("widens a drag over a bar to that bar's bucket before the page applies it (Bugs 1, 2)", async () => {
+      const MIN_MS = 60_000;
+      const xData = [0, 1, 2].map((i) => Date.UTC(2026, 10, 15, 18, i, 0));
+      wrapper.vm.searchObj.data.histogramInterval = MIN_MS * 1000;
+      wrapper.vm.plotChart = convertLogData(xData, [1, 122, 0], {
+        title: "",
+        unparsed_x_data: [],
+        timezone: "Asia/Kolkata",
+      });
+      const bar = Number(wrapper.vm.plotChart.options.series[0].data[1][0]);
+
+      await wrapper.vm.onChartUpdate({ start: bar - 20_700.3, end: bar + 20_700.3 });
+
+      const emitted = wrapper.emitted()["update:datetime"] as unknown[][];
+      expect(emitted[emitted.length - 1]).toEqual([{ start: bar, end: bar + MIN_MS }]);
+    });
+
     it("should handle time boxed event", async () => {
       const timeboxData = { key: "2023-01-01T00:00:00Z" };
 
@@ -247,6 +265,18 @@ describe("SearchResult Component", () => {
 
       expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
       expect(wrapper.vm.searchObj.data.searchAround.indexTimestamp).toBe("2023-01-01T00:00:00Z");
+    });
+
+    it("hands a search-around time window to the page, not as a plain date update", async () => {
+      const startUs = 1_700_000_000_000_000;
+      const endUs = startUs + 600_000_000;
+      wrapper.vm.searchObj.meta.showDetailTab = true;
+
+      await wrapper.vm.onSearchAroundWindow({ startUs, endUs });
+
+      expect(wrapper.vm.searchObj.meta.showDetailTab).toBe(false);
+      expect(wrapper.emitted()["search:aroundwindow"]).toEqual([[{ startUs, endUs }]]);
+      expect(wrapper.emitted()["update:datetime"]).toBeUndefined();
     });
   });
 

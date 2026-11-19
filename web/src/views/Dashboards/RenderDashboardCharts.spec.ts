@@ -778,7 +778,8 @@ describe("RenderDashboardCharts", () => {
       name: "PanelContainer",
       props: ["data", "isTimeRangeWaiting"],
       emits: ["refreshPanelRequest"],
-      template: '<div data-test="panel-container-stub"><slot name="panel-variables" /></div>',
+      template:
+        '<div data-test="panel-container-stub"><div data-test="panel-bar-stub"><slot name="panel-time" /></div><slot name="panel-variables" /></div>',
     };
 
     const RELATIVE_HOUR = { type: "relative", relativeTimePeriod: "1h" };
@@ -816,6 +817,8 @@ describe("RenderDashboardCharts", () => {
             PanelContainer: PanelContainerStub,
             DateTimePickerDashboard: false,
             DateTime: false,
+            OTag: false,
+            OBadge: false,
           },
         },
       });
@@ -828,6 +831,16 @@ describe("RenderDashboardCharts", () => {
     const dateTime = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
     const pickPreset = async (unit: string, value: number) => {
       dateTime().findComponent(DateTime).vm.setRelativeDate(unit, value);
+      await flushPromises();
+    };
+    // A picker correction (not a user apply) is the one way a range still waits with Auto Run off.
+    const holdRange = async (period: string) => {
+      wrapper.vm
+        .getPanelTimeGate("P1")
+        .onApply(
+          { type: "relative", valueType: "relative", relativeTimePeriod: period },
+          { userChanged: false },
+        );
       await flushPromises();
     };
     const panelRefreshRequests = () =>
@@ -845,17 +858,30 @@ describe("RenderDashboardCharts", () => {
       io.restore();
     });
 
-    it("renders the panel's own picker without an Apply button", async () => {
+    it("renders the panel's own picker as a dashboard host", async () => {
       await mountWithPanelPicker();
 
-      expect(dateTime().props("autoApplyDashboard")).toBe(true);
+      expect(dateTime().props("preset")).toBe("dashboard");
       expect(wrapper.vm.getPanelTimeGate("P1").applied.value.relativeTimePeriod).toBe("1h");
     });
 
-    it("keeps a picked range waiting with Auto Run off and marks only that panel", async () => {
+    it("runs a picked range at once with Auto Run off and writes it to the URL (N3)", async () => {
       await mountWithPanelPicker();
 
       await pickPreset("h", 6);
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(replaceSpy).toHaveBeenCalledWith({
+        query: expect.objectContaining({ "pt-period.P1": "6h" }),
+      });
+      expect(panelRefreshRequests()).toEqual([["P1", false]]);
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+    });
+
+    it("keeps a range the picker set on its own waiting with Auto Run off and marks only that panel", async () => {
+      await mountWithPanelPicker();
+
+      await holdRange("6h");
 
       expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("6h");
       expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("1h");
@@ -866,7 +892,7 @@ describe("RenderDashboardCharts", () => {
 
     it("applies the waiting range when the panel's own refresh is clicked", async () => {
       await mountWithPanelPicker();
-      await pickPreset("h", 6);
+      await holdRange("6h");
 
       panel().vm.$emit("refreshPanelRequest", "P1", false);
       await flushPromises();
@@ -881,7 +907,7 @@ describe("RenderDashboardCharts", () => {
 
     it("applies the waiting range on the dashboard Refresh", async () => {
       await mountWithPanelPicker();
-      await pickPreset("h", 6);
+      await holdRange("6h");
 
       await wrapper.vm.syncAllPanelDateTimePickers();
       await flushPromises();
@@ -892,9 +918,9 @@ describe("RenderDashboardCharts", () => {
 
     it("clears the marker without a reload when the applied range is picked again", async () => {
       await mountWithPanelPicker();
-      await pickPreset("h", 6);
+      await holdRange("6h");
 
-      await pickPreset("h", 1);
+      await holdRange("1h");
 
       expect(panel().props("isTimeRangeWaiting")).toBe(false);
       expect(panelRefreshRequests()).toHaveLength(0);
@@ -914,7 +940,7 @@ describe("RenderDashboardCharts", () => {
 
     it("applies a waiting range when Auto Run is turned on", async () => {
       await mountWithPanelPicker();
-      await pickPreset("h", 6);
+      await holdRange("6h");
 
       autoRun.value = true;
       await flushPromises();
@@ -943,7 +969,7 @@ describe("RenderDashboardCharts", () => {
         realPicker.vm.onMenuOpenChange(false);
         await flushPromises();
 
-        expect(realPicker.vm.getDisplayValue).toBe("Past 1 Hour");
+        expect(realPicker.vm.getDisplayValue).toBe("Last 1 hour");
         expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("1h");
         expect(panel().props("isTimeRangeWaiting")).toBe(false);
         expect(panelRefreshRequests()).toHaveLength(0);
@@ -974,6 +1000,130 @@ describe("RenderDashboardCharts", () => {
       expect(panel().props("isTimeRangeWaiting")).toBe(false);
       expect(panelRefreshRequests()).toHaveLength(0);
       expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("puts the panel's own time in its header as one timer chip, not a toolbar (R9)", async () => {
+      await mountWithPanelPicker();
+      const bar = wrapper.get('[data-test="panel-bar-stub"]');
+      const chip = bar.get('[data-test="dashboard-panel-P1-time-chip"]');
+      expect(chip.text()).toBe("1h");
+      expect(chip.attributes("aria-label")).toBe("Panel-Specific Time Range: 1h");
+      expect(chip.findComponent({ name: "OIcon" }).props("name")).toBe("timer");
+      expect(bar.find('[data-test="dashboard-panel-P1-time-picker"]').exists()).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="dashboard-panel-P1-variables"] [data-test="panel-time-picker-P1"]')
+          .exists(),
+      ).toBe(false);
+    });
+
+    it("lets a long fixed-range chip shrink and ellipsise in a narrow panel, keeping the full range in its name and tooltip", async () => {
+      const start = Date.UTC(2026, 9, 13, 10, 0, 0) * 1000;
+      await mountWithPanelPicker({
+        type: "absolute",
+        startTime: start,
+        endTime: start + 30 * 60e6,
+      });
+      const holder = wrapper.get('[data-test="dashboard-panel-P1-time-picker"]');
+      const chip = wrapper.get('[data-test="dashboard-panel-P1-time-chip"]');
+      const text = chip.get('[data-test="dashboard-panel-P1-time-chip-text"]');
+      const range = text.text();
+      expect(range.length).toBeGreaterThan(20);
+
+      expect(holder.classes()).not.toContain("shrink-0");
+      expect(holder.classes()).toEqual(expect.arrayContaining(["min-w-0", "max-w-full"]));
+      expect(chip.classes()).toEqual(expect.arrayContaining(["min-w-0", "max-w-full"]));
+      expect(text.classes()).toContain("truncate");
+      expect(chip.attributes("aria-label")).toBe(`Panel-Specific Time Range: ${range}`);
+      expect(chip.findComponent({ name: "OTooltip" }).props("content")).toBe(
+        `Panel-Specific Time Range: ${range}`,
+      );
+    });
+
+    it("never cuts a short relative chip: it holds its width and the title gives way (B8)", async () => {
+      await mountWithPanelPicker();
+      const holder = wrapper.get('[data-test="dashboard-panel-P1-time-picker"]');
+      const chip = wrapper.get('[data-test="dashboard-panel-P1-time-chip"]');
+      const text = chip.get('[data-test="dashboard-panel-P1-time-chip-text"]');
+      expect(text.text()).toBe("1h");
+
+      expect(holder.classes()).toContain("shrink-0");
+      expect(holder.classes()).not.toContain("min-w-0");
+      expect(chip.classes()).not.toContain("min-w-0");
+      expect(text.classes()).not.toContain("truncate");
+    });
+
+    it("opens that panel's picker from its chip", async () => {
+      await mountWithPanelPicker();
+      const realPicker = dateTime().findComponent(DateTime);
+      expect(realPicker.vm.menuOpen).toBe(false);
+
+      await wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').trigger("click");
+      await flushPromises();
+
+      expect(realPicker.vm.menuOpen).toBe(true);
+    });
+
+    it("returns focus to the panel's chip once Escape's close animation unmounts the menu (B5, C-1)", async () => {
+      await mountWithPanelPicker();
+      document.body.appendChild(wrapper.element);
+      const realPicker = dateTime().findComponent(DateTime);
+      const chip = wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').element as HTMLElement;
+
+      const menu = document.createElement("div");
+      const field = document.createElement("input");
+      menu.appendChild(field);
+      document.body.appendChild(menu);
+      realPicker.vm.menuEl = menu;
+      await wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').trigger("click");
+      field.focus();
+
+      realPicker.vm.onMenuOpenChange(false);
+      await flushPromises();
+      // reka's hidden trigger cannot take focus, so removing the menu leaves it on <body>.
+      menu.remove();
+      expect(document.activeElement).toBe(document.body);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(document.activeElement).toBe(chip);
+      wrapper.element.remove();
+    });
+
+    it("leaves focus where the user moved it when the panel picker closes", async () => {
+      await mountWithPanelPicker();
+      document.body.appendChild(wrapper.element);
+      const realPicker = dateTime().findComponent(DateTime);
+      const elsewhere = document.createElement("button");
+      document.body.appendChild(elsewhere);
+
+      realPicker.vm.onMenuOpenChange(true);
+      elsewhere.focus();
+      realPicker.vm.onMenuOpenChange(false);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+      wrapper.element.remove();
+    });
+
+    it("names a waiting pick on the chip", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+      expect(wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').text()).toBe("6h");
+    });
+
+    it("offers the panel's undo beside its chip once a pick can be undone", async () => {
+      await mountWithPanelPicker();
+      const undo = () => wrapper.find('[data-test="dashboard-panel-P1-time-undo"]');
+      expect(undo().exists()).toBe(false);
+
+      await pickPreset("h", 6);
+      expect(undo().exists()).toBe(true);
+      await undo().trigger("click");
+      await flushPromises();
+
+      expect(wrapper.get('[data-test="dashboard-panel-P1-time-chip"]').text()).toBe("1h");
+      expect(undo().exists()).toBe(false);
     });
 
     it("does not reload the panel when its picker reports its starting range", async () => {

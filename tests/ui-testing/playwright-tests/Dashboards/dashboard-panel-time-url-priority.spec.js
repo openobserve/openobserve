@@ -69,8 +69,8 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     // Wait explicitly for the picker to be visible before reading its text —
     // networkidle alone is not enough on a loaded server; the panel may still
     // be rendering its time picker element when networkidle fires.
-    await newPage.locator(`[data-test="panel-time-picker-${panelId}"]`).waitFor({ state: "visible", timeout: 20000 });
-    const pickerText = await newPage.locator(`[data-test="panel-time-picker-${panelId}"]`).textContent();
+    await newPage.locator(`[data-test="dashboard-panel-${panelId}-time-picker"]`).waitFor({ state: "visible", timeout: 20000 });
+    const pickerText = await newPage.locator(`[data-test="dashboard-panel-${panelId}-time-picker"]`).textContent();
     expect(pickerText).toContain("6");
 
     await newPage.close();

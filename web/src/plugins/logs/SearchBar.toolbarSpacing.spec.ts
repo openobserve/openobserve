@@ -115,6 +115,33 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
     }
   });
 
+  it("lets the time range group shrink inside the toolbar row instead of overflowing it", async () => {
+    wrapper = mount(SearchBar, {
+      attachTo: document.body,
+      global: { provide: { store }, plugins: [i18n, router], stubs: { QueryEditor: true } },
+    });
+    await flushPromises();
+
+    const group = document.querySelector(".date-time-container")!;
+    expect(group.classList).toContain("max-w-full");
+    expect(group.parentElement!.classList).toContain("min-w-0");
+  });
+
+  // jsdom has no layout; a 390px browser render must confirm "Last 15m" stays readable.
+  it("keeps room for the compact range label on a phone-width toolbar", async () => {
+    wrapper = mount(SearchBar, {
+      attachTo: document.body,
+      global: { provide: { store }, plugins: [i18n, router], stubs: { QueryEditor: true } },
+    });
+    await flushPromises();
+
+    const group = document.querySelector(".date-time-container")!;
+    expect(group.querySelector(".date-time-label")!.classList).toContain("max-md:min-w-16");
+    expect(group.querySelector('[data-test="date-time-zoom-out-btn"]')!.classList).toContain(
+      "max-md:hidden",
+    );
+  });
+
   it.each([
     ["unlocked", null, "bg-button-primary!", "enabled:bg-button-primary!"],
     ["license-locked", "logs", "enabled:bg-button-primary!", "bg-button-primary!"],

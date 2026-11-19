@@ -33,6 +33,8 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 import DateTime from "@/components/DateTime.vue";
+import usePageTimeRange, { pageRange } from "@/composables/usePageTimeRange";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
 import SecurityEventsSources from "@/components/security/events/SecurityEventsSources.vue";
 import SecurityEventsDetected from "@/components/security/events/SecurityEventsDetected.vue";
 import SecurityEventsFilterBar from "@/components/security/events/SecurityEventsFilterBar.vue";
@@ -1228,6 +1230,24 @@ function onDateChange(dt: any) {
   void runSearch();
 }
 
+const dateStateRange = () =>
+  pageRange({
+    valueType: dateState.value.type,
+    relativeTimePeriod: dateState.value.period || "15m",
+    startTime: dateState.value.absolute?.startTime,
+    endTime: dateState.value.absolute?.endTime,
+  });
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("siem.events.title"),
+  url: false,
+  initial: dateStateRange,
+  capabilities: { kinds: ["rolling", "fixed"] },
+  onRange: onDateChange,
+});
+// A re-keyed picker seeds from the host's range, so a link or reset must move it first.
+watch(dateKey, () => (timeHost.range.value = dateStateRange()), { flush: "sync" });
+
 onMounted(async () => {
   await loadStreams();
   if (selectedStream.value && !isHunt.value) {
@@ -1301,13 +1321,16 @@ function widenTo(period: string) {
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime
+          preset="explorer-auto"
+          :capabilities="{ kinds: ['rolling', 'fixed'] }"
           :key="dateKey"
           :default-type="dateState.type"
           :default-relative-time="dateState.period || '15m'"
           :default-absolute-time="dateState.absolute ?? undefined"
-          :auto-apply="true"
           data-test="security-events-datetime"
-          @on:date-change="onDateChange"
+          :range="timeHost.range.value"
+          @apply="timeHost.onApply"
+          @on:date-change="timeHost.onDateChange"
         />
         <OButton
           v-if="loading || histogramLoading || huntLoading"
@@ -1491,6 +1514,12 @@ function widenTo(period: string) {
       </OFieldList>
     </template>
 
+    <TimeRangeGuardStrip
+      :guard="timeHost.guard.value"
+      data-test="security-events-range-guard"
+      @run="timeHost.confirmGuard"
+      @back="timeHost.dismissGuard"
+    />
     <div class="flex min-h-0 flex-1 flex-col">
       <SecurityEventsDetected
         v-if="detectedSummary && !isHunt"

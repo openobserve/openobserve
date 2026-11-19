@@ -267,33 +267,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @exploreCreateAlert="$emit('exploreCreateAlert', $event)"
                   @exploreAddToDashboard="$emit('exploreAddToDashboard', $event)"
                 >
+                  <template v-if="hasPanelTime(item) && panelTimeValues[item.id]" #panel-time>
+                    <!-- The chip stands in for the picker's trigger; the hidden picker under it anchors its panel there. -->
+                    <!-- Only a long fixed range may ellipsise; a short relative one holds its width and the title gives way. -->
+                    <span
+                      class="relative inline-flex"
+                      :class="panelTimeChipIsFixed(item.id) ? 'max-w-full min-w-0' : 'shrink-0'"
+                      :data-test="`dashboard-panel-${item.id}-time-picker`"
+                    >
+                      <OTag
+                        variant="primary-soft"
+                        size="sm"
+                        icon="timer"
+                        clickable
+                        :class="{ 'max-w-full min-w-0': panelTimeChipIsFixed(item.id) }"
+                        :aria-label="panelTimeChipName(item.id)"
+                        :data-test="`dashboard-panel-${item.id}-time-chip`"
+                        :ref="(chip) => setPanelTimeChip(item.id, chip)"
+                        @click="openPanelTimePicker(item.id)"
+                        ><span
+                          :class="{ truncate: panelTimeChipIsFixed(item.id) }"
+                          :data-test="`dashboard-panel-${item.id}-time-chip-text`"
+                          >{{ panelTimeChipText(item.id) }}</span
+                        ><OTooltip :content="panelTimeChipName(item.id)" side="bottom"
+                      /></OTag>
+                      <DateTimePickerDashboard
+                        preset="dashboard"
+                        :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
+                        size="sm"
+                        menu-align="start"
+                        class="panel-time-picker-widget invisible absolute start-0 top-0"
+                        @update:modelValue="(val, meta) => onPanelTimeApply(item.id, val, meta)"
+                        @show="getPanelTimeGate(item.id).onShow()"
+                        @hide="onPanelTimePickerHide(item.id)"
+                        @timezone-change="getPanelTimeGate(item.id).flush()"
+                        :data-test="`panel-time-picker-${item.id}`"
+                        :ref="(picker) => setPanelTimePicker(item.id, picker)"
+                      />
+                      <OButton
+                        v-if="panelTimePickers.get(item.id)?.canUndo"
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        icon-left="undo"
+                        :aria-label="panelTimePickers.get(item.id)?.undoLabel"
+                        :data-test="`dashboard-panel-${item.id}-time-undo`"
+                        @click="panelTimePickers.get(item.id)?.undo()"
+                        ><OTooltip
+                          :content="panelTimePickers.get(item.id)?.undoLabel"
+                          side="bottom"
+                      /></OButton>
+                    </span>
+                  </template>
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
                     <div
                       class="panel-variables-container px-1"
                       :data-test="`dashboard-panel-${item.id}-variables`"
                     >
-                      <!-- Panel Time Picker (NEW) -->
-                      <div
-                        v-if="hasPanelTime(item) && panelTimeValues[item.id]"
-                        class="panel-time-picker-wrapper mt-1 mb-2"
-                        :data-test="`dashboard-panel-${item.id}-time-picker`"
-                      >
-                        <DateTimePickerDashboard
-                          :modelValue="getPanelPickedTime(item.id) ?? panelTimeValues[item.id]"
-                          :auto-apply-dashboard="true"
-                          calendar-presets
-                          size="sm"
-                          class="panel-time-picker-widget"
-                          @update:modelValue="(val) => getPanelTimeGate(item.id).onPick(val)"
-                          @show="getPanelTimeGate(item.id).onShow()"
-                          @hide="getPanelTimeGate(item.id).onHide()"
-                          @timezone-change="getPanelTimeGate(item.id).flush()"
-                          :data-test="`panel-time-picker-${item.id}`"
-                          :ref="(picker) => setPanelTimePicker(item.id, picker)"
-                        />
-                      </div>
-
                       <VariablesValueSelector
                         v-if="variablesManager && getPanelVariables(item.id).length > 0"
                         :scope="'panels'"
@@ -371,6 +401,7 @@ import {
   watch,
   nextTick,
   reactive,
+  shallowReactive,
   inject,
   type PropType,
   type Ref,
@@ -381,6 +412,11 @@ import { getPanelDisplayTitle } from "@/utils/dashboard/panelTitle";
 import { useRouter } from "vue-router";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { getIntlLocale } from "@/locales";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { panelTimeChipLabel } from "@/utils/dashboard/dashboardTimeLabels";
 import { useRoute } from "vue-router";
 import { updateDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
@@ -393,6 +429,7 @@ import { getVariableKey, useVariablesManager } from "@/composables/dashboard/use
 import {
   useDashboardTimeGate,
   type DashboardTimeGate,
+  type DashboardTimeApplyMeta,
 } from "@/composables/dashboard/useDashboardTimeGate";
 import useStreams from "@/composables/useStreams";
 import {
@@ -402,6 +439,7 @@ import {
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import { computeFitCellHeight } from "@/utils/dashboard/kiosk";
+import { urlTimeToMicros } from "@/utils/dashboard/urlTimeParams";
 import {
   arePickerValuesEqual,
   convertTimeObjToPickerFormat,
@@ -542,6 +580,9 @@ export default defineComponent({
     TabList,
     ODialog,
     OTruncatedText,
+    OTag,
+    OButton,
+    OTooltip,
   },
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();
@@ -1772,10 +1813,12 @@ export default defineComponent({
 
     // Gates outlive a picker remount, so a range still waiting survives a tab switch.
     const panelTimeGates = new Map<string, DashboardTimeGate>();
+    const panelAutoRuns = new Map<string, number>();
     const panelTimeGateScope = effectScope(true);
     onBeforeUnmount(() => panelTimeGateScope.stop());
 
-    const panelTimePickers = new Map<string, any>();
+    // Reactive so the chip's undo appears once its picker mounts and gains a step.
+    const panelTimePickers = shallowReactive(new Map<string, any>());
     const setPanelTimePicker = (panelId: string, picker: any) => {
       if (picker) panelTimePickers.set(panelId, picker);
       else panelTimePickers.delete(panelId);
@@ -1787,7 +1830,10 @@ export default defineComponent({
         gate = panelTimeGateScope.run(() =>
           useDashboardTimeGate({
             isAutoRunOn: () => dashboardAutoRun.value === true,
-            onAutoApply: () => refreshPanelRequest(panelId, false),
+            onAutoApply: () => {
+              panelAutoRuns.set(panelId, (panelAutoRuns.get(panelId) ?? 0) + 1);
+              refreshPanelRequest(panelId, false);
+            },
             showInPicker: (value) =>
               panelTimePickers
                 .get(panelId)
@@ -1800,6 +1846,60 @@ export default defineComponent({
     };
 
     const getPanelPickedTime = (panelId: string) => getPanelTimeGate(panelId).picked.value;
+
+    // A user's apply runs the panel even with Auto Run off; the gate's own auto-apply may already have run it.
+    const onPanelTimeApply = (panelId: string, value: any, meta?: DashboardTimeApplyMeta) => {
+      const gate = getPanelTimeGate(panelId);
+      const before = gate.applied.value;
+      const runsBefore = panelAutoRuns.get(panelId) ?? 0;
+      gate.onApply(value, meta);
+      const ranAlready = (panelAutoRuns.get(panelId) ?? 0) !== runsBefore;
+      if (before && gate.applied.value !== before && !ranAlready) {
+        refreshPanelRequest(panelId, false);
+      }
+    };
+
+    const panelTimeChips = new Map<string, { $el?: HTMLElement }>();
+    const setPanelTimeChip = (panelId: string, chip: any) => {
+      if (chip) panelTimeChips.set(panelId, chip);
+      else panelTimeChips.delete(panelId);
+    };
+    const panelTimeChipText = (panelId: string): I18nText =>
+      panelTimeChipLabel(
+        getPanelPickedTime(panelId) ?? panelTimeValues.value[panelId],
+        store.state.timezone,
+        t,
+        getIntlLocale(),
+      );
+    const panelTimeChipIsFixed = (panelId: string): boolean => {
+      const value = getPanelPickedTime(panelId) ?? panelTimeValues.value[panelId];
+      return !!value && (value.valueType ?? value.type) !== "relative";
+    };
+    const panelTimeChipName = (panelId: string): I18nText =>
+      t("dashboard.panelTimeChipLabel", { range: String(panelTimeChipText(panelId)) });
+    const openPanelTimePicker = (panelId: string) => {
+      panelTimePickers.get(panelId)?.dateTimePicker?.openMenu?.();
+    };
+    // Reka returns focus only once the close animation unmounts the menu, and the picker's hidden trigger cannot take it.
+    const afterMenuUnmounts = (
+      menu: HTMLElement | null | undefined,
+      done: () => void,
+      frames = 60,
+    ) => {
+      if (!menu?.isConnected || frames <= 0) return void nextTick(done);
+      requestAnimationFrame(() => afterMenuUnmounts(menu, done, frames - 1));
+    };
+    // The picker's own trigger is hidden, so focus returns to the chip that opened it.
+    const onPanelTimePickerHide = (panelId: string) => {
+      getPanelTimeGate(panelId).onHide();
+      const picker = panelTimePickers.get(panelId);
+      afterMenuUnmounts(picker?.dateTimePicker?.menuEl, () => {
+        const active = document.activeElement;
+        const pickerEl = picker?.$el as HTMLElement | undefined;
+        if (active && active !== document.body && !pickerEl?.contains(active)) return;
+        panelTimeChips.get(panelId)?.$el?.focus();
+      });
+    };
 
     // panelDownloadRegistry is a module-level singleton (see utils/panelDownloadRegistry.ts).
     // PanelContainer instances register themselves on mount; no provide/inject needed.
@@ -1879,8 +1979,8 @@ export default defineComponent({
         return {
           type: "absolute",
           valueType: "absolute",
-          startTime: parseInt(route.query.from as string),
-          endTime: parseInt(route.query.to as string),
+          startTime: urlTimeToMicros(route.query.from),
+          endTime: urlTimeToMicros(route.query.to),
         };
       }
 
@@ -2040,9 +2140,17 @@ export default defineComponent({
       panelTimeValues,
       hasPanelTime,
       getPanelTimeGate,
+      onPanelTimeApply,
       getPanelPickedTime,
       isPanelTimeWaiting,
       setPanelTimePicker,
+      setPanelTimeChip,
+      panelTimeChipText,
+      panelTimeChipName,
+      panelTimeChipIsFixed,
+      panelTimePickers,
+      openPanelTimePicker,
+      onPanelTimePickerHide,
       viewPanelSelectedDate,
     };
   },

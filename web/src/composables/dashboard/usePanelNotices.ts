@@ -15,6 +15,7 @@
 
 import { computed, ref, shallowRef } from "vue";
 import { processQueryMetadataErrors } from "@/utils/queryUtils";
+import { useStreamTimeLimits, type StreamRef } from "@/composables/useStreamTimeLimits";
 import {
   omitFunctionErrorMessages,
   type PanelDiagnostics,
@@ -23,11 +24,34 @@ import {
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
 
+/** What a host knows of its panel: the streams its SQL reads and the hours its window spans. */
+export interface PanelNoticeSource {
+  streams: () => StreamRef[];
+  rangeHours?: () => number;
+}
+
+/** The streams a SQL panel reads; PromQL has none, since the stream query-range limit does not clip it. */
+export const panelQueryStreams = (panel: any): StreamRef[] =>
+  panel?.queryType === "promql"
+    ? []
+    : (panel?.queries ?? []).map((query: any) => ({
+        name: String(query?.fields?.stream ?? ""),
+        type: String(query?.fields?.stream_type ?? "logs"),
+      }));
+
+/** Hours a dashboard panel time spans; 0 when either bound is missing. */
+export const panelRangeHours = (time: any): number => {
+  // Dashboard time Dates carry epoch microseconds in getTime(), not milliseconds.
+  const startUs = Number(time?.start_time?.getTime?.());
+  const endUs = Number(time?.end_time?.getTime?.());
+  return endUs > startUs ? (endUs - startUs) / 3_600_000_000 : 0;
+};
+
 /**
  * The notice state a PanelSchemaRenderer host keeps for PanelErrorButtons: server diagnostics,
  * the series cap, and the legacy range warning without the messages the chips already show.
  */
-export const usePanelNotices = (timezone: () => string) => {
+export const usePanelNotices = (timezone: () => string, panel?: PanelNoticeSource) => {
   const resultMetadata = shallowRef<unknown>(null);
   const panelDiagnostics = shallowRef<PanelDiagnostics | null>(null);
   const seriesLimit = shallowRef<SeriesLimitInfo | null>(null);
@@ -45,6 +69,10 @@ export const usePanelNotices = (timezone: () => string) => {
       tz,
     );
   };
+
+  // A result-cache hit clips with a notice that names no hours, or with none at all, so the chip needs the streams' own limit.
+  const streamLimits = panel ? useStreamTimeLimits(panel.streams) : null;
+  const rangeLimitHours = computed(() => streamLimits?.value.queryRangeRestrictionInHour ?? 0);
 
   const handleResultMetadataUpdate = (metadata: unknown) => {
     resultMetadata.value = metadata;
@@ -86,6 +114,9 @@ export const usePanelNotices = (timezone: () => string) => {
     rowsCapped: panelDiagnostics.value?.rowsCapped ?? false,
     serverPartialReasons: panelDiagnostics.value?.partialReasons ?? [],
     functionErrors: panelDiagnostics.value?.functionErrors ?? [],
+    rangeLimitHours: rangeLimitHours.value,
+    rangeOverLimit:
+      rangeLimitHours.value > 0 && (panel?.rangeHours?.() ?? 0) > rangeLimitHours.value,
   }));
 
   return {

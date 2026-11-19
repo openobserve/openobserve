@@ -32,6 +32,8 @@ export interface Shortcut {
   skipInInput?: boolean;
   /** Fire a plain-key shortcut even while focus is inside a dialog or drawer, which otherwise owns those keys. */
   allowInDialog?: boolean;
+  /** Never fire a plain-key shortcut while a modal layer is open, wherever focus is. */
+  skipUnderModal?: boolean;
 }
 
 /**

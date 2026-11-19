@@ -50,12 +50,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #actions>
       <span id="rum-analytics-filters-host" class="contents" />
-      <DateTimePickerDashboard
+      <DateTime
+        preset="explorer-auto"
         ref="dateTimePickerRef"
-        :model-value="state.datetime"
+        :range="timeHost.range.value"
         menu-align="end"
         data-test="rum-analytics-date-picker"
-        @update:model-value="onDateChange"
+        :retention-days="rumStreamLimits.retentionDays"
+        :query-range-restriction-in-hour="rumStreamLimits.queryRangeRestrictionInHour"
+        @apply="timeHost.onApply"
+        @on:date-change="timeHost.onDateChange"
       />
       <OButton
         icon-left="refresh"
@@ -114,6 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
+      <TimeRangeGuardStrip
+        :guard="timeHost.guard.value"
+        data-test="rum-analytics-range-guard"
+        @run="timeHost.confirmGuard"
+        @back="timeHost.dismissGuard"
+      />
       <!-- Teleport moves the same filter instances between the header and the sub-nav, so they never remount. -->
       <Teleport to="#rum-analytics-filters-host" defer :disabled="narrow">
         <div
@@ -364,6 +374,7 @@ let enteredOrg = "";
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useStreamTimeLimits } from "@/composables/useStreamTimeLimits";
 import { formatInTimeZone } from "date-fns-tz";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -378,7 +389,9 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+import DateTime from "@/components/DateTime.vue";
+import TimeRangeGuardStrip from "@/components/TimeRangeGuardStrip.vue";
+import usePageTimeRange, { pageRange, type PageDateChange } from "@/composables/usePageTimeRange";
 import ShareButton from "@/components/common/ShareButton.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import SampledTag from "@/components/rum/productAnalytics/SampledTag.vue";
@@ -427,6 +440,7 @@ const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
+const rumStreamLimits = useStreamTimeLimits(() => [{ name: "_rumdata", type: "logs" }]);
 const { shareUrl } = useRum();
 const pa = useProductAnalytics();
 const namedEvents = useNamedEvents();
@@ -642,11 +656,22 @@ const onDateChange = (value: AnalyticsDateTime) => {
   pa.setScope({ datetime: { ...value } });
   void reload();
 };
+const timeHost = usePageTimeRange({
+  preset: "explorer-auto",
+  source: t("rum.analytics.title"),
+  url: false,
+  initial: () => pageRange(state.datetime),
+  onRange: (value: PageDateChange) =>
+    onDateChange({
+      startTime: Number(value.startTime),
+      endTime: Number(value.endTime),
+      relativeTimePeriod: value.relativeTimePeriod ?? null,
+      valueType: value.valueType === "absolute" ? "absolute" : "relative",
+    }),
+});
 
-// The picker only reads its v-model on mount, so a programmatic scope change that
-// doesn't come from the picker itself (widenRange's "show the past 30 days" fallback,
-// initFromRoute's URL restore, a sub-tab switch that carries a new range) never reaches
-// its displayed label unless pushed in here.
+// A scope change made outside the picker (widen, URL restore) reaches neither its label nor the host,
+// and a stale host range drops a re-pick of the old range as unchanged.
 watch(
   () => [
     state.datetime.valueType,
@@ -654,7 +679,10 @@ watch(
     state.datetime.startTime,
     state.datetime.endTime,
   ],
-  () => dateTimePickerRef.value?.setSavedDate?.(toPickerSavedDate(state.datetime)),
+  () => {
+    timeHost.range.value = pageRange(state.datetime);
+    dateTimePickerRef.value?.setSavedDate?.(toPickerSavedDate(state.datetime));
+  },
 );
 
 const toggleIncludeAll = () => {

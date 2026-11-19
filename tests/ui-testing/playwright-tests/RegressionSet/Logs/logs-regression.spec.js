@@ -48,10 +48,8 @@ test.describe("Logs Regression Bugs", () => {
     await pm.logsPage.expectStartTimeVisible();
     await pm.logsPage.expectEndTimeVisible();
 
-    // Post-UX-revamp: native <input type="time"> prevents invalid time entry.
-    // The OTime component does not render a per-input error icon in this context.
-    // Instead, verify that the absolute time tab UI is functional:
-    // the start/end time inputs are visible and a query can be executed.
+    // Start / End are text fields that flag unreadable text themselves (see logs-bugs #9049);
+    // here verify the calendar fields are visible and a query can be executed.
     await pm.logsPage.clickRefreshButton();
 
     testLogger.info('Absolute time tab verification completed');
