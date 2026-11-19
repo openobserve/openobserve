@@ -953,6 +953,14 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(true);
     });
 
+    it("one per series keeps the one-alert limit line in place, out of reach", async () => {
+      const limit = () => wrapper.find('[data-test="add-alert-group-limit"]');
+      expect(limit().attributes("inert")).toBeUndefined();
+      wrapper.vm.onGroupAnswer("each");
+      await flushPromises();
+      expect(limit().attributes("inert")).toBeDefined();
+    });
+
     it("locks Multi only while rule mode has a pending duration", async () => {
       await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
       await flushPromises();

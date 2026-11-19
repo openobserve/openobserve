@@ -776,10 +776,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                         </ORadio>
                       </ORadioGroup>
-                      <!-- The picked answer's limit takes its own line, so it starts at the control column. -->
+                      <!-- Kept, hidden, under "One per": rows below never move and a value typed there lands. -->
                       <div
-                        v-if="groupAnswer === 'one'"
                         class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                        :class="groupAnswer === 'one' ? '' : 'invisible'"
+                        :inert="groupAnswer !== 'one' || undefined"
                         data-test="add-alert-group-limit"
                       >
                         <template v-if="countOperatorShown">
@@ -1371,10 +1372,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </ORadio>
                           </ORadioGroup>
                           <template v-if="!(localTab === 'promql' && isPromRuleMode)">
-                            <!-- The picked answer's limit takes its own line, so it starts at the control column. -->
+                            <!-- Kept, hidden, under "One per": rows below never move and a value typed there lands. -->
                             <div
-                              v-if="groupAnswer === 'one'"
+                              v-if="groupAnswer === 'one' || localTab !== 'sql'"
                               class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                              :class="groupAnswer === 'one' ? '' : 'invisible'"
+                              :inert="groupAnswer !== 'one' || undefined"
                               data-test="add-alert-group-limit"
                             >
                               <template v-if="localTab === 'sql' || countOperatorShown">
