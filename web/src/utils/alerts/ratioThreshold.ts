@@ -25,22 +25,19 @@ const RATIO_CEILING = 2;
 
 /** The range across every numeric `[time, value]` point of the drawn series; null when none is a number. */
 export function seriesValueRange(series: ReadonlyArray<{ data?: unknown }>): ValueRange | null {
-  let range: ValueRange | null = null;
-  for (const { data } of series) {
-    if (!Array.isArray(data)) continue;
-    for (const point of data) {
-      const raw = Array.isArray(point) ? point[1] : point;
-      if (raw === null || raw === undefined || raw === "") continue;
-      const value = Number(raw);
-      if (!Number.isFinite(value)) continue;
-      range = {
-        min: Math.min(range?.min ?? value, value),
-        max: Math.max(range?.max ?? value, value),
-        fractional: (range?.fractional ?? false) || !Number.isInteger(value),
-      };
-    }
-  }
-  return range;
+  const values = series.flatMap(({ data }) => (Array.isArray(data) ? data : []));
+  const numbers = values
+    .map((point) => (Array.isArray(point) ? point[1] : point))
+    .filter((raw) => raw !== null && raw !== undefined && raw !== "")
+    .map(Number)
+    .filter(Number.isFinite);
+  if (!numbers.length) return null;
+  // A reduce, not Math.min(...): a 500-series preview passes the engine's argument limit.
+  return {
+    min: numbers.reduce((a, b) => Math.min(a, b)),
+    max: numbers.reduce((a, b) => Math.max(a, b)),
+    fractional: numbers.some((value) => !Number.isInteger(value)),
+  };
 }
 
 /**

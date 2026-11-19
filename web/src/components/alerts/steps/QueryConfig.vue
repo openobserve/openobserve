@@ -341,7 +341,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <AlertWarningRow
                       v-if="selectedFunction !== 'total_events' && aggWarningVisible"
                       name="query_condition.aggregation.warning_value"
-                      :unit="thresholdUnit"
                       :operator="operatorLabel(conditionOperator)"
                       :error="aggregationWarningError"
                       input-data-test="alert-aggregation-warning-value-input-182"
@@ -659,6 +658,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <AlertWarningRow
                       v-if="selectedFunction !== 'total_events' && aggWarningVisible"
                       name="query_condition.aggregation.warning_value"
+                      :unit="thresholdUnit || undefined"
                       :operator="operatorLabel(conditionOperator)"
                       :error="aggregationWarningError"
                       input-data-test="alert-aggregation-warning-value-input-413"
@@ -1675,7 +1675,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <AlertWarningRow
                         v-if="!isPromRuleMode && promqlWarningVisible"
                         name="query_condition.promql_warning_value"
-                        :unit="thresholdUnit"
+                        :unit="thresholdUnit || undefined"
                         :operator="operatorLabel(promqlOperatorEcho)"
                         :error="promqlWarningError"
                         input-data-test="alert-promql-warning-value-input"
