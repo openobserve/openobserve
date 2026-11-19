@@ -12636,7 +12636,8 @@
       "linkUrlUnsupportedScheme": "Unsupported URL scheme \"{scheme}\". Use http, https or mailto — a relative path or a {'{'}variable{'}'} also works.",
       "linkUrlInvalid": "Link \"{label}\": {reason}",
       "linkUrlNotAUrl": "Enter a valid URL — for example https://example.com/runbook, a path like /web/logs, or a {'{'}variable{'}'}.",
-      "cronSixFields": "Cron needs 6 fields: second, minute, hour, day of month, month, day of week."
+      "cronSixFields": "Cron needs 6 fields: second, minute, hour, day of month, month, day of week.",
+      "nameTaken": "An alert named {name} already exists in folder {folder}"
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
@@ -14519,7 +14520,7 @@
       "noEvaluationsTitle": "No evaluations in this window",
       "noEvaluationsDescription": "Each run of this alert appears here. Try a wider time range, and check that the alert is enabled.",
       "firingCount": "{count} firing",
-      "ofNGroups": "of {count} groups",
+      "ofNGroups": "of {count} group | of {count} groups",
       "evaluation": "Evaluation",
       "range1h": "1h",
       "range6h": "6h",
@@ -15568,7 +15569,11 @@
         "note": "Shows the outcome of each check.",
         "emptyExpected": "No checks in the last 24 hours. It should check every {every}: see Alert history.",
         "firstDue": "No checks yet. The first is due by {time}.",
-        "emptySinceSave": "No checks since it was saved at {time}. It should check every {every}: see Alert history."
+        "emptySinceSave": "No checks since it was saved at {time}. It should check every {every}: see Alert history.",
+        "titleRealtime": "Recent notifications",
+        "emptyRealtimeSinceSave": "No matching events since it was saved at {time}. It checks each event as it arrives.",
+        "emptyRealtime": "No matching events in the last 24 hours. It checks each event as it arrives.",
+        "noteRealtime": "Each row is a matching event that notified."
       },
       "enabled": "Alert enabled"
     },
@@ -16123,6 +16128,12 @@
     "conditionCountWith": "{noun} with",
     "lookAlike": {
       "line": "Similar alert already set up: {names} | Similar alerts already set up: {names}"
+    },
+    "runState": {
+      "fired": "Fired {time}",
+      "firedTooltip": "Last fired at {time}. It checks each event as it arrives.",
+      "noMatchYet": "No match yet",
+      "noMatchTooltip": "It checks each event as it arrives and notifies on the first match."
     }
   },
   "alert_dependencies": {
