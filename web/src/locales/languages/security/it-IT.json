@@ -920,8 +920,8 @@
       "correlationWindow": "Definito dall'intervallo di tempo della correlazione",
       "createForbidden": "Creare un rilevamento richiede il permesso Sicurezza",
       "preview": {
-        "run": "Anteprima sulla cronologia",
-        "hint": "Esegue la regola sull'intervallo scelto come farebbe il pianificatore e indica cosa si sarebbe attivato",
+        "run": "Esegui l'anteprima sullo storico",
+        "hint": "Esegue la regola sull'intervallo scelto come farebbe lo scheduler e indica cosa sarebbe scattato",
         "failed": "La query non è riuscita: {reason}",
         "time": "Ora",
         "range": {
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Registro modifiche",
-      "hint": "Chi ha modificato rilevamenti, origini, casi e concessioni di ruolo Sicurezza, per tutto il periodo in cui viene conservata la traccia di controllo",
+      "hint": "Chi ha modificato rilevamenti, origini, casi e concessioni di ruoli di Sicurezza, per tutto il periodo in cui viene conservata la traccia di controllo",
       "includeReads": "Includi letture",
       "when": "Quando",
       "who": "Modificato da",

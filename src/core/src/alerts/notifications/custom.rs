@@ -28,9 +28,31 @@ use super::context::NotificationContext;
 
 /// Render `tpl` against `ctx`. Pure: no I/O, no clock, no DB.
 pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: bool) -> String {
+    render_custom(tpl, ctx, is_email, false)
+}
+
+/// Render a stored Custom template. An unchanged shipped prebuilt body also escapes alert values,
+/// so an alert named `cpu "high"` still sends valid JSON. Any body a user wrote or edited keeps
+/// the raw insert, because it may place a value outside a JSON string.
+pub fn apply_template_body(
+    template: &config::meta::destinations::Template,
+    ctx: &NotificationContext,
+    is_email: bool,
+) -> String {
+    let shipped = config::prebuilt_loader::is_shipped_prebuilt_body(&template.name, &template.body);
+    render_custom(&template.body, ctx, is_email, shipped)
+}
+
+fn render_custom(
+    tpl: &str,
+    ctx: &NotificationContext,
+    is_email: bool,
+    escape_alert: bool,
+) -> String {
     // Another kind's names and text are free (a downtime "deploy" <db>), so a JSON body escapes
     // them as it escapes attributes; plain text such as an SNS message gets them as written.
-    let json_body = ctx.kind != NotificationKind::Alert && !is_email && looks_like_json(tpl);
+    let json_body =
+        (ctx.kind != NotificationKind::Alert || escape_alert) && !is_email && looks_like_json(tpl);
     let prepared = super::modifiers::prepare_modifiers(
         tpl,
         |field| {
@@ -682,6 +704,38 @@ mod golden {
         assert_eq!(
             apply_custom_template(r#"{"text":"{alert_name}"}"#, &alert, false),
             r#"{"text":"cpu high"}"#
+        );
+    }
+
+    #[test]
+    fn a_shipped_prebuilt_body_escapes_alert_values_and_an_edited_one_does_not() {
+        let ctx = NotificationContext {
+            alert_name: "cpu \"high\"\nnow".into(),
+            alert_description: r#"{"cpu":99}"#.into(),
+            ..Default::default()
+        };
+        for kind in [
+            "slack",
+            "msteams",
+            "discord",
+            "webhook",
+            "opsgenie",
+            "pagerduty",
+        ] {
+            let template = config::prebuilt_loader::get_prebuilt_template(kind).unwrap();
+            let body = apply_template_body(&template, &ctx, false);
+            let json: serde_json::Value =
+                serde_json::from_str(&body).unwrap_or_else(|e| panic!("{kind}: {e}: {body}"));
+            assert!(
+                json.to_string().contains(r#"cpu \"high\"\nnow"#),
+                "{kind}: {body}"
+            );
+        }
+        let mut edited = config::prebuilt_loader::get_prebuilt_template("webhook").unwrap();
+        edited.body = r#"{"data": {alert_description}}"#.into();
+        assert_eq!(
+            apply_template_body(&edited, &ctx, false),
+            r#"{"data": {"cpu":99}}"#
         );
     }
 

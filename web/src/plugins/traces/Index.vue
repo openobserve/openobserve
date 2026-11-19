@@ -321,7 +321,11 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
-import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
+import {
+  tracesQueryNotRun,
+  tracesRunIsStaged,
+  tracesSearchRunSignature,
+} from "./tracesSearchBar.utils";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -341,6 +345,11 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import {
+  isRequiredCondition,
+  mergeFilterTerm,
+  removeRequiredCondition,
+} from "@/utils/traces/filterUtils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -1986,14 +1995,15 @@ const onMetricsEditorFilterRun = (text: string) => {
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
-// Handler for Error Only toggle — only adds/removes span_status condition,
-// leaving all other filters (field sidebar, duration, etc.) intact.
 const onErrorOnlyToggled = (value: boolean) => {
-  if (value) {
-    searchBarRef.value?.applyFilters(["span_status = 'ERROR'"]);
-  } else {
-    searchBarRef.value?.removeFilterByField("span_status");
-  }
+  const filter = searchObj.data.editorValue ?? "";
+  // On ANDs onto the whole filter, so it holds under a top-level OR; off cuts only that condition, not the user's own.
+  const text = value
+    ? mergeFilterTerm("span_status = 'ERROR'", filter)
+    : removeRequiredCondition(filter, "span_status", "'ERROR'");
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
 // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
@@ -2355,8 +2365,9 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   return result;
 });
 
-const showErrorOnly = computed(
-  () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
+// Errors-only means every result is an error, so a span_status = 'ERROR' under an OR does not count.
+const showErrorOnly = computed(() =>
+  isRequiredCondition(searchObj.data.editorValue ?? "", "span_status", "'ERROR'"),
 );
 
 const searchData = (record = true) => {
@@ -2740,7 +2751,14 @@ const tracesShortcuts = [
   },
   {
     id: "tracesCopyUrl",
-    handler: () => copyTracesUrl(t),
+    // The shortcut copies without the Share button, so it applies the button's gate itself.
+    handler: () => {
+      if (tracesQueryNotRun(searchObj)) {
+        toast({ variant: "warning", message: t("search.autoRunPersistNeedsRun") });
+        return;
+      }
+      copyTracesUrl(t);
+    },
   },
   {
     id: "tracesNextRow",

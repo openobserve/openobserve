@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reactive } from "vue";
+import { computed, reactive } from "vue";
 import config from "@/aws-exports";
 import {
   estimateSignature,
@@ -683,6 +683,185 @@ describe("refinement de-duplication and search-around", () => {
 });
 
 describe("panel records for Visualize and Build (J7)", () => {
+  it("keeps a computed staleness in step with the scope the chart was handed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    const stale = computed(() => run().isPanelScopeStale());
+    expect(stale.value).toBe(false);
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(stale.value).toBe(true);
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    expect(stale.value).toBe(true);
+    run().panelLoadingChanged(false, false);
+    expect(stale.value).toBe(false);
+  });
+
+  it.each(["visualize", "build"])(
+    "%s: a chart-type reload after a time change still shows the old window, so Run stays amber",
+    (mode) => {
+      run().setPanelConfigReader(() => ({ type: "bar" }));
+      fakeSearchObj.value.meta.logsVisualizeToggle = mode;
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+      run().markPanelDispatched(run().openPanelRun());
+      run().endPanelRun(true);
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+      expect(run().isPanelScopeStale()).toBe(true);
+      run().setPanelConfigReader(() => ({ type: "line" }));
+      run().panelLoadingChanged(true, false);
+      run().panelLoadingChanged(false, false);
+      expect(run().isPanelScopeStale()).toBe(true);
+    },
+  );
+
+  it("a load outside a run with no scope handed to the chart records nothing", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("a cancelled load outside a run does not record the scope it was handed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    run().cancelPanelLoad();
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("Build ignores the search bar's wording and SQL mode but not a time move", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    fakeSearchObj.value.data.query = 'SELECT count(*) FROM "logs"';
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.meta.sqlMode = !fakeSearchObj.value.meta.sqlMode;
+    fakeSearchObj.value.data.query = "level = 'error'";
+    expect(run().isPanelScopeStale()).toBe(false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a cancelled panel run keeps the scope the chart last showed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().panelLoadingChanged(true, false);
+    run().cancelPanelLoad();
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a dispatched panel run notes its scope even when its loading is not reported to the logs page", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().markPanelDispatched(run().openPanelRun());
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().endPanelRun(true);
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("a cancelled or failed load keeps the scope the chart last showed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().panelLoadingChanged(true, false);
+    run().engine.cancelGeneration(null, { cause: "user" });
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, true);
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a panel run that ends without loading keeps the scope the chart last loaded", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().openPanelRun();
+    run().endPanelRun(false);
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a scope reset forgets the scope every chart last loaded", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().engine.resetScope("org");
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("Logs results are reusable by Visualize only while the time selection matches the run that produced them", () => {
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    expect(run().executedTimeMatches()).toBe(false);
+    fakeSearchObj.value.meta.executed = { signature: run().readSignature(), complete: true };
+    expect(run().executedTimeMatches()).toBe(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().executedTimeMatches()).toBe(false);
+  });
+
+  it.each(["visualize", "build"])(
+    "%s: a scope change after the chart loaded is stale, a chart-only edit is not",
+    (mode) => {
+      run().setPanelConfigReader(() => ({ type: "bar" }));
+      fakeSearchObj.value.meta.logsVisualizeToggle = mode;
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+      expect(run().isPanelScopeStale()).toBe(false);
+      run().notePanelScopeApplied();
+      run().panelLoadingChanged(true, false);
+      run().panelLoadingChanged(false, false);
+      run().setPanelConfigReader(() => ({ type: "line" }));
+      expect(run().isPanelScopeStale()).toBe(false);
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+      expect(run().isPanelScopeStale()).toBe(true);
+      fakeSearchObj.value.meta.logsVisualizeToggle = "patterns";
+      expect(run().isPanelScopeStale()).toBe(false);
+      fakeSearchObj.value.meta.logsVisualizeToggle = mode;
+      run().notePanelScopeApplied();
+      run().panelLoadingChanged(true, false);
+      run().panelLoadingChanged(false, false);
+      expect(run().isPanelScopeStale()).toBe(false);
+    },
+  );
+
   it("publishes a panel record only after the panel's load starts and ends without errors", () => {
     run().setPanelConfigReader(() => ({ type: "bar" }));
     fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";

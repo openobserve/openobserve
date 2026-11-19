@@ -302,7 +302,7 @@
       "source": "Source",
       "matchedRules": "{n} détection correspondante | {n} détections correspondantes",
       "openCase": "Ouvrir un cas",
-      "openCaseHint": "Ouvrir un dossier sur cet événement, avec son titre, sa priorité et ses entités renseignés",
+      "openCaseHint": "Ouvrir un cas sur cet événement, avec son titre, sa priorité et ses entités préremplis",
       "addToCase": "Ajouter au cas",
       "pickCase": "Ajouter à un cas ouvert",
       "caseOpened": "Cas ouvert : {title}",
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Journal des modifications",
-      "hint": "Qui a modifié les détections, les sources, les dossiers et les attributions de rôles de sécurité, aussi longtemps que le journal d'audit est conservé",
+      "hint": "Qui a modifié les détections, les sources, les cas et les attributions de rôles de sécurité, tant que la piste d'audit est conservée",
       "includeReads": "Inclure les lectures",
       "when": "Quand",
       "who": "Modifié par",
