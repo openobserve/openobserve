@@ -38,23 +38,18 @@ describe("describeDestinations", () => {
       ["Slack webhook", "#ops"],
     ],
     [
-      "prebuilt pager by its product name and host",
+      "prebuilt pager by its product name alone",
       {
         name: "a",
         type: "http",
         url: "https://events.pagerduty.com/v2/enqueue",
         destination_type_name: "pagerduty",
       },
-      ["PagerDuty", "events.pagerduty.com"],
+      ["PagerDuty", null],
     ],
     [
-      "plain webhook shows only the host",
-      { name: "a", type: "http", url: "https://hooks.example.com/t/abc?token=x" },
-      ["Webhook", "hooks.example.com"],
-    ],
-    [
-      "unparseable URL has no target",
-      { name: "a", type: "http", url: "{host}/x" },
+      "plain webhook shows no address",
+      { name: "a", type: "http", url: "http://127.0.0.1:18491/t/abc?token=x" },
       ["Webhook", null],
     ],
     [

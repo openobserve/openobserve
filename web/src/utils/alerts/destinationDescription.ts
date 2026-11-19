@@ -22,7 +22,7 @@ import {
 } from "@/utils/slackAppDestination";
 import { joinListMore } from "@/utils/alerts/alertCopy";
 
-/** What a destination is and where it delivers, for pickers and the read-back. */
+/** What a destination is and who it reaches (channel or recipients), for pickers and the read-back. */
 export interface DestinationDescription {
   type: I18nText;
   target: I18nText | null;
@@ -41,16 +41,6 @@ interface DestinationLike {
 }
 
 const SLACK = raw("Slack");
-
-// Only the host: a webhook path or query often carries its token.
-const hostOf = (url: string | undefined): string | null => {
-  if (!url) return null;
-  try {
-    return new URL(url).host || null;
-  } catch {
-    return null;
-  }
-};
 
 const channel = (name: string | undefined): I18nText | null =>
   name ? raw(`#${name.replace(/^#/, "")}`) : null;
@@ -76,8 +66,8 @@ function targetOf(destination: DestinationLike, t: TranslateFn): I18nText | null
   }
   if (isSlackWebhookDestination(destination))
     return channel(slackWebhookTarget(destination).channelName);
-  const host = hostOf(destination.url);
-  return host ? raw(host) : null;
+  // A URL names a machine, not who reads it, and its path or query often carries a token.
+  return null;
 }
 
 export function describeDestination(
