@@ -12521,7 +12521,7 @@ export class LogsPage {
             await this.page.waitForTimeout(interval);
             await this.dismissSuggestions();
             await monacoHelper.triggerSuggestions();
-            const labels = await this.waitAndGetSuggestionLabels();
+            const labels = await this.waitAndGetSuggestionLabels(2000).catch(() => []);
             if (labels.some(l => expected.includes(l.toLowerCase())) || Date.now() >= deadline) {
                 return labels;
             }
