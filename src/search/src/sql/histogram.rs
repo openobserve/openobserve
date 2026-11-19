@@ -138,7 +138,7 @@ pub fn convert_to_histogram_query(
     is_multi_stream_search: bool,
     breakdown_field: Option<&str>,
 ) -> Result<String, Error> {
-    let (is_eligible, is_sub_query) =
+    let (is_eligible, from_sub_query) =
         is_eligible_for_histogram(original_query, is_multi_stream_search)
             .map_err(|e| Error::Message(e.to_string()))?;
     if !is_eligible {
@@ -155,7 +155,7 @@ pub fn convert_to_histogram_query(
     let histogram_query = if is_multi_stream_search {
         multi_stream_histogram_query(&statements, stream_names)?
     } else {
-        single_stream_histogram_query(&statements, stream_names, is_sub_query, breakdown_field)?
+        single_stream_histogram_query(&statements, stream_names, from_sub_query, breakdown_field)?
     };
 
     Ok(histogram_query)
@@ -164,7 +164,7 @@ pub fn convert_to_histogram_query(
 fn single_stream_histogram_query(
     statements: &[Statement],
     stream_names: &[String],
-    is_sub_query: bool,
+    from_sub_query: bool,
     breakdown_field: Option<&str>,
 ) -> Result<String, Error> {
     let statement = statements
@@ -191,9 +191,8 @@ fn single_stream_histogram_query(
         ),
     };
 
-    // Add WHERE clause if it exists
-    // skip where clause for sub query
-    if !where_clause.is_empty() && !is_sub_query {
+    // Over a derived table the outer WHERE names its columns, which the stream may not have.
+    if !where_clause.is_empty() && !from_sub_query {
         histogram_query.push_str(&format!(" WHERE {where_clause}"));
     }
 
@@ -746,16 +745,33 @@ mod tests {
     }
 
     #[test]
-    fn test_single_stream_sub_query_skips_where_clause() {
-        // When is_sub_query=true, the WHERE clause from the original must be dropped.
-        // is_eligible_for_histogram returns (true, true) for a sub-query pattern
-        // which we trigger via a UNION ALL (multi-stream) is_sub_query path.
-        // Instead, call single_stream_histogram_query directly with is_sub_query=true.
+    fn test_single_stream_from_sub_query_skips_where_clause() {
         let sql = "SELECT * FROM logs WHERE level = 'error'";
         let statements = Parser::parse_sql(&PostgreSqlDialect {}, sql).unwrap();
         let stream_names = vec!["logs".to_string()];
         let result = single_stream_histogram_query(&statements, &stream_names, true, None).unwrap();
-        // WHERE clause must be absent when is_sub_query is true
         assert!(!result.contains("WHERE"), "expected no WHERE: {result}");
+    }
+
+    #[test]
+    fn test_convert_query_keeps_where_with_subquery_filter() {
+        let stream_names = vec!["a".to_string()];
+        for sql in [
+            r#"SELECT * FROM "a" WHERE seq IN (SELECT seq FROM "b" WHERE seq < 4)"#,
+            r#"SELECT * FROM "a" WHERE EXISTS (SELECT 1 FROM "b" WHERE b.seq = a.seq)"#,
+            r#"SELECT * FROM "a" WHERE seq > (SELECT max(seq) FROM "b")"#,
+        ] {
+            let result = convert_to_histogram_query(sql, &stream_names, false, None).unwrap();
+            let (_, where_clause) = result.split_once(" WHERE ").expect(&result);
+            assert!(where_clause.contains(r#"FROM "b""#), "{sql} -> {result}");
+        }
+    }
+
+    #[test]
+    fn test_convert_query_drops_where_over_derived_table() {
+        let stream_names = vec!["a".to_string()];
+        let sql = r#"SELECT * FROM (SELECT seq AS s FROM "a") WHERE s < 4"#;
+        let result = convert_to_histogram_query(sql, &stream_names, false, None).unwrap();
+        assert!(!result.contains("WHERE"), "{sql} -> {result}");
     }
 }

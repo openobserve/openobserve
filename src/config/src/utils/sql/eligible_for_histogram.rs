@@ -16,10 +16,11 @@
 use sqlparser::{ast::Statement, dialect::GenericDialect, parser::Parser};
 
 use super::{
-    helpers::{has_cte, has_join, has_limit},
+    helpers::{has_cte, has_join, has_limit, reads_from_derived_table},
     visitors::{has_distinct, has_subquery, has_union, is_multi_search_eligible_for_histogram},
 };
 
+/// Returns `(eligible, reads_from_derived_table)`; the histogram keeps the WHERE only when false.
 pub fn is_eligible_for_histogram(
     query: &str,
     is_multi_stream_search: bool,
@@ -32,7 +33,7 @@ pub fn is_eligible_for_histogram(
     for statement in ast.iter() {
         if let Statement::Query(query) = statement {
             if has_subquery(statement) {
-                return Ok((true, true));
+                return Ok((true, reads_from_derived_table(query)));
             } else if has_distinct(statement)
                 || has_limit(query)
                 || has_cte(query)
@@ -97,6 +98,12 @@ mod tests {
             is_eligible_for_histogram("SELECT x FROM (SELECT x FROM t)", false).unwrap();
         assert!(eligible);
         assert!(is_sub);
+
+        let (eligible, is_sub) =
+            is_eligible_for_histogram("SELECT x FROM t WHERE x IN (SELECT x FROM u)", false)
+                .unwrap();
+        assert!(eligible);
+        assert!(!is_sub);
     }
 
     #[test]
