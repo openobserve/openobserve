@@ -15,6 +15,7 @@
 
 //! The OSS half of the AutoObserve engine: its ports, and its start-up registration.
 
+pub mod causes;
 pub mod incidents;
 pub mod ports;
 

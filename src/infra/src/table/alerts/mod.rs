@@ -64,6 +64,8 @@ pub struct AlertSummaryRow {
 pub struct WriteGuard {
     pub written_us: Option<i64>,
     pub fence: Option<KvFence>,
+    /// The `updated_at` the save swaps in, so its caller knows its own write's time; None is now.
+    pub writes_us: Option<i64>,
 }
 
 /// A kv row of the alert's org that the save swaps from `expected` to `written` in its transaction.
@@ -465,6 +467,9 @@ pub async fn update_where<C: TransactionTrait + ConnectionTrait>(
     // Update fields using values from the given alert.
     let mut alert_am: alerts::ActiveModel = alert_m.into();
     update_mutable_fields(&mut alert_am, alert)?;
+    if let Some(us) = guard.as_ref().and_then(|g| g.writes_us) {
+        alert_am.updated_at = Set(Some(us));
+    }
 
     // Update the folder if a new parent folder was provided.
     if let Some(folder_m) = maybe_folder_m {
@@ -2711,8 +2716,15 @@ pub(super) mod tests {
             let (_, kept) = get_by_id(db, ORG, ksuid).await.unwrap().unwrap();
             assert_eq!(kept.pending_period_sec, 300);
             let fresh = last_written_us(db, ORG, &id).await.unwrap();
-            let saved = update_where(db, ORG, None, ours, Some(guard(fresh))).await;
+            let stamp = fresh.unwrap() + 1;
+            let stamped = WriteGuard {
+                writes_us: Some(stamp),
+                ..guard(fresh)
+            };
+            let saved = update_where(db, ORG, None, ours, Some(stamped)).await;
             assert_eq!(saved.unwrap().unwrap().pending_period_sec, 120);
+            let written = last_written_us(db, ORG, &id).await.unwrap();
+            assert_eq!(written, Some(stamp), "the save wrote the caller's time");
         }
 
         #[tokio::test]
@@ -2755,6 +2767,7 @@ pub(super) mod tests {
             WriteGuard {
                 written_us,
                 fence: None,
+                writes_us: None,
             }
         }
 
@@ -2784,6 +2797,7 @@ pub(super) mod tests {
                     expected: expected.to_vec(),
                     written: b"written".to_vec(),
                 }),
+                writes_us: None,
             };
             let read = last_written_us(db, ORG, &id).await.unwrap();
             let taken_back =
