@@ -95,6 +95,12 @@ export interface IntentFill {
   anomaly?: Record<string, unknown>;
 }
 
+interface FormAggregation {
+  function?: string;
+  group_by?: readonly (string | null)[] | null;
+  having?: { column?: string } | null;
+}
+
 export const EVENT_INTENTS: readonly IntentId[] = [
   "countWhere",
   "percentile",
@@ -123,6 +129,29 @@ export const CARDS_FOLD_AT = 10;
 export const DEFAULT_FACTOR = 2;
 /** Anomaly histograms bucket by 5 minutes unless changed in section 2. */
 export const ANOMALY_BUCKET_MINUTES = 5;
+/** Step 2's functions for a measured value, in its order, less "total events": that is the Count chip. */
+export const VALUE_AGGS = [
+  "count",
+  "avg",
+  "min",
+  "max",
+  "sum",
+  "median",
+  "p50",
+  "p75",
+  "p90",
+  "p95",
+  "p99",
+] as const;
+/** The quantile each percentile function reads, as the server's builder does. */
+export const QUANTILE_OF: Readonly<Record<string, number>> = {
+  median: 0.5,
+  p50: 0.5,
+  p75: 0.75,
+  p90: 0.9,
+  p95: 0.95,
+  p99: 0.99,
+};
 
 // Value-shape bounds from the starter design (phase2 §2.5).
 const CATEGORY_MAX_DISTINCT = 20;
@@ -551,7 +580,7 @@ export function buildEventFill(
       vrl: false,
       values: {
         ...filters,
-        "query_condition.aggregation": groupAggregation("p95", measure, slots.group, {
+        "query_condition.aggregation": groupAggregation(slots.agg || "p95", measure, slots.group, {
           operator: ">",
           value: "",
         }),
@@ -713,14 +742,23 @@ export function metricPromql(
   return `${opts.counter ? "sum" : "avg"} by (${opts.group}) (${read})`;
 }
 
-/** p95 over a histogram's bucket series; buckets are cumulative counters, so they are read as a rate. */
+/** A percentile over a histogram's bucket series; buckets are cumulative counters, so they are read as a rate. */
 export function percentilePromql(
   metric: string,
-  opts: { group?: string; windowMinutes: number },
+  opts: { group?: string; windowMinutes: number; agg?: string },
 ): string {
   const window = `${Math.max(1, Math.round(opts.windowMinutes))}m`;
   const by = [BUCKET_LABEL, ...(opts.group ? [opts.group] : [])].join(", ");
-  return `histogram_quantile(0.95, sum by (${by}) (rate(${metric}[${window}])))`;
+  const q = QUANTILE_OF[opts.agg ?? ""] ?? QUANTILE_OF.p95;
+  return `histogram_quantile(${q}, sum by (${by}) (rate(${metric}[${window}])))`;
+}
+
+/** The percentile function a histogram starter's query reads, `prefer` when it reads the same quantile. */
+export function promqlQuantileAgg(promql: unknown, prefer?: string): string | undefined {
+  const q = Number(/^\s*histogram_quantile\(\s*([\d.]+)\s*,/.exec(String(promql ?? ""))?.[1]);
+  if (!(q > 0)) return undefined;
+  if (prefer && QUANTILE_OF[prefer] === q) return prefer;
+  return Object.keys(QUANTILE_OF).find((fn) => QUANTILE_OF[fn] === q);
 }
 
 /** A metric intent as the values it writes. */
@@ -755,6 +793,7 @@ export function buildMetricFill(
         "query_condition.promql": percentilePromql(slots.metric, {
           group: slots.group,
           windowMinutes: ctx.periodMinutes,
+          agg: slots.agg,
         }),
         "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
         "query_condition.promql_multi_alert": !!slots.group,
@@ -817,8 +856,33 @@ export function buildMetricFill(
   };
 }
 
-/** Functions a gauge above a value offers in its sentence; the rest stay in step 2's picker. */
-export const METRIC_AGGS = ["avg", "max", "min", "sum"] as const;
+/** The functions an intent's Watch row offers: a histogram's buckets only read as a percentile. */
+export function aggsFor(intent: IntentId, metrics: boolean): readonly string[] {
+  return intent === "percentile" && metrics ? Object.keys(QUANTILE_OF) : VALUE_AGGS;
+}
+
+export const defaultAgg = (intent: IntentId): string => (intent === "percentile" ? "p95" : "avg");
+
+/** The picks a starter's query holds now, so step 1 shows what step 2 changed instead of its own copy. */
+export function slotsFromForm(
+  intent: IntentId,
+  read: (path: string) => unknown,
+  prefer: IntentSlots = {},
+): Partial<IntentSlots> {
+  const type = read("query_condition.type");
+  if (type === "promql") {
+    const agg = promqlQuantileAgg(read("query_condition.promql"), prefer.agg);
+    return intent === "percentile" && agg ? { agg } : {};
+  }
+  if (type !== "custom") return {};
+  const aggregation = read("query_condition.aggregation") as FormAggregation | null | undefined;
+  const group = aggregation?.group_by?.find((g): g is string => !!g);
+  if (intent === "countWhere") return { group };
+  if (!aggregation) return {};
+  if (intent === "percentile")
+    return { agg: aggregation.function, measure: aggregation.having?.column || undefined, group };
+  return intent === "metricAbove" ? { agg: aggregation.function, group } : {};
+}
 
 export interface ThresholdPaths {
   operator: string;

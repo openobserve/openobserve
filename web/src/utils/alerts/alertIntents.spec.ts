@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
+import { generateSqlQuery } from "./alertQueryBuilder";
 import {
+  aggsFor,
   buildEventFill,
   buildMetricFill,
   cardsFolded,
@@ -39,6 +41,7 @@ import {
   rankMetricGroup,
   orgGroupUse,
   pickedValues,
+  promqlQuantileAgg,
   spellingVariants,
   starterAlternative,
   ratioPromql,
@@ -503,8 +506,66 @@ describe("alertIntents", () => {
     );
     expect(fill.values["query_condition.type"]).toBe("custom");
     expect(fill.values["query_condition.aggregation"]).toMatchObject({ function: "avg" });
-    const max = buildMetricFill("metricAbove", { metric: "m", agg: "max" }, { periodMinutes: 10 });
-    expect(max.values["query_condition.aggregation"]).toMatchObject({ function: "max" });
+  });
+
+  // Step 2's function list, each as the builder's query reads it; {c} is the measured column.
+  const VALUE_FUNCTIONS = [
+    ["count", "count({c})"],
+    ["avg", "avg({c})"],
+    ["min", "min({c})"],
+    ["max", "max({c})"],
+    ["sum", "sum({c})"],
+    ["median", "median({c})"],
+    ["p50", "approx_percentile_cont({c}, 0.5)"],
+    ["p75", "approx_percentile_cont({c}, 0.75)"],
+    ["p90", "approx_percentile_cont({c}, 0.9)"],
+    ["p95", "approx_percentile_cont({c}, 0.95)"],
+    ["p99", "approx_percentile_cont({c}, 0.99)"],
+  ] as const;
+  const builderSql = (values: Record<string, unknown>) =>
+    generateSqlQuery(
+      {
+        stream_name: "s",
+        query_condition: {
+          conditions: values["query_condition.conditions"] ?? {
+            filterType: "group",
+            conditions: [],
+          },
+          aggregation: values["query_condition.aggregation"],
+        },
+      } as never,
+      {},
+      true,
+    );
+  it.each([
+    ...VALUE_FUNCTIONS.map(([fn, sql]) => ["logs percentile", fn, sql.replace("{c}", "took")]),
+    ...VALUE_FUNCTIONS.map(([fn, sql]) => ["gauge above a value", fn, sql.replace("{c}", "value")]),
+  ])("the %s Watch row's %s reads %s", (row, agg, expression) => {
+    const fill =
+      row === "logs percentile"
+        ? ev("percentile", { measure: "took", agg })
+        : mt("metricAbove", { counter: false, agg });
+    expect(builderSql(fill.values)).toContain(` ${expression} as zo_sql_val`);
+  });
+
+  it.each([
+    ["median", "0.5"],
+    ["p50", "0.5"],
+    ["p75", "0.75"],
+    ["p90", "0.9"],
+    ["p95", "0.95"],
+    ["p99", "0.99"],
+  ])("a histogram's %s reads histogram_quantile(%s, …) and reads back as itself", (agg, q) => {
+    const promql = mt("percentile", { agg }).values["query_condition.promql"];
+    expect(promql).toBe(`histogram_quantile(${q}, sum by (le) (rate(m[10m])))`);
+    expect(promqlQuantileAgg(promql, agg)).toBe(agg);
+  });
+
+  it("offers every function step 2 offers for a measured value, and only percentiles for a histogram", () => {
+    const all = VALUE_FUNCTIONS.map(([fn]) => fn);
+    expect(aggsFor("percentile", false)).toEqual(all);
+    expect(aggsFor("metricAbove", true)).toEqual(all);
+    expect(aggsFor("percentile", true)).toEqual(["median", "p50", "p75", "p90", "p95", "p99"]);
   });
 
   const HAVING = [

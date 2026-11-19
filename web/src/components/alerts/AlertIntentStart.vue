@@ -40,6 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="choose(id)"
         >{{ intentLabel(id) }}</OButton
       >
+      <OButton
+        variant="outline"
+        size="chip"
+        :active="scratchPressed"
+        :aria-pressed="scratchPressed"
+        data-test="add-alert-start-from-scratch"
+        @click="pickScratch"
+        >{{ t("alerts.intent.scratch.label") }}</OButton
+      >
     </div>
 
     <div
@@ -76,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #agg>
             <OSelect
-              :model-value="formAgg"
+              :model-value="shownAgg"
               :options="aggOptions"
               size="sm"
               :searchable="false"
@@ -363,12 +372,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <template v-if="showLibrary && area.state !== 'absent'">
-      <div
-        class="flex min-h-7 min-w-0 items-center justify-between gap-2"
-        data-test="add-alert-suggestions-header"
-      >
+    <template v-if="showLibrary">
+      <!-- Held whatever the library answers, so the end of the step never moves. -->
+      <div class="flex min-h-7 min-w-0 items-center" data-test="add-alert-suggestions-header">
         <p
+          v-if="headerText"
           class="m-0 min-w-0 text-xs"
           :class="
             area.state === 'unavailable' || area.state === 'failed'
@@ -388,14 +396,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ folded ? t("common.show") : t("common.hide") }}</OButton
           >
         </p>
-        <OButton
-          variant="outline"
-          size="xs"
-          :tabindex="applied ? -1 : undefined"
-          data-test="add-alert-start-from-scratch"
-          @click="emit('scratch')"
-          >{{ t("alerts.librarySuggest.startFromScratch") }}</OButton
-        >
       </div>
       <div
         v-if="area.state === 'ready' && !folded"
@@ -423,16 +423,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("alerts.librarySuggest.seeAll", { count: formatNumber(area.total) }) }}</OButton
       >
     </template>
-    <div v-else class="flex justify-end">
-      <OButton
-        variant="outline"
-        size="xs"
-        :tabindex="applied ? -1 : undefined"
-        data-test="add-alert-start-from-scratch"
-        @click="emit('scratch')"
-        >{{ t("alerts.librarySuggest.startFromScratch") }}</OButton
-      >
-    </div>
 
     <LibraryDrawer
       :open="!!drawerCard"
@@ -448,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, ref, toRefs, watch } from "vue";
 import { get } from "lodash-es";
 import { useStore } from "vuex";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
@@ -485,6 +475,7 @@ import {
 } from "@/composables/alerts/useStreamDiscovery";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
 import { publishGroupRanking } from "@/composables/alerts/groupRanking";
+import { useIntentState } from "@/composables/alerts/useIntentState";
 import {
   dataNoun,
   durationWords,
@@ -496,14 +487,15 @@ import {
   ANOMALY_BUCKET_MINUTES,
   BUCKET_LABEL,
   DEFAULT_FACTOR,
-  METRIC_AGGS,
   SHAPE_NUMBER_CAP,
   SHAPE_STRING_CAP,
   SHAPE_WINDOW_US,
   SAMPLE_ROWS,
+  aggsFor,
   buildEventFill,
   buildMetricFill,
   cardsFolded,
+  defaultAgg,
   fieldsBySamplePresence,
   intentsFor,
   isCounterLike,
@@ -526,6 +518,7 @@ import {
   readFieldShapes,
   shapeQuerySql,
   slotFields,
+  slotsFromForm,
   thresholdPaths,
   withCaseVariants,
   hasCaseVariants,
@@ -554,7 +547,7 @@ const props = defineProps<{
   showLibrary: boolean;
   /** The intent the form was last filled from; null once the user starts from scratch. */
   active: IntentId | null;
-  /** An intent or card wrote the form, so Start from scratch undoes it and leaves the Tab order. */
+  /** An intent or card wrote the form, so the sentence reads its picks back from the form. */
   applied?: boolean;
   /** The type picked above the chips (`is_real_time`): "false", "true" or "anomaly". */
   howItChecks?: string;
@@ -598,9 +591,11 @@ const STATE_TAG = {
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const isMetrics = computed(() => props.streamType === "metrics");
-// A type a chip set does not narrow the chips, so the row never loses the chip beside the one clicked.
-// The type as it was when a chip was pressed: a chip that sets the type keeps its row, one picked under it filters it.
-const typeAtPick = ref<string | undefined>();
+// Step 1 unmounts when it folds away, so its picks live with the form, not with this component.
+const form = inject(FORM_CONTEXT_KEY, null);
+const state = useIntentState(form);
+const slots = state.slots;
+const { seeded, alternative, typeAtPick } = toRefs(state);
 // A histogram's bucket series carry the bucket label; the schema says so before any series load.
 const isBucket = computed(
   () => isMetrics.value && props.columns.some((c) => c.value === BUCKET_LABEL),
@@ -617,11 +612,6 @@ const nounOne = computed(() => dataNoun(props.streamType, "custom", 1, t));
 const questionText = computed(() => t("alerts.intent.question", { stream: raw(props.streamName) }));
 const bucketWords = computed(() => durationWords(ANOMALY_BUCKET_MINUTES, t));
 
-const slots = reactive<IntentSlots>({});
-// The values a starter suggested; the user's first pick replaces them instead of joining them.
-const seeded = ref<string[]>([]);
-// A value the data cannot tell from the suggested one, offered as a one-click swap while it stands.
-const alternative = ref<string | undefined>();
 // The chip pressed while its slots are still being ranked and seeded.
 const choosing = ref<IntentId | null>(null);
 
@@ -827,11 +817,15 @@ const labelValues = computed(
 
 watch(
   () => `${props.streamType}/${props.streamName}`,
-  async () => {
+  async (stream) => {
     choosing.value = null;
-    for (const key of Object.keys(slots) as (keyof IntentSlots)[]) delete slots[key];
-    seeded.value = [];
-    alternative.value = undefined;
+    if (state.stream !== stream) {
+      state.stream = stream;
+      for (const key of Object.keys(slots) as (keyof IntentSlots)[]) delete slots[key];
+      seeded.value = [];
+      alternative.value = undefined;
+      state.scratch = false;
+    }
     if (isMetrics.value && props.streamName) await loadSeries(props.streamName);
   },
   { immediate: true },
@@ -944,7 +938,7 @@ const isCounter = computed(
 );
 const WATCH: Record<IntentId, I18nKey> = {
   countWhere: "alerts.intent.rows.countOf",
-  percentile: "alerts.intent.rows.percentileOf",
+  percentile: "alerts.intent.rows.aggOfMeasure",
   anyEvent: "alerts.intent.rows.eachEvent",
   unusualVolume: "alerts.intent.rows.unusualNumber",
   compareLastWeek: "alerts.intent.rows.countOf",
@@ -1003,7 +997,6 @@ const missingSlot = computed(() => (props.active ? missingSlotFor(props.active) 
 const needsChoice = computed(() => missingSlot.value !== null);
 
 // ── The threshold: step 2's own form fields, typed at the end of the sentence ──
-const form = inject(FORM_CONTEXT_KEY, null);
 const guide = inject(ALERT_FORM_CONTEXT_KEY, null)?.thresholdGuide;
 const formValues = form?.useStore((s: { values: unknown }) => s.values);
 const read = (path: string) => get(formValues?.value, path);
@@ -1039,9 +1032,14 @@ const unitWord = computed(() =>
     ? dataNoun(props.streamType, "custom", Number(thresholdValue.value) === 1 ? 1 : 2, t)
     : (guide?.value?.unit.value ?? ""),
 );
-const formAgg = computed(() => String(read("query_condition.aggregation.function") ?? "avg"));
+const shownAgg = computed(() => slots.agg ?? (props.active ? defaultAgg(props.active) : "avg"));
 const aggOptions = computed<SelectOption[]>(() =>
-  [...new Set<string>([...METRIC_AGGS, formAgg.value])].map((fn) => ({
+  [
+    ...new Set<string>([
+      ...(props.active ? aggsFor(props.active, isMetrics.value) : []),
+      shownAgg.value,
+    ]),
+  ].map((fn) => ({
     label: t(`alerts.queryConfig.functions.${fn}` as I18nKey),
     value: fn,
   })),
@@ -1060,10 +1058,9 @@ const apply = (id: IntentId) => {
   else emit("apply", { fill: fillFor(id), label });
 };
 
-/** Fills empty slots with the first candidate that passes the slot's rule; none passing leaves it empty. */
+/** Fills empty slots with the first candidate that passes the slot's rule; grouping stays the user's pick. */
 const seedSlots = (id: IntentId) => {
   if (!wantsGroup(id)) slots.group = undefined;
-  else if (slots.group === undefined) slots.group = groupCandidates.value.fit[0];
   if (id === "percentile" && !isMetrics.value) slots.measure ??= measureCandidates.value.fit[0];
   if (id === "compareLastWeek") slots.factor ??= DEFAULT_FACTOR;
   if (!wantsValue(id)) return;
@@ -1103,6 +1100,9 @@ const seedValues = async (id: IntentId) => {
 };
 
 const choose = async (id: IntentId) => {
+  // Pressing the chip already applied keeps what the user set; only another chip starts over.
+  if (id === props.active && props.applied) return;
+  state.scratch = false;
   analytics.track("alert_intent_applied", { intent: id, stream_type: props.streamType });
   if (!props.active) typeAtPick.value = props.howItChecks;
   choosing.value = id;
@@ -1116,6 +1116,26 @@ const choose = async (id: IntentId) => {
 };
 
 const reapply = () => props.active && apply(props.active);
+
+const scratchPressed = computed(() => state.scratch && !props.active);
+const pickScratch = () => {
+  choosing.value = null;
+  state.scratch = true;
+  emit("scratch");
+};
+
+// The form is the source of truth: what step 2 changed in a starter's query reads back here.
+const formSlots = computed(() =>
+  props.applied && props.active ? slotsFromForm(props.active, read, slots) : {},
+);
+watch(
+  () => JSON.stringify(formSlots.value, (_, v) => (v === undefined ? null : v)),
+  () => {
+    for (const [key, value] of Object.entries(formSlots.value) as [keyof IntentSlots, never][])
+      if (slots[key] !== value) slots[key] = value;
+  },
+  { immediate: true },
+);
 
 const asText = (value: SelectModelValue): string =>
   typeof value === "string" || typeof value === "number" ? String(value) : "";
@@ -1293,7 +1313,8 @@ watch(
     if (before === undefined) folded.value = cardsFolded(count);
   },
 );
-const headerText = computed<I18nText>(() => {
+// Nothing to say when no ready-made alert fits, or the library is not there.
+const headerText = computed<I18nText | null>(() => {
   switch (area.value.state) {
     case "loading":
       return t("alerts.librarySuggest.loading", { stream: raw(props.streamName) });
@@ -1301,14 +1322,14 @@ const headerText = computed<I18nText>(() => {
       return t("alerts.librarySuggest.failed");
     case "unavailable":
       return t("alerts.librarySuggest.unavailable");
-    case "none":
-      return t("alerts.librarySuggest.none");
-    default:
+    case "ready":
       return t(
         "alerts.librarySuggest.folded",
         { count: formatNumber(area.value.total) },
         area.value.total,
       );
+    default:
+      return null;
   }
 });
 
@@ -1340,6 +1361,7 @@ const useCard = () => {
     rank: area.value.cards.indexOf(card) + 1,
     confidence: card.fit,
   });
+  state.scratch = false;
   emit("use-suggestion", card);
   drawerCard.value = null;
 };
