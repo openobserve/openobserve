@@ -3609,6 +3609,7 @@ export default defineComponent({
       clearPermalink();
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
+      let shortenedToHours = 0;
       const viewOrg = store.state.selectedOrganization.identifier;
       const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
@@ -3749,7 +3750,7 @@ export default defineComponent({
               //here we are getting data so we need to check here
               //before we set the time to the dateTimeRef.value we need to check if the startTime and endTime difference is greater than maxQueryRange in hours
               //solution will be we will do endTime - startTime and convert that difference into hours and check with both global and stream level maxQueryRange and if it is less than or equal to that we will keep that as it is
-              //if that exceeds the maxQueryRange we will convert that to relative type (because we cannot assume the start and end date) or we can do that by converting present time - maxQueryRange
+              //if that exceeds the maxQueryRange we keep the end (the saved end for absolute views, now for relative ones) and move the start to end - maxQueryRange
 
               // Validate and adjust time range based on maxQueryRange
               //before we check all this we need to get the current selected stream max query range and also global max query range
@@ -3805,15 +3806,14 @@ export default defineComponent({
 
                 // Check if time difference exceeds effective max query range
                 if (timeDiffInHours > effectiveMaxQueryRange) {
-                  // Adjust to current time - maxQueryRange
-                  const currentTimeMicros = Date.now() * 1000; // Convert milliseconds to microseconds
                   const maxQueryRangeMicros = effectiveMaxQueryRange * 60 * 60 * 1000000;
-
-                  const adjustedStartTime = currentTimeMicros - maxQueryRangeMicros;
-                  const adjustedEndTime = currentTimeMicros;
-
-                  // Get the current datetime type
                   const currentType = searchObj.data.datetime.type || "relative";
+
+                  // Keep the saved end and move only the start, as the backend clamp does.
+                  const adjustedEndTime =
+                    currentType === "absolute" ? endTimeMicros : Date.now() * 1000;
+                  const adjustedStartTime = adjustedEndTime - maxQueryRangeMicros;
+                  shortenedToHours = effectiveMaxQueryRange;
 
                   // Build the complete datetime object with all required fields
                   const updatedDateTime = buildDateTimeObject(
@@ -3982,10 +3982,20 @@ export default defineComponent({
 
             updateEditorWidth();
 
-            toast({
-              message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
-              variant: "success",
-            });
+            toast(
+              shortenedToHours > 0
+                ? {
+                    message: t("logs.searchBar.viewAppliedRangeShortened", {
+                      name: item.view_name,
+                      hours: shortenedToHours,
+                    }),
+                    variant: "warning",
+                  }
+                : {
+                    message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
+                    variant: "success",
+                  },
+            );
             markSavedViewApplied(item.view_id);
             setTimeout(async () => {
               if (leftViewOrg()) return;
