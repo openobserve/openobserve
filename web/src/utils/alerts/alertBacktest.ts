@@ -25,11 +25,15 @@ const MAX_CHECKS = 24 * 60;
 const NOISY_SHARE = 0.25;
 
 // Which way the threshold should move depends on the comparison; exactly / not exactly have no direction.
+// A noisy alert is offered Must last first: the threshold is often a target the user was given.
 const HINT_KEYS: Record<"above" | "below" | "none", { never: I18nKey; noisy: I18nKey }> = {
-  above: { never: "alerts.sections.backtest.never", noisy: "alerts.sections.backtest.noisy" },
+  above: {
+    never: "alerts.sections.backtest.never",
+    noisy: "alerts.sections.backtest.noisyMustLast",
+  },
   below: {
     never: "alerts.sections.backtest.neverRaise",
-    noisy: "alerts.sections.backtest.noisyLower",
+    noisy: "alerts.sections.backtest.noisyMustLastLower",
   },
   none: {
     never: "alerts.sections.backtest.neverCheck",
@@ -266,7 +270,7 @@ export function backtestHintKey(
   alerts: number,
   total: number,
   operator: string,
-  day: { events?: number; filtered?: boolean; pending?: number } = {},
+  day: { events?: number; filtered?: boolean; pending?: number; compares?: boolean } = {},
 ): I18nKey | null {
   if (total === 0) return null;
   // No event to count means the threshold is not what kept it quiet (or noisy).
@@ -275,5 +279,7 @@ export function backtestHintKey(
   // Matches Must last held back say the threshold already caught them.
   if (alerts === 0 && (day.pending ?? 0) > 0) return "alerts.sections.backtest.heldByMustLast";
   if (alerts === 0) return HINT_KEYS[direction].never;
-  return alerts / total > NOISY_SHARE ? HINT_KEYS[direction].noisy : null;
+  if (alerts / total <= NOISY_SHARE) return null;
+  // A comparison with an empty past fires on any match, which no threshold or Must last fixes.
+  return day.compares ? "alerts.sections.backtest.noisyCompare" : HINT_KEYS[direction].noisy;
 }

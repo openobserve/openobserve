@@ -262,11 +262,14 @@ describe("AlertBacktest", () => {
     testRun.result.value = grouped as any;
     testRun.state.value = "ready";
     testRun.testedKey.value = testRun.currentKey.value = "k";
-    const wrapper = mountBacktest('SELECT count(*) FROM "default"', ref(null), { testRun });
+    const signal = ref<BacktestSignal | null>(null);
+    const wrapper = mountBacktest('SELECT count(*) FROM "default"', signal, { testRun });
     await vi.advanceTimersByTimeAsync(700);
 
     expect(calls).toHaveLength(0);
     expect(wrapper.find('[data-test="add-alert-backtest-result"]').text()).toContain("2 of 6");
+    // Suggestions read the same day, so a flapping note can't outlive an answer that says otherwise.
+    expect(signal.value).toMatchObject({ checks: 6, alerts: 2, refires: 1, singleCheckSpikes: 1 });
     expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
 
     testRun.currentKey.value = "edited";

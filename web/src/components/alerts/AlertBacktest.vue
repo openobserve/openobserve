@@ -36,7 +36,8 @@ import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
 import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { ALERT_TEST_RUN_KEY } from "@/composables/alerts/useAlertTestRun";
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
-import { testRunDay } from "@/utils/alerts/alertTestRun";
+import { checkTimeText, testRunDay } from "@/utils/alerts/alertTestRun";
+import store from "@/stores";
 import {
   backtestBucketMinutes,
   backtestHintKey,
@@ -66,6 +67,8 @@ const props = defineProps<{
   };
   /** Real time: every matching event notifies, so the day is counted by the hour. */
   realTime?: boolean;
+  /** Compares with past windows, which fire on any match while they hold no data. */
+  compares?: boolean;
 }>();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -226,9 +229,10 @@ const frequencyMinutes = computed(() => {
 
 watchEffect(() => {
   if (!signal) return;
-  const r = result.value;
+  // Once Test it has answered, its checks are the day, so a replay never contradicts it.
+  const r = serverDay.value ?? result.value;
   signal.value =
-    sql.value && status.value === "ready" && !props.realTime
+    (sql.value || server.value) && status.value === "ready" && !props.realTime
       ? {
           checks: r.total,
           alerts: r.alerts,
@@ -309,16 +313,42 @@ const hint = computed(() => {
     events: counts.value.events,
     filtered: filtered.value,
     pending: serverDay.value?.pending,
+    compares: props.compares,
   });
   if (!key) return null;
-  const held = key === "alerts.sections.backtest.heldByMustLast";
-  return { text: t(key), action: held ? t("alerts.sections.backtest.changeMustLast") : null };
+  if (key === "alerts.sections.backtest.noisyCompare")
+    return {
+      text: t(key),
+      action: t("alerts.sections.backtest.changeCompare"),
+      target: "add-alert-compare-needs-baseline",
+    };
+  const mustLast = [
+    "alerts.sections.backtest.heldByMustLast",
+    "alerts.sections.backtest.noisyMustLast",
+    "alerts.sections.backtest.noisyMustLastLower",
+  ].includes(key);
+  return {
+    text: t(key),
+    action: mustLast ? t("alerts.sections.backtest.changeMustLast") : null,
+    target: "add-alert-hold-for-row",
+  };
 });
-const openMustLast = async () => {
+const openHintTarget = async () => {
   formContext?.goToSection("condition");
   await nextTick();
-  const row = document.querySelector<HTMLElement>('[data-test="add-alert-hold-for-row"]');
+  const row = document.querySelector<HTMLElement>(`[data-test="${hint.value?.target}"]`);
   if (row) formContext?.reveal(row);
+};
+
+// Each hour of the strip says when it is, so a firing hour can be placed on the clock.
+const hourTitle = (hour: number, fired: boolean) => {
+  const dayStartMs = server.value ? server.value.end / 1000 - DAY_MS : startMs;
+  const at = (ms: number) => checkTimeText(ms * 1000, store.state.timezone, Date.now());
+  const from = dayStartMs + hour * 3_600_000;
+  return t(fired ? "alerts.sections.backtest.hourFired" : "alerts.sections.backtest.hourQuiet", {
+    from: at(from),
+    to: at(from + 3_600_000),
+  });
 };
 </script>
 
@@ -377,6 +407,7 @@ const openMustLast = async () => {
           :key="hour"
           class="rounded-default h-4"
           :class="fired ? 'bg-accent' : 'bg-surface-subtle'"
+          :title="hourTitle(hour, fired)"
           :data-test="fired ? 'add-alert-backtest-hour-fired' : 'add-alert-backtest-hour'"
         />
       </div>
@@ -399,7 +430,7 @@ const openMustLast = async () => {
         :text="hint.text"
         :action="hint.action"
         data-test="add-alert-backtest-hint"
-        @action="openMustLast"
+        @action="openHintTarget"
       />
     </template>
   </OSettingRow>

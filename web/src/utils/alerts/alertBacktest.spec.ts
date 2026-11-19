@@ -192,8 +192,8 @@ describe("backtestHintKey", () => {
     [0, 288, ">=", "alerts.sections.backtest.never"],
     [0, 288, "<", "alerts.sections.backtest.neverRaise"],
     [0, 288, "!=", "alerts.sections.backtest.neverCheck"],
-    [100, 288, ">", "alerts.sections.backtest.noisy"],
-    [100, 288, "<=", "alerts.sections.backtest.noisyLower"],
+    [100, 288, ">", "alerts.sections.backtest.noisyMustLast"],
+    [100, 288, "<=", "alerts.sections.backtest.noisyMustLastLower"],
     [100, 288, "=", "alerts.sections.backtest.noisyCheck"],
     [10, 288, ">=", null],
     [0, 0, ">=", null],
@@ -206,6 +206,12 @@ describe("backtestHintKey", () => {
       name: "a filter that matched nothing",
       day: { events: 0 },
       key: "alerts.guard.matchedNothing",
+    },
+    {
+      name: "a noisy comparison, whose empty past fires on any match",
+      day: { compares: true },
+      alerts: 288,
+      key: "alerts.sections.backtest.noisyCompare",
     },
     {
       name: "a fewer-than limit over no events",
