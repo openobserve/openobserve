@@ -18,6 +18,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { addCommasToNumber } from "@/utils/formatters";
 import type { RegionJoinInfo } from "./convertMapsData";
 import type { SankeyNotice } from "./convertSankeyData";
+import type { TreemapNotice } from "./convertTreemapData";
 import type { PanelDiagnostics, SeriesLimitInfo } from "./panelDiagnostics";
 
 export type PanelNoticeId =
@@ -50,6 +51,7 @@ export interface PanelNoticeInput {
   seriesLimitMessage?: string;
   seriesTotalBound?: SeriesTotalBound;
   sankeyNotice?: SankeyNotice | null;
+  treemapNotice?: TreemapNotice | null;
   serverPartial?: boolean;
   partialReasons?: string[];
   interrupted?: boolean;
@@ -172,6 +174,20 @@ const unmatchedRegionsNotice = (join: RegionJoinInfo, t: TranslateFn): PanelNoti
   };
 };
 
+const skippedRowsNotice = (count: number, body: I18nText, t: TranslateFn): PanelNotice => ({
+  id: "skipped-rows",
+  tone: "warning",
+  icon: "visibility-off",
+  chipLabel: t(
+    "dashboard.panelErrorButtons.skippedRowsChip",
+    { count: addCommasToNumber(count) },
+    count,
+  ),
+  title: t("dashboard.panelErrorButtons.skippedRowsTitle"),
+  body,
+  details: [],
+});
+
 /** The header notices in severity order: errors first, then what was hidden, then what was cut short. */
 export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): PanelNotice[] => {
   const notices: PanelNotice[] = [];
@@ -219,15 +235,25 @@ export const buildPanelNotices = (input: PanelNoticeInput, t: TranslateFn): Pane
   const skippedRows = input.sankeyNotice?.skippedRows ?? 0;
   if (skippedRows) {
     const count = addCommasToNumber(skippedRows);
-    notices.push({
-      id: "skipped-rows",
-      tone: "warning",
-      icon: "visibility-off",
-      chipLabel: t("dashboard.panelErrorButtons.skippedRowsChip", { count }, skippedRows),
-      title: t("dashboard.panelErrorButtons.skippedRowsTitle"),
-      body: t("dashboard.panelErrorButtons.skippedRowsBody", { count }, skippedRows),
-      details: [],
-    });
+    notices.push(
+      skippedRowsNotice(
+        skippedRows,
+        t("dashboard.panelErrorButtons.skippedRowsBody", { count }, skippedRows),
+        t,
+      ),
+    );
+  }
+
+  const skippedTiles = input.treemapNotice?.skippedRows ?? 0;
+  if (skippedTiles) {
+    const count = addCommasToNumber(skippedTiles);
+    notices.push(
+      skippedRowsNotice(
+        skippedTiles,
+        t("dashboard.panelErrorButtons.treemapSkippedRowsBody", { count }, skippedTiles),
+        t,
+      ),
+    );
   }
 
   if (input.serverPartial) {
