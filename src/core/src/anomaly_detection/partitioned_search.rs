@@ -545,14 +545,45 @@ pub(super) fn log_fallback(org_id: &str, anomaly_id: &str, reason: &str) {
 }
 
 /// The save-time form of [`check_custom_group_by`]: the P1.11 error for a GROUP BY that is
-/// not the bucket alone. SQL with no single SELECT or no histogram is left to the other checks.
+/// not the bucket alone, in any SELECT that can produce the rows. Other SQL errors are left out.
 pub(super) fn custom_group_by_error(sql: &str, stream_fields: &HashSet<String>) -> Option<String> {
     let statement = single_statement(sql).ok()?;
-    let offender = select_group_by_offender(statement_select(&statement)?, stream_fields)?;
+    let Statement::Query(query) = &statement else {
+        return None;
+    };
+    let offender = row_selects(query)
+        .into_iter()
+        .find_map(|select| select_group_by_offender(select, stream_fields))?;
     Some(match offender {
         GroupByOffender::All(bucket) => super::GROUP_BY_ALL_ERROR.replace("{bucket}", &bucket),
         GroupByOffender::Key(expr) => super::SECOND_GROUP_KEY_ERROR.replace("{expr}", &expr),
     })
+}
+
+/// Each set-operation branch, then each CTE that builds the bucket; a helper CTE is not one.
+fn row_selects(query: &Query) -> Vec<&Select> {
+    let mut selects = Vec::new();
+    set_branches(&query.body, &mut selects);
+    for cte in query.with.iter().flat_map(|with| &with.cte_tables) {
+        selects.extend(
+            row_selects(&cte.query)
+                .into_iter()
+                .filter(|select| save_time_bucket(select).is_some()),
+        );
+    }
+    selects
+}
+
+fn set_branches<'a>(body: &'a SetExpr, selects: &mut Vec<&'a Select>) {
+    match body {
+        SetExpr::Select(select) => selects.push(select),
+        SetExpr::Query(query) => selects.extend(row_selects(query)),
+        SetExpr::SetOperation { left, right, .. } => {
+            set_branches(left, selects);
+            set_branches(right, selects);
+        }
+        _ => {}
+    }
 }
 
 /// A bucket from a FROM subquery is checked there; above it a GROUP BY may hold only one key.

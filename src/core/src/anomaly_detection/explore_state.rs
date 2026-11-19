@@ -369,6 +369,7 @@ pub fn is_peer_cluster(
 }
 
 /// Peers neither run the detector nor get its cursor, so they report no run state.
+/// `now_us` is the end the detector judges to: the wall clock minus its evaluation delay.
 pub fn freshness(
     is_peer: bool,
     last_detection_run: Option<i64>,
@@ -1182,5 +1183,23 @@ mod tests {
         assert_eq!(complete_hits(resp.clone()).unwrap().len(), 1);
         resp.is_partial = true;
         assert!(complete_hits(resp).is_err());
+    }
+
+    #[test]
+    fn a_cursor_parked_at_the_delayed_end_is_fresh() {
+        let now = 1_000 * B;
+        let delay = 10 * B;
+        let cursor = Some(now - delay);
+        assert!(
+            freshness(false, Some(now), cursor, B, now - delay)
+                .no_new_data_since_us
+                .is_none()
+        );
+        assert!(
+            freshness(false, Some(now), cursor, B, now)
+                .no_new_data_since_us
+                .is_some(),
+            "measured from the wall clock, the same cursor would read as stale"
+        );
     }
 }

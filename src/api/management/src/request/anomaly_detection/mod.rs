@@ -355,7 +355,7 @@ async fn explore_response(
         last_detection_run,
         detector.last_processed_timestamp,
         bucket_us,
-        now_us,
+        now_us.saturating_sub(eval_delay_us()),
     );
     let (start_us, end_us) =
         explore_state::served_link_window(&mut decision, &freshness, requested, bucket_us, now_us);
@@ -442,6 +442,15 @@ async fn explore_response(
         window: decision.window,
         explore_start_us: target.as_ref().map_or(start_us, |t| t.start_us),
     })
+}
+
+/// A run judges only up to now minus this delay, so its cursor trails the wall clock by it.
+fn eval_delay_us() -> i64 {
+    o2_enterprise::enterprise::anomaly_detection::detector::eval_delay_us_from_secs(
+        o2_enterprise::enterprise::common::config::get_config()
+            .anomaly_detection
+            .eval_delay_secs,
+    )
 }
 
 /// Only the job cluster runs the scheduler, so other members of a super cluster hide run state.

@@ -10855,6 +10855,35 @@ mod tests {
         }
 
         #[test]
+        fn a_second_group_by_key_in_a_cte_or_a_union_branch_is_rejected() {
+            let bucketed = "SELECT histogram(_timestamp, '5m') AS time_bucket, service, \
+                            count(*) AS value FROM logs";
+            let check = |sql: String| {
+                validate_custom_sql_grid(&sql, "5m", Some(&fields(&["service"])))
+                    .map_err(|e| e.to_string())
+            };
+            let cte = |group_by: &str| {
+                format!("WITH s AS ({bucketed} {group_by}) SELECT time_bucket, value FROM s")
+            };
+            let err = check(cte("GROUP BY time_bucket, service")).unwrap_err();
+            assert!(err.contains("Remove 'service'"), "{err}");
+            assert!(check(cte("GROUP BY time_bucket")).is_ok());
+            let union = format!(
+                "{SELECT} GROUP BY time_bucket UNION ALL {bucketed} GROUP BY time_bucket, service"
+            );
+            let err = check(union).unwrap_err();
+            assert!(err.contains("Remove 'service'"), "{err}");
+            let helper = format!(
+                "WITH h AS (SELECT service, host, count(*) AS n FROM logs GROUP BY service, host) \
+                 {SELECT} GROUP BY time_bucket"
+            );
+            assert!(
+                check(helper).is_ok(),
+                "a CTE with no bucket is not a row source"
+            );
+        }
+
+        #[test]
         fn a_second_group_by_key_in_a_from_subquery_is_rejected() {
             let inner = "SELECT histogram(_timestamp, '5m') AS time_bucket, service, count(*) AS \
                          value FROM logs";
