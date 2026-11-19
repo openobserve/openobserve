@@ -291,7 +291,12 @@ describe("StarterPackHeaderChip", () => {
     expect(find(wrapper, "starter-pack-list-tile-summary-alert").text()).toBe(
       "Pod Crashloop Backoff, Pod Oom Killed",
     );
-    expect(find(wrapper, "starter-pack-list-tile-severity").text()).toBe("1 critical · 1 warning");
+    const badges = find(wrapper, "starter-pack-list-tile-severity").findAll(
+      '[data-test^="starter-pack-list-tile-severity-"]',
+    );
+    expect(badges.map((badge) => badge.text())).toEqual(["1 critical", "1 warning"]);
+    expect(badges[0].classes()).toContain("bg-badge-error-soft-bg");
+    expect(badges[1].classes()).toContain("bg-badge-warning-soft-bg");
   });
 
   it("goes from the list to the pack and back, and Back keeps that pack selected", async () => {
