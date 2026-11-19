@@ -59,9 +59,9 @@ use serde::{Deserialize, Serialize};
 use super::ports::SearchAdapter;
 use crate::alerts::incidents::{
     AutoStart, BudgetedPage, FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION,
-    FINDING_STREAM_TYPE_DIMENSION, FindingIncident, FindingPager, OncallPager, budgeted_page,
-    finding_dimensions, incidents_enabled, open_finding_incident, resolve_finding_firing,
-    start_automatic_rca,
+    FINDING_STREAM_TYPE_DIMENSION, FindingIncident, FindingPager, OncallPager,
+    autoobserve_page_team, budgeted_page, finding_dimensions, incidents_enabled,
+    open_finding_incident, resolve_finding_firing, start_automatic_rca,
 };
 
 /// Prefixes every finding's trigger id, so it can never equal an alert's id in `alert_id`.
@@ -951,8 +951,11 @@ async fn routes_nowhere(org: &str, members: &[MemberView]) -> anyhow::Result<boo
         .iter()
         .filter_map(|m| Some((m.stream_type.clone()?, m.stream_name.clone()?)))
         .collect();
+    let team = autoobserve_page_team(org).await?;
     let dimensions = cohort_dimensions(org, &streams).await;
-    let routed = o2_enterprise::enterprise::oncall::routing::decide(org, None, &dimensions).await?;
+    let routed =
+        o2_enterprise::enterprise::oncall::routing::decide(org, team.as_deref(), &dimensions)
+            .await?;
     Ok(routed.team_id().is_none())
 }
 

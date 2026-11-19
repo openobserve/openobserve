@@ -57,6 +57,10 @@ const INCIDENT_NOTIFY_RETRY_DELAY: std::time::Duration = std::time::Duration::fr
 const RECOVERY_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(2);
 /// Most other detections read for a case's tactics; past it the entity is multi-stage anyway.
 const MAX_RISK_RELATED_DETECTIONS: usize = 20;
+/// AutoObserve paging teams found deleted, so each is warned about once per process.
+#[cfg(feature = "enterprise")]
+static DELETED_PAGE_TEAMS: LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
+    LazyLock::new(Default::default);
 /// Per-entity case lock, so detections firing in one tick join one case; striped to stay bounded.
 static SIEM_CASE_LOCKS: LazyLock<Vec<tokio::sync::Mutex<()>>> =
     LazyLock::new(|| (0..64).map(|_| tokio::sync::Mutex::new(())).collect());
@@ -386,6 +390,17 @@ impl FindingPager for OncallPager {
         title: &str,
         streams: &[(String, String)],
     ) -> RoutedIncident {
+        let team = match autoobserve_page_team(org_id).await {
+            Ok(team) => team,
+            Err(e) => {
+                return RoutedIncident {
+                    record: None,
+                    error: Some(e.context(format!(
+                        "reading the AutoObserve paging team for {org_id}/{incident_id}"
+                    ))),
+                };
+            }
+        };
         let dimensions = o2_enterprise::enterprise::autoobserve::page_routing::cohort_dimensions(
             org_id, streams,
         )
@@ -396,7 +411,7 @@ impl FindingPager for OncallPager {
             incident_id,
             title,
             config::meta::oncall::DEFAULT_PAGING_PRIORITY,
-            None,
+            team.as_deref(),
             &dimensions,
         )
         .await;
@@ -6064,6 +6079,38 @@ pub(crate) async fn start_automatic_rca(
     AutoStart::Started
 }
 
+/// The team the org saved for AutoObserve pages; None when unset or deleted, so routing runs as
+/// usual. A failed read errs, so a blip never pages the default team instead.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn autoobserve_page_team(org_id: &str) -> anyhow::Result<Option<String>> {
+    use o2_enterprise::enterprise::autoobserve::{
+        marks::TableKvReader, paging_settings::try_paging_settings,
+    };
+
+    let Some(team_id) = try_paging_settings(&TableKvReader, org_id).await?.team_id else {
+        return Ok(None);
+    };
+    // The row, not the team cache: routing pages an explicit team unchecked, and a cached entry can
+    // outlive a delete on another node.
+    if infra::table::oncall_teams::get(org_id, &team_id)
+        .await?
+        .is_some()
+    {
+        return Ok(Some(team_id));
+    }
+    let first = DELETED_PAGE_TEAMS
+        .lock()
+        .map(|mut seen| seen.insert(format!("{org_id}/{team_id}")))
+        .unwrap_or(true);
+    if first {
+        log::warn!(
+            "[incidents] {org_id}: the AutoObserve paging team {team_id} no longer exists; \
+             AutoObserve pages route as if none were set"
+        );
+    }
+    Ok(None)
+}
+
 /// Pages a new incident's on-call record and blast radius; the record decides L0.
 #[cfg(feature = "enterprise")]
 async fn route_new_incident(
@@ -8237,13 +8284,21 @@ mod tests {
 
             let _db = store().await;
             let pager = Pager::default();
-            let (ruleless, teamless) = (new_org(), new_org());
-            let _team = infra::table::oncall_teams::create(&ruleless, "core", "UTC", None)
-                .await
-                .unwrap();
-            age_teams(&ruleless, 2 * PAGE_PENDING_US).await;
-            let old = open(&stop(&ruleless, 0), &pager).await.unwrap();
-            age(&old, 0, PAGE_PENDING_US + 60_000_000).await;
+            let (ruleless, teamless, chosen) = (new_org(), new_org(), new_org());
+            let mut olds = Vec::new();
+            for org in [&ruleless, &chosen] {
+                let team = infra::table::oncall_teams::create(org, "core", "UTC", None)
+                    .await
+                    .unwrap();
+                if org == &chosen {
+                    set_paging_team(org, &team.id).await;
+                }
+                age_teams(org, 2 * PAGE_PENDING_US).await;
+                let old = open(&stop(org, 0), &pager).await.unwrap();
+                age(&old, 0, PAGE_PENDING_US + 60_000_000).await;
+                olds.push(old);
+            }
+            let (old, chosen_old) = (olds[0].clone(), olds[1].clone());
             let fresh = open(&stop(&teamless, 0), &pager).await.unwrap();
             assert_eq!(
                 pages_of(&ruleless, true).await[&old].outcome,
@@ -8260,6 +8315,76 @@ mod tests {
                 PageOutcome::Unrouted,
                 "on-call off"
             );
+            assert_eq!(
+                pages_of(&chosen, true).await[&chosen_old].outcome,
+                PageOutcome::Failed,
+                "the AutoObserve paging team should have taken it"
+            );
+        }
+
+        #[tokio::test]
+        async fn autoobserve_pages_reach_the_paging_team_while_alerts_keep_the_default_team() {
+            let _db = store().await;
+            // (paging team saved, then deleted, the page lands on it)
+            let cases = [
+                (false, false, false),
+                (true, false, true),
+                (true, true, false),
+            ];
+            for (n, (saved, deleted, to_paging_team)) in cases.into_iter().enumerate() {
+                let org = new_org();
+                let create = |name| infra::table::oncall_teams::create(&org, name, "UTC", None);
+                let (sre, ao) = (create("sre").await.unwrap(), create("ao").await.unwrap());
+                infra::table::oncall_routing_config::set_default_team(&org, Some(&sre.id))
+                    .await
+                    .unwrap();
+                if saved {
+                    set_paging_team(&org, &ao.id).await;
+                }
+                if deleted {
+                    // A cache entry the delete never invalidated, as on a node that missed it.
+                    let cached = infra::table::oncall_teams::get_cached(&org, &ao.id).await;
+                    assert!(cached.unwrap().is_some());
+                    infra::table::entity::oncall_teams::Entity::delete_by_id(ao.id.clone())
+                        .exec(infra::db::get_orm_client_rw().await)
+                        .await
+                        .unwrap();
+                }
+                let f = stop(&org, 0);
+                let id = open(&f, &Pager::default()).await.unwrap();
+                let routed = OncallPager
+                    .route(&org, &id, &f.page_title, &f.streams)
+                    .await;
+                assert!(routed.error.is_none(), "case {n}: {:?}", routed.error);
+                let want = if to_paging_team { &ao.id } else { &sre.id };
+                assert_eq!(
+                    routed.record.and_then(|r| r.team_id).as_ref(),
+                    Some(want),
+                    "case {n}: the AutoObserve page"
+                );
+                assert_eq!(
+                    infra::table::oncall_routing_config::default_team(&org)
+                        .await
+                        .unwrap(),
+                    Some(sre.id.clone()),
+                    "case {n}: the default team stays"
+                );
+                let alert = route_new_incident(
+                    &org,
+                    &format!("alert-{id}"),
+                    "checkout errors",
+                    config::meta::oncall::DEFAULT_PAGING_PRIORITY,
+                    None,
+                    &HashMap::new(),
+                )
+                .await;
+                assert!(alert.error.is_none(), "case {n}: {:?}", alert.error);
+                assert_eq!(
+                    alert.record.and_then(|r| r.team_id),
+                    Some(sre.id.clone()),
+                    "case {n}: a regular alert"
+                );
+            }
         }
 
         #[tokio::test]
@@ -8498,6 +8623,15 @@ mod tests {
                 )
                 .filter(teams::Column::OrgId.eq(org))
                 .exec(infra::db::get_orm_client_rw().await)
+                .await
+                .unwrap();
+        }
+
+        async fn set_paging_team(org: &str, team_id: &str) {
+            use o2_enterprise::enterprise::autoobserve::names::kv::PAGING_SETTINGS;
+
+            let row = serde_json::json!({"page_on_stop": true, "team_id": team_id});
+            infra::table::kv_store::set(org, PAGING_SETTINGS, row.to_string().as_bytes())
                 .await
                 .unwrap();
         }
@@ -9288,6 +9422,18 @@ mod tests {
                             schema.create_table_from_entity(oncall_routing_config::Entity),
                             schema.create_table_from_entity(oncall_ownership_rules::Entity),
                             schema.create_table_from_entity(oncall_response_events::Entity),
+                            schema.create_table_from_entity(
+                                infra::table::entity::oncall_policies::Entity,
+                            ),
+                            schema.create_table_from_entity(
+                                infra::table::entity::oncall_team_members::Entity,
+                            ),
+                            schema.create_table_from_entity(
+                                infra::table::entity::oncall_schedules::Entity,
+                            ),
+                            schema.create_table_from_entity(
+                                infra::table::entity::oncall_overrides::Entity,
+                            ),
                         ] {
                             conn.execute(backend.build(table.if_not_exists()))
                                 .await
@@ -9324,6 +9470,10 @@ mod tests {
                         schema.create_table_from_entity(oncall_routing_config::Entity),
                         schema.create_table_from_entity(oncall_ownership_rules::Entity),
                         schema.create_table_from_entity(oncall_response_events::Entity),
+                        schema.create_table_from_entity(infra::table::entity::oncall_policies::Entity),
+                        schema.create_table_from_entity(infra::table::entity::oncall_team_members::Entity),
+                        schema.create_table_from_entity(infra::table::entity::oncall_schedules::Entity),
+                        schema.create_table_from_entity(infra::table::entity::oncall_overrides::Entity),
                         schema.create_table_from_entity(infra::table::entity::kv_store::Entity),
                     ] {
                         conn.execute(backend.build(table.if_not_exists()))
