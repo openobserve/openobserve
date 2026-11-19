@@ -2544,12 +2544,12 @@ export default defineComponent({
       {
         label: t("alerts.queryConfig.functions.min"),
         value: "min",
-        tooltip: t("alerts.queryConfig.functionTooltips.min"),
+        tooltip: t("alerts.queryConfig.functionTooltips.minWindow"),
       },
       {
         label: t("alerts.queryConfig.functions.max"),
         value: "max",
-        tooltip: t("alerts.queryConfig.functionTooltips.max"),
+        tooltip: t("alerts.queryConfig.functionTooltips.maxWindow"),
       },
       {
         label: t("alerts.queryConfig.functions.sum"),

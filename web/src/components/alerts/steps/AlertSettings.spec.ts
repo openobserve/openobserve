@@ -584,6 +584,51 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     );
   });
 
+  describe("a lowest or highest value over the window already means it stayed across", () => {
+    const query = (fn: string, operator: string) => ({
+      query_condition: {
+        type: "custom",
+        aggregation: { function: fn, having: { column: "v", operator, value: 1 } },
+      },
+    });
+    const holdLine = (host: VueWrapper) => host.find('[data-test="alert-settings-hold-window"]');
+
+    it.each([
+      ["min above", query("min", ">"), true],
+      ["max below", query("max", "<="), true],
+      ["avg above", query("avg", ">"), false],
+      ["min below", query("min", "<"), false],
+    ])("%s: Must last says whether it is needed", (_case, values, covered) => {
+      const host = mountDescendant("false", {
+        ...values,
+        trigger_condition: { silence: 10, period: 10 },
+      });
+      expect(holdLine(host).exists()).toBe(covered);
+      if (covered) expect(holdLine(host).classes()).not.toContain("text-status-warning-text");
+    });
+
+    it("Must last on top of it warns amber with the total wait, and turns off in one click", async () => {
+      const host = mountDescendant("false", {
+        ...query("min", ">"),
+        trigger_condition: { silence: 10, period: 10, frequency: 2 },
+        pending_period_sec: 20,
+        _ui: { pendingPeriod: 20 },
+      });
+      expect(holdLine(host).classes()).toContain("text-status-warning-text");
+      expect(host.find('[data-test="alert-settings-hold-window-text"]').text()).toBe(
+        t("alerts.form.holdFor.windowStacks", {
+          fn: "min",
+          window: durationWords(10, i18n.global.t as any),
+          total: durationWords(30, i18n.global.t as any),
+        }),
+      );
+
+      await host.find('[data-test="alert-settings-hold-window-action"]').trigger("click");
+      await flushPromises();
+      expect(hostForm(host).state.values.pending_period_sec).toBe(0);
+    });
+  });
+
   it("period cleared: emits update:trigger without cascading", () => {
     const host = mountDescendant("false");
     const step = host.findComponent(AlertSettings);

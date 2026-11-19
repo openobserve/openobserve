@@ -177,6 +177,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-settings-pending-period-warning"
                   @action="pendingPeriodWarning.run"
                 />
+                <AlertLinkNote
+                  v-else-if="!pendingPeriodError && holdWindowNote"
+                  class="w-0 min-w-full"
+                  :text="holdWindowNote.text"
+                  :action="holdWindowNote.action"
+                  :warning="holdWindowNote.warning"
+                  data-test="alert-settings-hold-window"
+                  @action="setPendingPeriodMinutes(0)"
+                />
               </div>
             </AlertSentenceRow>
           </AlertTierPlace>
@@ -525,7 +534,7 @@ import {
   watch,
   type PropType,
 } from "vue";
-import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -540,7 +549,11 @@ import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
 import { describeDestinations } from "@/utils/alerts/destinationDescription";
 import { durationWords, everyWords, notifyHelp } from "@/utils/alerts/alertCopy";
-import { finerCheckMinutes, missedBreachMinutes } from "@/utils/alerts/checkCadence";
+import {
+  crossesOnlyWhenEverySampleDoes,
+  finerCheckMinutes,
+  missedBreachMinutes,
+} from "@/utils/alerts/checkCadence";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import {
@@ -837,6 +850,31 @@ export default defineComponent({
         text: t("alerts.guard.breachUnseen", { duration: durationWords(missed, t) }),
         ...checkEveryFix(period),
       };
+    });
+
+    // "Stays above for N minutes" is one path: a lowest value over the window already says it, so
+    // Must last either is not needed or adds its own wait on top.
+    const holdWindowNote = computed(() => {
+      if (!isScheduled.value) return null;
+      const query = fv("query_condition") ?? {};
+      const aggregation = query.aggregation;
+      if ((query.type ?? "custom") !== "custom" || !aggregation) return null;
+      if (!crossesOnlyWhenEverySampleDoes(aggregation.function, aggregation.having?.operator))
+        return null;
+      const window = Number(fv("trigger_condition.period"));
+      if (!(window > 0)) return null;
+      const pending = Number(fv("pending_period_sec")) || 0;
+      const words = { fn: raw(aggregation.function), window: durationWords(window, t) };
+      return pending > 0
+        ? {
+            text: t("alerts.form.holdFor.windowStacks", {
+              ...words,
+              total: durationWords(window + pending, t),
+            }),
+            action: t("alerts.form.holdFor.turnOff"),
+            warning: true,
+          }
+        : { text: t("alerts.form.holdFor.windowCovers", words), action: null, warning: false };
     });
 
     // The schema's floor: none when the org sets no minimum refresh interval.
@@ -1196,6 +1234,8 @@ export default defineComponent({
       handlePeriodChange,
       scheduleNote,
       silenceHint,
+      holdWindowNote,
+      setPendingPeriodMinutes,
       notifyLines,
       destinationDetails,
       // Field refs for the parent focus manager

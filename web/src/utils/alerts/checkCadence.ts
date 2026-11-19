@@ -31,17 +31,24 @@ export function finerCheckMinutes(spanMinutes: number, floorMinutes: number): nu
   return fits[fits.length - 1];
 }
 
+/** Whether the measure crosses only when every sample in the look back does: lowest above, highest below. */
+export function crossesOnlyWhenEverySampleDoes(
+  fn: string | undefined,
+  operator: string | undefined,
+): boolean {
+  const side = thresholdSide(operator);
+  return (fn === "min" && side === "above") || (fn === "max" && side === "below");
+}
+
 /** How long a breach can last unseen when every sample in the look back must cross the threshold
- * (lowest above it, highest below it) and the checks do not overlap; undefined when they overlap. */
+ * and the checks do not overlap; undefined when they overlap. */
 export function missedBreachMinutes(input: {
   fn: string | undefined;
   operator: string | undefined;
   period: number;
   frequency: number;
 }): number | undefined {
-  const side = thresholdSide(input.operator);
-  const everySample =
-    (input.fn === "min" && side === "above") || (input.fn === "max" && side === "below");
+  const everySample = crossesOnlyWhenEverySampleDoes(input.fn, input.operator);
   if (!everySample || !(input.period > 0) || !(input.frequency >= input.period)) return undefined;
   return input.period + input.frequency;
 }
