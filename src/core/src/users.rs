@@ -864,6 +864,14 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
     }
 }
 
+/// True for the instance root and for an admin of `org_id`.
+pub async fn is_org_admin(org_id: &str, user_id: &str) -> bool {
+    is_root_user(user_id)
+        || get_user(Some(org_id), user_id)
+            .await
+            .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
+}
+
 /// One member of `org_id`, shaped exactly as `list_users` reports them.
 ///
 /// `None` means the account holds no membership in this organization. An account that exists
