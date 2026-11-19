@@ -78,8 +78,8 @@ const KEPT_OPEN: &str = "This incident stays open because someone acknowledged o
 
 /// A finding's decision kind, stream entity id and onset.
 type IssueKey = (String, String, i64);
-/// One member's issue lookup: its incident's index, its key and the recovery its links recorded.
-type MemberIssue = (usize, IssueKey, Option<i64>);
+/// One member's issue lookup: its incident's index and its key.
+type MemberIssue = (usize, IssueKey);
 
 /// P6 over main's incident path: the incident's own automatic analysis is the investigation.
 pub struct IncidentInvestigation;
@@ -403,13 +403,13 @@ pub async fn attach_context(
         return Ok(());
     }
     let members = member_issues(org, items);
-    let keys: Vec<IssueKey> = members.iter().map(|(_, key, _)| key.clone()).collect();
+    let keys: Vec<IssueKey> = members.iter().map(|(_, key)| key.clone()).collect();
     let issues: Vec<Option<IssueRef>> = futures::stream::iter(keys)
         .map(|key| issue_of(org.to_string(), Some(key)))
         .buffered(ISSUE_READS)
         .try_collect()
         .await?;
-    let grouped = per_incident(items.len(), &members, issues);
+    let grouped = per_incident(org, items, &members, issues);
     let found: Vec<IssueRef> = grouped.iter().flatten().cloned().collect();
     if found.is_empty() {
         return Ok(());
@@ -583,14 +583,15 @@ pub fn incident_of(
     issue: &IssueRef,
     items: &[AutoObserveIncident],
 ) -> Option<IssueIncident> {
-    let firing = (
-        finding_id(org, &issue.decision_kind, &issue.entity_id()),
-        issue.onset_us,
-    );
-    items
-        .iter()
-        .find(|item| item.firings.contains(&firing))
-        .and_then(|item| item.issue_incident.clone())
+    holding(org, issue, items).and_then(|item| item.issue_incident.clone())
+}
+
+/// The issue's recovery as the drawer reads it, from the incident holding its own firing.
+pub fn recovery_of(org: &str, issue: &IssueRef, items: &[AutoObserveIncident]) -> Option<i64> {
+    match holding(org, issue, items) {
+        Some(item) => recovered(org, issue, item),
+        None => issue.recovered_us,
+    }
 }
 
 pub(crate) fn kept_open_line(back_us: i64) -> String {
@@ -732,7 +733,7 @@ fn member_issues(org: &str, items: &[AutoObserveIncident]) -> Vec<MemberIssue> {
     let mut out = Vec::new();
     for (n, item) in items.iter().enumerate() {
         if item.members.is_empty() {
-            out.extend(issue_key(item).map(|key| (n, key, None)));
+            out.extend(issue_key(item).map(|key| (n, key)));
         }
         for m in &item.members {
             let (Some(stream_type), Some(name)) = (&m.stream_type, &m.stream_name) else {
@@ -741,27 +742,47 @@ fn member_issues(org: &str, items: &[AutoObserveIncident]) -> Vec<MemberIssue> {
             let entity = format!("{stream_type}/{name}");
             if let Some(kind) = paged_kind(org, &m.id, &entity) {
                 let onset = current_onset(item, &m.id).unwrap_or(m.first_seen_at);
-                out.push((n, (kind.to_string(), entity, onset), m.recovered_at));
+                out.push((n, (kind.to_string(), entity, onset)));
             }
         }
     }
     out
 }
 
-/// Each incident's issues; stream issue rows record no recovery, so the member's links supply it.
+/// Each incident's issues, each with its member's recovery.
 fn per_incident(
-    len: usize,
+    org: &str,
+    items: &[AutoObserveIncident],
     members: &[MemberIssue],
     found: Vec<Option<IssueRef>>,
 ) -> Vec<Vec<IssueRef>> {
-    let mut out = vec![Vec::new(); len];
-    for ((n, _, recovered), issue) in members.iter().zip(found) {
+    let mut out = vec![Vec::new(); items.len()];
+    for ((n, _), issue) in members.iter().zip(found) {
         if let Some(mut issue) = issue {
-            issue.recovered_us = issue.recovered_us.or(*recovered);
+            issue.recovered_us = recovered(org, &issue, &items[*n]);
             out[*n].push(issue);
         }
     }
     out
+}
+
+fn holding<'a>(
+    org: &str,
+    issue: &IssueRef,
+    items: &'a [AutoObserveIncident],
+) -> Option<&'a AutoObserveIncident> {
+    let firing = (
+        finding_id(org, &issue.decision_kind, &issue.entity_id()),
+        issue.onset_us,
+    );
+    items.iter().find(|item| item.firings.contains(&firing))
+}
+
+/// Stream issue rows record no recovery, so the member supplies it once all its firings closed.
+fn recovered(org: &str, issue: &IssueRef, item: &AutoObserveIncident) -> Option<i64> {
+    let id = finding_id(org, &issue.decision_kind, &issue.entity_id());
+    let member = item.members.iter().find(|m| m.id == id);
+    issue.recovered_us.or(member.and_then(|m| m.recovered_at))
 }
 
 async fn unrouted_samples(org: &str) -> anyhow::Result<HashSet<String>> {
@@ -1194,6 +1215,66 @@ mod tests {
     }
 
     #[test]
+    fn a_stop_reads_as_recovered_once_every_firing_of_its_stream_closed() {
+        use o2_enterprise::enterprise::autoobserve::context::subject_of;
+        let (org, entity) = ("demo-org", "logs/checkout");
+        let id = finding_id(org, decision_kinds::STREAM_SILENCE, entity);
+        let names = HashMap::from([(id.clone(), ("logs".to_string(), "checkout".to_string()))]);
+        let firing = |at: i64, back: Option<i64>| alert_incident_alerts::Model {
+            alert_fired_at: at,
+            resolved_at: back,
+            ..link(&id)
+        };
+        let issue = |onset_us: i64, recovered_us: Option<i64>| IssueRef {
+            org: org.into(),
+            decision_kind: decision_kinds::STREAM_SILENCE.into(),
+            subject: subject_of(kinds::STREAM, entity),
+            decision_id: format!("d-{onset_us}"),
+            onset_us,
+            detected_us: onset_us,
+            recovered_us,
+            shadow: false,
+            source: None,
+        };
+        let cases = [
+            (
+                "every firing back",
+                vec![(10, Some(20)), (30, Some(45))],
+                30,
+                Some(45),
+            ),
+            ("partly back", vec![(10, Some(20)), (30, None)], 30, None),
+            ("still quiet", vec![(30, None)], 30, None),
+            (
+                "no incident holds the onset",
+                vec![(30, Some(45))],
+                99,
+                None,
+            ),
+        ];
+        for (case, firings, onset, want) in cases {
+            let links: Vec<_> = firings
+                .iter()
+                .map(|(at, back)| firing(*at, *back))
+                .collect();
+            let mut item = item_of(&incident(finding_dims()), &links[0]);
+            item.members = members_of(&links, &names);
+            item.firings.extend(links.iter().map(firing_of));
+            assert_eq!(
+                recovery_of(org, &issue(onset, None), &[item]),
+                want,
+                "{case}"
+            );
+        }
+        let recorded = issue(10, Some(7));
+        assert_eq!(
+            recovery_of(org, &recorded, &[]),
+            Some(7),
+            "a recorded recovery stays"
+        );
+    }
+
+    #[test]
     fn a_cohort_reads_every_members_issue_with_its_recorded_recovery() {
         use o2_enterprise::enterprise::autoobserve::context::subject_of;
         const MINUTE: i64 = 60_000_000;
@@ -1253,7 +1334,7 @@ mod tests {
         let members = member_issues(org, &items);
         let keys: Vec<(usize, &str, &str, i64)> = members
             .iter()
-            .map(|(n, (kind, entity, onset), _)| (*n, kind.as_str(), entity.as_str(), *onset))
+            .map(|(n, (kind, entity, onset))| (*n, kind.as_str(), entity.as_str(), *onset))
             .collect();
         assert_eq!(
             keys,
@@ -1267,7 +1348,7 @@ mod tests {
         );
         let found: Vec<Option<IssueRef>> = members
             .iter()
-            .map(|(_, (kind, entity, onset), _)| {
+            .map(|(_, (kind, entity, onset))| {
                 Some(IssueRef {
                     org: org.into(),
                     decision_kind: kind.clone(),
@@ -1306,7 +1387,7 @@ mod tests {
             ],
             "the incident holding that very firing, a re-fire included; none for an unlinked onset"
         );
-        let per = per_incident(items.len(), &members, found);
+        let per = per_incident(org, &items, &members, found);
         let read: Vec<Vec<(&str, Option<i64>)>> = per
             .iter()
             .map(|issues| {
