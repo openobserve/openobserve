@@ -15,7 +15,7 @@
 
 import { getIntlLocale } from "@/locales";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import { formatNumber, joinList, thresholdSide, valueWithUnit } from "./alertCopy";
+import { durationWords, formatNumber, joinList, thresholdSide, valueWithUnit } from "./alertCopy";
 import { alertConditionsPayload } from "./alertConditionsLoad";
 import { getAlertPayload, type PayloadContext, type PayloadFormData } from "./alertPayload";
 import type { EvaluateAlertBody, EvaluateAlertResponse } from "./alertEvaluate.types";
@@ -32,6 +32,11 @@ const GROUP_CHECKS_KEYS: Record<"above" | "below" | "none", I18nKey> = {
   above: "alerts.testRun.groupChecksAbove",
   below: "alerts.testRun.groupChecksBelow",
   none: "alerts.testRun.groupChecksMatched",
+};
+const LATEST_GROUPS_KEYS: Record<"above" | "below" | "none", I18nKey> = {
+  above: "alerts.testRun.latestGroupsAbove",
+  below: "alerts.testRun.latestGroupsBelow",
+  none: "alerts.testRun.latestGroupsMatched",
 };
 
 export type TestRunTone = "body" | "secondary" | "warning" | "error";
@@ -64,6 +69,10 @@ export interface TestRunDay {
   events?: number;
   /** Checks that matched but were held back by Must last. */
   pending?: number;
+  /** Fire, clear, fire again: the pattern that reads as flapping. */
+  refires: number;
+  /** Notifying checks with a clear check on both sides. */
+  singleCheckSpikes: number;
 }
 
 /** The alert as the save path sends it, minus the record stamps, for the dry run. */
@@ -138,6 +147,45 @@ export interface TestRunReportOptions {
   t: TranslateFn;
   timeZone?: string;
   nowMs: number;
+  /** Notify at most every, in minutes; a real-time alert's notifications follow it. */
+  silenceMinutes?: number;
+  /** The PromQL query divides one part by another, so "no value" means its top part matched nothing. */
+  ratio?: boolean;
+}
+
+// A few times are listed; past that only the latest says when, since the first ones are a day old.
+const notifiedTimes = (s: EvaluateAlertResponse["summary"], o: TestRunReportOptions) => {
+  const at = (micros: number) => checkTimeText(micros, o.timeZone, o.nowMs);
+  if (s.notifications <= SHOWN_TIMES && s.notified_at.length === s.notifications)
+    return joinList(s.notified_at.map(at));
+  const latest = s.notified_at[s.notified_at.length - 1];
+  return latest === undefined
+    ? listWithMore(s.notified_at.slice(0, SHOWN_TIMES).map(at), s.notifications, o.t)
+    : o.t("alerts.testRun.latestAt", { time: at(latest) });
+};
+
+// Real time notifies per event, so its day is events and notifications, never checks.
+function realtimeSummary(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine {
+  const { t } = o;
+  const s = r.summary;
+  const events = r.checks.reduce((sum, c) => sum + (c.error ? 0 : (c.value ?? 0)), 0);
+  const params = {
+    events: t("alerts.sections.backtest.matchingEvents", { count: formatNumber(events) }, events),
+    count: formatNumber(s.notifications),
+  };
+  const wait = o.silenceMinutes ?? 0;
+  return {
+    id: "summary",
+    text:
+      wait > 0
+        ? t(
+            "alerts.testRun.realtimeSentWait",
+            { ...params, wait: durationWords(wait, t) },
+            s.notifications,
+          )
+        : t("alerts.testRun.realtimeSent", params, s.notifications),
+    tone: "body",
+  };
 }
 
 function summaryLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine {
@@ -145,11 +193,8 @@ function summaryLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
   const s = r.summary;
   if (s.notifications === 0)
     return { id: "summary", text: t("alerts.testRun.neverFired"), tone: "body" };
-  const times = listWithMore(
-    s.notified_at.slice(0, SHOWN_TIMES).map((at) => checkTimeText(at, o.timeZone, o.nowMs)),
-    s.notifications,
-    t,
-  );
+  if (r.is_real_time) return realtimeSummary(r, o);
+  const times = notifiedTimes(s, o);
   // Checks that fired and notifications are counted apart, so the held line below adds up to the first.
   const params = {
     count: formatNumber(s.notifications),
@@ -201,10 +246,30 @@ function closestLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
   };
 }
 
-function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | null {
+/** How many groups the latest check found past the threshold: what the preview calls "now". */
+function latestGroupsLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | null {
+  const latest = r.checks[r.checks.length - 1];
+  if (!latest || latest.error || !r.summary.groups_fired.length) return null;
+  const over = (latest.groups ?? []).filter((g) => g.fired).length;
+  // The server lists at most 100 groups, fired first; a full list of fired ones may hold more.
+  const atLeast = over === (latest.groups ?? []).length && latest.groups_total > over;
+  const count = atLeast
+    ? t("alerts.verdict.atLeast", { value: formatNumber(over) })
+    : formatNumber(over);
+  return {
+    id: "latestGroups",
+    text: t(LATEST_GROUPS_KEYS[thresholdSide(latest.operator) ?? "none"], { count }, over),
+    tone: "secondary",
+  };
+}
+
+function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn, ratio = false): TestRunLine | null {
   const metrics = r.diagnostics?.metrics ?? [];
   const latest = r.checks[r.checks.length - 1];
   if (!metrics.length || !latest || latest.matched > 0) return null;
+  // Every metric has series, so the top part of a ratio found nothing to count: its share is 0.
+  if (ratio && metrics.every((m) => m.series > 0))
+    return { id: "noSeries", text: t("alerts.testRun.noValueRatio"), tone: "secondary" };
   if (metrics.length === 1) {
     const [{ name, series }] = metrics;
     // A metric with series that matched nothing is an answer; a metric with none is a broken query.
@@ -245,8 +310,10 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
   const answered = r.checks.filter((c) => !c.error);
   if (r.query_type !== "promql" && answered.length && answered.every((c) => c.reason === "no_data"))
     lines.push({ id: "matchedNothing", text: t("alerts.guard.matchedNothing"), tone: "secondary" });
+  const latestGroups = latestGroupsLine(r, t);
+  if (latestGroups) lines.push(latestGroups);
   const held = r.checks.filter((c) => c.held_by === "notify_at_most_every").length;
-  if (held)
+  if (held && !r.is_real_time)
     lines.push({
       id: "held",
       text: t(
@@ -256,7 +323,7 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
       ),
       tone: "secondary",
     });
-  const noSeries = noSeriesLine(r, t);
+  const noSeries = noSeriesLine(r, t, o.ratio);
   if (noSeries) lines.push(noSeries);
   const failed = r.checks.find((c) => c.error);
   if (s.errors && failed?.error)
@@ -304,12 +371,23 @@ export function testRunDay(r: EvaluateAlertResponse): TestRunDay {
     : empty
       ? 0
       : undefined;
+  const firing = r.checks.map((c) => c.fired);
+  let refires = 0;
+  let singleCheckSpikes = 0;
+  r.checks.forEach((check, i) => {
+    if (!check.fired) return;
+    if (i + 2 < firing.length && !firing[i + 1] && firing[i + 2]) refires += 1;
+    if (check.notified && !firing[i - 1] && i + 1 < firing.length && !firing[i + 1])
+      singleCheckSpikes += 1;
+  });
   return {
     fired: r.summary.fired,
     alerts: r.summary.notifications,
     total: r.summary.checks,
     pending: r.summary.pending ?? 0,
     hours,
+    refires,
+    singleCheckSpikes,
     ...(events === undefined ? {} : { events }),
   };
 }

@@ -90,11 +90,23 @@ const sameAlert = computed(() => testRun.testedKey.value === testRun.currentKey.
 const report = computed(() => {
   const result = testRun.result.value;
   if (!result || (running.value && !sameAlert.value)) return null;
+  const tc = props.body?.trigger_condition;
   return testRunReport(result, {
     t,
     timeZone: store.state.timezone,
     nowMs: Date.now(),
+    silenceMinutes: Number(tc?.silence) || 0,
+    ratio: /\)\s*\/|\s\/\s/.test(props.body?.query_condition?.promql ?? ""),
   });
+});
+// The run is one request with no progress of its own, so the wait names how much it replays.
+const runningText = computed(() => {
+  const tc = props.body?.trigger_condition;
+  const every = Number(tc?.frequency) || 0;
+  if (props.body?.is_real_time || tc?.frequency_type === "cron" || every <= 0)
+    return t("alerts.testRun.running");
+  const checks = Math.floor((24 * 60) / every);
+  return t("alerts.testRun.runningChecks", { count: formatNumber(checks) }, checks);
 });
 const stale = computed(
   () => testRun.state.value === "ready" && !!testRun.result.value && !sameAlert.value,
@@ -176,7 +188,7 @@ const send = async () => {
             class="text-text-secondary m-0 text-sm"
             data-test="alert-test-run-running"
           >
-            {{ t("alerts.testRun.running") }}
+            {{ runningText }}
             <OButton variant="link" data-test="alert-test-run-cancel" @click="cancelRun">
               {{ t("common.cancel") }}
             </OButton>

@@ -31,13 +31,15 @@ import {
 } from "./alertTestRun";
 
 const t = i18n.global.t as unknown as TranslateFn;
-const report = (r: unknown) =>
+const report = (r: unknown, extra: { silenceMinutes?: number; ratio?: boolean } = {}) =>
   testRunReport(r as EvaluateAlertResponse, {
     t,
     timeZone: "UTC",
     nowMs: (r as EvaluateAlertResponse).end / 1000,
+    ...extra,
   });
-const lines = (r: unknown) => Object.fromEntries(report(r).lines.map((l) => [l.id, l]));
+const lines = (r: unknown, extra: { silenceMinutes?: number; ratio?: boolean } = {}) =>
+  Object.fromEntries(report(r, extra).lines.map((l) => [l.id, l]));
 
 describe("testRunReport", () => {
   it.each([
@@ -47,6 +49,7 @@ describe("testRunReport", () => {
       {
         summary:
           "Over the last 24 hours this would have fired in 3 of 6 checks, for 2 groups, and notified 2 times (09:20 and 09:50).",
+        latestGroups: "At the latest check, no group was above the threshold.",
         held: "Notify at most every held back the other 1 firing.",
       },
     ],
@@ -132,7 +135,26 @@ describe("testRunReport", () => {
     );
   });
 
-  it("counts the firing times past three", () => {
+  it("says a real-time day in events and notifications, never checks", () => {
+    const realTime = {
+      ...grouped,
+      is_real_time: true,
+      checks: grouped.checks.map((c) => ({ ...c, value: 10 })),
+      summary: { ...grouped.summary, groups_fired: [] },
+    };
+    expect(Object.keys(lines(realTime, { silenceMinutes: 10 }))).toEqual(["summary"]);
+    expect(String(lines(realTime, { silenceMinutes: 10 }).summary.text)).toBe(
+      "Over the last 24 hours, 60 matching events would have sent 2 notifications, at most one every 10 minutes.",
+    );
+  });
+
+  it("says a ratio with nothing in its top part is 0, not a broken query", () => {
+    expect(String(lines(noSeries, { ratio: true }).noSeries.text)).toBe(
+      "The query returned no value: the top of its ratio matched nothing in the latest check, so the share was 0.",
+    );
+  });
+
+  it("names only the latest time once there are more than three", () => {
     const many = {
       ...grouped,
       summary: {
@@ -143,7 +165,7 @@ describe("testRunReport", () => {
       },
     };
     expect(String(lines(many).summary.text)).toBe(
-      "Over the last 24 hours this would have fired in 3 of 6 checks and notified 5 times (05:00, 06:00, 07:00, and 2 more).",
+      "Over the last 24 hours this would have fired in 3 of 6 checks and notified 5 times (the latest at 09:00).",
     );
   });
 
@@ -176,6 +198,8 @@ describe("testRunDay", () => {
   it("marks the hours with a firing check and keeps the scheduler's counts", () => {
     const day = testRunDay(grouped as EvaluateAlertResponse);
     expect([day.total, day.fired, day.alerts, day.pending]).toEqual([6, 3, 2, 0]);
+    // Fired, fired, clear, fired: one refire, and the last firing is a single-check spike.
+    expect([day.refires, day.singleCheckSpikes]).toEqual([1, 1]);
     expect(day.hours.map((h, i) => (h ? i : -1)).filter((i) => i >= 0)).toEqual([23]);
     expect(day.events).toBeUndefined();
   });

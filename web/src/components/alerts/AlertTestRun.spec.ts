@@ -61,7 +61,7 @@ describe("AlertTestRun", () => {
     evaluate.mockResolvedValue({ data: grouped });
     const { wrapper } = mountRun();
     await nextTick();
-    expect(text(wrapper, "running")).toContain("Testing the last 24 hours");
+    expect(text(wrapper, "running")).toContain("Testing 144 checks over the last 24 hours");
     await flushPromises();
 
     expect(evaluate).toHaveBeenCalledWith("default", { alert: BODY }, "f1", expect.anything());
