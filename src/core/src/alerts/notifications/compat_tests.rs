@@ -115,6 +115,19 @@ fn rendered(spec: &ContentSpec, ctx: &NotificationContext) -> serde_json::Value 
     for format in FORMATS {
         let content = resolve_content(spec, ctx, format.channel_family());
         let value = match render(format, &content, ctx) {
+            // Main sent no bar: compare the blocks, and check the bar on its own.
+            Ok(RenderedMessage::Http { body }) if format == ChannelFormat::Slack => {
+                let raw: serde_json::Value = serde_json::from_str(&body).unwrap();
+                let bar = super::resolve::status_color(ctx);
+                assert!(
+                    raw["attachments"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .all(|a| a["color"] == bar)
+                );
+                super::render::slack::flat_blocks(&raw)
+            }
             Ok(RenderedMessage::Http { body }) => serde_json::from_str(&body).unwrap(),
             Ok(RenderedMessage::Email {
                 subject,

@@ -767,7 +767,8 @@ mod tests {
     fn golden_example_alert_has_the_data_and_object_buttons() {
         let want: serde_json::Value = serde_json::from_str(EXAMPLE_ALERT).unwrap();
         assert_eq!(example(NotificationKind::Alert), want);
-        let actions = want["slack_firing"]["blocks"]
+        let flat = crate::alerts::notifications::render::slack::flat_blocks(&want["slack_firing"]);
+        let actions = flat["blocks"]
             .as_array()
             .unwrap()
             .iter()
@@ -781,7 +782,8 @@ mod tests {
     fn golden_example_anomaly() {
         let want: serde_json::Value = serde_json::from_str(EXAMPLE_ANOMALY).unwrap();
         assert_eq!(example(NotificationKind::Anomaly), want);
-        let title = &want["slack_firing"]["blocks"][0]["text"]["text"];
+        let flat = crate::alerts::notifications::render::slack::flat_blocks(&want["slack_firing"]);
+        let title = &flat["blocks"][0]["text"]["text"];
         assert!(
             title
                 .as_str()
@@ -804,7 +806,8 @@ mod tests {
     fn golden_example_synthetics_reads_its_own_state_word() {
         let want: serde_json::Value = serde_json::from_str(EXAMPLE_SYNTHETICS).unwrap();
         assert_eq!(example(NotificationKind::Synthetics), want);
-        let title = &want["slack_firing"]["blocks"][0]["text"]["text"];
+        let flat = crate::alerts::notifications::render::slack::flat_blocks(&want["slack_firing"]);
+        let title = &flat["blocks"][0]["text"]["text"];
         assert!(title.as_str().unwrap().contains("🔴 checkout API failing"));
     }
 

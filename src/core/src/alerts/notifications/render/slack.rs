@@ -374,6 +374,18 @@ pub fn strip_image_blocks_with_base(msg: &str, web_url_base: &str) -> Option<Str
     })
 }
 
+/// Test view of a rendered body: every attachment's blocks in order, as one `blocks` list.
+#[cfg(test)]
+pub(crate) fn flat_blocks(v: &Value) -> Value {
+    let blocks: Vec<Value> = v["attachments"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|a| a["blocks"].as_array().cloned().unwrap_or_default())
+        .collect();
+    json!({ "blocks": blocks })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -481,5 +493,48 @@ mod tests {
         assert!(images_undeliverable(1_000));
         assert!(images_undeliverable(1_000 + IMAGES_RETRY_SECS - 1));
         assert!(!images_undeliverable(1_000 + IMAGES_RETRY_SECS));
+    }
+
+    #[test]
+    fn the_bar_wraps_the_head_and_the_buttons_in_the_dot_color() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+
+        use super::{Link, RenderedContent};
+        let content = |links: Vec<Link>| RenderedContent {
+            title: "🟠 cpu".into(),
+            body_markdown: String::new(),
+            fields: vec![],
+            links,
+            rows: vec![],
+            row_lines: None,
+            severity: None,
+            unknown_variables: vec![],
+        };
+        let ctx = NotificationContext {
+            level: Some(config::meta::alerts::level::AlertLevel::Warning),
+            ..Default::default()
+        };
+        let v = render_slack(
+            &content(vec![Link::authored("Runbook", "https://rb.example/x")]),
+            &ctx,
+        );
+        assert!(v.get("blocks").is_none(), "{v}");
+        let attachments = v["attachments"].as_array().unwrap();
+        assert_eq!(attachments.len(), 2, "{v}");
+        assert!(attachments.iter().all(|a| a["color"] == "#F2952F"), "{v}");
+        assert_eq!(attachments[1]["blocks"][0]["type"], "actions");
+
+        let resolved = NotificationContext {
+            event: NotificationEvent::Resolved,
+            ..ctx
+        };
+        let v = render_slack(&content(vec![]), &resolved);
+        let attachments = v["attachments"].as_array().unwrap();
+        assert_eq!(
+            attachments.len(),
+            1,
+            "an attachment with no blocks is never sent: {v}"
+        );
+        assert_eq!(attachments[0]["color"], "#2EB67D");
     }
 }

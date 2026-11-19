@@ -1,137 +1,157 @@
 {
   "slack_firing": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136|🔴 error rate on web-logs firing>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#E01E5A",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Level*\nCritical"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136|🔴 error rate on web-logs firing>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nFiring"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "web-logs rose 249.0% above expected | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in window 2026-11-02 09:50 UTC–2026-11-02 10:05 UTC"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Stream*\nweb-logs"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Value*\n342.00"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Expected*\n60.00-136.00"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Change*\n+249.0%"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Started*\n2026-11-02 09:50 UTC"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 10:05:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Level*\nCritical"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nFiring"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Stream*\nweb-logs"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Value*\n342.00"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Expected*\n60.00-136.00"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Change*\n+249.0%"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Started*\n2026-11-02 09:50 UTC"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 10:05:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#E01E5A",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "View logs"
-            },
-            "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136",
-            "style": "primary"
-          },
-          {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open anomaly"
-            },
-            "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View logs"
+                },
+                "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1&anomaly_start=1793613000000000&anomaly_end=1793613900000000&anomaly_kind=value&anomaly_measure=count%28*%29+per+5+min&anomaly_actual=342&anomaly_lower=60&anomaly_upper=136",
+                "style": "primary"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open anomaly"
+                },
+                "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
+              }
+            ]
           }
         ]
       }
     ]
   },
   "slack_resolved": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1|🟢 error rate on web-logs resolved>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "a full detection run found no anomalies in window 2026-11-02 10:25 UTC–2026-11-02 10:40 UTC"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Level*\nOk"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1|🟢 error rate on web-logs resolved>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nResolved"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "a full detection run found no anomalies in window 2026-11-02 10:25 UTC–2026-11-02 10:40 UTC"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Stream*\nweb-logs"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 10:40:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Level*\nOk"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nResolved"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Stream*\nweb-logs"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 10:40:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "View logs"
-            },
-            "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1",
-            "style": "primary"
-          },
-          {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open anomaly"
-            },
-            "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View logs"
+                },
+                "url": "https://o2.acme.com/web/logs?stream_type=logs&stream=web-logs&stream_value=web-logs&from=1793612100000000&to=1793613900000000&sql_mode=true&query=U0VMRUNUICogRlJPTSAid2ViLWxvZ3MiIFdIRVJFIGxldmVsID0gJ2Vycm9yJw..&org_identifier=acme&show_histogram=true&type=search_scheduler&from_anomaly=a1b2c3&anomaly_filter_applied=1",
+                "style": "primary"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open anomaly"
+                },
+                "url": "https://o2.acme.com/web/alerts/detail/a1b2c3?org_identifier=acme&tab=anomalyDetection"
+              }
+            ]
           }
         ]
       }
