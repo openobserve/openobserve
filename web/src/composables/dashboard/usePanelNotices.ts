@@ -22,6 +22,7 @@ import {
 } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
+import type { TreemapNotice } from "@/utils/dashboard/convertTreemapData";
 
 /**
  * The notice state a PanelSchemaRenderer host keeps for PanelErrorButtons: server diagnostics,
@@ -33,6 +34,7 @@ export const usePanelNotices = (timezone: () => string) => {
   const seriesLimit = shallowRef<SeriesLimitInfo | null>(null);
   const regionJoin = shallowRef<RegionJoinInfo | null>(null);
   const sankeyNotice = shallowRef<SankeyNotice | null>(null);
+  const treemapNotice = shallowRef<TreemapNotice | null>(null);
   // Writable, so a host can still clear it with its other warnings.
   const maxQueryRangeWarning = ref("");
 
@@ -68,12 +70,17 @@ export const usePanelNotices = (timezone: () => string) => {
     sankeyNotice.value = notice;
   };
 
+  const handleTreemapNoticeUpdate = (notice: TreemapNotice | null) => {
+    treemapNotice.value = notice;
+  };
+
   const resetNotices = () => {
     resultMetadata.value = null;
     panelDiagnostics.value = null;
     seriesLimit.value = null;
     regionJoin.value = null;
     sankeyNotice.value = null;
+    treemapNotice.value = null;
     maxQueryRangeWarning.value = "";
   };
 
@@ -82,6 +89,7 @@ export const usePanelNotices = (timezone: () => string) => {
     seriesLimit: seriesLimit.value,
     regionJoin: regionJoin.value,
     sankeyNotice: sankeyNotice.value,
+    treemapNotice: treemapNotice.value,
     serverPartial: panelDiagnostics.value?.serverPartial ?? false,
     rowsCapped: panelDiagnostics.value?.rowsCapped ?? false,
     serverPartialReasons: panelDiagnostics.value?.partialReasons ?? [],
@@ -92,6 +100,7 @@ export const usePanelNotices = (timezone: () => string) => {
     panelDiagnostics,
     seriesLimit,
     sankeyNotice,
+    treemapNotice,
     maxQueryRangeWarning,
     noticeProps,
     handleResultMetadataUpdate,
@@ -99,6 +108,7 @@ export const usePanelNotices = (timezone: () => string) => {
     handleSeriesLimitUpdate,
     handleRegionJoinUpdate,
     handleSankeyNoticeUpdate,
+    handleTreemapNoticeUpdate,
     resetNotices,
   };
 };

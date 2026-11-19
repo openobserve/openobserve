@@ -39,7 +39,7 @@ use config::{
         base64,
         hash::Sum64,
         json,
-        sql::{is_complex_query, is_eligible_for_histogram},
+        sql::{is_complex_query, is_eligible_for_histogram, is_time_splittable},
         time::{format_duration, now_micros, second_micros},
     },
 };
@@ -764,6 +764,7 @@ fn is_result_cacheable(
         && sql.histogram_offset == Some(0)
         // #16650: a top-N ranked by another field cannot be split or reused across time ranges
         && !result_utils::is_ranked_by_non_timestamp(&sql.order_by, ts_column)
+        && is_time_splittable(&req.query.sql).unwrap_or(false)
 }
 
 /// Awaits every delta; with `drain` the first error, in any order, aborts the rest and waits.
@@ -1694,6 +1695,110 @@ mod tests {
                     eligible && mode == CacheMode::ReadWrite,
                     "{case}"
                 );
+            }
+        }
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&format!("{org_id}/logs/t"));
+    }
+
+    #[tokio::test]
+    async fn test_prepare_needs_time_column_and_time_splittable_sql() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "time_split_eligibility";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_id}/logs/t"),
+            SchemaCache::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("k", DataType::Utf8, true),
+            ])),
+        );
+        // (sql, ts column, eligible)
+        let cases = [
+            (
+                "SELECT k, max(_timestamp) AS _timestamp, count(*) AS c FROM t GROUP BY k",
+                "",
+                false,
+            ),
+            (
+                "SELECT max(_timestamp) AS _timestamp, count(*) AS c FROM t",
+                "",
+                false,
+            ),
+            (
+                "SELECT k AS _timestamp, count(*) AS c FROM t GROUP BY k ORDER BY _timestamp DESC",
+                "",
+                false,
+            ),
+            (
+                "SELECT s._timestamp AS _timestamp, s.c FROM (SELECT max(_timestamp) AS _timestamp, count(*) AS c FROM t) s ORDER BY _timestamp DESC",
+                "",
+                false,
+            ),
+            (
+                "SELECT * FROM t ORDER BY _timestamp DESC LIMIT 10 OFFSET 5",
+                TIMESTAMP_COL_NAME,
+                false,
+            ),
+            (
+                "SELECT _timestamp AS ts, k FROM t WHERE k IN (SELECT k FROM t GROUP BY k HAVING count(*) > 1) ORDER BY ts DESC",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT _timestamp AS ts, row_number() OVER () AS rn FROM t ORDER BY ts DESC",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour') AS ts, sum(count(*)) OVER (ORDER BY histogram(_timestamp, '1 hour')) AS cum FROM t GROUP BY ts ORDER BY ts",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM t GROUP BY ts",
+                "ts",
+                true,
+            ),
+            (
+                "SELECT * FROM t ORDER BY _timestamp DESC LIMIT 10 OFFSET 0",
+                TIMESTAMP_COL_NAME,
+                true,
+            ),
+        ];
+        for (sql, ts_column, eligible) in cases {
+            for mode in [CacheMode::Bypass, CacheMode::ReadWrite, CacheMode::Refresh] {
+                let mut req = search::Request {
+                    query: search::Query {
+                        sql: sql.to_string(),
+                        start_time: 1_735_689_600_000_000,
+                        end_time: 1_735_776_000_000_000,
+                        size: 100,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let (prepared, should_exec_query) =
+                    prepare_cache_response(org_id, org_id, StreamType::Logs, &mut req, mode)
+                        .await
+                        .unwrap();
+                let case = format!("sql={sql}, mode={mode:?}");
+                assert!(should_exec_query, "{case}");
+                assert_eq!(prepared.ts_column, ts_column, "{case}");
+                assert_eq!(
+                    !prepared.file_path.is_empty(),
+                    eligible && mode != CacheMode::Bypass,
+                    "{case}"
+                );
+                assert_eq!(
+                    prepared.cache_query_response,
+                    eligible && mode == CacheMode::ReadWrite,
+                    "{case}"
+                );
+                assert!(prepared.cached_response.is_empty(), "{case}");
             }
         }
         STREAM_SCHEMAS_LATEST
