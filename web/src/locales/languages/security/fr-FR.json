@@ -302,7 +302,7 @@
       "source": "Source",
       "matchedRules": "{n} détection correspondante | {n} détections correspondantes",
       "openCase": "Ouvrir un cas",
-      "openCaseHint": "Ouvrir un cas sur cet événement, avec son titre, sa priorité et ses entités préremplis",
+      "openCaseHint": "Ouvrir un cas sur cet événement, avec le titre, la priorité et les entités déjà renseignés.",
       "addToCase": "Ajouter au cas",
       "pickCase": "Ajouter à un cas ouvert",
       "caseOpened": "Cas ouvert : {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Défini par la durée de la corrélation",
       "createForbidden": "La création d'une détection nécessite l'autorisation Security",
       "preview": {
-        "run": "Aperçu sur l'historique",
-        "hint": "Exécute la règle sur la plage choisie comme le fait le planificateur et indique ce qui se serait déclenché",
+        "run": "Prévisualiser sur l’historique",
+        "hint": "Exécute la règle sur la plage choisie comme le fait le planificateur et indique ce qui se serait déclenché.",
         "failed": "La requête a échoué : {reason}",
         "time": "Heure",
         "range": {
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Journal des modifications",
-      "hint": "Qui a modifié les détections, les sources, les cas et les attributions de rôles de sécurité, tant que la piste d'audit est conservée",
+      "hint": "Qui a modifié les détections, les sources, les cas et les attributions de rôles de sécurité, pendant toute la durée de conservation de la piste d’audit.",
       "includeReads": "Inclure les lectures",
       "when": "Quand",
       "who": "Modifié par",
