@@ -2273,7 +2273,35 @@ const comparisons = computed(() =>
     ? comparisonWindows(props.formData.query_condition?.multi_time_range)
     : [],
 );
-const compareStatus = ref<NonNullable<typeof evaluationStatus.value> | null>(null);
+// What the past windows held: null until searched; `empty` names those with no rows.
+const baselines = ref<{ all: string; empty: string | null } | null>(null);
+// Waiting for the past is a choice in the function, so ticking it changes the words, not the search.
+const compareWaits = computed(
+  () =>
+    compareRule(smartDecodeVrlFunction(props.formData.query_condition?.vrl_function ?? ""))
+      ?.needsBaseline === true,
+);
+const compareStatus = computed((): NonNullable<typeof evaluationStatus.value> | null => {
+  const b = baselines.value;
+  if (!b) return null;
+  if (!b.empty)
+    return {
+      wouldTrigger: false,
+      reason: t("alerts.form.preview.compareNote", { offset: b.all }),
+      note: "note",
+    };
+  return compareWaits.value
+    ? {
+        wouldTrigger: false,
+        reason: t("alerts.form.preview.compareWaitsForBaseline", { offset: b.empty }),
+        note: "note",
+      }
+    : {
+        wouldTrigger: false,
+        reason: t("alerts.form.preview.compareNoBaseline", { offset: b.empty }),
+        note: "warn",
+      };
+});
 let compareGeneration = 0;
 let compareTraceIds: string[] = [];
 const cancelBaselineSearches = () => {
@@ -2323,19 +2351,14 @@ const countRows = (sql: string, startMicros: number, endMicros: number) =>
 const checkBaselines = async (endMicros: number) => {
   cancelBaselineSearches();
   const mine = compareGeneration;
-  compareStatus.value = null;
+  baselines.value = null;
   const windows = comparisons.value;
   if (!windows.length || !props.query) return;
   const period = alertWindowMinutes();
   const offset = (shown: typeof windows) => comparisonOffsetText(shown, getIntlLocale());
-  const note = {
-    wouldTrigger: false,
-    reason: t("alerts.form.preview.compareNote", { offset: offset(windows) }),
-    note: "note" as const,
-  };
   const count = buildCountChartQuery(props.query);
   if (!count || period <= 0) {
-    compareStatus.value = note;
+    baselines.value = { all: offset(windows), empty: null };
     return;
   }
   const sql = withHistogramMinutes(count, period);
@@ -2351,22 +2374,7 @@ const checkBaselines = async (endMicros: number) => {
   if (mine !== compareGeneration) return;
   compareTraceIds = [];
   const empty = windows.filter((_, i) => totals[i] === 0);
-  const waits = compareRule(
-    smartDecodeVrlFunction(props.formData.query_condition?.vrl_function ?? ""),
-  )?.needsBaseline;
-  compareStatus.value = !empty.length
-    ? note
-    : waits
-      ? {
-          wouldTrigger: false,
-          reason: t("alerts.form.preview.compareWaitsForBaseline", { offset: offset(empty) }),
-          note: "note",
-        }
-      : {
-          wouldTrigger: false,
-          reason: t("alerts.form.preview.compareNoBaseline", { offset: offset(empty) }),
-          note: "warn",
-        };
+  baselines.value = { all: offset(windows), empty: empty.length ? offset(empty) : null };
 };
 watch(
   () => JSON.stringify(comparisons.value),

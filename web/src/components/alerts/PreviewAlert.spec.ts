@@ -3373,6 +3373,20 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
       answer(call, [{ hits }]);
       await flushPromises();
       expect(w.vm.evaluationStatus).toMatchObject({ note });
+      if (!hits.length) {
+        const calls = streaming.calls.length;
+        const other = btoa(
+          vrl === compareFunction(2, true) ? compareFunction(2) : compareFunction(2, true),
+        );
+        await w.setProps({
+          formData: {
+            ...formData,
+            query_condition: { ...formData.query_condition, vrl_function: other },
+          },
+        });
+        expect(w.vm.evaluationStatus).toMatchObject({ note: note === "warn" ? "note" : "warn" });
+        expect(streaming.calls).toHaveLength(calls);
+      }
       // Its function reads rows of the past windows, which the chart's one search has not got.
       const panel = w.findComponent({ name: "PanelSchemaRenderer" });
       expect(panel.props("panelSchema").queries[0].vrlFunctionQuery).toBeNull();
