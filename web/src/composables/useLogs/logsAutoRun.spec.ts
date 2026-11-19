@@ -612,6 +612,30 @@ describe("refinement de-duplication and search-around", () => {
     expect(run().searchAroundActive()).toBe(false);
   });
 
+  it("leaves search-around when a normal grid run starts, even without a bound search payload", () => {
+    const sa = (fakeSearchObj.value.data.searchAround ??= {});
+    sa.indexTimestamp = 123;
+    sa.histogramHide = true;
+    fakeSearchObj.value.meta.showHistogram = false;
+    run().setExecutors({ logs: () => "dispatched" as any });
+    run().invalidateExecuted("search-around");
+    expect(run().searchAroundActive()).toBe(true);
+    run().request("run");
+    expect(run().searchAroundActive()).toBe(false);
+    expect(sa.indexTimestamp).toBe(-1);
+    expect(sa.histogramHide).toBe(false);
+    expect(fakeSearchObj.value.meta.showHistogram).toBe(true);
+  });
+
+  it("leaves search-around on a search payload that has no generation id", () => {
+    const sa = (fakeSearchObj.value.data.searchAround ??= {});
+    sa.indexTimestamp = 123;
+    run().invalidateExecuted("search-around");
+    run().bindPayload({ traceId: "t", type: "search", generationId: null, queryReq: {} });
+    expect(run().searchAroundActive()).toBe(false);
+    expect(sa.indexTimestamp).toBe(-1);
+  });
+
   it("keeps the shown rows when search-around invalidates the record", () => {
     fakeSearchObj.value.data.queryResults = { hits: [{ a: 1 }] };
     run().invalidateExecuted("search-around");
