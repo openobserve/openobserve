@@ -58,7 +58,7 @@ use openobserve_core::{
 use serde::Serialize;
 use svix_ksuid::Ksuid;
 
-use super::{LiveDigest, alert_allows, may_change_mark, readable_subjects};
+use super::{LiveDigest, alert_allows, fix_ports, may_change_mark, readable_subjects};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     request::{
@@ -131,13 +131,7 @@ impl Access for LiveAccess<'_> {
 
     /// The checks the alert PUT route makes, so a change here needs what the editor's Save does.
     async fn may_edit_alert(&self, alert_id: &str) -> bool {
-        let may_put = !rbac_enforced().await
-            || alert_allows(self.org_id, self.user_id, alert_id, "PUT").await == Some(true);
-        let detection = security::is_siem_alert(self.org_id, alert_id).await;
-        may_put
-            && security::guard_siem(self.org_id, self.user_id, "POST", detection)
-                .await
-                .is_ok()
+        alert_edit(self.org_id, self.user_id, alert_id).await == Permission::Allowed
     }
 
     /// Only a caller the folder already lets edit is refused for Security alone.
@@ -172,15 +166,26 @@ impl Access for LiveAccess<'_> {
         Ok(finding_change(self.org_id, self.user_id, id, now).await?)
     }
 
-    /// Each action lane adds its kind's own write check here, run as `user_id`;
-    /// until then no kind can be approved.
+    /// The target's own route check run as `user_id`; a kind without one is never approved.
     async fn may_apply_fix(
         &self,
-        _user_id: &str,
-        _kind: &ActionKind,
-        _target: &EntityRef,
+        user_id: &str,
+        kind: &ActionKind,
+        target: &EntityRef,
     ) -> Permission {
-        Permission::Denied(RefusalReason::Org)
+        let alert_id = (target.kind == kinds::ALERT)
+            .then(|| target.key_dims.get(dims::ENTITY_ID))
+            .flatten();
+        let Some(alert_id) = alert_id else {
+            return Permission::Denied(RefusalReason::Org);
+        };
+        match kind {
+            ActionKind::Snooze => fix_ports::may_snooze(self.org_id, user_id, alert_id).await,
+            ActionKind::AddDestination | ActionKind::CalibrationFix => {
+                alert_edit(self.org_id, user_id, alert_id).await
+            }
+            _ => Permission::Denied(RefusalReason::Org),
+        }
     }
 }
 
@@ -533,6 +538,16 @@ async fn describe(org_id: &str, subject: &EntityRef) -> SubjectInfo {
         folder: None,
         team: None,
     }
+}
+
+/// The alert PUT route's checks, Security included for a detection, run as `user_id`.
+async fn alert_edit(org_id: &str, user_id: &str, alert_id: &str) -> Permission {
+    let may_put = !rbac_enforced().await
+        || alert_allows(org_id, user_id, alert_id, "PUT").await == Some(true);
+    if !may_put {
+        return Permission::Denied(RefusalReason::Folder);
+    }
+    fix_ports::security_permission(org_id, user_id, alert_id).await
 }
 
 async fn alert_folder_id(org_id: &str, subject: &EntityRef) -> Option<String> {
