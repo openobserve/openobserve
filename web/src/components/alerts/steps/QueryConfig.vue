@@ -162,17 +162,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <template v-if="selectedFunction !== 'total_events'">
                               <span
                                 class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
-                                >{{ measureConnector }}</span
+                                >{{ countsGroupField ? countedNoun : measureConnector }}</span
                               >
-                              <OFormSelect
-                                :aria-label="t('alerts.form.names.field')"
-                                name="query_condition.aggregation.having.column"
-                                :options="numericColumns"
-                                searchable
-                                :placeholder="t('alerts.placeholders.selectColumn')"
-                                class="w-50! min-w-28 shrink"
-                                @update:model-value="onLogMeasureColumnChange($event)"
-                              />
+                              <span v-show="!countsGroupField" class="contents">
+                                <OFormSelect
+                                  :aria-label="t('alerts.form.names.field')"
+                                  name="query_condition.aggregation.having.column"
+                                  :options="numericColumns"
+                                  searchable
+                                  :placeholder="t('alerts.placeholders.selectColumn')"
+                                  class="w-50! min-w-28 shrink"
+                                  @update:model-value="onLogMeasureColumnChange($event)"
+                                />
+                              </span>
                             </template>
                           </div>
                           <span
@@ -1239,9 +1241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBanner
                 v-if="localTab === 'sql' && isMultiAlert && sqlQueryHasHaving"
                 dense
-                variant="warning"
                 class="mt-2"
-                :content="t('alerts.queryConfig.sqlHavingClauseWarning')"
+                :content="t('alerts.queryConfig.sqlHavingRunsFirst')"
                 data-test="alert-sql-having-clause-warning"
               />
 
@@ -1255,8 +1256,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="
                           localTab === 'promql' && !isForecastMode && tierShows('ruleExpression')
                         "
-                        :label="t('alerts.promRuleMode')"
-                        :description="keptThresholdText || t('alerts.promRuleModeHelp')"
+                        :label="t('alerts.tiers.names.queryComparison')"
+                        :description="keptThresholdText || t('alerts.form.ruleMode.help')"
                         fill
                         data-test="add-alert-rule-mode-row"
                       >
@@ -1264,7 +1265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="query_condition.promql_rule_mode"
                           off-tone="neutral"
                           state-text
-                          :aria-label="t('alerts.promRuleMode')"
+                          :aria-label="t('alerts.tiers.names.queryComparison')"
                           data-test="alert-prom-rule-mode"
                           @update:model-value="onPromRuleModeChange"
                         />
@@ -1861,8 +1862,12 @@ import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
 import { dataNoun, formatNumber, joinListMore } from "@/utils/alerts/alertCopy";
 import { metricPromql } from "@/utils/alerts/alertIntents";
-import { isSpanDurationMeasure, UNIT_KEEPING_FUNCTIONS } from "@/utils/alerts/alertReadBack";
-import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
+import {
+  isSpanDurationMeasure,
+  SPAN_DURATION_FIELD,
+  UNIT_KEEPING_FUNCTIONS,
+} from "@/utils/alerts/alertReadBack";
+import { alwaysOneRow, oneRowMeetsLimit, sqlHavingCondition } from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
 import { promqlScaledToPercent, promqlWithMetric } from "@/utils/alerts/promqlMetrics";
 import { groupRanking } from "@/composables/alerts/groupRanking";
@@ -2451,6 +2456,13 @@ export default defineComponent({
     }
 
     const countedNoun = computed(() => dataNoun(props.streamType, "custom", 2, t));
+    // Every event of a group carries its group's field, so counting that field counts all its events.
+    const countsGroupField = computed(
+      () =>
+        selectedFunction.value === "count" &&
+        !!logMeasureColumn.value &&
+        logGroupBy.value.includes(logMeasureColumn.value),
+    );
     // COUNT(field) counts the events carrying the field, so "count of service_name" would misread.
     const measureConnector = computed(() =>
       selectedFunction.value === "count"
@@ -3156,6 +3168,19 @@ export default defineComponent({
         agg.function = "count";
         agg.group_by = [];
         if (!props.sqlAggColumnOptions.includes(agg.having.column)) agg.having.column = "";
+        // The query's HAVING already states the per-row rule, so the condition starts from it.
+        const fromHaving = sqlHavingCondition(localSqlQuery.value ?? "");
+        const known =
+          !props.sqlAggColumnOptions.length ||
+          props.sqlAggColumnOptions.includes(fromHaving?.column ?? "");
+        if (
+          fromHaving &&
+          known &&
+          !agg.having.column &&
+          ["", null, undefined].includes(agg.having.value)
+        ) {
+          agg.having = { ...agg.having, ...fromHaving };
+        }
       });
     };
 
@@ -3781,7 +3806,14 @@ export default defineComponent({
       ];
     });
     const whichEventsHelp = computed(() => {
-      if (localTab.value === "sql") return t("alerts.sections.rows.whichEventsSql");
+      if (localTab.value === "sql") {
+        const spans =
+          props.streamType === "traces" &&
+          new RegExp(`\\b${SPAN_DURATION_FIELD}\\b`, "i").test(localSqlQuery.value ?? "");
+        return spans
+          ? t("alerts.sections.rows.whichEventsSqlSpans")
+          : t("alerts.sections.rows.whichEventsSql");
+      }
       if (localTab.value === "promql")
         return props.promqlStreamNote || t("alerts.sections.rows.whichEventsPromql");
       return leafFilterCount.value > 0
@@ -4560,6 +4592,7 @@ export default defineComponent({
       groupTotalBy,
       countedNoun,
       measureConnector,
+      countsGroupField,
       isSpanDuration,
       durationUnit,
       durationUnitOptions,

@@ -139,7 +139,7 @@ const PROMQL_QUIET_KEYS: Record<"above" | "below" | "none", I18nKey> = {
 };
 const FILTER_CONDITIONS_SHOWN = 3;
 // Span duration is microseconds by the traces contract, whatever unit the user typed it in.
-const SPAN_DURATION_FIELD = "duration";
+export const SPAN_DURATION_FIELD = "duration";
 const MICROS_PER_MS = 1000;
 
 /** Measure functions whose result keeps the measured field's unit. */

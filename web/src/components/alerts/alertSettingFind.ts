@@ -453,7 +453,7 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
   },
   {
     id: "ruleExpression",
-    labelKey: "alerts.tiers.names.ruleExpression",
+    labelKey: "alerts.tiers.names.queryComparison",
     aliases: ["rule mode", "rule expression", "recording rule"],
     section: "condition",
     tier: "smart",

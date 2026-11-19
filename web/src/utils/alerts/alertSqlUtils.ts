@@ -306,3 +306,97 @@ export function oneRowMeetsLimit(operator: unknown, threshold: unknown): boolean
       return false;
   }
 }
+
+/** The SQL with quoted text and everything inside parentheses blanked, so offsets still line up. */
+function maskNested(sql: string): string {
+  let out = "";
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (quote) {
+      out += " ";
+      if (ch === quote && sql[i + 1] === quote) {
+        out += " ";
+        i++;
+      } else if (ch === quote) quote = null;
+    } else if (ch === "'" || ch === '"' || ch === "`") {
+      quote = ch;
+      out += " ";
+    } else if (ch === "(" || ch === ")") {
+      depth = Math.max(0, depth + (ch === "(" ? 1 : -1));
+      out += " ";
+    } else out += depth > 0 ? " " : ch;
+  }
+  return out;
+}
+
+const clauseOf = (sql: string, start: RegExp, end: RegExp): string | null => {
+  const masked = maskNested(sql);
+  const head = start.exec(masked);
+  if (!head) return null;
+  const from = head.index + head[0].length;
+  const stop = end.exec(masked.slice(from));
+  return sql.slice(from, stop ? from + stop.index : sql.length).trim() || null;
+};
+
+const splitTop = (text: string, separator: RegExp): string[] => {
+  const parts: string[] = [];
+  let last = 0;
+  for (const match of maskNested(text).matchAll(separator)) {
+    parts.push(text.slice(last, match.index));
+    last = (match.index ?? 0) + match[0].length;
+  }
+  parts.push(text.slice(last));
+  return parts.map((part) => part.trim()).filter(Boolean);
+};
+
+const squash = (text: string) => text.replace(/["`\s]/g, "").toLowerCase();
+const CLAUSE_END = /\b(?:group\s+by|having|order\s+by|limit|qualify|union|window)\b|;/i;
+const COMPARISON = /^([\s\S]+?)\s*(>=|<=|!=|<>|>|<|=)\s*(-?\d+(?:\.\d+)?(?:e[-+]?\d+)?)$/i;
+
+/** The outer query's WHERE clause as written, or null when it has none. */
+export function sqlWhereText(sql: string): string | null {
+  return clauseOf(sql ?? "", /\bwhere\b/i, CLAUSE_END);
+}
+
+/** A HAVING comparison restated on a column the query returns, for a per-row condition. A column
+ * that scales the compared expression (`expr / 1000.0 AS p95_ms`) gets the value scaled with it. */
+export function sqlHavingCondition(
+  sql: string,
+): { column: string; operator: string; value: number } | null {
+  const having = clauseOf(
+    sql ?? "",
+    /\bhaving\b/i,
+    /\b(?:order\s+by|limit|qualify|union|window)\b|;/i,
+  );
+  if (!having || /\bor\b/i.test(maskNested(having))) return null;
+  const list = clauseOf(sql, /^\s*select\b(?:\s+distinct\b)?/i, /\bfrom\b/i) ?? "";
+  const columns = splitTop(list, /,/g).map((item) => {
+    const named = /^([\s\S]+?)\s+as\s+([\w"`]+)$/i.exec(item);
+    return named
+      ? { expr: squash(named[1]), name: named[2].replace(/["`]/g, "") }
+      : { expr: squash(item), name: item.replace(/["`]/g, "") };
+  });
+  let found: { column: string; operator: string; value: number } | null = null;
+  // The last comparison wins: a minimum-volume guard is written before the threshold it guards.
+  for (const part of splitTop(having, /\band\b/gi)) {
+    const comparison = COMPARISON.exec(part);
+    if (!comparison) continue;
+    const lhs = squash(comparison[1]);
+    const operator = comparison[2] === "<>" ? "!=" : comparison[2];
+    const value = Number(comparison[3]);
+    for (const column of columns) {
+      const scaled = /^(.+)([/*])(\d+(?:\.\d+)?)$/.exec(column.expr);
+      const factor = scaled && scaled[1] === lhs ? Number(scaled[3]) : 0;
+      if (column.expr === lhs || squash(column.name) === lhs) {
+        found = { column: column.name, operator, value };
+      } else if (factor > 0) {
+        const restated = scaled![2] === "/" ? value / factor : value * factor;
+        found = { column: column.name, operator, value: Number(restated.toPrecision(12)) };
+      } else continue;
+      break;
+    }
+  }
+  return found;
+}

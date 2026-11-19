@@ -552,7 +552,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["query_condition", "promql_rule_mode"],
-            message: t("alerts.promRuleModeConflict"),
+            message: t("alerts.form.ruleMode.conflict"),
           });
         }
       }

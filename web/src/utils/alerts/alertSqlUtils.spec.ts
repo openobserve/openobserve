@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { addHavingClauseToQuery, alwaysOneRow, oneRowMeetsLimit } from "./alertSqlUtils";
+import {
+  addHavingClauseToQuery,
+  alwaysOneRow,
+  oneRowMeetsLimit,
+  sqlHavingCondition,
+  sqlWhereText,
+} from "./alertSqlUtils";
 
 describe("alertSqlUtils", () => {
   let parser: any;
@@ -345,5 +351,35 @@ describe("alertSqlUtils", () => {
     [">=", "", false],
   ])("one row meets %s %s: %s", (operator, threshold, expected) => {
     expect(oneRowMeetsLimit(operator, threshold)).toBe(expected);
+  });
+
+  const P95 = `SELECT service_name, COUNT(*) AS requests, approx_percentile_cont(duration, 0.95) / 1000.0 AS p95_ms FROM "default" WHERE span_kind IN ('2', '5') GROUP BY service_name`;
+  it.each([
+    [
+      `${P95} HAVING approx_percentile_cont(duration, 0.95) > 500000`,
+      { column: "p95_ms", operator: ">", value: 500 },
+    ],
+    [
+      `${P95} HAVING COUNT(*) >= 50 AND approx_percentile_cont(duration, 0.95) > 2000000`,
+      { column: "p95_ms", operator: ">", value: 2000 },
+    ],
+    [`${P95} HAVING COUNT(*) <> 3`, { column: "requests", operator: "!=", value: 3 }],
+    [
+      "SELECT k, avg(x) * 100 AS pct FROM t GROUP BY k HAVING avg(x) > 0.5",
+      { column: "pct", operator: ">", value: 50 },
+    ],
+    [`${P95} HAVING COUNT(*) > 5 OR COUNT(*) < 1`, null],
+    [`${P95} HAVING max(duration) > 5`, null],
+    [P95, null],
+  ])("sqlHavingCondition(%s)", (sql, expected) => {
+    expect(sqlHavingCondition(sql)).toEqual(expected);
+  });
+
+  it.each([
+    [`${P95} HAVING COUNT(*) > 1`, "span_kind IN ('2', '5')"],
+    ["SELECT count(*) FROM (SELECT * FROM t WHERE a = 1) WHERE b = 'x y' LIMIT 5", "b = 'x y'"],
+    ["SELECT count(*) FROM t", null],
+  ])("sqlWhereText(%s)", (sql, expected) => {
+    expect(sqlWhereText(sql)).toBe(expected);
   });
 });
