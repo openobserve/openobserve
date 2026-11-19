@@ -45,6 +45,10 @@ describe("promqlMetricNames", () => {
     ["a * 100 > 5", false],
     ["sum(a) / sum(b)", false],
     ["a * 1000", false],
+    ["1 - a * 100", false],
+    ["100 * a - 1", false],
+    ["(1 - a / b) * 100", true],
+    ["a / 1e-3 * 100", true],
   ])("%s reads in percent: %s", (query, percent) => {
     expect(promqlScaledToPercent(query)).toBe(percent);
   });

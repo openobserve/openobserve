@@ -33,6 +33,8 @@ const NAME_MATCHER = /__name__\s*=\s*"([^"]+)"/g;
 const STRINGS = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`/g;
 const LABEL_LISTS = /\b(?:by|without|on|ignoring|group_left|group_right)\s*\([^)]*\)/g;
 const IDENTIFIER = /(?<![\w:.])[a-zA-Z_:][\w:]*(?![\w:])/g;
+const EXPONENT_LITERAL = /\d(?:\.\d*)?e[-+]?\d+/gi;
+const LOWER_THAN_MULTIPLY = /[-+<>=!]|\b(?:and|or|unless)\b/i;
 
 /** The metric names a PromQL query reads, in the order they first appear. */
 export function promqlMetricNames(query: string): string[] {
@@ -53,12 +55,16 @@ export function promqlMetricNames(query: string): string[] {
 
 /** Whether the whole query is scaled by 100, so its value (and the threshold) reads in percent. */
 export function promqlScaledToPercent(query: string): boolean {
-  const bare = query
+  let top = query
     .replace(STRINGS, '""')
     .replace(/\{[^}]*\}/g, "")
     .replace(/\[[^\]]*\]/g, "")
+    .replace(EXPONENT_LITERAL, "0")
     .trim();
-  return /^100\s*\*/.test(bare) || /\*\s*100$/.test(bare);
+  for (let inner = ""; inner !== top;) [inner, top] = [top, top.replace(/\([^()]*\)/g, "_")];
+  if (!/^100\s*\*/.test(top) && !/\*\s*100$/.test(top)) return false;
+  // `*` binds tighter than these, so `1 - x * 100` scales only `x`, not the whole value.
+  return !LOWER_THAN_MULTIPLY.test(top);
 }
 
 /** The query reading `to` where it read `from`; undefined unless `from` is the only metric it reads. */
