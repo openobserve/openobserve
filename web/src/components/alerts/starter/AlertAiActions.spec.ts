@@ -128,36 +128,107 @@ describe("AlertAiActions", () => {
     mocks.fetchAiChat.mockResolvedValue(pausedTurn());
     mocks.confirmAiTool.mockImplementation(async (_o, _s, approved: boolean) => {
       setTimeout(() => release(approved));
-      return true;
+      return { ok: true, status: 200, body: {} };
     });
     mocks.evaluate.mockResolvedValue({
       data: { end: 0, is_real_time: false, summary: { checks: 0, errors: 0 }, checks: [] },
     });
   });
 
-  it("Create alert approves the checked proposal and refreshes the alert list once it is created", async () => {
-    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-    const { w } = await mountReady();
-    expect(w.find("[data-test=alert-starter-ai-nobody-told]").exists()).toBe(true);
+  it.each([
+    { name: "nobody", who: [] as string[] },
+    { name: "an edited list", who: ["oncall-webhook"] },
+  ])(
+    "Create alert approves with Who to tell as shown ($name) and refreshes the list",
+    async (c) => {
+      const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+      const { w, controller } = await mountReady();
+      controller.setDestinations(c.who);
+      await flushPromises();
+      expect(w.find("[data-test=alert-starter-ai-nobody-told]").exists()).toBe(!c.who.length);
 
+      await w.find("[data-test=alert-starter-ai-create]").trigger("click");
+      await new Promise((resolve) => setTimeout(resolve));
+      await flushPromises();
+
+      expect({
+        evaluated: mocks.evaluate.mock.calls[0]?.[1]?.alert?.query_condition?.sql,
+        sent: mocks.confirmAiTool.mock.calls.map((call) => call.slice(2)),
+        created: w.findComponent(AlertAiActions).emitted("created")?.length,
+        listRefreshed: invalidate.mock.calls.some(
+          ([filters]) =>
+            JSON.stringify((filters as { queryKey?: unknown[] })?.queryKey) ===
+            '["org","org1","alerts"]',
+        ),
+      }).toEqual({
+        evaluated: SQL,
+        sent: [[true, { destinations: c.who }]],
+        created: 1,
+        listRefreshed: true,
+      });
+    },
+  );
+
+  const unknownDetail = {
+    code: "unknown_destinations",
+    unknown: ["no-such-dest"],
+    message: "No destination named no-such-dest in this organization. Nothing was created.",
+  };
+  it.each([
+    {
+      name: "a 422",
+      status: 422,
+      body: { detail: unknownDetail },
+      pending: true,
+      says: "no-such-dest",
+    },
+    {
+      name: "a relayed 500",
+      status: 500,
+      body: {
+        code: 500,
+        message: `Confirmation failed: ${JSON.stringify({ detail: unknownDetail })}`,
+      },
+      pending: true,
+      says: "no-such-dest",
+    },
+    {
+      name: "unchecked destinations",
+      status: 503,
+      body: {
+        detail: { code: "destinations_unchecked", message: "Destinations could not be checked" },
+      },
+      pending: true,
+      says: "Destinations could not be checked",
+    },
+    {
+      name: "any other failure",
+      status: 500,
+      body: { message: "boom" },
+      pending: false,
+      says: null,
+    },
+  ])("a refused Create on $name", async (c) => {
+    const { w, controller } = await mountReady();
+    mocks.confirmAiTool.mockResolvedValueOnce({ ok: false, status: c.status, body: c.body });
     await w.find("[data-test=alert-starter-ai-create]").trigger("click");
-    await new Promise((resolve) => setTimeout(resolve));
     await flushPromises();
 
+    const refused = controller.ai.refused.value;
     expect({
-      evaluated: mocks.evaluate.mock.calls[0]?.[1]?.alert?.query_condition?.sql,
-      answers: mocks.confirmAiTool.mock.calls.map((c) => c[2]),
-      created: w.findComponent(AlertAiActions).emitted("created")?.length,
-      listRefreshed: invalidate.mock.calls.some(
-        ([filters]) =>
-          JSON.stringify((filters as { queryKey?: unknown[] })?.queryKey) ===
-          '["org","org1","alerts"]',
-      ),
-    }).toEqual({ evaluated: SQL, answers: [true], created: 1, listRefreshed: true });
+      phase: controller.ai.phase.value,
+      canCreateAgain: w.find("[data-test=alert-starter-ai-create]").exists(),
+      says: refused === null ? null : refused.includes(c.says ?? "") && c.says,
+    }).toEqual({
+      phase: c.pending ? "ready" : "failed",
+      canCreateAgain: c.pending,
+      says: c.says,
+    });
   });
 
-  it("Edit in form declines the proposal and opens the form with the assistant prefill", async () => {
-    const { w } = await mountReady();
+  it("Edit in form declines the proposal and opens the form with the edited prefill", async () => {
+    const { w, controller } = await mountReady();
+    controller.setDestinations(["oncall-webhook"]);
     await w.find("[data-test=alert-starter-ai-edit-in-form]").trigger("click");
     await flushPromises();
 
@@ -167,12 +238,14 @@ describe("AlertAiActions", () => {
       route: mocks.push.mock.calls[0]?.[0].query.prefill,
       source: prefill?.source,
       stream: prefill?.streamName,
+      who: prefill?.meta?.destinations,
       opened: w.findComponent(AlertAiActions).emitted("opened")?.length,
     }).toEqual({
       answers: [false],
       route: "assistant",
       source: "assistant",
       stream: "nginx",
+      who: ["oncall-webhook"],
       opened: 1,
     });
   });

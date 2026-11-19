@@ -120,9 +120,11 @@ const chatOpens = computed(
 const create = async () => {
   const name = ai.result.value?.draft.name ?? "";
   try {
-    await approveAlert.mutateAsync(() => ai.approve());
+    // Always the pane's list, so the agent's own guess never wins silently.
+    const destinations = [...props.controller.destinations.value];
+    await approveAlert.mutateAsync(() => ai.approve({ destinations }));
   } catch {
-    // The pane's failure line says what went wrong.
+    // The pane says what went wrong: its failure line, or a refusal under Who to tell.
     return;
   }
   toast({ variant: "success", message: t("alertStarter.ai.created", { name: raw(name) }) });

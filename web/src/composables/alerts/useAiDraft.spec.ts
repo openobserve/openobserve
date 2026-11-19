@@ -31,6 +31,7 @@ vi.mock("@/stores", () => ({
 }));
 
 import { useAiDraft, type AiDraft, type AiDraftHost } from "./useAiDraft";
+import type { I18nText } from "@/types/i18n";
 
 type Args = { name: string };
 /** A stream part, or one that waits for the confirm call and depends on its answer. */
@@ -121,7 +122,7 @@ describe("useAiDraft", () => {
     waiter = null;
     chat.confirmAiTool.mockImplementation(async (_org, _session, approved: boolean) => {
       answer(approved);
-      return true;
+      return { ok: true, status: 200, body: {} };
     });
     chat.getStructuredContext.mockResolvedValue({ currentPage: "alerts", incident_id: "inc-1" });
   });
@@ -163,6 +164,28 @@ describe("useAiDraft", () => {
       { kind: "notCreated", detail: "alert name already exists" },
       { name: "nginx_5xx" },
     ]);
+  });
+
+  it.each([
+    {
+      name: "a refusal the agent still waits on",
+      reason: "No destination named x",
+      phase: "ready",
+    },
+    { name: "any other failure", reason: null, phase: "failed" },
+  ])("a refused approval: $name", async (c) => {
+    chat.fetchAiChat.mockResolvedValueOnce(stream(proposal("nginx_5xx"), afterAnswer));
+    const ai = run({ readRefusal: () => c.reason as I18nText | null });
+    void ai.start("nginx 5xx above 5%");
+    await flushPromises();
+    chat.confirmAiTool.mockResolvedValueOnce({ ok: false, status: 422, body: {} });
+
+    await expect(ai.approve({ destinations: ["x"] })).rejects.toThrow();
+    expect({
+      phase: ai.phase.value,
+      refused: ai.refused.value,
+      sent: chat.confirmAiTool.mock.calls[0].slice(2),
+    }).toEqual({ phase: c.phase, refused: c.reason, sent: [true, { destinations: ["x"] }] });
   });
 
   it("declining stops the turn and answers no", async () => {

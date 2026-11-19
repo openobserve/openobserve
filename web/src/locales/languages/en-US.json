@@ -35841,7 +35841,9 @@
       "editInForm": "Edit in form",
       "create": "Create alert",
       "created": "Alert {name} created",
-      "unknownDestination": "There is no destination named {name}"
+      "unknownDestination": "There is no destination named {name}",
+      "unknownDestinations": "No destination named {names}, so nothing was created | No destinations named {names}, so nothing was created",
+      "destinationsRefused": "Who to tell couldn't be checked, so nothing was created"
     },
     "library": {
       "searchPlaceholder": "Search the library",

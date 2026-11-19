@@ -67,29 +67,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="notifications" size="xs" class="shrink-0" />
             <OTruncatedText class="min-w-0">{{ dayLine.text }}</OTruncatedText>
           </p>
-          <!-- Read-only: Create runs the proposal as it stands, so a change goes through Edit in form. -->
-          <p
-            class="m-0 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm"
+          <div
+            class="flex min-w-0 flex-col gap-1"
+            :inert="controller.ai.phase.value === 'approving'"
             data-test="alert-starter-ai-who"
           >
-            <span class="text-text-heading me-2 font-medium">{{
-              t("alertStarter.whoToTell.label")
-            }}</span>
-            <span v-if="!whoShown.length" class="text-text-heading">{{
-              t("alertStarter.whoToTell.noOne")
-            }}</span>
-            <OBadge
-              v-for="name in whoShown"
-              :key="name"
-              variant="default-outline"
-              shape="rounded"
-              data-test="alert-starter-ai-who-chip"
-              >{{ name }}</OBadge
+            <WhoToTell
+              :model-value="controller.destinations.value"
+              :stream-type="proposal?.stream_type"
+              :stream-name="proposal?.stream_name"
+              @update:model-value="controller.setDestinations"
+            />
+            <p
+              v-if="refusalText"
+              role="alert"
+              class="text-status-error-text m-0 flex min-w-0 items-center gap-1 text-xs"
+              data-test="alert-starter-ai-who-refused"
             >
-            <span v-if="whoHidden > 0" class="text-text-secondary text-xs">{{
-              t("alertStarter.whoToTell.more", { count: whoHidden }, whoHidden)
-            }}</span>
-          </p>
+              <OIcon name="error-outline" size="xs" class="shrink-0" />
+              <span class="min-w-0">{{ refusalText }}</span>
+            </p>
+          </div>
         </section>
       </template>
     </AiDraftPane>
@@ -101,12 +99,12 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { useQueries } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AiDraftPane from "@/components/ai-draft/AiDraftPane.vue";
+import WhoToTell from "@/components/alerts/starter/WhoToTell.vue";
 import type { AlertAiDraft } from "@/components/alerts/starter/useAlertAiDraft";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -115,7 +113,6 @@ import { DAY_VERDICT_TONE_CLASS, dayVerdictLine } from "@/utils/alerts/alertTest
 type ExampleStreamType = "logs" | "metrics" | "traces";
 
 const MAX_EXAMPLES = 3;
-const MAX_WHO = 3;
 const STREAM_TYPES: readonly ExampleStreamType[] = ["logs", "metrics", "traces"];
 // Two shapes per stream type; each needs only the stream's name, never a field or metric name.
 const EXAMPLE_KEYS: Record<ExampleStreamType, readonly [I18nKey, I18nKey]> = {
@@ -170,10 +167,9 @@ const dayLine = computed(() => {
   return verdict ? dayVerdictLine(verdict, t) : null;
 });
 
-const whoShown = computed(() => props.controller.destinations.value.slice(0, MAX_WHO));
-const whoHidden = computed(
-  () => props.controller.destinations.value.length - whoShown.value.length,
-);
+const proposal = computed(() => props.controller.ai.result.value?.draft ?? null);
+
+const refusalText = computed(() => props.controller.ai.refused.value);
 
 const focusPrompt = () => rootEl.value?.querySelector("textarea")?.focus();
 

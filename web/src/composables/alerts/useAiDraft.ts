@@ -16,7 +16,7 @@
 import { ref, shallowRef, type Ref, type ShallowRef } from "vue";
 import type { ZodType } from "zod";
 import store from "@/stores";
-import useAiChat from "@/composables/useAiChat";
+import useAiChat, { type AiConfirmAnswer } from "@/composables/useAiChat";
 import { extractFrames, extractTailFrames } from "@/components/O2AIChat.framing";
 import {
   buildNavigationRoute,
@@ -73,6 +73,8 @@ export interface AiDraftHost<T> {
   context?: () => Promise<Record<string, unknown>> | Record<string, unknown>;
   /** Server-side checks (a dry run); an empty list means the proposal is good. */
   check?: (draft: T, signal: AbortSignal) => Promise<AiDraftIssue[]>;
+  /** Why a refused approval left the proposal waiting; null means the answer failed outright. */
+  readRefusal?: (answer: AiConfirmAnswer) => I18nText | null;
 }
 
 export interface AiDraft<T> {
@@ -83,6 +85,8 @@ export interface AiDraft<T> {
   result: ShallowRef<AiDraftResult<T> | null>;
   issues: Ref<AiDraftIssue[]>;
   failure: Ref<AiDraftFailure | null>;
+  /** Why the server refused the last approval while keeping the proposal approvable. */
+  refused: Ref<I18nText | null>;
   /** Where the created resource opens. */
   createdRoute: Ref<NavigationRoute | null>;
   sessionId: Ref<string | null>;
@@ -90,8 +94,8 @@ export interface AiDraft<T> {
   start: (prompt: string) => Promise<void>;
   /** Answers the assistant's question with the next message of the same session. */
   reply: (value: string) => Promise<void>;
-  /** Approves the waiting proposal; resolves once the agent reports it created. */
-  approve: () => Promise<void>;
+  /** Approves the waiting proposal with `extra` beside `approved`; resolves once the agent reports it created. */
+  approve: (extra?: Record<string, unknown>) => Promise<void>;
   /** Declines the waiting proposal and stops reading the turn. */
   decline: () => Promise<void>;
   retry: () => Promise<void>;
@@ -144,6 +148,7 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
   const result = shallowRef<AiDraftResult<T> | null>(null);
   const issues = ref<AiDraftIssue[]>([]);
   const failure = ref<AiDraftFailure | null>(null);
+  const refused = ref<I18nText | null>(null);
   const createdRoute = ref<NavigationRoute | null>(null);
   const sessionId = ref<string | null>(null);
   const prompt = ref("");
@@ -213,10 +218,10 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
       if (!response) return { ok: false, failure: { kind: "stream", detail: null } };
       if (response.cancelled) return { ok: false, cancelled: true };
       if (response.ok) break;
-      const refused = await refusal(response);
-      if (!("consent" in refused)) return { ok: false, failure: refused };
+      const denial = await refusal(response);
+      if (!("consent" in denial)) return { ok: false, failure: denial };
       if (consentAsked) return { ok: false, failure: { kind: "quota", detail: null } };
-      const accepted = await promptForConsent(org(), "ai_credits", refused.consent, signal);
+      const accepted = await promptForConsent(org(), "ai_credits", denial.consent, signal);
       if (signal.aborted) return { ok: false, cancelled: true };
       if (!accepted) {
         return { ok: false, failure: { kind: "quota", detail: t("paidUsage.declinedNotice") } };
@@ -383,6 +388,7 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
     statusLines.value = [];
     text.value = "";
     failure.value = null;
+    refused.value = null;
     issues.value = [];
     result.value = null;
     approved = false;
@@ -406,6 +412,7 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
     result.value = null;
     issues.value = [];
     failure.value = null;
+    refused.value = null;
     createdRoute.value = null;
   };
 
@@ -432,18 +439,27 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
     controller = null;
   };
 
-  const approve = async () => {
+  const approve = async (extra: Record<string, unknown> = {}) => {
     if (phase.value !== "ready" || !sessionId.value) return;
     const done = new Promise<void>((resolve, reject) => {
       approval = { resolve, reject };
     });
     approved = true;
     awaitingAnswer = false;
+    refused.value = null;
     phase.value = "approving";
-    if (!(await confirmAiTool(org(), sessionId.value, true))) {
+    const answer = await confirmAiTool(org(), sessionId.value, true, extra);
+    if (!answer.ok) {
       approved = false;
-      stopReading();
-      failWith("expired");
+      const reason = host.readRefusal?.(answer) ?? null;
+      if (reason) {
+        awaitingAnswer = true;
+        refused.value = reason;
+        phase.value = "ready";
+      } else {
+        stopReading();
+        failWith("expired");
+      }
       settleApproval(new Error("approval not delivered"));
     }
     return done;
@@ -486,6 +502,7 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
     result,
     issues,
     failure,
+    refused,
     createdRoute,
     sessionId,
     prompt,
