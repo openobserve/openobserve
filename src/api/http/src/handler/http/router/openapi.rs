@@ -1863,6 +1863,7 @@ mod tests {
         ),
         ("/api/{org_id}/anomaly_detection/{config_id}/detect", "post"),
         ("/api/{org_id}/anomaly_detection/{config_id}/history", "get"),
+        ("/api/{org_id}/anomaly_detection/{config_id}/explore", "get"),
         ("/api/{org_id}/workflows", "get"),
         ("/api/{org_id}/workflows", "post"),
         ("/api/v2/{org_id}/workflows/move", "patch"),

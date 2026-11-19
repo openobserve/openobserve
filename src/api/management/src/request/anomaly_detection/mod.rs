@@ -246,7 +246,8 @@ pub async fn get_config(Path((org_id, anomaly_id)): Path<(String, String)>) -> R
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Get the state, readings and explore link of an anomaly detector", "category": "anomaly_detection"})),
+        // Built for the detector page and alert links; agents get no explore data in Phase 1
+        ("x-o2-mcp" = json!({"enabled": false})),
         ("x-o2-ratelimit" = json!({"module": "Anomaly Detection", "operation": "get"}))
     )
 )]
