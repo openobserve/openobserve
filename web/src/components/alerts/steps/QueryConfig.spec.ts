@@ -3009,9 +3009,11 @@ describe("QueryConfig.vue", () => {
         having: { column: "service", operator: ">", value: 50 },
       });
       expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(1);
-      expect(host.find('[data-test="add-alert-group-by-sentence"]').text()).toContain(
-        "Switched to count, so it counts events per service",
+      const groupRow = host.find('[data-test="add-alert-group-question-row"]');
+      expect(groupRow.find('[data-test="add-alert-group-by-sentence"]').text()).toContain(
+        "service",
       );
+      expect(groupRow.text()).toContain("Switched to count, so it counts events per service");
       wrapper.vm.clearGroupBy();
       await flushPromises();
       expect(wrapper.vm.selectedFunction).toBe("total_events");

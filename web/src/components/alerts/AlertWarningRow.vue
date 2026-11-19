@@ -43,7 +43,7 @@ const { t } = useI18nTyped();
 <template>
   <OSettingRow
     :label="t('alerts.form.warning.label')"
-    :description="t('alerts.form.warning.help')"
+    :info="t('alerts.form.warning.help')"
     :error="error ? raw(error) : undefined"
     :error-data-test="errorDataTest"
     data-test="alert-warning-row"
