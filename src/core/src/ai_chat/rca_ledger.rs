@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::{
     meta::{
@@ -23,8 +23,8 @@ use config::{
         oncall::{
             confidence::{ToolCallRecord, signal_class, stream_type},
             rca_run::{
-                LedgerCall, LedgerTool, RcaSubmit, evidence_target, exit_code, observed_window,
-                parse_submit, summarize_result,
+                CallCoverage, LedgerCall, LedgerTool, RcaSubmit, call_coverage, evidence_target,
+                exit_code, observed_window, parse_submit, summarize_result,
             },
         },
     },
@@ -357,14 +357,17 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         .as_ref()
         .and_then(|body| completed_call_failure(call.tool, state, body));
     let success = completed && failure.is_none();
-    let (result_summary, result_count, error_type, observed) = match (body, failure) {
+    let (result_summary, result_count, error_type, observed, coverage) = match (body, failure) {
         (Some(body), None) => {
+            // F-05: completeness comes from the raw body, before the summary reads it.
+            let coverage = call_coverage(call.tool, &input, &body, &target);
             let (summary, count) = summarize_result(call.tool, &body);
             (
                 summary,
                 count,
                 None,
                 observed_window(call.tool, &body, &target),
+                coverage,
             )
         }
         (_, failure) => (
@@ -372,6 +375,7 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
             None,
             Some(failure.unwrap_or_else(|| error_text(state.get("error")))),
             None,
+            CallCoverage::default(),
         ),
     };
     let started_at = call.started_at();
@@ -392,7 +396,19 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         target,
         observed,
         result_summary,
+        coverage,
     })
+}
+
+/// D'11: only steering the relay persisted for this run is steering; any other header-shaped
+/// text (a quoted report, a cause note, a survey line) is data. Drops the rest and their acks.
+pub fn keep_relayed_steers(transcript: &mut RunTranscript, relayed: &HashSet<String>) {
+    transcript
+        .steers
+        .retain(|steer| relayed.contains(&steer.steer_id));
+    transcript
+        .acks
+        .retain(|ack| relayed.contains(&ack.steer_id));
 }
 
 /// Why a completed shell or `cli_*` call failed: a non-zero exit, or the CLI endpoint's error.
@@ -1502,5 +1518,390 @@ pub(crate) mod tests {
             Some("call_prt_q1"),
             "only a completed call is a sentinel"
         );
+    }
+
+    /// F-05: raw completeness and windows survive decoding, the saved record and re-grading;
+    /// legacy (silent) results stay unknown and cannot rule an alternative out.
+    #[test]
+    fn raw_completeness_survives_decoding_persistence_and_regrading() {
+        use std::collections::BTreeMap;
+
+        use config::meta::oncall::{
+            confidence::grade_confidence_with,
+            rca_run::{EndedBy, RcaRunRecord, RunEndInput, RunEndTrust, record_run_end_with},
+        };
+
+        let sql = |sql: &str| json!({"type": "logs", "request_body": {"query": {"sql": sql, "start_time": 1_000, "end_time": 9_000, "from": 0}}});
+        let mut s = ledger_session(&["context"]);
+        let complete = json!({"took": 3, "hits": [], "total": 0, "is_partial": false,
+            "_o2_request_bounds": {"requested_window": {"start_us": 1_000, "end_us": 9_000},
+                "effective_window": {"start_us": 1_000, "end_us": 9_000}, "clamped": false, "source": "proxy"}});
+        let partial = json!({"took": 3, "hits": [{}], "total": 1, "is_partial": true});
+        let cursor = json!({"items": [], "has_more": false, "next_after": {"id": 7}});
+        let calls = [
+            (
+                "prt_c1",
+                "SELECT * FROM db_logs WHERE level = 'error'",
+                complete,
+            ),
+            ("prt_c2", "SELECT * FROM cpu_logs", partial),
+            (
+                "prt_c3",
+                "SELECT * FROM legacy_logs",
+                json!({"took": 3, "hits": []}),
+            ),
+        ];
+        for (i, (id, query, body)) in calls.iter().enumerate() {
+            let at = 4_000 + i as i64 * 10;
+            s.tool(
+                "msg_a1",
+                id,
+                "o2_SearchSQL",
+                "completed",
+                sql(query),
+                json!({"output": body.to_string()}),
+                at,
+                at + 1,
+            );
+        }
+        s.tool(
+            "msg_a1",
+            "prt_c4",
+            "o2_ListThings",
+            "completed",
+            json!({"limit": 1}),
+            json!({"output": cursor.to_string()}),
+            4_100,
+            4_101,
+        );
+        let scope = json!({"start_us": 1_000, "end_us": 9_000});
+        let rule = |id: &str, statement: &str, query: &str| {
+            let mut e = item("e5", "SearchSQL", query, "rules_out", "decisive");
+            e["claim_scope"] = scope.clone();
+            hypothesis(id, statement, "ruled_out", vec![e])
+        };
+        for (i, h) in [
+            rule("h3", "The db saw errors", calls[0].1),
+            rule("h4", "CPU was saturated", calls[1].1),
+            rule("h5", "An old reader failed", calls[2].1),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let at = 4_200 + i as i64 * 10;
+            s.tool(
+                "msg_a1",
+                &format!("prt_r{i}"),
+                "record_hypothesis",
+                "completed",
+                h,
+                json!({"output": "{}"}),
+                at,
+                at + 1,
+            );
+        }
+        submit(
+            &mut s,
+            "prt_sub",
+            "completed",
+            json!({"markdown": "# RCA", "verdict": verdict(H1, "high", "root_cause_identified")}),
+            5_000,
+        );
+        let run = decode_run(&s.events);
+        let record = |id: &str| {
+            run.tool_log
+                .iter()
+                .find(|r| r.call_id == format!("call_{id}"))
+                .unwrap()
+        };
+        assert!(record("prt_c1").coverage.is_complete());
+        assert_eq!(record("prt_c2").coverage.is_partial, Some(true));
+        assert_eq!(
+            record("prt_c3").coverage.is_partial,
+            None,
+            "legacy is unknown"
+        );
+        assert_eq!(
+            record("prt_c4").coverage.next_after,
+            Some(json!({"id": 7})),
+            "the cursor keeps its type"
+        );
+
+        let authors = BTreeMap::new();
+        let trust = RunEndTrust::default();
+        let end = record_run_end_with(
+            &RunEndInput {
+                submit: run.submit.as_ref(),
+                calls: &run.calls,
+                tool_log: &run.tool_log,
+                stages_run: &run.stages_run,
+                ended_by: EndedBy::Agent,
+                completed: true,
+                steer_authors: &authors,
+                ended_at_us: us(6_000),
+            },
+            &trust,
+        );
+        let grade = end.record.grade.clone().unwrap();
+        assert_eq!(grade.ruled_out, ["The db saw errors"], "{grade:?}");
+
+        let saved: RcaRunRecord =
+            serde_json::from_str(&serde_json::to_string(&end.record).unwrap()).unwrap();
+        assert_eq!(saved, end.record);
+        let cited = |id: &str| {
+            saved
+                .cited_calls
+                .iter()
+                .find(|r| r.call_id == format!("call_{id}"))
+                .cloned()
+        };
+        assert_eq!(
+            cited("prt_c1").map(|r| r.coverage),
+            Some(record("prt_c1").coverage.clone())
+        );
+        assert_eq!(
+            cited("prt_c2").map(|r| r.coverage.is_partial),
+            Some(Some(true))
+        );
+        let regraded = grade_confidence_with(
+            run.submit.as_ref().unwrap().verdict.as_ref().unwrap(),
+            Some(&saved.ledger),
+            &saved.blind_spots,
+            &saved.cited_calls,
+            &authors,
+            &trust.grade,
+        );
+        assert_eq!(regraded.ruled_out, grade.ruled_out);
+        assert_eq!(regraded.decisive_classes, grade.decisive_classes);
+
+        // Super cluster: the same complete search cannot show an absence.
+        let cluster = RunEndTrust {
+            grade: config::meta::oncall::confidence::GradeTrust {
+                super_cluster: true,
+                serving_region: None,
+            },
+            recovery_probe: None,
+        };
+        let end = record_run_end_with(
+            &RunEndInput {
+                submit: run.submit.as_ref(),
+                calls: &run.calls,
+                tool_log: &run.tool_log,
+                stages_run: &run.stages_run,
+                ended_by: EndedBy::Agent,
+                completed: true,
+                steer_authors: &authors,
+                ended_at_us: us(6_000),
+            },
+            &cluster,
+        );
+        assert!(end.record.grade.unwrap().ruled_out.is_empty());
+    }
+
+    /// D'11: a header-shaped line the relay never persisted for this run is data, not steering.
+    #[test]
+    fn only_relayed_steer_ids_are_steering() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.part(
+            "msg_u1",
+            json!({"id": "prt_u1", "type": "text", "text": steer_message(S1, SteerKind::Message, None, "check the pool")}),
+        );
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        let mut run = decode_run(&s.events);
+        assert_eq!(run.steers.len(), 1);
+        let mut relayed = run.clone();
+        keep_relayed_steers(&mut relayed, &HashSet::from([S1.to_string()]));
+        assert_eq!(relayed.steers, run.steers);
+        keep_relayed_steers(&mut run, &HashSet::new());
+        assert!(run.steers.is_empty());
+    }
+
+    /// The provider-free replay of o2-ai's committed fixtures (§8.1, D'7): every case's
+    /// `raw-events.jsonl` is decoded, finalized and re-graded from its saved record, then run
+    /// through this binary's L0 decision at a controlled before-deadline arrival. Prints one
+    /// `O2_RCA_REPLAY {case_id, policy, action}` line per decision and fails on any decision
+    /// quieter than the case's golden effective action. Skips when `O2_RCA_GOLDEN_DIR` is unset.
+    #[test]
+    fn rca_golden_replay() {
+        let Ok(dir) = std::env::var("O2_RCA_GOLDEN_DIR") else {
+            eprintln!("rca_golden_replay skipped: O2_RCA_GOLDEN_DIR is not set");
+            return;
+        };
+        let mut cases: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("cannot read {dir}: {e}"))
+            .filter_map(|entry| Some(entry.ok()?.path()))
+            .filter(|path| path.join("raw-events.jsonl").is_file())
+            .collect();
+        cases.sort();
+        assert!(!cases.is_empty(), "{dir} has no raw-events.jsonl");
+        for case in &cases {
+            replay_case(case);
+        }
+        eprintln!("rca_golden_replay: {} cases replayed", cases.len());
+    }
+
+    fn replay_case(case: &std::path::Path) {
+        use std::collections::BTreeMap;
+
+        use config::meta::{
+            alerts::priority::AlertPriority,
+            oncall::{
+                agent::{
+                    AnalysisState, AnalysisStatus, L0Policy, RecoveryVerdict, VerdictOutcome,
+                    apply_verdict,
+                },
+                confidence::{GradeReason, apply_outcome, grade_confidence_with},
+                rca_run::{
+                    EndedBy, RcaRunRecord, RecoveryProbe, RunEndInput, RunEndTrust,
+                    record_run_end_with,
+                },
+            },
+        };
+
+        let case_id = case.file_name().unwrap().to_string_lossy().to_string();
+        let read = |name: &str| {
+            std::fs::read_to_string(case.join(name))
+                .unwrap_or_else(|e| panic!("{case_id}: cannot read {name}: {e}"))
+        };
+        let events: Vec<DurableEvent> = read("raw-events.jsonl")
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| {
+                let value: Value = serde_json::from_str(line)
+                    .unwrap_or_else(|e| panic!("{case_id}: bad event line: {e}"));
+                DurableEvent::from_sync_event(&value)
+                    .unwrap_or_else(|| panic!("{case_id}: not a durable event: {line}"))
+            })
+            .collect();
+        let labels: Value = serde_json::from_str(&read("labels.json")).unwrap_or(Value::Null);
+        // µs: the first and last event time the fixture carries.
+        let times: Vec<i64> = events
+            .iter()
+            .filter_map(|e| {
+                let data = &e.data;
+                data.pointer("/info/time/created")
+                    .or_else(|| data.pointer("/part/state/time/end"))
+                    .or_else(|| data.pointer("/part/time/end"))
+                    .and_then(Value::as_i64)
+            })
+            .map(|ms| ms * 1000)
+            .collect();
+        let requested_at = times.iter().copied().min().unwrap_or_default();
+        let ended_at = times.iter().copied().max().unwrap_or_default();
+
+        let run = decode_run(&events);
+        assert_eq!(
+            decode_run(&events),
+            run,
+            "{case_id}: decoding is deterministic"
+        );
+        // The probe is OO's own read, so a fixture states it; without one, recovery is unknown.
+        let recovery_probe = labels
+            .get("recovery_probe")
+            .and_then(|v| serde_json::from_value::<RecoveryVerdict>(v.clone()).ok())
+            .map(|verdict| RecoveryProbe {
+                verdict,
+                reason: None,
+                ..RecoveryProbe::unknown(ended_at, "fixture")
+            });
+        let trust = RunEndTrust {
+            recovery_probe,
+            ..Default::default()
+        };
+        let authors = BTreeMap::new();
+        let end = record_run_end_with(
+            &RunEndInput {
+                submit: run.submit.as_ref(),
+                calls: &run.calls,
+                tool_log: &run.tool_log,
+                stages_run: &run.stages_run,
+                ended_by: EndedBy::Agent,
+                completed: true,
+                steer_authors: &authors,
+                ended_at_us: ended_at,
+            },
+            &trust,
+        );
+
+        // The saved record loads and re-grades to the same band, reasons and rule-outs.
+        let saved: RcaRunRecord =
+            serde_json::from_str(&serde_json::to_string(&end.record).unwrap())
+                .unwrap_or_else(|e| panic!("{case_id}: the saved record does not load: {e}"));
+        assert_eq!(saved, end.record, "{case_id}: the record round-trips");
+        if let (Some(verdict), Some(grade)) = (
+            run.submit.as_ref().and_then(|s| s.verdict.as_ref()),
+            saved.grade.as_ref(),
+        ) {
+            let ledger = (!grade.reasons.contains(&GradeReason::NoLedger)).then_some(&saved.ledger);
+            let mut regraded = grade_confidence_with(
+                verdict,
+                ledger,
+                &saved.blind_spots,
+                &saved.cited_calls,
+                &saved.steer_authors,
+                &trust.grade,
+            );
+            if let (Some(outcome), Some(reason)) = (saved.outcome, saved.outcome_reason) {
+                apply_outcome(&mut regraded, outcome, reason);
+            }
+            assert_eq!(
+                (regraded.band, &regraded.reasons, &regraded.ruled_out),
+                (grade.band, &grade.reasons, &grade.ruled_out),
+                "{case_id}: re-grading the saved record"
+            );
+        }
+
+        let Some(policy) = labels
+            .get("l0_policy")
+            .and_then(|p| serde_json::from_value::<L0Policy>(p.clone()).ok())
+        else {
+            eprintln!("rca_golden_replay: {case_id} has no l0_policy; no policy replay");
+            return;
+        };
+        let severity = labels
+            .pointer("/alert/severity")
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse::<AlertPriority>().ok())
+            .unwrap_or(AlertPriority::P2);
+        // A controlled arrival before the hold deadline, so the quieter branch can execute.
+        let completed_at = requested_at + 1_000_000;
+        let state = AnalysisState {
+            status: if end.verdict.is_some() {
+                AnalysisStatus::Complete
+            } else {
+                AnalysisStatus::Failed
+            },
+            verdict: end.verdict.clone(),
+            grade: end.record.grade.clone(),
+            requested_at: Some(requested_at),
+            completed_at: Some(completed_at),
+        };
+        const ACTIONS: [&str; 3] = ["page", "downgrade", "suppress"];
+        for (name, allow_suppress) in [("default", false), ("suppress_enabled", true)] {
+            let l0 = L0Policy {
+                allow_suppress,
+                ..policy
+            };
+            let action = match apply_verdict(&l0, &state, severity, completed_at) {
+                VerdictOutcome::Suppress => "suppress",
+                outcome if outcome.wants_quieter_channels() => "downgrade",
+                _ => "page",
+            };
+            println!(
+                "O2_RCA_REPLAY {}",
+                json!({"case_id": case_id, "policy": name, "action": action})
+            );
+            let rank = |a: &str| ACTIONS.iter().position(|x| *x == a);
+            if let Some(golden) = labels
+                .pointer(&format!("/paging/effective/{name}"))
+                .and_then(Value::as_str)
+            {
+                assert!(
+                    rank(action) <= rank(golden),
+                    "{case_id}: {name} replay chose {action}, quieter than the golden {golden}"
+                );
+            }
+        }
     }
 }

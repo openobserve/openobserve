@@ -21,7 +21,9 @@ use serde_json::{Value, json};
 
 use super::{
     response_filter::filter_response,
-    tools::{get_pinned_tools, get_shared_http_client, get_tool_metadata, tool_search},
+    tools::{
+        get_pinned_tools, get_shared_http_client, get_tool_metadata, loopback_headers, tool_search,
+    },
     types::*,
 };
 
@@ -30,6 +32,26 @@ const MCP_DISABLED_MESSAGE: &str = "MCP is disabled on this node (ZO_MCP_ENABLED
 
 /// Largest upstream text a tool result carries; more would swamp most models' context windows.
 const MAX_TOOL_RESULT_BYTES: usize = 1024 * 1024;
+
+/// The assistant-session header an RCA run's agent sends; the API binds SysRcaAgent reads to it.
+pub const ASSISTANT_SESSION_HEADER: &str = "x-o2-assistant-session-id";
+
+/// Who sent an MCP request: its own credentials and, for an RCA run, its assistant session.
+#[derive(Debug, Clone, Default)]
+pub struct McpCaller {
+    pub auth_token: Option<String>,
+    /// Forwarded on each of this request's API calls, never stored on the shared client.
+    pub session_id: Option<String>,
+}
+
+impl McpCaller {
+    pub fn from_token(auth_token: Option<String>) -> Self {
+        Self {
+            auth_token,
+            session_id: None,
+        }
+    }
+}
 
 /// A failed request, carrying the JSON-RPC code the client should see.
 struct RpcError {
@@ -60,6 +82,15 @@ pub async fn route_request(
     org_id: &str,
     request: MCPRequest,
     auth_token: Option<String>,
+) -> Result<MCPResponse> {
+    route_request_as(org_id, request, &McpCaller::from_token(auth_token)).await
+}
+
+/// [route_request] for a caller that may carry an assistant session.
+pub async fn route_request_as(
+    org_id: &str,
+    request: MCPRequest,
+    caller: &McpCaller,
 ) -> Result<MCPResponse> {
     // Validate JSON-RPC version
     if request.jsonrpc != JSONRPC_VERSION {
@@ -114,7 +145,7 @@ pub async fn route_request(
         MCPMethod::ToolsList if !mcp_enabled => Ok(json!({ "tools": [] })),
         MCPMethod::ToolsCall if !mcp_enabled => Err(anyhow!(MCP_DISABLED_MESSAGE).into()),
         MCPMethod::ToolsList => handle_tools_list().map_err(RpcError::from),
-        MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, auth_token).await,
+        MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, caller).await,
         MCPMethod::ServerDiscover => handle_server_discover().map_err(RpcError::from),
         // Notifications are one-way; no response body required (HTTP layer returns 202)
         MCPMethod::NotificationsInitialized => Ok(Value::Null),
@@ -322,13 +353,13 @@ async fn handle_direct_call(
     tool_name: &str,
     args: Value,
     detail: &DetailLevel,
-    auth_token: Option<String>,
+    caller: &McpCaller,
 ) -> Result<Value, RpcError> {
     // Find the tool metadata for execution
     let tool_metadata = get_tool_metadata(tool_name)
         .ok_or_else(|| RpcError::invalid_params(format!("Unknown tool: {tool_name}")))?;
 
-    let client = authorized_client(auth_token);
+    let client = authorized_client(caller);
     let result = execute_tool(&client, org_id, &tool_metadata, args, detail).await;
 
     Ok(serde_json::to_value(result)?)
@@ -339,7 +370,7 @@ async fn handle_direct_call(
 async fn handle_tools_call(
     org_id: &str,
     params: Value,
-    auth_token: Option<String>,
+    caller: &McpCaller,
 ) -> Result<Value, RpcError> {
     // Parse parameters
     let call_params: ToolsCallParams = serde_json::from_value(params)
@@ -361,7 +392,7 @@ async fn handle_tools_call(
                 serde_json::from_value(call_params.arguments).map_err(|e| {
                     RpcError::invalid_params(format!("Invalid arguments for tools_call: {e}"))
                 })?;
-            handle_direct_call(org_id, &args.tool, args.args, &args.detail, auth_token).await
+            handle_direct_call(org_id, &args.tool, args.args, &args.detail, caller).await
         }
         // Pinned tools are exposed directly in tools/list and called by name.
         // Route them straight to execution with their arguments.
@@ -371,7 +402,7 @@ async fn handle_tools_call(
                 name,
                 call_params.arguments,
                 &DetailLevel::default(),
-                auth_token,
+                caller,
             )
             .await
         }
@@ -507,12 +538,24 @@ fn structured_content(content_text: &str) -> Option<Value> {
 }
 
 /// The shared HTTP client, carrying the caller's own credentials when it sent any.
-fn authorized_client(auth_token: Option<String>) -> rmcp_openapi::HttpClient {
+fn authorized_client(caller: &McpCaller) -> rmcp_openapi::HttpClient {
     let shared_client = get_shared_http_client();
-    match auth_token {
-        Some(token) => shared_client.with_authorization(&token),
+    let client = match caller.session_id.as_deref().and_then(session_headers) {
+        Some(headers) => shared_client.clone().with_default_headers(headers),
         None => shared_client.clone(),
+    };
+    match caller.auth_token.as_deref() {
+        Some(token) => client.with_authorization(token),
+        None => client,
     }
+}
+
+/// The loopback headers plus the session; `None` when the value is not a valid header.
+fn session_headers(session_id: &str) -> Option<reqwest::header::HeaderMap> {
+    let value = reqwest::header::HeaderValue::from_str(session_id).ok()?;
+    let mut headers = loopback_headers().ok()?;
+    headers.insert(ASSISTANT_SESSION_HEADER, value);
+    Some(headers)
 }
 
 /// What a client may be told of a failed API request; the cause stays in the server log.
@@ -1476,5 +1519,13 @@ mod tests {
 
         assert_eq!(result.is_error, None);
         assert_eq!(text_of(&result).len(), MAX_TOOL_RESULT_BYTES);
+    }
+
+    #[test]
+    fn session_headers_carry_the_loopback_marker_and_the_session() {
+        let headers = session_headers("s-1").unwrap();
+        assert_eq!(headers[ASSISTANT_SESSION_HEADER], "s-1");
+        assert!(headers.contains_key("x-o2-mcp"));
+        assert!(session_headers("bad\nvalue").is_none());
     }
 }

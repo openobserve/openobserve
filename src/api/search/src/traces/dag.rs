@@ -38,6 +38,9 @@ use crate::{
     search::error_utils::map_error_to_http_response,
 };
 
+/// Spans a DAG returns when the caller sends no `size`, and the most it may ask for.
+const DAG_MAX_SPANS: i64 = 10_000;
+
 /// GetTraceDAG
 ///
 /// #{"ratelimit_module":"Traces", "ratelimit_module_operation":"list"}#
@@ -59,6 +62,7 @@ use crate::{
         ("start_time" = i64, Query, description = "start time in microseconds"),
         ("end_time" = i64, Query, description = "end time in microseconds"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
+        ("size" = Option<i64>, Query, description = "Most spans to return (default and maximum 10000); a cut result sets is_partial and has_more"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object, example = json!({
@@ -77,7 +81,11 @@ use crate::{
                     "from": "span1",
                     "to": "span2"
                 }
-            ]
+            ],
+            "is_partial": false,
+            "has_more": false,
+            "new_start_time": 1700000000000000_i64,
+            "new_end_time": 1700000600000000_i64
         })),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -151,6 +159,11 @@ pub async fn get_trace_dag(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    let size = match parse_dag_size(query.get("size").map(String::as_str)) {
+        Ok(size) => size,
+        Err(msg) => return MetaHttpResponse::bad_request(msg),
+    };
+
     // Check whether reference_parent_span_id exists in the stream schema.
     // If missing, omit it from the SELECT to avoid query errors; the DAG
     // will still show all spans but without parent-child edges.
@@ -168,7 +181,8 @@ pub async fn get_trace_dag(
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
-            size: 10000, // Large enough for most traces
+            // One extra row tells a cut trace from one that fits exactly.
+            size: size + 1,
             start_time,
             end_time,
             ..Default::default()
@@ -235,12 +249,14 @@ pub async fn get_trace_dag(
     if resp_search.hits.is_empty() {
         return MetaHttpResponse::not_found("Trace not found");
     }
+    let server_partial = resp_search.is_partial;
+    let (hits, cut) = cut_hits(resp_search.hits, size);
 
     // Build DAG structure
-    let mut nodes: Vec<SpanNode> = Vec::with_capacity(resp_search.hits.len());
+    let mut nodes: Vec<SpanNode> = Vec::with_capacity(hits.len());
     let mut edges: Vec<SpanEdge> = Vec::new();
 
-    for item in resp_search.hits {
+    for item in hits {
         let span_id = item
             .get("span_id")
             .and_then(|v| v.as_str())
@@ -318,6 +334,10 @@ pub async fn get_trace_dag(
     resp.insert("nodes", json::to_value(nodes).unwrap());
     resp.insert("edges", json::to_value(edges).unwrap());
     resp.insert("internal_trace_id", json::Value::from(internal_trace_id));
+    resp.insert("is_partial", json::Value::from(server_partial || cut));
+    resp.insert("has_more", json::Value::from(cut));
+    resp.insert("new_start_time", json::Value::from(start_time));
+    resp.insert("new_end_time", json::Value::from(end_time));
 
     MetaHttpResponse::json(resp)
 }
@@ -338,6 +358,25 @@ struct SpanNode {
 struct SpanEdge {
     from: String,
     to: String,
+}
+
+/// `size` must be a positive integer; it is capped at [DAG_MAX_SPANS].
+fn parse_dag_size(raw: Option<&str>) -> Result<i64, &'static str> {
+    match raw {
+        None => Ok(DAG_MAX_SPANS),
+        Some(v) => match v.parse::<i64>() {
+            Ok(size) if size > 0 => Ok(size.min(DAG_MAX_SPANS)),
+            _ => Err("size must be a positive integer"),
+        },
+    }
+}
+
+/// Keeps the first `size` hits in upstream order; `true` when any were dropped.
+fn cut_hits(mut hits: Vec<json::Value>, size: i64) -> (Vec<json::Value>, bool) {
+    let keep = usize::try_from(size).unwrap_or(usize::MAX);
+    let cut = hits.len() > keep;
+    hits.truncate(keep);
+    (hits, cut)
 }
 
 fn build_trace_dag_sql(stream_name: &str, trace_id: &str, has_ref_parent_id: bool) -> String {
@@ -421,6 +460,28 @@ mod tests {
         };
         let json = serde_json::to_string(&node).unwrap();
         assert!(json.contains("parent"));
+    }
+
+    #[test]
+    fn dag_size_defaults_caps_and_rejects() {
+        assert_eq!(parse_dag_size(None), Ok(DAG_MAX_SPANS));
+        assert_eq!(parse_dag_size(Some("200")), Ok(200));
+        assert_eq!(parse_dag_size(Some("50000")), Ok(DAG_MAX_SPANS));
+        assert!(parse_dag_size(Some("0")).is_err());
+        assert!(parse_dag_size(Some("-1")).is_err());
+        assert!(parse_dag_size(Some("ten")).is_err());
+    }
+
+    #[test]
+    fn a_dag_over_size_is_cut_and_one_that_fits_is_not() {
+        let hits: Vec<json::Value> = (0..3).map(|i| json::json!({ "span_id": i })).collect();
+        let (kept, cut) = cut_hits(hits.clone(), 2);
+        assert!(cut);
+        assert_eq!(kept.len(), 2);
+        assert_eq!(kept[0]["span_id"], 0);
+        let (kept, cut) = cut_hits(hits, 3);
+        assert!(!cut);
+        assert_eq!(kept.len(), 3);
     }
 
     #[test]

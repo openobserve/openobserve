@@ -159,6 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OPopover>
       </span>
+
+      <RcaRegionTag
+        v-if="regionDisplay !== 'hidden'"
+        class="ms-auto"
+        :region="region"
+        state="terminal"
+        :loading="regionDisplay === 'loading'"
+      />
     </div>
 
     <div class="flex max-w-225 flex-col items-start gap-0.5">
@@ -360,9 +368,16 @@ import { timezoneAbbr } from "@/utils/formatters";
 import { incidentLiveWords, unfoldDuration } from "@/utils/incidents/incidentUnfold";
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
 import { getIntlLocale } from "@/locales";
-import { rcaImpactFact, rcaOpenFindings, type RcaAlertsNow, type RcaFiringScope } from "./rcaLight";
+import {
+  rcaImpactFact,
+  rcaOpenFindings,
+  type RcaAlertsNow,
+  type RcaFiringScope,
+  type RcaRegionDisplay,
+} from "./rcaLight";
 import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
+import RcaRegionTag from "./RcaRegionTag.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -377,8 +392,14 @@ const props = withDefaults(
     alertsNow?: RcaAlertsNow | null;
     /** The app's time zone. */
     timezone?: string;
+    /** `context_used.serving_region` of this run (U8). */
+    region?: string | null;
+    /** `hidden` while the run list failed or is forbidden: no region is claimed. */
+    regionDisplay?: RcaRegionDisplay;
   }>(),
   {
+    region: null,
+    regionDisplay: "hidden",
     headline: undefined,
     verdictDetails: null,
     reportText: "",

@@ -164,6 +164,23 @@ export interface RcaRunItem {
   report_format: RcaReportFormat;
   /** The run stored a record: a cancelled or failed run with a partial ledger can be opened. */
   has_record: boolean;
+  /** `context_used.serving_region` of this run; absent from an older server or a legacy run. */
+  serving_region?: string | null;
+  /** Stable 1-based number of the run within its incident; absent from an older server. */
+  run_number?: number | null;
+}
+
+/** Why an on-call page started no new run: the covering run was live or cooling down. */
+export type RcaSkippedReason = "in_flight" | "cooling_down";
+
+/** A page the run guard refused; the covering run is the one it pointed at. Times are microseconds. */
+export interface RcaSkippedPage {
+  at_us: number;
+  reason: RcaSkippedReason;
+  covering_run_id: string;
+  covering_run_number?: number | null;
+  retry_after_us?: number | null;
+  cooldown_us?: number | null;
 }
 
 export interface RcaRunError {
@@ -217,6 +234,8 @@ export interface RcaRun {
 
 /** `rca_runs.context_used`: the leads the run started with, not evidence. */
 export interface RcaContextUsed {
+  /** Region of the cluster that ran the analysis. */
+  serving_region?: string | null;
   past_causes?: { id: string; summary: string }[];
   skills?: string[];
   toolsets?: string[];
@@ -648,6 +667,8 @@ export class RcaLiveStreamRefused extends Error {
 export interface ListRcaRunsResponse {
   runs: RcaRunItem[];
   has_more: boolean;
+  /** Pages refused because a run already covered them; omitted when empty. */
+  skipped_pages?: RcaSkippedPage[];
 }
 
 /** POST …/rca: 202 `{message, run_id}`. */

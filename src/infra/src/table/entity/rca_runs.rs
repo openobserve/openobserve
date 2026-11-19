@@ -57,6 +57,11 @@ pub struct Model {
     pub questions_asked: i32,
     /// When the sweeper closed the answer deadline, µs; steering is refused after it.
     pub deadline_closed_at: Option<i64>,
+    /// Stable per subject, NULL on rows from before numbering.
+    pub run_number: Option<i32>,
+    /// Set when the subject became a security case while the run was live.
+    #[sea_orm(default_value = false)]
+    pub fenced: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

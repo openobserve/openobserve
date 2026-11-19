@@ -12874,6 +12874,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "Analysiert in {region}",
+          "analyzingIn": "Wird analysiert in {region}",
+          "unknown": "Analyseregion unbekannt",
+          "noLocalRun": "keine lokale Analyse; andere Regionen unbekannt",
+          "tooltip": "Der Verlauf der Läufe wird pro Region gespeichert. Dieser Lauf lief in {region}.",
+          "historyFailed": "Der Berichtsverlauf konnte nicht geladen werden.",
+          "historyFailedHint": "Regionen werden angezeigt, sobald er geladen ist."
+        },
+        "skipped": {
+          "title": "Bereitschaftsalarm um {time} UTC: kein neuer Lauf",
+          "inFlight": "Lauf {number} lief bereits",
+          "coolingDown": "Lauf {number} lief innerhalb der Wartezeit von {cooldown}",
+          "gone": "Lauf nicht mehr gespeichert",
+          "open": "Lauf {number} öffnen"
+        },
         "reanalyzingFresh": "Erneute Analyse von Grund auf …",
         "reanalyzingBuildOnPrevious": "Aufbauend auf dem vorherigen Bericht …",
         "resumingFrom": "Wird ab „{step}“ fortgesetzt…",

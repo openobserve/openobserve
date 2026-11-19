@@ -191,7 +191,7 @@ pub struct EdgeHistoryQuery {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": true, "description": "Request, error and latency trend of one service graph edge", "category": "traces"}))
     )
 )]
 #[cfg(feature = "enterprise")]

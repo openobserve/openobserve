@@ -24,8 +24,9 @@ use utoipa::ToSchema;
 use super::{
     agent::Confidence,
     rca_run::{
-        BlindSpot, BlindSpotAxis, EvidenceItem, EvidenceLedger, EvidenceTarget, HypothesisStatus,
-        OutcomeReason, Polarity, RcaOutcome, Strength, SubmittedVerdict, TimeWindow, subject,
+        BlindSpot, BlindSpotAxis, CallCoverage, ClaimScope, EvidenceItem, EvidenceLedger,
+        EvidenceTarget, Hypothesis, HypothesisStatus, OutcomeReason, Polarity, RcaOutcome,
+        Strength, SubmittedVerdict, TimeWindow, subject,
     },
 };
 use crate::meta::alerts::rca_steering::STEER_ID_PREFIX;
@@ -44,15 +45,18 @@ const SEARCH_TOOLS: [&str; 4] = [
     "SearchValues",
 ];
 
-/// The PromQL query tools; the other `Prometheus*` tools read metadata, not metrics.
-const PROMETHEUS_TOOLS: [&str; 3] = [
+/// The PromQL tools whose input carries a query and a window. `PrometheusSeries` is parsed like
+/// them but classed as context: its response lists label combinations, never a measurement.
+const PROMETHEUS_TOOLS: [&str; 4] = [
     "PrometheusQuery",
     "PrometheusRangeQuery",
+    "PrometheusQueryExemplars",
     "PrometheusSeries",
 ];
 
-/// Tools that give context but never count toward the band.
-const CONTEXT_TOOLS: [&str; 9] = [
+/// Tools that give context but never count toward the band. `correlate_streams` and
+/// `get_dimension_analytics` are the old names, kept one release for runs graded mid-rollout.
+const CONTEXT_TOOLS: [&str; 24] = [
     "GetIncident",
     "GetAlert",
     "GetAlertHistory",
@@ -60,9 +64,38 @@ const CONTEXT_TOOLS: [&str; 9] = [
     "StreamList",
     "StreamSchema",
     "ListDashboards",
+    "CorrelateServiceStreams",
+    "GetServiceStreamAnalytics",
+    "GetIncidentEvents",
+    "GetAlertHistorySummary",
+    "ListIncidents",
+    "ListIncidentRcaRuns",
+    "ListServiceStreams",
+    "ListAnomalyConfigs",
+    "GetAllAnomalyHistory",
+    "GetSloGroups",
+    "ListSyntheticsRuns",
+    "ListServiceDeploys",
+    "GetAnnotations",
+    "PrometheusLabelValues",
+    "PrometheusSeries",
     "correlate_streams",
     "get_dimension_analytics",
 ];
+
+/// Trace reads; a graph edge trend is measured from spans.
+const TRACE_TOOLS: [&str; 4] = [
+    "GetLatestTraces",
+    "GetTraceDetails",
+    "GetTraceDAG",
+    "GetServiceGraphEdgeTrend",
+];
+
+/// The native version comparison: a change only when it persists a sufficient adverse metric.
+pub const COMPARE_SERVICE_VERSIONS: &str = "CompareServiceVersions";
+
+/// Profile diffs measure where time went, so they are metrics.
+const PROFILE_TOOLS: [&str; 1] = ["ProfilesDiff"];
 
 /// Tool-name prefixes that are not an org AI Toolset MCP server (first-party and shell toolsets).
 const NOT_TOOLSET_SERVERS: [&str; 3] = ["o2", "cli", "custom"];
@@ -141,6 +174,9 @@ pub struct ToolCallRecord {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed: Option<TimeWindow>,
     pub result_summary: String,
+    /// Completeness, windows and comparison read from the raw result; absent on legacy records.
+    #[serde(flatten)]
+    pub coverage: CallCoverage,
 }
 
 impl ToolCallRecord {
@@ -263,6 +299,9 @@ pub enum GradeReason {
     HumanLead,
     /// `impact.window` reaches past the data the verified runtime evidence showed.
     ImpactOutsideObservedData,
+    /// A reason this binary does not know, written by a newer grader; read so the record loads.
+    #[serde(other)]
+    Unknown,
 }
 
 impl GradeReason {
@@ -561,16 +600,20 @@ pub fn signal_class(tool: &str, input: &serde_json::Value) -> SignalClass {
             _ => SignalClass::Logs,
         };
     }
-    if is_prometheus_tool(tool) {
-        return SignalClass::Metrics;
-    }
-    if tool == "GetLatestTraces" {
-        return SignalClass::Traces;
-    }
+    // Before the PromQL check: `PrometheusSeries` is parsed as PromQL but is context.
     if CONTEXT_TOOLS.contains(&tool) {
         return SignalClass::Context;
     }
-    if tool == "ExecuteCode" || tool.starts_with("custom_") {
+    if is_prometheus_tool(tool) || PROFILE_TOOLS.contains(&tool) {
+        return SignalClass::Metrics;
+    }
+    if TRACE_TOOLS.contains(&tool) {
+        return SignalClass::Traces;
+    }
+    if tool == COMPARE_SERVICE_VERSIONS {
+        return SignalClass::Change;
+    }
+    if tool.starts_with("custom_") {
         return SignalClass::Unclassified;
     }
     let command = ["command", "cmd"]
@@ -600,7 +643,7 @@ fn toolset_tool(tool: &str) -> Option<&str> {
     (is_server && !bare.is_empty()).then_some(bare)
 }
 
-/// Whether `tool` is one of the three PromQL query tools.
+/// Whether `tool` is one of the PromQL tools whose input carries a query ([PROMETHEUS_TOOLS]).
 pub fn is_prometheus_tool(tool: &str) -> bool {
     PROMETHEUS_TOOLS.contains(&tool)
 }
@@ -742,6 +785,16 @@ pub fn min_band(a: Confidence, b: Confidence) -> Confidence {
     }
 }
 
+/// What the finalizer knows from trusted state, not from the agent.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct GradeTrust {
+    /// The run's `context_used.capabilities.super_cluster`, else the finalizing node's setting.
+    /// Search, PromQL and graph results then cannot show an absence: regions are unknown.
+    pub super_cluster: bool,
+    /// The run's analysis region; a claim scope naming another region cannot be covered.
+    pub serving_region: Option<String>,
+}
+
 /// `ledger: None` means the agent never called `record_hypothesis`.
 pub fn grade_confidence(
     verdict: &SubmittedVerdict,
@@ -749,6 +802,25 @@ pub fn grade_confidence(
     blind_spots: &[BlindSpot],
     tool_log: &[ToolCallRecord],
     steer_authors: &BTreeMap<String, String>,
+) -> ConfidenceGrade {
+    grade_confidence_with(
+        verdict,
+        ledger,
+        blind_spots,
+        tool_log,
+        steer_authors,
+        &GradeTrust::default(),
+    )
+}
+
+/// [grade_confidence] with the finalizer's trusted state.
+pub fn grade_confidence_with(
+    verdict: &SubmittedVerdict,
+    ledger: Option<&EvidenceLedger>,
+    blind_spots: &[BlindSpot],
+    tool_log: &[ToolCallRecord],
+    steer_authors: &BTreeMap<String, String>,
+    trust: &GradeTrust,
 ) -> ConfidenceGrade {
     let hypotheses = ledger.map(|l| l.hypotheses.as_slice()).unwrap_or_default();
 
@@ -792,15 +864,16 @@ pub fn grade_confidence(
         subject.into_iter().collect()
     };
 
-    // Verified items of one hypothesis with their signal class.
+    // Verified items of one hypothesis with the strength their record allows.
     let items_of = |i: usize| {
         hypotheses[i]
             .evidence
             .iter()
             .zip(&verified[i])
-            .filter_map(|(item, rec)| rec.map(|r| (item.polarity, item.strength, r.signal)))
+            .filter_map(|(item, rec)| rec.map(|r| (item.polarity, effective_strength(item, r), r)))
     };
 
+    // F-05/F-06: an alternative is ruled out only by decisive, counting, complete coverage.
     let ruled_out: Vec<String> = hypotheses
         .iter()
         .zip(&verified)
@@ -808,10 +881,7 @@ pub fn grade_confidence(
         .filter(|(i, (h, recs))| {
             !graded_ids.contains(i)
                 && h.status == HypothesisStatus::RuledOut
-                && h.evidence.iter().zip(recs.iter()).any(|(item, rec)| {
-                    rec.is_some()
-                        && matches!(item.polarity, Polarity::RulesOut | Polarity::Contradicts)
-                })
+                && rules_out(h, recs, trust)
         })
         .map(|(_, (h, _))| h.statement.chars().take(RULED_OUT_MAX_CHARS).collect())
         .collect();
@@ -833,9 +903,10 @@ pub fn grade_confidence(
     // The suspect change belongs to one of the causes, so a read of it by any cause counts.
     let change_read = verdict.suspect_change.as_ref().is_some_and(|change| {
         graded_ids.iter().any(|&i| {
-            verified[i].iter().flatten().any(|r| {
-                r.signal == SignalClass::Change && names_change(&change.reference, &r.key_arg)
-            })
+            verified[i]
+                .iter()
+                .flatten()
+                .any(|r| r.signal == SignalClass::Change && cited_change(&change.reference, r))
         })
     });
     let change_unreachable = blind_spots.iter().any(|b| b.axis == BlindSpotAxis::Change);
@@ -843,18 +914,22 @@ pub fn grade_confidence(
         impact_outside_evidence(verdict, verified.iter().flatten().flatten().copied());
 
     let grade_cause = |cause: Option<usize>| {
-        let items: Vec<(Polarity, Strength, SignalClass)> =
+        let items: Vec<(Polarity, Strength, &ToolCallRecord)> =
             cause.map(|i| items_of(i).collect()).unwrap_or_default();
+        let decisive: Vec<&ToolCallRecord> = items
+            .iter()
+            .filter(|(p, strength, r)| {
+                *p == Polarity::Supports && *strength == Strength::Decisive && r.signal.counts()
+            })
+            .map(|(.., r)| *r)
+            .collect();
         let mut decisive_classes: Vec<SignalClass> = Vec::new();
-        for (polarity, strength, signal) in &items {
-            if *polarity == Polarity::Supports
-                && *strength == Strength::Decisive
-                && signal.counts()
-                && !decisive_classes.contains(signal)
-            {
-                decisive_classes.push(*signal);
+        for record in &decisive {
+            if !decisive_classes.contains(&record.signal) {
+                decisive_classes.push(record.signal);
             }
         }
+        let independent = independent_classes(&decisive);
         let has_support = items.iter().any(|(p, ..)| *p == Polarity::Supports);
         let has_contradiction = items.iter().any(|(p, ..)| *p == Polarity::Contradicts);
 
@@ -865,7 +940,7 @@ pub fn grade_confidence(
         }
         let mut graded = if !reasons.is_empty() {
             Confidence::Low
-        } else if decisive_classes.len() >= 2 && !ruled_out.is_empty() && !has_contradiction {
+        } else if independent >= 2 && !ruled_out.is_empty() && !has_contradiction {
             reasons.push(GradeReason::TwoDecisiveClassesAndRuledOut);
             Confidence::High
         } else if !decisive_classes.is_empty() {
@@ -958,6 +1033,172 @@ pub fn grade_confidence(
     }
 }
 
+/// The item's strength as its record allows: an insufficient result, or a native comparison
+/// without a decisive adverse metric, is a lead and never decisive.
+fn effective_strength(item: &EvidenceItem, record: &ToolCallRecord) -> Strength {
+    let lead = record.coverage.insufficient == Some(true)
+        || (record.tool == COMPARE_SERVICE_VERSIONS
+            && !record
+                .coverage
+                .comparison
+                .as_ref()
+                .is_some_and(|c| c.is_decisive()));
+    if lead {
+        Strength::Supporting
+    } else {
+        item.strength
+    }
+}
+
+/// F-14, D'6: the decisive classes that count toward High. A native comparison reads the same
+/// spans as a trace cohort, so without a read diff it needs Logs, Metrics or Infra beside it,
+/// and a Logs read of a comparison's own source (or of an unnamed one) does not corroborate.
+fn independent_classes(decisive: &[&ToolCallRecord]) -> usize {
+    let is_native = |r: &&&ToolCallRecord| r.tool == COMPARE_SERVICE_VERSIONS;
+    let native: Vec<&ToolCallRecord> = decisive.iter().filter(is_native).copied().collect();
+    let read_diff = decisive
+        .iter()
+        .any(|r| r.signal == SignalClass::Change && !is_native(&r));
+    let mut classes: Vec<SignalClass> = Vec::new();
+    if native.is_empty() || read_diff {
+        for r in decisive {
+            if !classes.contains(&r.signal) {
+                classes.push(r.signal);
+            }
+        }
+        return classes.len();
+    }
+    let sources: Vec<Option<&str>> = native
+        .iter()
+        .filter_map(|r| r.coverage.comparison.as_ref())
+        .flat_map(|c| c.decisive_metrics().map(|m| m.source.as_deref()))
+        .collect();
+    let overlaps = |r: &ToolCallRecord| {
+        sources.iter().any(|source| match source {
+            None => true,
+            Some(source) => r
+                .target
+                .streams
+                .iter()
+                .any(|s| *source == format!("{}/{s}", r.signal.as_str())),
+        })
+    };
+    classes.push(SignalClass::Change);
+    for r in decisive {
+        let corroborates = match r.signal {
+            SignalClass::Metrics | SignalClass::Infra => true,
+            SignalClass::Logs => !overlaps(*r),
+            _ => false,
+        };
+        if corroborates && !classes.contains(&r.signal) {
+            classes.push(r.signal);
+        }
+    }
+    classes.len()
+}
+
+/// Whether a ruled-out hypothesis is backed: its `rules_out`/`contradicts` items that are
+/// decisive, counting and complete together cover one item's claim scope with no gap.
+fn rules_out(h: &Hypothesis, records: &[Option<&ToolCallRecord>], trust: &GradeTrust) -> bool {
+    let usable: Vec<(&EvidenceItem, &ToolCallRecord)> = h
+        .evidence
+        .iter()
+        .zip(records)
+        .filter_map(|(item, record)| {
+            let record = (*record)?;
+            let ok = matches!(item.polarity, Polarity::RulesOut | Polarity::Contradicts)
+                && effective_strength(item, record) == Strength::Decisive
+                && record.signal.counts()
+                && record.coverage.is_complete()
+                // Super cluster: the regions that answered are unknown, so no runtime absence.
+                && !(trust.super_cluster && is_runtime_read(record));
+            ok.then_some((item, record))
+        })
+        .collect();
+    usable.iter().any(|(item, _)| {
+        let Some(scope) = item.claim_scope.as_ref() else {
+            return false;
+        };
+        let windows: Vec<TimeWindow> = usable
+            .iter()
+            .filter(|(other, record)| {
+                other
+                    .claim_scope
+                    .as_ref()
+                    .is_some_and(|s| s.selectors_eq(scope))
+                    && scope_selects(scope, record, trust)
+            })
+            .filter_map(|(_, record)| record.coverage.effective_window)
+            .collect();
+        covers(windows, scope.start_us, scope.end_us)
+    })
+}
+
+/// Search, PromQL, trace and graph reads: what a region-partial super cluster can miss.
+fn is_runtime_read(record: &ToolCallRecord) -> bool {
+    matches!(
+        record.signal,
+        SignalClass::Logs | SignalClass::Metrics | SignalClass::Traces
+    )
+}
+
+/// Whether the call read exactly the scope's stream, service and region.
+fn scope_selects(scope: &ClaimScope, record: &ToolCallRecord, trust: &GradeTrust) -> bool {
+    let stream = scope
+        .stream
+        .as_deref()
+        .is_none_or(|s| record.target.streams.iter().any(|t| t == s));
+    let service = scope.service.as_deref().is_none_or(|svc| {
+        let read = [
+            Some(record.key_arg.as_str()),
+            record.target.sql.as_deref(),
+            record.target.promql.as_deref(),
+            record.target.filter.as_deref(),
+        ];
+        read.iter().flatten().any(|text| names_token(text, svc))
+    });
+    let region = scope.region.as_deref().is_none_or(|r| {
+        !trust.super_cluster && trust.serving_region.as_deref().is_none_or(|own| own == r)
+    });
+    stream && service && region
+}
+
+/// `needle` as a whole token of `text`: not part of a longer name.
+fn names_token(text: &str, needle: &str) -> bool {
+    let is_name = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '-';
+    !needle.is_empty()
+        && text.match_indices(needle).any(|(at, _)| {
+            let before = text[..at].chars().next_back().is_none_or(|c| !is_name(c));
+            let after = text[at + needle.len()..]
+                .chars()
+                .next()
+                .is_none_or(|c| !is_name(c));
+            before && after
+        })
+}
+
+/// Whether `windows` cover `[start, end]` continuously.
+fn covers(mut windows: Vec<TimeWindow>, start: i64, end: i64) -> bool {
+    if start > end {
+        return false;
+    }
+    windows.sort_by_key(|w| w.start);
+    let mut reached = start;
+    for w in windows {
+        if w.end < reached {
+            continue;
+        }
+        if w.start > reached {
+            return false;
+        }
+        if w.end >= end {
+            return true;
+        }
+        reached = w.end.saturating_add(1);
+    }
+    false
+}
+
 /// The grade of one cause hypothesis, before the run takes it.
 struct CauseGrading {
     graded: Confidence,
@@ -1004,11 +1245,50 @@ pub fn apply_outcome(grade: &mut ConfidenceGrade, outcome: RcaOutcome, reason: O
     }
 }
 
+/// A `service@version` reference: one `@`, no whitespace. `Err` when native-shaped but malformed.
+fn native_reference(reference: &str) -> Option<Result<(&str, &str), ()>> {
+    if !reference.contains('@') || reference.contains(char::is_whitespace) {
+        return None;
+    }
+    Some(match reference.split_once('@') {
+        Some((service, version))
+            if !service.is_empty() && !version.is_empty() && !version.contains('@') =>
+        {
+            Ok((service, version))
+        }
+        _ => Err(()),
+    })
+}
+
+/// F-15: whether a verified Change record reads the suspect change. A native `service@version`
+/// needs a decisive comparison of exactly that tuple; other references match only diff reads.
+pub fn cited_change(reference: &str, record: &ToolCallRecord) -> bool {
+    let native = record.tool == COMPARE_SERVICE_VERSIONS;
+    match native_reference(reference.trim()) {
+        Some(Ok((service, version))) => {
+            native
+                && record
+                    .coverage
+                    .comparison
+                    .as_ref()
+                    .is_some_and(|c| c.names(service, version))
+        }
+        Some(Err(())) => false,
+        None => !native && names_change(reference, &record.key_arg),
+    }
+}
+
 /// Whether a diff read's key argument names `reference`: its PR number or SHA, else all of it.
+/// A native `service@version` matches only the identical key; a malformed one matches nothing.
 pub fn names_change(reference: &str, key_arg: &str) -> bool {
     let reference = reference.trim();
     if reference.is_empty() {
         return false;
+    }
+    match native_reference(reference) {
+        Some(Ok(_)) => return key_arg.trim() == reference,
+        Some(Err(())) => return false,
+        None => {}
     }
     let read: Vec<String> = tokens(key_arg).map(str::to_ascii_lowercase).collect();
     let prs = pr_numbers(reference);
@@ -1106,10 +1386,10 @@ mod tests {
 
     use super::*;
     use crate::meta::oncall::rca_run::{
-        LedgerCall, RcaOutcome, SuspectChangeState,
+        LedgerCall, RUM_SOURCE, RcaOutcome, SuspectChangeState,
         fixtures::{
-            BASH, PROM, SQL, TRACES, hyp, hyp_input, item, logs, prom, rec, shell, spot, submitted,
-            suspect, traces,
+            BASH, PROM, SQL, TRACES, complete, hyp, hyp_input, item, logs, prom, rec, rule_out,
+            shell, spot, submitted, suspect, traces,
         },
     };
 
@@ -1199,6 +1479,7 @@ mod tests {
                     strength: Strength::Decisive,
                     observation: String::new(),
                     first_cited_seq: 1,
+                    claim_scope: None,
                 })
                 .map(|r| (r.call_id.as_str(), r.started_at_us))
         };
@@ -1296,7 +1577,19 @@ mod tests {
             ("SearchValues", json!({"type": "metrics"}), Metrics),
             ("PrometheusQuery", json!({}), Metrics),
             (PROM, json!({}), Metrics),
-            ("PrometheusSeries", json!({}), Metrics),
+            ("PrometheusSeries", json!({}), Context),
+            ("PrometheusQueryExemplars", json!({}), Metrics),
+            ("PrometheusLabelValues", json!({}), Context),
+            ("GetTraceDetails", json!({}), Traces),
+            ("GetTraceDAG", json!({}), Traces),
+            ("GetServiceGraphEdgeTrend", json!({}), Traces),
+            ("CompareServiceVersions", json!({}), Change),
+            ("ListServiceDeploys", json!({}), Context),
+            ("GetAnnotations", json!({}), Context),
+            ("CorrelateServiceStreams", json!({}), Context),
+            ("GetAllAnomalyHistory", json!({}), Context),
+            ("ProfilesDiff", json!({}), Metrics),
+            ("GetDashboard", json!({}), Unclassified),
             ("PrometheusFormatQuery", json!({}), Unclassified),
             ("PrometheusLabels", json!({}), Unclassified),
             (TRACES, json!({}), Traces),
@@ -1316,7 +1609,7 @@ mod tests {
             ("shell", json!({"cmd": "git show x"}), Change),
             ("cli_kubectl", cmd("kubectl get pods"), Infra),
             ("cli_git", cmd("git diff"), Change),
-            ("ExecuteCode", cmd("git diff"), Unclassified),
+            ("ExecuteCode", json!({"code": "print(1)"}), Unclassified),
             ("custom_deploys", json!({}), Unclassified),
             ("SomethingNew", json!({}), Unclassified),
             // Toolset calls: a diff is a change, a code read is context, anything else counts for
@@ -1533,7 +1826,7 @@ mod tests {
                 3,
                 true,
             ),
-            logs("l1", "SELECT * FROM app", 4),
+            complete(logs("l1", "SELECT * FROM app", 4)),
         ];
         let grade_with = |cause_item: serde_json::Value, reference: &str| {
             let calls = [
@@ -1547,13 +1840,7 @@ mod tests {
                     2,
                     "h2",
                     "ruled_out",
-                    vec![item(
-                        "e3",
-                        SQL,
-                        "SELECT * FROM app",
-                        "rules_out",
-                        "supporting",
-                    )],
+                    vec![rule_out("e3", SQL, "SELECT * FROM app")],
                 ),
             ];
             let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(
@@ -1612,9 +1899,9 @@ mod tests {
     fn log() -> Vec<ToolCallRecord> {
         vec![
             prom("m1", "pool_active", 1),
-            prom("m2", "pool_waiting", 2),
+            complete(prom("m2", "pool_waiting", 2)),
             traces("t1", "slow", 3),
-            logs("l1", "SELECT * FROM app", 4),
+            complete(logs("l1", "SELECT * FROM app", 4)),
             shell("d1", "gh pr diff 812", 5, true),
             rec("g1", "GetIncident", "inc", json!({}), 6, true),
         ]
@@ -1652,13 +1939,7 @@ mod tests {
                 2,
                 "h2",
                 "ruled_out",
-                vec![item(
-                    "e3",
-                    SQL,
-                    "SELECT * FROM app",
-                    "rules_out",
-                    "supporting",
-                )],
+                vec![rule_out("e3", SQL, "SELECT * FROM app")],
             ),
         ]
     }
@@ -1851,13 +2132,7 @@ mod tests {
                         2,
                         "h2",
                         "ruled_out",
-                        vec![item(
-                            "e3",
-                            SQL,
-                            "SELECT * FROM app",
-                            "rules_out",
-                            "supporting",
-                        )],
+                        vec![rule_out("e3", SQL, "SELECT * FROM app")],
                     ),
                 ],
                 named(h),
@@ -2010,7 +2285,7 @@ mod tests {
             9,
             "h3",
             "ruled_out",
-            vec![item("e9", PROM, "pool_waiting", "rules_out", "supporting")],
+            vec![rule_out("e9", PROM, "pool_waiting")],
         );
         let root = |seq, id: &str, evidence| hyp(seq, id, "root_cause", evidence);
         let two_classes = || {
@@ -2602,7 +2877,7 @@ mod tests {
                 ranged(prom("m1", "pool_active", 1), seen, 10),
                 ranged(traces("t1", "slow", 3), seen, 10),
                 // Rows with no timestamp: the call covers the range it queried.
-                ranged(logs("l1", "SELECT * FROM app", 4), None, sql_rows),
+                complete(ranged(logs("l1", "SELECT * FROM app", 4), None, sql_rows)),
                 // The incident's resolve time is context, not an observation of the failure.
                 rec("g1", "GetIncident", "inc", json!({}), 6, true),
             ]
@@ -2685,5 +2960,463 @@ mod tests {
             &BTreeMap::new(),
         );
         assert!(!g.reasons.contains(&ImpactOutsideObservedData));
+    }
+
+    #[test]
+    fn unknown_grade_reason_deserializes_to_unknown() {
+        let reasons: Vec<GradeReason> =
+            serde_json::from_str(r#"["decisive_class","a_reason_from_a_newer_grader"]"#).unwrap();
+        assert_eq!(
+            reasons,
+            vec![GradeReason::DecisiveClass, GradeReason::Unknown]
+        );
+        let grade: ConfidenceGrade = serde_json::from_value(serde_json::json!({
+            "band": "low", "claimed": "high", "graded": "low", "reasons": ["not_yet_invented"]
+        }))
+        .unwrap();
+        assert_eq!(grade.reasons, vec![GradeReason::Unknown]);
+    }
+
+    /// A record of a native comparison of `payments@v1.4.2` with the given adverse metrics.
+    fn compare_rec(
+        id: &str,
+        started: i64,
+        adverse: Vec<crate::meta::oncall::rca_run::AdverseMetric>,
+        arms_with_version: u32,
+    ) -> ToolCallRecord {
+        let input = json!({"request_body": {"service": "payments", "a": {"version": "v1.4.2"}}});
+        let mut r = rec(
+            id,
+            COMPARE_SERVICE_VERSIONS,
+            "payments@v1.4.2",
+            input,
+            started,
+            true,
+        );
+        r.coverage.comparison = Some(crate::meta::oncall::rca_run::ComparisonCitation {
+            service: "payments".into(),
+            version: "v1.4.2".into(),
+            baseline_version: Some("v1.4.1".into()),
+            version_key: Some("vk".into()),
+            image: None,
+            window: None,
+            baseline_window: None,
+            arms_with_version,
+            adverse,
+        });
+        r
+    }
+
+    fn adverse(source: &str, ci_kind: &str) -> crate::meta::oncall::rca_run::AdverseMetric {
+        use crate::meta::oncall::rca_run::{AdverseMetric, Num};
+        AdverseMetric {
+            scope: "endpoint:default/GET /pay".into(),
+            metric: "error_rate".into(),
+            delta: Num(0.2),
+            lo: Num(0.1),
+            hi: Num(0.3),
+            ci_kind: ci_kind.into(),
+            source: Some(source.into()),
+        }
+    }
+
+    fn graded_with(
+        calls: &[LedgerCall],
+        verdict: &SubmittedVerdict,
+        log: &[ToolCallRecord],
+        trust: &GradeTrust,
+    ) -> ConfidenceGrade {
+        let (ledger, spots, _) = crate::meta::oncall::rca_run::build_ledger(
+            calls,
+            Some(crate::meta::oncall::rca_run::fixtures::RUN_END_US),
+        );
+        grade_confidence_with(
+            verdict,
+            ledger.as_ref(),
+            &spots,
+            log,
+            &BTreeMap::new(),
+            trust,
+        )
+    }
+
+    /// F-15: a native `service@version` matches only the identical tuple of a decisive
+    /// comparison; PR and SHA references keep matching diff reads only.
+    #[test]
+    fn native_change_references_match_only_their_exact_tuple() {
+        assert!(names_change("payments@v1.4.2", "payments@v1.4.2"));
+        assert!(!names_change("payments@v1.4.2", "payments@v1.4.20"));
+        assert!(!names_change("payments@v1.4.20", "payments@v1.4.2"));
+        assert!(!names_change("payments@deadbeef", "orders@deadbeef"));
+        assert!(!names_change("payments@", "payments@"), "malformed");
+        assert!(!names_change("a@b@c", "a@b@c"), "malformed");
+        assert!(
+            names_change("PR #812", "gh pr diff 812"),
+            "diff matching is unchanged"
+        );
+        assert!(names_change("4f2c1e9", "git show 4f2c1e9abc"));
+
+        let decisive = compare_rec("c1", 1, vec![adverse("traces/default", "variance")], 1);
+        assert!(cited_change("payments@v1.4.2", &decisive));
+        assert!(!cited_change("payments@v1.4.20", &decisive));
+        assert!(!cited_change("Payments@v1.4.2", &decisive), "case is kept");
+        assert!(
+            !cited_change("PR #812", &decisive),
+            "a comparison is no diff read"
+        );
+        let lead = compare_rec("c2", 1, vec![adverse("traces/default", "sketch_band")], 1);
+        assert!(
+            !cited_change("payments@v1.4.2", &lead),
+            "a sketch band is a lead"
+        );
+        let shared = compare_rec("c3", 1, vec![adverse("traces/default", "variance")], 2);
+        assert!(
+            !cited_change("payments@v1.4.2", &shared),
+            "two images, one version"
+        );
+        let diff = shell("d1", "git show deadbeef1", 1, true);
+        assert!(!cited_change("payments@deadbeef1", &diff));
+        assert!(cited_change("deadbeef1", &diff));
+    }
+
+    /// F-14, D'6, review D7: what a native comparison adds to the band.
+    #[test]
+    fn a_native_comparison_needs_independent_corroboration_for_high() {
+        use Confidence::*;
+        let cmp = "payments@v1.4.2";
+        let log = vec![
+            compare_rec("c1", 1, vec![adverse("traces/default", "variance")], 1),
+            traces("t1", "slow", 2),
+            complete(logs("l1", "SELECT * FROM app", 3)),
+            logs("l2", "SELECT * FROM _rumdata", 4),
+            shell("d1", "gh pr diff 812", 5, true),
+            compare_rec("c2", 6, vec![adverse(RUM_SOURCE, "variance")], 1),
+            compare_rec("c3", 7, vec![adverse("traces/default", "sketch_band")], 1),
+            rec("a1", "GetAnnotations", "deploy", json!({}), 8, true),
+            rec("y1", "GetAllAnomalyHistory", "anoms", json!({}), 9, true),
+            rec(
+                "s1",
+                "PrometheusSeries",
+                "up",
+                json!({"query": "up"}),
+                10,
+                true,
+            ),
+            prom("m1", "pool_active", 11),
+            rec("k1", "ListServiceDeploys", "deploys", json!({}), 12, true),
+            rec(
+                "g1",
+                "GetServiceGraphEdgeTrend",
+                "edge",
+                json!({}),
+                13,
+                true,
+            ),
+        ];
+        let rule = hyp(
+            9,
+            "h9",
+            "ruled_out",
+            vec![rule_out("e9", SQL, "SELECT * FROM app")],
+        );
+        let case = |evidence: Vec<serde_json::Value>, log: &[ToolCallRecord]| {
+            let calls = [hyp(1, "h1", "root_cause", evidence), rule.clone()];
+            graded_with(&calls, &named(High), log, &GradeTrust::default())
+        };
+        let by_tool = |tool: &str, q: &str| decisive("e1", tool, q);
+        let only = |ids: &[&str]| -> Vec<ToolCallRecord> {
+            let mut kept: Vec<ToolCallRecord> = log
+                .iter()
+                .filter(|r| ids.contains(&r.call_id.as_str()))
+                .cloned()
+                .collect();
+            kept.push(complete(logs("l1", "SELECT * FROM app", 3)));
+            kept
+        };
+
+        // Comparison + trace cohort on the same spans: Medium.
+        let g = case(
+            vec![
+                by_tool(COMPARE_SERVICE_VERSIONS, cmp),
+                decisive("e2", TRACES, "slow"),
+            ],
+            &only(&["c1", "t1"]),
+        );
+        assert_eq!(g.graded, Medium, "{g:?}");
+        assert_eq!(
+            g.decisive_classes,
+            [SignalClass::Change, SignalClass::Traces]
+        );
+        // Comparison + independent logs + a qualifying rule-out: High.
+        let g = case(
+            vec![
+                by_tool(COMPARE_SERVICE_VERSIONS, cmp),
+                decisive("e2", SQL, "SELECT * FROM app"),
+            ],
+            &only(&["c1"]),
+        );
+        assert_eq!(g.graded, High, "{g:?}");
+        // A real diff read + traces stays eligible.
+        let g = case(
+            vec![
+                decisive("e1", BASH, "gh pr diff 812"),
+                decisive("e2", TRACES, "slow"),
+            ],
+            &only(&["d1", "t1"]),
+        );
+        assert_eq!(g.graded, High, "{g:?}");
+        // A RUM comparison + SQL over `_rumdata` never reaches High.
+        let g = case(
+            vec![
+                decisive("e1", COMPARE_SERVICE_VERSIONS, cmp),
+                decisive("e2", SQL, "SELECT * FROM _rumdata"),
+            ],
+            &only(&["c2", "l2"]),
+        );
+        assert_eq!(g.graded, Medium, "{g:?}");
+        // A sketch-band p95 is not decisive: no Change class at all.
+        let g = case(vec![by_tool(COMPARE_SERVICE_VERSIONS, cmp)], &only(&["c3"]));
+        assert!(g.decisive_classes.is_empty(), "{g:?}");
+        // Annotations, anomaly history and deploy markers are context.
+        for (tool, q, id) in [
+            ("GetAnnotations", "deploy", "a1"),
+            ("GetAllAnomalyHistory", "anoms", "y1"),
+            ("ListServiceDeploys", "deploys", "k1"),
+        ] {
+            let g = case(vec![by_tool(tool, q)], &only(&[id]));
+            assert_eq!(g.graded, Low, "{tool}");
+            assert!(g.decisive_classes.is_empty(), "{tool}");
+        }
+        // A deploy marker + traces: Medium.
+        let g = case(
+            vec![
+                by_tool("ListServiceDeploys", "deploys"),
+                decisive("e2", TRACES, "slow"),
+            ],
+            &only(&["k1", "t1"]),
+        );
+        assert_eq!(g.graded, Medium);
+        // `PrometheusSeries` never is the second class.
+        let g = case(
+            vec![
+                by_tool("PrometheusSeries", "up"),
+                decisive("e2", TRACES, "slow"),
+            ],
+            &only(&["s1", "t1"]),
+        );
+        assert_eq!(g.decisive_classes, [SignalClass::Traces]);
+        // An edge trend is traces, so with logs it is two classes.
+        let g = case(
+            vec![
+                by_tool("GetServiceGraphEdgeTrend", "edge"),
+                decisive("e2", SQL, "SELECT * FROM app"),
+            ],
+            &only(&["g1"]),
+        );
+        assert_eq!(g.graded, High, "{g:?}");
+        // Suspect change: only a decisive comparison of the exact tuple reads it.
+        let mut v = named(High);
+        let mut change = suspect(SuspectChangeState::Confirmed);
+        change.reference = cmp.into();
+        v.suspect_change = Some(change);
+        let calls = [
+            hyp(
+                1,
+                "h1",
+                "root_cause",
+                vec![
+                    by_tool(COMPARE_SERVICE_VERSIONS, cmp),
+                    decisive("e2", SQL, "SELECT * FROM app"),
+                ],
+            ),
+            rule.clone(),
+        ];
+        let g = graded_with(&calls, &v, &only(&["c1"]), &GradeTrust::default());
+        assert!(
+            !g.reasons.contains(&GradeReason::SuspectChangeNotRead),
+            "{g:?}"
+        );
+        let g = graded_with(&calls, &v, &only(&["c3"]), &GradeTrust::default());
+        assert!(
+            g.reasons.contains(&GradeReason::SuspectChangeNotRead),
+            "{g:?}"
+        );
+    }
+
+    /// F-05, F-06, D'8, D'18, review D9: an alternative is ruled out only by decisive,
+    /// counting, complete coverage of exactly its claimed scope.
+    #[test]
+    fn a_rule_out_needs_complete_decisive_coverage_of_its_scope() {
+        use crate::meta::oncall::rca_run::fixtures::RUN_END_US;
+        let window = |r: &mut ToolCallRecord, start: i64, end: i64| {
+            r.coverage.is_partial = Some(false);
+            r.coverage.effective_window = Some(TimeWindow { start, end });
+        };
+        let mut a = logs("l1", "SELECT * FROM app WHERE service_name = 'payments'", 1);
+        window(&mut a, 0, 500);
+        let mut b = logs(
+            "l2",
+            "SELECT * FROM app WHERE service_name = 'payments' AND x",
+            2,
+        );
+        window(&mut b, 501, 1_000);
+        let mut gap = logs(
+            "l3",
+            "SELECT * FROM app WHERE service_name = 'payments' AND y",
+            3,
+        );
+        window(&mut gap, 700, 1_000);
+        let mut partial = complete(logs("l4", "SELECT * FROM app WHERE p", 4));
+        partial.coverage.is_partial = Some(true);
+        let legacy = logs("l5", "SELECT * FROM app WHERE q", 5);
+        let mut paged = complete(logs("l6", "SELECT * FROM app WHERE r", 6));
+        paged.coverage.page_offset = Some(500);
+        let mut cursor = complete(logs("l7", "SELECT * FROM app WHERE s", 7));
+        cursor.coverage.next_after = Some(json!(""));
+        let mut cursor_left = cursor.clone();
+        cursor_left.call_id = "l8".into();
+        cursor_left.key_arg = "SELECT * FROM app WHERE t".into();
+        cursor_left.coverage.next_after = Some(json!(42));
+        let mut thin = complete(logs("l9", "SELECT * FROM app WHERE u", 9));
+        thin.coverage.insufficient = Some(true);
+        let context = complete(rec("g1", "GetIncident", "inc", json!({}), 10, true));
+        let log = vec![
+            prom("m1", "pool_active", 0),
+            traces("t1", "slow", 0),
+            a,
+            b,
+            gap,
+            partial,
+            legacy,
+            paged,
+            cursor,
+            cursor_left,
+            thin,
+            context,
+        ];
+        let scoped = |id: &str, tool: &str, q: &str, scope: serde_json::Value| {
+            let mut v = rule_out(id, tool, q);
+            v["claim_scope"] = scope;
+            v
+        };
+        let payments = |start: i64, end: i64| json!({"service": "payments", "stream": "app", "start_us": start, "end_us": end});
+        let ruled = |items: Vec<serde_json::Value>, trust: &GradeTrust| {
+            let calls = [
+                hyp(
+                    1,
+                    "h1",
+                    "root_cause",
+                    vec![
+                        decisive("e1", PROM, "pool_active"),
+                        decisive("e2", TRACES, "slow"),
+                    ],
+                ),
+                hyp(2, "h2", "ruled_out", items),
+            ];
+            !graded_with(&calls, &named(Confidence::High), &log, trust)
+                .ruled_out
+                .is_empty()
+        };
+        let single = GradeTrust::default();
+        let q1 = "SELECT * FROM app WHERE service_name = 'payments'";
+        let q2 = "SELECT * FROM app WHERE service_name = 'payments' AND x";
+        let q3 = "SELECT * FROM app WHERE service_name = 'payments' AND y";
+        assert!(ruled(
+            vec![scoped("e3", SQL, q1, payments(0, 500))],
+            &single
+        ));
+        // Two contiguous calls cover the scope; a gap between two does not.
+        assert!(ruled(
+            vec![
+                scoped("e3", SQL, q1, payments(0, 1_000)),
+                scoped("e4", SQL, q2, payments(0, 1_000))
+            ],
+            &single
+        ));
+        assert!(!ruled(
+            vec![
+                scoped("e3", SQL, q1, payments(0, 1_000)),
+                scoped("e4", SQL, q3, payments(0, 1_000))
+            ],
+            &single
+        ));
+        // A complete query for one service cannot rule out another.
+        let orders = json!({"service": "orders", "start_us": 0, "end_us": 500});
+        assert!(!ruled(vec![scoped("e3", SQL, q1, orders)], &single));
+        // A missing scope fails.
+        let mut bare = rule_out("e3", SQL, q1);
+        bare.as_object_mut().unwrap().remove("claim_scope");
+        assert!(!ruled(vec![bare], &single));
+        // Weak strength or a context call fails.
+        let mut weak = scoped("e3", SQL, q1, payments(0, 500));
+        weak["strength"] = json!("supporting");
+        assert!(!ruled(vec![weak], &single));
+        let all = json!({"start_us": 0, "end_us": RUN_END_US});
+        assert!(!ruled(
+            vec![scoped("e3", "GetIncident", "inc", all.clone())],
+            &single
+        ));
+        // Partial, legacy, a later page, a cursor left and insufficient all fail.
+        for q in [
+            "SELECT * FROM app WHERE p",
+            "SELECT * FROM app WHERE q",
+            "SELECT * FROM app WHERE r",
+            "SELECT * FROM app WHERE t",
+            "SELECT * FROM app WHERE u",
+        ] {
+            assert!(
+                !ruled(vec![scoped("e3", SQL, q, all.clone())], &single),
+                "{q}"
+            );
+        }
+        assert!(
+            ruled(
+                vec![scoped("e3", SQL, "SELECT * FROM app WHERE s", all.clone())],
+                &single
+            ),
+            "an empty cursor is the last page"
+        );
+        // Super cluster: the same complete search cannot show an absence.
+        let cluster = GradeTrust {
+            super_cluster: true,
+            serving_region: None,
+        };
+        assert!(!ruled(
+            vec![scoped("e3", SQL, q1, payments(0, 500))],
+            &cluster
+        ));
+    }
+
+    /// F-05: a counterexample on a partial page still contradicts the cause.
+    #[test]
+    fn a_partial_counterexample_still_contradicts() {
+        let mut partial = logs("l1", "SELECT * FROM app", 4);
+        partial.coverage.is_partial = Some(true);
+        let log = vec![
+            prom("m1", "pool_active", 1),
+            traces("t1", "slow", 2),
+            partial,
+        ];
+        let calls = [hyp(
+            1,
+            "h1",
+            "root_cause",
+            vec![
+                decisive("e1", PROM, "pool_active"),
+                decisive("e2", TRACES, "slow"),
+                item("e3", SQL, "SELECT * FROM app", "contradicts", "decisive"),
+            ],
+        )];
+        let g = graded_with(
+            &calls,
+            &named(Confidence::High),
+            &log,
+            &GradeTrust::default(),
+        );
+        assert!(
+            g.reasons.contains(&GradeReason::ContradictingEvidence),
+            "{g:?}"
+        );
+        assert_ne!(g.graded, Confidence::High);
     }
 }

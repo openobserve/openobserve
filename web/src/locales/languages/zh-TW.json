@@ -12296,6 +12296,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "分析區域：{region}",
+          "analyzingIn": "正在 {region} 分析",
+          "unknown": "分析區域未知",
+          "noLocalRun": "無本機分析；其他區域未知",
+          "tooltip": "執行歷史依區域保存。此執行在 {region} 中進行。",
+          "historyFailed": "無法載入報告歷史。",
+          "historyFailedHint": "載入後將顯示區域。"
+        },
+        "skipped": {
+          "title": "{time} UTC 的值班呼叫：未啟動新執行",
+          "inFlight": "執行 {number} 已在執行中",
+          "coolingDown": "執行 {number} 在 {cooldown} 冷卻期內已執行",
+          "gone": "執行已不再保留",
+          "open": "開啟執行 {number}"
+        },
         "reanalyzingFresh": "正在從頭重新分析…",
         "reanalyzingBuildOnPrevious": "正在根據先前的報表繼續分析…",
         "resumingFrom": "從「{step}」繼續…",

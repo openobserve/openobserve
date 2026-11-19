@@ -265,3 +265,149 @@ describe("RcaAnalysisBar (contract E5)", () => {
     });
   });
 });
+
+describe("RcaAnalysisBar: U8 region and P16 skipped-run notes", () => {
+  // Renders the item's side slots and its attributes, so tags and notes can be read.
+  const richStubs = {
+    ...stubs,
+    ODropdownItem: {
+      props: {
+        disabled: { type: Boolean, default: false },
+        description: { type: String, default: "" },
+      },
+      emits: ["select"],
+      template:
+        "<div role='menuitem' :data-disabled='disabled' @click=\"!disabled && $emit('select')\"><slot name='icon-left' /><b><slot /></b><small>{{ description }}</small><slot name='icon-right' /></div>",
+    },
+  };
+
+  // Run 4 is newer than run 3, the run both skipped pages point at.
+  const REGION_RUNS = [
+    rcaRunItem({
+      run_id: "r4",
+      run_number: 4,
+      trigger: "reanalyze",
+      started_by: "priya@acme.io",
+      started_at: RCA_T0 + sec(3000),
+      serving_region: "us-east-1",
+    }),
+    rcaRunItem({
+      run_id: "r3",
+      run_number: 3,
+      trigger: "oncall_page",
+      started_at: RCA_T0 + sec(1000),
+      serving_region: "us-east-1",
+    }),
+    rcaRunItem({ run_id: "r1", run_number: 1, started_at: RCA_T0, report_format: "v1" }),
+  ];
+  const SKIPPED = [
+    {
+      at_us: RCA_T0 + sec(1500),
+      reason: "in_flight" as const,
+      covering_run_id: "r3",
+      covering_run_number: 3,
+    },
+    {
+      at_us: RCA_T0 + sec(2000),
+      reason: "cooling_down" as const,
+      covering_run_id: "r3",
+      covering_run_number: 3,
+      retry_after_us: RCA_T0 + sec(2800),
+      cooldown_us: sec(1800),
+    },
+  ];
+
+  const mountRegionBar = (props: Record<string, unknown> = {}) =>
+    mount(RcaAnalysisBar, {
+      props: {
+        runs: REGION_RUNS,
+        latestRunId: "r4",
+        selectedRunId: "r4",
+        live: false,
+        subtitle: "Re-analyze by priya",
+        hasReport: true,
+        hasThread: true,
+        skippedPages: SKIPPED,
+        ...props,
+      },
+      global: { plugins: [i18n], stubs: richStubs },
+    });
+
+  it("tags every history row with its own region, and a legacy run as unknown", () => {
+    const wrapper = mountRegionBar();
+    const tag = (idx: number) => byTest(wrapper, `rca-history-item-${idx}-region`);
+
+    expect(tag(0).text()).toBe("Analyzed in us-east-1");
+    expect(tag(0).attributes("data-region-state")).toBe("known");
+    expect(tag(1).text()).toBe("Analyzed in us-east-1");
+    expect(tag(2).text()).toBe("analysis region unknown");
+    expect(tag(2).attributes("data-region-state")).toBe("unknown");
+  });
+
+  it("reads Analyzing in on the live run's row", () => {
+    const wrapper = mountRegionBar({ live: true });
+
+    expect(byTest(wrapper, "rca-history-item-0-region").text()).toBe("Analyzing in us-east-1");
+  });
+
+  it("claims no unknown region while the run list failed, but keeps the known ones", () => {
+    const wrapper = mountRegionBar({ listStatus: "error" });
+
+    expect(byTest(wrapper, "rca-history-item-0-region").text()).toBe("Analyzed in us-east-1");
+    expect(byTest(wrapper, "rca-history-item-2-region").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("analysis region unknown");
+  });
+
+  it("numbers runs by their stable run_number, not their position", () => {
+    const wrapper = mountRegionBar();
+
+    expect(byTest(wrapper, "rca-history-item-2").find("b").text()).toBe("Run 1 · Oct 9, 08:53 UTC");
+  });
+
+  it("places the skipped pages in time order between the runs they fell between", () => {
+    const wrapper = mountRegionBar();
+    const order = byTest(wrapper, "rca-history-group")
+      .findAll('[role="menuitem"]')
+      .map((item) => item.attributes("data-test"));
+
+    expect(order).toEqual([
+      "rca-history-item-0",
+      "rca-history-skipped-1",
+      "rca-history-skipped-0",
+      "rca-history-item-1",
+      "rca-history-item-2",
+    ]);
+  });
+
+  it("words both refusal reasons with the covering run's number and the cooldown", () => {
+    const wrapper = mountRegionBar();
+    const inFlight = byTest(wrapper, "rca-history-skipped-0");
+    const cooling = byTest(wrapper, "rca-history-skipped-1");
+
+    expect(inFlight.find("b").text()).toBe("On-call page at 09:18 UTC: no new run");
+    expect(inFlight.find("small").text()).toBe("Run 3 was already running");
+    expect(cooling.find("small").text()).toBe("Run 3 ran within the 30m cooldown");
+    expect(byTest(wrapper, "rca-history-skipped-1-link").text()).toBe("Open run 3");
+    expect(inFlight.attributes("data-covering-run-id")).toBe("r3");
+  });
+
+  it("opens the exact covering run, never the latest, while a newer run exists", async () => {
+    const wrapper = mountRegionBar();
+
+    await byTest(wrapper, "rca-history-skipped-0").trigger("click");
+    await byTest(wrapper, "rca-history-skipped-1-link").trigger("click");
+
+    expect(wrapper.emitted("select-run")).toEqual([["r3"], ["r3"]]);
+  });
+
+  it("keeps a note whose covering run is gone, disabled and not selectable", async () => {
+    const wrapper = mountRegionBar({ goneRunIds: ["r3"] });
+    const note = byTest(wrapper, "rca-history-skipped-0");
+
+    expect(note.attributes("data-disabled")).toBe("true");
+    expect(note.find("small").text()).toBe("Run 3 was already running · run no longer kept");
+    expect(byTest(wrapper, "rca-history-skipped-0-link").attributes("aria-disabled")).toBe("true");
+    await note.trigger("click");
+    expect(wrapper.emitted("select-run")).toBeUndefined();
+  });
+});

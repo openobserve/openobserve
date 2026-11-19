@@ -22,9 +22,9 @@ use axum::{
 };
 use futures_util::StreamExt;
 use openobserve_mcp::{
-    MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest,
-    decode_mcp_header_value, handle_mcp_request, handle_mcp_request_stream,
-    is_supported_protocol_version,
+    ASSISTANT_SESSION_HEADER, MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS,
+    MCPRequest, McpCaller, decode_mcp_header_value, handle_mcp_request_as,
+    handle_mcp_request_stream_as, is_supported_protocol_version,
 };
 #[cfg(feature = "enterprise")]
 use openobserve_mcp::{OAuthProtectedResourceMetadata, OAuthServerMetadata};
@@ -76,6 +76,19 @@ fn jsonrpc_error_response(
 /// header/body mismatches → 400 + HeaderMismatch (-32020); an unsupported
 /// version (header or body) → 400 + UnsupportedProtocolVersionError
 /// (-32022) listing the versions we support.
+/// The request's credentials and assistant session; tool calls forward both, nothing else.
+fn caller(headers: &HeaderMap, auth_token: Option<String>) -> McpCaller {
+    let session_id = headers
+        .get(ASSISTANT_SESSION_HEADER)
+        .and_then(|v| v.to_str().ok())
+        .filter(|v| !v.is_empty())
+        .map(str::to_string);
+    McpCaller {
+        auth_token,
+        session_id,
+    }
+}
+
 fn validate_mcp_headers(headers: &HeaderMap, request: &MCPRequest) -> Option<Response> {
     let id = request.id.as_ref();
     let unsupported = |requested: &str| {
@@ -235,7 +248,7 @@ pub async fn handle_mcp_post(
     // Process the notification but return 202.
     if mcp_request.id.is_none() && mcp_request.method != "initialize" {
         // Fire-and-forget: process notification asynchronously, don't wait
-        let _ = handle_mcp_request(&org_id, mcp_request, auth_token).await;
+        let _ = handle_mcp_request_as(&org_id, mcp_request, caller(&headers, auth_token)).await;
         return Response::builder()
             .status(StatusCode::ACCEPTED)
             .body(Body::empty())
@@ -251,17 +264,18 @@ pub async fn handle_mcp_post(
     // Determine if client wants SSE streaming
     let wants_sse = accept_header.contains("text/event-stream");
 
-    let response = match handle_mcp_request(&org_id, mcp_request, auth_token).await {
-        Ok(r) => r,
-        Err(e) => {
-            log::error!("MCP handle_mcp_request error: {e}");
-            return Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
-                .unwrap();
-        }
-    };
+    let response =
+        match handle_mcp_request_as(&org_id, mcp_request, caller(&headers, auth_token)).await {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("MCP handle_mcp_request error: {e}");
+                return Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                    .unwrap();
+            }
+        };
 
     // Per 2026-07-28, some JSON-RPC errors carry a non-200 HTTP status so
     // dual-era clients can distinguish a modern server from a legacy one.
@@ -403,7 +417,13 @@ pub async fn handle_mcp_get(
     };
 
     // Handle the request with streaming (returns SSE format)
-    let stream = match handle_mcp_request_stream(&org_id, mcp_request, auth_token).await {
+    let stream = match handle_mcp_request_stream_as(
+        &org_id,
+        mcp_request,
+        caller(&headers, auth_token),
+    )
+    .await
+    {
         Ok(s) => s,
         Err(e) => {
             return Response::builder()
@@ -1006,5 +1026,18 @@ mod tests {
                 "grace active: {active}"
             );
         }
+    }
+
+    #[test]
+    fn the_caller_carries_the_assistant_session_and_nothing_empty() {
+        let mut headers = HeaderMap::new();
+        headers.insert(ASSISTANT_SESSION_HEADER, "s-1".parse().unwrap());
+        let c = caller(&headers, Some("Basic x".to_string()));
+        assert_eq!(c.session_id.as_deref(), Some("s-1"));
+        assert_eq!(c.auth_token.as_deref(), Some("Basic x"));
+
+        headers.insert(ASSISTANT_SESSION_HEADER, "".parse().unwrap());
+        assert_eq!(caller(&headers, None).session_id, None);
+        assert_eq!(caller(&HeaderMap::new(), None).session_id, None);
     }
 }

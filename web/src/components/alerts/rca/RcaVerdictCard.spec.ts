@@ -926,3 +926,57 @@ describe("RcaVerdictCard", () => {
     expect(byTest(unknown, "rca-retry-fresh").attributes("description")).toBeUndefined();
   });
 });
+
+describe("RcaVerdictCard: U8 analysis region", () => {
+  const regionTag = (wrapper: VueWrapper) => byTest(wrapper, "rca-analysis-region");
+
+  it("a live run reads Analyzing in its region on the pill row", () => {
+    const wrapper = mountCard({
+      cardState: "investigating",
+      region: "us-east-1",
+      regionDisplay: "tag",
+    });
+
+    expect(regionTag(wrapper).text()).toBe("Analyzing in us-east-1");
+    expect(regionTag(wrapper).attributes("data-region-state")).toBe("known");
+  });
+
+  it.each([
+    ["failed", { cardState: "failed" }],
+    ["cancelled", { cardState: "cancelled" }],
+    ["failed with a partial record", { cardState: "failed", summary: rcaRunSummaryLive() }],
+  ])("a %s run reads Analyzed in its region", (_name, props) => {
+    const wrapper = mountCard({ ...props, region: "us-east-1", regionDisplay: "tag" });
+
+    expect(regionTag(wrapper).text()).toBe("Analyzed in us-east-1");
+  });
+
+  it("a graded run carries the tag on its verdict row", () => {
+    const wrapper = mountCard({
+      cardState: "analyzed",
+      summary: rcaRunSummary(),
+      region: "us-east-1",
+      regionDisplay: "tag",
+    });
+
+    expect(regionTag(wrapper).text()).toBe("Analyzed in us-east-1");
+  });
+
+  it("a run with no recorded region reads the exact unknown label, with no icon", () => {
+    const wrapper = mountCard({ cardState: "failed", region: null, regionDisplay: "tag" });
+
+    expect(regionTag(wrapper).text()).toBe("analysis region unknown");
+    expect(regionTag(wrapper).attributes("data-region-state")).toBe("unknown");
+    expect(regionTag(wrapper).find("svg").exists()).toBe(false);
+  });
+
+  it("holds the slot with a skeleton while the run list loads, and shows nothing when hidden", () => {
+    const loading = mountCard({ cardState: "failed", regionDisplay: "loading" });
+    expect(byTest(loading, "rca-analysis-region-loading").exists()).toBe(true);
+    expect(regionTag(loading).exists()).toBe(false);
+
+    const hidden = mountCard({ cardState: "failed", region: null });
+    expect(regionTag(hidden).exists()).toBe(false);
+    expect(byTest(hidden, "rca-analysis-region-loading").exists()).toBe(false);
+  });
+});

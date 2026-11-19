@@ -2741,8 +2741,22 @@ async fn trigger_rca_for_alert_firing(
         let subject_id = alert_id.unwrap_or_else(|| representative.response.subject.subject_id());
         let subjects: Vec<config::meta::oncall::SubjectRef> =
             pending.iter().map(|p| p.response.subject.clone()).collect();
+        // §13.1 P16: the generation each record is on now; delivery compares against it.
+        let recipients = pending
+            .iter()
+            .map(|p| infra::table::rca_delivery_obligations::Recipient {
+                response_id: p.response.id.clone(),
+                subject: p.response.subject.clone(),
+                ladder_run: p.response.current_run(),
+            })
+            .collect();
+        let fired_at_us = pending
+            .iter()
+            .map(|p| p.response.opened_at)
+            .min()
+            .unwrap_or_else(config::utils::time::now_micros);
 
-        // One `alert` run per firing; every exit below ends it.
+        // One `alert` run per firing scope; a repeat delivery of the firing joins no new run.
         let run_id = match rca_runs::start_run(rca_runs::StartRun {
             org_id: org_id.clone(),
             subject: rca_runs::RunSubject::Alert {
@@ -2753,18 +2767,38 @@ async fn trigger_rca_for_alert_firing(
             mode: RunMode::Fresh,
             started_by: "system".to_string(),
             guidance: None,
-            skip_cooldown: true,
+            skip_cooldown: false,
             oncall_subjects: serde_json::to_value(&subjects).ok(),
             context_used: None,
+            recipients,
         })
         .await
         {
             Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
-            Ok(outcome) => {
+            Ok(
+                outcome @ (rca_runs::StartOutcome::InFlight { .. }
+                | rca_runs::StartOutcome::CoolingDown { .. }),
+            ) => {
                 log::debug!(
                     "[SCHEDULER trace_id {trace_id}] alert RCA run not started for {org_id}/{alert_name}: {outcome:?}"
                 );
-                release_alert_firing_hold(&org_id, &opened).await;
+                // D'2: the covering run's own subjects stay held until its delivery settles them.
+                let owned = match outcome.covering_run_id() {
+                    Some(covering) => infra::table::rca_runs::owned_subjects(&org_id, covering)
+                        .await
+                        .unwrap_or_else(|e| {
+                            log::warn!(
+                                "[SCHEDULER trace_id {trace_id}] cannot read run {covering}'s subjects: {e}"
+                            );
+                            Vec::new()
+                        }),
+                    None => Vec::new(),
+                };
+                let unowned = opened
+                    .iter()
+                    .map(|p| &p.response.subject)
+                    .filter(|subject| !owned.contains(subject));
+                release_subjects(&org_id, unowned).await;
                 return;
             }
             Err(e) => {
@@ -2785,20 +2819,21 @@ async fn trigger_rca_for_alert_firing(
             .flatten();
 
         // §2.2: one context for the whole firing — every record it opened reads the same answer.
+        // `incident_id` stays omitted, never null: the agent routes on `"incident_id" in context`.
         let context = config::meta::oncall::RcaContext {
-            subject_type: config::meta::oncall::SubjectType::Alert,
-            subject_id: subject_id.clone(),
-            // Omitted, never null — the agent routes on `"incident_id" in context`.
-            incident_id: None,
-            org_id: org_id.clone(),
-            previous_analysis: None,
             severity: Some(severity),
             past_causes: rca_service::past_causes_for_record(&org_id, &representative.response.id)
                 .await,
             alert_name: Some(alert_name.clone()),
             stream: Some(stream_name.clone()),
             dimensions,
-            evidence: None,
+            fired_at_us: Some(fired_at_us),
+            ..config::meta::oncall::RcaContext::new(
+                config::meta::oncall::SubjectType::Alert,
+                subject_id.clone(),
+                org_id.clone(),
+            )
+            .with_first_alert(fired_at_us)
         };
 
         // The turn's finalizer delivers the report to `oncall_subjects` or releases them.
@@ -2854,19 +2889,20 @@ async fn release_alert_firing_hold(
     org_id: &str,
     opened: &[o2_enterprise::enterprise::oncall::escalation::PagedGroup],
 ) {
+    release_subjects(org_id, opened.iter().map(|p| &p.response.subject)).await;
+}
+
+#[cfg(feature = "enterprise")]
+async fn release_subjects<'a>(
+    org_id: &str,
+    subjects: impl IntoIterator<Item = &'a config::meta::oncall::SubjectRef>,
+) {
     let now = config::utils::time::now_micros();
-    for paged in opened {
-        if let Err(e) = o2_enterprise::enterprise::oncall::escalation::skip_analysis(
-            org_id,
-            &paged.response.subject,
-            now,
-        )
-        .await
+    for subject in subjects {
+        if let Err(e) =
+            o2_enterprise::enterprise::oncall::escalation::skip_analysis(org_id, subject, now).await
         {
-            log::warn!(
-                "[SCHEDULER] could not release the triage hold on {}: {e}",
-                paged.response.id
-            );
+            log::warn!("[SCHEDULER] could not release the triage hold on {subject}: {e}");
         }
     }
 }

@@ -453,11 +453,7 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
         &zo_config.common.base_uri,
     )?;
 
-    let mut mcp_marker =
-        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
-    mcp_marker.set_sensitive(true);
-    let mut default_headers = reqwest::header::HeaderMap::new();
-    default_headers.insert("x-o2-mcp", mcp_marker);
+    let default_headers = loopback_headers()?;
 
     let mut client_builder = reqwest::Client::builder()
         .user_agent(format!("openobserve/{}", config::VERSION))
@@ -676,6 +672,16 @@ pub fn register_summary_configs(configs: HashMap<String, SummaryFieldsConfig>) {
 }
 
 /// Get the shared HTTP client for tool execution
+/// The headers every loopback tool call carries: the marker that tells the API the call is MCP's.
+pub fn loopback_headers() -> Result<reqwest::header::HeaderMap> {
+    let mut mcp_marker =
+        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
+    mcp_marker.set_sensitive(true);
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("x-o2-mcp", mcp_marker);
+    Ok(headers)
+}
+
 pub fn get_shared_http_client() -> &'static rmcp_openapi::HttpClient {
     SHARED_HTTP_CLIENT
         .get()

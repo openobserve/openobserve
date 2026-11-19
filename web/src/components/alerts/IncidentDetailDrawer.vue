@@ -343,6 +343,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :firings="triggers"
               :alerts-now="rcaAlertsNow"
               :incident-events="rcaIncidentEvents"
+              :run-list-status="rcaRunListStatus"
+              :skipped-pages="rcaSkippedPages"
+              :gone-run-ids="rcaGoneRunIds"
               @trigger-rca="triggerRca"
               @cancel-rca="cancelRca"
               @view-run="viewRcaRun"
@@ -352,6 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @open-report="activeTab = 'report'"
               @open-analysis="activeTab = 'incidentAnalysis'"
               @retry-report="retryRcaReport"
+              @retry-run-list="retryRcaRunList"
             />
 
             <!-- Tab Content Area -->
@@ -1924,6 +1928,10 @@ export default defineComponent({
       currentError: rcaError,
       reportRun: rcaReportRun,
       history: rcaHistory,
+      runListStatus: rcaRunListStatus,
+      skippedPages: rcaSkippedPages,
+      goneRunIds: rcaGoneRunIds,
+      retryRunList: retryRcaRunList,
       viewedRun: rcaViewedRun,
       reportText: rcaReportText,
       reportVerdict: rcaReportVerdict,
@@ -2866,6 +2874,10 @@ export default defineComponent({
       rcaError,
       rcaReportRun,
       rcaHistory,
+      rcaRunListStatus,
+      rcaSkippedPages,
+      rcaGoneRunIds,
+      retryRcaRunList,
       rcaViewedRun,
       rcaReportText,
       rcaReportVerdict,

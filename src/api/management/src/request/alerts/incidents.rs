@@ -209,7 +209,21 @@ pub async fn list_incidents(
     Path(org_id): Path<String>,
     Query(query): Query<ListIncidentsQuery>,
     Headers(user_email): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
+    // D11: SysRcaAgent never lists cases, and a case or unbound run lists nothing.
+    let rca = security::rca_scope::rca_caller(&org_id, &user_email.user_id, &headers).await;
+    if rca.is_rca() {
+        if query.siem || !rca.history_allowed() {
+            return MetaHttpResponse::forbidden(RCA_HISTORY_BLOCKED);
+        }
+        return list_incidents_with(
+            &org_id,
+            &query,
+            infra::table::alert_incidents::CaseFilter::NoCases,
+        )
+        .await;
+    }
     let cases = if query.siem {
         if let Err(resp) =
             security::guard_siem_case(&org_id, &user_email.user_id, "GET", true).await
@@ -220,8 +234,17 @@ pub async fn list_incidents(
     } else {
         security::visible_cases(&org_id, &user_email.user_id).await
     };
+    list_incidents_with(&org_id, &query, cases).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn list_incidents_with(
+    org_id: &str,
+    query: &ListIncidentsQuery,
+    cases: infra::table::alert_incidents::CaseFilter,
+) -> Response {
     match openobserve_core::alerts::incidents::list_incidents_filtered(
-        &org_id,
+        org_id,
         query.status.as_deref(),
         cases,
         query.limit,
@@ -263,7 +286,13 @@ pub async fn list_incidents(
 pub async fn get_incident(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
+    let rca = security::rca_scope::rca_caller(&org_id, &user_email.user_id, &headers).await;
+    // F-02/D'4: refused before any content is read.
+    if !security::rca_scope::may_read_incident(&org_id, &rca, &incident_id).await {
+        return MetaHttpResponse::forbidden(RCA_TARGET_BLOCKED);
+    }
     match openobserve_core::alerts::incidents::get_incident_with_alerts(
         &org_id,
         &incident_id,
@@ -282,7 +311,17 @@ pub async fn get_incident(
             {
                 return resp;
             }
-            MetaHttpResponse::json(incident)
+            if !rca.is_rca() {
+                return MetaHttpResponse::json(incident);
+            }
+            // A run reads its subject, never the prior analyses embedded under `rca`.
+            match serde_json::to_value(&incident) {
+                Ok(mut value) => {
+                    security::rca_scope::strip_rca(&mut value);
+                    MetaHttpResponse::json(value)
+                }
+                Err(e) => MetaHttpResponse::internal_error(e),
+            }
         }
         Ok(None) => MetaHttpResponse::not_found("Incident not found"),
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -609,6 +648,15 @@ pub struct CancelRcaResponse {
 pub const RCA_RUNS_DEFAULT_LIMIT: u64 = 25;
 /// Largest page size of the incident's run list.
 pub const RCA_RUNS_MAX_LIMIT: u64 = 100;
+/// Skipped pages one run-list page carries.
+pub const RCA_SKIPPED_PAGES_MAX: u64 = 100;
+/// D11: a SysRcaAgent run of a security case, or one without a valid binding, reads no history.
+#[cfg(feature = "enterprise")]
+const RCA_HISTORY_BLOCKED: &str =
+    "History is not available to this analysis: its subject is a security case or unbound";
+/// D'4: a SysRcaAgent run reads only its own incident or a known non-case incident.
+#[cfg(feature = "enterprise")]
+const RCA_TARGET_BLOCKED: &str = "This analysis may not read that incident";
 
 /// Query parameters for listing an incident's analysis runs
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
@@ -799,11 +847,14 @@ pub async fn trigger_incident_rca(
         skip_cooldown: true,
         oncall_subjects: None,
         context_used: None,
+        recipients: Vec::new(),
     })
     .await
     {
         Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
-        Ok(rca_runs::StartOutcome::InFlight) | Ok(rca_runs::StartOutcome::CoolingDown) => {
+        Ok(
+            rca_runs::StartOutcome::InFlight { .. } | rca_runs::StartOutcome::CoolingDown { .. },
+        ) => {
             return MetaHttpResponse::bad_request("Analysis already in progress");
         }
         Err(e) => {
@@ -1069,8 +1120,9 @@ pub async fn list_incident_rca_runs(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<ListRcaRunsQuery>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "GET", &incident_id).await
+    if let Err(resp) = guard_run_history(&org_id, &user_email.user_id, &headers, &incident_id).await
     {
         return resp;
     }
@@ -1115,7 +1167,62 @@ pub async fn list_incident_rca_runs(
         runs.extend(rest.by_ref().take(room).map(|report| report.item()));
         has_more = rest.next().is_some();
     }
-    MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse { runs, has_more })
+    let skipped_pages = match skipped_pages_of(&org_id, &incident_id, &runs, has_more, before).await
+    {
+        Ok(pages) => pages,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse {
+        runs,
+        has_more,
+        skipped_pages,
+    })
+}
+
+/// The incident's skipped pages inside this page's time span (newest page: at or after its
+/// oldest run; last page: everything older), at most [RCA_SKIPPED_PAGES_MAX].
+#[cfg(feature = "enterprise")]
+async fn skipped_pages_of(
+    org_id: &str,
+    incident_id: &str,
+    runs: &[config::meta::alerts::rca_runs::RcaRunItem],
+    has_more: bool,
+    before: Option<&str>,
+) -> Result<Vec<config::meta::alerts::rca_runs::RcaSkippedPage>, sea_orm::DbErr> {
+    let newer_than = if has_more {
+        runs.last().map(|run| run.started_at)
+    } else {
+        None
+    };
+    let older_than = match before {
+        Some(cursor) => infra::table::rca_runs::get(org_id, cursor)
+            .await?
+            .map(|run| run.started_at),
+        None => None,
+    };
+    infra::table::rca_skipped_pages::list_for_incident(
+        org_id,
+        incident_id,
+        newer_than,
+        older_than,
+        RCA_SKIPPED_PAGES_MAX,
+    )
+    .await
+}
+
+/// D11 for past runs of `incident_id`: the ordinary case guard, then SysRcaAgent's binding.
+#[cfg(feature = "enterprise")]
+async fn guard_run_history(
+    org_id: &str,
+    user_id: &str,
+    headers: &axum::http::HeaderMap,
+    incident_id: &str,
+) -> Result<(), Response> {
+    let rca = security::rca_scope::rca_caller(org_id, user_id, headers).await;
+    if !security::rca_scope::may_read_run_history(org_id, &rca, incident_id).await {
+        return Err(MetaHttpResponse::forbidden(RCA_HISTORY_BLOCKED));
+    }
+    security::guard_case(org_id, user_id, "GET", incident_id).await
 }
 
 #[cfg(feature = "enterprise")]
@@ -1147,8 +1254,9 @@ pub async fn list_incident_rca_runs(
 pub async fn get_incident_rca_run(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "GET", &incident_id).await
+    if let Err(resp) = guard_run_history(&org_id, &user_email.user_id, &headers, &incident_id).await
     {
         return resp;
     }
@@ -1203,10 +1311,11 @@ pub async fn get_incident_rca_thread(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<RcaThreadQuery>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
     use openobserve_core::alerts::rca_live::{RunParts, RunSession, StoreReader};
 
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "GET", &incident_id).await
+    if let Err(resp) = guard_run_history(&org_id, &user_email.user_id, &headers, &incident_id).await
     {
         return resp;
     }
@@ -1648,6 +1757,12 @@ fn resume_error_response(
                 None,
             )
         }
+        ResumeError::SecurityCaseBlocked => rca_error_response(
+            StatusCode::CONFLICT,
+            "This incident is a security case, so its analysis cannot be resumed; start a new one",
+            Some("security_case_resume_blocked"),
+            None,
+        ),
         ResumeError::Internal(e) => {
             log::error!("[INCIDENTS::RCA] Failed to prepare resuming run {run_id}: {e}");
             rca_error_response(
@@ -1694,13 +1809,16 @@ async fn start_resumed_run(
             skip_cooldown: true,
             oncall_subjects: None,
             context_used: Some(serde_json::json!({ "resumed_from": seed.resumed_from() })),
+            recipients: Vec::new(),
         },
         &seed.latest_run_id,
     )
     .await
     {
         Ok(rca_runs::StartOutcome::Started { run_id }) => run_id,
-        Ok(rca_runs::StartOutcome::InFlight) | Ok(rca_runs::StartOutcome::CoolingDown) => {
+        Ok(
+            rca_runs::StartOutcome::InFlight { .. } | rca_runs::StartOutcome::CoolingDown { .. },
+        ) => {
             return rca_error_response(
                 StatusCode::CONFLICT,
                 "Analysis already in progress",
@@ -1788,12 +1906,13 @@ pub async fn get_incident_rca_summary(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<RcaThreadQuery>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
     use openobserve_core::alerts::rca_live::{
         RunParts, RunSession, StoreReader, summary_reads_session,
     };
 
-    if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "GET", &incident_id).await
+    if let Err(resp) = guard_run_history(&org_id, &user_email.user_id, &headers, &incident_id).await
     {
         return resp;
     }
@@ -1963,19 +2082,33 @@ pub async fn get_incident_rca_live_stream(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": true, "description": "Get the event timeline of an incident", "category": "alerts"}))
     )
 )]
 pub async fn get_incident_events(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
+    let rca = security::rca_scope::rca_caller(&org_id, &user_email.user_id, &headers).await;
+    if !security::rca_scope::may_read_incident(&org_id, &rca, &incident_id).await {
+        return MetaHttpResponse::forbidden(RCA_TARGET_BLOCKED);
+    }
     if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "GET", &incident_id).await
     {
         return resp;
     }
+    // D3: a case run's own timeline keeps alert chronology only, stored or rebuilt.
+    let project = rca.projects_timeline();
+    let shown = |events: Vec<config::meta::alerts::incidents::IncidentEvent>| {
+        if project {
+            security::rca_scope::project_timeline(events)
+        } else {
+            events
+        }
+    };
     let events = match infra::table::incident_events::get(&org_id, &incident_id).await {
-        Ok(events) => events,
+        Ok(events) => shown(events),
         Err(e) => return MetaHttpResponse::internal_error(format!("Failed to get events: {e}")),
     };
 
@@ -1987,13 +2120,17 @@ pub async fn get_incident_events(
         match infra::table::incident_events::reconstruct_if_empty(&org_id, &incident_id).await {
             Ok(Some(_)) => match infra::table::incident_events::get(&org_id, &incident_id).await {
                 Ok(rebuilt) => {
-                    return MetaHttpResponse::json(serde_json::json!({
-                        "events": rebuilt,
+                    let mut body = serde_json::json!({
+                        "events": shown(rebuilt),
                         // Flags that the timeline was rebuilt from incident/alert rows and is
                         // missing anything that lived only in the lost blob (comments,
                         // acknowledgements, RCA activity).
                         "partial_reconstruction": true,
-                    }));
+                    });
+                    if project {
+                        body["projected"] = serde_json::Value::Bool(true);
+                    }
+                    return MetaHttpResponse::json(body);
                 }
                 Err(e) => {
                     return MetaHttpResponse::internal_error(format!("Failed to get events: {e}"));
@@ -2007,6 +2144,9 @@ pub async fn get_incident_events(
         }
     }
 
+    if project {
+        return MetaHttpResponse::json(serde_json::json!({ "events": events, "projected": true }));
+    }
     MetaHttpResponse::json(serde_json::json!({ "events": events }))
 }
 
@@ -2887,12 +3027,21 @@ mod tests {
                 cancelled_by: Some("a.rao@acme.io".to_string()),
                 error_reason: None,
                 has_record: true,
+                serving_region: Some("us-east-1".to_string()),
+                run_number: Some(3),
             }],
             has_more: true,
+            skipped_pages: Vec::new(),
         })
         .unwrap();
         assert_eq!(json["has_more"], true);
+        assert!(
+            json.get("skipped_pages").is_none(),
+            "empty skipped pages are omitted"
+        );
         let run = &json["runs"][0];
+        assert_eq!(run["serving_region"], "us-east-1");
+        assert_eq!(run["run_number"], 3);
         assert_eq!(run["run_id"], "2abc");
         assert_eq!(run["subject_type"], "incident");
         assert_eq!(run["trigger"], "reanalyze");
@@ -3076,6 +3225,8 @@ mod tests {
             pending_question_id: None,
             questions_asked: 0,
             deadline_closed_at: None,
+            run_number: None,
+            fenced: false,
         }
     }
 
@@ -3278,6 +3429,7 @@ mod tests {
             target: evidence_target("SearchSQL", &input),
             observed: None,
             result_summary,
+            coverage: Default::default(),
         }];
         let submit = parse_submit(&json!({
             "markdown": "report",
@@ -3750,6 +3902,7 @@ mod tests {
                 skip_cooldown: true,
                 oncall_subjects: None,
                 context_used: None,
+                recipients: Vec::new(),
             })
             .await
             .unwrap();
@@ -5004,6 +5157,11 @@ mod tests {
                 ResumeError::Unavailable(details.to_string()),
                 StatusCode::SERVICE_UNAVAILABLE,
                 Some("history_unavailable"),
+            ),
+            (
+                ResumeError::SecurityCaseBlocked,
+                StatusCode::CONFLICT,
+                Some("security_case_resume_blocked"),
             ),
             (
                 ResumeError::Internal(details.to_string()),

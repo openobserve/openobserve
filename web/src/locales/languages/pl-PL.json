@@ -12301,6 +12301,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "Przeanalizowano w {region}",
+          "analyzingIn": "Trwa analiza w {region}",
+          "unknown": "region analizy nieznany",
+          "noLocalRun": "brak analizy lokalnej; inne regiony nieznane",
+          "tooltip": "Historia uruchomień jest przechowywana dla każdego regionu. To uruchomienie odbyło się w {region}.",
+          "historyFailed": "Nie udało się wczytać historii raportów.",
+          "historyFailedHint": "Regiony pojawią się po wczytaniu."
+        },
+        "skipped": {
+          "title": "Powiadomienie dyżurne o {time} UTC: brak nowego uruchomienia",
+          "inFlight": "Uruchomienie {number} już trwało",
+          "coolingDown": "Uruchomienie {number} odbyło się w okresie wyciszenia {cooldown}",
+          "gone": "uruchomienie nie jest już przechowywane",
+          "open": "Otwórz uruchomienie {number}"
+        },
         "reanalyzingFresh": "Ponowna analiza od zera…",
         "reanalyzingBuildOnPrevious": "Kontynuowanie na podstawie poprzedniego raportu…",
         "resumingFrom": "Wznawianie od „{step}”…",

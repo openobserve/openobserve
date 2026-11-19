@@ -34,6 +34,7 @@ vi.mock("@/services/incidents", () => ({
   default: {
     get: vi.fn(),
     getRcaRun: vi.fn(),
+    listRcaRuns: vi.fn(),
     triggerRca: vi.fn(),
     resumeRca: vi.fn(),
     cancelRca: vi.fn(),
@@ -169,6 +170,7 @@ describe("useIncidentRca (RR-35)", () => {
     service.getRcaRun.mockImplementation((_org, _id, runId) =>
       Promise.resolve({ data: { run_id: runId, report: `report of ${runId}` } } as never),
     );
+    service.listRcaRuns.mockResolvedValue({ data: { runs: [], has_more: false } } as never);
     service.openRcaLiveStream.mockImplementation((org, incidentId, runId, { onEvent, signal }) => {
       const { promise, resolve, reject } = Promise.withResolvers<{ ended: boolean }>();
       connections.push({
@@ -926,6 +928,147 @@ describe("useIncidentRca (RR-35)", () => {
       expect(toastMock).not.toHaveBeenCalled();
       expect(host.api.resuming.value).toBe(false);
       expect(service.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("U8/P16: the region-local run list", () => {
+    // Query results land through the notify scheduler, which runs on (fake) timers.
+    const settle = async () => {
+      await vi.advanceTimersByTimeAsync(1);
+      await flushPromises();
+    };
+    const listed = (overrides: Partial<RcaRunItem>) => ({ ...reportRun("run-1"), ...overrides });
+
+    it("reads the list once and adds its stable numbers and regions to the detail's runs", async () => {
+      service.listRcaRuns.mockResolvedValue({
+        data: {
+          runs: [listed({ run_number: 7, serving_region: "us-east-1" })],
+          has_more: false,
+        },
+      } as never);
+      host = mountHost(rca("completed", "run-1", "run-1"));
+      expect(host.api.runListStatus.value).toBe("loading");
+      await settle();
+
+      expect(service.listRcaRuns).toHaveBeenCalledWith("default", "inc-1", { limit: 100 });
+      expect(host.api.runListStatus.value).toBe("ready");
+      expect(host.api.history.value).toHaveLength(1);
+      expect(host.api.history.value[0]).toMatchObject({
+        run_id: "run-1",
+        run_number: 7,
+        serving_region: "us-east-1",
+      });
+    });
+
+    it.each([
+      [403, "forbidden"],
+      [500, "error"],
+    ])("a %s answer is %s, and the embedded history still shows", async (status, expected) => {
+      service.listRcaRuns.mockRejectedValue({ isAxiosError: true, response: { status } });
+      host = mountHost(rca("completed", "run-1", "run-1"));
+      await settle();
+
+      expect(host.api.runListStatus.value).toBe(expected);
+      expect(host.api.history.value.map((run) => run.run_id)).toEqual(["run-1"]);
+      expect(host.api.skippedPages.value).toEqual([]);
+    });
+
+    it("Retry reads the list again", async () => {
+      service.listRcaRuns.mockRejectedValueOnce({ isAxiosError: true, response: { status: 500 } });
+      host = mountHost(rca("completed", "run-1", "run-1"));
+      await settle();
+      expect(host.api.runListStatus.value).toBe("error");
+
+      host.api.retryRunList();
+      await settle();
+      expect(host.api.runListStatus.value).toBe("ready");
+    });
+
+    it("an empty list is ready and empty: only then may the page say no local analysis", async () => {
+      host = mountHost(null);
+      await settle();
+
+      expect(host.api.runListStatus.value).toBe("ready");
+      expect(host.api.history.value).toEqual([]);
+    });
+
+    it("confirms a covering run missing from the list by id: a 404 marks it no longer kept", async () => {
+      service.listRcaRuns.mockResolvedValue({
+        data: {
+          runs: [listed({})],
+          has_more: false,
+          skipped_pages: [
+            { at_us: T0, reason: "in_flight", covering_run_id: "run-0", covering_run_number: 1 },
+          ],
+        },
+      } as never);
+      service.getRcaRun.mockImplementation((_org, _id, runId) =>
+        runId === "run-0"
+          ? Promise.reject({ isAxiosError: true, response: { status: 404 } })
+          : Promise.resolve({ data: { run_id: runId, report: `report of ${runId}` } } as never),
+      );
+      host = mountHost(rca("completed", "run-1", "run-1"));
+      await settle();
+
+      expect(service.getRcaRun).toHaveBeenCalledWith("default", "inc-1", "run-0");
+      expect(host.api.goneRunIds.value).toEqual(["run-0"]);
+      expect(host.api.skippedPages.value).toHaveLength(1);
+    });
+
+    it("an off-page covering run joins the history, so its note pins it", async () => {
+      service.listRcaRuns.mockResolvedValue({
+        data: {
+          runs: [listed({ run_id: "run-2", started_at: T0 + 10_000_000 })],
+          has_more: true,
+          skipped_pages: [
+            {
+              at_us: T0 + 5_000_000,
+              reason: "cooling_down",
+              covering_run_id: "run-1",
+              covering_run_number: 1,
+              cooldown_us: 1_800_000_000,
+            },
+          ],
+        },
+      } as never);
+      service.getRcaRun.mockImplementation((_org, _id, runId) =>
+        Promise.resolve({
+          data: {
+            ...reportRun(runId),
+            subject_id: "inc-1",
+            incident_id: "inc-1",
+            guidance: null,
+            updated_at: T0,
+            error: null,
+            session_id: null,
+            stats: null,
+            result: {},
+            report: `report of ${runId}`,
+            context_used: { serving_region: "us-east-1" },
+          } as RcaRun,
+        } as never),
+      );
+      host = mountHost(rca("completed", "run-2", "run-2"));
+      await settle();
+
+      const covering = host.api.history.value.find((run) => run.run_id === "run-1");
+      expect(covering).toMatchObject({
+        run_number: 1,
+        serving_region: "us-east-1",
+        has_record: true,
+      });
+      host.api.viewRun("run-1");
+      expect(host.api.viewedRun.value?.run_id).toBe("run-1");
+    });
+
+    it("a new run reads the list again for its row and any skipped page", async () => {
+      host = mountHost(rca("completed", "run-1", "run-1"));
+      await settle();
+      expect(service.listRcaRuns).toHaveBeenCalledTimes(1);
+
+      host.incident.value = { ...host.incident.value!, rca: rca("running", "run-2", null) };
+      await settle();
+      expect(service.listRcaRuns).toHaveBeenCalledTimes(2);
     });
   });
 });

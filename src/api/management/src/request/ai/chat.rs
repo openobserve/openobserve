@@ -2328,17 +2328,14 @@ mod tests {
     #[cfg(feature = "enterprise")]
     fn incident_rca_context() -> RcaContext {
         RcaContext {
-            subject_type: config::meta::oncall::subject::SubjectType::Incident,
-            subject_id: "inc-1".to_string(),
             incident_id: Some("inc-1".to_string()),
-            org_id: "org-a".to_string(),
-            previous_analysis: None,
             severity: Some(config::meta::alerts::priority::AlertPriority::P2),
             past_causes: vec!["disk full".to_string()],
-            alert_name: None,
-            stream: None,
-            dimensions: None,
-            evidence: None,
+            ..RcaContext::new(
+                config::meta::oncall::subject::SubjectType::Incident,
+                "inc-1".to_string(),
+                "org-a".to_string(),
+            )
         }
     }
 

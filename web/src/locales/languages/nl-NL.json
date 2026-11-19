@@ -12301,6 +12301,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "Geanalyseerd in {region}",
+          "analyzingIn": "Wordt geanalyseerd in {region}",
+          "unknown": "analyseregio onbekend",
+          "noLocalRun": "geen lokale analyse; andere regio's onbekend",
+          "tooltip": "De rungeschiedenis wordt per regio bewaard. Deze run liep in {region}.",
+          "historyFailed": "De rapportgeschiedenis kon niet worden geladen.",
+          "historyFailedHint": "Regio's verschijnen zodra deze is geladen."
+        },
+        "skipped": {
+          "title": "Oproep van dienst om {time} UTC: geen nieuwe run",
+          "inFlight": "Run {number} liep al",
+          "coolingDown": "Run {number} liep binnen de wachttijd van {cooldown}",
+          "gone": "run niet meer bewaard",
+          "open": "Run {number} openen"
+        },
         "reanalyzingFresh": "Opnieuw analyseren vanaf nul…",
         "reanalyzingBuildOnPrevious": "Voortbouwen op het vorige rapport…",
         "resumingFrom": "Hervatten vanaf “{step}”…",

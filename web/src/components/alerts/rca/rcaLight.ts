@@ -25,6 +25,9 @@ import type { RcaImpact, RcaRunItem, RcaSummaryHypothesis } from "@/services/inc
 /** The live state of this incident's alerts: `incidentLiveSummary`, as the header reads it. */
 export type RcaAlertsNow = IncidentLive;
 
+/** How the shown run's region tag renders: a tag, a skeleton while the run list loads, or none. */
+export type RcaRegionDisplay = "tag" | "loading" | "hidden";
+
 const OPEN_STATUSES = new Set(["likely", "untested"]);
 
 /** Hypotheses beside the root cause that are still open: Likely or not yet tested. */

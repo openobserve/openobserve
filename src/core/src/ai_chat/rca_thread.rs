@@ -19,7 +19,10 @@ use config::{
     meta::{
         alerts::rca_steering::SteerKind,
         oncall::{
-            confidence::{KEY_ARG_MAX_BYTES, cut_bytes, is_prometheus_tool, strip_call_ref},
+            confidence::{
+                COMPARE_SERVICE_VERSIONS, KEY_ARG_MAX_BYTES, cut_bytes, is_prometheus_tool,
+                strip_call_ref,
+            },
             rca_run::summarize_result,
         },
     },
@@ -803,6 +806,15 @@ pub(crate) fn key_arg(tool: &str, input: &Map<String, Value>) -> Option<String> 
             .or_else(|| request_body.and_then(|rb| rb.get("query")))
             .and_then(Value::as_str)
             .map(str::to_string),
+        // F-15: `service@version`, matched only as an exact tuple, never as a substring.
+        COMPARE_SERVICE_VERSIONS => {
+            let service = request_body.and_then(|rb| rb.get("service")?.as_str());
+            let version = request_body.and_then(|rb| rb.pointer("/a/version")?.as_str());
+            service
+                .zip(version)
+                .filter(|(s, v)| !s.is_empty() && !v.is_empty())
+                .map(|(s, v)| format!("{s}@{v}"))
+        }
         _ => None,
     }
     .or_else(|| {
@@ -1744,5 +1756,24 @@ pub(crate) mod tests {
             let thread = project_rca_thread(&s.events, &turns, false, false);
             assert_eq!(thread.stats.duration_ms, last - T, "{turns:?}");
         }
+    }
+
+    /// F-15: a native comparison's key is its exact `service@version`; a call missing either
+    /// keeps the plain JSON key, which no native reference matches.
+    #[test]
+    fn a_version_comparison_is_keyed_by_service_and_version() {
+        let args = |v: Value| v.as_object().cloned().unwrap();
+        let input = args(json!({
+            "org_id": "default",
+            "request_body": {"service": "payments", "where": "env=prod", "a": {"version": "v1.4.2", "deploy_key": "d1"}, "signals": ["traces"]},
+        }));
+        assert_eq!(
+            key_arg(COMPARE_SERVICE_VERSIONS, &input).as_deref(),
+            Some("payments@v1.4.2")
+        );
+        let no_version =
+            args(json!({"request_body": {"service": "payments", "a": {"deploy_key": "d1"}}}));
+        let key = key_arg(COMPARE_SERVICE_VERSIONS, &no_version).unwrap();
+        assert!(key.starts_with('{'), "{key}");
     }
 }

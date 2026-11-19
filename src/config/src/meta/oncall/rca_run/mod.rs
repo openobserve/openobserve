@@ -17,22 +17,34 @@
 
 use std::collections::BTreeMap;
 
+mod coverage;
 mod evidence;
 mod ledger;
 mod outcome;
+mod recovery;
 mod summary;
 
+pub use coverage::{
+    AdverseMetric, CallCoverage, ComparisonCitation, Num, RUM_SOURCE, RequestedWindow,
+    VARIANCE_CI_KIND, call_coverage,
+};
 pub use evidence::{
     Citation, EvidenceEntry, EvidenceTarget, build_evidence, evidence_kind, evidence_target,
     exit_code, observed_window, summarize_result,
 };
 pub use ledger::{
-    BlindSpot, BlindSpotAxis, BlindSpotFix, EvidenceItem, EvidenceLedger, Hypothesis,
-    HypothesisStatus, LeadingEntry, LedgerCall, LedgerCounts, LedgerTool, MAX_BLIND_SPOTS,
-    MAX_EVIDENCE_ITEMS, MAX_HYPOTHESES, MAX_QUERY_BYTES, MAX_TEXT_CHARS, MAX_TITLE_CHARS, Polarity,
-    StatusChange, Strength, build_ledger, leading, leading_history, status_rank, subject,
+    BlindSpot, BlindSpotAxis, BlindSpotFix, ClaimScope, DisproofCheck, DisproofCheckKind,
+    DisproofCheckResult, EvidenceItem, EvidenceLedger, Hypothesis, HypothesisStatus, LeadingEntry,
+    LedgerCall, LedgerCounts, LedgerTool, MAX_BLIND_SPOTS, MAX_DISPROOF_CHECKS, MAX_EVIDENCE_ITEMS,
+    MAX_HYPOTHESES, MAX_PREDICTION_CHARS, MAX_QUERY_BYTES, MAX_TEXT_CHARS, MAX_TITLE_CHARS,
+    Polarity, StatusChange, Strength, build_ledger, leading, leading_history, status_rank, subject,
 };
 pub use outcome::{EndedBy, OutcomeReason, derive_outcome};
+pub use recovery::{
+    MAX_ERROR_RATE_RISE, MAX_P95_RATIO, MIN_TRAFFIC_SHARE, RECOVERY_BASELINE_US,
+    RECOVERY_PROBE_CALL_ID, RECOVERY_PROBE_TOOL, RECOVERY_WINDOW_US, RecoveryProbe,
+    ServiceRecovery, TrafficSample, baseline_window, judge, recent_window,
+};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value};
 pub use summary::{
@@ -48,7 +60,8 @@ use super::{
         ProposedAction, SubmittedNextStep, SuspectChange,
     },
     confidence::{
-        ConfidenceGrade, ToolCallRecord, UnverifiedCitation, apply_outcome, grade_confidence,
+        ConfidenceGrade, GradeTrust, ToolCallRecord, UnverifiedCitation, apply_outcome,
+        grade_confidence_with,
     },
 };
 
@@ -473,6 +486,7 @@ pub fn to_analysis_verdict(
         proposed_actions: v.proposed_actions.clone(),
         report_ref: v.report_ref.clone(),
         next_step: v.next_step.clone(),
+        recovery: None,
     }
 }
 
@@ -543,6 +557,17 @@ pub struct RcaRunRecord {
     pub cited_calls: Vec<ToolCallRecord>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub steer_authors: BTreeMap<String, String>,
+    /// OO's recovery probe; run only when the verdict recommends paging quieter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery_probe: Option<RecoveryProbe>,
+}
+
+/// What the finalizer knows from trusted state; the default is a single-cluster run with no
+/// probe, whose verdict never pages quieter.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct RunEndTrust {
+    pub grade: GradeTrust,
+    pub recovery_probe: Option<RecoveryProbe>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -606,6 +631,12 @@ fn blocked_detail(blind_spots: &[BlindSpot]) -> String {
 
 /// Build the ledger, grade verified evidence and derive the final outcome in precedence order.
 pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
+    record_run_end_with(input, &RunEndTrust::default())
+}
+
+/// [record_run_end] with the finalizer's trusted state: region coverage and the recovery probe,
+/// which is kept in the record, cited as a call, and carried on the verdict for L0.
+pub fn record_run_end_with(input: &RunEndInput, trust: &RunEndTrust) -> RunEndResult {
     let (ledger, mut blind_spots, counts) = build_ledger(input.calls, Some(input.ended_at_us));
     if !input.completed
         && let Some(spot) = run_end_blind_spot(input.stages_run)
@@ -618,12 +649,13 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
 
     let (grade, outcome) = match submitted {
         Some(v) => {
-            let mut grade = grade_confidence(
+            let mut grade = grade_confidence_with(
                 v,
                 ledger.as_ref(),
                 &blind_spots,
                 input.tool_log,
                 input.steer_authors,
+                &trust.grade,
             );
             let (outcome, reason) = derive_outcome(ledger.as_ref(), &grade, v, input.ended_by);
             apply_outcome(&mut grade, outcome, reason);
@@ -637,14 +669,17 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
         None => (None, None),
     };
 
-    let verdict = submitted
-        .zip(grade.as_ref())
-        .map(|(v, g)| to_analysis_verdict(v, g, &evidence));
+    let recovery_probe = trust.recovery_probe.clone().filter(|_| submitted.is_some());
+    let verdict = submitted.zip(grade.as_ref()).map(|(v, g)| AnalysisVerdict {
+        recovery: recovery_probe.as_ref().map(|p| p.verdict),
+        ..to_analysis_verdict(v, g, &evidence)
+    });
     let timeline = submit.map(|s| s.timeline.clone()).unwrap_or_default();
     let cited_calls: Vec<ToolCallRecord> = evidence
         .iter()
         .filter_map(|e| input.tool_log.iter().find(|r| r.call_id == e.call_id))
         .cloned()
+        .chain(recovery_probe.as_ref().map(RecoveryProbe::cited_call))
         .collect();
     let timeline_unverified =
         summary::timeline_view(&timeline, &evidence, &unverified, &cited_calls)
@@ -691,6 +726,7 @@ pub fn record_run_end(input: &RunEndInput) -> RunEndResult {
         leading_history: leading_history(input.calls),
         cited_calls,
         steer_authors,
+        recovery_probe,
     };
     RunEndResult {
         record,
@@ -791,7 +827,25 @@ pub(crate) mod fixtures {
             target: evidence_target(tool, &input),
             observed: None,
             result_summary: format!("{call_id} summary"),
+            coverage: Default::default(),
         }
+    }
+
+    /// A record whose result said it is complete over the whole fixture run.
+    pub(crate) fn complete(mut record: ToolCallRecord) -> ToolCallRecord {
+        record.coverage.is_partial = Some(false);
+        record.coverage.effective_window = Some(TimeWindow {
+            start: 0,
+            end: RUN_END_US,
+        });
+        record
+    }
+
+    /// A decisive `rules_out` item with a claim scope that a [complete] call covers.
+    pub(crate) fn rule_out(id: &str, tool: &str, query: &str) -> Value {
+        let mut v = item(id, tool, query, "rules_out", "decisive");
+        v["claim_scope"] = json!({"start_us": 0, "end_us": 1_000_000});
+        v
     }
 
     /// The end of a fixture run, after every fixture call; microseconds.
@@ -1049,7 +1103,13 @@ mod tests {
             let submit = parse_submit(&payload).unwrap();
             assert_eq!(submit.defects, defects);
             let verdict = submit.verdict.unwrap();
-            let grade = grade_confidence(&verdict, None, &[], &[], &BTreeMap::new());
+            let grade = crate::meta::oncall::confidence::grade_confidence(
+                &verdict,
+                None,
+                &[],
+                &[],
+                &BTreeMap::new(),
+            );
             assert_eq!(verdict.next_step, want);
             assert_eq!(to_analysis_verdict(&verdict, &grade, &[]).next_step, want);
         }
@@ -1384,7 +1444,7 @@ mod tests {
             vec![
                 prom("m1", "pool_active", 1),
                 traces("t1", "slow", 2),
-                logs("l1", "SELECT * FROM app", 3),
+                complete(logs("l1", "SELECT * FROM app", 3)),
             ]
         }
 
@@ -1406,13 +1466,7 @@ mod tests {
                 seq,
                 id,
                 "ruled_out",
-                vec![item(
-                    "e3",
-                    SQL,
-                    "SELECT * FROM app",
-                    "rules_out",
-                    "supporting",
-                )],
+                vec![rule_out("e3", SQL, "SELECT * FROM app")],
             )
         }
 

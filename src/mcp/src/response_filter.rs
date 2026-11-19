@@ -39,6 +39,9 @@ const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
     "format",
     "advisory",
     "is_partial",
+    // Server-adjusted bounds: without them the effective window of the result is unknown.
+    "new_start_time",
+    "new_end_time",
 ];
 
 /// Filter a tool's response body based on the requested detail level.
@@ -904,5 +907,24 @@ mod tests {
         let body = r#"{"data":"keep everything"}"#;
         let result = filter_response("UnknownTool", body, &DetailLevel::Summary);
         assert_eq!(result, body);
+    }
+
+    /// The grader reads a server-narrowed range as the result's effective window.
+    #[test]
+    fn test_search_sql_keeps_server_adjusted_bounds() {
+        let body = serde_json::to_string(&json!({
+            "hits": [],
+            "total": 0,
+            "is_partial": false,
+            "new_start_time": 1_700_000_060_000_000_i64,
+            "new_end_time": 1_700_000_900_000_000_i64,
+            "trace_id": "abc-123"
+        }))
+        .unwrap();
+        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert_eq!(parsed["new_start_time"], 1_700_000_060_000_000_i64);
+        assert_eq!(parsed["new_end_time"], 1_700_000_900_000_000_i64);
+        assert!(parsed.get("trace_id").is_none());
     }
 }

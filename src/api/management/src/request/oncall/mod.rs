@@ -2778,14 +2778,22 @@ pub async fn get_response(
                 return internal_error("get_response", &e);
             }
         };
-        match infra::table::oncall_responses::list_events(&response_id).await {
-            Ok(events) => MetaHttpResponse::json(serde_json::json!({
-                // Hoisted: "where is the runbook" must not depend on the alert still existing.
-                "response": with_page_details(&org_id, vec![record]).await.pop(),
-                "events": events,
-            })),
-            Err(e) => internal_error("get_response events", &e),
-        }
+        let events = match infra::table::oncall_responses::list_events(&response_id).await {
+            Ok(events) => events,
+            Err(e) => return internal_error("get_response events", &e),
+        };
+        // P16: pages this record opened that started no run, each naming the run that covered it.
+        let rca_skipped =
+            match infra::table::rca_skipped_pages::list_for_response(&org_id, &response_id).await {
+                Ok(pages) => pages,
+                Err(e) => return internal_error("get_response skipped pages", &e),
+            };
+        MetaHttpResponse::json(serde_json::json!({
+            // Hoisted: "where is the runbook" must not depend on the alert still existing.
+            "response": with_page_details(&org_id, vec![record]).await.pop(),
+            "events": events,
+            "rca_skipped": rca_skipped,
+        }))
     }
     #[cfg(not(feature = "enterprise"))]
     {

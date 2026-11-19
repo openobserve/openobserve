@@ -49,6 +49,17 @@ export const incidentEventsQuery = (org: string, id: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
+/** The newest RCA runs of an incident (the server's page cap) and its skipped pages. */
+export const RCA_RUNS_PAGE_LIMIT = 100;
+
+export const incidentRcaRunsQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: incidentKeys.rcaRuns(org, id),
+    queryFn: async () =>
+      (await incidents.listRcaRuns(org, id, { limit: RCA_RUNS_PAGE_LIMIT })).data,
+    staleTime: LIVE_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 /** What a status write answers: the incident when it could be read, and the one ack's answer. */

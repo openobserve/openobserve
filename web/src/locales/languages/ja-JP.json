@@ -12301,6 +12301,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "{region} で分析済み",
+          "analyzingIn": "{region} で分析中",
+          "unknown": "分析リージョン不明",
+          "noLocalRun": "ローカルの分析なし。他のリージョンは不明",
+          "tooltip": "実行履歴はリージョンごとに保存されます。この実行は {region} で行われました。",
+          "historyFailed": "レポート履歴を読み込めませんでした。",
+          "historyFailedHint": "読み込まれるとリージョンが表示されます。"
+        },
+        "skipped": {
+          "title": "{time} UTC のオンコール通知: 新しい実行なし",
+          "inFlight": "実行 {number} はすでに実行中でした",
+          "coolingDown": "実行 {number} は {cooldown} のクールダウン内に実行されました",
+          "gone": "実行はもう保存されていません",
+          "open": "実行 {number} を開く"
+        },
         "reanalyzingFresh": "最初から再分析しています…",
         "reanalyzingBuildOnPrevious": "前回のレポートを基に構築しています…",
         "resumingFrom": "「{step}」から再開しています…",

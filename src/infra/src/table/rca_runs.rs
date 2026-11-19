@@ -17,14 +17,17 @@
 
 use std::str::FromStr;
 
-use config::meta::alerts::{
-    incidents::IncidentEvent,
-    rca_runs::{
-        RcaRun, RcaRunItem, RcaSummary, ReportFormat, RunError, RunMode, RunState, RunStats,
-        RunSubjectType, RunSummaryFields, RunTrigger, is_live_blocking, is_stale, is_v1_run_id,
-        next_previous,
+use config::meta::{
+    alerts::{
+        incidents::IncidentEvent,
+        rca_runs::{
+            RcaRun, RcaRunItem, RcaSummary, ReportFormat, RunError, RunMode, RunState, RunStats,
+            RunSubjectType, RunSummaryFields, RunTrigger, SkipReason, is_live_blocking, is_stale,
+            is_v1_run_id, next_previous,
+        },
+        rca_steering::SteerRecord,
     },
-    rca_steering::SteerRecord,
+    oncall::SubjectRef,
 };
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, DbErr,
@@ -36,8 +39,11 @@ use svix_ksuid::KsuidLike;
 
 pub use super::entity::rca_runs::Model;
 use super::{
-    entity::{alert_incidents, rca_runs},
-    incident_events, rca_steering,
+    entity::{alert_incidents, alerts, rca_runs},
+    incident_events,
+    rca_delivery_obligations::{self, ObligationKind, Recipient},
+    rca_skipped_pages::{self, NewSkippedPage},
+    rca_steering,
 };
 use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
@@ -45,6 +51,15 @@ use crate::db::{get_orm_client_ro, get_orm_client_rw};
 pub const STALE_ERROR_CODE: &str = "stale";
 /// `error.reason` of a stale run.
 pub const STALE_ERROR_REASON: &str = "The analysis stopped responding";
+/// `error.code` of a run whose subject became a security case while it ran (D'3, D'9).
+pub const RECLASSIFIED_ERROR_CODE: &str = "security_case_reclassified";
+/// `error.reason` of a reclassified run.
+pub const RECLASSIFIED_ERROR_REASON: &str =
+    "The incident became a security case; start a new analysis";
+/// `started_by` of an automatic page; only its starts take the paging cooldown.
+const PAGING_STARTED_BY: &str = "system";
+/// Skipped pages a subject keeps per run of its history limit (re-review D'22).
+const SKIPPED_PAGES_PER_HISTORY_RUN: usize = 4;
 
 /// Steering users kept in the run summary, newest first.
 const STEERED_BY_MAX: usize = 3;
@@ -52,6 +67,19 @@ const STEERED_BY_MAX: usize = 3;
 /// A new run id: a KSUID, so ids sort by time.
 pub fn new_run_id() -> String {
     svix_ksuid::Ksuid::new(None, None).to_string()
+}
+
+/// The P16 key of a firing: hex SHA-256 of its sorted subject ids; empty for no subjects.
+pub fn firing_scope(subjects: &[SubjectRef]) -> String {
+    use sha2::{Digest, Sha256};
+
+    if subjects.is_empty() {
+        return String::new();
+    }
+    let mut ids: Vec<String> = subjects.iter().map(SubjectRef::subject_id).collect();
+    ids.sort();
+    ids.dedup();
+    hex::encode(Sha256::digest(ids.join("\n").as_bytes()))
 }
 
 /// The row [start_run] inserts.
@@ -69,6 +97,8 @@ pub struct NewRun {
     /// Serialized `Vec<SubjectRef>`: the pending on-call records of an alert run.
     pub oncall_subjects: Option<serde_json::Value>,
     pub context_used: Option<serde_json::Value>,
+    /// One delivery obligation is armed per recipient when the run starts.
+    pub recipients: Vec<Recipient>,
 }
 
 /// The values [start_run] decides with.
@@ -82,6 +112,8 @@ pub struct StartGuards<'a> {
     pub history_limit: usize,
     /// The incident's latest run the caller decided on (a Resume); any other start since wins.
     pub latest_run_id: Option<&'a str>,
+    /// An automatic start: a refusal records one skipped page per recipient, in its transaction.
+    pub records_skips: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,10 +124,22 @@ pub enum StartResult {
         /// The id of that stale run, so the caller closes its steering rows.
         replaced_run_id: Option<String>,
     },
-    /// The latest run is live and not stale, or a concurrent start won.
-    InFlight,
-    /// The newest completed run ended within the cooldown.
-    CoolingDown,
+    /// The latest run is live and not stale, or a concurrent start won; ids come from the guard.
+    InFlight { covering_run_id: String },
+    /// A recent run is within the cooldown.
+    CoolingDown {
+        covering_run_id: String,
+        retry_after_us: i64,
+    },
+}
+
+/// What the alert-subject guard decided inside the start transaction.
+enum AlertAdmission {
+    Admit {
+        replaced_stale: Option<RunTrigger>,
+        replaced_run_id: Option<String>,
+    },
+    Refuse(StartResult),
 }
 
 /// One [update_run] write. `state: None` is a progress write.
@@ -135,6 +179,8 @@ pub struct RunUpdate {
     pub questions_asked_inc: bool,
     /// When the answer deadline closed; the write loses once it closed.
     pub deadline_closed_at: Option<i64>,
+    /// D'9: a completing run that read history ends `failed` if its subject is now a case.
+    pub withhold_if_case: bool,
     pub now_us: i64,
     /// The incident's status episode the write belongs to; it loses once the incident left it.
     pub episode: Option<crate::table::alert_incidents::Episode>,
@@ -248,19 +294,24 @@ pub async fn start_run_with<C: TransactionTrait>(
             .as_deref()
             .and_then(|s| RunState::from_str(s).ok());
         let seen_updated_at = seen.rca_updated_at.unwrap_or_default();
+        let seen_run_id = seen.rca_run_id.clone().unwrap_or_default();
         // A start since the caller's decision is the concurrent start that won.
         if guards
             .latest_run_id
             .is_some_and(|latest| seen.rca_run_id.as_deref() != Some(latest))
         {
-            txn.rollback().await?;
-            return Ok(StartResult::InFlight);
+            let refusal = StartResult::InFlight {
+                covering_run_id: seen_run_id,
+            };
+            return refuse(txn, &new, &guards, refusal).await;
         }
         if seen_state.is_some_and(|state| {
             is_live_blocking(state, seen_updated_at, now, guards.rca_timeout_secs)
         }) {
-            txn.rollback().await?;
-            return Ok(StartResult::InFlight);
+            let refusal = StartResult::InFlight {
+                covering_run_id: seen_run_id,
+            };
+            return refuse(txn, &new, &guards, refusal).await;
         }
 
         if let Some(cooldown) = guards.cooldown_us {
@@ -272,12 +323,15 @@ pub async fn start_run_with<C: TransactionTrait>(
                     .add(rca_runs::Column::SubjectId.eq(new.subject_id.as_str())),
             )
             .await?;
-            if newest
-                .and_then(|run| run.ended_at)
-                .is_some_and(|ended_at| now.saturating_sub(ended_at) < cooldown)
+            if let Some(run) = newest
+                && let Some(ended_at) = run.ended_at
+                && now.saturating_sub(ended_at) < cooldown
             {
-                txn.rollback().await?;
-                return Ok(StartResult::CoolingDown);
+                let refusal = StartResult::CoolingDown {
+                    covering_run_id: run.run_id,
+                    retry_after_us: ended_at.saturating_add(cooldown),
+                };
+                return refuse(txn, &new, &guards, refusal).await;
             }
         }
 
@@ -332,7 +386,9 @@ pub async fn start_run_with<C: TransactionTrait>(
             .await?;
         if cas.rows_affected == 0 {
             txn.rollback().await?;
-            return Ok(StartResult::InFlight);
+            return Ok(StartResult::InFlight {
+                covering_run_id: seen.rca_run_id.unwrap_or_default(),
+            });
         }
 
         // The replaced run stopped writing; end it in this transaction.
@@ -343,8 +399,20 @@ pub async fn start_run_with<C: TransactionTrait>(
             replaced_stale = fail_stale_with(&txn, &new.org_id, seen_run_id, now).await?;
             replaced_run_id = replaced_stale.is_some().then(|| seen_run_id.to_string());
         }
+    } else {
+        match guard_alert(&txn, &new, &guards).await? {
+            AlertAdmission::Admit {
+                replaced_stale: stale,
+                replaced_run_id: stale_id,
+            } => {
+                replaced_stale = stale;
+                replaced_run_id = stale_id;
+            }
+            AlertAdmission::Refuse(refusal) => return refuse(txn, &new, &guards, refusal).await,
+        }
     }
 
+    let run_number = next_run_number(&txn, &new.org_id, new.subject_type, &new.subject_id).await?;
     rca_runs::ActiveModel {
         run_id: Set(new.run_id.clone()),
         org_id: Set(new.org_id.clone()),
@@ -376,9 +444,12 @@ pub async fn start_run_with<C: TransactionTrait>(
         pending_question_id: Set(None),
         questions_asked: Set(0),
         deadline_closed_at: Set(None),
+        run_number: Set(Some(run_number)),
+        fenced: Set(false),
     }
     .insert(&txn)
     .await?;
+    rca_delivery_obligations::arm_in(&txn, &new.org_id, &new.run_id, &new.recipients, now).await?;
 
     if let Some(row) = guidance_row.as_ref() {
         rca_steering::insert_in(&txn, row).await?;
@@ -454,8 +525,244 @@ async fn fail_stale_with(
         .filter(rca_runs::Column::State.eq(RunState::Running.as_str()))
         .exec(txn)
         .await?;
-    Ok((ended.rows_affected > 0)
-        .then(|| parse_or(&run.trigger, RunTrigger::Legacy, &run.run_id, "trigger")))
+    if ended.rows_affected == 0 {
+        return Ok(None);
+    }
+    rca_delivery_obligations::settle_in(txn, org_id, run_id, ObligationKind::NoVerdict, now)
+        .await?;
+    Ok(Some(parse_or(
+        &run.trigger,
+        RunTrigger::Legacy,
+        &run.run_id,
+        "trigger",
+    )))
+}
+
+/// A refused start: its skipped pages commit with the refusal, else nothing is written.
+async fn refuse(
+    txn: DatabaseTransaction,
+    new: &NewRun,
+    guards: &StartGuards<'_>,
+    refusal: StartResult,
+) -> Result<StartResult, DbErr> {
+    let pages = skipped_pages(&txn, new, guards, &refusal).await?;
+    if pages.is_empty() {
+        txn.rollback().await?;
+        return Ok(refusal);
+    }
+    rca_skipped_pages::insert_in(&txn, &pages).await?;
+    // `prune_with` runs only on a start, so sustained refusals keep the cap here.
+    rca_skipped_pages::retain_newest_in(
+        &txn,
+        &new.org_id,
+        new.subject_type,
+        &new.subject_id,
+        skipped_page_cap(guards.history_limit),
+    )
+    .await?;
+    txn.commit().await?;
+    Ok(refusal)
+}
+
+/// One skipped page per recipient of an automatic start; none for manual, Slack or resume.
+async fn skipped_pages(
+    txn: &DatabaseTransaction,
+    new: &NewRun,
+    guards: &StartGuards<'_>,
+    refusal: &StartResult,
+) -> Result<Vec<NewSkippedPage>, DbErr> {
+    let (reason, covering_run_id, retry_after_us) = match refusal {
+        StartResult::InFlight { covering_run_id } => (SkipReason::InFlight, covering_run_id, None),
+        StartResult::CoolingDown {
+            covering_run_id,
+            retry_after_us,
+        } => (
+            SkipReason::CoolingDown,
+            covering_run_id,
+            Some(*retry_after_us),
+        ),
+        StartResult::Started { .. } => return Ok(Vec::new()),
+    };
+    if !guards.records_skips || new.recipients.is_empty() || covering_run_id.is_empty() {
+        return Ok(Vec::new());
+    }
+    let covering_run_number = run_number_of(txn, &new.org_id, covering_run_id).await?;
+    let firing_key = match new.subject_type {
+        RunSubjectType::Alert => firing_scope_of(&new.recipients),
+        RunSubjectType::Incident => new.trigger.as_str().to_string(),
+    };
+    Ok(new
+        .recipients
+        .iter()
+        .map(|recipient| NewSkippedPage {
+            org_id: new.org_id.clone(),
+            subject_type: new.subject_type,
+            subject_id: new.subject_id.clone(),
+            incident_id: new.incident_id.clone(),
+            response_id: Some(recipient.response_id.clone()),
+            firing_key: firing_key.clone(),
+            reason,
+            covering_run_id: covering_run_id.clone(),
+            covering_run_number,
+            retry_after_us,
+            cooldown_us: guards.cooldown_us,
+            at_us: guards.now_us,
+        })
+        .collect())
+}
+
+fn skipped_page_cap(history_limit: usize) -> usize {
+    history_limit
+        .max(1)
+        .saturating_mul(SKIPPED_PAGES_PER_HISTORY_RUN)
+}
+
+/// P16 for an alert subject, keyed `(org, alert, firing scope)` and serialized on the alert row.
+async fn guard_alert(
+    txn: &DatabaseTransaction,
+    new: &NewRun,
+    guards: &StartGuards<'_>,
+) -> Result<AlertAdmission, DbErr> {
+    let paging = new.trigger == RunTrigger::OncallPage && new.started_by == PAGING_STARTED_BY;
+    if !lock_alert(txn, &new.org_id, &new.subject_id).await? && paging {
+        // A firing id is not lockable, so an unknown alert would admit concurrent runs.
+        return Err(DbErr::RecordNotFound(format!(
+            "alert {}/{}",
+            new.org_id, new.subject_id
+        )));
+    }
+    let scope = firing_scope_of(&new.recipients);
+    let runs = rca_runs::Entity::find()
+        .filter(rca_runs::Column::OrgId.eq(new.org_id.as_str()))
+        .filter(rca_runs::Column::SubjectType.eq(RunSubjectType::Alert.as_str()))
+        .filter(rca_runs::Column::SubjectId.eq(new.subject_id.as_str()))
+        .order_by_desc(rca_runs::Column::StartedAt)
+        .order_by_desc(rca_runs::Column::RunId)
+        .all(txn)
+        .await?;
+
+    let now = guards.now_us;
+    let mut replaced_stale = None;
+    let mut replaced_run_id = None;
+    let mut stale_ended = Vec::new();
+    for run in &runs {
+        let state = state_of(run);
+        if !state.is_live() {
+            continue;
+        }
+        if is_stale(state, run.updated_at, now, guards.rca_timeout_secs) {
+            if let Some(trigger) = fail_stale_with(txn, &new.org_id, &run.run_id, now).await? {
+                replaced_stale = Some(trigger);
+                replaced_run_id = Some(run.run_id.clone());
+            }
+            stale_ended.push(run.run_id.as_str());
+            continue;
+        }
+        // A start without a scope (human, Slack) and a run without one cover the whole alert.
+        let run_scope = firing_scope(&owned_subjects_of(run));
+        if scope.is_empty() || run_scope.is_empty() || run_scope == scope {
+            return Ok(AlertAdmission::Refuse(StartResult::InFlight {
+                covering_run_id: run.run_id.clone(),
+            }));
+        }
+    }
+
+    if let Some(cooldown) = guards.cooldown_us.filter(|_| paging && !scope.is_empty()) {
+        let newest = runs.iter().find(|run| {
+            run.trigger == RunTrigger::OncallPage.as_str()
+                && firing_scope(&owned_subjects_of(run)) == scope
+        });
+        if let Some(run) = newest {
+            // A run this start just ended stale stopped at its last write, not now.
+            let ended_at = if stale_ended.contains(&run.run_id.as_str()) {
+                run.updated_at
+            } else {
+                run.ended_at.unwrap_or(run.started_at)
+            };
+            if now.saturating_sub(ended_at) < cooldown {
+                return Ok(AlertAdmission::Refuse(StartResult::CoolingDown {
+                    covering_run_id: run.run_id.clone(),
+                    retry_after_us: ended_at.saturating_add(cooldown),
+                }));
+            }
+        }
+    }
+    Ok(AlertAdmission::Admit {
+        replaced_stale,
+        replaced_run_id,
+    })
+}
+
+/// Row lock on the source alert; SQLite takes its writer lock with a no-op write instead.
+async fn lock_alert(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    alert_id: &str,
+) -> Result<bool, DbErr> {
+    if txn.get_database_backend() == sea_orm::DatabaseBackend::Sqlite {
+        let touched = alerts::Entity::update_many()
+            .col_expr(alerts::Column::Org, Expr::col(alerts::Column::Org).into())
+            .filter(alerts::Column::Id.eq(alert_id))
+            .filter(alerts::Column::Org.eq(org_id))
+            .exec(txn)
+            .await?;
+        return Ok(touched.rows_affected > 0);
+    }
+    let found = alerts::Entity::find_by_id(alert_id)
+        .filter(alerts::Column::Org.eq(org_id))
+        .select_only()
+        .column(alerts::Column::Id)
+        .lock(LockType::Update)
+        .into_tuple::<String>()
+        .one(txn)
+        .await?;
+    Ok(found.is_some())
+}
+
+/// `max + 1` of the subject's numbered runs, read under the start's lock.
+async fn next_run_number(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    subject_type: RunSubjectType,
+    subject_id: &str,
+) -> Result<i32, DbErr> {
+    let max = rca_runs::Entity::find()
+        .select_only()
+        .column_as(rca_runs::Column::RunNumber.max(), "max_run_number")
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::SubjectType.eq(subject_type.as_str()))
+        .filter(rca_runs::Column::SubjectId.eq(subject_id))
+        .into_tuple::<Option<i32>>()
+        .one(txn)
+        .await?
+        .flatten();
+    Ok(max.unwrap_or(0).saturating_add(1))
+}
+
+async fn run_number_of(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    run_id: &str,
+) -> Result<Option<u32>, DbErr> {
+    let number = rca_runs::Entity::find_by_id(run_id)
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .select_only()
+        .column(rca_runs::Column::RunNumber)
+        .into_tuple::<Option<i32>>()
+        .one(txn)
+        .await?
+        .flatten();
+    Ok(number.and_then(|n| u32::try_from(n).ok()))
+}
+
+fn firing_scope_of(recipients: &[Recipient]) -> String {
+    let subjects: Vec<SubjectRef> = recipients.iter().map(|r| r.subject.clone()).collect();
+    firing_scope(&subjects)
+}
+
+/// The `oncall_subjects` a row stored; a row without them owns none.
+fn owned_subjects_of(run: &Model) -> Vec<SubjectRef> {
+    decode(run.oncall_subjects.as_deref()).unwrap_or_default()
 }
 
 async fn prune_with(
@@ -476,6 +783,14 @@ async fn prune_with(
         .into_tuple()
         .all(txn)
         .await?;
+    rca_skipped_pages::retain_newest_in(
+        txn,
+        org_id,
+        subject_type,
+        subject_id,
+        skipped_page_cap(history_limit),
+    )
+    .await?;
 
     let keep = history_limit.saturating_add(1);
     if runs.len() <= keep {
@@ -497,8 +812,9 @@ async fn prune_with(
     if doomed.is_empty() {
         return Ok(());
     }
-    // A pruned run's steering rows go with it.
+    // A pruned run's steering rows and settled deliveries go with it.
     rca_steering::delete_for_runs_in(txn, org_id, &doomed).await?;
+    rca_delivery_obligations::delete_for_runs_in(txn, org_id, &doomed).await?;
     rca_runs::Entity::delete_many()
         .filter(rca_runs::Column::OrgId.eq(org_id))
         .filter(rca_runs::Column::RunId.is_in(doomed))
@@ -630,6 +946,7 @@ pub async fn update_run_with<C: TransactionTrait>(
         return final_stats_with(db, org_id, run_id, &upd).await;
     }
     let txn = db.begin().await?;
+    let (upd, withheld) = withhold_if_reclassified(&txn, org_id, run_id, upd).await?;
     let now = upd.now_us;
     let from: Vec<_> = allowed_from(upd.state)
         .iter()
@@ -766,6 +1083,17 @@ pub async fn update_run_with<C: TransactionTrait>(
             Expr::value(encode(context_used, "context_used")?),
         );
     }
+    // A withheld run keeps no report or record, including one an earlier write stored.
+    if withheld {
+        for column in [
+            rca_runs::Column::Report,
+            rca_runs::Column::Result,
+            rca_runs::Column::Outcome,
+            rca_runs::Column::Confidence,
+        ] {
+            update = update.col_expr(column, Expr::value(Option::<String>::None));
+        }
+    }
     if upd.continuations_inc {
         update = update.col_expr(
             rca_runs::Column::Continuations,
@@ -835,8 +1163,72 @@ pub async fn update_run_with<C: TransactionTrait>(
         }
     }
 
+    // D'2: the deliveries this run owes become due in the transaction that ends it.
+    if let Some(state) = upd.state.filter(|s| s.is_terminal()) {
+        let kind = if state == RunState::Completed {
+            ObligationKind::Verdict
+        } else {
+            ObligationKind::NoVerdict
+        };
+        rca_delivery_obligations::settle_in(&txn, org_id, run_id, kind, now).await?;
+    }
+
     txn.commit().await?;
     Ok(true)
+}
+
+/// D'9: a completing run that read history, whose subject is fenced or now a case (or can no
+/// longer be classified), ends `failed` with no report and owes only a release.
+async fn withhold_if_reclassified(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    run_id: &str,
+    upd: RunUpdate,
+) -> Result<(RunUpdate, bool), DbErr> {
+    if upd.state != Some(RunState::Completed) || !upd.withhold_if_case {
+        return Ok((upd, false));
+    }
+    let Some((fenced, incident_id)) = rca_runs::Entity::find_by_id(run_id)
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .select_only()
+        .columns([rca_runs::Column::Fenced, rca_runs::Column::IncidentId])
+        .into_tuple::<(bool, Option<String>)>()
+        .one(txn)
+        .await?
+    else {
+        return Ok((upd, false));
+    };
+    let case = match incident_id.as_deref() {
+        Some(incident_id) => alert_incidents::Entity::find_by_id(incident_id)
+            .filter(alert_incidents::Column::OrgId.eq(org_id))
+            .select_only()
+            .column(alert_incidents::Column::SecurityCase)
+            .into_tuple::<bool>()
+            .one(txn)
+            .await?
+            .unwrap_or(true),
+        None => false,
+    };
+    if !fenced && !case {
+        return Ok((upd, false));
+    }
+    log::warn!("[RCA_RUNS] run {run_id} of {org_id} read history and its subject is now a case");
+    let withheld = RunUpdate {
+        state: Some(RunState::Failed),
+        report: None,
+        outcome: None,
+        confidence: None,
+        result: None,
+        error: Some(RunError {
+            code: RECLASSIFIED_ERROR_CODE.to_string(),
+            reason: RECLASSIFIED_ERROR_REASON.to_string(),
+            details: None,
+            trigger_type: None,
+        }),
+        event: None,
+        ..upd
+    };
+    Ok((withheld, true))
 }
 
 /// Stats-only writes preserve terminal state and never overwrite a stored result.
@@ -1116,6 +1508,38 @@ pub async fn list_live_for_alert(
         .await
 }
 
+/// The subjects a run owns: its `oncall_subjects` and the records its deliveries owe (D'2).
+pub async fn owned_subjects(org_id: &str, run_id: &str) -> Result<Vec<SubjectRef>, DbErr> {
+    let mut owned = match get_rw(org_id, run_id).await? {
+        Some(run) => owned_subjects_of(&run),
+        None => Vec::new(),
+    };
+    for obligation in rca_delivery_obligations::for_run(org_id, run_id).await? {
+        if !owned.contains(&obligation.subject) {
+            owned.push(obligation.subject);
+        }
+    }
+    Ok(owned)
+}
+
+/// The one live run bound to an assistant session; `None` for zero, several or another org's.
+pub async fn live_run_for_session(org_id: &str, session_id: &str) -> Result<Option<Model>, DbErr> {
+    let mut runs = rca_runs::Entity::find()
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::SessionId.eq(session_id))
+        .filter(
+            rca_runs::Column::State
+                .is_in([RunState::Running.as_str(), RunState::WaitingInput.as_str()]),
+        )
+        .limit(2)
+        .all(get_orm_client_rw().await)
+        .await?;
+    if runs.len() != 1 {
+        return Ok(None);
+    }
+    Ok(runs.pop())
+}
+
 pub async fn list_waiting_past_deadline(now_us: i64, limit: u64) -> Result<Vec<Model>, DbErr> {
     list_waiting_past_deadline_with(get_orm_client_rw().await, now_us, limit).await
 }
@@ -1264,8 +1688,10 @@ pub async fn reopen_waiting_with<C: TransactionTrait>(
     Ok(true)
 }
 
-/// Deletes every run of the org.
+/// Deletes every run of the org, with its skipped pages and delivery obligations.
 pub async fn delete_by_org(org_id: &str) -> Result<(), DbErr> {
+    rca_skipped_pages::delete_by_org(org_id).await?;
+    rca_delivery_obligations::delete_by_org(org_id).await?;
     rca_runs::Entity::delete_many()
         .filter(rca_runs::Column::OrgId.eq(org_id))
         .exec(get_orm_client_rw().await)
@@ -1355,6 +1781,13 @@ pub fn to_item(m: &Model) -> RcaRunItem {
         cancelled_by: m.cancelled_by.clone(),
         error_reason: error_of(m).map(|e| e.reason),
         has_record: m.result.is_some(),
+        serving_region: decode::<serde_json::Value>(m.context_used.as_deref()).and_then(|used| {
+            used.get("serving_region")
+                .and_then(serde_json::Value::as_str)
+                .filter(|region| !region.is_empty())
+                .map(str::to_string)
+        }),
+        run_number: m.run_number.and_then(|n| u32::try_from(n).ok()),
     }
 }
 
@@ -1399,28 +1832,39 @@ pub async fn backfill_v1_pointers_for_tests() -> Result<(), DbErr> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::alerts::{
-        incidents::{AnalysisTriggerType, IncidentEventType},
-        rca_runs::PreviousResult,
+    use config::meta::{
+        alerts::{
+            incidents::{AnalysisTriggerType, IncidentEventType},
+            rca_runs::PreviousResult,
+        },
+        oncall::SubjectType,
     };
     use sea_orm::{ConnectOptions, Database, DatabaseConnection, Schema};
 
     use super::*;
-    use crate::table::entity::incident_events as events_entity;
+    use crate::table::entity::{
+        incident_events as events_entity, rca_delivery_obligations as obligations_entity,
+        rca_skipped_pages as skipped_entity,
+    };
 
     const ORG: &str = "acme";
     const SEC: i64 = 1_000_000;
     const T0: i64 = 1_700_000_000 * SEC;
     const TIMEOUT: u64 = 600;
+    const COOLDOWN: i64 = 30 * 60 * SEC;
 
     async fn create_tables(db: &DatabaseConnection) {
         let backend = db.get_database_backend();
         let schema = Schema::new(backend);
         for stmt in [
+            schema.create_table_from_entity(crate::table::entity::folders::Entity),
+            schema.create_table_from_entity(crate::table::entity::alerts::Entity),
             schema.create_table_from_entity(rca_runs::Entity),
             schema.create_table_from_entity(alert_incidents::Entity),
             schema.create_table_from_entity(events_entity::Entity),
             schema.create_table_from_entity(crate::table::entity::rca_steering::Entity),
+            schema.create_table_from_entity(obligations_entity::Entity),
+            schema.create_table_from_entity(skipped_entity::Entity),
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
@@ -1480,6 +1924,51 @@ mod tests {
         .unwrap();
     }
 
+    async fn alert_row(db: &DatabaseConnection, id: &str) {
+        let folder_id = format!("folder-{id}");
+        crate::table::entity::folders::ActiveModel {
+            id: Set(folder_id.clone()),
+            org: Set(ORG.to_string()),
+            folder_id: Set(folder_id.clone()),
+            name: Set(folder_id.clone()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(0),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+        crate::table::entity::alerts::ActiveModel {
+            id: Set(id.to_string()),
+            org: Set(ORG.to_string()),
+            folder_id: Set(folder_id),
+            name: Set(id.to_string()),
+            stream_type: Set("logs".to_string()),
+            stream_name: Set("default".to_string()),
+            is_real_time: Set(false),
+            destinations: Set(serde_json::json!([])),
+            row_template_type: Set(0),
+            enabled: Set(true),
+            tz_offset: Set(0),
+            query_type: Set(0),
+            trigger_threshold_operator: Set(">".to_string()),
+            trigger_period_seconds: Set(60),
+            trigger_threshold_count: Set(1),
+            trigger_frequency_type: Set(0),
+            trigger_frequency_seconds: Set(60),
+            trigger_silence_seconds: Set(0),
+            align_time: Set(false),
+            dedup_enabled: Set(false),
+            creates_incident: Set(false),
+            workflows: Set(serde_json::json!([])),
+            pending_period_sec: Set(0),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
     fn new_run(subject_type: RunSubjectType, subject_id: &str) -> NewRun {
         NewRun {
             run_id: new_run_id(),
@@ -1493,7 +1982,30 @@ mod tests {
             guidance: None,
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
         }
+    }
+
+    fn recipient(response_id: &str, alert_id: &str, firing: u32) -> Recipient {
+        Recipient {
+            response_id: response_id.to_string(),
+            subject: SubjectRef::new(SubjectType::Alert, alert_id, firing),
+            ladder_run: 1,
+        }
+    }
+
+    fn with_recipients(mut new: NewRun, recipients: Vec<Recipient>) -> NewRun {
+        let subjects: Vec<_> = recipients.iter().map(|r| &r.subject).collect();
+        new.oncall_subjects = Some(serde_json::to_value(subjects).unwrap());
+        new.recipients = recipients;
+        new
+    }
+
+    fn paging_run(alert_id: &str, recipients: Vec<Recipient>) -> NewRun {
+        let mut new = with_recipients(new_run(RunSubjectType::Alert, alert_id), recipients);
+        new.trigger = RunTrigger::OncallPage;
+        new.started_by = "system".to_string();
+        new
     }
 
     fn guards(now_us: i64) -> StartGuards<'static> {
@@ -1503,6 +2015,21 @@ mod tests {
             cooldown_us: None,
             history_limit: 25,
             latest_run_id: None,
+            records_skips: false,
+        }
+    }
+
+    fn paging_guards(now_us: i64) -> StartGuards<'static> {
+        StartGuards {
+            cooldown_us: Some(COOLDOWN),
+            ..guards(now_us)
+        }
+    }
+
+    fn started_id(result: StartResult) -> String {
+        match result {
+            StartResult::Started { run_id, .. } => run_id,
+            other => panic!("expected Started, got {other:?}"),
         }
     }
 
@@ -1582,6 +2109,25 @@ mod tests {
         rca_runs::Entity::find()
             .filter(rca_runs::Column::SubjectId.eq(subject_id))
             .order_by_desc(rca_runs::Column::StartedAt)
+            .all(db)
+            .await
+            .unwrap()
+    }
+
+    async fn obligations(db: &DatabaseConnection, run_id: &str) -> Vec<obligations_entity::Model> {
+        obligations_entity::Entity::find()
+            .filter(obligations_entity::Column::OrgId.eq(ORG))
+            .filter(obligations_entity::Column::RunId.eq(run_id))
+            .order_by_asc(obligations_entity::Column::ResponseId)
+            .all(db)
+            .await
+            .unwrap()
+    }
+
+    async fn skipped(db: &DatabaseConnection) -> Vec<skipped_entity::Model> {
+        skipped_entity::Entity::find()
+            .filter(skipped_entity::Column::OrgId.eq(ORG))
+            .order_by_asc(skipped_entity::Column::ResponseId)
             .all(db)
             .await
             .unwrap()
@@ -1720,7 +2266,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(second, StartResult::InFlight);
+        assert!(matches!(second, StartResult::InFlight { .. }));
         assert_eq!(runs_of(&db, "inc-1").await.len(), 1);
         assert_eq!(
             (inc(&db, "inc-1").await, events(&db, "inc-1").await),
@@ -1741,9 +2287,8 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(
-            third,
-            StartResult::InFlight,
+        assert!(
+            matches!(third, StartResult::InFlight { .. }),
             "waiting_input never goes stale"
         );
         assert_eq!(runs_of(&db, "inc-1").await.len(), 1);
@@ -1778,7 +2323,11 @@ mod tests {
                 .count(),
             1
         );
-        assert!(results.contains(&StartResult::InFlight));
+        assert!(
+            results
+                .iter()
+                .any(|r| matches!(r, StartResult::InFlight { .. }))
+        );
         assert_eq!(runs_of(&db, "inc-1").await.len(), 1);
         assert_eq!(event_types(&db, "inc-1").await.len(), 1);
     }
@@ -1787,7 +2336,20 @@ mod tests {
     async fn rr6_a_start_replaces_a_stale_run_and_fails_it() {
         let db = db().await;
         incident(&db, "inc-1").await;
-        let r1 = start(&db, "inc-1", T0).await;
+        let r1 = started_id(
+            start_run_with(
+                &db,
+                with_recipients(
+                    new_run(RunSubjectType::Incident, "inc-1"),
+                    vec![recipient("response-1", "alert-1", 1)],
+                ),
+                guards(T0),
+                Some(IncidentEvent::ai_analysis_begin()),
+                None,
+            )
+            .await
+            .unwrap(),
+        );
 
         let early = start_run_with(
             &db,
@@ -1798,7 +2360,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(early, StartResult::InFlight);
+        assert!(matches!(early, StartResult::InFlight { .. }));
 
         let now = T0 + 721 * SEC;
         let replacing = start_run_with(
@@ -1826,6 +2388,11 @@ mod tests {
         let error = error_of(&stale).unwrap();
         assert_eq!(error.code, STALE_ERROR_CODE);
         assert_eq!(error.reason, STALE_ERROR_REASON);
+        let due = obligations(&db, &r1).await;
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0].state, "pending");
+        assert_eq!(due[0].kind.as_deref(), Some("no_verdict"));
+        assert_eq!(due[0].next_attempt_at, now);
 
         let incident = inc(&db, "inc-1").await;
         assert_eq!(incident.rca_run_id.as_deref(), Some(r2.as_str()));
@@ -1857,7 +2424,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(cooling, StartResult::CoolingDown);
+        assert!(matches!(cooling, StartResult::CoolingDown { .. }));
         assert_eq!(runs_of(&db, "inc-1").await.len(), 1);
         assert_eq!(
             inc(&db, "inc-1").await.rca_run_id.as_deref(),
@@ -2009,10 +2576,24 @@ mod tests {
         let db = db().await;
         incident(&db, "inc-1").await;
         incident(&db, "inc-2").await;
-        let r1 = start(&db, "inc-1", T0).await;
+        let r1 = started_id(
+            start_run_with(
+                &db,
+                with_recipients(
+                    new_run(RunSubjectType::Incident, "inc-1"),
+                    vec![recipient("response-1", "alert-1", 1)],
+                ),
+                guards(T0),
+                Some(IncidentEvent::ai_analysis_begin()),
+                None,
+            )
+            .await
+            .unwrap(),
+        );
         let run_before = run(&db, &r1).await;
         let inc1_before = inc(&db, "inc-1").await;
         let inc2_before = inc(&db, "inc-2").await;
+        let obligations_before = obligations(&db, &r1).await;
 
         db.execute_unprepared("DROP TABLE incident_events")
             .await
@@ -2023,10 +2604,16 @@ mod tests {
         assert!(finished.is_err());
         assert_eq!(run(&db, &r1).await, run_before);
         assert_eq!(inc(&db, "inc-1").await, inc1_before);
+        assert_eq!(obligations(&db, &r1).await, obligations_before);
 
+        let new = with_recipients(
+            new_run(RunSubjectType::Incident, "inc-2"),
+            vec![recipient("response-2", "alert-2", 1)],
+        );
+        let attempted_id = new.run_id.clone();
         let started = start_run_with(
             &db,
-            new_run(RunSubjectType::Incident, "inc-2"),
+            new,
             guards(T0),
             Some(IncidentEvent::ai_analysis_begin()),
             None,
@@ -2034,6 +2621,7 @@ mod tests {
         .await;
         assert!(started.is_err());
         assert!(runs_of(&db, "inc-2").await.is_empty());
+        assert!(obligations(&db, &attempted_id).await.is_empty());
         assert_eq!(inc(&db, "inc-2").await, inc2_before);
     }
 
@@ -2159,16 +2747,23 @@ mod tests {
     #[tokio::test]
     async fn rr25_prune_never_deletes_a_live_run() {
         let db = db().await;
+        alert_row(&db, "alert-1").await;
         let mut live = Vec::new();
         for i in 0..3 {
-            let new = new_run(RunSubjectType::Alert, "alert-1");
+            let new = with_recipients(
+                new_run(RunSubjectType::Alert, "alert-1"),
+                vec![recipient(&format!("response-{i}"), "alert-1", i)],
+            );
             live.push(new.run_id.clone());
-            let started = start_run_with(&db, new, guards(T0 + i * SEC), None, None)
+            let started = start_run_with(&db, new, guards(T0 + i64::from(i) * SEC), None, None)
                 .await
                 .unwrap();
             assert!(matches!(started, StartResult::Started { .. }));
         }
-        let last = new_run(RunSubjectType::Alert, "alert-1");
+        let last = with_recipients(
+            new_run(RunSubjectType::Alert, "alert-1"),
+            vec![recipient("response-3", "alert-1", 3)],
+        );
         live.push(last.run_id.clone());
         let started = start_run_with(
             &db,
@@ -2486,7 +3081,12 @@ mod tests {
             1,
             "{results:?}"
         );
-        assert!(results.contains(&StartResult::InFlight), "{results:?}");
+        assert!(
+            results
+                .iter()
+                .any(|r| matches!(r, StartResult::InFlight { .. })),
+            "{results:?}"
+        );
         assert_eq!(runs_of(db, "inc-1").await.len(), 1);
         assert_eq!(event_types(db, "inc-1").await.len(), 1);
 
@@ -2807,7 +3407,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(refused, StartResult::InFlight);
+        assert!(matches!(refused, StartResult::InFlight { .. }));
         assert_eq!(inc(&db, "inc-1").await.rca_run_id, Some(other.clone()));
 
         let started = start_run_with(
@@ -3016,10 +3616,10 @@ mod tests {
         };
 
         // Live and not stale: in flight, nothing replaced.
-        assert_eq!(
+        assert!(matches!(
             start_at(RunSubjectType::Incident, "inc-1", T0 + 60 * SEC).await,
-            StartResult::InFlight
-        );
+            StartResult::InFlight { .. }
+        ));
 
         // Stale: replaced, and the id is the stale run's.
         let r = start_at(RunSubjectType::Incident, "inc-1", T0 + 721 * SEC).await;
@@ -3038,17 +3638,20 @@ mod tests {
 
         // A waiting run never goes stale, so it is never replaced.
         let waiting = waiting_run(&db, "inc-w", DEADLINE).await;
-        assert_eq!(
+        assert!(matches!(
             start_at(RunSubjectType::Incident, "inc-w", T0 + 99_999 * SEC).await,
-            StartResult::InFlight
-        );
+            StartResult::InFlight { .. }
+        ));
         assert_eq!(run(&db, &waiting).await.unwrap().state, "waiting_input");
 
-        // Alert subjects take no compare-and-set: never a replacement.
+        // A stale alert run must not keep blocking future starts.
+        alert_row(&db, "alert-1").await;
         let a1 = start_at(RunSubjectType::Alert, "alert-1", T0).await;
         assert_eq!(replaced(&a1), None);
+        let a1_id = started_id(a1);
         let a2 = start_at(RunSubjectType::Alert, "alert-1", T0 + 99_999 * SEC).await;
-        assert_eq!(replaced(&a2), None);
+        assert_eq!(replaced(&a2), Some(a1_id.clone()));
+        assert_eq!(run(&db, &a1_id).await.unwrap().state, "failed");
     }
 
     /// SQLite, and a fresh Postgres schema when `ZO_META_POSTGRES_DSN` is set.
@@ -3114,6 +3717,735 @@ mod tests {
                     .unwrap();
                 println!("postgres arm ran");
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn the_covering_run_id_comes_from_the_guard() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let first = start(&db, "inc-1", T0).await;
+        let refused = start_run_with(
+            &db,
+            new_run(RunSubjectType::Incident, "inc-1"),
+            guards(T0 + SEC),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            refused,
+            StartResult::InFlight { covering_run_id } if covering_run_id == first
+        ));
+
+        let ended_at = T0 + 60 * SEC;
+        finish(&db, &first, RunState::Completed, ended_at).await;
+        let refused = start_run_with(
+            &db,
+            new_run(RunSubjectType::Incident, "inc-1"),
+            paging_guards(ended_at + COOLDOWN - 1),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            refused,
+            StartResult::CoolingDown { covering_run_id, retry_after_us }
+                if covering_run_id == first && retry_after_us == ended_at + COOLDOWN
+        ));
+    }
+
+    #[tokio::test]
+    async fn run_numbers_are_stable_per_subject_and_survive_pruning() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let mut ids = Vec::new();
+        for number in 1..=3 {
+            let at = T0 + i64::from(number) * 10 * SEC;
+            let new = with_recipients(
+                new_run(RunSubjectType::Incident, "inc-1"),
+                vec![recipient("response-1", "alert-1", 1)],
+            );
+            let id = started_id(
+                start_run_with(&db, new, guards(at), None, None)
+                    .await
+                    .unwrap(),
+            );
+            let row = run(&db, &id).await.unwrap();
+            assert_eq!(to_item(&row).run_number, Some(number));
+            finish(&db, &id, RunState::Completed, at + SEC).await;
+            ids.push(id);
+        }
+
+        let txn = db.begin().await.unwrap();
+        prune_with(&txn, ORG, RunSubjectType::Incident, "inc-1", 1)
+            .await
+            .unwrap();
+        txn.commit().await.unwrap();
+        assert!(run(&db, &ids[0]).await.is_none());
+        assert!(obligations(&db, &ids[0]).await.is_empty());
+        assert_eq!(runs_of(&db, "inc-1").await.len(), 2);
+        for (id, number) in [(&ids[1], 2), (&ids[2], 3)] {
+            assert_eq!(
+                to_item(&run(&db, id).await.unwrap()).run_number,
+                Some(number)
+            );
+            assert_eq!(obligations(&db, id).await.len(), 1);
+        }
+        let fourth = start(&db, "inc-1", T0 + 40 * SEC).await;
+        assert_eq!(
+            to_item(&run(&db, &fourth).await.unwrap()).run_number,
+            Some(4)
+        );
+
+        incident(&db, "inc-2").await;
+        let other = start(&db, "inc-2", T0 + 40 * SEC).await;
+        assert_eq!(
+            to_item(&run(&db, &other).await.unwrap()).run_number,
+            Some(1)
+        );
+
+        alert_row(&db, "inc-1").await;
+        for org in [ORG, "other-org"] {
+            let mut new = new_run(RunSubjectType::Alert, "inc-1");
+            new.org_id = org.to_string();
+            let id = started_id(
+                start_run_with(&db, new, guards(T0 + 50 * SEC), None, None)
+                    .await
+                    .unwrap(),
+            );
+            assert_eq!(to_item(&run(&db, &id).await.unwrap()).run_number, Some(1));
+        }
+    }
+
+    #[tokio::test]
+    async fn a_repeat_page_of_one_firing_is_in_flight_and_a_distinct_firing_gets_its_own_run() {
+        let db = db().await;
+        alert_row(&db, "alert-1").await;
+        let recipients = vec![recipient("response-1", "alert-1", 1)];
+        let first = started_id(
+            start_run_with(
+                &db,
+                paging_run("alert-1", recipients.clone()),
+                paging_guards(T0),
+                None,
+                None,
+            )
+            .await
+            .unwrap(),
+        );
+        let repeated = start_run_with(
+            &db,
+            paging_run("alert-1", recipients),
+            paging_guards(T0 + SEC),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            repeated,
+            StartResult::InFlight { covering_run_id } if covering_run_id == first
+        ));
+
+        let distinct = start_run_with(
+            &db,
+            paging_run("alert-1", vec![recipient("response-2", "alert-1", 2)]),
+            paging_guards(T0 + 2 * SEC),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(distinct, StartResult::Started { .. }));
+        assert_eq!(runs_of(&db, "alert-1").await.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_failed_or_cancelled_paging_attempt_cools_down_its_scope_and_expiry_admits() {
+        let db = db().await;
+        for (alert_id, state) in [
+            ("alert-failed", RunState::Failed),
+            ("alert-cancelled", RunState::Cancelled),
+        ] {
+            alert_row(&db, alert_id).await;
+            let mut page = paging_run(alert_id, vec![recipient(alert_id, alert_id, 1)]);
+            let first = started_id(
+                start_run_with(&db, page.clone(), paging_guards(T0), None, None)
+                    .await
+                    .unwrap(),
+            );
+            let ended_at = T0 + 100 * SEC;
+            finish(&db, &first, state, ended_at).await;
+            page.run_id = new_run_id();
+            let refused = start_run_with(
+                &db,
+                page.clone(),
+                paging_guards(ended_at + COOLDOWN - 1),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            assert!(matches!(
+                refused,
+                StartResult::CoolingDown { covering_run_id, retry_after_us }
+                    if covering_run_id == first && retry_after_us == ended_at + COOLDOWN
+            ));
+            let admitted =
+                start_run_with(&db, page, paging_guards(ended_at + COOLDOWN), None, None)
+                    .await
+                    .unwrap();
+            assert!(matches!(admitted, StartResult::Started { .. }));
+        }
+    }
+
+    #[tokio::test]
+    async fn a_human_start_skips_the_paging_cooldown_but_not_a_live_run() {
+        let db = db().await;
+        alert_row(&db, "alert-1").await;
+        let first = started_id(
+            start_run_with(
+                &db,
+                paging_run("alert-1", vec![recipient("response-1", "alert-1", 1)]),
+                paging_guards(T0),
+                None,
+                None,
+            )
+            .await
+            .unwrap(),
+        );
+        finish(&db, &first, RunState::Completed, T0 + SEC).await;
+        let human = started_id(
+            start_run_with(
+                &db,
+                new_run(RunSubjectType::Alert, "alert-1"),
+                paging_guards(T0 + 2 * SEC),
+                None,
+                None,
+            )
+            .await
+            .unwrap(),
+        );
+        finish(&db, &human, RunState::Completed, T0 + 3 * SEC).await;
+
+        let live = started_id(
+            start_run_with(
+                &db,
+                paging_run("alert-1", vec![recipient("response-2", "alert-1", 2)]),
+                paging_guards(T0 + 4 * SEC),
+                None,
+                None,
+            )
+            .await
+            .unwrap(),
+        );
+        let refused = start_run_with(
+            &db,
+            new_run(RunSubjectType::Alert, "alert-1"),
+            paging_guards(T0 + 5 * SEC),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            refused,
+            StartResult::InFlight { covering_run_id } if covering_run_id == live
+        ));
+    }
+
+    #[tokio::test]
+    async fn paging_an_alert_with_no_alert_row_is_an_error() {
+        let db = db().await;
+        let refused = start_run_with(
+            &db,
+            paging_run("missing", vec![recipient("response-1", "missing", 1)]),
+            paging_guards(T0),
+            None,
+            None,
+        )
+        .await;
+        assert!(matches!(refused, Err(DbErr::RecordNotFound(_))));
+        assert!(runs_of(&db, "missing").await.is_empty());
+        assert!(
+            obligations_entity::Entity::find()
+                .all(&db)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+
+        let manual = start_run_with(
+            &db,
+            new_run(RunSubjectType::Alert, "missing"),
+            guards(T0 + SEC),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(manual, StartResult::Started { .. }));
+    }
+
+    #[tokio::test]
+    async fn a_refused_automatic_page_writes_one_skipped_row_per_recipient_once() {
+        for state in [RunState::Running, RunState::Completed] {
+            let db = db().await;
+            alert_row(&db, "alert-1").await;
+            let mut page = paging_run(
+                "alert-1",
+                vec![
+                    recipient("response-1", "alert-1", 1),
+                    recipient("response-2", "alert-1", 2),
+                ],
+            );
+            let first = started_id(
+                start_run_with(&db, page.clone(), paging_guards(T0), None, None)
+                    .await
+                    .unwrap(),
+            );
+            if state == RunState::Completed {
+                finish(&db, &first, state, T0 + SEC).await;
+            }
+            page.run_id = new_run_id();
+            let now = T0 + 2 * SEC;
+            let unrecorded = start_run_with(&db, page.clone(), paging_guards(now), None, None)
+                .await
+                .unwrap();
+            assert!(!matches!(unrecorded, StartResult::Started { .. }));
+            assert!(skipped(&db).await.is_empty());
+
+            let refusal = start_run_with(
+                &db,
+                page.clone(),
+                StartGuards {
+                    records_skips: true,
+                    ..paging_guards(now)
+                },
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            let (reason, retry_after_us) = match &refusal {
+                StartResult::InFlight { covering_run_id } => {
+                    assert_eq!(covering_run_id, &first);
+                    ("in_flight", None)
+                }
+                StartResult::CoolingDown {
+                    covering_run_id,
+                    retry_after_us,
+                } => {
+                    assert_eq!(covering_run_id, &first);
+                    assert_eq!(*retry_after_us, T0 + SEC + COOLDOWN);
+                    ("cooling_down", Some(*retry_after_us))
+                }
+                other => panic!("expected refusal, got {other:?}"),
+            };
+            assert_eq!(
+                reason,
+                if state == RunState::Running {
+                    "in_flight"
+                } else {
+                    "cooling_down"
+                }
+            );
+            let rows = skipped(&db).await;
+            assert_eq!(rows.len(), 2);
+            for (row, recipient) in rows.iter().zip(&page.recipients) {
+                assert_eq!(row.org_id, ORG);
+                assert_eq!(row.subject_type, "alert");
+                assert_eq!(row.subject_id, "alert-1");
+                assert_eq!(row.incident_id, None);
+                assert_eq!(
+                    row.response_id.as_deref(),
+                    Some(recipient.response_id.as_str())
+                );
+                assert_eq!(row.covering_run_id, first);
+                assert_eq!(row.covering_run_number, Some(1));
+                assert_eq!(row.reason, reason);
+                assert_eq!(row.retry_after_us, retry_after_us);
+                assert_eq!(row.cooldown_us, Some(COOLDOWN));
+                assert_eq!(row.at_us, now);
+            }
+
+            page.run_id = new_run_id();
+            let repeated = start_run_with(
+                &db,
+                page,
+                StartGuards {
+                    records_skips: true,
+                    ..paging_guards(now + SEC)
+                },
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            assert_eq!(repeated, refusal);
+            assert_eq!(skipped(&db).await, rows);
+            assert_eq!(runs_of(&db, "alert-1").await.len(), 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn skipped_pages_stay_within_four_times_the_history_limit() {
+        let db = db().await;
+        alert_row(&db, "alert-1").await;
+        let first = started_id(
+            start_run_with(
+                &db,
+                paging_run("alert-1", vec![recipient("initial", "alert-1", 1)]),
+                paging_guards(T0),
+                None,
+                None,
+            )
+            .await
+            .unwrap(),
+        );
+        for i in 1..=12 {
+            let refused = start_run_with(
+                &db,
+                paging_run(
+                    "alert-1",
+                    vec![recipient(&format!("response-{i}"), "alert-1", 1)],
+                ),
+                StartGuards {
+                    records_skips: true,
+                    history_limit: 1,
+                    ..paging_guards(T0 + i * SEC)
+                },
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            assert!(matches!(
+                refused,
+                StartResult::InFlight { covering_run_id } if covering_run_id == first
+            ));
+            assert!(skipped(&db).await.len() <= 4);
+        }
+        let rows = skipped(&db).await;
+        assert_eq!(rows.len(), 4);
+        assert!(rows.iter().all(|row| row.at_us >= T0 + 9 * SEC));
+    }
+
+    #[tokio::test]
+    async fn obligations_are_armed_at_start_and_due_with_the_terminal_write() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        for (at, state, kind) in [
+            (T0, RunState::Completed, "verdict"),
+            (T0 + 10 * SEC, RunState::Failed, "no_verdict"),
+            (T0 + 20 * SEC, RunState::Cancelled, "no_verdict"),
+        ] {
+            let recipients = vec![
+                recipient("response-1", "alert-1", 1),
+                Recipient {
+                    ladder_run: 2,
+                    ..recipient("response-2", "alert-1", 2)
+                },
+            ];
+            let new = with_recipients(
+                new_run(RunSubjectType::Incident, "inc-1"),
+                recipients.clone(),
+            );
+            let id = started_id(
+                start_run_with(&db, new, guards(at), None, None)
+                    .await
+                    .unwrap(),
+            );
+            let armed = obligations(&db, &id).await;
+            assert_eq!(armed.len(), 2);
+            for (row, recipient) in armed.iter().zip(&recipients) {
+                assert_eq!(row.org_id, ORG);
+                assert_eq!(row.run_id, id);
+                assert_eq!(row.response_id, recipient.response_id);
+                assert_eq!(
+                    serde_json::from_str::<SubjectRef>(&row.subject).unwrap(),
+                    recipient.subject
+                );
+                assert_eq!(row.ladder_run, recipient.ladder_run);
+                assert_eq!(row.state, "armed");
+                assert_eq!(row.kind, None);
+                assert_eq!(row.created_at, at);
+            }
+
+            let mut progress = update(None, at + SEC);
+            progress.stage = Some("converge".to_string());
+            assert!(update_run_with(&db, ORG, &id, progress).await.unwrap());
+            assert_eq!(obligations(&db, &id).await, armed);
+
+            let ended_at = at + 2 * SEC;
+            let run_before = run(&db, &id).await;
+            let incident_before = inc(&db, "inc-1").await;
+            db.execute_unprepared(
+                "CREATE TRIGGER reject_settlement BEFORE UPDATE ON rca_delivery_obligations \
+                 BEGIN SELECT RAISE(ABORT, 'settlement rejected'); END",
+            )
+            .await
+            .unwrap();
+            assert!(
+                update_run_with(&db, ORG, &id, finish_update(state, ended_at))
+                    .await
+                    .is_err()
+            );
+            assert_eq!(run(&db, &id).await, run_before);
+            assert_eq!(inc(&db, "inc-1").await, incident_before);
+            assert_eq!(obligations(&db, &id).await, armed);
+            db.execute_unprepared("DROP TRIGGER reject_settlement")
+                .await
+                .unwrap();
+
+            finish(&db, &id, state, ended_at).await;
+            let due = obligations(&db, &id).await;
+            assert_eq!(due.len(), 2);
+            for row in due {
+                assert_eq!(row.state, "pending");
+                assert_eq!(row.kind.as_deref(), Some(kind));
+                assert_eq!(row.next_attempt_at, ended_at);
+                assert_eq!(row.updated_at, ended_at);
+                assert_eq!(row.created_at, at);
+                assert_eq!(row.attempts, 0);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_completing_run_that_read_history_is_withheld_once_its_incident_is_a_case() {
+        let db = db().await;
+        for (id, security_case, fenced, withhold_if_case, partial_result, expected) in [
+            ("case", true, false, true, false, RunState::Failed),
+            ("fenced-case", true, true, true, false, RunState::Failed),
+            ("fenced", false, true, true, false, RunState::Failed),
+            (
+                "case-without-history",
+                true,
+                false,
+                false,
+                false,
+                RunState::Completed,
+            ),
+            (
+                "fenced-without-history",
+                true,
+                true,
+                false,
+                false,
+                RunState::Completed,
+            ),
+            ("ordinary", false, false, true, false, RunState::Completed),
+            (
+                "case-with-partial-result",
+                true,
+                false,
+                true,
+                true,
+                RunState::Failed,
+            ),
+        ] {
+            incident(&db, id).await;
+            let new = with_recipients(
+                new_run(RunSubjectType::Incident, id),
+                vec![recipient(id, "alert-1", 1)],
+            );
+            let run_id = started_id(
+                start_run_with(&db, new, guards(T0), None, None)
+                    .await
+                    .unwrap(),
+            );
+            let result = serde_json::json!({"schema_version": 1, "ledger": {}});
+            if partial_result {
+                let upd = RunUpdate {
+                    final_stats_only: true,
+                    result: Some(result.clone()),
+                    ..update(None, T0 + SEC / 2)
+                };
+                assert!(update_run_with(&db, ORG, &run_id, upd).await.unwrap());
+            }
+            alert_incidents::Entity::update_many()
+                .col_expr(
+                    alert_incidents::Column::SecurityCase,
+                    Expr::value(security_case),
+                )
+                .filter(alert_incidents::Column::Id.eq(id))
+                .exec(&db)
+                .await
+                .unwrap();
+            rca_runs::Entity::update_many()
+                .col_expr(rca_runs::Column::Fenced, Expr::value(fenced))
+                .filter(rca_runs::Column::RunId.eq(run_id.as_str()))
+                .exec(&db)
+                .await
+                .unwrap();
+            let upd = RunUpdate {
+                withhold_if_case,
+                result: Some(result.clone()),
+                ..finish_update(RunState::Completed, T0 + SEC)
+            };
+            assert!(
+                update_run_with(&db, ORG, &run_id, upd).await.unwrap(),
+                "{id}"
+            );
+            let stored = assert_summary_mirrors_run(&db, id).await;
+            assert_eq!(stored.state, expected.as_str(), "{id}");
+            assert_eq!(stored.ended_at, Some(T0 + SEC));
+            let kind = if expected == RunState::Failed {
+                assert_eq!(
+                    error_of(&stored).unwrap().code,
+                    "security_case_reclassified"
+                );
+                assert_eq!(stored.report, None);
+                assert_eq!(stored.outcome, None);
+                assert_eq!(stored.confidence, None);
+                assert_eq!(stored.result, None);
+                "no_verdict"
+            } else {
+                assert!(stored.report.is_some());
+                assert_eq!(stored.outcome.as_deref(), Some("root_cause"));
+                assert_eq!(
+                    decode::<serde_json::Value>(stored.result.as_deref()),
+                    Some(result)
+                );
+                assert_eq!(stored.error, None);
+                "verdict"
+            };
+            let rows = obligations(&db, &run_id).await;
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].state, "pending");
+            assert_eq!(rows[0].kind.as_deref(), Some(kind));
+        }
+    }
+
+    #[test]
+    fn firing_scope_ignores_order_and_duplicates() {
+        let first = SubjectRef::new(SubjectType::Alert, "alert-1", 1);
+        let second = SubjectRef::new(SubjectType::Alert, "alert-1", 2);
+        let scope = firing_scope(&[first.clone(), second.clone(), first.clone()]);
+        assert!(!scope.is_empty());
+        assert_eq!(
+            scope,
+            firing_scope(&[second.clone(), first.clone(), second.clone()])
+        );
+        assert_eq!(firing_scope(&[]), "");
+        assert_ne!(scope, firing_scope(std::slice::from_ref(&first)));
+        assert_ne!(
+            firing_scope(std::slice::from_ref(&first)),
+            firing_scope(std::slice::from_ref(&second))
+        );
+    }
+
+    #[tokio::test]
+    async fn to_item_reads_the_stored_region_and_run_number() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let mut new = new_run(RunSubjectType::Incident, "inc-1");
+        new.context_used = Some(serde_json::json!({"serving_region": "us-east-1"}));
+        let id = started_id(
+            start_run_with(&db, new, guards(T0), None, None)
+                .await
+                .unwrap(),
+        );
+        let mut row = run(&db, &id).await.unwrap();
+        row.run_number = Some(7);
+        let item = to_item(&row);
+        assert_eq!(item.serving_region.as_deref(), Some("us-east-1"));
+        assert_eq!(item.run_number, Some(7));
+
+        for context in [
+            Some(serde_json::json!({"serving_region": ""})),
+            Some(serde_json::json!({"serving_region": 42})),
+            Some(serde_json::json!({})),
+            None,
+        ] {
+            row.context_used = context.map(|value| value.to_string());
+            let item = to_item(&row);
+            assert_eq!(item.serving_region, None);
+            assert_eq!(item.run_number, Some(7));
+        }
+        row.run_number = None;
+        assert_eq!(to_item(&row).run_number, None);
+    }
+
+    #[tokio::test]
+    async fn a_new_writer_refuses_against_a_row_an_old_writer_inserted() {
+        let db = db().await;
+        for (alert_id, state, ended_at) in [
+            ("alert-live", RunState::Running, None),
+            ("alert-completed", RunState::Completed, Some(T0 + SEC)),
+            ("alert-no-end", RunState::Failed, None),
+        ] {
+            alert_row(&db, alert_id).await;
+            let recipient = recipient(alert_id, alert_id, 1);
+            let old_id = new_run_id();
+            let old = rca_runs::ActiveModel {
+                run_id: Set(old_id.clone()),
+                org_id: Set(ORG.to_string()),
+                subject_type: Set(RunSubjectType::Alert.as_str().to_string()),
+                subject_id: Set(alert_id.to_string()),
+                incident_id: Set(None),
+                trigger: Set(RunTrigger::OncallPage.as_str().to_string()),
+                mode: Set(RunMode::Fresh.as_str().to_string()),
+                started_by: Set("system".to_string()),
+                guidance: Set(None),
+                state: Set(state.as_str().to_string()),
+                started_at: Set(T0),
+                updated_at: Set(ended_at.unwrap_or(T0)),
+                ended_at: Set(ended_at),
+                cancelled_by: Set(None),
+                outcome: Set(None),
+                confidence: Set(None),
+                report: Set(None),
+                result: Set(None),
+                error: Set(None),
+                session_id: Set(None),
+                stats: Set(None),
+                stage: Set(None),
+                stage_index: Set(None),
+                context_used: Set(None),
+                continuations: Set(0),
+                oncall_subjects: Set(Some(
+                    serde_json::to_string(std::slice::from_ref(&recipient.subject)).unwrap(),
+                )),
+                input_deadline_at: Set(None),
+                pending_question_id: Set(None),
+                questions_asked: Set(0),
+                deadline_closed_at: Set(None),
+                run_number: Set(None),
+                fenced: Set(false),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+            assert_eq!(to_item(&old).run_number, None);
+
+            let refused = start_run_with(
+                &db,
+                paging_run(alert_id, vec![recipient]),
+                paging_guards(T0 + 2 * SEC),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            if state == RunState::Running {
+                assert!(matches!(
+                    refused,
+                    StartResult::InFlight { covering_run_id } if covering_run_id == old_id
+                ));
+            } else {
+                assert!(matches!(
+                    refused,
+                    StartResult::CoolingDown { covering_run_id, retry_after_us }
+                        if covering_run_id == old_id
+                            && retry_after_us == ended_at.unwrap_or(T0) + COOLDOWN
+                ));
+            }
+            assert_eq!(runs_of(&db, alert_id).await.len(), 1);
         }
     }
 }

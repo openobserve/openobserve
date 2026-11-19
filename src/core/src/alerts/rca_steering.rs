@@ -2872,7 +2872,7 @@ mod tests {
         };
         assert!(matches!(
             start_run(guided()).await.unwrap(),
-            StartOutcome::InFlight
+            StartOutcome::InFlight { .. }
         ));
         assert_eq!(org_rows(&org).await, 1, "the refused start wrote no row");
 

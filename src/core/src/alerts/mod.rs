@@ -65,6 +65,7 @@ pub mod membership_provider;
 pub mod mute;
 pub mod notifications;
 mod prom_rule;
+pub mod rca_capabilities;
 #[cfg(feature = "enterprise")]
 pub mod rca_live;
 #[cfg(feature = "enterprise")]

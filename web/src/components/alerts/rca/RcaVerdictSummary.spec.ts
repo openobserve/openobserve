@@ -199,3 +199,23 @@ describe("RcaVerdictSummary", () => {
     });
   });
 });
+
+describe("RcaVerdictSummary: U8 analysis region", () => {
+  it("ends the verdict row with the run's own region", () => {
+    const wrapper = mountSummary({ region: "us-east-1", regionDisplay: "tag" });
+    const tag = byTest(wrapper, "rca-analysis-region");
+
+    expect(tag.text()).toBe("Analyzed in us-east-1");
+    expect(tag.classes()).toContain("ms-auto");
+  });
+
+  it("shows OSS's local region verbatim", () => {
+    const wrapper = mountSummary({ region: "local", regionDisplay: "tag" });
+
+    expect(byTest(wrapper, "rca-analysis-region").text()).toBe("Analyzed in local");
+  });
+
+  it("renders no tag unless the caller asks for one", () => {
+    expect(byTest(mountSummary(), "rca-analysis-region").exists()).toBe(false);
+  });
+});

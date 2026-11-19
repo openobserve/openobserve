@@ -7,9 +7,11 @@
 
 import { computed, onScopeDispose, ref, shallowRef, watch, type Ref } from "vue";
 import { isAxiosError } from "axios";
-import { useQueryClient } from "@tanstack/vue-query";
+import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import incidentsService, {
   type IncidentWithAlerts,
+  type RcaRun,
+  type RcaSkippedPage,
   type RcaLiveError,
   type RcaLiveEvent,
   type RcaRunError,
@@ -21,6 +23,7 @@ import incidentsService, {
   type RcaThread,
 } from "@/services/incidents";
 import { incidentKeys } from "@/services/incidents.querykeys";
+import { incidentRcaRunsQuery } from "@/services/incidents.queries";
 import {
   useRcaTrigger,
   type RcaResumeResult,
@@ -45,6 +48,49 @@ export type RcaReadStatus =
   | "unavailable"
   | "unsupported"
   | "missing";
+
+/** How the region-local run list read: the embedded detail history cannot tell empty from failed. */
+export type RcaRunListStatus = "loading" | "ready" | "forbidden" | "error";
+
+/** The detail's runs joined with the run list's: the detail is newer on state, the list adds numbers and regions. */
+const mergeRuns = (detail: RcaRunItem[], listed: RcaRunItem[]): RcaRunItem[] => {
+  const byId = new Map<string, RcaRunItem>(listed.map((run) => [run.run_id, run]));
+  for (const run of detail) {
+    const known = byId.get(run.run_id);
+    byId.set(
+      run.run_id,
+      known
+        ? {
+            ...known,
+            ...run,
+            run_number: run.run_number ?? known.run_number,
+            serving_region: run.serving_region ?? known.serving_region,
+          }
+        : run,
+    );
+  }
+  return [...byId.values()].sort((a, b) => b.started_at - a.started_at);
+};
+
+/** A run read by id, as a history row (a covering run past the list's page). */
+const runItemOf = (run: RcaRun, runNumber: number | null): RcaRunItem => ({
+  run_id: run.run_id,
+  subject_type: run.subject_type,
+  trigger: run.trigger,
+  mode: run.mode,
+  started_by: run.started_by,
+  state: run.state,
+  started_at: run.started_at,
+  ended_at: run.ended_at,
+  outcome: run.outcome,
+  confidence: run.confidence,
+  cancelled_by: run.cancelled_by,
+  error_reason: run.error?.reason ?? null,
+  report_format: run.report_format,
+  has_record: run.result != null,
+  serving_region: run.context_used?.serving_region ?? null,
+  run_number: runNumber,
+});
 
 /** The waits before each reconnect of a dropped live stream; the last repeats. */
 const RCA_LIVE_RECONNECT_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000];
@@ -98,7 +144,34 @@ export function useIncidentRca(
   const stale = computed(() => live.value && summary.value?.stale === true);
   const currentRun = computed(() => summary.value?.current_run ?? null);
   const reportRun = computed<RcaRunItem | null>(() => summary.value?.report_run ?? null);
-  const history = computed<RcaRunItem[]>(() => summary.value?.history ?? []);
+
+  // The region-local run list: stable numbers, regions and the skipped pages (U8, P16).
+  const runList = useQuery(() => ({
+    ...incidentRcaRunsQuery(orgRef.value, incidentRef.value?.id ?? ""),
+    enabled: !!incidentRef.value?.id,
+  }));
+  const runListStatus = computed<RcaRunListStatus>(() => {
+    if (runList.isSuccess.value) return "ready";
+    if (!runList.isError.value) return "loading";
+    const error = runList.error.value;
+    return isAxiosError(error) && error.response?.status === 403 ? "forbidden" : "error";
+  });
+  const skippedPages = computed<RcaSkippedPage[]>(() =>
+    runListStatus.value === "ready" ? (runList.data.value?.skipped_pages ?? []) : [],
+  );
+  /** Read the run list again (its load error's Retry). */
+  const retryRunList = () => void runList.refetch();
+
+  // Covering runs past the list's page, read by id; a 404 means the run is no longer kept.
+  const coveringRuns = shallowRef<Record<string, RcaRunItem>>({});
+  const goneRunIds = ref<string[]>([]);
+
+  const history = computed<RcaRunItem[]>(() =>
+    mergeRuns(summary.value?.history ?? [], [
+      ...(runList.data.value?.runs ?? []),
+      ...Object.values(coveringRuns.value),
+    ]),
+  );
 
   /** The failure of the latest run, or null when the latest run did not fail. */
   const currentError = computed<RcaRunError | null>(() => {
@@ -230,6 +303,8 @@ export function useIncidentRca(
     (id, previousId) => {
       if (id === previousId) return;
       viewedRunId.value = null;
+      coveringRuns.value = {};
+      goneRunIds.value = [];
       reports.value = {};
       verdicts.value = {};
       failedRunIds.value = [];
@@ -247,6 +322,56 @@ export function useIncidentRca(
       if (runId && runId !== previousRunId) refusal.value = null;
     },
   );
+
+  const coveringReads = new Set<string>();
+
+  /** Read a skipped page's covering run that the list does not hold: past its page, or pruned. */
+  const loadCoveringRun = async (page: RcaSkippedPage) => {
+    const incident = incidentRef.value;
+    const runId = page.covering_run_id;
+    if (!incident || coveringReads.has(`${incident.id}/${runId}`)) return;
+    const org = orgRef.value;
+    coveringReads.add(`${incident.id}/${runId}`);
+    try {
+      const response = await incidentsService.getRcaRun(org, incident.id, runId);
+      if (!isCurrentIncident(org, incident.id)) return;
+      coveringRuns.value = {
+        ...coveringRuns.value,
+        [runId]: runItemOf(response.data, page.covering_run_number ?? null),
+      };
+    } catch (error) {
+      if (!isCurrentIncident(org, incident.id)) return;
+      if (isAxiosError(error) && error.response?.status === 404) {
+        goneRunIds.value = [...goneRunIds.value, runId];
+      } else {
+        // Unconfirmed: a later read may try again.
+        coveringReads.delete(`${incident.id}/${runId}`);
+        console.error("Failed to read the covering RCA run:", error);
+      }
+    }
+  };
+
+  watch(
+    skippedPages,
+    (pages) => {
+      const listed = new Set(history.value.map((run) => run.run_id));
+      for (const page of pages) {
+        if (!listed.has(page.covering_run_id)) void loadCoveringRun(page);
+      }
+    },
+    { immediate: true },
+  );
+
+  // A new or finished run changes the list's rows and may add a skipped page.
+  watch([() => summary.value?.run_id, () => summary.value?.state] as const, (next, previous) => {
+    if (
+      previous &&
+      (next[0] !== previous[0] || next[1] !== previous[1]) &&
+      runList.isFetched.value
+    ) {
+      void runList.refetch();
+    }
+  });
 
   // Ignore older detail reads that finish after a newer one.
   let reloadGeneration = 0;
@@ -585,6 +710,10 @@ export function useIncidentRca(
     currentError,
     reportRun,
     history,
+    runListStatus,
+    skippedPages,
+    goneRunIds,
+    retryRunList,
     viewedRun,
     displayedRunId,
     threadRunId,

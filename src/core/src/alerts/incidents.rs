@@ -69,6 +69,9 @@ pub const FINDING_STREAM_TYPE_DIMENSION: &str = "stream_type";
 pub const FINDING_STREAM_NAME_DIMENSION: &str = "stream_name";
 /// Stored in `rca_off_reason` when `O2_INCIDENTS_RCA_ENABLED` (or incidents) is off.
 pub const RCA_OFF_DISABLED: &str = "rca_disabled";
+/// Incidents one drain reconciliation restarts at most.
+#[cfg(feature = "enterprise")]
+const DRAIN_RECONCILE_MAX: u64 = 10_000;
 /// Stored when AI is off, no agent is set or the licence lacks AI (`rca_agent_available`).
 pub const RCA_OFF_AI_UNAVAILABLE: &str = "ai_unavailable";
 /// Stored when the org's AI quota refused the run (`trial_quota::precheck_ai_usage`).
@@ -3949,6 +3952,21 @@ async fn resolve_firing(
     Ok(done)
 }
 
+/// D11: history for an RCA run of this incident; a case, an unknown incident or a failed
+/// lookup all block. Reads the writer, because a replica can still say "not a case".
+pub async fn incident_history_allowed(org_id: &str, incident_id: &str) -> bool {
+    match infra::table::alert_incidents::security_case_of_rw(org_id, incident_id).await {
+        Ok(Some(case)) => !case,
+        Ok(None) => false,
+        Err(e) => {
+            log::warn!(
+                "[INCIDENTS::RCA] cannot classify {org_id}/{incident_id}: {e}; history blocked"
+            );
+            false
+        }
+    }
+}
+
 /// A case is an analyst's to close; the marker decides, since an alert can change kind later.
 async fn is_security_case(org_id: &str, incident_id: &str) -> Result<bool, anyhow::Error> {
     let marked = infra::table::alert_incidents::security_case_of(org_id, incident_id).await?;
@@ -5926,6 +5944,79 @@ pub fn rca_off_reason_for(analysis_on: bool, agent_available: bool) -> Option<&'
 #[cfg(feature = "enterprise")]
 pub(crate) const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
 
+/// D'20, after a drain: incidents opened with RCA switched off get one automatic run each.
+/// `l0_off` and every other reason stay; returns how many runs started.
+#[cfg(feature = "enterprise")]
+pub async fn reconcile_drained_incidents(from_us: i64, to_us: i64) -> anyhow::Result<usize> {
+    use config::meta::alerts::rca_runs::{AutoRunOpts, RunTrigger};
+
+    let drained = infra::table::alert_incidents::list_open_off_between(
+        RCA_OFF_DISABLED,
+        from_us,
+        to_us,
+        DRAIN_RECONCILE_MAX,
+    )
+    .await?;
+    let mut started = 0;
+    for (org_id, incident_id) in drained {
+        if !infra::table::alert_incidents::clear_rca_off_reason_if(
+            &org_id,
+            &incident_id,
+            RCA_OFF_DISABLED,
+        )
+        .await?
+        {
+            continue;
+        }
+        let start = start_automatic_rca(
+            &org_id,
+            &incident_id,
+            RunTrigger::AutoNewIncident,
+            AutoRunOpts::for_trigger(RunTrigger::AutoNewIncident),
+        )
+        .await;
+        if matches!(start, AutoStart::Started) {
+            started += 1;
+        }
+    }
+    Ok(started)
+}
+
+/// The incident's on-call records still waiting on an analysis, at their current ladder run.
+#[cfg(feature = "enterprise")]
+async fn incident_recipients(
+    org_id: &str,
+    incident_id: &str,
+) -> Vec<infra::table::rca_delivery_obligations::Recipient> {
+    use o2_enterprise::enterprise::oncall::escalation::analysis_may_run;
+
+    let records = match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await
+    {
+        Ok(linked) if !linked.is_empty() => linked,
+        _ => infra::table::oncall_responses::latest_open_for_source(
+            org_id,
+            config::meta::oncall::SubjectType::Incident,
+            incident_id,
+        )
+        .await
+        .ok()
+        .flatten()
+        .into_iter()
+        .collect(),
+    };
+    let mut recipients = Vec::new();
+    for record in records {
+        if analysis_may_run(org_id, &record.subject).await {
+            recipients.push(infra::table::rca_delivery_obligations::Recipient {
+                ladder_run: record.current_run(),
+                response_id: record.id,
+                subject: record.subject,
+            });
+        }
+    }
+    recipients
+}
+
 /// The one start path of automatic runs.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn start_automatic_rca(
@@ -5989,18 +6080,19 @@ pub(crate) async fn start_automatic_rca(
         skip_cooldown: opts.skip_cooldown,
         oncall_subjects: None,
         context_used: None,
+        recipients: incident_recipients(org_id, incident_id).await,
     })
     .await;
     let run_id = match outcome {
         Ok(StartOutcome::Started { run_id }) => run_id,
-        Ok(StartOutcome::InFlight) => {
+        Ok(StartOutcome::InFlight { .. }) => {
             log::debug!(
                 "[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping {} trigger",
                 trigger.as_str()
             );
             return AutoStart::NotStarted(None);
         }
-        Ok(StartOutcome::CoolingDown) => {
+        Ok(StartOutcome::CoolingDown { .. }) => {
             log::debug!(
                 "[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping {} trigger",
                 trigger.as_str()
@@ -6394,7 +6486,9 @@ pub async fn trigger_rca_for_incident(
         trigger.as_str()
     );
 
-    let previous_analysis = if build_on_previous && resume.is_none() {
+    // D'3: classify before any history is read, so a case never fetches its previous report.
+    let history_allowed = incident_history_allowed(&org_id, &incident_id).await;
+    let previous_analysis = if build_on_previous && resume.is_none() && history_allowed {
         newest_completed_report(&org_id, &incident_id)
             .await
             .unwrap_or_else(|e| {

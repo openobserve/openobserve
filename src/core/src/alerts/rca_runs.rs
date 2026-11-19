@@ -27,6 +27,7 @@ use config::{
 };
 use infra::table::{
     entity::alert_incidents,
+    rca_delivery_obligations::Recipient,
     rca_runs::{self as runs_table, NewRun, RunUpdate, StartGuards, StartResult},
 };
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -113,6 +114,8 @@ pub struct StartRun {
     pub oncall_subjects: Option<serde_json::Value>,
     /// `context_used` stored with the row: a resumed run's `{resumed_from}`.
     pub context_used: Option<serde_json::Value>,
+    /// The on-call records waiting on this run, at their ladder run now; delivery owes each one.
+    pub recipients: Vec<Recipient>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -120,10 +123,28 @@ pub enum StartOutcome {
     Started {
         run_id: String,
     },
-    /// A live run already holds the subject.
-    InFlight,
-    /// A run completed within the reanalysis cooldown.
-    CoolingDown,
+    /// A live run already holds the subject (or this firing scope of an alert).
+    InFlight {
+        covering_run_id: String,
+    },
+    /// A recent run is within the cooldown; retry after `retry_after_us`.
+    CoolingDown {
+        covering_run_id: String,
+        retry_after_us: i64,
+    },
+}
+
+impl StartOutcome {
+    /// The run that covers a refused start, taken from the guard's own read.
+    pub fn covering_run_id(&self) -> Option<&str> {
+        match self {
+            Self::Started { .. } => None,
+            Self::InFlight { covering_run_id }
+            | Self::CoolingDown {
+                covering_run_id, ..
+            } => Some(covering_run_id),
+        }
+    }
 }
 
 /// Commit the run and Begin event atomically; dispatch workflows only after commit.
@@ -153,6 +174,7 @@ async fn start_run_after(
         skip_cooldown,
         oncall_subjects,
         context_used,
+        recipients,
     } = req;
     let cfg = get_o2_config();
 
@@ -185,6 +207,8 @@ async fn start_run_after(
         }
         _ => None,
     };
+    // Manual, Slack and resume refusals record nothing; only an automatic page is a skipped page.
+    let records_skips = !trigger.is_user_started();
     let new = NewRun {
         run_id,
         org_id: org_id.clone(),
@@ -197,6 +221,7 @@ async fn start_run_after(
         guidance,
         oncall_subjects,
         context_used,
+        recipients,
     };
     let guards = StartGuards {
         now_us,
@@ -205,6 +230,7 @@ async fn start_run_after(
             .then(|| minutes_to_us(cfg.incidents.reanalysis_cooldown_minutes)),
         history_limit: cfg.incidents.rca_history_limit,
         latest_run_id,
+        records_skips,
     };
 
     match runs_table::start_run(new, guards, begin_event.clone(), guidance_row).await? {
@@ -231,8 +257,14 @@ async fn start_run_after(
             }
             Ok(StartOutcome::Started { run_id })
         }
-        StartResult::InFlight => Ok(StartOutcome::InFlight),
-        StartResult::CoolingDown => Ok(StartOutcome::CoolingDown),
+        StartResult::InFlight { covering_run_id } => Ok(StartOutcome::InFlight { covering_run_id }),
+        StartResult::CoolingDown {
+            covering_run_id,
+            retry_after_us,
+        } => Ok(StartOutcome::CoolingDown {
+            covering_run_id,
+            retry_after_us,
+        }),
     }
 }
 
@@ -706,6 +738,7 @@ pub(crate) mod tests {
             skip_cooldown: trigger.is_user_started(),
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
         }
     }
 
@@ -1391,6 +1424,7 @@ pub(crate) mod tests {
             skip_cooldown: true,
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
         };
         let StartOutcome::Started { run_id: done } = start_run(start_alert("al_1")).await.unwrap()
         else {
@@ -1446,12 +1480,21 @@ pub(crate) mod tests {
                 .unwrap()
         );
 
+        let refused = start_run(incident_start(&org, &inc, RunTrigger::AutoNewAlertType))
+            .await
+            .unwrap();
+        let StartOutcome::CoolingDown {
+            covering_run_id,
+            retry_after_us,
+        } = refused
+        else {
+            panic!("the cooldown did not refuse: {refused:?}");
+        };
         assert_eq!(
-            start_run(incident_start(&org, &inc, RunTrigger::AutoNewAlertType))
-                .await
-                .unwrap(),
-            StartOutcome::CoolingDown
+            covering_run_id, done,
+            "the covering run is the one that cooled down"
         );
+        assert!(retry_after_us > 0);
         assert_eq!(
             incident_row(&org, &inc).await.rca_run_id.as_deref(),
             Some(done.as_str())
@@ -1469,7 +1512,9 @@ pub(crate) mod tests {
             start_run(incident_start(&org, &inc, RunTrigger::Manual))
                 .await
                 .unwrap(),
-            StartOutcome::InFlight
+            StartOutcome::InFlight {
+                covering_run_id: live.clone()
+            }
         );
         assert_eq!(
             incident_row(&org, &inc).await.rca_run_id.as_deref(),

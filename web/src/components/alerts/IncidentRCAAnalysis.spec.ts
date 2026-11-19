@@ -1755,3 +1755,163 @@ describe("IncidentRCAAnalysis", () => {
     });
   });
 });
+
+describe("IncidentRCAAnalysis: U8 analysis region and P16 notes", () => {
+  let wrapper: VueWrapper | undefined;
+  const regionTag = () => byTest(wrapper!, "rca-analysis-region");
+
+  beforeEach(() => {
+    answers = {
+      thread: rcaThread(),
+      threadStatus: "ready",
+      runSummary: rcaRunSummaryLegacy(),
+      runSummaryStatus: "ready",
+      steering: rcaSteering(),
+    };
+    store.state.zoConfig.incidents_rca_enabled = true;
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = undefined;
+  });
+
+  const show = async (props: Record<string, unknown>) => {
+    wrapper = mountPanel(props);
+    await flushPromises();
+  };
+
+  /** A completed run-1 whose own record names its region. */
+  const withRegion = (region: string | null | undefined) => {
+    const props = completedProps();
+    return { ...props, history: [rcaRunItem({ serving_region: region })] };
+  };
+
+  it("reads Analyzed in from the shown run's own serving_region (01)", async () => {
+    await show(withRegion("us-east-1"));
+
+    expect(regionTag().text()).toBe("Analyzed in us-east-1");
+    expect(regionTag().attributes("data-region-state")).toBe("known");
+  });
+
+  it("never shows the viewer's or the org's region (F-23)", async () => {
+    const zo = store.state.zoConfig as Record<string, unknown>;
+    const saved = { region: zo.region, super_cluster_region: zo.super_cluster_region };
+    zo.region = "eu-west-1";
+    zo.super_cluster_region = "eu-west-1";
+    try {
+      await show(withRegion(undefined));
+
+      expect(regionTag().text()).toBe("analysis region unknown");
+      expect(wrapper!.text()).not.toContain("eu-west-1");
+
+      await wrapper!.setProps(withRegion("us-east-1"));
+      expect(regionTag().text()).toBe("Analyzed in us-east-1");
+      expect(wrapper!.text()).not.toContain("eu-west-1");
+    } finally {
+      Object.assign(zo, saved);
+    }
+  });
+
+  it("a live run reads Analyzing in, from the live run's context_used (04)", async () => {
+    const props = liveProps();
+    await show({
+      ...props,
+      rca: rcaSummary({
+        summary: { stage: "log_patterns", stage_index: 5, steps: 9, tool_calls: 27 },
+        current_run: rcaRun({ context_used: { serving_region: "us-east-1" } }),
+      }),
+    });
+
+    expect(regionTag().text()).toBe("Analyzing in us-east-1");
+  });
+
+  it("a legacy run reads the exact unknown label (06)", async () => {
+    await show({
+      rca: rcaV1Summary(),
+      reportRun: rcaV1RunItem(),
+      history: [rcaV1RunItem()],
+      reportText: REPORT,
+      threadRunId: rcaV1RunItem().run_id,
+      threadRunIsV1: true,
+    });
+
+    expect(regionTag().text()).toBe("analysis region unknown");
+    expect(regionTag().attributes("data-region-state")).toBe("unknown");
+  });
+
+  it("an incident with an empty region-local run list says so exactly (07)", async () => {
+    await show({ rca: null, history: [], runListStatus: "ready" });
+
+    const section = byTest(wrapper!, "rca-trigger-section");
+    expect(section.find('[data-test="rca-analysis-region"]').text()).toBe(
+      "no local analysis; other regions unknown",
+    );
+    expect(regionTag().attributes("data-region-state")).toBe("none");
+    expect(wrapper!.text()).not.toMatch(/never analyzed/i);
+  });
+
+  it.each([
+    ["loading", true],
+    ["error", false],
+    ["forbidden", false],
+  ])(
+    "makes no no-local-analysis claim while the run list is %s (08)",
+    async (runListStatus, skeleton) => {
+      await show({ rca: null, history: [], runListStatus });
+
+      expect(regionTag().exists()).toBe(false);
+      expect(wrapper!.text()).not.toContain("no local analysis");
+      expect(byTest(wrapper!, "rca-analysis-region-loading").exists()).toBe(skeleton);
+      expect(byTest(wrapper!, "rca-history-load-error").exists()).toBe(runListStatus === "error");
+    },
+  );
+
+  it("a failed run list shows its load error with Retry and no unknown label (08b)", async () => {
+    await show({ ...withRegion(null), runListStatus: "error" });
+
+    expect(regionTag().exists()).toBe(false);
+    expect(wrapper!.text()).not.toContain("analysis region unknown");
+    expect(byTest(wrapper!, "rca-history-load-error").text()).toContain(
+      "The report history could not be loaded.",
+    );
+    await byTest(wrapper!, "rca-history-retry-btn").trigger("click");
+    expect(wrapper!.emitted("retry-run-list")).toHaveLength(1);
+  });
+
+  it("holds the shown run's tag with a skeleton while the run list loads (08a)", async () => {
+    await show({ ...withRegion(null), runListStatus: "loading" });
+
+    expect(byTest(wrapper!, "rca-analysis-region-loading").exists()).toBe(true);
+    expect(regionTag().exists()).toBe(false);
+  });
+
+  it("the skipped note opens its covering run while a newer run exists (03)", async () => {
+    const props = completedProps();
+    await show({
+      ...props,
+      rca: rcaSummary({
+        run_id: "run-4",
+        state: "completed",
+        current_run: rcaRun({ run_id: "run-4", state: "completed" }),
+      }),
+      history: [
+        rcaRunItem({ run_id: "run-4", run_number: 4, started_at: RCA_T0 + sec(600) }),
+        rcaRunItem({ run_id: "run-3", run_number: 3, started_at: RCA_T0 }),
+      ],
+      skippedPages: [
+        {
+          at_us: RCA_T0 + sec(300),
+          reason: "in_flight",
+          covering_run_id: "run-3",
+          covering_run_number: 3,
+        },
+      ],
+    });
+
+    const note = byTest(wrapper!, "rca-history-skipped-0");
+    expect(note.attributes("data-covering-run-id")).toBe("run-3");
+    await note.trigger("click");
+    expect(wrapper!.emitted("view-run")).toEqual([["run-3"]]);
+  });
+});

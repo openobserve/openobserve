@@ -316,6 +316,12 @@ pub struct RcaRunItem {
     /// The run stored a record, so a cancelled or failed run's partial ledger still opens.
     #[serde(default)]
     pub has_record: bool,
+    /// `context_used.serving_region`; `None` is an unknown region, never the viewer's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub serving_region: Option<String>,
+    /// Stable per subject (`max + 1` at start); `None` on rows from before numbering.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_number: Option<u32>,
 }
 
 /// One analysis run (`rca_runs` row).
@@ -378,6 +384,34 @@ pub struct RcaRun {
 pub struct ListRcaRunsResponse {
     pub runs: Vec<RcaRunItem>,
     pub has_more: bool,
+    /// On-call pages refused inside this page's time span, newest first.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skipped_pages: Vec<RcaSkippedPage>,
+}
+
+/// An automatic page that started no run because another run covered it (`rca_skipped_pages`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
+pub struct RcaSkippedPage {
+    /// Refusal time, µs.
+    pub at_us: i64,
+    pub reason: SkipReason,
+    pub covering_run_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub covering_run_number: Option<u32>,
+    /// `cooling_down` only, µs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_after_us: Option<i64>,
+    /// The cooldown configured at refusal, µs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cooldown_us: Option<i64>,
+}
+
+string_enum! {
+    /// Why an automatic page started no run.
+    SkipReason {
+        InFlight => "in_flight",
+        CoolingDown => "cooling_down",
+    }
 }
 
 /// A report kept in `topology_context` from before analysis runs existed.
@@ -406,6 +440,8 @@ impl V1Report {
             cancelled_by: None,
             error_reason: None,
             has_record: false,
+            serving_region: None,
+            run_number: None,
         }
     }
 

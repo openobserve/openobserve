@@ -15,6 +15,8 @@
 
 //! The investigation turns of an RCA run.
 
+mod recovery_probe;
+
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     future::Future,
@@ -36,7 +38,7 @@ use config::{
             SubjectRef,
             rca_run::{
                 EndedBy, RcaRunRecord, RcaSubmit, RunEndInput, RunEndResult, protocol_stage,
-                record_run_end, stage_index,
+                record_run_end, record_run_end_with, stage_index,
             },
         },
     },
@@ -124,6 +126,10 @@ const SWEEP_CONCURRENCY: usize = 16;
 const MAX_QUESTIONS: i32 = 2;
 /// `rca_questions_total{result}` of a wait the deadline ended.
 const QUESTION_DEADLINE: &str = "deadline";
+/// The `/health` key of an o2-ai that keeps RCA credentials off external MCPs.
+const CREDENTIAL_BOUNDARY_FIELD: &str = "rca_mcp_credential_boundary";
+/// The reads that carry another incident's or run's history (D11).
+const HISTORY_OPERATIONS: [&str; 3] = ["ListIncidents", "ListIncidentRcaRuns", "GetIncidentRcaRun"];
 
 /// The user text of an RCA turn.
 #[derive(Debug, Clone, PartialEq)]
@@ -370,14 +376,25 @@ pub async fn start_forked_rca_turn(
 }
 
 async fn start_turn(
-    run: RcaTurnRun,
+    mut run: RcaTurnRun,
     prompt: RcaPrompt,
     fork: Option<ForkedSession>,
 ) -> Result<TurnStarted, RcaTurnError> {
     // A cancel may have ended the run since the decision to continue it.
+    let mut stored_region = None;
+    let mut started_with_history = false;
     if run.session_id.is_some() {
         match runs_table::get_rw(&run.org_id, &run.run_id).await {
-            Ok(Some(row)) if runs_table::to_item(&row).state == RunState::Running => {}
+            Ok(Some(row)) if runs_table::to_item(&row).state == RunState::Running => {
+                let used = runs_table::decode::<Value>(row.context_used.as_deref());
+                stored_region = super::rca_capabilities::stored_serving_region(used.as_ref());
+                // A row from before this flag existed may have read history.
+                started_with_history = used
+                    .as_ref()
+                    .and_then(|u| u.get("history_reads_allowed"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true);
+            }
             Ok(_) => {
                 return Err(RcaTurnError::Other(format!(
                     "run {} is no longer running",
@@ -387,14 +404,37 @@ async fn start_turn(
             Err(e) => return Err(RcaTurnError::Other(format!("{e:#}"))),
         }
     }
+    let history_allowed = history_allowed_for(&run.org_id, &run.subject).await;
+    // D'3: a subject that became a case since the first turn never resumes its session.
+    if started_with_history && !history_allowed {
+        fail_reclassified(&run).await;
+        return Err(RcaTurnError::Other(format!(
+            "run {} ended: {}",
+            run.run_id,
+            runs_table::RECLASSIFIED_ERROR_CODE
+        )));
+    }
+    enrich_turn_context(&mut run, history_allowed, stored_region.as_deref()).await;
     let prompt = prompt.render();
     let (mcps, clis, skills) = load_agent_tools(&run.org_id).await;
+
+    // The run reads as SysRcaAgent; this is `sre_agent_email(org)` and its token.
+    let (email, token) = crate::organization::get_sre_agent_credentials(&run.org_id)
+        .await
+        .map_err(|e| RcaTurnError::Credentials(format!("{e:#}")))?;
+    let auth_header = crate::auth::build_basic_auth_header(&email, &token);
+    let client = get_agent_client().ok_or_else(|| {
+        RcaTurnError::AgentUnavailable("the agent client is not initialized".to_string())
+    })?;
+    // A refused or slow health check fails the run `agent_unavailable` before admission.
+    let health = probe_health(client.health(&auth_header)).await?;
+    let (mcps, withheld) = rca_toolsets(mcps, &auth_header, credential_boundary(&health.extra));
 
     let session_id = match run.session_id.clone() {
         Some(session_id) => session_id,
         None => {
             let mut patch = RunUpdate {
-                context_used: Some(context_used(&run.context, &mcps, &clis, &skills)),
+                context_used: Some(context_used(&run.context, &mcps, &clis, &skills, &withheld)),
                 ..Default::default()
             };
             let session_id = match fork {
@@ -437,17 +477,6 @@ async fn start_turn(
             }
         }
     };
-
-    // The run reads as SysRcaAgent; this is `sre_agent_email(org)` and its token.
-    let (email, token) = crate::organization::get_sre_agent_credentials(&run.org_id)
-        .await
-        .map_err(|e| RcaTurnError::Credentials(format!("{e:#}")))?;
-    let auth_header = crate::auth::build_basic_auth_header(&email, &token);
-    let client = get_agent_client().ok_or_else(|| {
-        RcaTurnError::AgentUnavailable("the agent client is not initialized".to_string())
-    })?;
-    // A refused or slow health check fails the run `agent_unavailable` before admission.
-    probe_health(client.health(&auth_header)).await?;
 
     // All RCA turns of an org are SysRcaAgent's, so `per_user` caps the org's runs.
     let caps = TurnCaps {
@@ -540,14 +569,133 @@ async fn start_turn(
 /// Bound the agent health probe independently of the streaming timeout.
 async fn probe_health<T, E: std::fmt::Display>(
     probe: impl Future<Output = Result<T, E>>,
-) -> Result<(), RcaTurnError> {
+) -> Result<T, RcaTurnError> {
     match tokio::time::timeout(HEALTH_CHECK_TIMEOUT, probe).await {
-        Ok(Ok(_)) => Ok(()),
+        Ok(Ok(health)) => Ok(health),
         Ok(Err(e)) => Err(RcaTurnError::AgentUnavailable(format!("{e:#}"))),
         Err(_) => Err(RcaTurnError::AgentUnavailable(
             "health check timed out".to_string(),
         )),
     }
+}
+
+/// D11: `false` for a security case or an incident whose writer-side lookup fails.
+async fn history_allowed_for(org_id: &str, subject: &RunSubject) -> bool {
+    let incident_id = match subject {
+        RunSubject::Incident(id) => Some(id.as_str()),
+        RunSubject::Alert { incident_id, .. } => incident_id.as_deref(),
+    };
+    match incident_id {
+        Some(id) => super::incidents::incident_history_allowed(org_id, id).await,
+        None => true,
+    }
+}
+
+/// Capabilities, region and history eligibility, set at the one point every producer passes.
+async fn enrich_turn_context(run: &mut RcaTurnRun, history_allowed: bool, stored: Option<&str>) {
+    let caps = super::rca_capabilities::rca_capabilities(&run.org_id).await;
+    super::rca_capabilities::enrich_context(&mut run.context, &caps, stored);
+    if !history_allowed {
+        super::rca_capabilities::block_history(&mut run.context);
+    } else if let Some(fields) = run.context.as_object_mut() {
+        // A producer's explicit `false` stands; only the guarded path may send `true`.
+        fields
+            .entry("history_reads_allowed")
+            .or_insert(Value::Bool(true));
+    }
+}
+
+/// Ends a run whose subject became a security case: no resumed session, no verdict.
+async fn fail_reclassified(run: &RcaTurnRun) {
+    if let Err(e) = rca_runs::fail_run(
+        &run.org_id,
+        &run.run_id,
+        run.trigger,
+        runs_table::RECLASSIFIED_ERROR_CODE,
+        runs_table::RECLASSIFIED_ERROR_REASON,
+        None,
+    )
+    .await
+    {
+        log::error!(
+            "[RCA_TURN] could not end reclassified run {}: {e}",
+            run.run_id
+        );
+    }
+    apply_obligations(&run.org_id, &run.run_id).await;
+}
+
+/// Applies the run's due deliveries now; the escalation tick's sweep retries what fails.
+async fn apply_obligations(org_id: &str, run_id: &str) {
+    if let Err(e) = rca_service::apply_delivery_obligations(org_id, run_id).await {
+        log::warn!("[RCA_TURN] delivery of run {run_id} deferred to the sweep: {e:#}");
+    }
+}
+
+/// Runs admitted with no recipients predate delivery obligations; they keep best-effort delivery.
+async fn owes_deliveries(org_id: &str, run_id: &str) -> bool {
+    match infra::table::rca_delivery_obligations::for_run(org_id, run_id).await {
+        Ok(rows) => !rows.is_empty(),
+        Err(e) => {
+            log::warn!("[RCA_TURN] cannot read the deliveries of run {run_id}: {e}");
+            true
+        }
+    }
+}
+
+/// D'9: a run that was given history, or read it, is withheld if its subject is now a case.
+fn read_history(run: &RunRow, transcript: &RunTranscript) -> bool {
+    let injected = runs_table::decode::<Value>(run.context_used.as_deref())
+        .and_then(|used| used.get("history_injected").and_then(Value::as_bool))
+        .unwrap_or(false);
+    injected
+        || transcript
+            .tool_log
+            .iter()
+            .any(|call| HISTORY_OPERATIONS.contains(&call.tool.as_str()))
+}
+
+/// D'10: only an o2-ai that keeps RCA credentials off external MCPs reports this as `true`.
+fn credential_boundary(health: &Map<String, Value>) -> bool {
+    health
+        .get(CREDENTIAL_BOUNDARY_FIELD)
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+/// D14: external toolsets never carry the run's credential or session header. Without the
+/// agent's boundary every toolset is withheld, and the names come back for the blind spot.
+fn rca_toolsets(
+    mcps: Vec<McpEntry>,
+    auth_header: &str,
+    boundary: bool,
+) -> (Vec<McpEntry>, Vec<String>) {
+    if !boundary {
+        if !mcps.is_empty() {
+            log::warn!(
+                "[RCA_TURN] the agent does not report {CREDENTIAL_BOUNDARY_FIELD}; {} toolset(s) withheld",
+                mcps.len()
+            );
+        }
+        return (Vec::new(), mcps.into_iter().map(|m| m.name).collect());
+    }
+    let kept = mcps
+        .into_iter()
+        .map(|mut mcp| {
+            let before = mcp.headers.len();
+            mcp.headers.retain(|name, value| {
+                !name.eq_ignore_ascii_case(SESSION_ID_HEADER) && value != auth_header
+            });
+            if mcp.headers.len() != before {
+                log::warn!(
+                    "[RCA_TURN] toolset {} carried a session or RCA credential header; dropped",
+                    mcp.name
+                );
+            }
+            mcp
+        })
+        .collect();
+    (kept, Vec::new())
 }
 
 /// Expose only the context actually provided to this run.
@@ -556,6 +704,7 @@ fn context_used(
     mcps: &[McpEntry],
     clis: &[CliEntry],
     skills: &[SkillEntry],
+    withheld: &[String],
 ) -> Value {
     let past_causes: Vec<Value> = context
         .get("past_causes")
@@ -571,7 +720,29 @@ fn context_used(
         .map(|m| m.name.as_str())
         .chain(clis.iter().map(|c| c.name.as_str()))
         .collect();
-    json!({ "past_causes": past_causes, "skills": skills, "toolsets": toolsets })
+    let history_injected = !past_causes.is_empty()
+        || context
+            .get("previous_analysis")
+            .and_then(Value::as_str)
+            .is_some_and(|p| !p.is_empty());
+    let mut used = json!({ "past_causes": past_causes, "skills": skills, "toolsets": toolsets });
+    if let Some(region) = context.get("serving_region").and_then(Value::as_str) {
+        used["serving_region"] = Value::from(region);
+    }
+    // D'9: a run that read history is withheld if its subject becomes a case before commit.
+    if history_injected {
+        used["history_injected"] = Value::Bool(true);
+    }
+    if !withheld.is_empty() {
+        used["withheld_toolsets"] = json!(withheld);
+    }
+    if let Some(allowed) = context
+        .get("history_reads_allowed")
+        .and_then(Value::as_bool)
+    {
+        used["history_reads_allowed"] = Value::Bool(allowed);
+    }
+    used
 }
 
 /// One `[past:<cause>] <summary>` context line as `{id: "past:<cause>", summary}`.
@@ -1003,16 +1174,23 @@ impl RunEnd {
             EndedBy::Agent
         };
         let authors = self.steer_authors().await;
-        let mut end = record_run_end(&RunEndInput {
-            submit: Some(submit),
-            calls: &transcript.calls,
-            tool_log: &transcript.tool_log,
-            stages_run: &transcript.stages_run,
-            ended_by,
-            completed: true,
-            steer_authors: &authors,
-            ended_at_us: now_micros(),
-        });
+        let ended_at_us = now_micros();
+        // D'4: OO's own recovery probe and region coverage, read before the grade.
+        let trust =
+            recovery_probe::run_end_trust(&self.org_id, &self.run, submit, ended_at_us).await;
+        let mut end = record_run_end_with(
+            &RunEndInput {
+                submit: Some(submit),
+                calls: &transcript.calls,
+                tool_log: &transcript.tool_log,
+                stages_run: &transcript.stages_run,
+                ended_by,
+                completed: true,
+                steer_authors: &authors,
+                ended_at_us,
+            },
+            &trust,
+        );
         if ended_by == EndedBy::AnswerDeadline {
             end.record.answer_deadline_need = transcript
                 .questions
@@ -1025,6 +1203,7 @@ impl RunEnd {
             outcome: record.outcome.as_ref().map(|o| o.as_str().to_string()),
             confidence: record.grade.as_ref().map(|g| g.band.as_str().to_string()),
             result: record_json(&self.run.run_id, record),
+            withhold_if_case: read_history(&self.run, transcript),
             ..self.counts()
         };
         let detail = match end.summary_detail.clone() {
@@ -1091,6 +1270,7 @@ impl RunEnd {
         let mut patch = RunUpdate {
             outcome: end.record.outcome.as_ref().map(|o| o.as_str().to_string()),
             result: record_json(&self.run.run_id, &end.record),
+            withhold_if_case: read_history(&self.run, transcript),
             ..self.counts()
         };
         if let Some(detail) = self.deadline_detail().or(end.summary_detail.clone()) {
@@ -1126,7 +1306,25 @@ impl RunEnd {
 
     /// Hand a completed run's report, verdict and grade to the on-call path.
     async fn deliver(&self, report: &str, end: &RunEndResult) {
+        // The commit may have withheld a reclassified run's verdict; its rows owe only a release.
+        if self.withheld().await {
+            apply_obligations(&self.org_id, &self.run.run_id).await;
+            return;
+        }
         let verdict = end.verdict.as_ref();
+        if owes_deliveries(&self.org_id, &self.run.run_id).await {
+            apply_obligations(&self.org_id, &self.run.run_id).await;
+            if self.item.subject_type == RunSubjectType::Incident {
+                crate::autoobserve::next_step::on_run_finished(
+                    &self.org_id,
+                    &self.run.subject_id,
+                    &self.run.run_id,
+                    verdict,
+                )
+                .await;
+            }
+            return;
+        }
         let grade = end.record.grade.as_ref();
         match self.item.subject_type {
             RunSubjectType::Incident => {
@@ -1362,8 +1560,28 @@ impl RunEnd {
         }
     }
 
+    /// Whether the terminal write ended this run as reclassified instead of completed.
+    async fn withheld(&self) -> bool {
+        match runs_table::get_rw(&self.org_id, &self.run.run_id).await {
+            Ok(Some(row)) => runs_table::error_of(&row)
+                .is_some_and(|e| e.code == runs_table::RECLASSIFIED_ERROR_CODE),
+            Ok(None) => false,
+            Err(e) => {
+                log::warn!(
+                    "[RCA_TURN] cannot re-read run {} after its end: {e}",
+                    self.run.run_id
+                );
+                false
+            }
+        }
+    }
+
     /// No verdict is coming, so no triage hold waits out its budget for one.
     async fn release_without_verdict(&self) {
+        if owes_deliveries(&self.org_id, &self.run.run_id).await {
+            apply_obligations(&self.org_id, &self.run.run_id).await;
+            return;
+        }
         match self.item.subject_type {
             RunSubjectType::Incident => {
                 rca_service::no_verdict_for_incident(&self.org_id, &self.run.subject_id).await
@@ -4611,6 +4829,7 @@ mod tests {
             skip_cooldown: true,
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
         })
         .await
         .unwrap() else {
@@ -4960,5 +5179,80 @@ mod tests {
         ] {
             assert_eq!(needs_detail(need).as_deref(), detail, "{need:?}");
         }
+    }
+
+    // ---- D14: the RCA credential boundary ----
+
+    fn toolset(name: &str, headers: &[(&str, &str)]) -> McpEntry {
+        McpEntry {
+            name: name.to_string(),
+            url: format!("https://{name}.example/mcp"),
+            description: String::new(),
+            headers: headers
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn external_toolsets_never_carry_the_rca_credential_or_session() {
+        let auth = "Basic c3lzcmNh";
+        let mcps = vec![
+            toolset("plain", &[]),
+            toolset("own", &[("Authorization", "Bearer ext")]),
+            toolset("copied", &[("Authorization", auth), ("X-Team", "sre")]),
+            toolset("session", &[("X-O2-Assistant-Session-Id", "s-1")]),
+        ];
+        let (kept, withheld) = rca_toolsets(mcps, auth, true);
+        assert!(withheld.is_empty());
+        let headers: Vec<_> = kept.iter().map(|m| (m.name.as_str(), &m.headers)).collect();
+        assert!(headers[0].1.is_empty());
+        assert_eq!(
+            headers[1].1["Authorization"], "Bearer ext",
+            "its own token stays"
+        );
+        assert!(!headers[2].1.contains_key("Authorization"));
+        assert_eq!(headers[2].1["X-Team"], "sre");
+        assert!(headers[3].1.is_empty(), "the session header is dropped");
+        assert!(
+            kept.iter()
+                .flat_map(|m| m.headers.values())
+                .all(|v| v != auth)
+        );
+    }
+
+    #[test]
+    fn an_agent_without_the_boundary_gets_no_external_toolsets() {
+        let mut health = Map::new();
+        assert!(
+            !credential_boundary(&health),
+            "an older o2-ai omits the key"
+        );
+        health.insert(CREDENTIAL_BOUNDARY_FIELD.to_string(), json!("true"));
+        assert!(!credential_boundary(&health), "only a JSON true counts");
+        let (kept, withheld) = rca_toolsets(vec![toolset("gh", &[])], "Basic x", false);
+        assert!(kept.is_empty());
+        assert_eq!(withheld, vec!["gh".to_string()]);
+        health.insert(CREDENTIAL_BOUNDARY_FIELD.to_string(), json!(true));
+        assert!(credential_boundary(&health));
+    }
+
+    #[test]
+    fn context_used_keeps_the_region_and_marks_history_and_withheld_toolsets() {
+        let ctx = json!({
+            "serving_region": "us-east-1",
+            "previous_analysis": "earlier report",
+            "past_causes": [],
+        });
+        let used = context_used(&ctx, &[], &[], &[], &["gh".to_string()]);
+        assert_eq!(used["serving_region"], "us-east-1");
+        assert_eq!(used["history_injected"], true);
+        assert_eq!(used["withheld_toolsets"], json!(["gh"]));
+
+        let bare = context_used(&json!({}), &[], &[], &[], &[]);
+        assert!(bare.get("serving_region").is_none());
+        assert!(bare.get("history_injected").is_none());
+        assert!(bare.get("withheld_toolsets").is_none());
     }
 }

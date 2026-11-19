@@ -28,4 +28,5 @@ export const incidentKeys = {
     orgKey(org, "incidents", "list", { status, limit, offset }),
   detail: (org: string, id: string) => orgKey(org, "incidents", "detail", id),
   events: (org: string, id: string) => orgKey(org, "incidents", "events", id),
+  rcaRuns: (org: string, id: string) => orgKey(org, "incidents", "rca-runs", id),
 };
