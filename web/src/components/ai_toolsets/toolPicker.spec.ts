@@ -27,6 +27,7 @@ import {
   setToolState,
   toolState,
   toolsetBadges,
+  failingSince,
   typedToolError,
   type DiscoveredTool,
   type ToolLists,
@@ -175,5 +176,19 @@ describe("toolPicker", () => {
     expect(toolsetBadges({ allowed_tools: ["a"] })).toEqual(["notVerified"]);
     expect(toolsetBadges({ allowed_tools: ["a"], tools_verified_at: 1 })).toEqual([]);
     expect(toolsetBadges(null)).toEqual([]);
+  });
+
+  it("shows Failing since only while the last 15 minutes held only failures", () => {
+    const min = 60 * 1_000_000;
+    const now = 100 * min;
+    const failing = {
+      failing_since: now - 30 * min,
+      last_error_at: now - 5 * min,
+      last_error: "401",
+    };
+    expect(failingSince(failing, now)).toEqual({ since: now - 30 * min, error: "401" });
+    expect(failingSince({ ...failing, last_error_at: now - 16 * min }, now)).toBeNull();
+    expect(failingSince({ ...failing, failing_since: null }, now)).toBeNull();
+    expect(failingSince(null, now)).toBeNull();
   });
 });

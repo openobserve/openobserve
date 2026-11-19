@@ -17962,6 +17962,7 @@
     "chooseTools": "choose tools",
     "badgeNoTools": "No tools allowed",
     "badgeNotVerified": "Not verified",
+    "failingSince": "Failing since {time}: {error}",
     "tools": "Tools",
     "refreshTools": "Refresh tools",
     "toolsLoading": "Listing the server's tools…",

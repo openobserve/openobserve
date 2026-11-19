@@ -1257,11 +1257,11 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
     use infra::table::{
-        ai_chat_sessions, ai_chat_shares, ai_chat_turns, alert_acks, alert_calibration,
-        alert_incidents, anomaly_detection, compactor_manual_jobs, distinct_values,
-        external_alerts, gen_ai_agents, incident_events, incident_integrations, llm_eval,
-        llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets, org_telephony,
-        providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
+        ai_chat_sessions, ai_chat_shares, ai_chat_turns, ai_toolset_health, alert_acks,
+        alert_calibration, alert_incidents, anomaly_detection, compactor_manual_jobs,
+        distinct_values, external_alerts, gen_ai_agents, incident_events, incident_integrations,
+        llm_eval, llm_prompts, llm_secrets, oncall_teams, online_eval_jobs, org_ai_toolsets,
+        org_telephony, providers, query_history, ratelimit, rca_runs, rca_steering, re_pattern,
         re_pattern_stream_map, rum_pa, score_configs, scorers, search_queue, slack_alert_messages,
         slo, slo_backfill_jobs, slo_budget, slos, status_pages, synthetics_agents,
         synthetics_checks, synthetics_environments, synthetics_locations, synthetics_probe_tokens,
@@ -1379,6 +1379,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_ai_toolsets::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ai_toolsets: {e}"))?;
+    ai_toolset_health::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_toolset_health: {e}"))?;
     // Before the rows: the purge lists the chats from them, and a retry skips confirmed ones.
     #[cfg(feature = "enterprise")]
     crate::ai_chat::purge_org_replicas(org_id)
@@ -2332,7 +2335,7 @@ mod tests {
     ];
 
     /// Every infra and db-layer source the org-deletion program touches, by path under `src/`.
-    const TEARDOWN_SOURCES: [(&str, &str); 92] = [
+    const TEARDOWN_SOURCES: [(&str, &str); 93] = [
         (
             "db/src/alerts/alert.rs",
             include_str!("../../../db/src/alerts/alert.rs"),
@@ -2592,6 +2595,10 @@ mod tests {
         (
             "infra/src/table/org_ai_toolsets.rs",
             include_str!("../../../infra/src/table/org_ai_toolsets.rs"),
+        ),
+        (
+            "infra/src/table/ai_toolset_health.rs",
+            include_str!("../../../infra/src/table/ai_toolset_health.rs"),
         ),
         (
             "infra/src/table/org_cleanup_tasks.rs",

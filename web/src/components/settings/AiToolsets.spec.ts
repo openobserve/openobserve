@@ -211,6 +211,28 @@ describe("AiToolsets tool badges", () => {
             data: { allowed_tools: ["x"], tools_verified_at: 1 },
           },
           { id: "e", name: "kube", kind: "cli", data: { command: "kubectl" } },
+          {
+            id: "f",
+            name: "down",
+            kind: "mcp",
+            data: { allowed_tools: ["x"], tools_verified_at: 1 },
+            health: {
+              failing_since: Date.now() * 1000 - 600_000_000,
+              last_error_at: Date.now() * 1000 - 60_000_000,
+              last_error: "401 Unauthorized",
+            },
+          },
+          {
+            id: "g",
+            name: "stale",
+            kind: "mcp",
+            data: { allowed_tools: ["x"], tools_verified_at: 1 },
+            health: {
+              failing_since: 1,
+              last_error_at: Date.now() * 1000 - 3_600_000_000,
+              last_error: "5xx",
+            },
+          },
         ],
       },
     } as any);
@@ -240,12 +262,71 @@ describe("AiToolsets tool badges", () => {
       ["ai-toolsets-typed-badge-notVerified", "Not verified"],
     ]);
 
+    const failing = w.findAll("[data-test$='-failing']");
+    expect(failing.map((b) => b.attributes("data-test"))).toEqual(["ai-toolsets-down-failing"]);
+    expect(failing[0].text()).toMatch(/^Failing since .+: 401 Unauthorized$/);
+
     const push = vi.spyOn(router, "push");
     await w.find("[data-test='ai-toolsets-legacy-choose-tools']").trigger("click");
     expect(push).toHaveBeenCalledWith({
       query: expect.objectContaining({ action: "edit", id: "a", section: "tools" }),
     });
     push.mockRestore();
+    w.unmount();
+  });
+});
+
+describe("AiToolsets failing badge", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    store.state.zoConfig.features = {};
+  });
+
+  it("expires while the list stays open", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(new Date("2026-11-19T10:00:00Z"));
+    resetListViewState();
+    queryClient.clear();
+    store.state.zoConfig.features = { ai_toolsets: "enabled" };
+    const nowUs = Date.now() * 1000;
+    vi.mocked(aiToolsetsService.list).mockResolvedValueOnce({
+      data: {
+        toolsets: [
+          {
+            id: "f",
+            name: "down",
+            kind: "mcp",
+            data: { allowed_tools: ["x"], tools_verified_at: 1 },
+            health: {
+              failing_since: nowUs - 20 * 60_000_000,
+              last_error_at: nowUs - 14 * 60_000_000,
+              last_error: "5xx",
+            },
+          },
+        ],
+      },
+    } as any);
+    const w = mount(AiToolsets, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: {
+          AddAiToolset: true,
+          ConfirmDialog: true,
+          OTable: {
+            props: ["data"],
+            template:
+              "<div><div v-for='row in data' :key='row.id'><slot name='cell-name' :row='row' /></div></div>",
+          },
+        },
+      },
+    });
+    await flushPromises();
+    expect(w.find("[data-test='ai-toolsets-down-failing']").exists()).toBe(true);
+
+    vi.advanceTimersByTime(90_000);
+    await flushPromises();
+    expect(w.find("[data-test='ai-toolsets-down-failing']").exists()).toBe(false);
     w.unmount();
   });
 });

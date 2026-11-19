@@ -121,6 +121,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :max-width="'25rem'" :content="t('aiToolset.renameNeededHint')" />
               </span>
               <OBadge
+                v-if="row.failing"
+                variant="error-outline"
+                size="sm"
+                :data-test="`ai-toolsets-${row.name}-failing`"
+              >
+                {{
+                  t("aiToolset.failingSince", {
+                    time: formatTime(row.failing.since),
+                    error: row.failing.error,
+                  })
+                }}
+              </OBadge>
+              <OBadge
                 v-for="badge in row.badges"
                 :key="badge"
                 :variant="badge === 'allTools' ? 'default-outline' : 'warning-outline'"
@@ -172,7 +185,16 @@ import { aiToolsetKeys } from "@/services/ai_toolsets.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
-import { defineComponent, ref, computed, watch, onMounted, onUpdated, Ref } from "vue";
+import {
+  defineComponent,
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUpdated,
+  onBeforeUnmount,
+  Ref,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -190,7 +212,11 @@ import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Tabl
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
-import { toolsetBadges, type ToolsetBadge } from "@/components/ai_toolsets/toolPicker";
+import {
+  failingSince,
+  toolsetBadges,
+  type ToolsetBadge,
+} from "@/components/ai_toolsets/toolPicker";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
@@ -235,6 +261,11 @@ export default defineComponent({
       }),
     );
 
+    // Ticks while the list is shown, so a "Failing since" badge expires without new data.
+    const nowMs = ref(Date.now());
+    const clock = setInterval(() => (nowMs.value = Date.now()), 30_000);
+    onBeforeUnmount(() => clearInterval(clock));
+
     // The list is the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
     const tabledata: any = computed(() =>
       (toolsetsList.data.value ?? []).map((item: any) => ({
@@ -244,6 +275,7 @@ export default defineComponent({
         description: item.description || "",
         rename_needed: !!item.rename_needed,
         badges: item.kind === "mcp" ? toolsetBadges(item.data) : [],
+        failing: failingSince(item.health, nowMs.value * 1000),
       })),
     );
     const showAddDialog = ref(false);
@@ -456,6 +488,9 @@ export default defineComponent({
       });
     };
 
+    const formatTime = (us: number) =>
+      new Date(us / 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
     const BADGE_LABELS: Record<ToolsetBadge, string> = {
       allTools: "aiToolset.badgeAllTools",
       noTools: "aiToolset.badgeNoTools",
@@ -576,6 +611,7 @@ export default defineComponent({
       editToolset,
       chooseTools,
       BADGE_LABELS,
+      formatTime,
       hideAddDialog,
       getData,
       confirmDeleteToolset,

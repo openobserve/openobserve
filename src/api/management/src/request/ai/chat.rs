@@ -1323,19 +1323,22 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 settings.retention_days,
             ));
             let span_for_task = otel_chat_span;
+            let identity = TurnIdentity {
+                org_id: org_id_str.clone(),
+                session_id,
+                user_id: owner,
+                agent_type,
+                turn_id,
+                trace_id: trace_id.clone(),
+                epoch: row.session_epoch,
+                last_committed_seq: row.last_committed_seq,
+                opencode_session_id: row.opencode_session_id,
+            };
+            let on_commit =
+                openobserve_core::ai_chat::toolset_calls::with_toolset_calls(&identity, None);
             let mut rx = spawn_turn(
                 TurnSpec {
-                    identity: TurnIdentity {
-                        org_id: org_id_str.clone(),
-                        session_id,
-                        user_id: owner,
-                        agent_type,
-                        turn_id,
-                        trace_id: trace_id.clone(),
-                        epoch: row.session_epoch,
-                        last_committed_seq: row.last_committed_seq,
-                        opencode_session_id: row.opencode_session_id,
-                    },
+                    identity,
                     request: query_req,
                     auth_header: auth_str,
                     forward_headers: headers_to_forward,
@@ -1350,7 +1353,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                             span_cx.span().end();
                         }
                     })),
-                    on_commit: None,
+                    on_commit: Some(on_commit),
                 },
                 settings,
             );

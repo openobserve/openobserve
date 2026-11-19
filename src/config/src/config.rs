@@ -155,7 +155,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      status_page_notices.false_alarm_recovered_at.
 // 155: create the service version, identity, alias, deploy and verdict tables.
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
-pub const DB_SCHEMA_VERSION: u64 = 156;
+pub const DB_SCHEMA_VERSION: u64 = 157;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
