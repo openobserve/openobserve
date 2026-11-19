@@ -250,12 +250,14 @@ test.describe("SQL Autocomplete — Logs", () => {
 
         await pm.logsPage.enableSqlModeIfNeeded();
 
-        // Type a complete FROM clause followed by WHERE — should exit FROM context
-        await pm.logsPage.setQueryEditorContentAndTriggerSuggestions(
-            `SELECT * FROM "${streamName}" WHERE `
-        );
+        // Known fields of e2e_automate stream (ingested in global setup):
+        const knownFields = ['code', 'floatvalue', 'job'];
 
-        const labels = await pm.logsPage.waitAndGetSuggestionLabels();
+        // Type a complete FROM clause followed by WHERE — should exit FROM context
+        const labels = await pm.logsPage.setQueryEditorContentAndWaitForSuggestions(
+            `SELECT * FROM "${streamName}" WHERE `,
+            knownFields
+        );
         testLogger.info(`WHERE clause suggestions: ${labels.slice(0, 10).join(', ')}`);
 
         expect(labels.length).toBeGreaterThan(0);
@@ -265,9 +267,6 @@ test.describe("SQL Autocomplete — Logs", () => {
         // of Monaco's initial viewport — only the fields are visible at first.
         // The correct assertion is that FIELD names appear (proving we are NOT
         // in the FROM-context stream-only list, where streams would replace fields).
-        //
-        // Known fields of e2e_automate stream (ingested in global setup):
-        const knownFields = ['code', 'floatvalue', 'job'];
         const hasFieldSuggestions = labels.some(l =>
             knownFields.some(f => l.toLowerCase() === f.toLowerCase())
         );

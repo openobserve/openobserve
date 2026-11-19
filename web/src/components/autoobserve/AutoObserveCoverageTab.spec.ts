@@ -270,7 +270,7 @@ describe("AutoObserveCoverageTab in live mode", () => {
       expect(shown(mountTab(live(FEW)))).toEqual(["web", "api", "db"]);
     });
 
-    it("keeps the filter a link names while the first read is still loading", async () => {
+    it("drops a learning filter a link names once the first read settles with no learning service", async () => {
       routeQuery.cov = "table";
       routeQuery.filter = "learning";
       const w = mountTab(live(undefined, { status: "loading" }), true);
@@ -281,8 +281,12 @@ describe("AutoObserveCoverageTab in live mode", () => {
         ],
       };
       await w.setProps({ source: live(coverage([young, watched("ready")])), skeleton: false });
+      await flushPromises();
+      expect(w.findComponent('[data-test="autoobserve-coverage-filter"]').props("modelValue")).toBe(
+        "all",
+      );
       const shown = w.findComponent(OTable).props("data") as { service: string }[];
-      expect(shown.map((r) => r.service)).toEqual(["young"]);
+      expect(shown.map((r) => r.service)).toEqual(["young", "ready"]);
     });
 
     it("counts the legend over the services the search matches", async () => {
