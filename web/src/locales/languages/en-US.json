@@ -16065,7 +16065,6 @@
         "over": "Over",
         "alertWhen": "Alert when",
         "countOf": "Count of {noun}",
-        "percentileOf": "p95 of {measure}",
         "eachEvent": "Each {noun}, as it happens",
         "unusualNumber": "Unusual number of {noun} per {bucket}",
         "aggOf": "{agg} of {metric}",

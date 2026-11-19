@@ -15,6 +15,7 @@
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { joinList, measureWords } from "./alertCopy";
+import { promqlQuantileAgg } from "./alertIntents";
 import { promqlByLabels } from "./queryGroupLabels";
 
 export interface PreviewCaptionInput {
@@ -52,19 +53,20 @@ export function previewCaption(input: PreviewCaptionInput, t: TranslateFn): I18n
   return each(what);
 }
 
-const PROMQL_P95 =
-  /^histogram_quantile\(\s*0?\.95\s*,\s*sum by \([^)]*\)\s*\(rate\((\w+)\[\w+\]\)\)\s*\)$/;
+const PROMQL_QUANTILE =
+  /^histogram_quantile\(\s*[\d.]+\s*,\s*sum by \([^)]*\)\s*\(rate\((\w+)\[\w+\]\)\)\s*\)$/;
 const PROMQL_SHARE = /^sum(?: by \([^)]*\))? \((?:rate\()?(\w+)\{.*\) \/ sum\b.*\* 100$/;
 const PROMQL_RATE = /^(?:sum by \([^)]*\)\s*\()?rate\((\w+)\[\w+\]\)\)?$/;
 
 /** The starters' PromQL shapes in words; any other query is shown as written. */
 function promqlCaption(query: string, t: TranslateFn): I18nText {
   const q = query.trim();
-  const p95 = PROMQL_P95.exec(q)?.[1];
+  const bucket = PROMQL_QUANTILE.exec(q)?.[1];
+  const quantile = bucket ? promqlQuantileAgg(q) : undefined;
   const share = PROMQL_SHARE.exec(q)?.[1];
   const rate = PROMQL_RATE.exec(q)?.[1];
-  const what = p95
-    ? t("alerts.intent.rows.percentileOf", { measure: raw(p95) })
+  const what = quantile
+    ? measureWords({ function: quantile, having: { column: bucket } }, [], "metrics", t)
     : share
       ? t("alerts.form.preview.shareOf", { metric: raw(share) })
       : rate

@@ -52,6 +52,22 @@ describe("previewCaption", () => {
       },
       "Plotted: p95 of d_bucket, one line per service_name",
     ],
+    ...(
+      [
+        ["0.5", "median"],
+        ["0.75", "p75"],
+        ["0.9", "p90"],
+        ["0.99", "p99"],
+      ] as const
+    ).map(([q, fn]): [string, PreviewCaptionInput, string] => [
+      `a PromQL ${fn}, in words like p95`,
+      {
+        tab: "promql",
+        query: `histogram_quantile(${q}, sum by (le) (rate(d_bucket[5m])))`,
+        measured: false,
+      },
+      `Plotted: ${fn} of d_bucket`,
+    ]),
     [
       "a PromQL share, in words",
       {
