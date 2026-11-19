@@ -787,7 +787,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @focusin="onNameFocus"
                       @blur.capture="applySavedName"
                       @keydown.enter="onNameEnter"
-                      @focusout="alertAutoName.onCommit(formData.name ?? '')"
+                      @focusout="onNameLeave"
                     >
                       <OFormInput
                         name="name"
@@ -1332,6 +1332,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { revealFieldErrors } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -2550,6 +2551,22 @@ export default defineComponent({
       nameRewrittenFrom.value = String(alertForm.formData.value?.name ?? "");
       alertForm.setF("name", nameSavedAs.value);
     };
+    // The folder list was read when the form opened; someone may have saved this name since.
+    const recheckName = async () => {
+      if (alertForm.beingUpdated.value || alertForm.anomalyEditMode.value) return;
+      await folderAlerts.refetch();
+      await nextTick();
+      if (!String(alertForm.form.state.values.name ?? "").trim()) return;
+      await alertForm.form.validateField("name", "change");
+      revealFieldErrors(alertForm.form, ["name"]);
+    };
+    watch(activeSection, (now) => {
+      if (now === "notify") void recheckName();
+    });
+    const onNameLeave = () => {
+      alertAutoName.onCommit(alertForm.formData.value?.name ?? "");
+      void recheckName();
+    };
     // Saving a nameless alert names it from what it watches instead of stopping on the name.
     const saveAlert = async () => {
       nameDue.value = true;
@@ -2593,6 +2610,7 @@ export default defineComponent({
     const onHeaderNameCommit = (name: string) => {
       applySavedName();
       alertAutoName.onCommit(alertForm.formData.value?.name ?? name);
+      void recheckName();
     };
 
     // Its SQL is compiled from its Sigma rule, so the server refuses query edits from here.
@@ -2911,6 +2929,7 @@ export default defineComponent({
       alertNameSuggestion,
       nameSavedAs,
       applySavedName,
+      onNameLeave,
       saveAlert,
       nameRewrittenFrom,
       nameFieldError,

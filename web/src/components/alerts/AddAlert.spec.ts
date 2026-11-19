@@ -2052,17 +2052,26 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.vm.alertNameSuggestion).toBe("k8s_logs_alert_2");
     });
 
-    it("re-reads the folder on Save, so a name saved since the form opened blocks it", async () => {
-      wrapper = mountAlert();
-      await flushPromises();
-      wrapper.vm.form.setFieldValue("name", "cpu_high");
-      vi.mocked(alertsService.listByFolderId).mockResolvedValue({
-        data: { list: [{ name: "cpu_high", folder_name: "default" }] },
-      } as any);
-      await wrapper.vm.saveAlert();
-      await flushPromises();
-      expect(wrapper.vm.nameFieldError).toBe(i18n.global.t("alerts.validation.nameTakenHere"));
-    });
+    it.each([
+      ["on Save", (w: any) => w.vm.saveAlert()],
+      [
+        "when the name field is left",
+        (w: any) => w.get('[data-test="add-alert-details-name-input"] input').trigger("focusout"),
+      ],
+    ])(
+      "re-reads the folder %s, so a name saved since the form opened is flagged",
+      async (_, act) => {
+        wrapper = mountAlert();
+        await flushPromises();
+        await wrapper.get('[data-test="add-alert-details-name-input"] input').setValue("cpu_high");
+        vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+          data: { list: [{ name: "cpu_high", folder_name: "default" }] },
+        } as any);
+        await act(wrapper);
+        await flushPromises();
+        expect(wrapper.vm.nameFieldError).toBe(i18n.global.t("alerts.validation.nameTakenHere"));
+      },
+    );
   });
 
   describe("edit header and tucked settings", () => {
