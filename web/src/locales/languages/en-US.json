@@ -15847,8 +15847,8 @@
         "label": "Must last",
         "sentence": "at least",
         "help": "Fires only if the condition still holds on every check for this long.",
-        "windowCovers": "Usually not needed: with {fn} over the last {window}, every value must cross the threshold.",
-        "windowStacks": "With {fn} over the last {window}, every value must already cross; Must last adds to that, so it fires after about {total}.",
+        "windowCovers": "Usually not needed: {fn} over {window} already checks every value.",
+        "windowStacks": "With Must last, it fires after about {total}.",
         "turnOff": "Turn off Must last"
       },
       "compare": {
@@ -15961,10 +15961,12 @@
       "fieldEmptyIn": "{field} has no values in the last {window}.",
       "mustLastOneCheckFix": "Checks every {every}, so this is 1 check.",
       "checkEvery": "Check every {every}",
-      "breachUnseen": "Every value in the window must cross the threshold and checks don't overlap, so a breach can last up to {duration} unseen.",
+      "breachUnseen": "A breach can go unseen for {duration} between checks.",
       "ratioRange": "Values here run from {min} to {max}, so {value} % is {fix}.",
       "ratioDeclared": "This metric is a ratio where 1 means 100 %, so {value} % is {fix}.",
-      "ratioUse": "Use {fix}"
+      "ratioUse": "Use {fix}",
+      "valueRange": "Values here run from {min} to {max}.",
+      "valueRangePending": "The preview shows recent values to compare with."
     },
     "discovery": {
       "lastEvent": "Last event {ago} ago · {rate}/h",
