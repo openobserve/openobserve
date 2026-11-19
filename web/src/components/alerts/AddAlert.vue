@@ -2155,6 +2155,12 @@ export default defineComponent({
       // The save check is stricter than the preview run, so its error also leaves nothing to judge.
       if (!status || fd.is_real_time !== "false" || sqlCheckFailed.value) return null;
       if (status.note) return { text: status.reason, tone: status.note };
+      // Before step 2 the threshold is the form's starter, so the rail states the value, not a verdict.
+      const undecided =
+        !isEditingAlert.value &&
+        !visitedSections.value.has("condition") &&
+        activeSection.value !== "condition";
+      if (undecided && (status.grouped || fd.query_condition?.type === "promql")) return null;
       // An empty value threshold leaves nothing to judge; a measured value still helps pick one.
       const noThreshold = alertForm.valueThresholdMissing.value;
       if (noThreshold && status.value === undefined) return null;
@@ -2162,8 +2168,9 @@ export default defineComponent({
         text: previewVerdictSentence(status, fd, alertForm.t, {
           countsEvents:
             fd.query_condition?.type === "custom" && !alertForm.isAggregationEnabled.value,
+          undecided,
         }),
-        tone: noThreshold ? "note" : status.wouldTrigger ? "fires" : "quiet",
+        tone: noThreshold || undecided ? "note" : status.wouldTrigger ? "fires" : "quiet",
       };
     });
 

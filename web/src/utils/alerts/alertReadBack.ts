@@ -386,7 +386,8 @@ export function previewVerdictSentence(
   verdict: PreviewVerdict,
   alert: ReadBackAlert,
   t: TranslateFn,
-  opts: { countsEvents?: boolean; hasFilter?: boolean } = {},
+  // `undecided`: the threshold is still the form's starter, so the rail states the value, not a verdict.
+  opts: { countsEvents?: boolean; hasFilter?: boolean; undecided?: boolean } = {},
 ): I18nText {
   const tc = alert.trigger_condition ?? {};
   const qc = alert.query_condition ?? {};
@@ -426,7 +427,8 @@ export function previewVerdictSentence(
     const measure = measureWords(qc.aggregation, groupsOf(alert), alert.stream_type, t);
     const value = measureValueText(alert, verdict.value, t);
     // With no threshold yet there is nothing to judge, but the value now helps pick one.
-    if (isBlank(having.value)) return t("alerts.verdict.valueNow", { measure, value, window });
+    if (isBlank(having.value) || opts.undecided)
+      return t("alerts.verdict.valueNow", { measure, value, window });
     return t(verdict.wouldTrigger ? "alerts.verdict.valueFires" : "alerts.verdict.valueQuiet", {
       measure,
       value,
@@ -446,6 +448,7 @@ export function previewVerdictSentence(
       label,
       limit,
     });
+  if (opts.undecided) return t("alerts.verdict.now", { count, label, window });
   return t(verdict.wouldTrigger ? "alerts.verdict.fires" : "alerts.verdict.quiet", {
     count,
     label,

@@ -303,6 +303,20 @@ describe("previewVerdictSentence", () => {
       "Now: avg of value is 42.13 in the last 10 minutes.",
     ],
     [
+      "an event count while the threshold is still the starter's",
+      { wouldTrigger: true, reason: "", count: 7 },
+      alert(),
+      { undecided: true },
+      "Now: 7 events in the last 10 minutes.",
+    ],
+    [
+      "a measure while the threshold is still the starter's",
+      { wouldTrigger: true, reason: "", count: 1, value: 42.125 },
+      measure,
+      { undecided: true },
+      "Now: avg of value is 42.13 in the last 10 minutes.",
+    ],
+    [
       "a span duration measure, in milliseconds",
       { wouldTrigger: false, reason: "", count: 1, value: 182400 },
       alert({
