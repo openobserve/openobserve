@@ -18,7 +18,7 @@
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use config::meta::alerts::alert::Alert;
+use config::{meta::alerts::alert::Alert, utils::time::now_micros};
 use infra::{
     db::get_orm_client_rw,
     table::alerts::{KvFence, WriteGuard},
@@ -70,7 +70,7 @@ impl AlertPatcher for LiveAlerts {
             expected: fence.expected.clone(),
             written: fence.written.clone(),
         };
-        let patched = write(org, alert_id, actor, patch, Some(kv)).await?;
+        let patched = write(org, alert_id, actor, patch, Some((kv, fence.writes_us))).await?;
         if patched == Patched::Changed
             && read_primary(org, &fence.key).await?.as_deref() != Some(fence.expected.as_slice())
         {
@@ -85,7 +85,7 @@ async fn write(
     alert_id: &str,
     actor: &str,
     patch: &[FieldPatch],
-    fence: Option<KvFence>,
+    fence: Option<(KvFence, i64)>,
 ) -> anyhow::Result<Patched> {
     let Ok(id) = Ksuid::from_str(alert_id) else {
         return Ok(Patched::Changed);
@@ -105,13 +105,30 @@ async fn write(
         set(&mut alert, field);
     }
     alert.last_edited_by = Some(actor.to_string());
+    let fence_us = fence.as_ref().map(|(_, us)| *us);
+    let Some(stamp) = stamp_of(written, fence_us, now_micros()) else {
+        return Ok(Patched::Changed);
+    };
     let guard = WriteGuard {
         written_us: written,
-        fence,
+        fence: fence.map(|(kv, _)| kv),
+        writes_us: Some(stamp),
     };
     match alert::update_where(conn, org, None, alert, Some(guard)).await? {
-        Some(_) => Ok(Patched::Written),
+        Some(_) => Ok(Patched::Written {
+            updated_at: Some(stamp),
+        }),
         None => Ok(Patched::Changed),
+    }
+}
+
+/// The `updated_at` a write swaps in, always past the row's; None when the fence time is not.
+/// The fence row already holds its time, so a fenced write stamps exactly that or nothing.
+fn stamp_of(read_us: Option<i64>, fence_us: Option<i64>, now_us: i64) -> Option<i64> {
+    let floor = read_us.map_or(0, |us| us + 1);
+    match fence_us {
+        Some(us) => (us >= floor).then_some(us),
+        None => Some(now_us.max(floor)),
     }
 }
 
@@ -164,5 +181,26 @@ mod tests {
         let now = now_of(Some("infra".into()), &alert);
         assert_eq!(now.title, "disk latency");
         assert_eq!(now.folder.as_deref(), Some("infra"));
+    }
+
+    #[test]
+    fn a_fenced_write_stamps_the_fence_time_and_never_over_a_newer_row() {
+        const NOW: i64 = 5_000;
+        let cases = [
+            ("fenced, row older", Some(1_000), Some(2_000), Some(2_000)),
+            ("fenced, row never written", None, Some(2_000), Some(2_000)),
+            (
+                "fenced, row at the fence time",
+                Some(2_000),
+                Some(2_000),
+                None,
+            ),
+            ("fenced, row newer", Some(3_000), Some(2_000), None),
+            ("unfenced, row older", Some(1_000), None, Some(NOW)),
+            ("unfenced, row ahead of now", Some(9_000), None, Some(9_001)),
+        ];
+        for (what, read_us, fence_us, want) in cases {
+            assert_eq!(stamp_of(read_us, fence_us, NOW), want, "{what}");
+        }
     }
 }

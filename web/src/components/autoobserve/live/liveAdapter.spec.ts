@@ -293,12 +293,15 @@ describe("toCoverageSource", () => {
     });
     const source = toCoverageSource(
       gt,
-      coverage({ rows: [row("api", "covered"), row("web", "none")] as never }),
+      coverage({
+        rows: [{ ...row("api", "covered"), traffic_per_hour: 1500 }, row("web", "none")] as never,
+      }),
       { status: "ready", retry },
       "en-US",
     );
     const [api, web] = source.rows;
     expect(api.status).toMatchObject({ state: "watched", label: "Watched" });
+    expect(api.identity?.trafficPerHour).toBe(1500);
     expect(web.status).toEqual({ state: "gap", label: "Coverage gap" });
     expect(source.totals).toMatchObject({ total: 2, gaps: 1, fullyWatched: 1, learning: 0 });
   });
