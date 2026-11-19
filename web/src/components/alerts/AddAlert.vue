@@ -297,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.watch.title')"
               :help="t('alerts.sections.watch.help')"
               @go="goToSection"
+              @step="stepToSection"
             >
               <template v-if="showsLibraryLink" #tools>
                 <i18n-t
@@ -461,6 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.condition.title')"
               :help="conditionHelp"
               @go="goToSection"
+              @step="stepToSection"
             >
               <template v-if="watchCollapsed" #lead>
                 <p
@@ -726,6 +728,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.notify.title')"
               :help="t('alerts.sections.notify.help')"
               @go="goToSection"
+              @step="stepToSection"
             >
               <div class="flex flex-col" data-snap-stop>
                 <div
@@ -1091,7 +1094,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
         data-test="add-alert-footer"
       >
-        <AlertStepNav :sections="formSections" :active="activeSection" @step="stepToSection" />
         <div class="me-auto flex min-w-0 flex-1 items-center gap-4">
           <AlertUnsavedChanges
             v-if="isEditingAlert"
@@ -1390,7 +1392,6 @@ import {
 } from "./alertSettingFind";
 import { useAlertSettingFind } from "@/composables/alerts/useAlertSettingFind";
 import AlertFormSection from "./AlertFormSection.vue";
-import AlertStepNav from "./AlertStepNav.vue";
 import { focusFirstControl } from "@/utils/focusNextControl";
 import AlertTierLinks from "./AlertTierLinks.vue";
 import AlertTierPlace from "./AlertTierPlace.vue";
@@ -1542,7 +1543,6 @@ export default defineComponent({
     OSettingRow,
     OSectionNav,
     OCollapsible,
-    AlertStepNav,
     AlertStreamContents,
     AlertStreamOption,
     AlertIntentStart,
@@ -1585,7 +1585,7 @@ export default defineComponent({
       }
       snapScrollRef.value?.scrollToSection(id);
     };
-    // The footer's Back and Next hand the Tab start to the section's first control, past its header arrows.
+    // A step's Back and Next hand the Tab start to the section's first control, past its header arrows.
     // Focus waits for the landing: a control that scrolls itself into view on focus would stop the glide.
     const stepToSection = (id: AlertSectionId) => {
       focusOnLanding = id;

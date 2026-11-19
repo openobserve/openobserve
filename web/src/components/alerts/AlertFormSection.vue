@@ -24,6 +24,7 @@ import {
   SETTING_ROW_BARE_KEY,
   SETTING_ROW_GRID_KEY,
 } from "@/lib/core/SettingRow/OSettingRow.types";
+import AlertStepNav from "./AlertStepNav.vue";
 import { ALERT_SECTIONS, type AlertSectionDef, type AlertSectionId } from "./alertFormSections";
 
 const props = withDefaults(
@@ -43,6 +44,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   /** The header arrows: scroll to the section and put the Tab start on its heading. */
   go: [id: AlertSectionId];
+  /** Back / Next after the last field: scroll to the step and focus its first control. */
+  step: [id: AlertSectionId];
 }>();
 
 const { t } = useI18nTyped();
@@ -160,6 +163,7 @@ provide(SETTING_ROW_GRID_KEY, true);
       >
         <slot name="optional" />
       </div>
+      <AlertStepNav :id="id" :sections="sections" class="px-4 pb-3" @step="emit('step', $event)" />
     </div>
   </section>
 </template>

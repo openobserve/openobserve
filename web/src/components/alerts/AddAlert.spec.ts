@@ -1819,7 +1819,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(scrollToSection).toHaveBeenCalledWith("condition");
     });
 
-    it("the bar's Next scrolls to the next section and focuses its first control", async () => {
+    it("a step's Next scrolls to the next section and focuses its first control", async () => {
       const rects = vi
         .spyOn(Element.prototype, "getClientRects")
         .mockReturnValue([new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList);
@@ -1829,7 +1829,9 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
       wrapper.vm.activeSection = "condition";
       await flushPromises();
-      await wrapper.find('[data-test="add-alert-step-next"]').trigger("click");
+      await wrapper
+        .find('[data-test="add-alert-section-condition"] [data-test="add-alert-step-next"]')
+        .trigger("click");
       await flushPromises();
       expect(scrollToSection).toHaveBeenCalledWith("notify");
       const notify = wrapper.get('[data-test="add-alert-section-notify-card"]').element;
@@ -1846,7 +1848,9 @@ describe("AddAlert (OForm owner)", () => {
       );
       wrapper.vm.activeSection = "notify";
       await flushPromises();
-      await wrapper.find('[data-test="add-alert-step-back"]').trigger("click");
+      await wrapper
+        .find('[data-test="add-alert-section-notify"] [data-test="add-alert-step-back"]')
+        .trigger("click");
       await vi.waitFor(() =>
         expect(
           (document.activeElement?.closest("[data-snap-section]") as HTMLElement)?.dataset
@@ -2370,7 +2374,9 @@ describe("AddAlert (OForm owner)", () => {
 
       await wrapper.get('[data-test="o-section-nav-item-watch"]').trigger("click");
       expect(scrollToSection).toHaveBeenLastCalledWith("watch");
-      await wrapper.get('[data-test="add-alert-step-back"]').trigger("click");
+      await wrapper
+        .get('[data-test="add-alert-section-condition"] [data-test="add-alert-step-back"]')
+        .trigger("click");
       expect(scrollToSection).toHaveBeenLastCalledWith("watch");
       await vi.waitFor(() => expect(watch().element.contains(document.activeElement)).toBe(true));
 

@@ -22,7 +22,8 @@ import type { AlertSectionDef, AlertSectionId } from "./alertFormSections";
 
 const props = defineProps<{
   sections: readonly AlertSectionDef[];
-  active: AlertSectionId;
+  /** The step this nav closes; it links to the steps either side. */
+  id: AlertSectionId;
 }>();
 
 const emit = defineEmits<{
@@ -31,39 +32,36 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const index = computed(() => props.sections.findIndex((section) => section.id === props.active));
+const index = computed(() => props.sections.findIndex((section) => section.id === props.id));
 const previous = computed(() => props.sections[index.value - 1]);
 const next = computed(() => props.sections[index.value + 1]);
 </script>
 
-<!-- Both buttons stay mounted, so the bar never shifts as the current step changes. -->
 <template>
-  <div class="flex shrink-0 items-center gap-2" data-test="add-alert-step-nav">
+  <div
+    v-if="previous || next"
+    class="flex items-center justify-end gap-2 pt-2"
+    data-test="add-alert-step-nav"
+  >
     <OButton
+      v-if="previous"
       variant="ghost"
       size="sm"
-      icon-left="arrow-upward"
-      :disabled="!previous"
+      icon-left="arrow-back"
       data-test="add-alert-step-back"
-      @click="previous && emit('step', previous.id)"
+      @click="emit('step', previous.id)"
     >
-      {{
-        previous
-          ? t("alerts.sections.back", { title: t(previous.navKey) })
-          : t("alerts.sections.previousStep")
-      }}
+      {{ t("alerts.sections.back", { title: t(previous.navKey) }) }}
     </OButton>
     <OButton
+      v-if="next"
       variant="outline"
       size="sm"
-      icon-right="arrow-downward"
-      :disabled="!next"
+      icon-right="arrow-forward"
       data-test="add-alert-step-next"
-      @click="next && emit('step', next.id)"
+      @click="emit('step', next.id)"
     >
-      {{
-        next ? t("alerts.sections.next", { title: t(next.navKey) }) : t("alerts.sections.nextStep")
-      }}
+      {{ t("alerts.sections.next", { title: t(next.navKey) }) }}
     </OButton>
   </div>
 </template>
