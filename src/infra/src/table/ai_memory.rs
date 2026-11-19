@@ -17,8 +17,9 @@
 //! here and ciphertext under the org DEK in the tables. Never publishes; `src/db` does.
 
 use config::meta::ai::memory::{
-    Author, ContentError, EditError, Evidence, MemoryEdit, MemoryScope, MemorySettings,
-    RevisionState, apply_edits, validate_content,
+    AgentMemoryWrites, Author, ContentError, EditError, Evidence, MemoryEdit, MemoryScope,
+    MemorySettings, RevisionState, WriteMode, apply_edits, effective_agent_writes,
+    validate_content, write_mode,
 };
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, PaginatorTrait, QueryFilter,
@@ -27,9 +28,14 @@ use sea_orm::{
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
-use super::entity::{ai_memory, ai_memory_revisions, org_ai_toolsets, org_users, users};
+use super::entity::{
+    ai_chat_sessions, ai_chat_turns, ai_memory, ai_memory_revisions, org_ai_toolsets, org_users,
+    users,
+};
 use crate::{db::get_orm_client_rw, errors};
 
+/// ENT's `RCA_AGENT_TYPE` (infra can't depend on ENT); an RCA chat has no person behind it.
+pub const RCA_CHAT_AGENT_TYPE: &str = "sre-rca";
 const PEOPLE_KEPT: usize = 200;
 const AGENT_KEPT: usize = 50;
 const MICROS_PER_DAY: i64 = 24 * 3600 * 1_000_000;
@@ -130,14 +136,56 @@ pub struct Write {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
-    Applied { rev: i64, op_id: String },
-    SettingsSaved { rev: i64, op_id: Option<String> },
-    Pending { revision_id: String },
+    Applied {
+        rev: i64,
+        op_id: String,
+    },
+    /// The change would leave the text as it is, so no revision was written.
+    Unchanged {
+        rev: i64,
+    },
+    SettingsSaved {
+        rev: i64,
+        op_id: Option<String>,
+    },
+    Pending {
+        revision_id: String,
+    },
     Discarded,
-    RevConflict { rev: i64, content: String },
+    RevConflict {
+        rev: i64,
+        content: String,
+    },
     EditConflict(EditError),
     TooLarge(ContentError),
     NotFound,
+}
+
+/// An agent's edit for a turn; `toolset` is the target toolset's `(normalized name, id)`.
+#[derive(Clone, Debug)]
+pub struct AgentWrite {
+    pub org: String,
+    pub session_id: String,
+    pub turn_id: String,
+    /// Turns started before this (microseconds) died with their node.
+    pub running_since: i64,
+    pub scope: MemoryScope,
+    pub toolset: Option<(String, String)>,
+    pub base_rev: i64,
+    pub edits: Vec<MemoryEdit>,
+    pub reason: Option<String>,
+    pub evidence: Vec<Evidence>,
+    pub origin_region: String,
+    pub now: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AgentOutcome {
+    TurnNotRunning,
+    /// An RCA turn has no person whose memory it could write.
+    UserScopeRefused,
+    WritesOff,
+    Written(MemoryKey, Outcome),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -188,6 +236,37 @@ pub async fn get_with<C: ConnectionTrait>(
         Some(model) => to_memory(model, dek).map(Some),
         None => Ok(None),
     }
+}
+
+/// The org's shared memories and the user's own, read for delivery with a turn.
+pub async fn load_for_turn(
+    org: &str,
+    user_id: Option<&str>,
+) -> Result<(Vec<Memory>, Option<Memory>), errors::Error> {
+    let dek = super::cipher::get_dek(org).await?;
+    let conn = crate::db::get_orm_client_ro().await;
+    let shared = list_shared_with(conn, &dek, org).await?;
+    let user = match user_id {
+        Some(id) => get_with(conn, &dek, &MemoryKey::user(org, id)).await?,
+        None => None,
+    };
+    Ok((shared, user))
+}
+
+/// The org's org and toolset memories, one query.
+pub async fn list_shared_with<C: ConnectionTrait>(
+    conn: &C,
+    dek: &[u8],
+    org: &str,
+) -> Result<Vec<Memory>, errors::Error> {
+    ai_memory::Entity::find()
+        .filter(ai_memory::Column::Org.eq(org))
+        .filter(ai_memory::Column::Scope.ne(MemoryScope::User.as_str()))
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(|model| to_memory(model, dek))
+        .collect()
 }
 
 pub async fn count_pending_with<C: ConnectionTrait>(
@@ -306,6 +385,27 @@ pub async fn apply_with<C: ConnectionTrait + TransactionTrait>(
         None => Outcome::NotFound,
     };
     finish(txn, outcome).await
+}
+
+/// The whole agent write in one primary transaction: the locked turn must still be running, and
+/// the chat, the setting and the cap are read in it, so a takeover or a setting change can't race
+/// it. [strong]
+pub async fn agent_write_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    dek: &[u8],
+    write: &AgentWrite,
+) -> Result<AgentOutcome, errors::Error> {
+    let txn = conn.begin().await?;
+    let outcome = agent_write_in(&txn, dek, write).await?;
+    match &outcome {
+        AgentOutcome::Written(_, written) => {
+            finish(txn, written.clone()).await?;
+        }
+        AgentOutcome::TurnNotRunning | AgentOutcome::UserScopeRefused | AgentOutcome::WritesOff => {
+            txn.rollback().await?
+        }
+    }
+    Ok(outcome)
 }
 
 /// Stores `edits` as a pending revision; the memory's content and rev stay as they are. [strong]
@@ -528,13 +628,178 @@ pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
     Ok(())
 }
 
+async fn agent_write_in(
+    txn: &DatabaseTransaction,
+    dek: &[u8],
+    write: &AgentWrite,
+) -> Result<AgentOutcome, errors::Error> {
+    let Some(chat) = running_chat_in(txn, write).await? else {
+        return Ok(AgentOutcome::TurnNotRunning);
+    };
+    let (key, toolset_id) = match (write.scope, &write.toolset) {
+        (MemoryScope::Org, _) => (MemoryKey::org(&write.org), None),
+        (MemoryScope::User, _) if chat.agent_type == RCA_CHAT_AGENT_TYPE => {
+            return Ok(AgentOutcome::UserScopeRefused);
+        }
+        (MemoryScope::User, _) => (MemoryKey::user(&write.org, &chat.user_id), None),
+        (MemoryScope::Toolset, Some((name, id))) => {
+            (MemoryKey::toolset(&write.org, name), Some(id.as_str()))
+        }
+        (MemoryScope::Toolset, None) => {
+            return Ok(AgentOutcome::Written(
+                MemoryKey::toolset(&write.org, ""),
+                Outcome::NotFound,
+            ));
+        }
+    };
+    let Some(row) = open_in(txn, dek, &key, toolset_id, write.now).await? else {
+        return Ok(AgentOutcome::Written(key, Outcome::NotFound));
+    };
+    // The lock makes a concurrent settings update of this row wait for, or precede, this write.
+    let row = lock_row(txn, &row.id).await?;
+    let author = Author::Agent {
+        session_id: write.session_id.clone(),
+        turn_id: write.turn_id.clone(),
+    };
+    let mode = write_mode(
+        key.scope,
+        &author,
+        false,
+        effective_writes_in(txn, &row).await?,
+    );
+    let meta = WriteMeta {
+        author,
+        reason: write.reason.clone(),
+        evidence: Some(write.evidence.clone()),
+        origin_region: write.origin_region.clone(),
+        now: write.now,
+    };
+    let outcome = match mode {
+        WriteMode::Refuse => return Ok(AgentOutcome::WritesOff),
+        WriteMode::Apply => {
+            let change = Write {
+                base_rev: write.base_rev,
+                change: Change::Edits(write.edits.clone()),
+                settings: MemorySettings::default(),
+            };
+            apply_in(txn, dek, row, &change, &meta).await?
+        }
+        WriteMode::Hold => hold_in(txn, dek, &row, write, &meta).await?,
+    };
+    Ok(AgentOutcome::Written(key, outcome))
+}
+
+/// The turn's chat while the turn, locked until commit, is the chat's running one.
+async fn running_chat_in(
+    txn: &DatabaseTransaction,
+    write: &AgentWrite,
+) -> Result<Option<ai_chat_sessions::Model>, errors::Error> {
+    let turn = ai_chat_turns::Entity::find()
+        .filter(ai_chat_turns::Column::OrgId.eq(&write.org))
+        .filter(ai_chat_turns::Column::SessionId.eq(&write.session_id))
+        .filter(ai_chat_turns::Column::TurnId.eq(&write.turn_id))
+        .lock_exclusive()
+        .one(txn)
+        .await?;
+    if !turn.is_some_and(|t| super::ai_chat_turns::is_running(&t, write.running_since)) {
+        return Ok(None);
+    }
+    Ok(ai_chat_sessions::Entity::find()
+        .filter(ai_chat_sessions::Column::OrgId.eq(&write.org))
+        .filter(ai_chat_sessions::Column::SessionId.eq(&write.session_id))
+        .one(txn)
+        .await?)
+}
+
+async fn lock_row(txn: &DatabaseTransaction, id: &str) -> Result<ai_memory::Model, errors::Error> {
+    ai_memory::Entity::find_by_id(id)
+        .lock_exclusive()
+        .one(txn)
+        .await?
+        .ok_or_else(|| errors::Error::Message(format!("ai_memory row {id} vanished")))
+}
+
+/// A toolset without its own setting reads the org row's, under a shared lock until commit.
+async fn effective_writes_in(
+    txn: &DatabaseTransaction,
+    row: &ai_memory::Model,
+) -> Result<AgentMemoryWrites, errors::Error> {
+    let parse = |s: Option<&str>| {
+        s.map(str::parse)
+            .transpose()
+            .map_err(errors::Error::Message)
+    };
+    let scope: MemoryScope = row.scope.parse().map_err(errors::Error::Message)?;
+    let setting = parse(row.agent_memory_writes.as_deref())?;
+    let org_setting = match scope {
+        MemoryScope::Toolset if setting.is_none() => {
+            let org = ai_memory::Entity::find()
+                .filter(ai_memory::Column::Org.eq(&row.org))
+                .filter(ai_memory::Column::Scope.eq(MemoryScope::Org.as_str()))
+                .filter(ai_memory::Column::ScopeKey.eq(""))
+                .lock_shared()
+                .one(txn)
+                .await?;
+            parse(org.and_then(|o| o.agent_memory_writes).as_deref())?
+        }
+        MemoryScope::Org | MemoryScope::Toolset | MemoryScope::User => None,
+    };
+    Ok(effective_agent_writes(scope, setting, org_setting))
+}
+
+/// Holds an agent's edits for review only if they could be accepted now: same rev, they apply,
+/// they change something and the result fits the cap.
+async fn hold_in(
+    txn: &DatabaseTransaction,
+    dek: &[u8],
+    row: &ai_memory::Model,
+    write: &AgentWrite,
+    meta: &WriteMeta,
+) -> Result<Outcome, errors::Error> {
+    let current = decrypt(dek, &row.content)?;
+    if write.base_rev != row.rev {
+        return Ok(Outcome::RevConflict {
+            rev: row.rev,
+            content: current,
+        });
+    }
+    let content = match apply_edits(&current, &write.edits) {
+        Ok(content) => content,
+        Err(e) => return Ok(Outcome::EditConflict(e)),
+    };
+    if content == current {
+        return Ok(Outcome::Unchanged { rev: row.rev });
+    }
+    if let Err(e) = check_size(txn, row, &content).await? {
+        return Ok(Outcome::TooLarge(e));
+    }
+    let revision_id = insert_revision(
+        txn,
+        dek,
+        NewRevision {
+            memory_id: &row.id,
+            org: &row.org,
+            rev: None,
+            state: RevisionState::Pending,
+            base_rev: write.base_rev,
+            edits: Some(&write.edits),
+            content: None,
+            op_id: new_id(),
+            meta,
+        },
+    )
+    .await?;
+    Ok(Outcome::Pending { revision_id })
+}
+
 async fn finish(txn: DatabaseTransaction, outcome: Outcome) -> Result<Outcome, errors::Error> {
     match outcome {
         Outcome::Applied { .. }
         | Outcome::Pending { .. }
         | Outcome::Discarded
         | Outcome::SettingsSaved { .. } => txn.commit().await?,
-        Outcome::RevConflict { .. }
+        Outcome::Unchanged { .. }
+        | Outcome::RevConflict { .. }
         | Outcome::EditConflict(_)
         | Outcome::TooLarge(_)
         | Outcome::NotFound => txn.rollback().await?,
@@ -695,6 +960,10 @@ async fn apply_in(
             Err(e) => return Ok(Outcome::EditConflict(e)),
         },
     };
+    // Only an agent's edit can be a no-op; a person's save or revert is always a revision.
+    if edits.is_some() && content == current && write.settings.is_empty() {
+        return Ok(Outcome::Unchanged { rev: row.rev });
+    }
     if let Err(e) = check_size(txn, &row, &content).await? {
         return Ok(Outcome::TooLarge(e));
     }
@@ -1697,6 +1966,59 @@ mod tests {
                 .unwrap();
             let root = apply(&db, &dek, &key, 0, &content("x"), &person(4)).await;
             assert!(matches!(root.unwrap(), Outcome::Applied { .. }));
+        }
+    }
+
+    #[tokio::test]
+    async fn a_change_that_leaves_the_text_as_it_is_writes_no_revision() {
+        let dek = random_bytes(64);
+        for db in databases("ai_memory_unchanged").await {
+            let key = toolset();
+            apply(&db, &dek, &key, 0, &content("## Quirks\n- a\n"), &person(1))
+                .await
+                .unwrap();
+            let same = vec![MemoryEdit::Replace {
+                old: "- a".to_string(),
+                new: "- a".to_string(),
+            }];
+            let outcome = apply(&db, &dek, &key, 1, &Change::Edits(same), &agent(2))
+                .await
+                .unwrap();
+            assert_eq!(outcome, Outcome::Unchanged { rev: 1 });
+            let memory = get_with(&db, &dek, &key).await.unwrap().unwrap();
+            assert_eq!(memory.rev, 1);
+            let history = list_revisions_with(&db, &dek, &memory.id).await.unwrap();
+            assert_eq!(history.len(), 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn shared_memories_are_listed_without_user_ones() {
+        let dek = random_bytes(64);
+        for db in databases("ai_memory_shared").await {
+            for key in [MemoryKey::org("o1"), toolset(), MemoryKey::user("o1", "u1")] {
+                apply(&db, &dek, &key, 0, &content("x"), &person(1))
+                    .await
+                    .unwrap();
+            }
+            apply(
+                &db,
+                &dek,
+                &MemoryKey::org("o2"),
+                0,
+                &content("x"),
+                &person(1),
+            )
+            .await
+            .unwrap();
+            let mut scopes: Vec<_> = list_shared_with(&db, &dek, "o1")
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|m| m.key.scope)
+                .collect();
+            scopes.sort_by_key(|s| s.as_str());
+            assert_eq!(scopes, [MemoryScope::Org, MemoryScope::Toolset]);
         }
     }
 

@@ -268,6 +268,18 @@ pub struct Evidence {
     pub tool: Option<String>,
 }
 
+/// One memory as it travels with a turn to o2-ai; `not_loaded` blocks carry no content.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoryBlock {
+    pub content: String,
+    pub rev: i64,
+    pub writable: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub op_id: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub not_loaded: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum EditError {
     #[error("edit {index}: the text in `old` is not in the memory")]
@@ -289,6 +301,28 @@ pub enum WriteMode {
     Apply,
     Hold,
     Refuse,
+}
+
+/// 24 KiB plus what each raised cap adds over its scope's default; `caps` are the stored settings.
+pub fn prompt_budget(caps: &[(MemoryScope, Option<i64>)]) -> i64 {
+    let raised: i64 = caps
+        .iter()
+        .map(|(scope, cap)| (scope.effective_max_bytes(*cap) - scope.default_max_bytes()).max(0))
+        .sum();
+    PROMPT_BUDGET_BYTES + raised
+}
+
+/// How many of `sizes` (toolset memories, newest-updated first) fit after `fixed` bytes; the
+/// first one that does not fit ends the list.
+pub fn loaded_within_budget(budget: i64, fixed: i64, sizes: &[i64]) -> usize {
+    let mut used = fixed;
+    for (loaded, size) in sizes.iter().enumerate() {
+        if used + size > budget {
+            return loaded;
+        }
+        used += size;
+    }
+    sizes.len()
 }
 
 /// Applies every edit in order to `content`, or none of them.
@@ -648,6 +682,49 @@ mod tests {
             cap(None, Some(USER_MAX_BYTES_LIMIT + 1)),
             MemoryScope::Org
         ));
+    }
+
+    #[test]
+    fn the_prompt_budget_grows_by_what_raised_caps_add() {
+        use MemoryScope::{Org, Toolset, User};
+        assert_eq!(prompt_budget(&[]), PROMPT_BUDGET_BYTES);
+        assert_eq!(
+            prompt_budget(&[(Org, None), (Toolset, None), (User, None)]),
+            PROMPT_BUDGET_BYTES
+        );
+        let raised = [
+            (Org, Some(ORG_DEFAULT_MAX_BYTES + 1000)),
+            (Toolset, Some(TOOLSET_DEFAULT_MAX_BYTES + 500)),
+            (User, Some(USER_DEFAULT_MAX_BYTES + 24)),
+        ];
+        assert_eq!(prompt_budget(&raised), PROMPT_BUDGET_BYTES + 1524);
+    }
+
+    #[test]
+    fn toolset_memories_load_newest_first_until_one_does_not_fit() {
+        assert_eq!(loaded_within_budget(100, 40, &[30, 31, 0]), 1);
+        assert_eq!(loaded_within_budget(100, 40, &[30, 20, 5]), 3);
+        assert_eq!(loaded_within_budget(100, 40, &[61, 1]), 0);
+        assert_eq!(loaded_within_budget(100, 120, &[0]), 0);
+        assert_eq!(loaded_within_budget(100, 0, &[]), 0);
+    }
+
+    #[test]
+    fn a_memory_block_skips_unset_fields_on_the_wire() {
+        let block = MemoryBlock {
+            rev: 2,
+            writable: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_value(&block).unwrap(),
+            serde_json::json!({"content": "", "rev": 2, "writable": true})
+        );
+        let skipped = MemoryBlock {
+            not_loaded: true,
+            ..Default::default()
+        };
+        assert_eq!(serde_json::to_value(&skipped).unwrap()["not_loaded"], true);
     }
 
     #[test]
