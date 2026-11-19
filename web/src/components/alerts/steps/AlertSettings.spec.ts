@@ -38,6 +38,8 @@ import {
   useAlertSettingTiers,
 } from "@/composables/alerts/useAlertSettingTiers";
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
+import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
+import { ALERT_FORM_CONTEXT_KEY } from "@/components/alerts/alertFormContext";
 import { durationWords, everyWords } from "@/utils/alerts/alertCopy";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
@@ -105,6 +107,16 @@ function makeFormData(overrides: Record<string, any> = {}) {
 // AddAlert.schema.ts reuses the same fragments via createAlertSettingsSchema).
 const parentSchema = z.object({ ...makeAlertSettingsShape(t) });
 
+// Stands in for the condition row, which shows what the step publishes about the condition.
+const ConditionLine = defineComponent({
+  components: { AlertMessageLine },
+  setup: () => ({ note: inject(ALERT_FORM_CONTEXT_KEY, null)?.conditionNote }),
+  template: `<AlertMessageLine :note="note" data-test="condition-line" />`,
+});
+const withConditionLine = () => ({
+  [ALERT_FORM_CONTEXT_KEY as symbol]: { conditionNote: ref(null) },
+});
+
 function makeDescendantHost(
   isRealTime = "true",
   defaultOverrides: Record<string, any> = {},
@@ -113,7 +125,7 @@ function makeDescendantHost(
   validateOn: "submit" | "leave" = "submit",
 ) {
   return defineComponent({
-    components: { OForm, AlertSettings },
+    components: { OForm, AlertSettings, ConditionLine },
     setup() {
       const schema = parentSchema;
       const defaultValues = {
@@ -133,6 +145,7 @@ function makeDescendantHost(
           :destinations="destinations"
           :formatted-destinations="['dest-a','dest-b']"
         />
+        <ConditionLine />
       </OForm>
     `,
   });
@@ -144,7 +157,7 @@ function mountDescendant(
   formDataOverrides: Record<string, any> = {},
 ) {
   return mount(makeDescendantHost(isRealTime, defaultOverrides, formDataOverrides), {
-    global: { plugins: [makeStore(), i18n] },
+    global: { plugins: [makeStore(), i18n], provide: withConditionLine() },
   });
 }
 
@@ -346,7 +359,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     ) =>
       mount(
         defineComponent({
-          components: { OForm, LiveStep },
+          components: { OForm, LiveStep, ConditionLine },
           setup: () => ({
             schema: parentSchema,
             defaultValues: { trigger_condition: { ...trigger }, destinations: [], ...values },
@@ -354,12 +367,14 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
           template: `
             <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
               <LiveStep />
+              <ConditionLine />
             </OForm>
           `,
         }),
         {
           global: {
             plugins: [makeStore({ min_auto_refresh_interval: minAutoRefreshInterval }), i18n],
+            provide: withConditionLine(),
           },
         },
       );
@@ -607,25 +622,24 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       if (covered) expect(holdLine(host).classes()).not.toContain("text-status-warning-text");
     });
 
-    it("Must last on top of it warns amber with the total wait, and turns off in one click", async () => {
+    it("Must last on top of it warns amber on the condition with the total wait, and turns off in one click", async () => {
       const host = mountDescendant("false", {
         ...query("min", ">"),
         trigger_condition: { silence: 10, period: 10, frequency: 2 },
         pending_period_sec: 20,
         _ui: { pendingPeriod: 20 },
       });
-      expect(holdLine(host).classes()).toContain("text-status-warning-text");
-      expect(host.find('[data-test="alert-settings-hold-window-text"]').text()).toBe(
-        t("alerts.form.holdFor.windowStacks", {
-          fn: "min",
-          window: durationWords(10, i18n.global.t as any),
-          total: durationWords(30, i18n.global.t as any),
-        }),
+      const stacks = host.find('[data-test="alert-settings-hold-stacks"]');
+      expect(holdLine(host).classes()).not.toContain("text-status-warning-text");
+      expect(stacks.classes()).toContain("text-status-warning-text");
+      expect(host.find('[data-test="alert-settings-hold-stacks-text"]').text()).toBe(
+        t("alerts.form.holdFor.windowStacks", { total: durationWords(30, i18n.global.t as any) }),
       );
 
-      await host.find('[data-test="alert-settings-hold-window-action"]').trigger("click");
+      await host.find('[data-test="alert-settings-hold-stacks-action"]').trigger("click");
       await flushPromises();
       expect(hostForm(host).state.values.pending_period_sec).toBe(0);
+      expect(host.find('[data-test="alert-settings-hold-stacks"]').exists()).toBe(false);
     });
   });
 

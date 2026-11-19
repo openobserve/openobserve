@@ -200,33 +200,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :searchable="false"
                               @update:model-value="onTriggerOperatorChange"
                             />
-                            <!-- Message hangs under the threshold field it describes. -->
-                            <div class="flex min-w-0 flex-col gap-1">
-                              <OFormInput
-                                :aria-label="t('alerts.alertIfNoOfEvents')"
-                                name="trigger_condition.threshold"
-                                type="number"
-                                fit-content
-                                data-test="alert-trigger-threshold-input"
-                                @blur="restoreDefaultThreshold"
-                                min="1"
-                                @update:model-value="onTriggerThresholdChange($event)"
-                              >
-                                <template #error />
-                              </OFormInput>
-                              <div
-                                v-if="thresholdError"
-                                class="text-input-error-text w-0 min-w-full text-xs"
-                                data-test="alert-if-row-logs-error"
-                                role="alert"
-                              >
-                                {{ thresholdError }}
-                              </div>
-                            </div>
+                            <OFormInput
+                              :aria-label="t('alerts.alertIfNoOfEvents')"
+                              name="trigger_condition.threshold"
+                              type="number"
+                              fit-content
+                              data-test="alert-trigger-threshold-input"
+                              @blur="restoreDefaultThreshold"
+                              min="1"
+                              @update:model-value="onTriggerThresholdChange($event)"
+                            >
+                              <template #error />
+                            </OFormInput>
                             <AlertWindowPhrase
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
                               :minutes="periodMinutes"
                               @update:minutes="emit('update:period', $event)"
+                            />
+                            <AlertMessageLine
+                              class="basis-full"
+                              :error="thresholdError"
+                              error-data-test="alert-if-row-logs-error"
+                              :note="conditionNote"
+                              :help="conditionHelp"
+                              data-test="alert-condition-message"
                             />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
@@ -257,41 +254,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="alert-condition-operator-select"
                               @update:model-value="onConditionOperatorChange"
                             />
-                            <!-- Message hangs under the value field it describes. -->
-                            <div class="flex min-w-0 flex-col gap-1">
-                              <OFormInput
-                                v-if="isSpanDuration"
-                                :aria-label="t('alerts.alertIfNoOfEvents')"
-                                name="_ui.durationValue"
-                                type="number"
-                                fit-content
-                                :placeholder="t('alerts.placeholders.value')"
-                                data-test="alert-duration-value-input"
-                                @update:model-value="onDurationValueChange($event)"
-                                @blur="revealDurationError"
-                              >
-                                <template #error />
-                              </OFormInput>
-                              <OFormInput
-                                v-else
-                                :aria-label="t('alerts.alertIfNoOfEvents')"
-                                name="query_condition.aggregation.having.value"
-                                type="number"
-                                fit-content
-                                :placeholder="t('alerts.placeholders.value')"
-                                @update:model-value="onConditionValueChange($event)"
-                              >
-                                <template #error />
-                              </OFormInput>
-                              <div
-                                v-if="havingValueError"
-                                class="text-input-error-text w-0 min-w-full text-xs"
-                                data-test="alert-if-row-logs-value-error"
-                                role="alert"
-                              >
-                                {{ havingValueError }}
-                              </div>
-                            </div>
+                            <OFormInput
+                              v-if="isSpanDuration"
+                              :aria-label="t('alerts.alertIfNoOfEvents')"
+                              name="_ui.durationValue"
+                              type="number"
+                              fit-content
+                              :placeholder="t('alerts.placeholders.value')"
+                              data-test="alert-duration-value-input"
+                              @update:model-value="onDurationValueChange($event)"
+                              @blur="revealDurationError"
+                            >
+                              <template #error />
+                            </OFormInput>
+                            <OFormInput
+                              v-else
+                              :aria-label="t('alerts.alertIfNoOfEvents')"
+                              name="query_condition.aggregation.having.value"
+                              type="number"
+                              fit-content
+                              :placeholder="t('alerts.placeholders.value')"
+                              @update:model-value="onConditionValueChange($event)"
+                            >
+                              <template #error />
+                            </OFormInput>
                             <OSelect
                               v-if="isSpanDuration"
                               :aria-label="
@@ -310,6 +296,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
                               :minutes="periodMinutes"
                               @update:minutes="emit('update:period', $event)"
+                            />
+                            <AlertMessageLine
+                              class="basis-full"
+                              :error="havingValueError"
+                              error-data-test="alert-if-row-logs-value-error"
+                              :note="conditionNote"
+                              :help="conditionHelp"
+                              data-test="alert-condition-message"
                             />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
@@ -534,30 +528,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="w-32!"
                               @update:model-value="onTriggerOperatorChange"
                             />
-                            <!-- Message hangs under the threshold field it describes. -->
-                            <div class="flex min-w-0 flex-col gap-1">
-                              <OFormInput
-                                :aria-label="t('alerts.alertIfNoOfEvents')"
-                                name="trigger_condition.threshold"
-                                type="number"
-                                fit-content
-                                @update:model-value="onTriggerThresholdChange($event)"
-                              >
-                                <template #error />
-                              </OFormInput>
-                              <div
-                                v-if="thresholdError"
-                                class="text-input-error-text w-0 min-w-full text-xs"
-                                data-test="alert-if-row-metrics-error"
-                                role="alert"
-                              >
-                                {{ thresholdError }}
-                              </div>
-                            </div>
+                            <OFormInput
+                              :aria-label="t('alerts.alertIfNoOfEvents')"
+                              name="trigger_condition.threshold"
+                              type="number"
+                              fit-content
+                              @update:model-value="onTriggerThresholdChange($event)"
+                            >
+                              <template #error />
+                            </OFormInput>
                             <AlertWindowPhrase
                               class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
                               :minutes="periodMinutes"
                               @update:minutes="emit('update:period', $event)"
+                            />
+                            <AlertMessageLine
+                              class="basis-full"
+                              :error="thresholdError"
+                              error-data-test="alert-if-row-metrics-error"
+                              :note="conditionNote"
+                              :help="conditionHelp"
+                              data-test="alert-condition-message"
                             />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
@@ -587,27 +578,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="w-32!"
                               @update:model-value="onConditionOperatorChange"
                             />
-                            <!-- Message hangs under the value field it describes. -->
-                            <div class="flex min-w-0 flex-col gap-1">
-                              <OFormInput
-                                :aria-label="t('alerts.alertIfNoOfEvents')"
-                                name="query_condition.aggregation.having.value"
-                                type="number"
-                                fit-content
-                                :placeholder="t('alerts.placeholders.value')"
-                                @update:model-value="onConditionValueChange($event)"
-                              >
-                                <template #error />
-                              </OFormInput>
-                              <div
-                                v-if="havingValueError"
-                                class="text-input-error-text w-0 min-w-full text-xs"
-                                data-test="alert-if-row-metrics-value-error"
-                                role="alert"
-                              >
-                                {{ havingValueError }}
-                              </div>
-                            </div>
+                            <OFormInput
+                              :aria-label="t('alerts.alertIfNoOfEvents')"
+                              name="query_condition.aggregation.having.value"
+                              type="number"
+                              fit-content
+                              :placeholder="t('alerts.placeholders.value')"
+                              @update:model-value="onConditionValueChange($event)"
+                            >
+                              <template #error />
+                            </OFormInput>
                             <span
                               v-if="thresholdUnit"
                               class="text-text-secondary text-compact leading-8.5"
@@ -619,14 +599,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :minutes="periodMinutes"
                               @update:minutes="emit('update:period', $event)"
                             />
-                            <AlertLinkNote
-                              v-if="ratioHint && !havingValueError"
+                            <AlertMessageLine
                               class="basis-full"
-                              :text="ratioHint.text"
-                              :action="ratioHint.action"
-                              warning
-                              data-test="alert-threshold-ratio-hint"
-                              @action="ratioHint.run"
+                              :error="havingValueError"
+                              error-data-test="alert-if-row-metrics-value-error"
+                              :note="conditionNote"
+                              :help="conditionHelp"
+                              data-test="alert-condition-message"
                             />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
@@ -804,58 +783,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :data-test="countTestIds.operator"
                             @update:model-value="onTriggerOperatorChange"
                           />
-                          <div class="flex min-w-0 flex-col gap-1">
-                            <OFormInput
-                              :aria-label="t('alerts.alertIfNoOfEvents')"
-                              name="trigger_condition.threshold"
-                              type="number"
-                              fit-content
-                              min="1"
-                              :data-test="countTestIds.threshold"
-                              @update:model-value="onTriggerThresholdChange($event)"
-                              @blur="restoreDefaultThreshold"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <div
-                              v-if="thresholdError"
-                              class="text-input-error-text w-0 min-w-full text-xs"
-                              :data-test="countErrorTest"
-                              role="alert"
-                            >
-                              {{ thresholdError }}
-                            </div>
-                          </div>
+                          <OFormInput
+                            :aria-label="t('alerts.alertIfNoOfEvents')"
+                            name="trigger_condition.threshold"
+                            type="number"
+                            fit-content
+                            min="1"
+                            :data-test="countTestIds.threshold"
+                            @update:model-value="onTriggerThresholdChange($event)"
+                            @blur="restoreDefaultThreshold"
+                          >
+                            <template #error />
+                          </OFormInput>
                           <span class="leading-8.5">{{ rowsNoun }}</span>
                         </template>
                         <template v-else>
                           <span class="leading-8.5">{{ t("alerts.form.group.whenAtLeast") }}</span>
-                          <div class="flex min-w-0 flex-col gap-1">
-                            <OFormInput
-                              :aria-label="t('alerts.form.group.countNameGroups')"
-                              name="trigger_condition.threshold"
-                              type="number"
-                              fit-content
-                              min="1"
-                              :data-test="countTestIds.threshold"
-                              @update:model-value="onTriggerThresholdChange($event)"
-                              @blur="restoreDefaultThreshold"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <div
-                              v-if="thresholdError"
-                              class="text-input-error-text w-0 min-w-full text-xs"
-                              :data-test="countErrorTest"
-                              role="alert"
-                            >
-                              {{ thresholdError }}
-                            </div>
-                          </div>
+                          <OFormInput
+                            :aria-label="t('alerts.form.group.countNameGroups')"
+                            name="trigger_condition.threshold"
+                            type="number"
+                            fit-content
+                            min="1"
+                            :data-test="countTestIds.threshold"
+                            @update:model-value="onTriggerThresholdChange($event)"
+                            @blur="restoreDefaultThreshold"
+                          >
+                            <template #error />
+                          </OFormInput>
                           <span class="leading-8.5">{{
                             t("alerts.form.group.builderOneTail", thresholdPlural)
                           }}</span>
                         </template>
+                        <AlertMessageLine
+                          class="basis-full"
+                          :error="thresholdError"
+                          :error-data-test="countErrorTest"
+                          data-test="alert-group-limit-message"
+                        />
                       </div>
                       <p v-if="isRuleMultiRequired" class="text-text-secondary text-xs">
                         {{ t("alerts.promRuleModePendingMulti") }}
@@ -1331,29 +1296,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="alert-trigger-operator-select"
                             @update:model-value="onTriggerOperatorChange"
                           />
-                          <div class="flex min-w-0 flex-col gap-1">
-                            <OFormInput
-                              :aria-label="t('alerts.alertIfNoOfEvents')"
-                              name="trigger_condition.threshold"
-                              type="number"
-                              fit-content
-                              min="1"
-                              data-test="alert-trigger-threshold-input"
-                              @update:model-value="onTriggerThresholdChange($event)"
-                              @blur="restoreDefaultThreshold"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <div
-                              v-if="thresholdError"
-                              class="text-input-error-text w-0 min-w-full text-xs"
-                              data-test="alert-trigger-threshold-error"
-                              role="alert"
-                            >
-                              {{ thresholdError }}
-                            </div>
-                          </div>
+                          <OFormInput
+                            :aria-label="t('alerts.alertIfNoOfEvents')"
+                            name="trigger_condition.threshold"
+                            type="number"
+                            fit-content
+                            min="1"
+                            data-test="alert-trigger-threshold-input"
+                            @update:model-value="onTriggerThresholdChange($event)"
+                            @blur="restoreDefaultThreshold"
+                          >
+                            <template #error />
+                          </OFormInput>
                           <span class="leading-8.5">{{ rowsNoun }}</span>
+                          <AlertMessageLine
+                            class="basis-full"
+                            :error="thresholdError"
+                            error-data-test="alert-trigger-threshold-error"
+                            data-test="alert-condition-message"
+                          />
                         </span>
                         <template v-else>
                           <ORadioGroup
@@ -1402,32 +1363,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   :data-test="countTestIds.operator"
                                   @update:model-value="onTriggerOperatorChange"
                                 />
-                                <div class="flex min-w-0 flex-col gap-1">
-                                  <OFormInput
-                                    :aria-label="
-                                      localTab === 'promql'
-                                        ? t('alerts.form.group.countNameSeries')
-                                        : t('alerts.alertIfNoOfEvents')
-                                    "
-                                    name="trigger_condition.threshold"
-                                    type="number"
-                                    fit-content
-                                    min="1"
-                                    :data-test="countTestIds.threshold"
-                                    @update:model-value="onTriggerThresholdChange($event)"
-                                    @blur="restoreDefaultThreshold"
-                                  >
-                                    <template #error />
-                                  </OFormInput>
-                                  <div
-                                    v-if="thresholdError"
-                                    class="text-input-error-text w-0 min-w-full text-xs"
-                                    :data-test="countErrorTest"
-                                    role="alert"
-                                  >
-                                    {{ thresholdError }}
-                                  </div>
-                                </div>
+                                <OFormInput
+                                  :aria-label="
+                                    localTab === 'promql'
+                                      ? t('alerts.form.group.countNameSeries')
+                                      : t('alerts.alertIfNoOfEvents')
+                                  "
+                                  name="trigger_condition.threshold"
+                                  type="number"
+                                  fit-content
+                                  min="1"
+                                  :data-test="countTestIds.threshold"
+                                  @update:model-value="onTriggerThresholdChange($event)"
+                                  @blur="restoreDefaultThreshold"
+                                >
+                                  <template #error />
+                                </OFormInput>
                                 <span class="leading-8.5">{{
                                   localTab === "promql" ? t("alerts.form.group.series") : rowsNoun
                                 }}</span>
@@ -1436,32 +1387,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 <span class="leading-8.5">{{
                                   t("alerts.form.group.whenAtLeast")
                                 }}</span>
-                                <div class="flex min-w-0 flex-col gap-1">
-                                  <OFormInput
-                                    :aria-label="t('alerts.form.group.countNameSeries')"
-                                    name="trigger_condition.threshold"
-                                    type="number"
-                                    fit-content
-                                    min="1"
-                                    :data-test="countTestIds.threshold"
-                                    @update:model-value="onTriggerThresholdChange($event)"
-                                    @blur="restoreDefaultThreshold"
-                                  >
-                                    <template #error />
-                                  </OFormInput>
-                                  <div
-                                    v-if="thresholdError"
-                                    class="text-input-error-text w-0 min-w-full text-xs"
-                                    :data-test="countErrorTest"
-                                    role="alert"
-                                  >
-                                    {{ thresholdError }}
-                                  </div>
-                                </div>
+                                <OFormInput
+                                  :aria-label="t('alerts.form.group.countNameSeries')"
+                                  name="trigger_condition.threshold"
+                                  type="number"
+                                  fit-content
+                                  min="1"
+                                  :data-test="countTestIds.threshold"
+                                  @update:model-value="onTriggerThresholdChange($event)"
+                                  @blur="restoreDefaultThreshold"
+                                >
+                                  <template #error />
+                                </OFormInput>
                                 <span class="leading-8.5">{{
                                   t("alerts.form.group.promqlOneTail", thresholdPlural)
                                 }}</span>
                               </template>
+                              <AlertMessageLine
+                                class="basis-full"
+                                :error="thresholdError"
+                                :error-data-test="countErrorTest"
+                                data-test="alert-group-limit-message"
+                              />
                             </div>
                             <div
                               v-else-if="localTab === 'sql'"
@@ -1488,27 +1435,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 data-test="alert-sql-agg-operator-select"
                                 @update:model-value="onConditionOperatorChange"
                               />
-                              <div class="flex min-w-0 flex-col gap-1">
-                                <OFormInput
-                                  :aria-label="t('alerts.alertIfNoOfEvents')"
-                                  name="query_condition.aggregation.having.value"
-                                  type="number"
-                                  fit-content
-                                  data-test="alert-sql-agg-value-input"
-                                  :placeholder="t('alerts.placeholders.value')"
-                                  @update:model-value="onConditionValueChange($event)"
-                                >
-                                  <template #error />
-                                </OFormInput>
-                                <div
-                                  v-if="havingValueError"
-                                  class="text-input-error-text w-0 min-w-full text-xs"
-                                  data-test="alert-sql-agg-value-error"
-                                  role="alert"
-                                >
-                                  {{ havingValueError }}
-                                </div>
-                              </div>
+                              <OFormInput
+                                :aria-label="t('alerts.alertIfNoOfEvents')"
+                                name="query_condition.aggregation.having.value"
+                                type="number"
+                                fit-content
+                                data-test="alert-sql-agg-value-input"
+                                :placeholder="t('alerts.placeholders.value')"
+                                @update:model-value="onConditionValueChange($event)"
+                              >
+                                <template #error />
+                              </OFormInput>
+                              <AlertMessageLine
+                                class="basis-full"
+                                :error="havingValueError"
+                                error-data-test="alert-sql-agg-value-error"
+                                :note="conditionNote"
+                                :help="conditionHelp"
+                                data-test="alert-condition-message"
+                              />
                             </div>
                           </template>
                         </template>
@@ -1618,28 +1563,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="w-32!"
                               @update:model-value="onPromqlOperatorChange"
                             />
-                            <!-- Message hangs under the value field it describes. -->
-                            <div class="flex min-w-0 flex-col gap-1">
-                              <OFormInput
-                                :aria-label="t('alerts.alertIfValueIs')"
-                                name="query_condition.promql_condition.value"
-                                type="number"
-                                fit-content
-                                data-test="alert-threshold-value-input"
-                                :debounce="300"
-                                @update:model-value="onPromqlValueChange"
-                              >
-                                <template #error />
-                              </OFormInput>
-                              <div
-                                v-if="promqlValueError"
-                                class="text-input-error-text w-0 min-w-full text-xs"
-                                data-test="alert-threshold-value-error"
-                                role="alert"
-                              >
-                                {{ promqlValueError }}
-                              </div>
-                            </div>
+                            <OFormInput
+                              :aria-label="t('alerts.alertIfValueIs')"
+                              name="query_condition.promql_condition.value"
+                              type="number"
+                              fit-content
+                              data-test="alert-threshold-value-input"
+                              :debounce="300"
+                              @update:model-value="onPromqlValueChange"
+                            >
+                              <template #error />
+                            </OFormInput>
                             <span
                               v-if="thresholdUnit"
                               class="text-text-secondary text-compact leading-8.5"
@@ -1647,13 +1581,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >{{ thresholdUnit }}</span
                             >
                           </div>
-                          <AlertLinkNote
-                            v-if="ratioHint && !promqlValueError"
-                            :text="ratioHint.text"
-                            :action="ratioHint.action"
-                            warning
-                            data-test="alert-threshold-ratio-hint"
-                            @action="ratioHint.run"
+                          <AlertMessageLine
+                            :error="promqlValueError"
+                            error-data-test="alert-threshold-value-error"
+                            :note="conditionNote"
+                            :help="conditionHelp"
+                            data-test="alert-condition-message"
                           />
                           <!-- Optional WARNING on the PromQL VALUE (alerts_2.md Feature 1).
                          PromQL bakes the threshold into the query itself, so severity
@@ -1911,7 +1844,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import AlertWarningRow from "@/components/alerts/AlertWarningRow.vue";
 import AlertWindowPhrase from "@/components/alerts/AlertWindowPhrase.vue";
-import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
+import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
+import { ALERT_FORM_CONTEXT_KEY, type AlertLineNote } from "@/components/alerts/alertFormContext";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -1981,7 +1915,7 @@ const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/Query
 export default defineComponent({
   name: "Step2QueryConfig",
   components: {
-    AlertLinkNote,
+    AlertMessageLine,
     AlertWarningRow,
     AlertWindowPhrase,
     OTag,
@@ -3031,7 +2965,7 @@ export default defineComponent({
       promqlPercent.value ? raw("%") : unitSuffix(unitMetric.value),
     );
     // A percent typed against 0-1 values never fires (90 vs 0.9), so the field offers the ratio.
-    const ratioHint = computed(() => {
+    const ratioHint = computed<AlertLineNote | null>(() => {
       if (props.streamType !== "metrics" || thresholdUnit.value || promqlPercent.value) return null;
       const field =
         localTab.value === "promql"
@@ -3060,12 +2994,25 @@ export default defineComponent({
             })
           : t("alerts.guard.ratioDeclared", { value, fix: shownFix }),
         action: t("alerts.guard.ratioUse", { fix: shownFix }),
+        warning: true,
         run: () => {
           setFV(field, fix);
           if (localTab.value === "promql") onPromqlValueChange(fix);
           else onConditionValueChange(fix);
         },
+        dataTest: "alert-threshold-ratio-hint",
       };
+    });
+    const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
+    const conditionNote = computed(() => ratioHint.value ?? formContext?.conditionNote?.value);
+    const conditionHelp = computed(() => {
+      const range = props.previewValueRange;
+      return range
+        ? t("alerts.guard.valueRange", {
+            min: formatNumber(range.min),
+            max: formatNumber(range.max),
+          })
+        : t("alerts.guard.valueRangePending");
     });
 
     // A loaded query longer than the fold reads as its first lines; typing or focusing opens it.
@@ -4606,6 +4553,8 @@ export default defineComponent({
       sqlOneRowWarning,
       thresholdUnit,
       ratioHint,
+      conditionNote,
+      conditionHelp,
       keptThresholdText,
       switchedToCountNote,
       groupTotalBy,

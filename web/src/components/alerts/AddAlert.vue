@@ -2317,6 +2317,7 @@ export default defineComponent({
       goToSection,
       reveal: (el: HTMLElement) => snapScrollRef.value?.revealElement(el),
       openSetting: (id: string) => settingFind.select(id),
+      conditionNote: ref(null),
     });
 
     const checkTimelineForecastWindow = computed(() => {

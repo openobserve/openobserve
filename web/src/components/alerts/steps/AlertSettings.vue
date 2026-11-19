@@ -160,43 +160,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </div>
-                <div
-                  v-if="pendingPeriodError"
-                  class="text-input-error-text w-0 min-w-full text-xs"
-                  data-test="alert-settings-pending-period-error"
-                  role="alert"
-                >
-                  {{ pendingPeriodError }}
-                </div>
-                <AlertLinkNote
-                  v-if="!pendingPeriodError && pendingPeriodWarning"
+                <AlertMessageLine
                   class="w-0 min-w-full"
-                  :text="pendingPeriodWarning.text"
-                  :action="pendingPeriodWarning.action"
-                  warning
-                  data-test="alert-settings-pending-period-warning"
-                  @action="pendingPeriodWarning.run"
-                />
-                <AlertLinkNote
-                  v-else-if="!pendingPeriodError && holdWindowNote"
-                  class="w-0 min-w-full"
-                  :text="holdWindowNote.text"
-                  :action="holdWindowNote.action"
-                  :warning="holdWindowNote.warning"
-                  data-test="alert-settings-hold-window"
-                  @action="setPendingPeriodMinutes(0)"
+                  :error="pendingPeriodError"
+                  error-data-test="alert-settings-pending-period-error"
+                  :note="pendingPeriodWarning ?? holdWindowNote"
+                  data-test="alert-settings-pending-period-message"
                 />
               </div>
             </AlertSentenceRow>
           </AlertTierPlace>
-          <AlertLinkNote
-            v-if="breachWarning"
-            :text="breachWarning.text"
-            :action="breachWarning.action"
-            warning
-            data-test="alert-settings-breach-warning"
-            @action="breachWarning.run"
-          />
         </Teleport>
 
         <Teleport :to="sectionTargets?.settingsNotify" :disabled="!sectionTargets?.settingsNotify">
@@ -234,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             fill
           >
-            <div class="flex w-fit max-w-full flex-col gap-1 pe-2">
+            <div class="flex min-w-0 flex-col gap-1 pe-2">
               <div class="flex items-center gap-2">
                 <div class="min-w-0">
                   <component :is="formField" v-if="formField" name="trigger_condition.silence">
@@ -266,25 +239,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="silence.onUnit"
                 />
               </div>
-              <div
-                v-if="silenceError"
-                class="text-input-error-text w-0 min-w-full text-xs"
-                data-test="alert-settings-silence-error"
-                role="alert"
-              >
-                {{ silenceError }}
-              </div>
-              <template v-else-if="isScheduled">
-                <AlertLinkNote
-                  v-if="silenceHint"
-                  :text="silenceHint.text"
-                  :action="silenceHint.action"
-                  warning
-                  data-test="alert-settings-silence-hint"
-                  @action="silenceHint.run"
-                />
-                <p v-else class="m-0 min-h-4" aria-hidden="true" />
-              </template>
+              <AlertMessageLine
+                :error="silenceError"
+                error-data-test="alert-settings-silence-error"
+                :note="isScheduled ? silenceHint : null"
+                data-test="alert-settings-silence-message"
+              />
             </div>
           </OSettingRow>
         </Teleport>
@@ -532,6 +492,7 @@ import {
   reactive,
   ref,
   watch,
+  watchEffect,
   type PropType,
 } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -547,6 +508,8 @@ import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.v
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
+import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
+import { ALERT_FORM_CONTEXT_KEY, type AlertLineNote } from "@/components/alerts/alertFormContext";
 import { describeDestinations } from "@/utils/alerts/destinationDescription";
 import { durationWords, everyWords, notifyHelp } from "@/utils/alerts/alertCopy";
 import {
@@ -582,6 +545,7 @@ export default defineComponent({
     AlertSentenceRow,
     AlertTierPlace,
     AlertLinkNote,
+    AlertMessageLine,
   },
   props: {
     // Opt-in: the sectioned alert editor renders each slice of these settings in its own section.
@@ -797,7 +761,7 @@ export default defineComponent({
       }
     };
 
-    const pendingPeriodWarning = computed<LinkNote | null>(() => {
+    const pendingPeriodWarning = computed<AlertLineNote | null>(() => {
       if (props.isRealTime !== "false") return null;
       const pendingMinutes = Number(fv("pending_period_sec"));
       if (!Number.isFinite(pendingMinutes) || pendingMinutes <= 0) return null;
@@ -813,6 +777,8 @@ export default defineComponent({
             ? t("alerts.guard.mustLastOneCheckFix", { every })
             : t("alerts.guard.mustLastOneCheck", { every }),
           ...fix,
+          warning: true,
+          dataTest: "alert-settings-pending-period-warning",
         };
       }
 
@@ -826,15 +792,14 @@ export default defineComponent({
         text: t("alerts.validation.pendingPeriodNotMultiple", {
           minutes: Math.round(freqMinutes * 100) / 100,
         }),
-        action: null,
-        separated: false,
-        run: () => {},
+        warning: true,
+        dataTest: "alert-settings-pending-period-warning",
       };
     });
 
     // A lowest (or highest) value must cross the threshold over a whole window, so a breach that
     // straddles two non-overlapping checks is seen by neither.
-    const breachWarning = computed<LinkNote | null>(() => {
+    const breachWarning = computed<AlertLineNote | null>(() => {
       if (!isScheduled.value || isCron.value) return null;
       const query = fv("query_condition") ?? {};
       if ((query.type ?? "custom") !== "custom" || !query.aggregation) return null;
@@ -849,12 +814,14 @@ export default defineComponent({
       return {
         text: t("alerts.guard.breachUnseen", { duration: durationWords(missed, t) }),
         ...checkEveryFix(period),
+        warning: true,
+        dataTest: "alert-settings-breach-warning",
       };
     });
 
     // "Stays above for N minutes" is one path: a lowest value over the window already says it, so
     // Must last either is not needed or adds its own wait on top.
-    const holdWindowNote = computed(() => {
+    const holdWindow = computed(() => {
       if (!isScheduled.value) return null;
       const query = fv("query_condition") ?? {};
       const aggregation = query.aggregation;
@@ -863,18 +830,33 @@ export default defineComponent({
         return null;
       const window = Number(fv("trigger_condition.period"));
       if (!(window > 0)) return null;
-      const pending = Number(fv("pending_period_sec")) || 0;
-      const words = { fn: raw(aggregation.function), window: durationWords(window, t) };
-      return pending > 0
+      return { fn: aggregation.function, window, pending: Number(fv("pending_period_sec")) || 0 };
+    });
+    const holdWindowNote = computed<AlertLineNote | null>(() =>
+      holdWindow.value
         ? {
-            text: t("alerts.form.holdFor.windowStacks", {
-              ...words,
-              total: durationWords(window + pending, t),
+            text: t("alerts.form.holdFor.windowCovers", {
+              fn: raw(holdWindow.value.fn),
+              window: durationWords(holdWindow.value.window, t),
             }),
-            action: t("alerts.form.holdFor.turnOff"),
-            warning: true,
+            dataTest: "alert-settings-hold-window",
           }
-        : { text: t("alerts.form.holdFor.windowCovers", words), action: null, warning: false };
+        : null,
+    );
+    // Both read as facts about the condition, so they show in its message line, not down here.
+    const conditionNote = computed<AlertLineNote | null>(() => {
+      if (breachWarning.value) return breachWarning.value;
+      const hold = holdWindow.value;
+      if (!hold?.pending) return null;
+      return {
+        text: t("alerts.form.holdFor.windowStacks", {
+          total: durationWords(hold.window + hold.pending, t),
+        }),
+        action: t("alerts.form.holdFor.turnOff"),
+        warning: true,
+        run: () => setPendingPeriodMinutes(0),
+        dataTest: "alert-settings-hold-stacks",
+      };
     });
 
     // The schema's floor: none when the org sets no minimum refresh interval.
@@ -941,7 +923,7 @@ export default defineComponent({
     });
     const notifyLines = computed(() => notifyHelp(fv("query_condition"), t));
     // A wait shorter than the checks never holds a notification back, so it says so instead of moving it.
-    const silenceHint = computed<LinkNote | null>(() => {
+    const silenceHint = computed<AlertLineNote | null>(() => {
       const checkMinutes = frequencyMinutes();
       const silenceMinutes = Number(fv("trigger_condition.silence"));
       if (!(silenceMinutes > 0) || !(checkMinutes > silenceMinutes)) return null;
@@ -949,8 +931,9 @@ export default defineComponent({
       return {
         text: t("alerts.form.remind.noEffect", { every: everyWords(minutes, t) }),
         action: t("alerts.form.remind.matchChecks", { duration: durationWords(minutes, t) }),
-        separated: false,
+        warning: true,
         run: () => setFV("trigger_condition.silence", minutes),
+        dataTest: "alert-settings-silence-hint",
       };
     });
 
@@ -1198,6 +1181,13 @@ export default defineComponent({
         ]
       : [];
     onBeforeUnmount(() => unregister.forEach((off) => off()));
+    const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
+    watchEffect(() => {
+      if (formContext?.conditionNote) formContext.conditionNote.value = conditionNote.value;
+    });
+    onBeforeUnmount(() => {
+      if (formContext?.conditionNote) formContext.conditionNote.value = null;
+    });
 
     return {
       tierShows,
