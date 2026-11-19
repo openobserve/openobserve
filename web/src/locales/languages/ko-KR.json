@@ -4996,9 +4996,7 @@
       "saved": "공지 배너가 업데이트되었습니다.",
       "saveFailed": "공지 배너를 저장할 수 없습니다.",
       "loadFailed": "공지 배너를 불러올 수 없습니다.",
-      "addBanner": "배너 추가",
-      "emptyTitle": "아직 배너가 없습니다.",
-      "emptyHint": "배너를 추가하여 앱 상단에 공지를 표시하세요."
+      "addBanner": "배너 추가"
     },
     "variants": {
       "info": "정보",
@@ -11935,10 +11933,7 @@
       "proposedActions": "제안된 작업",
       "qualityReasons": "이유: {reasons} | 이유: {reasons}",
       "openAlert": "알림 열기",
-      "advice": "확인할 사항",
-      "viewInLogs": "로그에서 보기",
-      "viewInLogsHint": "이 실행의 레코드를 로그에서 엽니다",
-      "loadFailed": "다이제스트를 불러올 수 없습니다: {message}"
+      "advice": "확인할 사항"
     },
     "dashboard": {
       "latestRunAgo": "최근 실행 {time}",
@@ -11996,8 +11991,7 @@
       "runNowHeading": "지금 실행",
       "findingsKept": "발견 항목은 이 조직의 자체 기록과 함께 보존 기간 동안 보관됩니다. 알림 캘리브레이션은 알림을 전송하지 않습니다.",
       "frequencyRange": "1시간에서 30일 사이의 주기를 선택하세요.",
-      "windowRange": "1분에서 90일 사이의 기간을 선택하세요.",
-      "loadFailed": "설정을 불러올 수 없습니다: {message}"
+      "windowRange": "1분에서 90일 사이의 기간을 선택하세요."
     },
     "visibility": {
       "allClear": "최근 실행에서 접근 가능한 알림에 대한 발견 항목이 없습니다.",
@@ -16423,12 +16417,7 @@
       "fieldNameMapping": "필드 이름 매핑",
       "logsWithCount": "로그 ({count})",
       "tracesWithCount": "트레이스 ({count})",
-      "metricsWithCount": "메트릭 ({count})",
-      "resetServicesConfirmMessage": "이 작업은 이 조직에 대해 발견된 모든 서비스를 삭제합니다. 새 텔레메트리 데이터가 수집되면 서비스가 자동으로 다시 발견됩니다. 이 작업은 취소할 수 없습니다.",
-      "resetServicesConfirmWarning": "새 텔레메트리 데이터가 수집되면 서비스가 자동으로 다시 발견됩니다. 이 작업은 취소할 수 없습니다.",
-      "configureServicesHint": "서비스가 식별되고 그룹화되는 방식을 구성하려면.",
-      "serviceCountSingular": "{count} 서비스 | {count} 서비스",
-      "instancesCount": "(인스턴스 {count}개)"
+      "metricsWithCount": "메트릭 ({count})"
     },
     "addRegexPattern": {
       "namePlaceholder": "예: 내부 비밀번호",
@@ -16507,8 +16496,7 @@
       "logoLightLabel": "사용자 지정 로고(라이트 모드)",
       "logoLightHelp": "라이트 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px.",
       "logoDarkLabel": "사용자 지정 로고(다크 모드)",
-      "logoDarkHelp": "다크 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px.",
-      "fileCounterLabel": "{constraint} {filesNumber}개 파일 {'|'} {totalSize}"
+      "logoDarkHelp": "다크 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px."
     },
     "modelPricingEditor": {
       "copySuffix": " (복사)"
@@ -16537,10 +16525,7 @@
       "daysValue": "{days}일",
       "forever": "영구 보존",
       "invalid": "0 또는 최소 3일을 사용하세요",
-      "invalidType": "최소 3일을 사용하거나 이 유형을 제거하세요",
-      "streamType": "스트림 유형",
-      "days": "일",
-      "removeType": "이 스트림 유형 제거"
+      "invalidType": "최소 3일을 사용하거나 이 유형을 제거하세요"
     },
     "organizationSettings": {
       "fieldNameHelp": "영숫자 및 '+=,.{'@'}-_' 문자만 사용하고 공백은 사용하지 마세요.",
@@ -16774,8 +16759,7 @@
       "reasonIdealForDisambiguation": "{details} — 서비스 식별에 이상적",
       "trackedK8sWorkload": "K8s 워크로드",
       "trackedK8sPod": "K8s 파드",
-      "serviceCountFailed": "서비스 수를 불러오지 못했습니다",
-      "toSeeDiscoveredServices": "실제로 발견된 서비스를 보려면."
+      "serviceCountFailed": "서비스 수를 불러오지 못했습니다"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "예: {example}",
@@ -16964,51 +16948,6 @@
       "requestApproved": "{domain} 연결됨",
       "requestRejected": "{domain}에 대한 요청이 거부되었습니다",
       "decisionFailed": "요청을 업데이트하지 못했습니다"
-    },
-    "groupDataAI": "데이터 및 AI",
-    "llmProvidersDesc": "온라인 평가를 위한 LLM 공급자",
-    "customLogoTitle": "맞춤 로고",
-    "customLogoTextDescription": "사용자 지정 로고 텍스트는 애플리케이션에 표시되는 기본 브랜딩 텍스트를 변경하는 데 사용됩니다.",
-    "dragDropUpload": "드래그 앤 드롭 또는 클릭하여 업로드",
-    "customLogoLightDescription": "라이트 모드 테마에 대한 사용자 정의 로고.사용자가 라이트 모드에 있을 때 표시됩니다.",
-    "customLogoDarkDescription": "다크 모드 테마에 대한 사용자 정의 로고.사용자가 다크 모드에 있을 때 표시됩니다.",
-    "textMaxCharacters": "텍스트는 100자 미만이어야 합니다.",
-    "genAiAgentMapping": {
-      "tabLabel": "젠아이 에이전트 매핑",
-      "title": "젠아이 에이전트 매핑",
-      "description": "LLM 트레이스 및 평가에서 에이전트 ID를 정규화하는 데 사용되는 대체 텔레메트리 속성을 구성합니다.",
-      "agentNameFields": "에이전트 이름 폴백 필드",
-      "agentNameHelp": "gen_ai.agent.name의 폴백으로 사용할 들어오는 속성입니다.",
-      "agentNameInfo": "표준 gen_ai.agent.name 속성이 없거나 비어 있는 경우에만 확인합니다.수신되는 텔레메트리 속성을 한 줄에 하나씩 추가합니다.",
-      "agentIdFields": "에이전트 ID 폴백 필드",
-      "agentIdHelp": "gen_ai.agent.id의 폴백으로 사용할 수신 속성입니다.",
-      "agentIdInfo": "표준 gen_ai.agent.id 속성이 없거나 비어 있는 경우에만 확인합니다.수신되는 텔레메트리 속성을 한 줄에 하나씩 추가합니다.",
-      "envFields": "환경 폴백 필드",
-      "envHelp": "에이전트 환경으로 사용할 수신 속성.",
-      "envInfo": "표준 deployment.environment.name 속성이 없거나 비어 있는 경우에만 확인됩니다. 줄마다 수신 텔레메트리 속성을 하나씩 추가하세요.",
-      "versionFields": "버전 폴백 필드",
-      "versionHelp": "에이전트 버전으로 사용할 수신 속성.",
-      "versionInfo": "표준 gen_ai.agent.version 속성이 없거나 비어 있는 경우에만 확인됩니다. 줄마다 수신 텔레메트리 속성을 하나씩 추가하세요.",
-      "alwaysAppliedStandard": "표준(먼저 확인됨):",
-      "applyDefaults": "기본값 적용",
-      "resetToEmpty": "빈 상태로 재설정",
-      "clearRegistry": "레지스트리 지우기",
-      "clearRegistryTitle": "에이전트 레지스트리를 지우시겠습니까?",
-      "clearRegistryDescription": "이 작업은 이 조직의 발견된 GenAI 에이전트 레지스트리 행을 모두 삭제합니다. 새로 일치하는 트레이스는 수집 중에 레지스트리를 다시 채웁니다.",
-      "clearRegistryConfirm": "레지스트리 지우기",
-      "saved": "GenAI 에이전트 매핑이 성공적으로 저장되었습니다.",
-      "clearRegistrySuccess": "GenAI 에이전트 레지스트리가 삭제되었습니다. {deletedCount} 개의 저장된 에이전트와 {bufferCount} 개의 대기 중인 관찰을 삭제했습니다.",
-      "loadFailed": "GenAI 에이전트 매핑을 로드하지 못했습니다.",
-      "saveFailed": "GenAI 에이전트 매핑을 저장하지 못했습니다.",
-      "clearRegistryFailed": "GenAI 에이전트 레지스트리를 지우지 못했습니다.",
-      "defaultsLoadFailed": "GenAI 에이전트 매핑 기본값을 로드하지 못했습니다.",
-      "defaultsFetchFailed": "기본값을 가져오지 못했습니다. ({status})"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "온라인 평가를 위한 LLM 공급자"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "GenAI 스팬을 에이전트 식별자에 매핑합니다"
     }
   },
   "reports": {
@@ -17270,8 +17209,7 @@
     "cancelQueryFailed": "쿼리를 취소하지 못했습니다",
     "searchTypeDashboards": "대시보드",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "기타",
-    "lastDataRefreshTime": "마지막 데이터 새로 고침 시간:"
+    "searchTypeOthers": "기타"
   },
   "traces": {
     "nlNeedsSql": "이 질문에는 SQL이 필요합니다. 로그에서 여세요.",
@@ -17721,8 +17659,7 @@
         "count": "{count}개 인사이트 | {count}개 인사이트",
         "countHint": "이 시간 범위의 서비스 이상 {count}건 | 이 시간 범위의 서비스 이상 {count}건",
         "viewTraces": "트레이스",
-        "viewCharts": "차트",
-        "scoreAbove": "임계값 초과 점수 +{percent}%"
+        "viewCharts": "차트"
       }
     },
     "spansTab": "스팬",
@@ -17832,8 +17769,7 @@
       "totalTraces": "총 트레이스",
       "p95Latency": "P95 지연 시간",
       "errorRate": "오류율",
-      "timeAxis": "시간",
-      "errorsSeries": "오류"
+      "timeAxis": "시간"
     },
     "searchBar": {
       "streamNotFound": "스트림을 찾을 수 없음"
@@ -17887,10 +17823,7 @@
       "metricsLoadFailed": "이 서비스의 상관 메트릭을 불러오지 못했습니다. {reason}",
       "noResourceRecorded": "이 시간 범위에서 이 서비스의 스팬에는 {resource}이(가) 기록되지 않습니다.",
       "resourceLoadFailed": "이 서비스의 {resource}을(를) 불러오지 못했습니다. {reason}",
-      "noVersionTraffic": "이 스트림에서 이 서비스의 스팬에는 버전이 기록되지 않으므로 버전별로 분할할 트래픽이 없습니다.",
-      "noResourceDataFound": "{resource} 데이터를 찾을 수 없음",
-      "failedToLoadMetrics": "메트릭을 불러오지 못했습니다.",
-      "requests": "요청"
+      "noVersionTraffic": "이 스트림에서 이 서비스의 스팬에는 버전이 기록되지 않으므로 버전별로 분할할 트래픽이 없습니다."
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP 상태 코드",
@@ -18130,15 +18063,6 @@
       "loadingPage": "페이지 {page} 로드 중",
       "pageFailed": "페이지 {page}을(를) 로드할 수 없습니다",
       "pageEmpty": "페이지 {page}에 결과가 없습니다"
-    },
-    "lLMErrorTable": {
-      "noData": "데이터 없음",
-      "noErrorsInRange": "이 시간 범위에 오류가 없습니다",
-      "loadFailed": "최근 오류를 불러오지 못했습니다",
-      "time": "시간",
-      "service": "서비스",
-      "operation": "작업",
-      "traceId": "트레이스 ID"
     }
   },
   "aiToolset": {
@@ -19602,8 +19526,7 @@
         "promptTemperatureOverrideInherited": "프롬프트 매개변수를 사용 중입니다.",
         "taskTimeoutLabel": "제한 시간(초)",
         "taskConcurrencyLabel": "최대 동시성",
-        "taskOverrideHelp": "이 실행에 대해 태스크의 게시된 값을 재정의합니다.",
-        "providerHelpSettingsLink": "설정"
+        "taskOverrideHelp": "이 실행에 대해 태스크의 게시된 값을 재정의합니다."
       },
       "columns": {
         "name": "이름",
@@ -19996,26 +19919,6 @@
           "traces": "트레이스",
           "last": "마지막 실패"
         }
-      },
-      "spanTrend": {
-        "title": "스팬 추세",
-        "subtitle": "종류별 스팬 수"
-      },
-      "errorsOverTime": {
-        "title": "시간 경과에 따른 오류",
-        "subtitle": "오류 개수"
-      },
-      "spansByModel": {
-        "title": "모델별 스팬",
-        "subtitle": "모델당 콜 수"
-      },
-      "tokensByModel": {
-        "title": "모델별 토큰",
-        "subtitle": "모델당 총 토큰"
-      },
-      "recentErrors": {
-        "title": "최근 오류",
-        "subtitle": "최근 10개의 실패한 스팬"
       }
     },
     "behavior": {
@@ -21214,8 +21117,7 @@
         "resultReasoning": "추론",
         "resultRaw": "원시 응답",
         "valuePlaceholder": "{variable} 의 값"
-      },
-      "providerHelpSettingsLink": "설정"
+      }
     },
     "job": {
       "detail": {
@@ -29820,10 +29722,7 @@
         "service": "서비스 기준",
         "place": "위치 기준",
         "none": "그룹 없음"
-      },
-      "fixNoLink": "service.name 레이블 추가",
-      "fixStopped": "컬렉터 확인",
-      "fixQueued": "모의 전용: {service}의 “{action}”이(가) 어디에도 전송되지 않았습니다"
+      }
     },
     "activity": {
       "before": "이전",
@@ -30718,8 +30617,7 @@
       "copyRequest": "요청 복사",
       "requestText": "Slack 워크스페이스 {team}의 _meta › 설정 › Slack › 조직에서 OpenObserve 조직 {name} ({org})을(를) 추가해 주세요.",
       "requestCopied": "요청이 복사되었습니다",
-      "setupAppOtherTeam": "{team}이 아닌 다른 Slack 워크스페이스용 · OpenObserve가 구성 토큰 하나로 사용자 전용 Slack 앱을 만듭니다",
-      "title": "Slack 워크스페이스 연결"
+      "setupAppOtherTeam": "{team}이 아닌 다른 Slack 워크스페이스용 · OpenObserve가 구성 토큰 하나로 사용자 전용 Slack 앱을 만듭니다"
     },
     "wizard": {
       "title": "Slack 앱 설정",
@@ -30939,9 +30837,7 @@
       "ownOrgOnlyHint": "인스턴스 워크스페이스에서는 채널을 자신의 조직에 매핑합니다",
       "claimableHint": "할당되지 않은 채널 및 {org} 소유 채널",
       "servedOrgsHint": "이 워크스페이스가 서비스하는 모든 조직",
-      "alertRoutes": "대상 {count}개 | 대상 {count}개",
-      "empty": "아직 기본 조직이 있는 채널이 없습니다",
-      "emptyDescription": "기본 조직이 설정되지 않은 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다)."
+      "alertRoutes": "대상 {count}개 | 대상 {count}개"
     },
     "people": {
       "title": "연결된 사용자",
@@ -30960,8 +30856,7 @@
         "email": "이메일 일치",
         "admin_bulk": "모두 연결"
       },
-      "loadMore": "더 불러오기",
-      "empty": "이 조직에서 아직 Slack을 연결한 사람이 없습니다"
+      "loadMore": "더 불러오기"
     },
     "credentials": {
       "title": "자격 증명 업데이트",
@@ -31899,13 +31794,6 @@
           "fix": "통합 가이드"
         }
       }
-    },
-    "chart": {
-      "costMissing": "이 차트에 없음: {models}. {tokens}개 토큰에 가격이 없습니다.",
-      "costMissingPricedSince": "이 차트에 없음: {models}. {tokens}개 토큰은 가격이 추가되기 전에 기록되었습니다.",
-      "unpricedModels": "가격 미책정: {models}",
-      "pricedSinceModels": "가격 추가 전에 기록됨: {models}",
-      "addPrice": "가격 추가"
     }
   },
   "onboarding": {

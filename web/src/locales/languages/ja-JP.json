@@ -4996,9 +4996,7 @@
       "saved": "お知らせバナーが更新されました",
       "saveFailed": "お知らせバナーを保存できませんでした",
       "loadFailed": "お知らせバナーを読み込めませんでした",
-      "addBanner": "バナーを追加",
-      "emptyTitle": "まだバナーはありません",
-      "emptyHint": "アプリの上部に通知を表示するには、1つ追加してください。"
+      "addBanner": "バナーを追加"
     },
     "variants": {
       "info": "情報",
@@ -11935,10 +11933,7 @@
       "proposedActions": "提案されたアクション",
       "qualityReasons": "理由: {reasons} | 理由: {reasons}",
       "openAlert": "アラートを開く",
-      "advice": "確認すべきこと",
-      "viewInLogs": "ログで表示",
-      "viewInLogsHint": "この実行のレコードをログで開きます",
-      "loadFailed": "ダイジェストを読み込めませんでした: {message}"
+      "advice": "確認すべきこと"
     },
     "dashboard": {
       "latestRunAgo": "最新の実行 {time}",
@@ -11996,8 +11991,7 @@
       "runNowHeading": "今すぐ実行",
       "findingsKept": "検出結果は、この組織の独自のレコードとして保持期間中保持されます。アラートキャリブレーションは通知を送信しません。",
       "frequencyRange": "1 時間から 30 日の間で実行間隔を選択してください。",
-      "windowRange": "1 分から 90 日の間でウィンドウを選択してください。",
-      "loadFailed": "設定を読み込めませんでした: {message}"
+      "windowRange": "1 分から 90 日の間でウィンドウを選択してください。"
     },
     "visibility": {
       "allClear": "最新の実行で、アクセス可能なアラートに検出結果はありません。",
@@ -16423,12 +16417,7 @@
       "fieldNameMapping": "フィールド名マッピング",
       "logsWithCount": "ログ（{count}）",
       "tracesWithCount": "トレース ({count})",
-      "metricsWithCount": "メトリクス（{count}）",
-      "resetServicesConfirmMessage": "これにより、この組織で検出されたすべてのサービスが削除されます。新しいテレメトリデータが取り込まれると、サービスは自動的に再検出されます。この操作は取り消せません。",
-      "resetServicesConfirmWarning": "新しいテレメトリデータが取り込まれると、サービスは自動的に再検出されます。この操作は取り消せません。",
-      "configureServicesHint": "サービスの識別方法とグループ化方法を設定します。",
-      "serviceCountSingular": "{count} サービス | {count} サービス",
-      "instancesCount": "（{count}インスタンス）"
+      "metricsWithCount": "メトリクス（{count}）"
     },
     "addRegexPattern": {
       "namePlaceholder": "例: Internal Passwords",
@@ -16507,8 +16496,7 @@
       "logoLightLabel": "カスタムロゴ（ライトモード）",
       "logoLightHelp": "ライトモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。",
       "logoDarkLabel": "カスタムロゴ（ダークモード）",
-      "logoDarkHelp": "ダークモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。",
-      "fileCounterLabel": "{constraint} {filesNumber} ファイル {'|'} {totalSize}"
+      "logoDarkHelp": "ダークモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。"
     },
     "modelPricingEditor": {
       "copySuffix": " (コピー)"
@@ -16537,10 +16525,7 @@
       "daysValue": "{days} 日",
       "forever": "無期限に保持",
       "invalid": "0 または 3 日以上を指定してください",
-      "invalidType": "3 日以上を指定するか、このタイプを削除してください",
-      "streamType": "ストリームタイプ",
-      "days": "日数",
-      "removeType": "このストリームタイプを削除"
+      "invalidType": "3 日以上を指定するか、このタイプを削除してください"
     },
     "organizationSettings": {
       "fieldNameHelp": "英数字と'+=,.{'@'}-_'文字のみを使用し、スペースは使用しないでください。",
@@ -16774,8 +16759,7 @@
       "reasonIdealForDisambiguation": "{details} — サービス識別に最適",
       "trackedK8sWorkload": "K8s ワークロード",
       "trackedK8sPod": "K8s Pod",
-      "serviceCountFailed": "サービスの件数を読み込めませんでした",
-      "toSeeDiscoveredServices": "実際に検出されたサービスを確認してください。"
+      "serviceCountFailed": "サービスの件数を読み込めませんでした"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "例: {example}",
@@ -16964,51 +16948,6 @@
       "requestApproved": "{domain} をリンクしました",
       "requestRejected": "{domain} のリクエストを拒否しました",
       "decisionFailed": "リクエストの更新に失敗しました"
-    },
-    "groupDataAI": "データとAI",
-    "llmProvidersDesc": "オンライン評価用のLLMプロバイダー",
-    "customLogoTitle": "カスタムロゴ",
-    "customLogoTextDescription": "カスタムロゴテキストは、アプリケーションに表示されるデフォルトのブランドテキストを変更するために使用されます。",
-    "dragDropUpload": "ドラッグアンドドロップまたはクリックしてアップロード",
-    "customLogoLightDescription": "ライトモードテーマのカスタムロゴ。これはユーザーがライトモードのときに表示されます。",
-    "customLogoDarkDescription": "ダークモードテーマのカスタムロゴ。これはユーザーがダークモードのときに表示されます。",
-    "textMaxCharacters": "テキストは 100 文字未満でなければなりません。",
-    "genAiAgentMapping": {
-      "tabLabel": "GenAI エージェントマッピング",
-      "title": "GenAI エージェントマッピング",
-      "description": "LLMトレースと評価でエージェントの識別情報を正規化するために使用するフォールバックテレメトリ属性を構成します。",
-      "agentNameFields": "エージェント名フォールバックフィールド",
-      "agentNameHelp": "gen_ai.agent.name のフォールバックとして使用する受信アトリビュート。",
-      "agentNameInfo": "標準の gen_ai.agent.name 属性が欠落しているか、空の場合にのみチェックされます。1 行に 1 つの受信テレメトリ属性を追加します。",
-      "agentIdFields": "エージェント ID フォールバックフィールド",
-      "agentIdHelp": "gen_ai.agent.id のフォールバックとして使用する受信アトリビュート。",
-      "agentIdInfo": "標準の gen_ai.agent.id 属性が欠落しているか、空の場合にのみチェックされます。1 行に 1 つの受信テレメトリ属性を追加します。",
-      "envFields": "環境フォールバックフィールド",
-      "envHelp": "エージェントの環境として使用する受信属性。",
-      "envInfo": "標準の deployment.environment.name 属性が欠落しているか空の場合にのみチェックされます。1行に1つの受信テレメトリ属性を追加してください。",
-      "versionFields": "バージョンフォールバックフィールド",
-      "versionHelp": "エージェントのバージョンとして使用する受信属性。",
-      "versionInfo": "標準の gen_ai.agent.version 属性が欠落しているか空の場合にのみチェックされます。1行に1つの受信テレメトリ属性を追加してください。",
-      "alwaysAppliedStandard": "標準（最初にチェック）：",
-      "applyDefaults": "デフォルトを適用",
-      "resetToEmpty": "空にリセット",
-      "clearRegistry": "レジストリをクリア",
-      "clearRegistryTitle": "エージェントレジストリを消去しますか?",
-      "clearRegistryDescription": "これにより、この組織で検出されたGenAIエージェントレジストリの全行が削除されます。新しい一致するトレースは、取り込み中にレジストリを再生成します。",
-      "clearRegistryConfirm": "レジストリをクリア",
-      "saved": "GenAI エージェントマッピングが正常に保存されました",
-      "clearRegistrySuccess": "GenAI エージェントレジストリをクリアしました。保存されたエージェント {deletedCount} 件と、キューに入った観測 {bufferCount} 件を削除しました。",
-      "loadFailed": "GenAI エージェントマッピングを読み込めませんでした",
-      "saveFailed": "GenAI エージェントマッピングを保存できませんでした",
-      "clearRegistryFailed": "GenAI エージェントレジストリをクリアできませんでした",
-      "defaultsLoadFailed": "GenAI エージェントマッピングのデフォルトをロードできませんでした",
-      "defaultsFetchFailed": "デフォルトの取得に失敗しました ({status})"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "オンライン評価用のLLMプロバイダー"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "GenAIスパンをエージェント識別子にマッピング"
     }
   },
   "reports": {
@@ -17270,8 +17209,7 @@
     "cancelQueryFailed": "クエリのキャンセルに失敗しました",
     "searchTypeDashboards": "ダッシュボード",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "その他",
-    "lastDataRefreshTime": "最終データ更新時刻:"
+    "searchTypeOthers": "その他"
   },
   "traces": {
     "nlNeedsSql": "この質問にはSQLが必要です。ログで開いてください",
@@ -17721,8 +17659,7 @@
         "count": "{count} 件のインサイト | {count} 件のインサイト",
         "countHint": "この時間範囲のサービス異常 {count} 件 | この時間範囲のサービス異常 {count} 件",
         "viewTraces": "トレース",
-        "viewCharts": "チャート",
-        "scoreAbove": "しきい値を {percent}% 上回るスコア"
+        "viewCharts": "チャート"
       }
     },
     "spansTab": "スパン",
@@ -17832,8 +17769,7 @@
       "totalTraces": "トレース合計",
       "p95Latency": "P95レイテンシ",
       "errorRate": "エラー率",
-      "timeAxis": "時刻",
-      "errorsSeries": "エラー"
+      "timeAxis": "時刻"
     },
     "searchBar": {
       "streamNotFound": "ストリームが見つかりません"
@@ -17887,10 +17823,7 @@
       "metricsLoadFailed": "このサービスの相関メトリクスを読み込めませんでした。{reason}",
       "noResourceRecorded": "この時間範囲におけるこのサービスのスパンには {resource} が記録されていません。",
       "resourceLoadFailed": "このサービスの {resource} を読み込めませんでした。{reason}",
-      "noVersionTraffic": "このストリームにおけるこのサービスのスパンにはバージョンが記録されていないため、バージョン別に分割するトラフィックがありません。",
-      "noResourceDataFound": "{resource}のデータが見つかりません",
-      "failedToLoadMetrics": "メトリクスの読み込みに失敗しました。",
-      "requests": "リクエスト"
+      "noVersionTraffic": "このストリームにおけるこのサービスのスパンにはバージョンが記録されていないため、バージョン別に分割するトラフィックがありません。"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTPステータスコード",
@@ -18130,15 +18063,6 @@
       "loadingPage": "ページ {page} を読み込み中",
       "pageFailed": "ページ {page} を読み込めませんでした",
       "pageEmpty": "ページ {page} に結果がありません"
-    },
-    "lLMErrorTable": {
-      "noData": "データなし",
-      "noErrorsInRange": "この時間範囲にエラーはありません",
-      "loadFailed": "最近のエラーを読み込めませんでした",
-      "time": "時間",
-      "service": "サービス",
-      "operation": "操作",
-      "traceId": "トレース ID"
     }
   },
   "aiToolset": {
@@ -19602,8 +19526,7 @@
         "promptTemperatureOverrideInherited": "プロンプトのパラメータを使用しています。",
         "taskTimeoutLabel": "タイムアウト（秒）",
         "taskConcurrencyLabel": "最大同時実行数",
-        "taskOverrideHelp": "この実行では、タスクの公開値を上書きします。",
-        "providerHelpSettingsLink": "設定"
+        "taskOverrideHelp": "この実行では、タスクの公開値を上書きします。"
       },
       "columns": {
         "name": "名前",
@@ -19996,26 +19919,6 @@
           "traces": "トレース",
           "last": "最終失敗"
         }
-      },
-      "spanTrend": {
-        "title": "スパントレンド",
-        "subtitle": "種類別スパン数"
-      },
-      "errorsOverTime": {
-        "title": "時間の経過に伴うエラー",
-        "subtitle": "エラー数"
-      },
-      "spansByModel": {
-        "title": "モデル別スパン",
-        "subtitle": "モデルごとのコール数"
-      },
-      "tokensByModel": {
-        "title": "モデル別トークン",
-        "subtitle": "モデルごとの合計トークン"
-      },
-      "recentErrors": {
-        "title": "最近のエラー",
-        "subtitle": "直近10件の失敗したスパン"
       }
     },
     "behavior": {
@@ -21214,8 +21117,7 @@
         "resultReasoning": "推論",
         "resultRaw": "生のレスポンス",
         "valuePlaceholder": "{variable} の値"
-      },
-      "providerHelpSettingsLink": "設定"
+      }
     },
     "job": {
       "detail": {
@@ -29820,10 +29722,7 @@
         "service": "サービス別",
         "place": "場所別",
         "none": "グループ化なし"
-      },
-      "fixNoLink": "service.name ラベルを追加",
-      "fixStopped": "コレクターを確認",
-      "fixQueued": "モックのみ: {service} の「{action}」はどこにも送信されませんでした"
+      }
     },
     "activity": {
       "before": "変更前",
@@ -30718,8 +30617,7 @@
       "copyRequest": "リクエストをコピー",
       "requestText": "OpenObserve 組織 {name} ({org}) を Slack ワークスペース {team} に追加してください (_meta › Settings › Slack › Organizations)。",
       "requestCopied": "リクエストをコピーしました",
-      "setupAppOtherTeam": "{team} 以外の Slack ワークスペース用 · OpenObserve が 1 つの設定トークンから専用の Slack アプリを作成します",
-      "title": "Slack ワークスペースを接続"
+      "setupAppOtherTeam": "{team} 以外の Slack ワークスペース用 · OpenObserve が 1 つの設定トークンから専用の Slack アプリを作成します"
     },
     "wizard": {
       "title": "Slack アプリを設定",
@@ -30939,9 +30837,7 @@
       "ownOrgOnlyHint": "インスタンスワークスペースでは、チャンネルを自身の組織にマッピングします",
       "claimableHint": "未割り当てのチャンネルと {org} が所有するチャンネル",
       "servedOrgsHint": "このワークスペースが対応する任意の組織",
-      "alertRoutes": "{count} 件の宛先 | {count} 件の宛先",
-      "empty": "デフォルト組織が設定されたチャンネルはまだありません",
-      "emptyDescription": "デフォルトがないチャネルでの質問は、各人のデフォルト組織に送られます（/o2 org で変更できます）。"
+      "alertRoutes": "{count} 件の宛先 | {count} 件の宛先"
     },
     "people": {
       "title": "リンク済みのユーザー",
@@ -30960,8 +30856,7 @@
         "email": "メール一致",
         "admin_bulk": "全員をリンク"
       },
-      "loadMore": "さらに読み込む",
-      "empty": "この組織ではまだ誰も Slack をリンクしていません"
+      "loadMore": "さらに読み込む"
     },
     "credentials": {
       "title": "認証情報を更新",
@@ -31899,13 +31794,6 @@
           "fix": "統合ガイド"
         }
       }
-    },
-    "chart": {
-      "costMissing": "このチャートには含まれません: {models}。{tokens} トークンに価格がありません。",
-      "costMissingPricedSince": "このチャートには含まれません: {models}。{tokens} トークンは価格追加前に記録されました。",
-      "unpricedModels": "価格未設定: {models}",
-      "pricedSinceModels": "価格追加前に記録: {models}",
-      "addPrice": "価格を追加"
     }
   },
   "onboarding": {

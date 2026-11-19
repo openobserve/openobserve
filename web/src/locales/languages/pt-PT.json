@@ -4996,9 +4996,7 @@
       "saved": "Banners de anúncio atualizados",
       "saveFailed": "Não foi possível guardar os banners de anúncio",
       "loadFailed": "Não foi possível carregar os banners de anúncio",
-      "addBanner": "Adicionar banner",
-      "emptyTitle": "Ainda não há banners",
-      "emptyHint": "Adicione um para mostrar um aviso no topo da aplicação."
+      "addBanner": "Adicionar banner"
     },
     "variants": {
       "info": "Info",
@@ -11935,10 +11933,7 @@
       "proposedActions": "Ações propostas",
       "qualityReasons": "Motivo: {reasons} | Motivos: {reasons}",
       "openAlert": "Abrir alerta",
-      "advice": "O que verificar",
-      "viewInLogs": "Ver em Logs",
-      "viewInLogsHint": "Abre os registos desta execução em Logs",
-      "loadFailed": "Não foi possível carregar o resumo: {message}"
+      "advice": "O que verificar"
     },
     "dashboard": {
       "latestRunAgo": "Última execução {time}",
@@ -11996,8 +11991,7 @@
       "runNowHeading": "Executar agora",
       "findingsKept": "Os resultados são guardados com os registos desta organização durante o seu período de retenção. A calibração de alertas não envia notificações.",
       "frequencyRange": "Escolha uma cadência entre 1 hora e 30 dias.",
-      "windowRange": "Escolha uma janela entre 1 minuto e 90 dias.",
-      "loadFailed": "Não foi possível carregar as definições: {message}"
+      "windowRange": "Escolha uma janela entre 1 minuto e 90 dias."
     },
     "visibility": {
       "allClear": "Sem resultados nos alertas a que tem acesso na execução mais recente.",
@@ -16423,12 +16417,7 @@
       "fieldNameMapping": "Mapeamento de Nome de Campo",
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
-      "metricsWithCount": "Métricas ({count})",
-      "resetServicesConfirmMessage": "Isto eliminará todos os serviços descobertos para esta organização. Os serviços serão redescobertos automaticamente à medida que novos dados de telemetria forem ingeridos. Esta ação não pode ser desfeita.",
-      "resetServicesConfirmWarning": "Os serviços serão redescobertos automaticamente à medida que novos dados de telemetria forem ingeridos. Esta ação não pode ser desfeita.",
-      "configureServicesHint": "para configurar como os serviços são identificados e agrupados.",
-      "serviceCountSingular": "{count} Serviço | {count} Serviços",
-      "instancesCount": "({count} instâncias)"
+      "metricsWithCount": "Métricas ({count})"
     },
     "addRegexPattern": {
       "namePlaceholder": "Ex.: Palavras-passe Internas",
@@ -16507,8 +16496,7 @@
       "logoLightLabel": "Logótipo personalizado (modo claro)",
       "logoLightHelp": "Apresentado no modo claro. PNG, JPG, GIF ou BMP, até 150 × 30 px.",
       "logoDarkLabel": "Logótipo personalizado (modo escuro)",
-      "logoDarkHelp": "Apresentado no modo escuro. PNG, JPG, GIF ou BMP, até 150 × 30 px.",
-      "fileCounterLabel": "{constraint} {filesNumber} ficheiro {'|'} {totalSize}"
+      "logoDarkHelp": "Apresentado no modo escuro. PNG, JPG, GIF ou BMP, até 150 × 30 px."
     },
     "modelPricingEditor": {
       "copySuffix": " (Cópia)"
@@ -16537,10 +16525,7 @@
       "daysValue": "{days} dias",
       "forever": "manter para sempre",
       "invalid": "Utilize 0 ou pelo menos 3 dias",
-      "invalidType": "Utilize pelo menos 3 dias ou remova este tipo",
-      "streamType": "Tipo de stream",
-      "days": "Dias",
-      "removeType": "Remover este tipo de stream"
+      "invalidType": "Utilize pelo menos 3 dias ou remova este tipo"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use apenas caracteres alfanuméricos e '+=,.{'@'}-_', sem espaços.",
@@ -16774,8 +16759,7 @@
       "reasonIdealForDisambiguation": "{details} — ideal para desambiguação de serviços",
       "trackedK8sWorkload": "Carga de trabalho K8s",
       "trackedK8sPod": "Pod K8s",
-      "serviceCountFailed": "Não foi possível carregar a contagem de serviços",
-      "toSeeDiscoveredServices": "para ver os serviços descobertos reais."
+      "serviceCountFailed": "Não foi possível carregar a contagem de serviços"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "ex.: {example}",
@@ -16964,51 +16948,6 @@
       "requestApproved": "{domain} vinculado",
       "requestRejected": "Solicitação de {domain} rejeitada",
       "decisionFailed": "Falha ao atualizar a solicitação"
-    },
-    "groupDataAI": "Dados e IA",
-    "llmProvidersDesc": "Fornecedores de LLM para avaliações online",
-    "customLogoTitle": "Logotipo personalizado",
-    "customLogoTextDescription": "O texto do logotipo personalizado é usado para alterar o texto padrão da marca exibido na aplicação.",
-    "dragDropUpload": "Arraste e largue ou clique para carregar",
-    "customLogoLightDescription": "Logotipo personalizado para o tema do modo claro. Isto será exibido quando os utilizadores estiverem no modo claro.",
-    "customLogoDarkDescription": "Logotipo personalizado para o tema do modo escuro. Isto será exibido quando os utilizadores estiverem no modo escuro.",
-    "textMaxCharacters": "O texto deve ter menos de 100 caracteres.",
-    "genAiAgentMapping": {
-      "tabLabel": "Mapeamento de agentes GenAI",
-      "title": "Mapeamento de agentes GenAI",
-      "description": "Configure atributos de telemetria de fallback usados para normalizar a identidade do agente para traces de LLM e avaliações.",
-      "agentNameFields": "Campos alternativos do nome do agente",
-      "agentNameHelp": "Atributos de entrada a serem usados como substitutos para gen_ai.agent.name.",
-      "agentNameInfo": "Verificado apenas quando o atributo gen_ai.agent.name padrão está ausente ou vazio. Adicione um atributo de telemetria de entrada por linha.",
-      "agentIdFields": "Campos alternativos de ID do agente",
-      "agentIdHelp": "Atributos de entrada a serem usados como substitutos para gen_ai.agent.id.",
-      "agentIdInfo": "Verificado apenas quando o atributo gen_ai.agent.id padrão está ausente ou vazio. Adicione um atributo de telemetria de entrada por linha.",
-      "envFields": "Campos de fallback de ambiente",
-      "envHelp": "Atributos recebidos para usar como ambiente do agente.",
-      "envInfo": "Verificado apenas quando o atributo padrão deployment.environment.name estiver ausente ou vazio. Adicione um atributo de telemetria recebido por linha.",
-      "versionFields": "Campos de fallback de versão",
-      "versionHelp": "Atributos recebidos para usar como versão do agente.",
-      "versionInfo": "Verificado apenas quando o atributo padrão gen_ai.agent.version estiver ausente ou vazio. Adicione um atributo de telemetria recebido por linha.",
-      "alwaysAppliedStandard": "Padrão (verificado primeiro):",
-      "applyDefaults": "Aplicar padrões",
-      "resetToEmpty": "Repor como vazio",
-      "clearRegistry": "Limpar registo",
-      "clearRegistryTitle": "Limpar o registo do agente?",
-      "clearRegistryDescription": "Isto elimina todas as linhas do registo de agentes GenAI descobertas para esta organização. Novos traces correspondentes repopularão o registo durante a ingestão.",
-      "clearRegistryConfirm": "Limpar registo",
-      "saved": "O mapeamento do agente GenAI foi guardado com sucesso",
-      "clearRegistrySuccess": "Registo de agentes GenAI limpo. Eliminados {deletedCount} agentes armazenados e {bufferCount} observações em fila.",
-      "loadFailed": "Falha ao carregar o mapeamento do agente GenAI",
-      "saveFailed": "Falha ao guardar o mapeamento do agente GenAI",
-      "clearRegistryFailed": "Falha ao limpar o registo do agente GenAI",
-      "defaultsLoadFailed": "Falha ao carregar os padrões de mapeamento do agente GenAI",
-      "defaultsFetchFailed": "Falha ao obter padrões ({status})"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "Fornecedores de LLM para avaliações online"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "Mapear spans GenAI para identificadores de agente"
     }
   },
   "reports": {
@@ -17270,8 +17209,7 @@
     "cancelQueryFailed": "Falha ao cancelar consulta",
     "searchTypeDashboards": "Dashboards",
     "searchTypeUi": "IU",
-    "searchTypeOthers": "Outros",
-    "lastDataRefreshTime": "Hora da última atualização de dados:"
+    "searchTypeOthers": "Outros"
   },
   "traces": {
     "nlNeedsSql": "Esta pergunta requer SQL; abra-a em Logs",
@@ -17721,8 +17659,7 @@
         "count": "{count} insight | {count} insights",
         "countHint": "{count} anomalia de serviço neste intervalo de tempo | {count} anomalias de serviço neste intervalo de tempo",
         "viewTraces": "Traces",
-        "viewCharts": "Gráficos",
-        "scoreAbove": "+{percent}% da pontuação acima do limite"
+        "viewCharts": "Gráficos"
       }
     },
     "spansTab": "Spans",
@@ -17832,8 +17769,7 @@
       "totalTraces": "Total de Traces",
       "p95Latency": "Latência P95",
       "errorRate": "Taxa de Erro",
-      "timeAxis": "Tempo",
-      "errorsSeries": "erros"
+      "timeAxis": "Tempo"
     },
     "searchBar": {
       "streamNotFound": "Stream não encontrado"
@@ -17887,10 +17823,7 @@
       "metricsLoadFailed": "Não foi possível carregar as métricas correlacionadas deste serviço. {reason}",
       "noResourceRecorded": "Os spans deste serviço neste intervalo de tempo não registam {resource}.",
       "resourceLoadFailed": "Não foi possível carregar {resource} para este serviço. {reason}",
-      "noVersionTraffic": "Os spans deste serviço neste stream não registam uma versão, pelo que não há tráfego para dividir por versão.",
-      "noResourceDataFound": "Nenhum dado de {resource} encontrado",
-      "failedToLoadMetrics": "Falha ao carregar métricas.",
-      "requests": "Pedidos"
+      "noVersionTraffic": "Os spans deste serviço neste stream não registam uma versão, pelo que não há tráfego para dividir por versão."
     },
     "traceErrorTab": {
       "httpStatusCode": "Código de Estado HTTP",
@@ -18130,15 +18063,6 @@
       "loadingPage": "A carregar página {page}",
       "pageFailed": "Não foi possível carregar a página {page}",
       "pageEmpty": "A página {page} não tem resultados"
-    },
-    "lLMErrorTable": {
-      "noData": "Sem dados",
-      "noErrorsInRange": "Nenhum erro neste intervalo de tempo",
-      "loadFailed": "Não foi possível carregar os erros recentes",
-      "time": "Hora",
-      "service": "Serviço",
-      "operation": "Operação",
-      "traceId": "ID do Trace"
     }
   },
   "aiToolset": {
@@ -19602,8 +19526,7 @@
         "promptTemperatureOverrideInherited": "A usar os parâmetros do prompt.",
         "taskTimeoutLabel": "Tempo limite (segundos)",
         "taskConcurrencyLabel": "Concorrência máxima",
-        "taskOverrideHelp": "Substitui o valor publicado da tarefa para esta execução.",
-        "providerHelpSettingsLink": "Definições"
+        "taskOverrideHelp": "Substitui o valor publicado da tarefa para esta execução."
       },
       "columns": {
         "name": "Nome",
@@ -19996,26 +19919,6 @@
           "traces": "Traces",
           "last": "Última falha"
         }
-      },
-      "spanTrend": {
-        "title": "Tendência de spans",
-        "subtitle": "contagem de spans por tipo"
-      },
-      "errorsOverTime": {
-        "title": "Erros ao longo do tempo",
-        "subtitle": "contagem de erros"
-      },
-      "spansByModel": {
-        "title": "Spans por modelo",
-        "subtitle": "contagem de chamadas por modelo"
-      },
-      "tokensByModel": {
-        "title": "Tokens por modelo",
-        "subtitle": "total de tokens por modelo"
-      },
-      "recentErrors": {
-        "title": "Erros recentes",
-        "subtitle": "últimos 10 spans com falha"
       }
     },
     "behavior": {
@@ -21214,8 +21117,7 @@
         "resultReasoning": "Raciocínio",
         "resultRaw": "Resposta bruta",
         "valuePlaceholder": "Valor para {variable}"
-      },
-      "providerHelpSettingsLink": "Definições"
+      }
     },
     "job": {
       "detail": {
@@ -29820,10 +29722,7 @@
         "service": "Por serviço",
         "place": "Por local",
         "none": "Não agrupado"
-      },
-      "fixNoLink": "Adicionar etiqueta service.name",
-      "fixStopped": "Verificar o coletor",
-      "fixQueued": "Apenas simulação: “{action}” para {service} não foi enviado para lado nenhum"
+      }
     },
     "activity": {
       "before": "Antes",
@@ -30718,8 +30617,7 @@
       "copyRequest": "Copiar pedido",
       "requestText": "Adicione a organização OpenObserve {name} ({org}) ao espaço de trabalho Slack {team}, em _meta › Definições › Slack › Organizações.",
       "requestCopied": "Pedido copiado",
-      "setupAppOtherTeam": "Para um espaço de trabalho Slack diferente de {team} · o OpenObserve cria a sua própria aplicação Slack a partir de um token de configuração",
-      "title": "Ligar um espaço de trabalho do Slack"
+      "setupAppOtherTeam": "Para um espaço de trabalho Slack diferente de {team} · o OpenObserve cria a sua própria aplicação Slack a partir de um token de configuração"
     },
     "wizard": {
       "title": "Configurar a aplicação Slack",
@@ -30939,9 +30837,7 @@
       "ownOrgOnlyHint": "Num espaço de trabalho de instância, associa os canais à sua própria organização",
       "claimableHint": "Canais por atribuir e canais pertencentes a {org}",
       "servedOrgsHint": "Qualquer organização servida por este espaço de trabalho",
-      "alertRoutes": "{count} destino | {count} destinos",
-      "empty": "Ainda nenhum canal tem uma organização predefinida",
-      "emptyDescription": "As perguntas num canal sem predefinição vão para a organização predefinida de cada pessoa (pode alterá-la com /o2 org)."
+      "alertRoutes": "{count} destino | {count} destinos"
     },
     "people": {
       "title": "Pessoas associadas",
@@ -30960,8 +30856,7 @@
         "email": "Correspondência por email",
         "admin_bulk": "Associar todos"
       },
-      "loadMore": "Carregar mais",
-      "empty": "Ainda ninguém nesta organização associou o Slack"
+      "loadMore": "Carregar mais"
     },
     "credentials": {
       "title": "Atualizar credenciais",
@@ -31899,13 +31794,6 @@
           "fix": "Guia de integração"
         }
       }
-    },
-    "chart": {
-      "costMissing": "Não incluído neste gráfico: {models}. {tokens} tokens não têm preço.",
-      "costMissingPricedSince": "Não incluído neste gráfico: {models}. {tokens} tokens foram registados antes de ser adicionado um preço.",
-      "unpricedModels": "Sem preço: {models}",
-      "pricedSinceModels": "Registados antes de ser adicionado um preço: {models}",
-      "addPrice": "Adicionar um preço"
     }
   },
   "onboarding": {

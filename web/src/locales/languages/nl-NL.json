@@ -4996,9 +4996,7 @@
       "saved": "Aankondigingsbanners bijgewerkt",
       "saveFailed": "Kan de aankondigingsbanners niet opslaan",
       "loadFailed": "Kan de aankondigingsbanners niet laden",
-      "addBanner": "Banner toevoegen",
-      "emptyTitle": "Nog geen banners",
-      "emptyHint": "Voeg er een toe om een bericht bovenaan de app weer te geven."
+      "addBanner": "Banner toevoegen"
     },
     "variants": {
       "info": "Info",
@@ -11935,10 +11933,7 @@
       "proposedActions": "Voorgestelde acties",
       "qualityReasons": "Reden: {reasons} | Redenen: {reasons}",
       "openAlert": "Alarm openen",
-      "advice": "Wat te controleren",
-      "viewInLogs": "Bekijk in Logs",
-      "viewInLogsHint": "Opent de records van deze run in Logs",
-      "loadFailed": "De samenvatting kon niet worden geladen: {message}"
+      "advice": "Wat te controleren"
     },
     "dashboard": {
       "latestRunAgo": "Laatste uitvoering {time}",
@@ -11996,8 +11991,7 @@
       "runNowHeading": "Nu uitvoeren",
       "findingsKept": "Bevindingen worden gedurende de bewaartermijn bij de eigen records van deze organisatie bewaard. Alarmkalibratie verstuurt geen meldingen.",
       "frequencyRange": "Kies een cadans tussen 1 uur en 30 dagen.",
-      "windowRange": "Kies een venster tussen 1 minuut en 90 dagen.",
-      "loadFailed": "De instellingen konden niet worden geladen: {message}"
+      "windowRange": "Kies een venster tussen 1 minuut en 90 dagen."
     },
     "visibility": {
       "allClear": "Geen bevindingen op de alarmen waartoe je toegang hebt in de laatste uitvoering.",
@@ -16423,12 +16417,7 @@
       "fieldNameMapping": "Toewijzing veldnamen",
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
-      "metricsWithCount": "Metrieken ({count})",
-      "resetServicesConfirmMessage": "Hiermee worden alle ontdekte services voor deze organisatie verwijderd. Services worden automatisch opnieuw ontdekt zodra er nieuwe telemetriegegevens worden ingelezen. Deze actie kan niet ongedaan worden gemaakt.",
-      "resetServicesConfirmWarning": "Services worden automatisch opnieuw ontdekt zodra er nieuwe telemetriegegevens worden ingelezen. Deze actie kan niet ongedaan worden gemaakt.",
-      "configureServicesHint": "om te configureren hoe services worden geïdentificeerd en gegroepeerd.",
-      "serviceCountSingular": "{count} service | {count} services",
-      "instancesCount": "({count} instanties)"
+      "metricsWithCount": "Metrieken ({count})"
     },
     "addRegexPattern": {
       "namePlaceholder": "Bijv. Interne Wachtwoorden",
@@ -16507,8 +16496,7 @@
       "logoLightLabel": "Aangepast logo (lichte modus)",
       "logoLightHelp": "Getoond in de lichte modus. PNG, JPG, GIF of BMP, tot 150 × 30 px.",
       "logoDarkLabel": "Aangepast logo (donkere modus)",
-      "logoDarkHelp": "Getoond in de donkere modus. PNG, JPG, GIF of BMP, tot 150 × 30 px.",
-      "fileCounterLabel": "{constraint} {filesNumber} bestand {'|'} {totalSize}"
+      "logoDarkHelp": "Getoond in de donkere modus. PNG, JPG, GIF of BMP, tot 150 × 30 px."
     },
     "modelPricingEditor": {
       "copySuffix": " (Kopiëren)"
@@ -16537,10 +16525,7 @@
       "daysValue": "{days} dagen",
       "forever": "voor altijd bewaren",
       "invalid": "Gebruik 0 of minimaal 3 dagen",
-      "invalidType": "Gebruik minimaal 3 dagen, of verwijder dit type",
-      "streamType": "Streamtype",
-      "days": "Dagen",
-      "removeType": "Dit streamtype verwijderen"
+      "invalidType": "Gebruik minimaal 3 dagen, of verwijder dit type"
     },
     "organizationSettings": {
       "fieldNameHelp": "Gebruik alleen alfanumerieke tekens en '+=,.{'@'}-_' tekens, zonder spaties.",
@@ -16774,8 +16759,7 @@
       "reasonIdealForDisambiguation": "{details} — ideaal om services te onderscheiden",
       "trackedK8sWorkload": "K8s Workload",
       "trackedK8sPod": "K8s Pod",
-      "serviceCountFailed": "Kan het aantal services niet laden",
-      "toSeeDiscoveredServices": "om de daadwerkelijk ontdekte services te zien."
+      "serviceCountFailed": "Kan het aantal services niet laden"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "bijv. {example}",
@@ -16964,51 +16948,6 @@
       "requestApproved": "{domain} gekoppeld",
       "requestRejected": "Verzoek voor {domain} afgewezen",
       "decisionFailed": "Kan het verzoek niet bijwerken"
-    },
-    "groupDataAI": "Data en AI",
-    "llmProvidersDesc": "LLM-providers voor online evaluaties",
-    "customLogoTitle": "Logo op maat",
-    "customLogoTextDescription": "Aangepaste logotekst wordt gebruikt om de standaardmerktekst te wijzigen die in de toepassing wordt weergegeven.",
-    "dragDropUpload": "Drag & drop of klik om te uploaden",
-    "customLogoLightDescription": "Aangepast logo voor thema in de lichtmodus. Dit wordt weergegeven wanneer gebruikers zich in de lichtmodus bevinden.",
-    "customLogoDarkDescription": "Aangepast logo voor thema in de donkere modus. Dit wordt weergegeven wanneer gebruikers zich in de donkere modus bevinden.",
-    "textMaxCharacters": "De tekst moet minder dan 100 tekens lang zijn.",
-    "genAiAgentMapping": {
-      "tabLabel": "In kaart brengen van GenAI-agenten",
-      "title": "In kaart brengen van GenAI-agenten",
-      "description": "Configureer fallback-telemetrie-attributen die worden gebruikt om de agentidentiteit te normaliseren voor LLM-traces en -evaluaties.",
-      "agentNameFields": "Terugvalvelden voor de naam van de agent",
-      "agentNameHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.name.",
-      "agentNameInfo": "Alleen aangevinkt als het standaardattribuut gen_ai.agent.name ontbreekt of leeg is. Voeg één inkomend telemetriekenmerk per regel toe.",
-      "agentIdFields": "Terugvalvelden voor Agent-ID",
-      "agentIdHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.id.",
-      "agentIdInfo": "Alleen aangevinkt als het standaardkenmerk gen_ai.agent.id ontbreekt of leeg is. Voeg één inkomend telemetriekenmerk per regel toe.",
-      "envFields": "Terugvalvelden voor omgeving",
-      "envHelp": "Inkomende attributen die als omgeving van de agent worden gebruikt.",
-      "envInfo": "Wordt alleen gecontroleerd wanneer het standaardattribuut deployment.environment.name ontbreekt of leeg is. Voeg één inkomend telemetrie-attribuut per regel toe.",
-      "versionFields": "Terugvalvelden voor versie",
-      "versionHelp": "Inkomende attributen die als versie van de agent worden gebruikt.",
-      "versionInfo": "Wordt alleen gecontroleerd wanneer het standaardattribuut gen_ai.agent.version ontbreekt of leeg is. Voeg één inkomend telemetrie-attribuut per regel toe.",
-      "alwaysAppliedStandard": "Standaard (eerst gecontroleerd):",
-      "applyDefaults": "Standaardwaarden toepassen",
-      "resetToEmpty": "Terugzetten naar leeg",
-      "clearRegistry": "Register wissen",
-      "clearRegistryTitle": "Register van agenten wissen?",
-      "clearRegistryDescription": "Dit verwijdert alle gedetecteerde GenAI-agentregisterrijen voor deze organisatie. Nieuwe overeenkomende traces vullen het register tijdens de ingestie opnieuw.",
-      "clearRegistryConfirm": "Register wissen",
-      "saved": "De toewijzing van GenAI-agenten is met succes opgeslagen",
-      "clearRegistrySuccess": "GenAI-agentregister gewist. {deletedCount} opgeslagen agents en {bufferCount} gebufferde observaties verwijderd.",
-      "loadFailed": "Het laden van de GenAI-agenttoewijzing is mislukt",
-      "saveFailed": "Kon de toewijzing van de GenAI-agent niet opslaan",
-      "clearRegistryFailed": "Kon het register van de GenAI-agent niet wissen",
-      "defaultsLoadFailed": "Het laden van de standaardinstellingen voor GenAI-agenttoewijzing is mislukt",
-      "defaultsFetchFailed": "Kan standaardwaarden niet ophalen ({status})"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "LLM-providers voor online evaluaties"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "GenAI-spans toewijzen aan agent-id's"
     }
   },
   "reports": {
@@ -17270,8 +17209,7 @@
     "cancelQueryFailed": "Kan de query niet annuleren.",
     "searchTypeDashboards": "Dashboards",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "Overige",
-    "lastDataRefreshTime": "Laatste dataverversingstijd:"
+    "searchTypeOthers": "Overige"
   },
   "traces": {
     "nlNeedsSql": "Deze vraag vereist SQL; open deze in logs",
@@ -17721,8 +17659,7 @@
         "count": "{count} inzicht | {count} inzichten",
         "countHint": "{count} service-anomalie in dit tijdsbereik | {count} service-anomalieën in dit tijdsbereik",
         "viewTraces": "Traces",
-        "viewCharts": "Grafieken",
-        "scoreAbove": "+{percent}% score boven drempelwaarde"
+        "viewCharts": "Grafieken"
       }
     },
     "spansTab": "Spans",
@@ -17832,8 +17769,7 @@
       "totalTraces": "Totaal traces",
       "p95Latency": "P95-latentie",
       "errorRate": "Foutpercentage",
-      "timeAxis": "Tijd",
-      "errorsSeries": "fouten"
+      "timeAxis": "Tijd"
     },
     "searchBar": {
       "streamNotFound": "Stream niet gevonden"
@@ -17887,10 +17823,7 @@
       "metricsLoadFailed": "Kan de gecorreleerde metrieken van deze service niet laden. {reason}",
       "noResourceRecorded": "De spans van deze service in dit tijdsbereik registreren {resource} niet.",
       "resourceLoadFailed": "Kan {resource} voor deze service niet laden. {reason}",
-      "noVersionTraffic": "De spans van deze service in deze stream registreren geen versie, dus er is geen verkeer om op versie te splitsen.",
-      "noResourceDataFound": "Geen {resource}-gegevens gevonden",
-      "failedToLoadMetrics": "Kan metrieken niet laden.",
-      "requests": "Verzoeken"
+      "noVersionTraffic": "De spans van deze service in deze stream registreren geen versie, dus er is geen verkeer om op versie te splitsen."
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP-statuscode",
@@ -18130,15 +18063,6 @@
       "loadingPage": "Pagina {page} laden",
       "pageFailed": "Kan pagina {page} niet laden",
       "pageEmpty": "Pagina {page} heeft geen resultaten"
-    },
-    "lLMErrorTable": {
-      "noData": "Geen gegevens",
-      "noErrorsInRange": "Geen fouten in dit tijdsbereik",
-      "loadFailed": "Kan recente fouten niet laden",
-      "time": "Tijd",
-      "service": "Service",
-      "operation": "Operatie",
-      "traceId": "Trace ID"
     }
   },
   "aiToolset": {
@@ -19602,8 +19526,7 @@
         "promptTemperatureOverrideInherited": "Gebruikt promptparameters.",
         "taskTimeoutLabel": "Timeout (seconden)",
         "taskConcurrencyLabel": "Maximale gelijktijdigheid",
-        "taskOverrideHelp": "Overschrijft de gepubliceerde waarde van de taak voor deze run.",
-        "providerHelpSettingsLink": "Instellingen"
+        "taskOverrideHelp": "Overschrijft de gepubliceerde waarde van de taak voor deze run."
       },
       "columns": {
         "name": "Naam",
@@ -19996,26 +19919,6 @@
           "traces": "Traces",
           "last": "Laatste fout"
         }
-      },
-      "spanTrend": {
-        "title": "Span-trend",
-        "subtitle": "aantal spans per soort"
-      },
-      "errorsOverTime": {
-        "title": "Fouten in de loop van de tijd",
-        "subtitle": "aantal fouten"
-      },
-      "spansByModel": {
-        "title": "Spans per model",
-        "subtitle": "aantal gesprekken per model"
-      },
-      "tokensByModel": {
-        "title": "Tokens per model",
-        "subtitle": "totaal aantal tokens per model"
-      },
-      "recentErrors": {
-        "title": "Recente fouten",
-        "subtitle": "laatste 10 mislukte spans"
       }
     },
     "behavior": {
@@ -21214,8 +21117,7 @@
         "resultReasoning": "Redenering",
         "resultRaw": "Onbewerkt antwoord",
         "valuePlaceholder": "Waarde voor {variable}"
-      },
-      "providerHelpSettingsLink": "Instellingen"
+      }
     },
     "job": {
       "detail": {
@@ -29820,10 +29722,7 @@
         "service": "Op service",
         "place": "Op locatie",
         "none": "Niet gegroepeerd"
-      },
-      "fixNoLink": "Label service.name toevoegen",
-      "fixStopped": "Controleer de collector",
-      "fixQueued": "Alleen mock: “{action}” voor {service} is nergens naartoe verzonden"
+      }
     },
     "activity": {
       "before": "Voor",
@@ -30718,8 +30617,7 @@
       "copyRequest": "Verzoek kopiëren",
       "requestText": "Voeg de OpenObserve-organisatie {name} ({org}) toe aan de Slack-workspace {team}, in _meta › Instellingen › Slack › Organisaties.",
       "requestCopied": "Verzoek gekopieerd",
-      "setupAppOtherTeam": "Voor een andere Slack-workspace dan {team} · OpenObserve maakt je eigen Slack-app aan met één configuratietoken",
-      "title": "Een Slack-workspace koppelen"
+      "setupAppOtherTeam": "Voor een andere Slack-workspace dan {team} · OpenObserve maakt je eigen Slack-app aan met één configuratietoken"
     },
     "wizard": {
       "title": "De Slack-app instellen",
@@ -30939,9 +30837,7 @@
       "ownOrgOnlyHint": "Op een instantiewerkruimte koppel je kanalen aan je eigen organisatie",
       "claimableHint": "Niet-geclaimde kanalen en kanalen die {org} bezit",
       "servedOrgsHint": "Elke organisatie die deze werkruimte bedient",
-      "alertRoutes": "{count} bestemming | {count} bestemmingen",
-      "empty": "Nog geen kanaal heeft een standaardorganisatie",
-      "emptyDescription": "Vragen in een kanaal zonder standaardorganisatie gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org)."
+      "alertRoutes": "{count} bestemming | {count} bestemmingen"
     },
     "people": {
       "title": "Gekoppelde personen",
@@ -30960,8 +30856,7 @@
         "email": "E-mailmatch",
         "admin_bulk": "Alles koppelen"
       },
-      "loadMore": "Meer laden",
-      "empty": "Nog niemand in deze organisatie heeft Slack gekoppeld"
+      "loadMore": "Meer laden"
     },
     "credentials": {
       "title": "Inloggegevens bijwerken",
@@ -31899,13 +31794,6 @@
           "fix": "Integratiehandleiding"
         }
       }
-    },
-    "chart": {
-      "costMissing": "Niet in deze grafiek: {models}. {tokens} tokens hebben geen prijs.",
-      "costMissingPricedSince": "Niet in deze grafiek: {models}. {tokens} tokens zijn geregistreerd voordat een prijs werd toegevoegd.",
-      "unpricedModels": "Zonder prijs: {models}",
-      "pricedSinceModels": "Geregistreerd voordat een prijs werd toegevoegd: {models}",
-      "addPrice": "Prijs toevoegen"
     }
   },
   "onboarding": {

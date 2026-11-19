@@ -4996,9 +4996,7 @@
       "saved": "Announcement banners updated",
       "saveFailed": "Could not save the announcement banners",
       "loadFailed": "Could not load the announcement banners",
-      "addBanner": "Add banner",
-      "emptyTitle": "No banners yet",
-      "emptyHint": "Add one to show a notice at the top of the app."
+      "addBanner": "Add banner"
     },
     "variants": {
       "info": "Info",
@@ -11933,10 +11931,7 @@
       "proposedActions": "Proposed actions",
       "qualityReasons": "เหตุผล: {reasons} | เหตุผล: {reasons}",
       "openAlert": "Open alert",
-      "advice": "สิ่งที่ควรตรวจสอบ",
-      "viewInLogs": "View in Logs",
-      "viewInLogsHint": "Opens this run's records in Logs",
-      "loadFailed": "The digest could not be loaded: {message}"
+      "advice": "สิ่งที่ควรตรวจสอบ"
     },
     "dashboard": {
       "latestRunAgo": "Latest run {time}",
@@ -11994,8 +11989,7 @@
       "runNowHeading": "Run now",
       "findingsKept": "ข้อค้นพบจะถูกเก็บไว้พร้อมข้อมูลขององค์กรนี้ตามระยะเวลาการเก็บรักษา การปรับเทียบการแจ้งเตือนไม่ส่งการแจ้งเตือนใด ๆ",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
-      "windowRange": "Choose a window between 1 minute and 90 days.",
-      "loadFailed": "The settings could not be loaded: {message}"
+      "windowRange": "Choose a window between 1 minute and 90 days."
     },
     "visibility": {
       "allClear": "ไม่มีข้อค้นพบจากการแจ้งเตือนที่คุณเข้าถึงได้ในรอบล่าสุด",
@@ -16421,12 +16415,7 @@
       "fieldNameMapping": "Field Name Mapping",
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
-      "metricsWithCount": "Metrics ({count})",
-      "resetServicesConfirmMessage": "This will delete all discovered services for this organization. Services will be automatically re-discovered as new telemetry data is ingested. This action cannot be undone.",
-      "resetServicesConfirmWarning": "Services will be automatically re-discovered as new telemetry data is ingested. This action cannot be undone.",
-      "configureServicesHint": "to configure how services are identified and grouped.",
-      "serviceCountSingular": "{count} Service | {count} Services",
-      "instancesCount": "({count} instances)"
+      "metricsWithCount": "Metrics ({count})"
     },
     "addRegexPattern": {
       "namePlaceholder": "Eg. Internal Passwords",
@@ -16505,8 +16494,7 @@
       "logoLightLabel": "โลโก้ที่กำหนดเอง (โหมดสว่าง)",
       "logoLightHelp": "แสดงในโหมดสว่าง รองรับ PNG, JPG, GIF หรือ BMP ขนาดสูงสุด 150 × 30 px",
       "logoDarkLabel": "โลโก้ที่กำหนดเอง (โหมดมืด)",
-      "logoDarkHelp": "แสดงในโหมดมืด รองรับ PNG, JPG, GIF หรือ BMP ขนาดสูงสุด 150 × 30 px",
-      "fileCounterLabel": "{constraint} {filesNumber} file {'|'} {totalSize}"
+      "logoDarkHelp": "แสดงในโหมดมืด รองรับ PNG, JPG, GIF หรือ BMP ขนาดสูงสุด 150 × 30 px"
     },
     "modelPricingEditor": {
       "copySuffix": " (Copy)"
@@ -16535,10 +16523,7 @@
       "daysValue": "{days} วัน",
       "forever": "เก็บไว้ตลอดไป",
       "invalid": "โปรดใช้ 0 หรืออย่างน้อย 3 วัน",
-      "invalidType": "ใช้อย่างน้อย 3 วัน หรือลบประเภทนี้ออก",
-      "streamType": "ประเภทสตรีม",
-      "days": "วัน",
-      "removeType": "ลบประเภทสตรีมนี้"
+      "invalidType": "ใช้อย่างน้อย 3 วัน หรือลบประเภทนี้ออก"
     },
     "organizationSettings": {
       "fieldNameHelp": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",
@@ -16772,8 +16757,7 @@
       "reasonIdealForDisambiguation": "{details} — ideal for service disambiguation",
       "trackedK8sWorkload": "เวิร์กโหลด K8s",
       "trackedK8sPod": "Pod K8s",
-      "serviceCountFailed": "ไม่สามารถโหลดจำนวนบริการได้",
-      "toSeeDiscoveredServices": "to see the actual discovered services."
+      "serviceCountFailed": "ไม่สามารถโหลดจำนวนบริการได้"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "e.g. {example}",
@@ -16962,51 +16946,6 @@
       "requestApproved": "เชื่อมโยง {domain} แล้ว",
       "requestRejected": "ปฏิเสธคำขอสำหรับ {domain} แล้ว",
       "decisionFailed": "ไม่สามารถอัปเดตคำขอได้"
-    },
-    "groupDataAI": "Data & AI",
-    "llmProvidersDesc": "LLM providers for online evaluations",
-    "customLogoTitle": "Custom Logo",
-    "customLogoTextDescription": "Custom logo text is used to change the default branding text displayed in the application.",
-    "dragDropUpload": "Drag & drop or click to upload",
-    "customLogoLightDescription": "Custom logo for light mode theme. This will be displayed when users are in light mode.",
-    "customLogoDarkDescription": "Custom logo for dark mode theme. This will be displayed when users are in dark mode.",
-    "textMaxCharacters": "Text should be less than 100 characters.",
-    "genAiAgentMapping": {
-      "tabLabel": "GenAI Agent Mapping",
-      "title": "GenAI Agent Mapping",
-      "description": "Configure fallback telemetry attributes used to normalize agent identity for LLM traces and evaluations.",
-      "agentNameFields": "Agent name fallback fields",
-      "agentNameHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.name.",
-      "agentNameInfo": "Checked only when the standard gen_ai.agent.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
-      "agentIdFields": "Agent ID fallback fields",
-      "agentIdHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.id.",
-      "agentIdInfo": "Checked only when the standard gen_ai.agent.id attribute is missing or empty. Add one incoming telemetry attribute per line.",
-      "envFields": "Environment fallback fields",
-      "envHelp": "Incoming attributes to use as the agent's environment.",
-      "envInfo": "Checked only when the standard deployment.environment.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
-      "versionFields": "Version fallback fields",
-      "versionHelp": "Incoming attributes to use as the agent's version.",
-      "versionInfo": "Checked only when the standard gen_ai.agent.version attribute is missing or empty. Add one incoming telemetry attribute per line.",
-      "alwaysAppliedStandard": "Standard (checked first):",
-      "applyDefaults": "Apply defaults",
-      "resetToEmpty": "Reset to empty",
-      "clearRegistry": "Clear registry",
-      "clearRegistryTitle": "Clear agent registry?",
-      "clearRegistryDescription": "This deletes all discovered GenAI agent registry rows for this organization. New matching traces will repopulate the registry during ingestion.",
-      "clearRegistryConfirm": "Clear registry",
-      "saved": "GenAI agent mapping saved successfully",
-      "clearRegistrySuccess": "GenAI agent registry cleared. Deleted {deletedCount} stored agents and {bufferCount} queued observations.",
-      "loadFailed": "Failed to load GenAI agent mapping",
-      "saveFailed": "Failed to save GenAI agent mapping",
-      "clearRegistryFailed": "Failed to clear GenAI agent registry",
-      "defaultsLoadFailed": "Failed to load GenAI agent mapping defaults",
-      "defaultsFetchFailed": "Failed to fetch defaults ({status})"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "LLM providers for online evaluations"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "Map GenAI spans to agent identifiers"
     }
   },
   "reports": {
@@ -17268,8 +17207,7 @@
     "cancelQueryFailed": "Failed to cancel query",
     "searchTypeDashboards": "Dashboards",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "Others",
-    "lastDataRefreshTime": "Last Data Refresh Time:"
+    "searchTypeOthers": "Others"
   },
   "traces": {
     "nlNeedsSql": "คำถามนี้ต้องใช้ SQL โปรดเปิดในล็อก",
@@ -17719,8 +17657,7 @@
         "count": "{count} ข้อค้นพบ | {count} ข้อค้นพบ",
         "countHint": "ความผิดปกติของบริการ {count} รายการในช่วงเวลานี้ | ความผิดปกติของบริการ {count} รายการในช่วงเวลานี้",
         "viewTraces": "Traces",
-        "viewCharts": "Charts",
-        "scoreAbove": "+{percent}% score above threshold"
+        "viewCharts": "Charts"
       }
     },
     "spansTab": "Spans",
@@ -17830,8 +17767,7 @@
       "totalTraces": "Total Traces",
       "p95Latency": "P95 Latency",
       "errorRate": "Error Rate",
-      "timeAxis": "เวลา",
-      "errorsSeries": "errors"
+      "timeAxis": "เวลา"
     },
     "searchBar": {
       "streamNotFound": "Stream not found"
@@ -17885,10 +17821,7 @@
       "metricsLoadFailed": "ไม่สามารถโหลดเมทริกซ์ที่เชื่อมโยงของบริการนี้ได้ {reason}",
       "noResourceRecorded": "สแปนของบริการนี้ในช่วงเวลานี้ไม่ได้บันทึก {resource}",
       "resourceLoadFailed": "ไม่สามารถโหลด {resource} สำหรับบริการนี้ได้ {reason}",
-      "noVersionTraffic": "สแปนของบริการนี้ในสตรีมนี้ไม่ได้บันทึกเวอร์ชัน จึงไม่มีทราฟฟิกให้แยกตามเวอร์ชัน",
-      "noResourceDataFound": "No {resource} data found",
-      "failedToLoadMetrics": "Failed to load metrics.",
-      "requests": "Requests"
+      "noVersionTraffic": "สแปนของบริการนี้ในสตรีมนี้ไม่ได้บันทึกเวอร์ชัน จึงไม่มีทราฟฟิกให้แยกตามเวอร์ชัน"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP Status Code",
@@ -18128,15 +18061,6 @@
       "loadingPage": "Loading page {page}",
       "pageFailed": "Couldn't load page {page}",
       "pageEmpty": "Page {page} has no results"
-    },
-    "lLMErrorTable": {
-      "noData": "ไม่มีข้อมูล",
-      "noErrorsInRange": "No errors in this time range",
-      "loadFailed": "ไม่สามารถโหลดข้อผิดพลาดล่าสุด",
-      "time": "เวลา",
-      "service": "Service",
-      "operation": "Operation",
-      "traceId": "Trace ID"
     }
   },
   "aiToolset": {
@@ -19600,8 +19524,7 @@
         "promptTemperatureOverrideInherited": "Using Prompt parameters.",
         "taskTimeoutLabel": "Timeout (seconds)",
         "taskConcurrencyLabel": "Max Concurrency",
-        "taskOverrideHelp": "Overrides the task's published value for this run.",
-        "providerHelpSettingsLink": "การตั้งค่า"
+        "taskOverrideHelp": "Overrides the task's published value for this run."
       },
       "columns": {
         "name": "ชื่อ",
@@ -19994,26 +19917,6 @@
           "traces": "เทรซ",
           "last": "ล้มเหลวล่าสุด"
         }
-      },
-      "spanTrend": {
-        "title": "Span trend",
-        "subtitle": "span count by kind"
-      },
-      "errorsOverTime": {
-        "title": "Errors over time",
-        "subtitle": "error count"
-      },
-      "spansByModel": {
-        "title": "Spans by model",
-        "subtitle": "call count per model"
-      },
-      "tokensByModel": {
-        "title": "Tokens by model",
-        "subtitle": "total tokens per model"
-      },
-      "recentErrors": {
-        "title": "Recent errors",
-        "subtitle": "last 10 failed spans"
       }
     },
     "behavior": {
@@ -21212,8 +21115,7 @@
         "resultReasoning": "Reasoning",
         "resultRaw": "Raw response",
         "valuePlaceholder": "Value for {variable}"
-      },
-      "providerHelpSettingsLink": "การตั้งค่า"
+      }
     },
     "job": {
       "detail": {
@@ -29818,10 +29720,7 @@
         "service": "ตามบริการ",
         "place": "ตามสถานที่",
         "none": "ไม่ได้จัดกลุ่ม"
-      },
-      "fixNoLink": "Add service.name label",
-      "fixStopped": "Check the collector",
-      "fixQueued": "Mock only: “{action}” for {service} was not sent anywhere"
+      }
     },
     "activity": {
       "before": "Before",
@@ -30716,8 +30615,7 @@
       "copyRequest": "Copy request",
       "requestText": "Please add the OpenObserve organization {name} ({org}) to the Slack workspace {team}, in _meta › Settings › Slack › Organizations.",
       "requestCopied": "Request copied",
-      "setupAppOtherTeam": "For a different Slack workspace than {team} · OpenObserve creates your own Slack app from one configuration token",
-      "title": "Connect a Slack workspace"
+      "setupAppOtherTeam": "For a different Slack workspace than {team} · OpenObserve creates your own Slack app from one configuration token"
     },
     "wizard": {
       "title": "Set up the Slack app",
@@ -30937,9 +30835,7 @@
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",
       "servedOrgsHint": "Any organization this workspace serves",
-      "alertRoutes": "{count} destination | {count} destinations",
-      "empty": "No channel has a default org yet",
-      "emptyDescription": "Questions in a channel without a default go to each person's default org (they can change it with /o2 org)."
+      "alertRoutes": "{count} destination | {count} destinations"
     },
     "people": {
       "title": "Linked people",
@@ -30958,8 +30854,7 @@
         "email": "Email match",
         "admin_bulk": "Link all"
       },
-      "loadMore": "Load more",
-      "empty": "Nobody in this org has linked Slack yet"
+      "loadMore": "Load more"
     },
     "credentials": {
       "title": "Update credentials",
@@ -31897,13 +31792,6 @@
           "fix": "คู่มือการเชื่อมต่อ"
         }
       }
-    },
-    "chart": {
-      "costMissing": "ไม่อยู่ในแผนภูมินี้: {models}. โทเค็น {tokens} รายการไม่มีราคา.",
-      "costMissingPricedSince": "ไม่อยู่ในแผนภูมินี้: {models}. โทเค็น {tokens} รายการถูกบันทึกก่อนมีการเพิ่มราคา.",
-      "unpricedModels": "ยังไม่กำหนดราคา: {models}",
-      "pricedSinceModels": "บันทึกก่อนมีการเพิ่มราคา: {models}",
-      "addPrice": "เพิ่มราคา"
     }
   },
   "onboarding": {

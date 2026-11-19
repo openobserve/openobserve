@@ -4996,9 +4996,7 @@
       "saved": "Banner thông báo đã được cập nhật",
       "saveFailed": "Không thể lưu các banner thông báo",
       "loadFailed": "Không thể tải các banner thông báo",
-      "addBanner": "Thêm banner",
-      "emptyTitle": "Chưa có banner nào",
-      "emptyHint": "Thêm một banner để hiển thị thông báo ở đầu ứng dụng."
+      "addBanner": "Thêm banner"
     },
     "variants": {
       "info": "Thông tin",
@@ -11935,10 +11933,7 @@
       "proposedActions": "Hành động đề xuất",
       "qualityReasons": "Lý do: {reasons} | Lý do: {reasons}",
       "openAlert": "Mở cảnh báo",
-      "advice": "Cần kiểm tra gì",
-      "viewInLogs": "Xem trong Nhật ký",
-      "viewInLogsHint": "Mở bản ghi của lượt chạy này trong Nhật ký",
-      "loadFailed": "Không thể tải bản tổng hợp: {message}"
+      "advice": "Cần kiểm tra gì"
     },
     "dashboard": {
       "latestRunAgo": "Lượt chạy gần nhất {time}",
@@ -11996,8 +11991,7 @@
       "runNowHeading": "Chạy ngay",
       "findingsKept": "Các phát hiện được lưu cùng hồ sơ riêng của tổ chức này trong thời hạn lưu trữ của tổ chức. Hiệu chỉnh cảnh báo không gửi thông báo nào.",
       "frequencyRange": "Chọn tần suất từ 1 giờ đến 30 ngày.",
-      "windowRange": "Chọn cửa sổ từ 1 phút đến 90 ngày.",
-      "loadFailed": "Không thể tải cài đặt: {message}"
+      "windowRange": "Chọn cửa sổ từ 1 phút đến 90 ngày."
     },
     "visibility": {
       "allClear": "Không có phát hiện nào trên các cảnh báo bạn có thể truy cập trong lần chạy mới nhất.",
@@ -16423,12 +16417,7 @@
       "fieldNameMapping": "Ánh xạ Tên Trường",
       "logsWithCount": "Nhật ký ({count})",
       "tracesWithCount": "Trace ({count})",
-      "metricsWithCount": "Chỉ số ({count})",
-      "resetServicesConfirmMessage": "Thao tác này sẽ xóa tất cả dịch vụ đã phát hiện cho tổ chức này. Các dịch vụ sẽ được tự động phát hiện lại khi dữ liệu đo từ xa mới được nhập. Hành động này không thể hoàn tác.",
-      "resetServicesConfirmWarning": "Các dịch vụ sẽ được tự động phát hiện lại khi dữ liệu đo từ xa mới được nhập. Hành động này không thể hoàn tác.",
-      "configureServicesHint": "để cấu hình cách nhận dạng và nhóm các dịch vụ.",
-      "serviceCountSingular": "{count} Dịch vụ | {count} Dịch vụ",
-      "instancesCount": "({count} phiên bản)"
+      "metricsWithCount": "Chỉ số ({count})"
     },
     "addRegexPattern": {
       "namePlaceholder": "Ví dụ: Mật khẩu nội bộ",
@@ -16507,8 +16496,7 @@
       "logoLightLabel": "Logo tùy chỉnh (chế độ sáng)",
       "logoLightHelp": "Hiển thị ở chế độ sáng. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
       "logoDarkLabel": "Logo tùy chỉnh (chế độ tối)",
-      "logoDarkHelp": "Hiển thị ở chế độ tối. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
-      "fileCounterLabel": "{constraint} {filesNumber} tệp {'|'} {totalSize}"
+      "logoDarkHelp": "Hiển thị ở chế độ tối. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px."
     },
     "modelPricingEditor": {
       "copySuffix": " (Sao chép)"
@@ -16537,10 +16525,7 @@
       "daysValue": "{days} ngày",
       "forever": "lưu giữ vĩnh viễn",
       "invalid": "Dùng 0 hoặc tối thiểu 3 ngày",
-      "invalidType": "Dùng ít nhất 3 ngày, hoặc xóa loại này",
-      "streamType": "Loại stream",
-      "days": "Ngày",
-      "removeType": "Xóa loại stream này"
+      "invalidType": "Dùng ít nhất 3 ngày, hoặc xóa loại này"
     },
     "organizationSettings": {
       "fieldNameHelp": "Chỉ sử dụng ký tự chữ số và '+=,.{'@'}-_', không có khoảng trắng.",
@@ -16774,8 +16759,7 @@
       "reasonIdealForDisambiguation": "{details} — lý tưởng để phân định dịch vụ",
       "trackedK8sWorkload": "Workload K8s",
       "trackedK8sPod": "Pod K8s",
-      "serviceCountFailed": "Không thể tải số lượng dịch vụ",
-      "toSeeDiscoveredServices": "để xem các dịch vụ được phát hiện thực tế."
+      "serviceCountFailed": "Không thể tải số lượng dịch vụ"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "ví dụ: {example}",
@@ -16964,51 +16948,6 @@
       "requestApproved": "{domain} đã được liên kết",
       "requestRejected": "Yêu cầu cho {domain} đã bị từ chối",
       "decisionFailed": "Không thể cập nhật yêu cầu"
-    },
-    "groupDataAI": "Dữ liệu & AI",
-    "llmProvidersDesc": "Nhà cung cấp LLM cho đánh giá trực tuyến",
-    "customLogoTitle": "Logo tùy chỉnh",
-    "customLogoTextDescription": "Văn bản logo tùy chỉnh được sử dụng để thay đổi văn bản thương hiệu mặc định hiển thị trong ứng dụng.",
-    "dragDropUpload": "Kéo & thả hoặc nhấp để tải lên",
-    "customLogoLightDescription": "Logo tùy chỉnh cho chủ đề chế độ sáng. Logo này sẽ hiển thị khi người dùng ở chế độ sáng.",
-    "customLogoDarkDescription": "Logo tùy chỉnh cho chủ đề chế độ tối. Logo này sẽ hiển thị khi người dùng ở chế độ tối.",
-    "textMaxCharacters": "Văn bản phải ít hơn 100 ký tự.",
-    "genAiAgentMapping": {
-      "tabLabel": "Ánh xạ Tác nhân GenAI",
-      "title": "Ánh xạ Tác nhân GenAI",
-      "description": "Định cấu hình các thuộc tính telemetry dự phòng được sử dụng để chuẩn hóa danh tính tác nhân cho các trace LLM và đánh giá.",
-      "agentNameFields": "Trường dự phòng tên tác nhân",
-      "agentNameHelp": "Các thuộc tính đến để sử dụng làm dự phòng cho gen_ai.agent.name.",
-      "agentNameInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.name tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến mỗi dòng.",
-      "agentIdFields": "Trường dự phòng ID tác nhân",
-      "agentIdHelp": "Các thuộc tính đến để sử dụng làm dự phòng cho gen_ai.agent.id.",
-      "agentIdInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.id tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến mỗi dòng.",
-      "envFields": "Các trường dự phòng môi trường",
-      "envHelp": "Các thuộc tính đến được sử dụng làm môi trường của agent.",
-      "envInfo": "Chỉ được kiểm tra khi thuộc tính deployment.environment.name tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
-      "versionFields": "Các trường dự phòng phiên bản",
-      "versionHelp": "Các thuộc tính đến được sử dụng làm phiên bản của agent.",
-      "versionInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.version tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
-      "alwaysAppliedStandard": "Tiêu chuẩn (được kiểm tra trước):",
-      "applyDefaults": "Áp dụng mặc định",
-      "resetToEmpty": "Đặt lại về trống",
-      "clearRegistry": "Xóa sổ đăng ký",
-      "clearRegistryTitle": "Xóa sổ đăng ký tác nhân?",
-      "clearRegistryDescription": "Thao tác này xóa tất cả các hàng đăng ký tác nhân GenAI đã được phát hiện cho tổ chức này. Các trace khớp mới sẽ điền lại sổ đăng ký trong quá trình tiếp nhận dữ liệu.",
-      "clearRegistryConfirm": "Xóa sổ đăng ký",
-      "saved": "Đã lưu ánh xạ tác nhân GenAI thành công",
-      "clearRegistrySuccess": "Đã xóa đăng ký tác nhân GenAI. Đã xóa {deletedCount} tác nhân được lưu trữ và {bufferCount} quan sát đang xếp hàng.",
-      "loadFailed": "Không thể tải ánh xạ tác nhân GenAI",
-      "saveFailed": "Không thể lưu ánh xạ tác nhân GenAI",
-      "clearRegistryFailed": "Không thể xóa sổ đăng ký tác nhân GenAI",
-      "defaultsLoadFailed": "Không thể tải mặc định ánh xạ tác nhân GenAI",
-      "defaultsFetchFailed": "Không lấy được mặc định ({status})"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "Nhà cung cấp LLM cho đánh giá trực tuyến"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "Ánh xạ các span GenAI sang mã định danh tác nhân"
     }
   },
   "reports": {
@@ -17270,8 +17209,7 @@
     "cancelQueryFailed": "Không thể hủy truy vấn",
     "searchTypeDashboards": "Bảng điều khiển",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "Khác",
-    "lastDataRefreshTime": "Thời gian làm mới dữ liệu gần nhất:"
+    "searchTypeOthers": "Khác"
   },
   "traces": {
     "nlNeedsSql": "Câu hỏi này cần SQL; hãy mở trong Nhật ký",
@@ -17721,8 +17659,7 @@
         "count": "{count} thông tin chi tiết | {count} thông tin chi tiết",
         "countHint": "{count} bất thường dịch vụ trong khoảng thời gian này | {count} bất thường dịch vụ trong khoảng thời gian này",
         "viewTraces": "Trace",
-        "viewCharts": "Biểu đồ",
-        "scoreAbove": "+{percent}% điểm số vượt ngưỡng"
+        "viewCharts": "Biểu đồ"
       }
     },
     "spansTab": "Span",
@@ -17832,8 +17769,7 @@
       "totalTraces": "Tổng số Trace",
       "p95Latency": "Độ trễ P95",
       "errorRate": "Tỷ lệ lỗi",
-      "timeAxis": "Thời gian",
-      "errorsSeries": "lỗi"
+      "timeAxis": "Thời gian"
     },
     "searchBar": {
       "streamNotFound": "Không tìm thấy stream"
@@ -17887,10 +17823,7 @@
       "metricsLoadFailed": "Không thể tải các chỉ số tương quan của dịch vụ này. {reason}",
       "noResourceRecorded": "Các span của dịch vụ này trong khoảng thời gian này không ghi nhận {resource}.",
       "resourceLoadFailed": "Không thể tải {resource} cho dịch vụ này. {reason}",
-      "noVersionTraffic": "Các span của dịch vụ này trong stream này không ghi lại phiên bản, vì vậy không có lưu lượng để tách theo phiên bản.",
-      "noResourceDataFound": "Không tìm thấy dữ liệu {resource}",
-      "failedToLoadMetrics": "Không thể tải chỉ số.",
-      "requests": "Yêu cầu"
+      "noVersionTraffic": "Các span của dịch vụ này trong stream này không ghi lại phiên bản, vì vậy không có lưu lượng để tách theo phiên bản."
     },
     "traceErrorTab": {
       "httpStatusCode": "Mã trạng thái HTTP",
@@ -18130,15 +18063,6 @@
       "loadingPage": "Đang tải trang {page}",
       "pageFailed": "Không thể tải trang {page}",
       "pageEmpty": "Trang {page} không có kết quả"
-    },
-    "lLMErrorTable": {
-      "noData": "Không có dữ liệu",
-      "noErrorsInRange": "Không có lỗi trong khoảng thời gian này",
-      "loadFailed": "Không thể tải các lỗi gần đây",
-      "time": "Thời gian",
-      "service": "Dịch vụ",
-      "operation": "Thao tác",
-      "traceId": "Trace ID"
     }
   },
   "aiToolset": {
@@ -19602,8 +19526,7 @@
         "promptTemperatureOverrideInherited": "Đang dùng các tham số của Prompt.",
         "taskTimeoutLabel": "Thời gian chờ (giây)",
         "taskConcurrencyLabel": "Đồng thời tối đa",
-        "taskOverrideHelp": "Ghi đè giá trị đã xuất bản của tác vụ cho lần chạy này.",
-        "providerHelpSettingsLink": "Cài đặt"
+        "taskOverrideHelp": "Ghi đè giá trị đã xuất bản của tác vụ cho lần chạy này."
       },
       "columns": {
         "name": "Tên",
@@ -19996,26 +19919,6 @@
           "traces": "Trace",
           "last": "Lần thất bại cuối"
         }
-      },
-      "spanTrend": {
-        "title": "Xu hướng Span",
-        "subtitle": "số span theo loại"
-      },
-      "errorsOverTime": {
-        "title": "Lỗi theo thời gian",
-        "subtitle": "số lượng lỗi"
-      },
-      "spansByModel": {
-        "title": "Span theo mô hình",
-        "subtitle": "số lượng cuộc gọi trên mỗi mô hình"
-      },
-      "tokensByModel": {
-        "title": "Token theo mô hình",
-        "subtitle": "tổng token trên mỗi mô hình"
-      },
-      "recentErrors": {
-        "title": "Lỗi gần đây",
-        "subtitle": "10 span lỗi gần nhất"
       }
     },
     "behavior": {
@@ -21214,8 +21117,7 @@
         "resultReasoning": "Lý luận",
         "resultRaw": "Phản hồi thô",
         "valuePlaceholder": "Giá trị cho {variable}"
-      },
-      "providerHelpSettingsLink": "Cài đặt"
+      }
     },
     "job": {
       "detail": {
@@ -29820,10 +29722,7 @@
         "service": "Theo dịch vụ",
         "place": "Theo vị trí",
         "none": "Không nhóm"
-      },
-      "fixNoLink": "Thêm nhãn service.name",
-      "fixStopped": "Kiểm tra collector",
-      "fixQueued": "Chỉ mô phỏng: “{action}” cho {service} chưa được gửi đi đâu cả"
+      }
     },
     "activity": {
       "before": "Trước",
@@ -30718,8 +30617,7 @@
       "copyRequest": "Sao chép yêu cầu",
       "requestText": "Vui lòng thêm tổ chức OpenObserve {name} ({org}) vào không gian làm việc Slack {team}, trong _meta › Settings › Slack › Organizations.",
       "requestCopied": "Đã sao chép yêu cầu",
-      "setupAppOtherTeam": "Dành cho không gian làm việc Slack khác với {team} · OpenObserve tạo ứng dụng Slack riêng của bạn từ một token cấu hình",
-      "title": "Kết nối không gian làm việc Slack"
+      "setupAppOtherTeam": "Dành cho không gian làm việc Slack khác với {team} · OpenObserve tạo ứng dụng Slack riêng của bạn từ một token cấu hình"
     },
     "wizard": {
       "title": "Thiết lập ứng dụng Slack",
@@ -30939,9 +30837,7 @@
       "ownOrgOnlyHint": "Trên không gian làm việc instance, bạn gán kênh cho tổ chức của riêng bạn",
       "claimableHint": "Các kênh chưa được nhận và các kênh do {org} sở hữu",
       "servedOrgsHint": "Mọi tổ chức mà không gian làm việc này phục vụ",
-      "alertRoutes": "{count} đích | {count} đích",
-      "empty": "Chưa có kênh nào có tổ chức mặc định",
-      "emptyDescription": "Câu hỏi trong kênh không có mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng /o2 org)."
+      "alertRoutes": "{count} đích | {count} đích"
     },
     "people": {
       "title": "Người dùng đã liên kết",
@@ -30960,8 +30856,7 @@
         "email": "Khớp email",
         "admin_bulk": "Liên kết tất cả"
       },
-      "loadMore": "Tải thêm",
-      "empty": "Chưa có ai trong tổ chức này liên kết Slack"
+      "loadMore": "Tải thêm"
     },
     "credentials": {
       "title": "Cập nhật thông tin xác thực",
@@ -31899,13 +31794,6 @@
           "fix": "Hướng dẫn tích hợp"
         }
       }
-    },
-    "chart": {
-      "costMissing": "Không có trong biểu đồ này: {models}. {tokens} token chưa có giá.",
-      "costMissingPricedSince": "Không có trong biểu đồ này: {models}. {tokens} token được ghi nhận trước khi có giá.",
-      "unpricedModels": "Chưa có giá: {models}",
-      "pricedSinceModels": "Được ghi nhận trước khi có giá: {models}",
-      "addPrice": "Thêm giá"
     }
   },
   "onboarding": {

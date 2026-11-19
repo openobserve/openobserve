@@ -4996,9 +4996,7 @@
       "saved": "公告橫幅已更新",
       "saveFailed": "無法儲存公告橫幅",
       "loadFailed": "無法載入公告橫幅",
-      "addBanner": "新增橫幅",
-      "emptyTitle": "尚無橫幅",
-      "emptyHint": "新增一個橫幅以在應用程式頂端顯示通知。"
+      "addBanner": "新增橫幅"
     },
     "variants": {
       "info": "資訊",
@@ -11930,10 +11928,7 @@
       "proposedActions": "建議動作",
       "qualityReasons": "原因：{reasons} | 原因：{reasons}",
       "openAlert": "開啟警示",
-      "advice": "應檢查什麼",
-      "viewInLogs": "在日誌中檢視",
-      "viewInLogsHint": "在日誌中開啟此執行記錄的紀錄",
-      "loadFailed": "無法載入摘要：{message}"
+      "advice": "應檢查什麼"
     },
     "dashboard": {
       "latestRunAgo": "最近一次執行 {time}",
@@ -11991,8 +11986,7 @@
       "runNowHeading": "立即執行",
       "findingsKept": "發現結果會依此組織自有記錄的保留期間保存。警示校準不會傳送任何通知。",
       "frequencyRange": "請選擇介於 1 小時到 30 天之間的執行頻率。",
-      "windowRange": "請選擇介於 1 分鐘到 90 天之間的時間範圍。",
-      "loadFailed": "無法載入設定：{message}"
+      "windowRange": "請選擇介於 1 分鐘到 90 天之間的時間範圍。"
     },
     "visibility": {
       "allClear": "在最近一次執行中，您可存取的警示沒有任何發現。",
@@ -16418,12 +16412,7 @@
       "fieldNameMapping": "欄位名稱對應",
       "logsWithCount": "日誌 ({count})",
       "tracesWithCount": "追蹤 ({count})",
-      "metricsWithCount": "指標 ({count})",
-      "resetServicesConfirmMessage": "此操作將刪除此組織的所有已發現服務。當攝取新的遙測資料時，服務會自動重新發現。此操作無法復原。",
-      "resetServicesConfirmWarning": "當攝取新的遙測資料時，服務會自動重新發現。此操作無法復原。",
-      "configureServicesHint": "以設定服務的識別和分組方式。",
-      "serviceCountSingular": "{count} 個服務 | {count} 個服務",
-      "instancesCount": "({count} 個執行個體)"
+      "metricsWithCount": "指標 ({count})"
     },
     "addRegexPattern": {
       "namePlaceholder": "例如：內部密碼",
@@ -16502,8 +16491,7 @@
       "logoLightLabel": "自訂標誌（淺色模式）",
       "logoLightHelp": "於淺色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。",
       "logoDarkLabel": "自訂標誌（深色模式）",
-      "logoDarkHelp": "於深色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。",
-      "fileCounterLabel": "{constraint} {filesNumber} 個檔案 {'|'} {totalSize}"
+      "logoDarkHelp": "於深色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。"
     },
     "modelPricingEditor": {
       "copySuffix": " (副本)"
@@ -16532,10 +16520,7 @@
       "daysValue": "{days} 天",
       "forever": "永久保留",
       "invalid": "使用 0 或至少 3 天",
-      "invalidType": "請至少使用 3 天，或移除此類型",
-      "streamType": "串流類型",
-      "days": "天",
-      "removeType": "移除此串流類型"
+      "invalidType": "請至少使用 3 天，或移除此類型"
     },
     "organizationSettings": {
       "fieldNameHelp": "僅使用字母數字和 '+=,.{'@'}-_' 字元，不要包含空格。",
@@ -16769,8 +16754,7 @@
       "reasonIdealForDisambiguation": "{details} — 適合服務消歧",
       "trackedK8sWorkload": "K8s 工作負載",
       "trackedK8sPod": "K8s Pod",
-      "serviceCountFailed": "無法載入服務數量",
-      "toSeeDiscoveredServices": "以查看實際發現的服務。"
+      "serviceCountFailed": "無法載入服務數量"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "例如：{example}",
@@ -16959,51 +16943,6 @@
       "requestApproved": "{domain} 已連結",
       "requestRejected": "{domain} 的請求已遭拒絕",
       "decisionFailed": "更新請求失敗"
-    },
-    "groupDataAI": "資料與 AI",
-    "llmProvidersDesc": "用於線上評估的 LLM 供應商",
-    "customLogoTitle": "自訂 Logo",
-    "customLogoTextDescription": "自訂 Logo 文字用於變更應用程式中顯示的預設品牌文字。",
-    "dragDropUpload": "拖放或按一下以上傳",
-    "customLogoLightDescription": "淺色模式佈景主題的自訂 Logo。在淺色模式下使用時顯示。",
-    "customLogoDarkDescription": "深色模式佈景主題的自訂 Logo。在深色模式下使用時顯示。",
-    "textMaxCharacters": "文字不得超過 100 個字元。",
-    "genAiAgentMapping": {
-      "tabLabel": "GenAI 代理映射",
-      "title": "GenAI 代理映射",
-      "description": "配置用於標準化 LLM 追蹤和評估中代理身份的回退遙測屬性。",
-      "agentNameFields": "代理名稱回退欄位",
-      "agentNameHelp": "用作 gen_ai.agent.name 回退的傳入屬性。",
-      "agentNameInfo": "僅在標準 gen_ai.agent.name 屬性缺失或為空時檢查。每行新增一個傳入遙測屬性。",
-      "agentIdFields": "代理 ID 回退欄位",
-      "agentIdHelp": "用作 gen_ai.agent.id 回退的傳入屬性。",
-      "agentIdInfo": "僅在標準 gen_ai.agent.id 屬性缺失或為空時檢查。每行新增一個傳入遙測屬性。",
-      "envFields": "環境後備欄位",
-      "envHelp": "要用作代理程式環境的傳入屬性。",
-      "envInfo": "僅在標準 deployment.environment.name 屬性遺失或空白時才會檢查。每行新增一個傳入遙測屬性。",
-      "versionFields": "版本後備欄位",
-      "versionHelp": "要用作代理程式版本的傳入屬性。",
-      "versionInfo": "僅在標準 gen_ai.agent.version 屬性遺失或空白時才會檢查。每行新增一個傳入遙測屬性。",
-      "alwaysAppliedStandard": "標準（優先檢查）：",
-      "applyDefaults": "套用預設值",
-      "resetToEmpty": "重設為空",
-      "clearRegistry": "清除註冊表",
-      "clearRegistryTitle": "清除代理註冊表？",
-      "clearRegistryDescription": "這將刪除此組織所有已發現的 GenAI 代理註冊表行。新的匹配追蹤將在攝入期間重新填充註冊表。",
-      "clearRegistryConfirm": "清除註冊表",
-      "saved": "GenAI 代理映射已成功儲存",
-      "clearRegistrySuccess": "GenAI 代理登錄已清除。已刪除 {deletedCount} 個儲存的代理和 {bufferCount} 個佇列中的觀測。",
-      "loadFailed": "無法載入 GenAI 代理映射",
-      "saveFailed": "無法儲存 GenAI 代理映射",
-      "clearRegistryFailed": "無法清除 GenAI 代理註冊表",
-      "defaultsLoadFailed": "無法載入 GenAI 代理映射預設值",
-      "defaultsFetchFailed": "取得預設值失敗（{status}）"
-    },
-    "llmProvidersSettings": {
-      "subtitle": "線上評估的 LLM 提供者"
-    },
-    "index": {
-      "genAiAgentMappingDesc": "將 GenAI Span 對應至代理程式識別碼"
     }
   },
   "reports": {
@@ -17265,8 +17204,7 @@
     "cancelQueryFailed": "取消查詢失敗",
     "searchTypeDashboards": "儀表板",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "其他",
-    "lastDataRefreshTime": "上次資料重新整理時間："
+    "searchTypeOthers": "其他"
   },
   "traces": {
     "nlNeedsSql": "此問題需要 SQL；請在日誌中開啟",
@@ -17716,8 +17654,7 @@
         "count": "{count} 個洞察 | {count} 個洞察",
         "countHint": "此時間範圍內有 {count} 個服務異常 | 此時間範圍內有 {count} 個服務異常",
         "viewTraces": "追蹤",
-        "viewCharts": "圖表",
-        "scoreAbove": "分數高於閾值 +{percent}%"
+        "viewCharts": "圖表"
       }
     },
     "spansTab": "Span",
@@ -17827,8 +17764,7 @@
       "totalTraces": "總追蹤數",
       "p95Latency": "P95 延遲",
       "errorRate": "錯誤率",
-      "timeAxis": "時間",
-      "errorsSeries": "錯誤"
+      "timeAxis": "時間"
     },
     "searchBar": {
       "streamNotFound": "找不到串流"
@@ -17882,10 +17818,7 @@
       "metricsLoadFailed": "無法載入此服務的關聯指標。{reason}",
       "noResourceRecorded": "此服務在此時間範圍內的 Span 未記錄 {resource}。",
       "resourceLoadFailed": "無法為此服務載入 {resource}。{reason}",
-      "noVersionTraffic": "此服務在此串流中的 Span 未記錄版本，因此沒有可依版本拆分的流量。",
-      "noResourceDataFound": "找不到 {resource} 資料",
-      "failedToLoadMetrics": "載入指標失敗。",
-      "requests": "請求"
+      "noVersionTraffic": "此服務在此串流中的 Span 未記錄版本，因此沒有可依版本拆分的流量。"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP 狀態碼",
@@ -18125,15 +18058,6 @@
       "loadingPage": "正在載入第 {page} 頁",
       "pageFailed": "無法載入第 {page} 頁",
       "pageEmpty": "第 {page} 頁沒有結果"
-    },
-    "lLMErrorTable": {
-      "noData": "無資料",
-      "noErrorsInRange": "此時間範圍內沒有錯誤",
-      "loadFailed": "無法載入最近的錯誤",
-      "time": "時間",
-      "service": "服務",
-      "operation": "操作",
-      "traceId": "追蹤 ID"
     }
   },
   "aiToolset": {
@@ -19597,8 +19521,7 @@
         "promptTemperatureOverrideInherited": "使用提示詞參數。",
         "taskTimeoutLabel": "逾時（秒）",
         "taskConcurrencyLabel": "最大並行數",
-        "taskOverrideHelp": "覆寫此執行中任務的已發佈值。",
-        "providerHelpSettingsLink": "設定"
+        "taskOverrideHelp": "覆寫此執行中任務的已發佈值。"
       },
       "columns": {
         "name": "名稱",
@@ -19991,26 +19914,6 @@
           "traces": "追蹤數",
           "last": "上次失敗"
         }
-      },
-      "spanTrend": {
-        "title": "Span 趨勢",
-        "subtitle": "依類型計的 span 數"
-      },
-      "errorsOverTime": {
-        "title": "錯誤隨時間變化",
-        "subtitle": "錯誤數"
-      },
-      "spansByModel": {
-        "title": "依模型計的 span",
-        "subtitle": "每個模型的呼叫次數"
-      },
-      "tokensByModel": {
-        "title": "依模型計的 token",
-        "subtitle": "每個模型的總 token 數"
-      },
-      "recentErrors": {
-        "title": "近期錯誤",
-        "subtitle": "最近 10 個失敗的 span"
       }
     },
     "behavior": {
@@ -21209,8 +21112,7 @@
         "resultReasoning": "推理",
         "resultRaw": "原始回應",
         "valuePlaceholder": "{variable} 的值"
-      },
-      "providerHelpSettingsLink": "設定"
+      }
     },
     "job": {
       "detail": {
@@ -29815,10 +29717,7 @@
         "service": "依服務",
         "place": "依地點",
         "none": "未分組"
-      },
-      "fixNoLink": "新增 service.name 標籤",
-      "fixStopped": "檢查收集器",
-      "fixQueued": "僅模擬：「{action}」針對 {service} 未傳送至任何位置"
+      }
     },
     "activity": {
       "before": "之前",
@@ -30713,8 +30612,7 @@
       "copyRequest": "複製請求",
       "requestText": "請在 _meta › Settings › Slack › Organizations 中，將 OpenObserve 組織 {name}（{org}）新增至 Slack 工作區 {team}。",
       "requestCopied": "已複製請求",
-      "setupAppOtherTeam": "適用於 {team} 以外的 Slack 工作區 · OpenObserve 會使用單一設定權杖為您建立專屬的 Slack 應用程式",
-      "title": "連結 Slack 工作區"
+      "setupAppOtherTeam": "適用於 {team} 以外的 Slack 工作區 · OpenObserve 會使用單一設定權杖為您建立專屬的 Slack 應用程式"
     },
     "wizard": {
       "title": "設定 Slack 應用程式",
@@ -30934,9 +30832,7 @@
       "ownOrgOnlyHint": "在執行個體工作區中，您可以將頻道對應到自己的組織",
       "claimableHint": "未認領的頻道，以及 {org} 擁有的頻道",
       "servedOrgsHint": "此工作區所服務的任何組織",
-      "alertRoutes": "{count} 個目標 | {count} 個目標",
-      "empty": "尚無頻道設定預設組織",
-      "emptyDescription": "沒有預設組織的頻道中的問題會傳送到每個人的預設組織（他們可以用 /o2 org 變更）。"
+      "alertRoutes": "{count} 個目標 | {count} 個目標"
     },
     "people": {
       "title": "已連結的人員",
@@ -30955,8 +30851,7 @@
         "email": "電子郵件比對",
         "admin_bulk": "全部連結"
       },
-      "loadMore": "載入更多",
-      "empty": "此組織尚無人連結 Slack"
+      "loadMore": "載入更多"
     },
     "credentials": {
       "title": "更新憑證",
@@ -31894,13 +31789,6 @@
           "fix": "整合指南"
         }
       }
-    },
-    "chart": {
-      "costMissing": "未顯示於此圖表：{models}。{tokens} 個 token 沒有價格。",
-      "costMissingPricedSince": "未顯示於此圖表：{models}。{tokens} 個 token 是在新增價格之前記錄的。",
-      "unpricedModels": "未定價：{models}",
-      "pricedSinceModels": "新增價格前記錄：{models}",
-      "addPrice": "新增價格"
     }
   },
   "onboarding": {
