@@ -55,14 +55,18 @@ describe("withoutEntrance", () => {
     });
   });
 
-  it("keeps a treemap's own update duration so a tile click can zoom", () => {
+  it("switches a treemap's animation off, so a data re-render cannot morph its tiles", () => {
     const still = withoutEntrance({
       series: [{ type: "treemap", animationDuration: 400 }, { type: "pie" }],
     });
     const [treemap, pie] = still.series as Record<string, unknown>[];
-    expect(treemap.animationDuration).toBe(0);
-    expect(treemap).not.toHaveProperty("animationDurationUpdate");
+    expect(treemap).toMatchObject({
+      animation: false,
+      animationDuration: 0,
+      animationDurationUpdate: 0,
+    });
     expect(pie).toMatchObject({ animationDuration: 0, animationDurationUpdate: 0 });
+    expect(pie).not.toHaveProperty("animation");
   });
 
   it("adds no series to options that have none and leaves empty entries", () => {
