@@ -525,21 +525,9 @@ pub async fn read_buckets(
     range: (i64, i64),
     bucket_us: i64,
 ) -> anyhow::Result<Vec<ExploreBucket>> {
-    let schema = infra::schema::get_cache(org_id, ANOMALY_STREAM, StreamType::Logs).await?;
-    let fields: HashSet<String> = schema.fields_map().keys().cloned().collect();
-    if ![
-        "_timestamp",
-        "anomaly_id",
-        "model_version",
-        "is_anomaly",
-        "actual_value",
-        "created_at",
-    ]
-    .iter()
-    .all(|f| fields.contains(*f))
-    {
+    let Some(fields) = anomaly_fields(org_id).await? else {
         return Ok(vec![]);
-    }
+    };
     let sql = buckets_sql(anomaly_id, model_version, &fields);
     let newest = parse_buckets(&search_hits(org_id, &sql, range, MAX_BUCKETS).await?);
     // Small buckets fill one read in hours, so an older anomaly is found and read on its own.
@@ -556,6 +544,52 @@ pub async fn read_buckets(
     let around = around_range(anomaly_us, bucket_us, range);
     let around = parse_buckets(&search_hits(org_id, &sql, around, MAX_BUCKETS).await?);
     Ok(merge_reads(around, newest))
+}
+
+/// The bucket a point request opens: from `buckets` when the history read has it, else read
+/// alone, because the capped history can miss an older bucket.
+pub async fn requested_bucket(
+    org_id: &str,
+    anomaly_id: &str,
+    model_version: i64,
+    buckets: &[ExploreBucket],
+    ts_us: i64,
+    bucket_us: i64,
+) -> anyhow::Result<Option<ExploreBucket>> {
+    if let Some(bucket) = bucket_at(buckets, ts_us, bucket_us) {
+        return Ok(Some(bucket.clone()));
+    }
+    let Some(fields) = anomaly_fields(org_id).await? else {
+        return Ok(None);
+    };
+    let sql = buckets_sql(anomaly_id, model_version, &fields);
+    let rows = search_hits(org_id, &sql, point_range(ts_us, bucket_us), 1).await?;
+    Ok(bucket_at(&parse_buckets(&rows), ts_us, bucket_us).cloned())
+}
+
+/// The range whose newest bucket holds `ts_us`. [pure]
+pub fn point_range(ts_us: i64, bucket_us: i64) -> (i64, i64) {
+    (
+        ts_us.saturating_sub(bucket_us.max(1)).saturating_add(1),
+        ts_us.saturating_add(1),
+    )
+}
+
+/// The fields of `_anomalies`, or `None` before the stream has the columns the reads need.
+async fn anomaly_fields(org_id: &str) -> anyhow::Result<Option<HashSet<String>>> {
+    let schema = infra::schema::get_cache(org_id, ANOMALY_STREAM, StreamType::Logs).await?;
+    let fields: HashSet<String> = schema.fields_map().keys().cloned().collect();
+    let ready = [
+        "_timestamp",
+        "anomaly_id",
+        "model_version",
+        "is_anomaly",
+        "actual_value",
+        "created_at",
+    ]
+    .iter()
+    .all(|f| fields.contains(*f));
+    Ok(ready.then_some(fields))
 }
 
 async fn search_hits(
@@ -885,6 +919,21 @@ mod tests {
         assert!(sql.contains("GROUP BY _timestamp HAVING "), "{sql}");
         assert!(sql.ends_with("ORDER BY ts DESC"), "{sql}");
         assert_eq!(sql.matches("ORDER BY ts DESC").count(), 1);
+    }
+
+    #[test]
+    fn test_a_point_read_covers_its_own_bucket_only() {
+        let s = 1_000_000;
+        let ts = 1_800_000_000 * s;
+        let (lo, hi) = point_range(ts, s);
+        assert!(lo <= ts && ts < hi, "the bucket that starts at the point");
+        assert!(ts - s < lo, "the bucket before it is outside");
+        assert!(hi <= ts + s, "the bucket after it is outside");
+        let (lo, hi) = point_range(ts, 15 * 60 * s);
+        assert_eq!(hi - lo, 15 * 60 * s);
+        // A history read that misses the bucket leaves bucket_at empty, so the point is read alone.
+        let newer = [normal(1), high(2, 900.0)];
+        assert!(bucket_at(&newer, 0, B).is_none());
     }
 
     #[test]

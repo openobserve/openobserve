@@ -368,9 +368,28 @@ async fn explore_response(
         .as_ref()
         .map(anomaly_service::anomaly_measure)
         .unwrap_or_default();
+    let point = match requested {
+        Some(_) if detector.is_trained => {
+            explore_state::requested_bucket(
+                org_id,
+                anomaly_id,
+                model_version,
+                &buckets,
+                start_us,
+                bucket_us,
+            )
+            .await
+            .unwrap_or_else(|e| {
+                // The link still opens; only its readings are missing.
+                log::warn!("[anomaly_detection {anomaly_id}] point read failed: {e}");
+                None
+            })
+        }
+        _ => None,
+    };
     let snapshot = match (requested, &decision.window, &decision.summary) {
         (Some(_), ..) => Some(explore_state::bucket_snapshot(
-            explore_state::bucket_at(&buckets, start_us, bucket_us),
+            point.as_ref(),
             start_us,
             end_us,
             &measure,
