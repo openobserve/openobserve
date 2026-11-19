@@ -377,6 +377,19 @@ describe("QueryFilterBar", () => {
       expect(sql(state)).toBe("level = 'error' AND status = 1");
     });
 
+    it.each([
+      ["drops", undefined, false],
+      ["keeps", "alert", true],
+    ])("%s a half-built condition on Escape (profile %s)", async (_, profile, kept) => {
+      mountBar({ profile });
+      await openBar();
+      await clickRow("level");
+      await clickRow("eq");
+      await press("Escape");
+      expect(rows()).toHaveLength(0);
+      expect(wrapper!.find('[data-test="query-filter-bar-draft"]').exists()).toBe(kept);
+    });
+
     it("marks the part being edited", async () => {
       mountBar({ modelValue: parseSqlFilter("level = 'error'")! });
       await editPart("level", "operator");

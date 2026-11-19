@@ -347,6 +347,10 @@ function clearAll() {
 
 // A vertical caret holds a line of its own, so Escape gives that line back instead of leaving it empty.
 function onEscape() {
+  if (config.value.keepDraftOnEscape && draft.value && !editingId.value) {
+    open.value = false;
+    return;
+  }
   if (vertical.value) close();
   else dismiss();
 }
@@ -409,6 +413,7 @@ const draftOperator = computed(() => {
     :size="size"
     :appearance="appearance"
     :max-rows="maxRows"
+    :row-tooltip-side="config.rowTooltipSide"
     :data-test="dataTest"
     @update:model-value="editor.onTextChange"
     @select="editor.select"

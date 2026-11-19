@@ -12,6 +12,7 @@ const props = withDefaults(defineProps<TruncatedTextProps>(), {
   lines: 1,
   tooltip: undefined,
   tooltipClass: undefined,
+  tooltipSide: undefined,
 });
 
 defineSlots<TruncatedTextSlots>();
@@ -43,6 +44,7 @@ const tooltipContent = computed(() => (props.tooltip === false ? undefined : pro
       v-if="tooltip !== false"
       overflow-only
       :content="tooltipContent"
+      :side="tooltipSide"
       :class="tooltipClass"
     />
     <slot />
