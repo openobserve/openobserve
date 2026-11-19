@@ -99,6 +99,8 @@ pub(crate) struct ToolPart<'a> {
     label: Option<String>,
     /// A gateway CLI run, whose stdout is data and never its exit code or error.
     gateway_cli: bool,
+    /// A gateway MCP call's own `(toolset, tool)`, which the grade classes by.
+    pub(crate) vendor: Option<(&'a str, &'a str)>,
     /// `tools_call`'s or a gateway call's arguments, else the part's input.
     input: Option<&'a Map<String, Value>>,
     pub(crate) state: Option<&'a Map<String, Value>>,
@@ -122,6 +124,7 @@ impl<'a> ToolPart<'a> {
         let mut tool = Cow::Borrowed(name);
         let mut label = None;
         let mut gateway_cli = false;
+        let mut vendor = None;
         if name == "tools_call" {
             tool = Cow::Borrowed(strip_mcp_prefix(
                 input
@@ -134,6 +137,7 @@ impl<'a> ToolPart<'a> {
             tool = Cow::Owned(call.key);
             label = Some(call.label);
             gateway_cli = call.cli;
+            vendor = (!call.cli).then_some((call.toolset, call.tool));
             input = call.args;
         } else if is_gateway_call(name) {
             tool = Cow::Borrowed("");
@@ -143,6 +147,7 @@ impl<'a> ToolPart<'a> {
             tool,
             label,
             gateway_cli,
+            vendor,
             input,
             state,
             status,

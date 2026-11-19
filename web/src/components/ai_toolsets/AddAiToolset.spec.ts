@@ -47,6 +47,7 @@ vi.mock("@/services/ai_toolsets", async (importOriginal) => {
       list: vi.fn(),
       delete: vi.fn(),
       discover: vi.fn(),
+      prebuilt: vi.fn(),
     },
   });
 });
@@ -59,6 +60,23 @@ import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import aiToolsetsService from "@/services/ai_toolsets";
+import { queryClient } from "@/composables/query/queryClient";
+
+const PRESETS = [
+  {
+    id: "dynatrace",
+    kind: "mcp",
+    label: "Dynatrace",
+    revision: 3,
+    description: "Dynatrace DQL",
+    url_template: "https://{environment}.apps.dynatrace.com/mcp",
+    params: [{ name: "environment", label: "Environment ID" }],
+    headers: [{ name: "Authorization" }],
+    allowed_tools: ["execute-dql", "query-problems"],
+    write_tools: [],
+    tool_classes: [{ tool: "execute-dql", class: "logs", args: { query: "^fetch logs" } }],
+  },
+];
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -79,6 +97,8 @@ describe("AddAiToolset", () => {
     vi.mocked(aiToolsetsService.create).mockResolvedValue({ data: {} } as any);
     vi.mocked(aiToolsetsService.update).mockResolvedValue({ data: {} } as any);
     vi.mocked(aiToolsetsService.discover).mockResolvedValue({ data: { tools: [] } } as any);
+    vi.mocked(aiToolsetsService.prebuilt).mockResolvedValue({ data: { presets: PRESETS } } as any);
+    queryClient.clear();
   });
 
   afterEach(() => {
@@ -623,6 +643,70 @@ describe("AddAiToolset", () => {
         max_result_bytes: 65536,
       });
       expect(data).not.toHaveProperty("tools_verified_at");
+    });
+  });
+
+  describe("presets from the server", () => {
+    it("fills an MCP toolset from a preset and stores the preset with its tool classes", async () => {
+      mockQuery = { action: "add", preset: "dynatrace" };
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(aiToolsetsService.prebuilt).toHaveBeenCalledWith("test-org");
+      expect(wrapper.find('[data-test="ai-toolset-preset-tools"]').text()).toContain(
+        "Preset tools (2)",
+      );
+      const env = wrapper.find('[data-test="ai-toolset-preset-param-environment"]');
+      await env.setValue("abc12345");
+      await flushPromises();
+      expect(getForm().state.values.mcp.url).toBe("https://abc12345.apps.dynatrace.com/mcp");
+
+      getForm().setFieldValue("mcp.headers[0].value", "Bearer t");
+      await getForm().handleSubmit();
+      await flushPromises();
+      const body = vi.mocked(aiToolsetsService.create).mock.calls.at(-1)![1];
+      expect(body).toMatchObject({ name: "dynatrace", kind: "mcp", description: "Dynatrace DQL" });
+      expect(body.data).toMatchObject({
+        url: "https://abc12345.apps.dynatrace.com/mcp",
+        headers: { Authorization: "Bearer t" },
+        allowed_tools: ["execute-dql", "query-problems"],
+        write_tools: [],
+        tool_classes: PRESETS[0].tool_classes,
+        preset: { id: "dynatrace", revision: 3 },
+      });
+      expect(JSON.stringify(body.data.preset)).not.toContain("abc12345");
+
+      await wrapper.find('[data-test="ai-toolset-preset-tools-customize"]').trigger("click");
+      expect(wrapper.find('[data-test="ai-toolset-tool-picker"]').exists()).toBe(true);
+    });
+
+    it("drops a URL copy that older preset metadata held, so no draft or save keeps it", async () => {
+      mockQuery = { action: "edit", id: "tool-9" };
+      vi.mocked(aiToolsetsService.get).mockResolvedValue({
+        data: {
+          id: "tool-9",
+          name: "grafana",
+          kind: "mcp",
+          description: "",
+          data: {
+            url: "https://g.example/mcp?token=s3cret",
+            allowed_tools: [],
+            write_tools: [],
+            preset: {
+              id: "grafana",
+              revision: 1,
+              params: { url: "https://g.example/mcp?token=s3cret" },
+            },
+          },
+        },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(getForm().state.values.mcp.extra.preset).toEqual({ id: "grafana", revision: 1 });
+      await getForm().handleSubmit();
+      await flushPromises();
+      const sent = vi.mocked(aiToolsetsService.update).mock.calls.at(-1)![2].data!;
+      expect(sent.preset).toEqual({ id: "grafana", revision: 1 });
     });
   });
 

@@ -21,7 +21,9 @@ use config::{
             MAX_AGENT_NOTE_CHARS, STEER_NOTICE, SteerHeader, SteerStatus, parse_steer_header,
         },
         oncall::{
-            confidence::{ToolCallRecord, signal_class, stream_type},
+            confidence::{
+                ToolCallRecord, ToolClassMap, signal_class, stream_type, toolset_signal_class,
+            },
             rca_run::{
                 LedgerCall, LedgerTool, RcaSubmit, evidence_target, exit_code, observed_window,
                 parse_submit, summarize_result,
@@ -30,7 +32,9 @@ use config::{
     },
     utils::json::{Map, Value},
 };
-use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
+use o2_enterprise::enterprise::ai::{
+    chat::batcher::DurableEvent, toolsets::push::normalize_tool_name,
+};
 
 use super::{
     projection::{Folded, obj},
@@ -209,6 +213,31 @@ fn closes_question(call: &ToolPart<'_>) -> bool {
 
 /// Decode the committed events of an RCA session.
 pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
+    decode_run_with(events, &ToolClassMap::default())
+}
+
+/// The org's `tool_classes` by the toolset name the agent uses, for grading one run.
+pub async fn org_tool_classes(org_id: &str) -> ToolClassMap {
+    let filter = infra::table::org_ai_toolsets::ListFilter {
+        name: None,
+        kind: Some("mcp".to_string()),
+    };
+    let rows = match infra::table::org_ai_toolsets::list(org_id, filter, None).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[RCA] org={org_id}: reading toolset tool_classes failed: {e}");
+            return ToolClassMap::default();
+        }
+    };
+    ToolClassMap::new(rows.into_iter().filter_map(|row| {
+        let data: Value = serde_json::from_str(row.data.as_deref()?).ok()?;
+        let rules = serde_json::from_value(data.get("tool_classes")?.clone()).ok()?;
+        Some((normalize_tool_name(&row.name), rules))
+    }))
+}
+
+/// [`decode_run`] grading toolset calls by the org's `tool_classes`.
+pub fn decode_run_with(events: &[DurableEvent], classes: &ToolClassMap) -> RunTranscript {
     let folded = Folded::fold(events);
     let seqs: HashMap<&str, i64> = events
         .iter()
@@ -307,7 +336,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
                 }
                 ThreadPart::Hidden => {}
                 ThreadPart::Row => {
-                    if let Some(record) = tool_record(&call) {
+                    if let Some(record) = tool_record(&call, classes) {
                         transcript.tool_log.push(record);
                     }
                 }
@@ -339,7 +368,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
 }
 
 /// The tool log entry of a visible tool part that completed or failed.
-fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
+fn tool_record(call: &ToolPart<'_>, classes: &ToolClassMap) -> Option<ToolCallRecord> {
     let completed = match call.status {
         "completed" => true,
         "error" => false,
@@ -348,7 +377,12 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
     let args = call.args();
     let key_arg = key_arg(&call.tool, &args).unwrap_or_default();
     let input = Value::Object(args);
-    let target = evidence_target(&call.tool, &input);
+    let signal = match call.vendor {
+        Some((toolset, tool)) => toolset_signal_class(toolset, tool, &input, classes),
+        None => signal_class(&call.tool, &input, classes),
+    };
+    let mut target = evidence_target(&call.tool, &input);
+    target.signal = signal;
     let empty = Map::new();
     let state = call.state.unwrap_or(&empty);
     let body = completed.then(|| call.body());
@@ -387,7 +421,7 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         started_at_us: started_at.unwrap_or_default(),
         duration_ms,
         error_type,
-        signal: signal_class(&call.tool, &input),
+        signal,
         target,
         observed,
         result_summary,
@@ -1015,6 +1049,89 @@ pub(crate) mod tests {
             ]
         );
         assert!(run.calls.is_empty() && run.submit.is_none());
+    }
+
+    #[test]
+    fn a_gateway_call_is_classed_by_its_own_toolset_and_tool_never_by_shell_rules() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        let calls = [
+            ("cli", "search_logs", json!({"q": "x"})),
+            ("vendor", "run_query", json!({"command": "git diff HEAD~1"})),
+        ];
+        for (i, (toolset, tool, args)) in calls.into_iter().enumerate() {
+            s.tool(
+                "msg_a1",
+                &format!("prt_g{i}"),
+                "toolset_tool_call",
+                "completed",
+                json!({"toolset_name": toolset, "tool_name": tool, "args": args}),
+                json!({"output": "{}"}),
+                1_000 + i as i64 * 10,
+                1_005 + i as i64 * 10,
+            );
+        }
+        let rules =
+            serde_json::from_value(json!([{"tool": "search_logs", "class": "logs"}])).unwrap();
+        let classes = ToolClassMap::new([("cli".to_string(), rules)]);
+        let run = decode_run_with(&s.events, &classes);
+        let signals: Vec<SignalClass> = run.tool_log.iter().map(|r| r.signal).collect();
+        assert_eq!(signals, [SignalClass::Logs, SignalClass::Unclassified]);
+        let plain: Vec<SignalClass> = decode_run(&s.events)
+            .tool_log
+            .iter()
+            .map(|r| r.signal)
+            .collect();
+        assert_eq!(
+            plain,
+            [SignalClass::Unclassified, SignalClass::Unclassified]
+        );
+    }
+
+    #[test]
+    fn a_toolset_s_tool_classes_grade_its_gateway_calls() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        for (i, query) in ["fetch logs | limit 5", "fetch bizevents"]
+            .iter()
+            .enumerate()
+        {
+            s.tool(
+                "msg_a1",
+                &format!("prt_d{i}"),
+                "toolset_tool_call",
+                "completed",
+                json!({"toolset_name": "dynatrace-prod", "tool_name": "execute-dql",
+                    "args": {"query": query}}),
+                json!({"output": "{}"}),
+                1_000 + i as i64 * 10,
+                1_005 + i as i64 * 10,
+            );
+        }
+        let rules = serde_json::from_value(json!([
+            {"tool": "execute-dql", "class": "logs", "args": {"query": "^\\s*fetch\\s+logs\\b"}}
+        ]))
+        .unwrap();
+        let classes = ToolClassMap::new([("dynatrace-prod".to_string(), rules)]);
+        let run = decode_run_with(&s.events, &classes);
+        let signals: Vec<(SignalClass, SignalClass)> = run
+            .tool_log
+            .iter()
+            .map(|r| (r.signal, r.target.signal))
+            .collect();
+        assert_eq!(
+            signals,
+            [
+                (SignalClass::Logs, SignalClass::Logs),
+                (SignalClass::Unclassified, SignalClass::Unclassified)
+            ]
+        );
+        assert_eq!(
+            decode_run(&s.events).tool_log[0].signal,
+            SignalClass::Unclassified
+        );
     }
 
     /// An org AI Toolset call keeps opencode's `<server>_<tool>` name in the tool log.

@@ -67,6 +67,10 @@ const CONTEXT_TOOLS: [&str; 9] = [
 /// Tool-name prefixes that are not an org AI Toolset MCP server (first-party and shell toolsets).
 const NOT_TOOLSET_SERVERS: [&str; 3] = ["o2", "cli", "custom"];
 
+/// Rules one toolset may carry, and the size of a rule's tool glob.
+const MAX_TOOL_CLASS_RULES: usize = 100;
+const MAX_TOOL_GLOB_CHARS: usize = 128;
+
 /// Code toolset tools that return a diff; like `git show`, a diff is evidence of a change.
 const TOOLSET_DIFF_TOOLS: [&str; 2] = ["git_show", "git_diff"];
 
@@ -114,6 +118,72 @@ impl SignalClass {
             Self::Context => "context",
             Self::Unclassified => "unclassified",
         }
+    }
+}
+
+/// A toolset's rule: a call to a tool matching `tool` (a `*` glob), with every `args` regex
+/// matching that argument, counts as `class`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ToolClassRule {
+    pub tool: String,
+    pub class: SignalClass,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub args: Option<BTreeMap<String, String>>,
+}
+
+/// Each toolset's compiled `tool_classes`, by the name the agent uses; the first match wins.
+#[derive(Debug, Default, Clone)]
+pub struct ToolClassMap {
+    by_toolset: HashMap<String, Vec<CompiledRule>>,
+}
+
+impl ToolClassMap {
+    /// Compiles each toolset's rules; a toolset whose rules don't validate is left out with a log.
+    pub fn new(rules: impl IntoIterator<Item = (String, Vec<ToolClassRule>)>) -> Self {
+        let mut by_toolset = HashMap::new();
+        for (toolset, rules) in rules {
+            match compile_rules(&rules) {
+                Ok(compiled) => {
+                    by_toolset.insert(toolset, compiled);
+                }
+                Err(e) => log::error!("[RCA] tool_classes of toolset '{toolset}' skipped: {e}"),
+            }
+        }
+        Self { by_toolset }
+    }
+
+    fn classify(
+        &self,
+        toolset: &str,
+        tool: &str,
+        input: &serde_json::Value,
+    ) -> Option<SignalClass> {
+        self.by_toolset
+            .get(toolset)?
+            .iter()
+            .find(|rule| rule.matches(tool, input))
+            .map(|rule| rule.class)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CompiledRule {
+    tool: String,
+    class: SignalClass,
+    args: Vec<(String, regex::Regex)>,
+}
+
+impl CompiledRule {
+    fn matches(&self, tool: &str, input: &serde_json::Value) -> bool {
+        glob_matches(&self.tool, tool)
+            && self
+                .args
+                .iter()
+                .all(|(name, pattern)| match input.get(name) {
+                    Some(serde_json::Value::String(text)) => pattern.is_match(text),
+                    Some(value) => pattern.is_match(&value.to_string()),
+                    None => false,
+                })
     }
 }
 
@@ -235,7 +305,7 @@ impl<'a> CallLog<'a> {
             return Err(UnverifiedReason::Ambiguous);
         }
         let tool = item.tool.strip_prefix("o2_").unwrap_or(&item.tool);
-        if !(first.tool == tool || toolset_tool(&first.tool) == Some(tool)) {
+        if !(first.tool == tool || toolset_tool(&first.tool).map(|(_, bare)| bare) == Some(tool)) {
             return Err(UnverifiedReason::NotRun);
         }
         records
@@ -554,7 +624,7 @@ pub fn stream_type(tool: &str, input: &serde_json::Value) -> Option<String> {
 }
 
 /// From the bare tool name and unwrapped input, never from the ledger.
-pub fn signal_class(tool: &str, input: &serde_json::Value) -> SignalClass {
+pub fn signal_class(tool: &str, input: &serde_json::Value, classes: &ToolClassMap) -> SignalClass {
     if SEARCH_TOOLS.contains(&tool) {
         return match input.get("type").and_then(serde_json::Value::as_str) {
             Some("metrics") => SignalClass::Metrics,
@@ -584,21 +654,117 @@ pub fn signal_class(tool: &str, input: &serde_json::Value) -> SignalClass {
         return SignalClass::Infra;
     }
     match toolset_tool(tool) {
-        Some(t) if TOOLSET_DIFF_TOOLS.contains(&t) => SignalClass::Change,
-        Some(t) if TOOLSET_CODE_TOOLS.contains(&t) => SignalClass::Context,
-        _ => SignalClass::Unclassified,
+        Some((_, t)) if TOOLSET_DIFF_TOOLS.contains(&t) => SignalClass::Change,
+        Some((_, t)) if TOOLSET_CODE_TOOLS.contains(&t) => SignalClass::Context,
+        Some((toolset, t)) => classes
+            .classify(toolset, t, input)
+            .unwrap_or(SignalClass::Unclassified),
+        None => SignalClass::Unclassified,
     }
 }
 
+/// A gateway MCP call's class from its own toolset, tool and arguments: the toolset's rules
+/// first, then the code-tool rules; never the shell or `cli_` heuristics.
+pub fn toolset_signal_class(
+    toolset: &str,
+    tool: &str,
+    args: &serde_json::Value,
+    classes: &ToolClassMap,
+) -> SignalClass {
+    if let Some(class) = classes.classify(toolset, tool, args) {
+        return class;
+    }
+    if TOOLSET_DIFF_TOOLS.contains(&tool) {
+        SignalClass::Change
+    } else if TOOLSET_CODE_TOOLS.contains(&tool) {
+        SignalClass::Context
+    } else {
+        SignalClass::Unclassified
+    }
+}
+
+/// Checks a toolset's `tool_classes` as saved: count, tool globs, classes and regexes.
+pub fn validate_tool_classes(rules: &[ToolClassRule]) -> Result<(), String> {
+    compile_rules(rules).map(|_| ())
+}
+
+fn compile_rules(rules: &[ToolClassRule]) -> Result<Vec<CompiledRule>, String> {
+    if rules.len() > MAX_TOOL_CLASS_RULES {
+        return Err(format!(
+            "`tool_classes` has {} rules; at most {MAX_TOOL_CLASS_RULES} are allowed",
+            rules.len()
+        ));
+    }
+    rules
+        .iter()
+        .map(|rule| {
+            let chars = rule.tool.chars().count();
+            if chars == 0
+                || chars > MAX_TOOL_GLOB_CHARS
+                || rule
+                    .tool
+                    .chars()
+                    .any(|c| c.is_whitespace() || c.is_control())
+            {
+                return Err(format!(
+                    "`tool_classes` tool '{}' must be 1 to {MAX_TOOL_GLOB_CHARS} characters \
+                     without whitespace",
+                    rule.tool
+                ));
+            }
+            if rule.class == SignalClass::Unclassified {
+                return Err(format!(
+                    "`tool_classes` rule for '{}' needs a class other than unclassified",
+                    rule.tool
+                ));
+            }
+            let args = rule
+                .args
+                .iter()
+                .flatten()
+                .map(|(name, pattern)| {
+                    regex::Regex::new(pattern)
+                        .map(|re| (name.clone(), re))
+                        .map_err(|e| format!("`tool_classes` pattern for '{name}': {e}"))
+                })
+                .collect::<Result<_, _>>()?;
+            Ok(CompiledRule {
+                tool: rule.tool.clone(),
+                class: rule.class,
+                args,
+            })
+        })
+        .collect()
+}
+
+/// The gateway's glob: `*` is any run of characters, the rest literal, the whole name.
+pub fn glob_matches(glob: &str, name: &str) -> bool {
+    let parts: Vec<&str> = glob.split('*').collect();
+    let [first, .., last] = parts.as_slice() else {
+        return glob == name;
+    };
+    if !name.starts_with(first) || name.len() < first.len() + last.len() {
+        return false;
+    }
+    let mut at = first.len();
+    for middle in &parts[1..parts.len() - 1] {
+        match name[at..].find(middle) {
+            Some(found) => at += found + middle.len(),
+            None => return false,
+        }
+    }
+    name.len() - last.len() >= at && name.ends_with(last)
+}
+
 /// Toolset server names are `[a-z0-9-]` only, so the server ends at the first `_`.
-fn toolset_tool(tool: &str) -> Option<&str> {
+fn toolset_tool(tool: &str) -> Option<(&str, &str)> {
     let (server, bare) = tool.split_once('_')?;
     let is_server = !server.is_empty()
         && server
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
         && !NOT_TOOLSET_SERVERS.contains(&server);
-    (is_server && !bare.is_empty()).then_some(bare)
+    (is_server && !bare.is_empty()).then_some((server, bare))
 }
 
 /// Whether `tool` is one of the three PromQL query tools.
@@ -664,7 +830,7 @@ pub fn match_citation<'a>(
     let mut matched = false;
     let mut best: Option<&ToolCallRecord> = None;
     for record in log.iter().filter(|r| {
-        (r.tool == tool || toolset_tool(&r.tool) == Some(tool))
+        (r.tool == tool || toolset_tool(&r.tool).map(|(_, bare)| bare) == Some(tool))
             && (MatchKey::of(&r.key_arg) == cited || code_citation_matches(r, &cited))
     }) {
         matched = true;
@@ -690,7 +856,7 @@ pub fn match_citation<'a>(
 /// same other arguments with a line range inside the call's range (none read the whole file).
 fn code_citation_matches(record: &ToolCallRecord, cited: &MatchKey) -> bool {
     let is_code_tool = toolset_tool(&record.tool)
-        .is_some_and(|t| TOOLSET_CODE_TOOLS.contains(&t) || TOOLSET_DIFF_TOOLS.contains(&t));
+        .is_some_and(|(_, t)| TOOLSET_CODE_TOOLS.contains(&t) || TOOLSET_DIFF_TOOLS.contains(&t));
     if !is_code_tool {
         return false;
     }
@@ -1345,10 +1511,18 @@ mod tests {
             ("Repo_git_show", json!({}), Unclassified),
         ];
         for (tool, input, want) in cases {
-            assert_eq!(signal_class(tool, &input), want, "{tool} {input}");
+            assert_eq!(
+                signal_class(tool, &input, &ToolClassMap::default()),
+                want,
+                "{tool} {input}"
+            );
         }
         for tool in CONTEXT_TOOLS {
-            assert_eq!(signal_class(tool, &json!({})), Context, "{tool}");
+            assert_eq!(
+                signal_class(tool, &json!({}), &ToolClassMap::default()),
+                Context,
+                "{tool}"
+            );
         }
         for (class, counts) in [
             (Logs, true),
@@ -2686,5 +2860,106 @@ mod tests {
             &BTreeMap::new(),
         );
         assert!(!g.reasons.contains(&ImpactOutsideObservedData));
+    }
+
+    fn dynatrace_rules() -> ToolClassMap {
+        let rules: Vec<ToolClassRule> = serde_json::from_value(json!([
+            {"tool": "execute-dql", "class": "logs", "args": {"query": "^\\s*fetch logs"}},
+            {"tool": "execute-dql", "class": "traces", "args": {"query": "^\\s*fetch spans"}},
+            {"tool": "execute-dql", "class": "metrics", "args": {"query": "^\\s*timeseries"}},
+            {"tool": "execute-dql", "class": "context", "args": {"query": "smartscapeEdges"}},
+            {"tool": "query-*", "class": "context"},
+            {"tool": "query-problems", "class": "infra"},
+        ]))
+        .unwrap();
+        ToolClassMap::new([("dynatrace-prod".to_string(), rules)])
+    }
+
+    #[test]
+    fn toolset_calls_are_classed_by_their_toolset_s_first_matching_rule() {
+        use SignalClass::*;
+        let map = dynatrace_rules();
+        let dql = |q: &str| json!({"query": q});
+        let cases = [
+            (
+                "dynatrace-prod_execute-dql",
+                dql("fetch logs | limit 5"),
+                Logs,
+            ),
+            ("dynatrace-prod_execute-dql", dql("  fetch spans"), Traces),
+            (
+                "dynatrace-prod_execute-dql",
+                dql("timeseries avg(cpu)"),
+                Metrics,
+            ),
+            (
+                "dynatrace-prod_execute-dql",
+                dql("fetch dt.smartscapeEdges"),
+                Context,
+            ),
+            (
+                "dynatrace-prod_execute-dql",
+                dql("fetch bizevents"),
+                Unclassified,
+            ),
+            ("dynatrace-prod_execute-dql", json!({}), Unclassified),
+            ("dynatrace-prod_query-problems", json!({}), Context),
+            ("dynatrace-eu_execute-dql", dql("fetch logs"), Unclassified),
+            ("dynatrace-prod_git_show", json!({}), Change),
+        ];
+        for (tool, input, want) in cases {
+            assert_eq!(signal_class(tool, &input, &map), want, "{tool} {input}");
+        }
+        let none = ToolClassMap::default();
+        assert_eq!(
+            signal_class("dynatrace-prod_execute-dql", &dql("fetch logs"), &none),
+            Unclassified
+        );
+    }
+
+    #[test]
+    fn tool_classes_are_validated_on_save() {
+        let rule = |tool: &str, class: &str, args: serde_json::Value| -> ToolClassRule {
+            serde_json::from_value(json!({"tool": tool, "class": class, "args": args})).unwrap()
+        };
+        assert!(validate_tool_classes(&[rule("search_*", "logs", json!({"q": "^a"}))]).is_ok());
+        for (rules, needle) in [
+            (vec![rule("", "logs", json!({}))], "1 to 128"),
+            (vec![rule("a b", "logs", json!({}))], "whitespace"),
+            (
+                vec![rule("x", "unclassified", json!({}))],
+                "other than unclassified",
+            ),
+            (
+                vec![rule("x", "logs", json!({"q": "("}))],
+                "pattern for 'q'",
+            ),
+            (vec![rule("x", "logs", json!({})); 101], "at most 100"),
+        ] {
+            let err = validate_tool_classes(&rules).unwrap_err();
+            assert!(err.contains(needle), "{err}");
+        }
+        let bad =
+            ToolClassMap::new([("t".to_string(), vec![rule("x", "logs", json!({"q": "("}))])]);
+        assert_eq!(
+            signal_class("t_x", &json!({"q": "a"}), &bad),
+            SignalClass::Unclassified
+        );
+    }
+
+    #[test]
+    fn globs_match_like_the_gateway() {
+        for (glob, name, want) in [
+            ("*", "anything", true),
+            ("query_*", "query_prometheus", true),
+            ("*tempo*", "search_tempo_traces", true),
+            ("get-entity-*", "get-entity-by-id", true),
+            ("a*a", "a", false),
+            ("query_*", "my_query_x", false),
+            ("exact", "exact", true),
+            ("exact", "exactly", false),
+        ] {
+            assert_eq!(glob_matches(glob, name), want, "{glob} {name}");
+        }
     }
 }

@@ -15,7 +15,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="mb-4" data-test="ai-toolset-tool-picker">
+  <div
+    v-if="presetTools !== undefined && !customizing"
+    class="mb-4 flex items-center gap-2 text-sm"
+    data-test="ai-toolset-preset-tools"
+  >
+    <span>{{ t("aiToolset.presetTools", { count: presetTools }) }}</span>
+    <OButton
+      variant="ghost"
+      size="xs"
+      data-test="ai-toolset-preset-tools-customize"
+      @click="customizing = true"
+    >
+      {{ t("aiToolset.customize") }}
+    </OButton>
+  </div>
+  <div v-else class="mb-4" data-test="ai-toolset-tool-picker">
     <div class="mb-2 flex items-center gap-2">
       <div class="text-sm font-medium">{{ t("aiToolset.tools") }}</div>
       <OButton
@@ -219,6 +234,8 @@ const props = defineProps<{
   tools: DiscoveredTool[] | null;
   status: "idle" | "loading" | "ok" | "failed";
   error?: string;
+  /** Set when a preset chose the tools: the table stays collapsed until Customize. */
+  presetTools?: number;
 }>();
 
 const emit = defineEmits<{
@@ -234,6 +251,7 @@ const stateOptions: { value: ToolState; label: string }[] = [
   { value: "write", label: t("aiToolset.stateWrite") },
 ];
 
+const customizing = ref(false);
 const typedName = ref("");
 const typedCanWrite = ref(false);
 
