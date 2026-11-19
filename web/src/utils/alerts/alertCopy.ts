@@ -16,6 +16,7 @@
 import { getIntlLocale } from "@/locales";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { promqlByLabels, sqlGroupByLabels } from "./queryGroupLabels";
+import type { IntentDescription, IntentId } from "./alertIntents";
 
 const NOUN_BY_STREAM: Record<string, I18nKey> = {
   logs: "alerts.verdict.events",
@@ -134,11 +135,21 @@ export const formatNumber = (value: unknown): I18nText => {
   return raw(new Intl.NumberFormat(getIntlLocale(), { maximumFractionDigits: 2 }).format(n));
 };
 
-/** Recent values in words, "stay at" when flat; a ratio threshold adds the typed percent and its fix. */
+// A span duration is stored in microseconds and typed in the unit picked beside its threshold.
+const DURATION_SHOWN: Record<string, readonly [number, string]> = {
+  ns: [0.001, "nanoseconds"],
+  us: [1, "microseconds"],
+  ms: [1000, "milliseconds"],
+  s: [1_000_000, "seconds"],
+};
+
+/** Recent values in words, "stay at" when flat; a ratio threshold adds the typed percent and its fix.
+ * `durationUnit` reads stored microseconds in the unit the threshold is typed in. */
 export function valueRangeText(
   range: { min: number; max: number } | null | undefined,
   t: TranslateFn,
   ratio?: { typed: unknown; fix: unknown },
+  durationUnit?: string,
 ): I18nText {
   const value = ratio ? formatNumber(ratio.typed) : undefined;
   const fix = ratio ? formatNumber(ratio.fix) : undefined;
@@ -146,7 +157,10 @@ export function valueRangeText(
     return ratio
       ? t("alerts.guard.ratioDeclared", { value, fix })
       : t("alerts.guard.valueRangePending");
-  const [min, max] = [formatNumber(range.min), formatNumber(range.max)];
+  const shown = DURATION_SHOWN[durationUnit ?? ""];
+  const inUnit = (n: number) =>
+    shown ? valueWithUnit(n / shown[0], shown[1], t) : formatNumber(n);
+  const [min, max] = [inUnit(range.min), inUnit(range.max)];
   if (min === max)
     return ratio
       ? t("alerts.guard.ratioSteady", { value: min, typed: value, fix })
@@ -154,6 +168,36 @@ export function valueRangeText(
   return ratio
     ? t("alerts.guard.ratioRange", { min, max, value, fix })
     : t("alerts.guard.valueRange", { min, max });
+}
+
+const PHRASE_KEYS: Record<IntentId, [I18nKey, I18nKey]> = {
+  countWhere: ["alerts.intent.phrase.count", "alerts.intent.phrase.countAll"],
+  percentile: ["alerts.intent.phrase.measure", "alerts.intent.phrase.measure"],
+  anyEvent: ["alerts.intent.phrase.each", "alerts.intent.phrase.eachAll"],
+  unusualVolume: ["alerts.intent.phrase.volume", "alerts.intent.phrase.volumeAll"],
+  compareLastWeek: ["alerts.intent.phrase.compare", "alerts.intent.phrase.compareAll"],
+  metricAbove: ["alerts.intent.phrase.measure", "alerts.intent.phrase.measure"],
+  ratio: ["alerts.intent.phrase.errorRate", "alerts.intent.phrase.errorRateAll"],
+  unusualChange: ["alerts.intent.phrase.change", "alerts.intent.phrase.change"],
+  promql: ["alerts.intent.phrase.promql", "alerts.intent.phrase.promql"],
+};
+
+/** What a starter watches in words, as its suggested name says it: "5xx error rate of http_server_duration_count
+ * per service_name". */
+export function intentPhrase(d: IntentDescription, streamType: string, t: TranslateFn): I18nText {
+  const [some, all] = PHRASE_KEYS[d.intent];
+  const what = t(d.values.length ? some : all, {
+    values: joinListOrMore(d.values, t),
+    noun: dataNoun(streamType, "custom", d.intent === "anyEvent" ? 1 : 2, t),
+    subject: raw(d.subject),
+    agg: d.agg
+      ? t(`alerts.queryConfig.functions.${d.agg}` as I18nKey)
+      : t("alerts.intent.phrase.value"),
+    factor: formatNumber(d.factor),
+  });
+  return d.groups.length
+    ? t("alerts.intent.phrase.per", { what, groups: joinListMore(d.groups, t) })
+    : what;
 }
 
 /** A duration in sentences: "10 minutes", "2 hours". */

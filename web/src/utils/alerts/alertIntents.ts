@@ -228,6 +228,11 @@ export function fieldsBySamplePresence(
     .map((f) => f.field);
 }
 
+// A value naming a failure, at any severity spelling: what an error count or an error rate filters on.
+const ERROR_WORD =
+  /(^|[^a-z])(error|errors|err|fatal|critical|crit|emerg|emergency|panic|fail|failed|failure|exception)([^a-z]|$)/i;
+const STATUS_CODE = /^\d{3}$/;
+
 const quoteId = (name: string) => `"${name.replace(/"/g, '""')}"`;
 const quoteText = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
@@ -459,7 +464,7 @@ const spellingOf = (a: string, b: string) => {
 
 /** Minority values (the other side of a 60 % majority) that are not a spelling of the majority, largest
  * first, those seen in `recent` ahead so the preview has something to show. */
-function starterCandidates(
+function minorityValues(
   values: readonly ValueCount[],
   recent: readonly ValueCount[],
 ): ValueCount[] {
@@ -474,7 +479,21 @@ function starterCandidates(
   return [...minority.filter(isRecent), ...minority.filter((v) => !isRecent(v))];
 }
 
-/** The largest minority that is not a spelling of the majority, preferring values seen in `recent`. */
+/** The minority values with error-like ones first, as an alert on a rare value is most often about errors;
+ * values differing only in case are one choice, as picking one adds the others. */
+function starterCandidates(
+  values: readonly ValueCount[],
+  recent: readonly ValueCount[],
+): ValueCount[] {
+  const minority = minorityValues(values, recent);
+  const isError = (v: ValueCount) => ERROR_WORD.test(v.value);
+  const ordered = [...minority.filter(isError), ...minority.filter((v) => !isError(v))];
+  return ordered.filter(
+    (v, i) => ordered.findIndex((w) => w.value.toLowerCase() === v.value.toLowerCase()) === i,
+  );
+}
+
+/** The starter value: an error-like minority, else the largest minority, preferring values seen in `recent`. */
 export function starterValue(
   values: readonly ValueCount[],
   recent: readonly ValueCount[] = [],
@@ -482,12 +501,15 @@ export function starterValue(
   return starterCandidates(values, recent)[0]?.value;
 }
 
-/** The runner-up when the data cannot tell it from the starter value (within 10 %), offered as a swap. */
+/** Offered as a swap: the largest minority an error-like value was put ahead of, else the runner-up the
+ * data cannot tell from the starter value (within 10 %). */
 export function starterAlternative(
   values: readonly ValueCount[],
   recent: readonly ValueCount[] = [],
 ): string | undefined {
   const [first, second] = starterCandidates(values, recent);
+  const largest = minorityValues(values, recent)[0];
+  if (first && largest && largest !== first) return largest.value;
   return first && second && second.count >= NEAR_TIE * first.count ? second.value : undefined;
 }
 
@@ -1100,7 +1122,6 @@ const seriesTopShare = (p: ReturnType<typeof labelProfile>[number]) => {
 };
 
 const VERSION_VALUE = /^\d+(\.\d+)*$/;
-const STATUS_CODE = /^\d{3}$/;
 const OUTCOME_WORD =
   /(^|[^a-z])(ok|error|err|success|succeeded|fail|failed|failure|timeout|unset)([^a-z]|$)/i;
 /** Numbers such as 1.1 and 2 name a version, which never splits good from bad. */
@@ -1112,13 +1133,42 @@ const statusLike = (p: ReturnType<typeof labelProfile>[number]) =>
   p.values.every((v) => STATUS_CODE.test(v.value)) ||
   p.values.some((v) => OUTCOME_WORD.test(v.value));
 
+/** Status-like labels an error rate filters on, one per set of spellings, read with their other spellings:
+ * on (nearly) every series together, even while every request still succeeds, and not fixed by the group. */
+function outcomeLabels(
+  profile: ReturnType<typeof labelProfile>,
+  series: readonly SeriesLabels[],
+  groups: readonly string[],
+): string[] {
+  const byLabel = new Map(profile.map((p) => [p.label, p]));
+  const taken = new Set<string>();
+  return [...profile]
+    .sort((a, b) => b.coverage - a.coverage)
+    .filter((p) => {
+      if (taken.has(p.label)) return false;
+      const spellings = familyMember(p.label, series)?.labels ?? [p.label];
+      spellings.forEach((l) => taken.add(l));
+      const values = spellings.flatMap((l) => byLabel.get(l)?.values ?? []);
+      const covered = series.filter((one) => spellings.some((l) => one[l] !== undefined)).length;
+      return (
+        series.length > 0 &&
+        covered / series.length >= CATEGORY_MIN_COVERAGE &&
+        statusLike({ ...p, values }) &&
+        groups.every((group) => fixedByGroup(series, p.label, group) < FIXED_BY_GROUP)
+      );
+    })
+    .map((p) => p.label);
+}
+
 /** Labels ranked for "where [label] matches": lopsided, on nearly every series, not fixed by the group
- * (its share would be 0 or 100 %); status-like labels lead and version-like ones never fit. */
+ * (its share would be 0 or 100 %); status-like labels lead and version-like ones never fit. An error
+ * rate (`outcome`) leads with status-like labels read across their spellings, whatever their split. */
 export function rankMetricCategory(
   profile: ReturnType<typeof labelProfile>,
-  opts: { groups?: readonly string[]; series?: readonly SeriesLabels[] } = {},
+  opts: { groups?: readonly string[]; series?: readonly SeriesLabels[]; outcome?: boolean } = {},
 ): Ranked {
   const { groups = [], series = [] } = opts;
+  const outcomes = opts.outcome ? outcomeLabels(profile, series, groups) : [];
   const fit = profile
     .filter(
       (p) =>
@@ -1137,9 +1187,25 @@ export function rankMetricCategory(
     )
     .map((p) => p.label);
   return ranked(
-    fit,
+    [...outcomes, ...fit.filter((label) => !outcomes.includes(label))],
     profile.map((p) => p.label),
   );
+}
+
+const ERROR_CODE_PATTERN = "5xx";
+
+/** What an error rate matches on a label's values: every 5xx code when they are status codes, else the
+ * error-like values seen; nothing when neither fits, so the user picks. */
+export function errorRateValues(values: readonly ValueCount[]): {
+  values: string[];
+  patterns: string[];
+} {
+  const seen = values.map((v) => v.value).filter((v) => v !== "");
+  if (seen.length && seen.every((v) => STATUS_CODE.test(v))) {
+    const pattern = labelPattern(ERROR_CODE_PATTERN, seen);
+    return { values: [pattern], patterns: pattern === ERROR_CODE_PATTERN ? [] : [pattern] };
+  }
+  return { values: seen.filter((v) => ERROR_WORD.test(v)), patterns: [] };
 }
 
 const DIGIT_PATTERN = /^(?=.*\d)(?=.*x)[\dx]+$/i;
@@ -1185,6 +1251,76 @@ export function ratioPromql(input: {
     return `sum${by} (${inner})`;
   };
   return `${sum(true)} / ${sum(false)} * 100`;
+}
+
+/** What a starter watches, as its name and its summary phrase both say it. */
+export interface IntentDescription {
+  intent: IntentId;
+  /** The picked values as typed ("5xx"), one per spelling that differs beyond case. */
+  values: string[];
+  /** The metric, the measured field, or the stream when nothing narrower is picked. */
+  subject: string;
+  agg?: string;
+  groups: string[];
+  factor?: number;
+}
+
+export function describeIntent(
+  intent: IntentId,
+  slots: IntentSlots,
+  ctx: { stream: string; metrics: boolean },
+): IntentDescription {
+  const shown = (slots.values ?? [])
+    .filter((v) => v !== "")
+    .map((v) => patternText(v, slots.patterns));
+  const values = shown.filter(
+    (v, i) => shown.findIndex((w) => w.toLowerCase() === v.toLowerCase()) === i,
+  );
+  const measure = intent === "percentile" && !ctx.metrics ? slots.measure : undefined;
+  return {
+    intent,
+    values,
+    subject: measure || ctx.stream,
+    agg: intent === "percentile" ? slots.agg || defaultAgg(intent) : slots.agg,
+    groups: (slots.groups ?? []).filter(Boolean),
+    factor: intent === "compareLastWeek" ? (slots.factor ?? DEFAULT_FACTOR) : undefined,
+  };
+}
+
+const NAME_NOUN: Record<string, string> = { logs: "log", traces: "span", metrics: "sample" };
+const MAX_NAMED_VALUES = 2;
+const slugWords = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+// "service_name" groups by service: a trailing name word adds nothing to the alert's name.
+const groupWord = (label: string) => {
+  const words = slugWords(label).split("_");
+  return words.length > 1 && words[words.length - 1] === "name"
+    ? words.slice(0, -1).join("_")
+    : words.join("_");
+};
+
+/** The alert name a starter suggests, saying what it watches: `http_5xx_error_rate_per_service`. English on
+ * purpose, as the stored name is shared across the org whatever each reader's language. */
+export function intentAlertName(d: IntentDescription, streamType: string): string {
+  const noun = NAME_NOUN[streamType] ?? "event";
+  const values = d.values.slice(0, MAX_NAMED_VALUES).map(slugWords).join("_or_");
+  const per = d.groups.length ? `per_${d.groups.map(groupWord).join("_and_")}` : "";
+  const subject = slugWords(d.subject);
+  const parts: Record<IntentId, string[]> = {
+    countWhere: [values, noun, "count"],
+    percentile: [subject, d.agg ?? ""],
+    anyEvent: values ? [values, noun] : [subject, "each", noun],
+    unusualVolume: [values || subject, noun, "volume_unusual"],
+    compareLastWeek: [values || subject, noun, `${d.factor ?? DEFAULT_FACTOR}x_last_week`],
+    metricAbove: [subject, d.agg ?? ""],
+    ratio: [subject.split("_")[0], values, "error_rate"],
+    unusualChange: [subject, "unusual_change"],
+    promql: [subject, "promql"],
+  };
+  return [...parts[d.intent], per].filter(Boolean).join("_");
 }
 
 /** True for counters and histogram/summary members, which are read as a rate. */

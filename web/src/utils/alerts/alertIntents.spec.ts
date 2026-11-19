@@ -25,7 +25,10 @@ import {
   compareFunction,
   compareSql,
   compareRule,
+  describeIntent,
+  errorRateValues,
   fieldKind,
+  intentAlertName,
   fieldsBySamplePresence,
   intentsFor,
   labelPattern,
@@ -54,6 +57,7 @@ import {
   withCaseVariants,
   hasCaseVariants,
   type FieldShape,
+  type IntentId,
 } from "./alertIntents";
 
 let n = 0;
@@ -223,6 +227,31 @@ describe("alertIntents", () => {
     expect(rankMetricCategory(oneCode)).toEqual({ fit: [], all: ["code", "node"] });
   });
 
+  it("an error rate filters on the status label, its spellings read together, before any lopsided label", () => {
+    const series = [
+      ...["a", "b", "c", "d"].map((pod) => ({
+        lib: "actix",
+        pod,
+        http_response_status_code: "200",
+      })),
+      ...["e", "f"].map((pod) => ({ lib: "flask", pod, http_status_code: "200" })),
+    ];
+    const profile = labelProfile(series);
+    expect(rankMetricCategory(profile, { series }).fit[0]).toBe("lib");
+    expect(rankMetricCategory(profile, { series, outcome: true }).fit).toEqual([
+      "http_response_status_code",
+      "lib",
+    ]);
+  });
+
+  it.each([
+    ["every 5xx code over status codes", ["200", "404"], { values: ["5.."], patterns: ["5.."] }],
+    ["the error-like outcomes", ["Ok", "Error", "Unset"], { values: ["Error"], patterns: [] }],
+    ["nothing when no value names an error", ["Ok", "Unset"], { values: [], patterns: [] }],
+  ])("an error rate matches %s", (_, values, expected) => {
+    expect(errorRateValues(values.map((value) => ({ value, count: 1 })))).toEqual(expected);
+  });
+
   const lopsided = (label: string, [major, minor]: string[]) =>
     [major, major, major, minor].map((v, i) => ({ [label]: v, node: `n${i}` }));
   it.each([
@@ -269,7 +298,8 @@ describe("alertIntents", () => {
     ];
     const recent = seen.filter((v) => v.value !== "ERROR");
     expect(starterValue(seen)).toBe("ERROR");
-    expect(starterValue(seen, recent)).toBe("WARN");
+    expect(starterValue(seen, recent)).toBe("error");
+    expect(starterAlternative(seen, recent)).toBe("WARN");
     expect(starterValue(seen, [])).toBe("ERROR");
     for (const none of [
       [
@@ -287,6 +317,44 @@ describe("alertIntents", () => {
     expect(starterAlternative(seen.filter((v) => v.value !== "WARN"))).toBeUndefined();
     expect(spellingVariants(["WARN"], seen)).toEqual(["Warning"]);
     expect(spellingVariants(["ERROR", "error"], seen)).toEqual([]);
+  });
+
+  const counts = (pairs: [string, number][]) => pairs.map(([value, count]) => ({ value, count }));
+  it.each([
+    [
+      "an error-like value ahead of a larger warning, which is offered",
+      [
+        ["INFO", 900],
+        ["WARN", 300],
+        ["ERROR", 50],
+      ],
+      "ERROR",
+      "WARN",
+    ],
+    [
+      "the largest minority when none is error-like",
+      [
+        ["INFO", 900],
+        ["WARN", 300],
+        ["DEBUG", 50],
+      ],
+      "WARN",
+      undefined,
+    ],
+    [
+      "a failure outcome over a larger other one",
+      [
+        ["ok", 900],
+        ["cancelled", 80],
+        ["failed", 20],
+      ],
+      "failed",
+      "cancelled",
+    ],
+  ])("a count starts from %s", (_, pairs, value, alternative) => {
+    const seen = counts(pairs as [string, number][]);
+    expect(starterValue(seen)).toBe(value);
+    expect(starterAlternative(seen)).toBe(alternative);
   });
 
   it.each([
@@ -725,5 +793,53 @@ describe("label value patterns", () => {
       windowMinutes: 5,
     });
     expect(promql).toBe(`sum (m{code=~"${matcher}"}) / sum (m) * 100`);
+  });
+});
+
+describe("intentAlertName", () => {
+  it.each([
+    [
+      "ratio",
+      { values: ["5.."], patterns: ["5.."], groups: ["service_name"] },
+      "http_server_duration_count",
+      "metrics",
+      "http_5xx_error_rate_per_service",
+    ],
+    [
+      "unusualVolume",
+      { field: "service", values: ["payment"] },
+      "app",
+      "logs",
+      "payment_log_volume_unusual",
+    ],
+    [
+      "countWhere",
+      { values: ["ERROR", "error"], groups: ["service_name", "k8s_node_name"] },
+      "app",
+      "logs",
+      "error_log_count_per_service_and_k8s_node",
+    ],
+    [
+      "percentile",
+      { measure: "duration", groups: ["service_name"] },
+      "default",
+      "traces",
+      "duration_p95_per_service",
+    ],
+    ["compareLastWeek", { values: ["ERROR"], factor: 3 }, "app", "logs", "error_log_3x_last_week"],
+    ["anyEvent", { values: [] }, "k8s_events", "logs", "k8s_events_each_log"],
+    [
+      "metricAbove",
+      { agg: "max", groups: ["host"] },
+      "node_cpu",
+      "metrics",
+      "node_cpu_max_per_host",
+    ],
+  ])("%s names what it watches", (intent, slots, stream, streamType, name) => {
+    const d = describeIntent(intent as IntentId, slots, {
+      stream,
+      metrics: streamType === "metrics",
+    });
+    expect(intentAlertName(d, streamType)).toBe(name);
   });
 });

@@ -11,9 +11,11 @@ import {
   joinListMore,
   measureWords,
   notifyHelp,
+  intentPhrase,
   valueRangeText,
   valueWithUnit,
 } from "./alertCopy";
+import { describeIntent, type IntentId } from "./alertIntents";
 
 const t = i18n.global.t as unknown as TranslateFn;
 
@@ -44,6 +46,39 @@ describe("valueRangeText", () => {
     ],
   ])("%j with %j reads the steady or ranged copy", (range, ratio, expected) => {
     expect(valueRangeText(range, t, ratio)).toBe(expected);
+  });
+
+  it("reads a stored microsecond duration in the unit its threshold is typed in", () => {
+    expect(valueRangeText({ min: 84, max: 24801826.25 }, t, undefined, "ms")).toBe(
+      t("alerts.guard.valueRange", { min: "0.08 ms", max: "24,801.83 ms" }),
+    );
+  });
+});
+
+describe("intentPhrase", () => {
+  it.each([
+    [
+      "ratio",
+      { values: ["5.."], patterns: ["5.."], groups: ["service_name"] },
+      "http_requests",
+      "metrics",
+      "5xx error rate of http_requests per service_name",
+    ],
+    ["countWhere", { values: ["ERROR", "error"] }, "app", "logs", "Count of ERROR events"],
+    [
+      "anyEvent",
+      { values: ["OOMKilled", "Killing"] },
+      "k8s_events",
+      "logs",
+      "Each OOMKilled or Killing event",
+    ],
+    ["unusualVolume", {}, "app", "logs", "Unusual volume of events"],
+  ])("%s says what it watches", (intent, slots, stream, streamType, phrase) => {
+    const d = describeIntent(intent as IntentId, slots, {
+      stream,
+      metrics: streamType === "metrics",
+    });
+    expect(intentPhrase(d, streamType, t)).toBe(phrase);
   });
 });
 
