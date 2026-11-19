@@ -416,7 +416,6 @@ pub async fn delete(
     Path((org_id, model_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    // Not edition-gated: OSS must still be able to remove prices it can no longer edit.
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &org_id,
