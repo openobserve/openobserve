@@ -134,6 +134,9 @@ interface EditorConfig {
   enabled: () => boolean;
   keywords: () => any[];
   suggestions: () => any[];
+  /** The catalog before the menu's own cuts, so hover and signature help still explain what was typed. */
+  allKeywords: () => any[];
+  allSuggestions: () => any[];
   resolveFieldValues: () => FieldValueResolver | null;
   editor: () => any;
   /** Esc presses so far, so a value answer that lands after one is dropped. */
@@ -879,6 +882,8 @@ export default defineComponent({
         enabled: () => props.showAutoComplete,
         keywords: () => offeredKeywords.value as any[],
         suggestions: () => offeredSuggestions.value as any[],
+        allKeywords: () => keywords.value as any[],
+        allSuggestions: () => suggestions.value as any[],
         resolveFieldValues: () => (props.fieldValueResolver as any) ?? null,
         editor: () => editorObj,
         escapeCount: () => escapeCount,
@@ -2090,7 +2095,7 @@ export default defineComponent({
 
           // The parser reports any identifier before the paren; the catalog
           // decides whether it is a function.
-          const entry = findFunctionEntry(call.name, config.keywords(), config.suggestions());
+          const entry = findFunctionEntry(call.name, config.allKeywords(), config.allSuggestions());
           const value = buildSignatureHelp(entry as any, call.activeParameter);
           if (!value) return null;
           // monaco reads `.value` off a SignatureHelpResult and disposes it.
@@ -2108,7 +2113,7 @@ export default defineComponent({
 
           const word = model.getWordAtPosition(position);
           if (!word?.word) return null;
-          const entry = findCatalogEntry(word.word, config.keywords(), config.suggestions());
+          const entry = findCatalogEntry(word.word, config.allKeywords(), config.allSuggestions());
           const contents = buildHoverContents(t, entry as any);
           if (!contents) return null;
           return {

@@ -2425,6 +2425,35 @@ describe("value quotes, late values, the empty-values copy and the typed prefix"
       },
     );
 
+    it(
+      "still explains match_all on hover and in signature help without full-text fields",
+      { timeout: 30000 },
+      async () => {
+        const { api, editor, model } = await mountWith("fts-docs", { fullTextSearch: false });
+        const lastFor = (register: any) =>
+          vi
+            .mocked(register)
+            .mock.calls.filter((c: any) => c[0] === "sql")
+            .at(-1)![1] as any;
+        model.getWordAtPosition.mockReturnValue({
+          word: "match_all",
+          startColumn: 1,
+          endColumn: 10,
+        });
+        const hover = await lastFor(api.languages.registerHoverProvider).provideHover(
+          model,
+          { lineNumber: 1, column: 3 },
+          {},
+        );
+        expect(hover?.contents?.[0]?.value).toContain("match_all");
+        placeCaret(editor, model, "SELECT * FROM logs WHERE match_all(");
+        const help = await lastFor(
+          api.languages.registerSignatureHelpProvider,
+        ).provideSignatureHelp(model, { lineNumber: 1, column: 36 }, {}, {});
+        expect(help?.value?.signatures?.[0]?.label).toContain("match_all");
+      },
+    );
+
     it("lists match_all where the streams have full-text fields", { timeout: 30000 }, async () => {
       const slot = await menuNames(
         "fts-list-default",
