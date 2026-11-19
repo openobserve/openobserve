@@ -26,16 +26,23 @@ export const sqlLiteral = (value: unknown): string => {
 // The SQL parser returns a quoted literal's value with its doubled quotes intact.
 export const unescapeSqlLiteral = (value: unknown): string => String(value).replace(/''/g, "'");
 
-// Splits on `junction` outside quoted literals, brackets and `--` comments; an unterminated quote falls back to a plain split.
+// Splits on `junction` outside quoted literals and names, brackets and `--` comments; an unterminated quote falls back to a plain split.
 const splitOnJunction = (query: string, junction: "AND" | "OR"): string[] => {
   const pattern = new RegExp(`\\s+${junction}\\s+`, "iy");
   const parts: string[] = [];
-  let inQuote = false;
+  let quote: string | null = null;
   let depth = 0;
   let start = 0;
   for (let i = 0; i < query.length; i++) {
-    if (query[i] === "'") inQuote = !inQuote;
-    if (inQuote) continue;
+    const ch = query[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      continue;
+    }
     if (query.startsWith("--", i)) {
       const eol = query.indexOf("\n", i);
       if (eol === -1) break;
@@ -52,7 +59,7 @@ const splitOnJunction = (query: string, junction: "AND" | "OR"): string[] => {
     i += match[0].length - 1;
     start = i + 1;
   }
-  if (inQuote) return query.split(new RegExp(`\\s+${junction}\\s+`, "i"));
+  if (quote) return query.split(new RegExp(`\\s+${junction}\\s+`, "i"));
   parts.push(query.slice(start));
   return parts;
 };
