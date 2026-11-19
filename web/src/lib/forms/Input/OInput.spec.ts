@@ -155,6 +155,20 @@ describe("OInput", () => {
     vi.useRealTimers();
   });
 
+  it("keeps typed text through a re-render while the debounced emit waits", async () => {
+    vi.useFakeTimers();
+    wrapper = mount(OInput, { props: { modelValue: "80", debounce: 300 } });
+    const input = wrapper.find("input");
+
+    await input.setValue("85");
+    await wrapper.setProps({ placeholder: "re-render" });
+    expect((input.element as HTMLInputElement).value).toBe("85");
+
+    await input.trigger("blur");
+    expect(wrapper.emitted("update:modelValue")?.at(-1)?.[0]).toBe("85");
+    vi.useRealTimers();
+  });
+
   it("applies model number modifier on emit", async () => {
     wrapper = mount(OInput, {
       props: {
