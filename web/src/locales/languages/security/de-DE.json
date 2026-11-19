@@ -302,7 +302,7 @@
       "source": "Quelle",
       "matchedRules": "{n} Erkennung stimmte überein | {n} Erkennungen stimmten überein",
       "openCase": "Fall eröffnen",
-      "openCaseHint": "Öffnen Sie einen Fall zu diesem Ereignis, mit ausgefülltem Titel, Priorität und Entitäten",
+      "openCaseHint": "Eröffnen Sie einen Fall zu diesem Ereignis, mit ausgefülltem Titel, Priorität und Entitäten",
       "addToCase": "Zu Fall hinzufügen",
       "pickCase": "Zu einem offenen Fall hinzufügen",
       "caseOpened": "Fall eröffnet: {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Durch die Zeitspanne der Korrelation festgelegt",
       "createForbidden": "Zum Erstellen einer Erkennung ist die Security-Berechtigung erforderlich",
       "preview": {
-        "run": "Vorschau im Verlauf",
-        "hint": "Führt die Regel über den gewählten Zeitraum so aus wie der Scheduler und zeigt an, was ausgelöst worden wäre",
+        "run": "Auf Verlauf testen",
+        "hint": "Führt die Regel über den gewählten Zeitraum aus, wie es der Scheduler tut, und zeigt, was ausgelöst worden wäre",
         "failed": "Die Abfrage ist fehlgeschlagen: {reason}",
         "time": "Zeit",
         "range": {
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Änderungsprotokoll",
-      "hint": "Wer Erkennungen, Quellen, Fälle und Vergaben von Sicherheitsrollen geändert hat, solange das Audit-Protokoll aufbewahrt wird",
+      "hint": "Wer Erkennungen, Quellen, Fälle und Zuweisungen von Sicherheitsrollen geändert hat, so lange das Prüfprotokoll aufbewahrt wird",
       "includeReads": "Lesezugriffe einbeziehen",
       "when": "Wann",
       "who": "Geändert von",

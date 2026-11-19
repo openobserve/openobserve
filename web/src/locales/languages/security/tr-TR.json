@@ -921,7 +921,7 @@
       "createForbidden": "Algılama oluşturmak için Güvenlik izni gerekir",
       "preview": {
         "run": "Geçmişte önizle",
-        "hint": "Kuralı, seçilen aralıkta zamanlayıcının yaptığı şekilde çalıştırır ve nelerin tetiklenmiş olacağını söyler.",
+        "hint": "Kuralı seçilen aralıkta zamanlayıcının yaptığı gibi çalıştırır ve neyin tetiklenmiş olacağını söyler.",
         "failed": "Sorgu başarısız oldu: {reason}",
         "time": "Zaman",
         "range": {
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Değişiklik günlüğü",
-      "hint": "Denetim izi tutulduğu sürece algılamaları, kaynakları, vakaları ve Güvenlik rolü atamalarını kimin değiştirdiğini gösterir.",
+      "hint": "Denetim izi saklandığı sürece algılamaları, kaynakları, vakaları ve Güvenlik rolü atamalarını kimin değiştirdiğini gösterir.",
       "includeReads": "Okumaları dahil et",
       "when": "Zaman",
       "who": "Değiştiren",

@@ -302,7 +302,7 @@
       "source": "Origem",
       "matchedRules": "{n} deteção correspondeu | {n} deteções corresponderam",
       "openCase": "Abrir caso",
-      "openCaseHint": "Abrir um caso sobre este evento, com o título, a prioridade e as entidades já preenchidos",
+      "openCaseHint": "Abrir um caso para este evento, com o título, a prioridade e as entidades já preenchidos",
       "addToCase": "Adicionar ao caso",
       "pickCase": "Adicionar a um caso aberto",
       "caseOpened": "Caso aberto: {title}",
@@ -921,7 +921,7 @@
       "createForbidden": "Criar uma deteção requer a permissão de Segurança",
       "preview": {
         "run": "Pré-visualizar no histórico",
-        "hint": "Executa a regra no intervalo escolhido tal como o agendador e indica o que teria disparado",
+        "hint": "Executa a regra sobre o intervalo escolhido tal como o agendador faz e indica o que teria disparado",
         "failed": "A consulta falhou: {reason}",
         "time": "Hora",
         "range": {
@@ -1093,7 +1093,7 @@
       "stat": {
         "ready": "Prontas para instalar",
         "installed": "Instaladas",
-        "applies": "Correspondem às suas fontes",
+        "applies": "Aplica-se às suas fontes",
         "readyHint": "Regras que são executadas em pelo menos um dos seus streams e ainda não estão instaladas",
         "appliesHint": "Regras para uma fonte de logs que tem, instaladas ou não; inclui todas as regras prontas a instalar",
         "allRules": "Todas as regras",
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Registo de alterações",
-      "hint": "Quem alterou deteções, fontes, casos e atribuições de funções de Segurança, durante todo o período de retenção do registo de auditoria",
+      "hint": "Quem alterou deteções, fontes, casos e atribuições de funções de Segurança, enquanto o registo de auditoria for mantido",
       "includeReads": "Incluir leituras",
       "when": "Quando",
       "who": "Alterado por",
