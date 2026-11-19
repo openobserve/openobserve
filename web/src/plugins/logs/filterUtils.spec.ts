@@ -378,6 +378,14 @@ describe("values with embedded quotes and replacement tokens (issue 11966)", () 
   });
 });
 
+describe("removeFieldCondition with brackets", () => {
+  it("removes only the field's comparison inside a group and keeps the rest", () => {
+    expect(removeFieldCondition("svc = 'c' AND (code = '500' OR level = 'error')", "code")).toBe(
+      "svc = 'c' AND (level = 'error')",
+    );
+  });
+});
+
 describe("removeFieldCondition with AND inside a quoted value (issue 11966)", () => {
   it("removes only the target condition and keeps a quoted ' and ' intact", () => {
     expect(removeFieldCondition("a = 'x and y' AND b = '1'", "b")).toBe("a = 'x and y'");
