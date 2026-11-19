@@ -151,6 +151,8 @@ export function useHomePacks(
   org: string,
   packs: StarterPack[] = allPacks(),
   active: () => boolean = () => true,
+  // A surface reading only some packs must not overwrite the org's saved copy with that subset.
+  { save = true }: { save?: boolean } = {},
 ) {
   const items = packs.map((pack) => useHomePack(org, pack, active));
   const { hasUserData } = useOrgHasUserData(org);
@@ -204,7 +206,7 @@ export function useHomePacks(
   watch(
     builtIn,
     (state) => {
-      if (!state) return;
+      if (!state || !save) return;
       const { sources, installed, interrupted } = JSON.parse(state);
       browser.saveBuiltIn(sources, installed, interrupted);
     },
@@ -213,6 +215,7 @@ export function useHomePacks(
 
   return {
     items,
+    offerable,
     offered,
     setUp,
     showSection,

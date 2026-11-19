@@ -382,6 +382,7 @@ const isStopped = computed(() =>
             ></div>
           </template>
         </template>
+        <slot name="actions" />
         <div
           v-if="
             !readonly &&

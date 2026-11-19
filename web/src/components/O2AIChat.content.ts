@@ -20,6 +20,7 @@ import { marked } from "marked";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import type { TranslateFn } from "@/types/i18n";
 import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
+import { PACK_DIGEST_NAME } from "@/composables/starterPacks/packDigestName";
 
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage("vrl", () => hljs.getLanguage("javascript") as any);
@@ -186,6 +187,10 @@ export function createPreview(content: string, maxLength: number = 40): string {
   return preview;
 }
 
+// The pack digest's first line names its packs, so its label stops there instead of running into the next line.
+const blockPreview = (filename: string, content: string) =>
+  filename.trim() === PACK_DIGEST_NAME ? content.split("\n")[0] : createPreview(content, 60);
+
 // Parse log entries from message content and maintain order
 export function parseLogEntries(content: string) {
   const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
@@ -213,7 +218,7 @@ export function parseLogEntries(content: string) {
       lineStart: lineStart ? parseInt(lineStart) : undefined,
       lineEnd: lineEnd ? parseInt(lineEnd) : undefined,
       content: logContent.trim(),
-      preview: createPreview(logContent.trim(), 60),
+      preview: blockPreview(filename, logContent.trim()),
     });
 
     lastIndex = matchIndex + fullMatch.length;

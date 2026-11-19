@@ -321,6 +321,17 @@ export default defineComponent({
       handleInput();
     };
 
+    // Puts a chip first without focusing or touching the selection, so text being typed is left alone.
+    const prependChip = (chip: ReferenceChip) => {
+      const div = editableDiv.value;
+      if (!div) return;
+      localReferences.value.push(chip);
+      emit("update:references", localReferences.value);
+      div.insertBefore(document.createTextNode(" "), div.firstChild);
+      div.insertBefore(createChipElement(chip), div.firstChild);
+      emitModelUpdate();
+    };
+
     // Remove chip by ID
     const removeChip = (chipId: string) => {
       if (!editableDiv.value) return;
@@ -682,6 +693,7 @@ export default defineComponent({
       handleBlur,
       focusInput,
       insertChip,
+      prependChip,
       removeChip,
       getPlainText,
       getMessageForBackend,

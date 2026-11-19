@@ -261,7 +261,12 @@
             v-if="chatMessages.length === 0"
             class="welcome-section rounded-default mb-0 flex flex-1 items-center justify-center bg-transparent p-0"
           >
-            <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
+            <O2AIHomeWelcome
+              v-if="centeredStart"
+              @select-prompt="selectWelcomePrompt"
+              @select-context="selectWelcomeContext"
+              @welcome-context="setWelcomeContext"
+            />
             <div v-else class="flex h-full w-full flex-col items-center justify-center">
               <div class="flex flex-col items-center gap-2">
                 <img alt="" :src="o2AiTitleLogo" />
@@ -291,7 +296,17 @@
             @like="likeCodeBlock(index)"
             @dislike="dislikeCodeBlock(index)"
             @preview-image="openImagePreview"
-          />
+          >
+            <template #actions>
+              <StarterPackChatActions
+                v-if="
+                  message.role === 'assistant' &&
+                  !(isLoading && index === processedMessages.length - 1)
+                "
+                :request="requestBefore(index)"
+              />
+            </template>
+          </O2AIChatMessage>
           <O2AIChatToolCallIndicator
             v-if="activeToolCall"
             :message="activeToolCall.message"
@@ -403,6 +418,16 @@
           @change="handleImageSelect"
         />
 
+        <OText
+          v-if="welcomeNoteShown"
+          as="div"
+          variant="meta"
+          class="mb-1.5 flex items-center gap-1.5 px-1"
+          data-test="o2-ai-chat-welcome-context-note"
+        >
+          <OIcon name="info" size="sm" class="shrink-0" />
+          {{ t("aiAssistant.starter.contextNote") }}
+        </OText>
         <O2AIChatInput
           v-if="!pendingConfirmation && !showPaidUsageConsent"
           v-model="inputMessage"
@@ -486,7 +511,10 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import StarterPackChatActions from "@/components/starterPacks/StarterPackChatActions.vue";
+import type { WelcomeContext } from "@/components/ai-assistant/welcome/starterWelcome";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { computeUserOrgKey } from "@/utils/userOrgKey";
@@ -545,7 +573,9 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OTruncatedText,
+    OText,
     OInput,
+    StarterPackChatActions,
   },
   props: {
     isOpen: {
@@ -805,6 +835,10 @@ export default defineComponent({
     } = useChatImages(chatInput, inputMessage, () => focusInput(), t);
 
     const contextReferences = ref<ReferenceChip[]>([]);
+    // The chip the welcome put in the composer on its own; once the user removes or sends it, it stays gone.
+    const welcomeChipId = ref<string | null>(null);
+    let welcomeChipDismissed = false;
+    let queuedWelcomeContext: WelcomeContext | null = null;
 
     const componentReady = ref(false);
     const pendingChips = ref<ReferenceChip[]>([]);
@@ -916,6 +950,53 @@ export default defineComponent({
       },
     );
 
+    const contextChip = (text: string, chipName: string, id = `context-${Date.now()}`) => {
+      const chip: ReferenceChip = {
+        id,
+        filename: raw(chipName),
+        // J5: the chip shows its name ("Analysis · <run>"), not the first words of the record.
+        preview: chipName,
+        fullContent: text,
+        charCount: text.length,
+        type: "context",
+      };
+      return chip;
+    };
+
+    // `context` undefined leaves the chat's pin as it is; `fresh` empties the composer first.
+    const handOffChip = (
+      text: string,
+      chipName: string,
+      opts: {
+        fresh?: boolean;
+        prompt?: string;
+        context?: Record<string, unknown> | null;
+        id?: string;
+      },
+    ) => {
+      // Deferred past addNewChat's chatUpdated re-entry, which would clear the pin set any sooner.
+      nextTick(() => {
+        setTimeout(() => {
+          if (opts.context !== undefined) setPinnedContext(opts.context);
+          const chip = contextChip(text, chipName, opts.id);
+          if (opts.fresh) {
+            // A new chat starts empty: the old draft and an earlier hand-off's chip go.
+            inputMessage.value = "";
+            contextReferences.value = [];
+            if (chatInput.value && typeof chatInput.value.clear === "function") {
+              chatInput.value.clear();
+            }
+            pendingChips.value = [chip];
+          } else {
+            pendingChips.value.push(chip);
+          }
+          caretBeforeChips = true;
+          pendingPrompt = opts.prompt ?? "";
+          if (componentReady.value) processPendingChips();
+        }, 50);
+      });
+    };
+
     // Atomic payload watcher — text + autoSend arrive together, no timing race
     watch(
       () => props.aiChatPayload,
@@ -924,39 +1005,10 @@ export default defineComponent({
         if (payload.chipName) {
           // Ask hand-off: fresh chat, named context chip, pinned context; the user writes the question.
           if (payload.newChat) addNewChat();
-          const text = payload.text;
-          const chipName = payload.chipName;
-          const context = payload.context ?? null;
-          const freshChat = payload.newChat === true;
-          const prompt = typeof payload.prompt === "string" ? payload.prompt : "";
-          // Deferred past addNewChat's chatUpdated re-entry, which would clear the pin set any sooner.
-          nextTick(() => {
-            setTimeout(() => {
-              setPinnedContext(context);
-              const chip: ReferenceChip = {
-                id: `context-${Date.now()}`,
-                filename: raw(chipName),
-                // J5: the chip shows its name ("Analysis · <run>"), not the first words of the record.
-                preview: chipName,
-                fullContent: text,
-                charCount: text.length,
-                type: "context",
-              };
-              if (freshChat) {
-                // A new chat starts empty: the old draft and an earlier hand-off's chip go.
-                inputMessage.value = "";
-                contextReferences.value = [];
-                if (chatInput.value && typeof chatInput.value.clear === "function") {
-                  chatInput.value.clear();
-                }
-                pendingChips.value = [chip];
-              } else {
-                pendingChips.value.push(chip);
-              }
-              caretBeforeChips = true;
-              pendingPrompt = prompt;
-              if (componentReady.value) processPendingChips();
-            }, 50);
+          handOffChip(payload.text, payload.chipName, {
+            fresh: payload.newChat === true,
+            prompt: typeof payload.prompt === "string" ? payload.prompt : "",
+            context: payload.context ?? null,
           });
           return;
         }
@@ -1024,6 +1076,7 @@ export default defineComponent({
 
     const addNewChat = () => {
       loadSeq += 1;
+      welcomeChipDismissed = false;
       detachCurrentStream();
       clearPinnedContext();
       historyUnavailable.value = false;
@@ -1055,6 +1108,7 @@ export default defineComponent({
         const seq = ++loadSeq;
         detachCurrentStream();
         releasePinnedContextFor(chatId);
+        setWelcomeContext(null);
 
         const chat = await dbLoadChat(chatId);
         if (seq !== loadSeq) return;
@@ -1242,6 +1296,54 @@ export default defineComponent({
       });
     };
 
+    const welcomeChipIn = (id: string) =>
+      [...contextReferences.value, ...pendingChips.value].some((chip) => chip.id === id);
+    const welcomeNoteShown = computed(
+      () =>
+        chatMessages.value.length === 0 &&
+        !!welcomeChipId.value &&
+        contextReferences.value.some((chip) => chip.id === welcomeChipId.value),
+    );
+    // Swaps the welcome's own chip for the latest digest, or drops it on null; never touches the caret.
+    const setWelcomeContext = (context: WelcomeContext | null) => {
+      const input = chatInput.value;
+      if (!componentReady.value || typeof input?.prependChip !== "function") {
+        queuedWelcomeContext = context;
+        return;
+      }
+      const id = welcomeChipId.value;
+      if (id) {
+        if (welcomeChipIn(id)) input.removeChip(id);
+        else welcomeChipDismissed = true;
+        welcomeChipId.value = null;
+      }
+      if (!context || welcomeChipDismissed) return;
+      // A hand-off chip kept in the draft by a new chat would send the digest twice.
+      const sameName = (chip: ReferenceChip) => chip.filename === context.name;
+      contextReferences.value.filter(sameName).forEach((old) => input.removeChip(old.id));
+      pendingChips.value = pendingChips.value.filter((old) => !sameName(old));
+      const chip = contextChip(context.text, context.name);
+      welcomeChipId.value = chip.id;
+      input.prependChip(chip);
+    };
+    watch(componentReady, (ready) => {
+      if (!ready || !queuedWelcomeContext) return;
+      const context = queuedWelcomeContext;
+      queuedWelcomeContext = null;
+      setWelcomeContext(context);
+    });
+    // Setting the text alone would flatten the chip, so the click puts the chip back with it.
+    const selectWelcomeContext = (prompt: string, context: WelcomeContext) => {
+      const id = `context-${Date.now()}`;
+      welcomeChipId.value = id;
+      welcomeChipDismissed = false;
+      handOffChip(context.text, context.name, { fresh: true, prompt, id });
+    };
+    const requestBefore = (index: number): string => {
+      const before = chatMessages.value[index - 1];
+      return before?.role === "user" ? String(before.content ?? "") : "";
+    };
+
     // RichTextInput ignores modelValue while focused, so a recalled prompt must be pushed in.
     const recallHistory = (direction: "up" | "down") => {
       const before = inputMessage.value;
@@ -1342,6 +1444,8 @@ export default defineComponent({
         if (newOrgId && newOrgId !== oldOrgId) {
           // A turn started under the old org must not keep streaming and writing history after the switch.
           abortBackgroundStreams();
+          // Before addNewChat, so the old org's digest leaves the composer and the new org's can attach.
+          setWelcomeContext(null);
           addNewChat();
           if (props.isOpen) {
             loadHistory();
@@ -1611,6 +1715,11 @@ export default defineComponent({
       capabilities,
       selectCapability,
       selectWelcomePrompt,
+      selectWelcomeContext,
+      setWelcomeContext,
+      welcomeChipId,
+      welcomeNoteShown,
+      requestBefore,
       inputPlaceholder,
       showHistory,
       chatHistory,
