@@ -52,8 +52,7 @@ impl Visitor for CrossSliceVisitor {
     }
 }
 
-/// True when each output row depends only on input rows of its own time slice, so the time
-/// range can be split and the slice results concatenated (result cache, search partitions).
+/// True when every output row depends only on input rows of its own time slice.
 pub fn is_time_splittable(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
     Ok(match ast.as_slice() {
@@ -81,8 +80,7 @@ fn is_splittable_body(body: &SetExpr) -> bool {
                     _ => return false,
                 }
             }
-            // Every slice sees a whole enrichment table, but a join of two streams pairs rows
-            // across slices.
+            // Each slice reads a whole enrichment table, but two streams pair rows across slices.
             streams <= 1
         }
         SetExpr::SetOperation { left, right, .. } => {
