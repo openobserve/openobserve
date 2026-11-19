@@ -21635,6 +21635,7 @@
       "noFunctionDefinition": "No function definition found.",
       "noStreamSaveView": "No stream available to save view.",
       "viewAppliedSuccess": "{name} view applied successfully.",
+      "viewAppliedRangeShortened": "นำมุมมอง {name} ไปใช้แล้ว โดยปรับช่วงเวลาให้สั้นลงเหลือ {hours} ชั่วโมงสุดท้ายของช่วงเวลาที่บันทึกไว้ ซึ่งเป็นช่วงเวลาคิวรีสูงสุดสำหรับสตรีมนี้",
       "errorApplyingSavedView": "Error while applying saved view.",
       "provideValidViewName": "Please provide valid view name.",
       "errorSavingView": "Error while saving view: {e}",

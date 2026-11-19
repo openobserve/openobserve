@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "関数定義が見つかりません。",
       "noStreamSaveView": "ビューを保存するためのストリームがありません。",
       "viewAppliedSuccess": "{name} ビューが正常に適用されました。",
+      "viewAppliedRangeShortened": "{name} ビューを適用しました。時間範囲は保存された範囲の直近 {hours} 時間に短縮されました。これはこのストリームでクエリできる最大範囲です。",
       "errorApplyingSavedView": "保存されたビューの適用中にエラーが発生しました。",
       "provideValidViewName": "有効なビュー名を入力してください。",
       "errorSavingView": "ビューの保存中にエラー: {e}",

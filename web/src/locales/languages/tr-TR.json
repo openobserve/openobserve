@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "Fonksiyon tanımı bulunamadı.",
       "noStreamSaveView": "Görünümü kaydetmek için kullanılabilir akış yok.",
       "viewAppliedSuccess": "{name} görünümü başarıyla uygulandı.",
+      "viewAppliedRangeShortened": "{name} görünümü uygulandı. Zaman aralığı, bu akış için maksimum sorgu aralığı olan kaydedilmiş aralığın son {hours} saatine kısaltıldı.",
       "errorApplyingSavedView": "Kaydedilmiş görünüm uygulanırken hata.",
       "provideValidViewName": "Lütfen geçerli bir görünüm adı sağlayın.",
       "errorSavingView": "Görünüm kaydedilirken hata: {e}",

@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "未找到函数定义。",
       "noStreamSaveView": "没有可用的流来保存视图。",
       "viewAppliedSuccess": "{name} 视图应用成功。",
+      "viewAppliedRangeShortened": "已应用 {name} 视图。时间范围已缩短为保存范围内的最近 {hours} 小时，即此数据流的最大查询范围。",
       "errorApplyingSavedView": "应用保存的视图时出错。",
       "provideValidViewName": "请提供有效的视图名称。",
       "errorSavingView": "保存视图时出错：{e}",

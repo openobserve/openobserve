@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "Geen functiedefinitie gevonden.",
       "noStreamSaveView": "Geen stream beschikbaar om weergave op te slaan.",
       "viewAppliedSuccess": "{name}-weergave succesvol toegepast.",
+      "viewAppliedRangeShortened": "{name}-weergave toegepast. Het tijdbereik is ingekort tot de laatste {hours} uur van het opgeslagen bereik, het maximale querybereik voor deze stream.",
       "errorApplyingSavedView": "Fout bij toepassen van opgeslagen weergave.",
       "provideValidViewName": "Geef een geldige weergavenaam op.",
       "errorSavingView": "Fout bij opslaan van weergave: {e}",

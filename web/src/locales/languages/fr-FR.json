@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "Aucune définition de fonction trouvée.",
       "noStreamSaveView": "Aucun flux disponible pour enregistrer la vue.",
       "viewAppliedSuccess": "La vue {name} a été appliquée avec succès.",
+      "viewAppliedRangeShortened": "Vue {name} appliquée. La plage temporelle a été réduite aux {hours} dernières heures de la plage enregistrée, soit la plage d'interrogation maximale pour ce flux.",
       "errorApplyingSavedView": "Erreur lors de l'application de la vue enregistrée.",
       "provideValidViewName": "Veuillez fournir un nom de vue valide.",
       "errorSavingView": "Erreur lors de l'enregistrement de la vue : {e}",

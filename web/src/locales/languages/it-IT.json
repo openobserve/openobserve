@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "Nessuna definizione di funzione trovata.",
       "noStreamSaveView": "Nessuno stream disponibile per salvare la vista.",
       "viewAppliedSuccess": "Vista {name} applicata con successo.",
+      "viewAppliedRangeShortened": "Vista {name} applicata. L'intervallo di tempo è stato ridotto alle ultime {hours} ore dell'intervallo salvato, il massimo intervallo di query per questo stream.",
       "errorApplyingSavedView": "Errore durante l'applicazione della vista salvata.",
       "provideValidViewName": "Fornisci un nome valido per la vista.",
       "errorSavingView": "Errore durante il salvataggio della vista: {e}",

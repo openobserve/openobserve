@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "Nenhuma definição de função encontrada.",
       "noStreamSaveView": "Nenhum stream disponível para guardar a visualização.",
       "viewAppliedSuccess": "Visualização {name} aplicada com sucesso.",
+      "viewAppliedRangeShortened": "Vista {name} aplicada. O intervalo de tempo foi reduzido para as últimas {hours} horas do intervalo guardado, o intervalo máximo de consulta para este stream.",
       "errorApplyingSavedView": "Erro ao aplicar a visualização guardada.",
       "provideValidViewName": "Forneça um nome de visualização válido.",
       "errorSavingView": "Erro ao guardar visualização: {e}",

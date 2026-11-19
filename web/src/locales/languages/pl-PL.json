@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "Nie znaleziono definicji funkcji.",
       "noStreamSaveView": "Brak dostępnego strumienia do zapisania widoku.",
       "viewAppliedSuccess": "Widok {name} zastosowany pomyślnie.",
+      "viewAppliedRangeShortened": "Zastosowano widok {name}. Zakres czasu został skrócony do ostatnich {hours} godzin zapisanego zakresu, czyli maksymalnego zakresu zapytania dla tego strumienia.",
       "errorApplyingSavedView": "Błąd podczas stosowania zapisanego widoku.",
       "provideValidViewName": "Podaj prawidłową nazwę widoku.",
       "errorSavingView": "Błąd podczas zapisywania widoku: {e}",

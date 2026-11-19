@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "No se encontró definición de función.",
       "noStreamSaveView": "No hay stream disponible para guardar la vista.",
       "viewAppliedSuccess": "{name} vista aplicada exitosamente.",
+      "viewAppliedRangeShortened": "Se aplicó la vista {name}. El rango de tiempo se acortó a las últimas {hours} horas del rango guardado, el rango de consulta máximo para este stream.",
       "errorApplyingSavedView": "Error al aplicar la vista guardada.",
       "provideValidViewName": "Proporcione un nombre de vista válido.",
       "errorSavingView": "Error al guardar la vista: {e}",

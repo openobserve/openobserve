@@ -21632,6 +21632,7 @@
       "noFunctionDefinition": "未找到函數定義。",
       "noStreamSaveView": "沒有可用的串流來儲存檢視。",
       "viewAppliedSuccess": "{name} 檢視已成功應用。",
+      "viewAppliedRangeShortened": "{name} 檢視已套用。時間範圍已縮短為已儲存範圍的最後 {hours} 小時，也就是此串流的查詢範圍上限。",
       "errorApplyingSavedView": "應用已儲存檢視時出錯。",
       "provideValidViewName": "請提供有效的檢視名稱。",
       "errorSavingView": "儲存檢視時出錯：{e}",

@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "Không tìm thấy định nghĩa hàm.",
       "noStreamSaveView": "Không có stream nào để lưu chế độ xem.",
       "viewAppliedSuccess": "Chế độ xem {name} đã được áp dụng thành công.",
+      "viewAppliedRangeShortened": "Đã áp dụng chế độ xem {name}. Khoảng thời gian đã được rút ngắn còn {hours} giờ gần nhất của khoảng đã lưu, phạm vi truy vấn tối đa cho stream này.",
       "errorApplyingSavedView": "Lỗi khi áp dụng chế độ xem đã lưu.",
       "provideValidViewName": "Vui lòng cung cấp tên chế độ xem hợp lệ.",
       "errorSavingView": "Lỗi khi lưu chế độ xem: {e}",

@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "함수 정의를 찾을 수 없습니다.",
       "noStreamSaveView": "뷰를 저장할 수 있는 스트림이 없습니다.",
       "viewAppliedSuccess": "{name} 뷰가 성공적으로 적용되었습니다.",
+      "viewAppliedRangeShortened": "{name} 뷰가 적용되었습니다. 시간 범위가 저장된 범위의 마지막 {hours}시간으로 단축되었으며, 이는 이 스트림의 최대 쿼리 범위입니다.",
       "errorApplyingSavedView": "저장된 뷰를 적용하는 중 오류가 발생했습니다.",
       "provideValidViewName": "유효한 뷰 이름을 입력하세요.",
       "errorSavingView": "뷰 저장 중 오류: {e}",

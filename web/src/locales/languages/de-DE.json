@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "Keine Funktionsdefinition gefunden.",
       "noStreamSaveView": "Kein Stream verfügbar, um die Ansicht zu speichern.",
       "viewAppliedSuccess": "{name} Ansicht erfolgreich angewendet.",
+      "viewAppliedRangeShortened": "{name}-Ansicht angewendet. Der Zeitbereich wurde auf die letzten {hours} Stunden des gespeicherten Bereichs gekürzt – den maximalen Abfragebereich für diesen Stream.",
       "errorApplyingSavedView": "Fehler beim Anwenden der gespeicherten Ansicht.",
       "provideValidViewName": "Bitte geben Sie einen gültigen Ansichtsnamen an.",
       "errorSavingView": "Fehler beim Speichern der Ansicht: {e}",

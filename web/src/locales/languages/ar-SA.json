@@ -21637,6 +21637,7 @@
       "noFunctionDefinition": "لم يتم العثور على تعريف للدالة.",
       "noStreamSaveView": "لا يوجد تدفق متاح لحفظ العرض.",
       "viewAppliedSuccess": "تم تطبيق {name} الرأي بنجاح.",
+      "viewAppliedRangeShortened": "تم تطبيق عرض {name}. تم تقصير النطاق الزمني إلى آخر {hours} ساعات من النطاق المحفوظ، وهو الحد الأقصى لنطاق الاستعلام لهذا التدفق.",
       "errorApplyingSavedView": "خطأ أثناء تطبيق العرض المحفوظ.",
       "provideValidViewName": "يرجى تقديم اسم العرض الصحيح.",
       "errorSavingView": "خطأ أثناء حفظ العرض: {e}",
