@@ -760,6 +760,40 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.findComponent({ name: "services-catalog" }).exists()).toBe(false);
     });
 
+    it("passes the graph's last load time and loading state to the search bar", async () => {
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { tab: "service-graph" }, name: "traces", path: "/traces" },
+      } as any);
+      const ServiceGraphStub = defineComponent({
+        name: "service-graph",
+        setup(_, { expose }) {
+          expose({ lastRunAt: 123, loading: true, refresh: vi.fn() });
+          return () => h("div");
+        },
+      });
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": ServiceGraphStub,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+
+      // SearchBar is an async component, so its stub declares no props and the values land as attributes.
+      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+      expect(searchBarEl.attributes("service-graph-last-run-at")).toBe("123");
+      expect(searchBarEl.attributes("service-graph-loading")).toBe("true");
+    });
+
     it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
       routerCurrentRouteSpy.mockReturnValue({
         value: { query: { tab: "services-catalog" }, name: "traces", path: "/traces" },

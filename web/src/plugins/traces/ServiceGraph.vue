@@ -545,24 +545,8 @@ export default defineComponent({
       props.timeRange && props.timeRange.startTime && props.timeRange.endTime
         ? { startTime: props.timeRange.startTime, endTime: props.timeRange.endTime }
         : getEffectiveTimeRange(searchObj.data.datetime);
-    // The panel resolves its window when it opens or the range changes.
+    // The panel shows the window the graph loaded with, so both always cover the same span.
     const sidePanelTimeRange = ref(effectiveTimeRange());
-    watch(
-      () => [
-        selectedNode.value,
-        props.timeRange?.startTime,
-        props.timeRange?.endTime,
-        searchObj.data.datetime.type,
-        searchObj.data.datetime.relativeTimePeriod,
-        searchObj.data.datetime.startTime,
-        searchObj.data.datetime.endTime,
-      ],
-      () => {
-        if (selectedNode.value) {
-          sidePanelTimeRange.value = effectiveTimeRange();
-        }
-      },
-    );
 
     const chartRendererRef = ref<any>(null);
     const graphContainerRef = ref<HTMLElement | null>(null);
@@ -1576,7 +1560,9 @@ export default defineComponent({
       },
     );
 
+    let unmounted = false;
     onBeforeUnmount(() => {
+      unmounted = true;
       // Clear any pending tooltip setup
       if (pendingTooltipSetup) {
         clearTimeout(pendingTooltipSetup);
@@ -1588,9 +1574,25 @@ export default defineComponent({
       }
     });
 
-    const loadServiceGraph = async () => {
-      // Prevent concurrent loads — if already loading, skip
+    // A relative range keys on its period, so re-stamping "now" alone never forces a second load.
+    const loadInputsKey = () => {
+      const dt = searchObj.data.datetime;
+      return JSON.stringify([
+        props.timeRange?.startTime,
+        props.timeRange?.endTime,
+        dt.type,
+        dt.relativeTimePeriod,
+        dt.type === "relative" ? null : [dt.startTime, dt.endTime],
+        selectedStreamFilter.value,
+        props.agentId,
+        props.agentName,
+        props.agentEnv,
+      ]);
+    };
+    const loadServiceGraph = async (): Promise<void> => {
+      // A call made mid-load joins it; the load reruns only if its inputs moved meanwhile.
       if (loading.value) return;
+      const inputs = loadInputsKey();
 
       loading.value = true;
       error.value = null;
@@ -1661,6 +1663,7 @@ export default defineComponent({
           nodes,
           edges,
         };
+        sidePanelTimeRange.value = { startTime, endTime };
 
         // The side panel reads the clicked node's numbers, so it follows the refreshed node or closes when the node is gone.
         const selectedId = selectedNode.value?.id;
@@ -1714,6 +1717,7 @@ export default defineComponent({
         loading.value = false;
         lastRunAt.value = Date.now();
       }
+      if (!unmounted && loadInputsKey() !== inputs) await loadServiceGraph();
     };
 
     const onStreamFilterChange = (stream: SelectModelValue) => {

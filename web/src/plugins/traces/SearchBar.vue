@@ -552,15 +552,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="h-8.5!"
               @on:date-change="updateDateTime"
             />
-            <OButton
-              data-test="service-graph-refresh-btn"
+            <ORefreshButton
               variant="outline"
-              size="icon-md"
+              data-test="service-graph-refresh-btn"
+              :last-run-at="serviceGraphLastRunAt"
+              :loading="serviceGraphLoading"
               @click="$emit('service-graph-refresh')"
-            >
-              <OIcon name="refresh" size="sm" />
-              <OTooltip :content="t('common.refresh')" />
-            </OButton>
+            />
             <OToggleGroup
               :model-value="searchObj.meta.serviceGraphVisualizationType"
               @update:model-value="onServiceGraphVisualizationChange($event)"
@@ -765,6 +763,7 @@ import {
   computed,
   toRef,
   shallowRef,
+  type PropType,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { useTracesAlertAction } from "@/plugins/traces/composables/useTracesAlertAction";
@@ -782,6 +781,7 @@ import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -868,6 +868,7 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     OButtonGroup,
+    ORefreshButton,
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -911,6 +912,14 @@ export default defineComponent({
     // so have added as prop
     // Run query btn was not getting disabled while loading
     isLoading: {
+      type: Boolean,
+      default: false,
+    },
+    serviceGraphLastRunAt: {
+      type: Number as PropType<number | null>,
+      default: null,
+    },
+    serviceGraphLoading: {
       type: Boolean,
       default: false,
     },

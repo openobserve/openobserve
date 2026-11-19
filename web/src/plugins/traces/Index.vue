@@ -78,6 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:searchMode="onSearchModeChange"
               @apply-saved-view="onApplySavedView"
               @recent-restore="onRecentRestore"
+              :service-graph-last-run-at="serviceGraphRef?.lastRunAt ?? null"
+              :service-graph-loading="serviceGraphRef?.loading ?? false"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
               @filter-builder-growth="filterBuilderGrowth = $event"
