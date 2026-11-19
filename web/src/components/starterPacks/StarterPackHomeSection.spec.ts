@@ -493,13 +493,12 @@ describe("StarterPackHomeSection", () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
     expect(has(wrapper, "home-pack-ask-admin")).toBe(false);
+    expect(has(wrapper, "home-pack-list-ask-admin")).toBe(false);
+    await wrapper.get('[data-test="home-pack-list-row-kubernetes"]').trigger("click");
     expect(has(wrapper, "home-pack-list-primary-btn")).toBe(false);
     expect(wrapper.get('[data-test="home-pack-list-ask-admin"]').text()).toBe(
       "Ask an admin to set this up",
     );
-    await wrapper.get('[data-test="home-pack-list-row-hosts"]').trigger("click");
-    expect(has(wrapper, "home-pack-list-ask-admin")).toBe(false);
-    expect(has(wrapper, "home-pack-list-primary-btn")).toBe(true);
   });
 
   it("says once to ask an admin when the user may create no offered pack", async () => {
@@ -555,13 +554,13 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-list-streams")).toBe(false);
   });
 
-  it("puts the best-start badge on the first pack the user can set up", async () => {
+  it("opens on the first pack the user can set up, with the best-start badge", async () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
-    expect(has(wrapper, "home-pack-list-best-start")).toBe(false);
-    await wrapper.get('[data-test="home-pack-list-row-hosts"]').trigger("click");
+    expect(wrapper.get('[data-test="home-pack-list-hero"]').text()).toContain("Hosts");
     expect(wrapper.get('[data-test="home-pack-list-best-start"]').text()).toBe(
       "Best place to start",
     );
+    expect(has(wrapper, "home-pack-list-primary-btn")).toBe(true);
   });
 });
