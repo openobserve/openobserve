@@ -90,7 +90,7 @@ const ownLinks = computed(() => [
         </OButton>
         <span
           v-if="view.more.length && !view.expanded"
-          class="text-text-secondary text-xs whitespace-normal"
+          class="text-text-secondary ps-3.5 text-xs whitespace-normal max-[85.5rem]:ps-3"
           :data-test="`add-alert-section-${section}-more-names`"
         >
           <template v-for="(item, index) in view.more" :key="item.id"
