@@ -146,6 +146,9 @@ const SentenceActions = () => [actionButton("change"), actionButton("remove")];
           ><SentenceActions
         /></span>
       </template>
+      <div v-if="$slots.trail" class="ms-auto flex shrink-0 items-center">
+        <slot name="trail" />
+      </div>
     </div>
     <template v-if="props.label && !empty" #actions><SentenceActions /></template>
   </component>

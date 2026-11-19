@@ -5,7 +5,6 @@ import { nextTick, ref, watch } from "vue";
 import type { OSectionNavEmits, OSectionNavProps, SectionNavItem } from "./OSectionNav.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw } from "@/types/i18n";
 
@@ -136,13 +135,13 @@ const showsSummary = (item: SectionNavItem): boolean =>
                 :data-test="`o-section-nav-tag-${item.id}`"
                 >{{ item.tag }}</span
               >
-              <OTruncatedText
+              <span
                 v-if="showsSummary(item)"
-                class="min-w-0"
+                class="min-w-0 break-words"
                 :data-test="`o-section-nav-summary-${item.id}`"
               >
                 {{ item.summary }}
-              </OTruncatedText>
+              </span>
             </span>
           </span>
         </button>

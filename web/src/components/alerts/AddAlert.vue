@@ -299,8 +299,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.watch.title')"
               :help="t('alerts.sections.watch.help')"
               @go="goToSection"
-              @step="stepToSection"
             >
+              <template v-if="showsLibraryLink" #tools>
+                <i18n-t
+                  keypath="alerts.form.watch.library"
+                  tag="span"
+                  scope="global"
+                  class="text-text-secondary text-xs whitespace-nowrap"
+                  data-test="add-alert-library-line"
+                >
+                  <template #link>
+                    <OButton
+                      variant="link"
+                      size="xs"
+                      data-test="add-alert-library-link"
+                      @click="goToAlertLibrary"
+                      >{{ t("alerts.form.watch.libraryLink") }}</OButton
+                    >
+                  </template>
+                </i18n-t>
+              </template>
               <p
                 v-if="isEditing"
                 class="text-text-secondary m-0 flex items-center gap-1 pt-2.5 pb-2 text-sm"
@@ -309,37 +327,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="lock" size="xs" />
                 {{ t("alerts.form.watch.locked") }}
               </p>
-              <p
-                v-if="showsLibraryLink"
-                class="text-text-secondary m-0 pt-2.5 pb-2 text-sm"
-                data-test="add-alert-library-line"
-              >
-                <i18n-t keypath="alerts.form.watch.library" tag="span" scope="global">
-                  <template #link>
-                    <OButton
-                      variant="link"
-                      data-test="add-alert-library-link"
-                      @click="goToAlertLibrary"
-                      >{{ t("alerts.form.watch.libraryLink") }}</OButton
-                    >
-                  </template>
-                </i18n-t>
-              </p>
               <OSettingRow
                 :label="t('alerts.sections.howItChecks')"
                 fill
                 wide
                 data-test="add-alert-how-it-checks-row"
               >
-                <OChoiceCards
+                <OToggleGroup
                   :model-value="formData.is_real_time"
-                  :options="alertTypeOptions"
-                  :label="t('alerts.sections.howItChecks')"
+                  :aria-label="t('alerts.sections.howItChecks')"
                   :disabled="beingUpdated || anomalyEditMode"
-                  :columns="alertTypeOptions.length === 4 ? 2 : undefined"
+                  class="min-w-0 flex-wrap"
+                  mobile-dropdown
                   data-test="add-alert-type-tabs"
-                  @update:model-value="onAlertTypeChange"
-                />
+                  @update:model-value="onAlertTypeChange($event as string)"
+                >
+                  <OToggleGroupItem
+                    v-for="option in alertTypeOptions"
+                    :key="option.value"
+                    :value="option.value"
+                    size="sm"
+                    :icon-left="option.icon"
+                    :disabled="option.disabled"
+                    :focusable-unavailable="option.disabled"
+                    :tooltip="option.description"
+                    :data-test="option.dataTest"
+                  >
+                    {{ option.label }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
               </OSettingRow>
               <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
                 <OSettingRow :label="t('alerts.sections.rows.streamLabel')" required fill>
@@ -351,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-alert-stream-type-select-dropdown"
                       :options="streamTypeOptions"
                       :searchable="false"
-                      class="w-32! max-md:w-full!"
+                      class="w-28! max-md:w-full!"
                       :disabled="beingUpdated || anomalyEditMode"
                       @update:model-value="onStreamTypeChange"
                     />
@@ -385,18 +401,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </OSettingRow>
-                <AlertMetricLabels
-                  v-if="
-                    formData.stream_name && formData.stream_type === 'metrics' && !isAnomalyMode
-                  "
-                  :stream-name="formData.stream_name"
-                  @insert="onMetricLabelInsert"
-                />
-                <AlertSampleEvents
+                <OCollapsible
                   v-if="formData.stream_name && !isAnomalyMode"
-                  :stream-name="formData.stream_name"
-                  :stream-type="formData.stream_type"
-                />
+                  :label="t('alerts.form.watch.streamContents')"
+                  data-test="add-alert-stream-contents"
+                >
+                  <AlertMetricLabels
+                    v-if="formData.stream_type === 'metrics'"
+                    :stream-name="formData.stream_name"
+                    @insert="onMetricLabelInsert"
+                  />
+                  <AlertSampleEvents
+                    :stream-name="formData.stream_name"
+                    :stream-type="formData.stream_type"
+                  />
+                </OCollapsible>
               </div>
               <AlertIntentStart
                 v-if="showsIntentStart"
@@ -433,7 +452,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.condition.title')"
               :help="conditionHelp"
               @go="goToSection"
-              @step="stepToSection"
             >
               <template v-if="watchCollapsed" #lead>
                 <p
@@ -528,12 +546,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   wide
                   data-test="add-alert-condition-presets"
                 >
-                  <OChoiceCards
+                  <OToggleGroup
                     :model-value="activeConditionPreset"
-                    :options="conditionPresetOptions"
-                    :label="t('alerts.sections.presets.label')"
-                    @update:model-value="applyConditionPreset"
-                  />
+                    :aria-label="t('alerts.sections.presets.label')"
+                    class="min-w-0 flex-wrap"
+                    @update:model-value="applyConditionPreset($event as string)"
+                  >
+                    <OToggleGroupItem
+                      v-for="option in conditionPresetOptions"
+                      :key="option.value"
+                      :value="option.value"
+                      size="sm"
+                      :tooltip="option.description"
+                      :data-test="option.dataTest"
+                    >
+                      {{ option.label }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
                 </OSettingRow>
                 <OSettingRow
                   v-if="formData.is_real_time === 'true'"
@@ -624,6 +653,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </AlertTierPlace>
                 </Teleport>
+                <OSettingRow
+                  v-if="formData.is_real_time === 'false' && !isCronSchedule"
+                  :label="t('alerts.queryConfig.checkEvery')"
+                  fill
+                  data-test="add-alert-schedule-row"
+                  data-snap-stop
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div :ref="(el) => setSectionTarget('querySchedule', el)" class="contents" />
+                    <div :ref="(el) => setSectionTarget('settingsSchedule', el)" class="contents" />
+                  </div>
+                </OSettingRow>
+                <template v-else>
+                  <div
+                    v-show="!isAnomalyMode && !isCompositeMode"
+                    :ref="(el) => setSectionTarget('querySchedule', el)"
+                    class="empty:hidden"
+                    data-snap-stop
+                  />
+                  <div
+                    v-show="!isAnomalyMode"
+                    :ref="(el) => setSectionTarget('settingsSchedule', el)"
+                    class="empty:hidden"
+                    data-snap-stop
+                  />
+                </template>
+                <div
+                  v-show="isAnomalyMode"
+                  :ref="(el) => setSectionTarget('anomalySchedule', el)"
+                  class="empty:hidden"
+                  data-snap-stop
+                />
+                <OCollapsible
+                  v-if="showsCheckTimeline"
+                  :label="t('alerts.sections.timeline.label')"
+                  data-test="add-alert-check-timeline-fold"
+                >
+                  <AlertCheckTimeline
+                    :frequency="Number(formData.trigger_condition.frequency)"
+                    :period="Number(formData.trigger_condition.period)"
+                    :forecast-window="checkTimelineForecastWindow"
+                    :query-condition="formData.query_condition"
+                    :aligned="formData.trigger_condition.align_time !== false"
+                  />
+                </OCollapsible>
                 <AlertSuggestionLine section="condition" anchor="end" />
                 <div
                   :ref="(el) => setSectionTarget('narrowPreview', el)"
@@ -648,7 +722,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('alerts.sections.notify.title')"
               :help="t('alerts.sections.notify.help')"
               @go="goToSection"
-              @step="stepToSection"
             >
               <div class="flex flex-col" data-snap-stop>
                 <div
@@ -683,183 +756,109 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
-                <AlertSuggestionLine section="notify" anchor="end" />
-              </div>
-              <template #optional>
-                <AlertTierLinks
-                  section="notify"
-                  :view="tiers.view('notify')"
-                  @add="onTierAdd"
-                  @toggle="tiers.toggle('notify')"
-                />
-              </template>
-            </AlertFormSection>
-
-            <AlertFormSection
-              v-if="hasScheduleStep"
-              id="schedule"
-              :current="activeSection === 'schedule'"
-              :sections="formSections"
-              :title="t('alerts.sections.schedule.title')"
-              :help="t('alerts.sections.schedule.help')"
-              @go="goToSection"
-              @step="stepToSection"
-            >
-              <div class="flex flex-col" data-snap-stop>
                 <OSettingRow
-                  v-if="formData.is_real_time === 'false' && !isCronSchedule"
-                  :label="t('alerts.queryConfig.checkEvery')"
-                  fill
-                  data-test="add-alert-schedule-row"
-                  data-snap-stop
-                >
-                  <div class="flex flex-wrap items-center gap-2">
-                    <div :ref="(el) => setSectionTarget('querySchedule', el)" class="contents" />
-                    <div :ref="(el) => setSectionTarget('settingsSchedule', el)" class="contents" />
-                  </div>
-                </OSettingRow>
-                <template v-else>
-                  <div
-                    v-show="!isAnomalyMode && !isCompositeMode"
-                    :ref="(el) => setSectionTarget('querySchedule', el)"
-                    class="empty:hidden"
-                    data-snap-stop
-                  />
-                  <div
-                    v-show="!isAnomalyMode"
-                    :ref="(el) => setSectionTarget('settingsSchedule', el)"
-                    class="empty:hidden"
-                    data-snap-stop
-                  />
-                </template>
-                <div
-                  v-show="isAnomalyMode"
-                  :ref="(el) => setSectionTarget('anomalySchedule', el)"
-                  class="empty:hidden"
-                  data-snap-stop
-                />
-                <AlertCheckTimeline
-                  v-if="showsCheckTimeline"
-                  :frequency="Number(formData.trigger_condition.frequency)"
-                  :period="Number(formData.trigger_condition.period)"
-                  :forecast-window="checkTimelineForecastWindow"
-                  :query-condition="formData.query_condition"
-                  :aligned="formData.trigger_condition.align_time !== false"
-                />
-              </div>
-            </AlertFormSection>
-
-            <AlertFormSection
-              id="details"
-              :current="activeSection === 'details'"
-              :sections="formSections"
-              :title="t('alerts.sections.details.title')"
-              :help="
-                beingUpdated || anomalyEditMode
-                  ? t('alerts.sections.details.editHelp')
-                  : t('alerts.sections.details.help')
-              "
-              @go="goToSection"
-              @step="stepToSection"
-            >
-              <div class="flex flex-col" data-snap-stop>
-                <OSettingRow
-                  v-if="beingUpdated || anomalyEditMode"
                   :label="t('alerts.sections.details.name')"
                   fill
+                  data-test="add-alert-details-name-row"
                   data-snap-stop
                 >
-                  <OTruncatedText
-                    class="text-text-body text-sm leading-8.5"
-                    data-test="add-alert-details-name-text"
-                  >
-                    {{ formData.name }}
-                  </OTruncatedText>
-                </OSettingRow>
-                <OSettingRow v-else :label="t('alerts.sections.details.name')" fill data-snap-stop>
-                  <div
-                    ref="step1Ref"
-                    class="flex max-w-120 min-w-0 flex-col gap-1.5"
-                    @input="onNameInput"
-                    @focusin="onNameFocus"
-                    @blur.capture="applySavedName"
-                    @keydown.enter="onNameEnter"
-                    @focusout="alertAutoName.onCommit(formData.name ?? '')"
-                  >
-                    <OFormInput
-                      name="name"
-                      :placeholder="
-                        isAnomalyMode
-                          ? t('alerts.anomalyNamePlaceholder')
-                          : t('alerts.alertNamePlaceholder')
-                      "
-                      :aria-label="t('alerts.sections.details.name')"
-                      data-test="add-alert-details-name-input"
-                    >
-                      <template #error />
-                    </OFormInput>
-                    <AlertMessageLine
-                      :error="nameFieldError"
-                      error-data-test="add-alert-details-name-error"
-                      data-test="add-alert-details-name-line"
-                    >
-                      <span
-                        v-if="nameSavedAs"
-                        class="text-text-secondary text-xs"
-                        data-test="add-alert-details-name-saved-as"
-                        >{{ t("alerts.form.names.savesAs", { name: nameSavedAs }) }}</span
+                  <div class="flex min-w-0 flex-wrap items-start gap-x-3 gap-y-1">
+                    <template v-if="beingUpdated || anomalyEditMode">
+                      <OTruncatedText
+                        class="text-text-body text-sm leading-8.5"
+                        data-test="add-alert-details-name-text"
                       >
-                      <span
-                        v-else-if="nameRewrittenFrom"
-                        class="text-text-secondary text-xs"
-                        data-test="add-alert-details-name-rewritten"
-                        >{{ t("alerts.form.names.rewritten") }}</span
-                      >
-                      <span
-                        v-else-if="
-                          formData.name &&
-                          (alertAutoName.isAuto.value || formData.name === alertNameSuggestion)
+                        {{ formData.name }}
+                      </OTruncatedText>
+                    </template>
+                    <div
+                      v-else
+                      ref="step1Ref"
+                      class="flex max-w-120 min-w-0 flex-1 basis-64 flex-col gap-1.5"
+                      @input="onNameInput"
+                      @focusin="onNameFocus"
+                      @blur.capture="applySavedName"
+                      @keydown.enter="onNameEnter"
+                      @focusout="alertAutoName.onCommit(formData.name ?? '')"
+                    >
+                      <OFormInput
+                        name="name"
+                        :placeholder="
+                          isAnomalyMode
+                            ? t('alerts.anomalyNamePlaceholder')
+                            : t('alerts.alertNamePlaceholder')
                         "
-                        class="text-text-secondary text-xs"
-                        data-test="add-alert-details-name-auto"
-                        >{{ t("alerts.sections.details.autoName") }}</span
+                        :aria-label="t('alerts.sections.details.name')"
+                        data-test="add-alert-details-name-input"
                       >
-                      <OButton
-                        v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
-                        class="self-start"
-                        variant="link"
-                        size="xs"
-                        data-test="add-alert-details-name-suggest"
-                        @click="alertAutoName.resetToAuto"
-                        >{{
-                          t("alerts.sections.details.useSuggestion", { name: alertNameSuggestion })
-                        }}</OButton
+                        <template #error />
+                      </OFormInput>
+                      <AlertMessageLine
+                        :error="nameFieldError"
+                        error-data-test="add-alert-details-name-error"
+                        data-test="add-alert-details-name-line"
                       >
-                    </AlertMessageLine>
+                        <span
+                          v-if="nameSavedAs"
+                          class="text-text-secondary text-xs"
+                          data-test="add-alert-details-name-saved-as"
+                          >{{ t("alerts.form.names.savesAs", { name: nameSavedAs }) }}</span
+                        >
+                        <span
+                          v-else-if="nameRewrittenFrom"
+                          class="text-text-secondary text-xs"
+                          data-test="add-alert-details-name-rewritten"
+                          >{{ t("alerts.form.names.rewritten") }}</span
+                        >
+                        <span
+                          v-else-if="
+                            formData.name &&
+                            (alertAutoName.isAuto.value || formData.name === alertNameSuggestion)
+                          "
+                          class="text-text-secondary text-xs"
+                          data-test="add-alert-details-name-auto"
+                          >{{ t("alerts.sections.details.autoName") }}</span
+                        >
+                        <OButton
+                          v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
+                          class="self-start"
+                          variant="link"
+                          size="xs"
+                          data-test="add-alert-details-name-suggest"
+                          @click="alertAutoName.resetToAuto"
+                          >{{
+                            t("alerts.sections.details.useSuggestion", {
+                              name: alertNameSuggestion,
+                            })
+                          }}</OButton
+                        >
+                      </AlertMessageLine>
+                    </div>
+                    <div
+                      class="flex min-h-8.5 items-center gap-1.5"
+                      data-test="add-alert-details-folder-row"
+                    >
+                      <span class="text-text-secondary text-sm">{{
+                        t("alerts.sections.details.inFolder")
+                      }}</span>
+                      <div v-if="!isEditing" class="flex items-center">
+                        <InlineSelectFolderDropdown
+                          variant="inline"
+                          :model-value="activeFolderId as string"
+                          type="alerts"
+                          data-test="add-alert-details-folder-select"
+                          @update:model-value="updateActiveFolderId({ value: $event })"
+                        />
+                      </div>
+                      <OTruncatedText
+                        v-else
+                        class="text-text-body text-sm leading-8.5"
+                        data-test="add-alert-details-folder-name"
+                      >
+                        {{ activeFolderName }}
+                      </OTruncatedText>
+                    </div>
                   </div>
-                </OSettingRow>
-                <OSettingRow
-                  :label="t('alerts.sections.details.folder')"
-                  fill
-                  data-test="add-alert-details-folder-row"
-                  data-snap-stop
-                >
-                  <div v-if="!isEditing" class="flex min-h-8.5 items-center">
-                    <InlineSelectFolderDropdown
-                      variant="inline"
-                      :model-value="activeFolderId as string"
-                      type="alerts"
-                      data-test="add-alert-details-folder-select"
-                      @update:model-value="updateActiveFolderId({ value: $event })"
-                    />
-                  </div>
-                  <OTruncatedText
-                    v-else
-                    class="text-text-body text-sm leading-8.5"
-                    data-test="add-alert-details-folder-name"
-                  >
-                    {{ activeFolderName }}
-                  </OTruncatedText>
                 </OSettingRow>
                 <!-- AlertSettings renders nothing inline in the sectioned editor: every slice lives in a section slot. -->
                 <AlertSettings
@@ -921,66 +920,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:rowTemplateType="updateRowTemplateType"
                   />
                 </div>
-                <AlertSuggestionLine section="details" anchor="end" />
-                <section
-                  class="border-border-default bg-surface-base rounded-surface mt-1 flex flex-col overflow-hidden border"
-                  aria-labelledby="add-alert-review-title"
-                  data-test="add-alert-review"
-                >
-                  <h3
-                    id="add-alert-review-title"
-                    class="text-text-heading m-0 px-3.5 pt-2 pb-1 text-sm font-semibold"
-                  >
-                    {{ t("alerts.sections.review.title") }}
-                  </h3>
-                  <div
-                    v-for="(line, index) in reviewLines"
-                    :key="line.id"
-                    class="text-compact flex min-w-0 items-center gap-6 py-1 ps-3.5"
-                    :class="{ 'border-border-subtle border-t': index > 0 }"
-                  >
-                    <span
-                      class="text-text-body min-w-0 flex-1 break-words"
-                      :data-test="`add-alert-review-${line.id}-text`"
-                    >
-                      <template
-                        v-for="(sentence, position) in [line, ...(line.more ?? [])]"
-                        :key="sentence.keypath"
-                        >{{ position > 0 ? sentenceGap : ""
-                        }}<i18n-t
-                          :keypath="sentence.keypath"
-                          :plural="sentence.plural"
-                          tag="span"
-                          scope="global"
-                        >
-                          <template v-for="(part, name) in sentence.parts" :key="name" #[name]>
-                            <strong v-if="part.strong" class="text-text-heading font-semibold">{{
-                              part.text
-                            }}</strong>
-                            <template v-else>{{ part.text }}</template>
-                          </template>
-                        </i18n-t></template
-                      >
-                    </span>
-                    <span class="flex w-18 shrink-0 justify-end">
-                      <OButton
-                        variant="ghost-primary"
-                        size="sm"
-                        :data-test="`add-alert-review-${line.id}`"
-                        @click="goToSection(line.id)"
-                        >{{ t("alerts.form.change") }}</OButton
-                      >
-                    </span>
-                  </div>
-                </section>
+                <AlertSuggestionLine section="notify" anchor="end" />
               </div>
               <template #optional>
                 <AlertTierLinks
-                  section="details"
-                  :view="tiers.view('details')"
+                  section="notify"
+                  :view="tiers.view('notify')"
                   @add="onTierAdd"
-                  @toggle="tiers.toggle('details')"
+                  @toggle="tiers.toggle('notify')"
                 />
+                <OCollapsible
+                  :label="t('alerts.sections.review.title')"
+                  class="border-border-default border-t"
+                  data-test="add-alert-review"
+                >
+                  <section class="flex flex-col" :aria-label="t('alerts.sections.review.title')">
+                    <div
+                      v-for="(line, index) in reviewLines"
+                      :key="line.id"
+                      class="text-compact flex min-w-0 items-center gap-6 py-1 ps-3.5"
+                      :class="{ 'border-border-subtle border-t': index > 0 }"
+                    >
+                      <span
+                        class="text-text-body min-w-0 flex-1 break-words"
+                        :data-test="`add-alert-review-${line.id}-text`"
+                      >
+                        <template
+                          v-for="(sentence, position) in [line, ...(line.more ?? [])]"
+                          :key="sentence.keypath"
+                          >{{ position > 0 ? sentenceGap : ""
+                          }}<i18n-t
+                            :keypath="sentence.keypath"
+                            :plural="sentence.plural"
+                            tag="span"
+                            scope="global"
+                          >
+                            <template v-for="(part, name) in sentence.parts" :key="name" #[name]>
+                              <strong v-if="part.strong" class="text-text-heading font-semibold">{{
+                                part.text
+                              }}</strong>
+                              <template v-else>{{ part.text }}</template>
+                            </template>
+                          </i18n-t></template
+                        >
+                      </span>
+                      <span class="flex w-18 shrink-0 justify-end">
+                        <OButton
+                          variant="ghost-primary"
+                          size="sm"
+                          :data-test="`add-alert-review-${line.id}`"
+                          @click="goToSection(line.section)"
+                          >{{ t("alerts.form.change") }}</OButton
+                        >
+                      </span>
+                    </div>
+                  </section>
+                </OCollapsible>
               </template>
             </AlertFormSection>
           </OSnapScroll>
@@ -1089,6 +1084,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
         data-test="add-alert-footer"
       >
+        <AlertStepNav :sections="formSections" :active="activeSection" @step="stepToSection" />
         <div class="me-auto flex min-w-0 flex-1 items-center gap-4">
           <AlertUnsavedChanges
             v-if="isEditingAlert"
@@ -1346,7 +1342,7 @@ import alertsService from "@/services/alerts";
 import OSnapScroll from "@/lib/core/SnapScroll/OSnapScroll.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OSectionNav from "@/lib/navigation/SectionNav/OSectionNav.vue";
-import OChoiceCards from "@/lib/forms/ChoiceCards/OChoiceCards.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import type { ChoiceCardOption } from "@/lib/forms/ChoiceCards/OChoiceCards.types";
 import AlertSampleEvents from "./AlertSampleEvents.vue";
 import AlertStreamOption from "./AlertStreamOption.vue";
@@ -1387,6 +1383,7 @@ import {
 } from "./alertSettingFind";
 import { useAlertSettingFind } from "@/composables/alerts/useAlertSettingFind";
 import AlertFormSection from "./AlertFormSection.vue";
+import AlertStepNav from "./AlertStepNav.vue";
 import { focusFirstControl } from "@/utils/focusNextControl";
 import AlertTierLinks from "./AlertTierLinks.vue";
 import AlertTierPlace from "./AlertTierPlace.vue";
@@ -1536,7 +1533,8 @@ export default defineComponent({
     OSnapScroll,
     OSettingRow,
     OSectionNav,
-    OChoiceCards,
+    OCollapsible,
+    AlertStepNav,
     AlertSampleEvents,
     AlertStreamOption,
     AlertIntentStart,
@@ -1967,7 +1965,7 @@ export default defineComponent({
     const focusMovedOn = () =>
       !!document.activeElement?.closest('[data-snap-section]:not([data-snap-section="watch"])');
     watch(activeSection, (now, left) => {
-      if (now === "details") nameDue.value = true;
+      if (now === "notify") nameDue.value = true;
       visitedSections.value = new Set([...visitedSections.value, left]);
       if (now === "watch") foldDue.value = false;
       // Scrolling past section 1 keeps it open; a jump, or focus moving on from it, folds it.
@@ -1985,7 +1983,7 @@ export default defineComponent({
     // An edit keeps section 1 open, read-only: it cannot change, but it stays one jump away.
     const watchCollapsed = computed(() => !isEditing.value && leftWatch.value);
     const editNameInDetails = () => {
-      goToSection("details");
+      goToSection("notify");
       void nextTick(() =>
         document
           .querySelector<HTMLElement>('[data-test="add-alert-details-name-input"] input')
@@ -2878,7 +2876,6 @@ export default defineComponent({
       setSectionTarget,
       sectionItems,
       formSections,
-      hasScheduleStep: computed(() => formSections.value.some((s) => s.id === "schedule")),
       isEditingAlert,
       editAlertId,
       editFolderId,

@@ -117,18 +117,18 @@ describe("useAlertFormSections", () => {
       isAnomalyMode: ref(false),
       isAggregationEnabled: ref(false),
       isEditing: ref(false),
-      extraErrors: ref({ schedule: 1 }),
+      extraErrors: ref({ notify: 1 }),
       t,
     });
-    expect(errorCounts.value.schedule).toBe(1);
-    expect(byId(items.value, "schedule").state).toBe("error");
+    expect(errorCounts.value.notify).toBe(1);
+    expect(byId(items.value, "notify").state).toBe("error");
   });
 
   it.each([
-    ["false", ["watch", "condition", "notify", "schedule", "details"]],
-    ["anomaly", ["watch", "condition", "notify", "schedule", "details"]],
-    ["true", ["watch", "condition", "notify", "details"]],
-    ["composite", ["watch", "condition", "notify", "details"]],
+    ["false", ["watch", "condition", "notify"]],
+    ["anomaly", ["watch", "condition", "notify"]],
+    ["true", ["watch", "condition", "notify"]],
+    ["composite", ["watch", "condition", "notify"]],
   ])("lists the sections a %s alert has, in order", (type, ids) => {
     const { items, sections } = setup(scheduled({ is_real_time: type }));
     expect(items.value.map((i) => i.id)).toEqual(ids);
@@ -148,7 +148,11 @@ describe("useAlertFormSections", () => {
       stateLabel: "Pick a stream",
       summary: "Pick a stream",
     });
-    expect(byId(items.value, "details").state).toBe("attention");
+    expect(byId(items.value, "notify")).toMatchObject({
+      state: "attention",
+      stateLabel: "Add a name",
+      summary: "No one yet",
+    });
   });
 
   it("ticks set sections and phrases them from the form", () => {
@@ -158,11 +162,10 @@ describe("useAlertFormSections", () => {
     expect(byId(items.value, "watch")).toMatchObject({ state: "done", summary: "k8s_logs" });
     expect(byId(items.value, "condition").summary).toBe("3+ events");
     expect(byId(items.value, "notify")).toMatchObject({ state: "done", summary: "slack" });
-    expect(byId(items.value, "schedule").summary).toBe("Every 10 min");
   });
 
   it("says nobody is notified without marking the optional section as missing", () => {
-    const { items } = setup(scheduled({ stream_name: "k8s_logs" }));
+    const { items } = setup(scheduled({ stream_name: "k8s_logs", name: "x" }));
     expect(byId(items.value, "notify")).toMatchObject({ state: "none", summary: "No one yet" });
   });
 
@@ -206,7 +209,9 @@ describe("useAlertFormSections", () => {
   });
 
   it("mentions the incident when it is the only one told", () => {
-    const { items } = setup(scheduled({ stream_name: "k8s_logs", creates_incident: true }));
+    const { items } = setup(
+      scheduled({ stream_name: "k8s_logs", name: "x", creates_incident: true }),
+    );
     expect(byId(items.value, "notify")).toMatchObject({
       state: "done",
       summary: "Opens an incident",
@@ -215,7 +220,7 @@ describe("useAlertFormSections", () => {
 
   it("ignores a stored incident flag where incidents are off", () => {
     const { items } = setup(
-      scheduled({ stream_name: "k8s_logs", creates_incident: true }),
+      scheduled({ stream_name: "k8s_logs", name: "x", creates_incident: true }),
       {},
       false,
       false,
@@ -228,11 +233,6 @@ describe("useAlertFormSections", () => {
       scheduled({ stream_name: "k8s_logs", creates_incident: true, destinations: ["slack"] }),
     );
     expect(byId(items.value, "notify").summary).toBe("slack and an incident");
-  });
-
-  it("keeps the last step's name while editing", () => {
-    const { items } = setup(scheduled({ stream_name: "k8s_logs", name: "errors" }), {}, true);
-    expect(byId(items.value, "details").title).toBe("Name it");
   });
 
   describe("anomaly condition", () => {
@@ -272,7 +272,7 @@ describe("useAlertFormSections", () => {
 
     it("names an on-call team as someone notified where on-call exists", () => {
       config.isEnterprise = "true";
-      const { items } = setup(scheduled({ stream_name: "cpu", oncall_team: "team-1" }));
+      const { items } = setup(scheduled({ stream_name: "cpu", name: "x", oncall_team: "team-1" }));
       expect(byId(items.value, "notify")).toMatchObject({ state: "done", summary: "team-1" });
     });
 
@@ -321,19 +321,18 @@ describe("useAlertFormSections", () => {
     expect(summary("!=")).toBe("not exactly 3 events");
   });
 
-  it("counts invalid fields per section from the form's field meta; a silence error counts against Who to tell", () => {
+  it("counts invalid fields per section from the form's field meta; the schedule counts against its step", () => {
     const { items, errorCounts } = setup(scheduled({ stream_name: "k8s_logs", name: "x" }), {
       "trigger_condition.period": { errors: ["Required"] },
       "trigger_condition.silence": { errors: ["Required"] },
       "trigger_condition.threshold": { errors: [] },
     });
-    expect(errorCounts.value.schedule).toBe(1);
+    expect(errorCounts.value.condition).toBe(1);
     expect(errorCounts.value.notify).toBe(1);
-    expect(byId(items.value, "schedule")).toMatchObject({
+    expect(byId(items.value, "condition")).toMatchObject({
       state: "error",
       stateLabel: t("alerts.sections.needsFix", { count: 1 }, 1),
     });
-    expect(byId(items.value, "condition").state).toBe("done");
   });
 
   it.each([
@@ -526,6 +525,7 @@ describe("useAlertFormSections", () => {
     expect(reviewLineText(byId(forecast.review.value, "schedule") as never, t)).toBe(
       "Checks every 30 minutes, fitting the trend over the last 2 days.",
     );
+    expect(byId(forecast.review.value, "schedule")).toMatchObject({ section: "condition" });
     const anomaly = setup({ ...base, is_real_time: "anomaly" }, {}, false, true, false, {
       anomaly: {
         detection_function: "count",
@@ -931,7 +931,8 @@ describe("sectionOfField", () => {
     expect(sectionOfField("pending_period_sec")).toBe("condition");
     expect(sectionOfField("destinations")).toBe("notify");
     expect(sectionOfField(AGGREGATION_ENABLED_FIELD)).toBe("condition");
-    expect(sectionOfField("trigger_condition.frequency")).toBe("schedule");
+    expect(sectionOfField("trigger_condition.frequency")).toBe("condition");
+    expect(sectionOfField("name")).toBe("notify");
     expect(sectionOfField("row_template_type")).toBe("notify");
     expect(sectionOfField("trigger_condition.silence")).toBe("notify");
   });

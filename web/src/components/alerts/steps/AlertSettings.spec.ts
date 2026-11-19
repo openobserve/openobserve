@@ -1363,7 +1363,8 @@ describe("AlertSettings — notify and timing in their sections", () => {
     ["false", {}, "alerts.form.remind.whileFiring"],
   ])("Notify at most every explains itself for is_real_time %s %j", (kind, values, key) => {
     const { targets } = mountSectioned(kind, values);
-    expect(targets.settingsNotify.textContent).toContain(t(key));
+    const info = targets.settingsNotify.querySelectorAll("[aria-label]");
+    expect([...info].map((el) => el.getAttribute("aria-label"))).toContain(t(key));
   });
 
   it("composite Must last lives in the condition section", () => {

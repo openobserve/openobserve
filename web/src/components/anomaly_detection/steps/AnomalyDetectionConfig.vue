@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @change="
               formContext.openSetting
                 ? formContext.openSetting('anomalyCheckEvery')
-                : formContext.goToSection('schedule')
+                : formContext.goToSection('condition')
             "
           >
             {{

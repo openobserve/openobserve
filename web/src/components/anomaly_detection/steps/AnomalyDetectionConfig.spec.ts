@@ -1637,7 +1637,7 @@ describe("AnomalyDetectionConfig — section 2 in the sectioned editor (E1)", ()
     expect(line.text()).toContain("Every hour");
     expect(line.text()).toContain("3 hours");
     await w.find('[data-test="anomaly-schedule-line-change"]').trigger("click");
-    expect(goToSection).toHaveBeenCalledWith("schedule");
+    expect(goToSection).toHaveBeenCalledWith("condition");
   });
 
   it.each([

@@ -46,15 +46,19 @@ const state = (c: AlertTierContext, over: Partial<AlertTierState> = {}): AlertTi
 });
 
 const ALL_ON = { incidentsEnabled: true, oncallEnabled: true, suppressRepeatsEnabled: true };
-const SECTIONS: AlertSectionId[] = ["watch", "condition", "notify", "schedule", "details"];
+const SECTIONS: AlertSectionId[] = ["watch", "condition", "notify"];
 
 describe("sectionTierView: the More options line per mockup screen", () => {
   it.each<[string, AlertSectionId, Partial<AlertTierContext>, AlertSettingId[]]>([
     ["A2 filters, total events too", "condition", {}, ["holdFor", "generatedSql", "groupBy"]],
     ["B0/B1 SQL", "condition", { shape: "sql" }, ["holdFor", "compareWithPast", "vrl"]],
     ["DRY-C2 PromQL", "condition", { shape: "promql" }, ["holdFor", "ruleExpression"]],
-    ["A3 notify", "notify", ALL_ON, ["recovery", "keepFiring", "suppressRepeats", "oncall"]],
-    ["A5 details", "details", {}, ["tags", "priority"]],
+    [
+      "A3 notify, with the alert's tags and priority",
+      "notify",
+      ALL_ON,
+      ["recovery", "keepFiring", "suppressRepeats", "oncall", "tags", "priority"],
+    ],
     [
       "E1 anomaly",
       "condition",
@@ -65,13 +69,7 @@ describe("sectionTierView: the More options line per mockup screen", () => {
       "E1b anomaly notify",
       "notify",
       { kind: "anomaly", shape: "anomaly", ...ALL_ON },
-      ["anomalyRecordOnly"],
-    ],
-    [
-      "E1c anomaly details",
-      "details",
-      { kind: "anomaly", shape: "anomaly" },
-      ["anomalyTags", "anomalyPriority"],
+      ["anomalyRecordOnly", "anomalyTags", "anomalyPriority"],
     ],
     [
       "E2 composite",
@@ -80,13 +78,12 @@ describe("sectionTierView: the More options line per mockup screen", () => {
       ["compositeWarningCounts", "compositeStalePolicy", "holdFor"],
     ],
     ["real-time condition", "condition", { kind: "realtime" }, []],
-    ["A4 schedule", "schedule", {}, []],
   ])("%s", (_name, section, over, expected) => {
     expect(sectionTierView(section, state(ctx(over))).more.map((d) => d.id)).toEqual(expected);
   });
 
   it("lists every unset setting on the line, never cutting it (Review Focus 4)", () => {
-    expect(sectionTierView("notify", state(ctx(ALL_ON))).more).toHaveLength(4);
+    expect(sectionTierView("notify", state(ctx(ALL_ON))).more).toHaveLength(6);
   });
 });
 

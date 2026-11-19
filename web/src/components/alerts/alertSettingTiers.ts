@@ -177,12 +177,12 @@ export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
   tierDef("anomalyTemplate", "notify", "add", "alerts.tiers.add.anomalyTemplate", {
     row: "message",
   }),
-  tierDef("cron", "schedule", "add", "alerts.tiers.add.cron", { inline: true }),
-  tierDef("tags", "details", "more", "alerts.tiers.names.tags"),
-  tierDef("priority", "details", "smart", "alerts.tiers.names.priority"),
-  tierDef("anomalyTags", "details", "more", "alerts.tiers.names.anomalyTags"),
-  tierDef("anomalyPriority", "details", "more", "alerts.tiers.names.anomalyPriority"),
-  tierDef("description", "details", "add", "alerts.tiers.add.description"),
+  tierDef("cron", "condition", "add", "alerts.tiers.add.cron", { inline: true }),
+  tierDef("tags", "notify", "more", "alerts.tiers.names.tags"),
+  tierDef("priority", "notify", "smart", "alerts.tiers.names.priority"),
+  tierDef("anomalyTags", "notify", "more", "alerts.tiers.names.anomalyTags"),
+  tierDef("anomalyPriority", "notify", "more", "alerts.tiers.names.anomalyPriority"),
+  tierDef("description", "notify", "add", "alerts.tiers.add.description"),
 ];
 
 // Composite is the one kind whose More options line puts Must last after its own settings.

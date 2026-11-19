@@ -42,17 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="t('alerts.destination')"
         @update:model-value="onUpdate"
       >
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-2">
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4 gap-y-1">
           <OCheckbox
             v-for="option in listOptions"
             :key="option.value"
             :value="option.value"
             :label="option.listLabel ?? option.label"
-            class="border-border-default rounded-default border px-3 py-2"
+            class="py-0.5"
             data-test="alert-destinations-list-option"
           >
             <template v-if="option.listMeta" #label>
-              <span class="flex min-w-0 flex-col">
+              <span class="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
                 <span class="text-text-body text-sm break-words">{{ option.label }}</span>
                 <span
                   class="text-text-secondary text-xs break-words"

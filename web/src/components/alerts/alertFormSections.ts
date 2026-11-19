@@ -17,7 +17,7 @@ import type { I18nKey } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
 
-export type AlertSectionId = "watch" | "condition" | "notify" | "schedule" | "details";
+export type AlertSectionId = "watch" | "condition" | "notify";
 
 /** Slots in the sectioned alert editor that step components teleport a slice of themselves into. */
 export type AlertSectionSlot =
@@ -52,8 +52,6 @@ export interface AlertSectionDef {
   /** One sentence under the heading that tells the user how little this step asks. */
   helpKey: I18nKey;
   icon: IconName;
-  /** The defaults work, so a user can skip the whole step. */
-  optional?: boolean;
 }
 
 export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
@@ -75,23 +73,8 @@ export const ALERT_SECTIONS: readonly AlertSectionDef[] = [
     id: "notify",
     titleKey: "alerts.sections.notify.title",
     navKey: "alerts.sections.notify.nav",
-    helpKey: "alerts.sections.notify.help",
+    helpKey: "alerts.sections.notify.helpNamed",
     icon: "location-on",
-  },
-  {
-    id: "schedule",
-    titleKey: "alerts.sections.schedule.title",
-    navKey: "alerts.sections.schedule.nav",
-    helpKey: "alerts.sections.schedule.help",
-    icon: "schedule",
-    optional: true,
-  },
-  {
-    id: "details",
-    titleKey: "alerts.sections.details.title",
-    navKey: "alerts.sections.details.nav",
-    helpKey: "alerts.sections.details.help",
-    icon: "label",
   },
 ];
 
@@ -126,8 +109,8 @@ const FIELD_SECTION_PREFIXES: ReadonlyArray<[string, AlertSectionId]> = [
   ["_ui.pendingPeriod", "condition"],
   ["trigger_condition.silence", "notify"],
   ["row_template", "notify"],
-  ["trigger_condition", "schedule"],
-  ["_ui", "schedule"],
+  ["trigger_condition", "condition"],
+  ["_ui", "condition"],
   ["destinations", "notify"],
   ["workflows", "notify"],
   ["recovery_destinations", "notify"],
@@ -138,10 +121,10 @@ const FIELD_SECTION_PREFIXES: ReadonlyArray<[string, AlertSectionId]> = [
   ["context_attributes", "notify"],
   ["oncall_team", "notify"],
   ["suppress_repeats", "notify"],
-  ["name", "details"],
-  ["description", "details"],
-  ["priority", "details"],
-  ["tags", "details"],
+  ["name", "notify"],
+  ["description", "notify"],
+  ["priority", "notify"],
+  ["tags", "notify"],
 ];
 
 /** Which section owns a form field, by its `name=` path; unknown paths belong to the first section. */

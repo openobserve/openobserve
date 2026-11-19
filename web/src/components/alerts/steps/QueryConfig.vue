@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div :class="['box-border w-full min-w-0', sectionTargets ? '' : 'px-3 py-2']">
         <!-- Query Mode Tabs (hidden for real-time alerts) -->
         <OSettingRow
-          v-if="sectionTargets && shouldShowTabs"
+          v-if="sectionTargets && shouldShowTabs && !defineWithInline"
           :label="t('alerts.sections.rows.whichEvents')"
           data-test="add-alert-which-events"
         >
@@ -886,7 +886,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @edit="openFilters"
                 @remove="removeFilters"
                 @toggle-connector="toggleFilterConnector"
-              />
+              >
+                <template v-if="defineWithInline" #trail>
+                  <OToggleGroup
+                    :model-value="localTab"
+                    :aria-label="t('alerts.sections.rows.whichEvents')"
+                    data-test="step2-query-tabs"
+                    @update:model-value="updateTab($event as 'sql' | 'promql' | 'custom')"
+                  >
+                    <OToggleGroupItem
+                      v-for="tab in tabOptions"
+                      :key="tab.value"
+                      :value="tab.value"
+                      :data-test="`query-mode-${tab.value}`"
+                      size="xs"
+                      :icon-left="QUERY_MODE_ICONS[tab.value as keyof typeof QUERY_MODE_ICONS]"
+                    >
+                      {{ tab.label }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                </template>
+              </AlertFilterSentence>
               <!-- Mounted while folded too: its validity check is what gates Save. -->
               <component
                 :is="sectionTargets ? 'OSettingRow' : 'div'"
@@ -1749,7 +1769,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OFormInput>
             <OSelect
               :aria-label="t('common.unitFor', { label: t('alerts.queryConfig.checkEvery') })"
-              class="w-32!"
+              class="w-28!"
               :model-value="frequencyMode"
               data-test="alert-check-every-unit-select"
               :options="frequencyUnitOptions"
@@ -1766,18 +1786,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ checkEveryError }}
             </div>
-            <div class="order-last basis-full">
-              <OButton
-                variant="ghost-primary"
-                size="sm"
-                icon-left="add"
-                class="-ms-3.5 max-[85.5rem]:-ms-3"
-                data-test="add-alert-add-cron"
-                @click="useCronSchedule"
-              >
-                {{ t("alerts.tiers.add.cron") }}
-              </OButton>
-            </div>
+            <OButton
+              variant="link"
+              size="xs"
+              icon-left="add"
+              class="order-1"
+              data-test="add-alert-add-cron"
+              @click="useCronSchedule"
+            >
+              {{ t("alerts.tiers.add.cron") }}
+            </OButton>
           </template>
           <OSettingRow
             v-else
@@ -2010,6 +2028,7 @@ const withoutBlankRows = (group: FilterGroup): FilterGroup => ({
 });
 
 const EDITOR_FOLD_LINES = 5;
+const QUERY_MODE_ICONS = { custom: "filter-alt", sql: "database", promql: "show-chart" } as const;
 
 // Span duration is microseconds by the traces contract, whatever unit the user types it in.
 const MICROS_PER: Record<string, number> = { ns: 0.001, us: 1, ms: 1000, s: 1_000_000 };
@@ -3982,6 +4001,14 @@ export default defineComponent({
         : t("alerts.sections.rows.whichEventsAll");
     });
     // Hide tabs completely for real-time alerts (only one option)
+    // With the filter sentence folded, the mode switch rides at the end of its line.
+    const defineWithInline = computed(
+      () =>
+        !!props.sectionTargets &&
+        shouldShowTabs.value &&
+        localTab.value === "custom" &&
+        filtersFolded.value,
+    );
     const shouldShowTabs = computed(() => {
       return props.isRealTime === "false";
     });
@@ -4761,6 +4788,8 @@ export default defineComponent({
       onDurationUnitChange,
       revealDurationError,
       shouldShowTabs,
+      defineWithInline,
+      QUERY_MODE_ICONS,
       updateTab,
       conditionsBuilderRef,
       conditionsValid,

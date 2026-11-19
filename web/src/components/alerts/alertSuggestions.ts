@@ -33,9 +33,7 @@ export interface BacktestSignal {
 export const ALERT_SUGGESTION_ORDER: Record<AlertSectionId, readonly AlertSuggestionId[]> = {
   watch: [],
   condition: ["ruleExpression", "holdFor"],
-  notify: ["recovery", "oncall", "keepFiring"],
-  schedule: [],
-  details: ["priority"],
+  notify: ["recovery", "oncall", "keepFiring", "priority"],
 };
 
 export const RESOLVING_PLATFORMS = ["pagerduty", "opsgenie", "servicenow"] as const;

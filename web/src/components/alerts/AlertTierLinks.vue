@@ -73,7 +73,6 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
     <OSettingRow
       v-if="ownLinks.length || view.more.length"
       :label="t('alerts.sections.optional.title')"
-      :description="t('alerts.sections.optional.help')"
       fill
       data-test="add-alert-optional-heading"
     >
@@ -105,15 +104,17 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
               : t("alerts.form.moreOptions", { count: view.more.length })
           }}
         </OButton>
-      </div>
-      <template v-if="view.more.length && !view.expanded" #note>
-        <span class="whitespace-normal" :data-test="`add-alert-section-${section}-more-names`">
+        <span
+          v-if="view.more.length && !view.expanded"
+          class="text-text-secondary text-xs whitespace-normal"
+          :data-test="`add-alert-section-${section}-more-names`"
+        >
           <template v-for="(item, index) in view.more" :key="item.id"
             ><template v-if="index">{{ SEP }}</template
             >{{ t(item.noteKey ?? item.nameKey) }}</template
           >
         </span>
-      </template>
+      </div>
     </OSettingRow>
   </div>
   <div

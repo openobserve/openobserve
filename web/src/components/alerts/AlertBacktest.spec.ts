@@ -178,6 +178,8 @@ describe("AlertBacktest", () => {
     expect(result.classes()).toContain("text-status-warning-text");
     await wrapper.find('[data-test="add-alert-backtest-wait-action"]').trigger("click");
     expect(goToSection).toHaveBeenCalledWith("notify");
+    expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(0);
+    await wrapper.find('[data-test="add-alert-backtest-toggle"]').trigger("click");
     expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
     expect(signal.value).toBeNull();
     wrapper.unmount();
@@ -274,6 +276,7 @@ describe("AlertBacktest", () => {
     expect(wrapper.find('[data-test="add-alert-backtest-result"]').text()).toContain("2 of 6");
     // Suggestions read the same day, so a flapping note can't outlive an answer that says otherwise.
     expect(signal.value).toMatchObject({ checks: 6, alerts: 2, refires: 1, singleCheckSpikes: 1 });
+    await wrapper.find('[data-test="add-alert-backtest-toggle"]').trigger("click");
     expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
 
     testRun.currentKey.value = "edited";

@@ -2579,12 +2579,12 @@ export function useAlertForm(
       // inline "Cron expression and timezone are required". Parity: no toast.
       if (!tc.cron || !tc.timezone) {
         activeTab.value = "condition";
-        hooks.showSection?.("schedule");
+        hooks.showSection?.("condition");
         return false;
       }
       if (!isSixFieldCron(tc.cron)) {
         activeTab.value = "condition";
-        hooks.showSection?.("schedule");
+        hooks.showSection?.("condition");
         toast({ variant: "error", message: t("alerts.queryConfig.invalidCronExpression") });
         return false;
       }
@@ -2596,7 +2596,7 @@ export function useAlertForm(
         ) {
           const minInterval = Number(store.state?.zoConfig?.min_auto_refresh_interval) || 1;
           activeTab.value = "condition";
-          hooks.showSection?.("schedule");
+          hooks.showSection?.("condition");
           toast({
             variant: "error",
             message: t("alerts.queryConfig.frequencyGreaterThanSeconds", {
@@ -2607,7 +2607,7 @@ export function useAlertForm(
         }
       } catch {
         activeTab.value = "condition";
-        hooks.showSection?.("schedule");
+        hooks.showSection?.("condition");
         toast({
           variant: "error",
           message: t("alerts.queryConfig.invalidCronExpression"),

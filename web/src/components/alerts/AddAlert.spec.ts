@@ -23,6 +23,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { computed, defineComponent, h, ref } from "vue";
 import { describe, it, expect, vi, afterEach, beforeEach, onTestFinished } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
+import AlertFormSection from "@/components/alerts/AlertFormSection.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
@@ -840,7 +841,7 @@ describe("AddAlert (OForm owner)", () => {
       ["unparseable", "not-a-cron", "UTC"],
       ["5 fields, not the 6 the server needs", "0 9 * * 1-5", "UTC"],
       ["missing its timezone", "0 */10 * * * *", ""],
-    ])("blocks a cron save %s as an issue in How often to check", async (_, cron, timezone) => {
+    ])("blocks a cron save %s as an issue in When to alert", async (_, cron, timezone) => {
       const restore = withMinInterval(300);
       try {
         wrapper = mountAlert();
@@ -852,7 +853,7 @@ describe("AddAlert (OForm owner)", () => {
 
         expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
         expect(toast).not.toHaveBeenCalled();
-        expect(wrapper.get('[data-test="o-section-nav-item-schedule"]').text()).toContain(
+        expect(wrapper.get('[data-test="o-section-nav-item-condition"]').text()).toContain(
           i18n.global.t("alerts.sections.needsFix", { count: 1 }, 1),
         );
       } finally {
@@ -1615,7 +1616,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert();
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-section-condition-more"]').exists()).toBe(true);
-      for (const section of ["condition", "notify", "details"] as const) {
+      for (const section of ["condition", "notify"] as const) {
         expect(wrapper.vm.tiers.view(section).expanded).toBe(false);
       }
       expect(wrapper.vm.tiers.isVisible("holdFor")).toBe(false);
@@ -1695,7 +1696,11 @@ describe("AddAlert (OForm owner)", () => {
     it("keeps Find a setting and fits the condition subtitle for anomaly and composite", async () => {
       wrapper = mountAlert();
       await flushPromises();
-      const help = () => wrapper.get('[data-test="add-alert-section-condition-help"]').text();
+      const help = () =>
+        wrapper
+          .findAllComponents(AlertFormSection)
+          .find((section) => section.props("id") === "condition")!
+          .props("help");
       expect(help()).toContain("how many is a problem");
 
       wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
@@ -1719,12 +1724,12 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert();
       await flushPromises();
       const save = () => wrapper.findComponent('[data-test="add-alert-submit-btn"]');
-      for (const section of ["watch", "details"]) {
+      for (const section of ["watch", "notify"]) {
         wrapper.vm.activeSection = section;
         await flushPromises();
         expect(save().props("variant")).toBe("primary");
+        expect(save().text()).not.toContain("Next");
       }
-      expect(wrapper.find('[data-test="add-alert-footer"]').text()).not.toContain("Next");
     });
 
     it("ticks a section with a value once the user moves past it", async () => {
@@ -1740,20 +1745,20 @@ describe("AddAlert (OForm owner)", () => {
       expect(state("condition")).toBe("done");
     });
 
-    it("renders the five sections in order beside the section list", async () => {
+    it("renders the three sections in order beside the section list", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const ids = wrapper
         .findAll("[data-snap-section]")
         .map((el) => el.attributes("data-snap-section"));
-      expect(ids).toEqual(["watch", "condition", "notify", "schedule", "details"]);
-      expect(wrapper.findAll('[data-test^="o-section-nav-item-"]')).toHaveLength(5);
+      expect(ids).toEqual(["watch", "condition", "notify"]);
+      expect(wrapper.findAll('[data-test^="o-section-nav-item-"]')).toHaveLength(3);
       expect(wrapper.find('[data-test="add-alert-tab-condition"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="add-alert-tab-advanced"]').exists()).toBe(false);
     });
 
     it.each(["true", "composite"])(
-      "a %s alert has no schedule step: four steps, its one sentence in step 2",
+      "a %s alert keeps the three steps, its schedule one sentence in step 2",
       async (type) => {
         wrapper = mountAlert();
         await flushPromises();
@@ -1762,17 +1767,19 @@ describe("AddAlert (OForm owner)", () => {
         const ids = wrapper
           .findAll("[data-snap-section]")
           .map((el) => el.attributes("data-snap-section"));
-        expect(ids).toEqual(["watch", "condition", "notify", "details"]);
-        expect(wrapper.findAll('[data-test^="o-section-nav-item-"]')).toHaveLength(4);
+        expect(ids).toEqual(["watch", "condition", "notify"]);
+        expect(wrapper.findAll('[data-test^="o-section-nav-item-"]')).toHaveLength(3);
         const condition = wrapper.get('[data-test="add-alert-section-condition"]');
         expect(condition.find('[data-test="add-alert-schedule-note"]').exists()).toBe(true);
         const scrollToSection = vi.fn();
         wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
-        await wrapper.get('[data-test="add-alert-section-notify-next"]').trigger("click");
+        await wrapper.get('[data-test="add-alert-section-condition-next"]').trigger("click");
         // A real-time alert says nothing about a schedule; a combined one says when it checks.
         const line = type === "true" ? "condition" : "schedule";
+        await wrapper.get('[data-test="add-alert-review"] button').trigger("click");
+        await flushPromises();
         await wrapper.get(`[data-test="add-alert-review-${line}"]`).trigger("click");
-        expect(scrollToSection.mock.calls).toEqual([["details"], ["condition"]]);
+        expect(scrollToSection.mock.calls).toEqual([["notify"], ["condition"]]);
       },
     );
 
@@ -1781,7 +1788,9 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       const tabs = '[data-test="add-alert-type-tabs"]';
       expect(wrapper.find(`[data-test="add-alert-section-watch"] ${tabs}`).exists()).toBe(true);
-      expect(wrapper.find(`[data-test="add-alert-section-schedule"] ${tabs}`).exists()).toBe(false);
+      expect(wrapper.find(`[data-test="add-alert-section-condition"] ${tabs}`).exists()).toBe(
+        false,
+      );
     });
 
     it("steps from each section header: Next names the following step, the ends stay in place disabled", async () => {
@@ -1794,22 +1803,22 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.find(btn("watch", "next")).attributes("aria-label")).toBe(
         "Next: When to alert",
       );
-      expect(wrapper.find(btn("notify", "next")).attributes("aria-label")).toBe(
-        "Next: How often to check",
+      expect(wrapper.find(btn("condition", "next")).attributes("aria-label")).toBe(
+        "Next: Who to tell",
       );
-      const lastNext = wrapper.find(btn("details", "next"));
+      const lastNext = wrapper.find(btn("notify", "next"));
       expect(lastNext.attributes("disabled")).toBeDefined();
       expect(lastNext.attributes("aria-label")).toBe("Next step");
 
       const scrollToSection = vi.fn();
       wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
-      await wrapper.find(btn("notify", "next")).trigger("click");
-      expect(scrollToSection).toHaveBeenCalledWith("schedule");
+      await wrapper.find(btn("condition", "next")).trigger("click");
+      expect(scrollToSection).toHaveBeenCalledWith("notify");
       await wrapper.find(btn("notify", "prev")).trigger("click");
       expect(scrollToSection).toHaveBeenCalledWith("condition");
     });
 
-    it("the footer Next scrolls to the next section and focuses its first control", async () => {
+    it("the bar's Next scrolls to the next section and focuses its first control", async () => {
       const rects = vi
         .spyOn(Element.prototype, "getClientRects")
         .mockReturnValue([new DOMRect(0, 0, 10, 10)] as unknown as DOMRectList);
@@ -1817,13 +1826,15 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       const scrollToSection = vi.fn();
       wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
-      await wrapper.find('[data-test="add-alert-section-4-next"]').trigger("click");
+      wrapper.vm.activeSection = "condition";
       await flushPromises();
-      expect(scrollToSection).toHaveBeenCalledWith("details");
-      const name = wrapper.find('[data-test="add-alert-details-name-input"] input').element;
+      await wrapper.find('[data-test="add-alert-step-next"]').trigger("click");
+      await flushPromises();
+      expect(scrollToSection).toHaveBeenCalledWith("notify");
+      const notify = wrapper.get('[data-test="add-alert-section-notify-card"]').element;
       // Focus waits for the glide to land, so a control scrolling itself into view cannot stop it.
-      expect(document.activeElement).not.toBe(name);
-      await vi.waitFor(() => expect(document.activeElement).toBe(name));
+      expect(notify.contains(document.activeElement)).toBe(false);
+      await vi.waitFor(() => expect(notify.contains(document.activeElement)).toBe(true));
       // Back to a section whose step 1 is folded skips the summary line's Change link.
       wrapper.vm.form.setFieldValue("stream_name", "app_logs");
       wrapper.vm.activeSection = "watch";
@@ -1832,7 +1843,9 @@ describe("AddAlert (OForm owner)", () => {
       await vi.waitFor(() =>
         expect(wrapper.find('[data-test="add-alert-watch-summary"]').exists()).toBe(true),
       );
-      await wrapper.find('[data-test="add-alert-section-3-back"]').trigger("click");
+      wrapper.vm.activeSection = "notify";
+      await flushPromises();
+      await wrapper.find('[data-test="add-alert-step-back"]').trigger("click");
       await vi.waitFor(() =>
         expect(
           (document.activeElement?.closest("[data-snap-section]") as HTMLElement)?.dataset
@@ -1923,10 +1936,9 @@ describe("AddAlert (OForm owner)", () => {
       await wrapper.find('[data-test="add-alert-add-variables"]').trigger("click");
       expect(wrapper.vm.form.getFieldValue("context_attributes")).toHaveLength(1);
       expect(wrapper.vm.tiers.isVisible("tags")).toBe(false);
-      expect(wrapper.vm.tiers.view("details").more.map((d: { id: string }) => d.id)).toEqual([
-        "tags",
-        "priority",
-      ]);
+      expect(wrapper.vm.tiers.view("notify").more.map((d: { id: string }) => d.id)).toEqual(
+        expect.arrayContaining(["tags", "priority"]),
+      );
     });
 
     it("finds a setting by its old name and reveals just that setting when picked", async () => {
@@ -1972,14 +1984,14 @@ describe("AddAlert (OForm owner)", () => {
       expect(found("cooldown")).toContain("cooldown");
     });
 
-    it("names the alert in a text field in section 5, offering the suggestion back once renamed", async () => {
+    it("names the alert in a text field in step 3, offering the suggestion back once renamed", async () => {
       wrapper = mountAlert();
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-details-name-input"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="add-alert-details-rename-btn"]').exists()).toBe(false);
 
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
-      wrapper.vm.activeSection = "details";
+      wrapper.vm.activeSection = "notify";
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-details-name-auto"]').exists()).toBe(true);
 
@@ -2010,7 +2022,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(toast).toHaveBeenCalledWith(
         expect.objectContaining({
           variant: "error",
-          message: expect.stringContaining(i18n.global.t("alerts.sections.details.nav")),
+          message: expect.stringContaining(i18n.global.t("alerts.sections.notify.nav")),
         }),
       );
     });
@@ -2022,7 +2034,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper = mountAlert();
       await flushPromises();
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
-      wrapper.vm.activeSection = "details";
+      wrapper.vm.activeSection = "notify";
       await flushPromises();
       expect(wrapper.vm.alertNameSuggestion).toBe("k8s_logs_alert_2");
     });
@@ -2354,7 +2366,7 @@ describe("AddAlert (OForm owner)", () => {
 
       await wrapper.get('[data-test="o-section-nav-item-watch"]').trigger("click");
       expect(scrollToSection).toHaveBeenLastCalledWith("watch");
-      await wrapper.get('[data-test="add-alert-section-2-back"]').trigger("click");
+      await wrapper.get('[data-test="add-alert-step-back"]').trigger("click");
       expect(scrollToSection).toHaveBeenLastCalledWith("watch");
       await vi.waitFor(() => expect(watch().element.contains(document.activeElement)).toBe(true));
 
@@ -2405,17 +2417,17 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
       const control = wrapper.get('[data-test="add-alert-section-condition-next"]')
         .element as HTMLElement;
-      if (jump) wrapper.vm.goToSection("schedule");
+      if (jump) wrapper.vm.goToSection("notify");
       else control.focus();
       wrapper.vm.activeSection = "condition";
       await flushPromises();
       const watchOpen = () => wrapper.find('[data-test="add-alert-section-watch"]').exists();
       expect(watchOpen()).toBe(jump);
       if (jump) {
-        wrapper.vm.activeSection = "schedule";
+        wrapper.vm.activeSection = "notify";
         await vi.waitFor(() => expect(watchOpen()).toBe(false));
       }
-      expect(scrollToSection.mock.calls).toEqual(jump ? [["schedule"]] : []);
+      expect(scrollToSection.mock.calls).toEqual(jump ? [["notify"]] : []);
       if (!jump) expect(document.activeElement).toBe(control);
     });
 
@@ -2502,7 +2514,7 @@ describe("AddAlert (OForm owner)", () => {
     });
   });
 
-  describe("name and folder live in section 5", () => {
+  describe("name and folder live in step 3", () => {
     const withHeader = (props: Record<string, any> = {}) =>
       mountAlert(props, {
         attachTo: document.body,
@@ -2544,14 +2556,14 @@ describe("AddAlert (OForm owner)", () => {
       ["create", {}, true],
       ["edit", { isUpdated: true, modelValue: savedAlert() }, false],
     ])(
-      "folder is chosen in section 5 on %s and read-only in the header",
+      "folder is chosen in step 3 on %s, on the name's row, and read-only in the header",
       async (_, props, pick) => {
         wrapper = withHeader(props);
         await flushPromises();
-        const details = wrapper.get('[data-test="add-alert-section-details"]');
-        expect(details.get('[data-test="add-alert-section-details-title"]').text()).toBe(
-          i18n.global.t("alerts.sections.details.title"),
+        const details = wrapper.get(
+          '[data-test="add-alert-section-notify"] [data-test="add-alert-details-name-row"]',
         );
+        expect(details.find('[data-test="add-alert-details-folder-row"]').exists()).toBe(true);
         expect(details.find('[data-test="add-alert-details-name-input"]').exists()).toBe(pick);
         expect(details.find('[data-test="add-alert-details-name-text"]').exists()).toBe(!pick);
         expect(details.find('[data-test="add-alert-details-folder-select"]').exists()).toBe(pick);
@@ -2574,11 +2586,16 @@ describe("AddAlert (OForm owner)", () => {
     await flushPromises();
     const scrollToSection = vi.fn();
     wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+    expect(wrapper.find('[data-test="add-alert-review-watch-text"]').exists()).toBe(false);
+    await wrapper.get('[data-test="add-alert-review"] button').trigger("click");
+    await flushPromises();
     const watchLine = wrapper.get('[data-test="add-alert-review-watch-text"]');
     expect(watchLine.text()).toBe("Watches Logs in app_logs, on a schedule.");
     expect(watchLine.findAll("strong").map((b) => b.text())).toEqual(["Logs", "app_logs"]);
     await wrapper.get('[data-test="add-alert-review-notify"]').trigger("click");
     expect(scrollToSection).toHaveBeenCalledWith("notify");
+    await wrapper.get('[data-test="add-alert-review-schedule"]').trigger("click");
+    expect(scrollToSection).toHaveBeenLastCalledWith("condition");
   });
 
   describe("Save names the issues to fix", () => {
@@ -2722,7 +2739,7 @@ describe("AddAlert (OForm owner)", () => {
         ),
       );
       const reason = wrapper.get('[data-test="add-alert-save-reason"]');
-      expect(reason.text()).toContain(i18n.global.t("alerts.sections.details.nav"));
+      expect(reason.text()).toContain(i18n.global.t("alerts.sections.notify.nav"));
       (document.activeElement as HTMLElement | null)?.blur();
       await reason.get('[data-test="add-alert-save-reason-link"]').trigger("click");
       await flushPromises();
@@ -2748,7 +2765,7 @@ describe("AddAlert (OForm owner)", () => {
     it("focuses the earliest section's error when several sections have one", async () => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
-      const later = seedFieldError("details");
+      const later = seedFieldError("notify");
       const earlier = seedFieldError("condition");
 
       wrapper.vm.focusOnFirstError();
@@ -2780,7 +2797,7 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
       await flushPromises();
       const hidden = seedFieldError("condition", true);
-      const visible = seedFieldError("details");
+      const visible = seedFieldError("notify");
 
       wrapper.vm.focusOnFirstError();
       await flushPromises();

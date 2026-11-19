@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, provide } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   SETTING_ROW_BARE_KEY,
@@ -28,10 +29,10 @@ import { ALERT_SECTIONS, type AlertSectionDef, type AlertSectionId } from "./ale
 const props = withDefaults(
   defineProps<{
     id: AlertSectionId;
-    /** The steps this alert type has, in order; numbering and Back/Next follow it. */
+    /** The steps this alert type has, in order; numbering and the arrows follow it. */
     sections?: readonly AlertSectionDef[];
     title: I18nText;
-    /** One sentence under the title. */
+    /** What the step asks for, opened from the info button beside the title. */
     help: I18nText;
     /** False while another section is in view: its step buttons fade out but stay in the Tab order. */
     current?: boolean;
@@ -42,14 +43,11 @@ const props = withDefaults(
 const emit = defineEmits<{
   /** The header arrows: scroll to the section and put the Tab start on its heading. */
   go: [id: AlertSectionId];
-  /** The footer buttons: scroll to the section and focus its first control. */
-  step: [id: AlertSectionId];
 }>();
 
 const { t } = useI18nTyped();
 const total = computed(() => props.sections.length);
 const index = computed(() => props.sections.findIndex((section) => section.id === props.id) + 1);
-const def = computed(() => props.sections[index.value - 1]);
 const previous = computed(() => props.sections[index.value - 2]);
 const next = computed(() => props.sections[index.value]);
 const previousLabel = computed(() =>
@@ -73,7 +71,7 @@ provide(SETTING_ROW_GRID_KEY, true);
   <section
     :data-snap-section="id"
     :data-test="`add-alert-section-${id}`"
-    class="flex flex-col px-4 py-2 max-lg:px-3 [&_[data-snap-stop]]:scroll-mt-28"
+    class="flex flex-col px-4 py-2 max-lg:px-3 [&_[data-snap-stop]]:scroll-mt-20"
   >
     <div v-if="$slots.lead" class="px-1 pb-2" :data-test="`add-alert-section-${id}-lead`">
       <slot name="lead" />
@@ -84,36 +82,50 @@ provide(SETTING_ROW_GRID_KEY, true);
     >
       <header
         data-snap-sticky
-        class="bg-surface-subtle border-border-default rounded-t-surface sticky top-0 z-30 flex items-start gap-3 border-b px-4 py-2 max-lg:static max-lg:z-auto"
+        class="bg-surface-subtle border-border-default rounded-t-surface sticky top-0 z-30 flex min-h-9 flex-wrap items-center gap-x-2 border-b px-4 py-1 max-lg:static max-lg:z-auto"
       >
-        <div class="flex min-w-0 flex-1 flex-col">
-          <span class="text-text-body text-xs" :data-test="`add-alert-section-${id}-eyebrow`">
-            {{
-              def?.optional
-                ? t("alerts.sections.eyebrowOptional", { n: index, total })
-                : t("alerts.sections.eyebrow", { n: index, total })
-            }}
-          </span>
-          <h2
-            class="text-text-heading m-0 text-sm font-semibold focus:outline-none"
-            tabindex="-1"
-            data-snap-heading
-            :data-test="`add-alert-section-${id}-title`"
+        <h2
+          class="text-text-heading m-0 text-sm font-semibold focus:outline-none"
+          tabindex="-1"
+          data-snap-heading
+          :data-test="`add-alert-section-${id}-title`"
+        >
+          {{ title }}
+        </h2>
+        <span
+          class="text-text-secondary text-xs whitespace-nowrap"
+          :data-test="`add-alert-section-${id}-eyebrow`"
+        >
+          {{ t("alerts.sections.eyebrow", { n: index, total }) }}
+        </span>
+        <OPopover side="bottom" align="start" :aria-label="t('alerts.sections.aboutStep')">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              icon-left="info-outline"
+              :aria-label="t('alerts.sections.aboutStep')"
+              :data-test="`add-alert-section-${id}-about`"
+            />
+          </template>
+          <p
+            class="text-text-body text-compact m-0 w-80 max-w-[calc(100vw-1.5rem)] p-3"
+            :data-test="`add-alert-section-${id}-help`"
           >
-            {{ title }}
-          </h2>
-          <p class="text-text-body text-compact m-0" :data-test="`add-alert-section-${id}-help`">
             {{ help }}
           </p>
+        </OPopover>
+        <div v-if="$slots.tools" class="flex min-w-0 items-center">
+          <slot name="tools" />
         </div>
         <div
-          class="flex shrink-0 gap-1"
+          class="ms-auto flex shrink-0 gap-1"
           :class="current === false && 'opacity-0 focus-within:opacity-100'"
           :data-test="`add-alert-section-${id}-steps`"
         >
           <OButton
             variant="outline"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="keyboard-arrow-up"
             :disabled="!previous"
             :aria-label="previousLabel"
@@ -124,7 +136,7 @@ provide(SETTING_ROW_GRID_KEY, true);
           </OButton>
           <OButton
             variant="outline"
-            size="icon-sm"
+            size="icon-xs-sq"
             icon-left="keyboard-arrow-down"
             :disabled="!next"
             :aria-label="nextLabel"
@@ -143,39 +155,11 @@ provide(SETTING_ROW_GRID_KEY, true);
       </div>
       <div
         v-if="$slots.optional"
-        class="bg-surface-panel border-border-default hidden flex-col border-t px-4 py-1.5 has-[>:not(:empty):not([style*='display:_none'])]:flex"
+        class="border-border-default rounded-b-surface hidden flex-col border-t px-4 py-1.5 has-[>:not(:empty):not([style*='display:_none'])]:flex"
         :data-test="`add-alert-section-${id}-optional`"
       >
         <slot name="optional" />
       </div>
-      <!-- The current step's footer sticks, so its Next is never cut off; a later card's would cover its own body. -->
-      <footer
-        class="border-border-default rounded-b-surface bg-surface-overlay flex flex-wrap items-center gap-2 border-t px-4 py-1.5 max-md:flex-col max-md:items-stretch"
-        :class="current !== false && 'sticky bottom-0 z-30 max-lg:static max-lg:z-auto'"
-        :data-test="`add-alert-section-${index}-footer`"
-      >
-        <OButton
-          v-if="previous"
-          variant="ghost"
-          size="sm"
-          icon-left="arrow-upward"
-          :data-test="`add-alert-section-${index}-back`"
-          @click="emit('step', previous.id)"
-        >
-          {{ previousLabel }}
-        </OButton>
-        <OButton
-          v-if="next"
-          class="ms-auto max-md:ms-0"
-          variant="outline"
-          size="sm"
-          icon-right="arrow-downward"
-          :data-test="`add-alert-section-${index}-next`"
-          @click="emit('step', next.id)"
-        >
-          {{ nextLabel }}
-        </OButton>
-      </footer>
     </div>
   </section>
 </template>

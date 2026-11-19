@@ -141,12 +141,14 @@ export interface AlertFormSectionsInput {
 
 /** One read-back sentence; a strong part is a value the user chose. */
 export interface AlertReviewLine {
-  id: Exclude<AlertSectionId, "details">;
+  id: "watch" | "condition" | "notify" | "schedule";
+  /** The step that holds the line's settings, which its Change link opens. */
+  section: AlertSectionId;
   keypath: I18nKey;
   parts: Record<string, { text: I18nText; strong?: boolean }>;
   plural?: number;
   /** Further sentences about the same section, read after the first. */
-  more?: Omit<AlertReviewLine, "id" | "more">[];
+  more?: Omit<AlertReviewLine, "id" | "section" | "more">[];
 }
 
 /** What a starter saves with unless the user opens a setting; null parts do not apply. */
@@ -170,7 +172,7 @@ type ConditionKind =
   | "composite"
   | "unset"
   | ConditionGap;
-type ReviewSentence = Omit<AlertReviewLine, "id">;
+type ReviewSentence = Omit<AlertReviewLine, "id" | "section">;
 
 const FIRES_KEYS: Record<ConditionKind, I18nKey> = {
   events: "alerts.sections.review.firesCount",
@@ -277,7 +279,7 @@ export function watchedStreamText(formData: AlertSectionsFormData, t: TranslateF
 
 /** A read-back line as plain text, the way its slots render it. */
 export function reviewLineText(line: AlertReviewLine, t: TranslateFn): I18nText {
-  const sentence = (one: Omit<AlertReviewLine, "id" | "more">) =>
+  const sentence = (one: Omit<AlertReviewLine, "id" | "section" | "more">) =>
     t(
       one.keypath,
       Object.fromEntries(Object.entries(one.parts).map(([k, p]) => [k, p.text])),
@@ -304,7 +306,6 @@ const lettersForAlertIds = (expression: string, childIds: string[]): string => {
 };
 
 export function useAlertFormSections(input: AlertFormSectionsInput): {
-  /** The steps this alert type has; real-time and composite alerts have no schedule to set. */
   sections: ComputedRef<readonly AlertSectionDef[]>;
   items: ComputedRef<SectionNavItem[]>;
   errorCounts: ComputedRef<Record<AlertSectionId, number>>;
@@ -315,19 +316,13 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   const { fieldMeta } = input;
 
   const mode = computed(() => String(input.formData.value?.is_real_time ?? "false"));
-  const sections = computed(() =>
-    mode.value === "true" || mode.value === "composite"
-      ? ALERT_SECTIONS.filter((section) => section.id !== "schedule")
-      : ALERT_SECTIONS,
-  );
+  const sections = computed(() => ALERT_SECTIONS);
 
   const errorCounts = computed(() => {
     const counts: Record<AlertSectionId, number> = {
       watch: 0,
       condition: 0,
       notify: 0,
-      schedule: 0,
-      details: 0,
     };
     for (const [name, meta] of Object.entries(fieldMeta.value ?? {})) {
       if (meta?.errors?.some((e) => e !== null && e !== undefined && e !== "")) {
@@ -659,23 +654,6 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       : t("alerts.sections.notify.incident");
   };
 
-  const schedulePhrase = (fd: AlertSectionsFormData): I18nText => {
-    if (mode.value === "true" || mode.value === "composite") {
-      return t("alerts.sections.schedule.realtime");
-    }
-    if (mode.value === "anomaly") {
-      const anomaly = input.anomalyConfig.value ?? {};
-      const value = Number(anomaly.schedule_interval_value ?? 1);
-      return anomaly.schedule_interval_unit === "m"
-        ? t("alerts.sections.everyMinutes", { count: value }, value)
-        : t("alerts.sections.everyHours", { count: value }, value);
-    }
-    if (fd.trigger_condition?.frequency_type === "cron") {
-      return t("alerts.sections.schedule.cron", { cron: fd.trigger_condition?.cron ?? "" });
-    }
-    return checkEveryLabel(fd, t);
-  };
-
   const sectionFacts = (id: AlertSectionId, fd: AlertSectionsFormData) => {
     switch (id) {
       case "watch": {
@@ -711,22 +689,17 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         const summary = facts.length ? raw([head, ...facts].join(NAV_SEPARATOR)) : head;
         return { missing: gap && !incomplete, empty: incomplete, summary };
       }
-      case "notify": {
+      default: {
         const count = notifyCount(fd);
         const incident = opensIncident(fd);
+        const named = hasValue(fd.name);
         return {
-          missing: false,
+          missing: !named,
+          attention: named ? undefined : t("alerts.sections.details.unnamed"),
           empty: count === 0 && !incident,
           summary: notifySummary(fd, count),
         };
       }
-      case "schedule":
-        return { missing: false, summary: schedulePhrase(fd) };
-      default:
-        return {
-          missing: !hasValue(fd.name),
-          summary: hasValue(fd.name) ? raw(fd.name) : t("alerts.sections.details.unnamed"),
-        };
     }
   };
 
@@ -746,7 +719,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       } else if (facts.missing) {
         if (seen) {
           state = "attention";
-          stateLabel = facts.summary;
+          stateLabel = "attention" in facts && facts.attention ? facts.attention : facts.summary;
         }
       } else if (input.changedSections?.value.has(id)) {
         state = "changed";
@@ -1170,12 +1143,13 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   const review = computed<AlertReviewLine[]>(() => {
     const fd = input.formData.value ?? {};
     const lines: AlertReviewLine[] = [
-      { id: "watch", ...watchLine(fd) },
-      { id: "condition", ...conditionLine(fd) },
-      { id: "notify", ...notifyLine(fd) },
+      { id: "watch", section: "watch", ...watchLine(fd) },
+      { id: "condition", section: "condition", ...conditionLine(fd) },
+      { id: "notify", section: "notify", ...notifyLine(fd) },
     ];
     // A real-time alert has no schedule; its watch line and verdict already say so.
-    if (mode.value !== "true") lines.push({ id: "schedule", ...scheduleLine(fd) });
+    if (mode.value !== "true")
+      lines.push({ id: "schedule", section: "condition", ...scheduleLine(fd) });
     return lines;
   });
 

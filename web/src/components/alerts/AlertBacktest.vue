@@ -114,6 +114,9 @@ const search = useAlertStreamQuery();
 const signal = inject(ALERT_BACKTEST_SIGNAL_KEY, null);
 const suggestions = inject(ALERT_SUGGESTIONS_KEY, null);
 const inPanel = computed(() => props.tested !== undefined);
+// The form shows the verdict line; the day strip and its notes open on request.
+const detailsOpen = ref(false);
+const showsDetails = computed(() => inPanel.value || detailsOpen.value);
 // Once Test it has run the alert as it stands, the day is the server's answer, for any query.
 const testRun = inject(ALERT_TEST_RUN_KEY, null);
 // A real-time row counts its own events: the dry run's counts stop at a cap per check.
@@ -499,8 +502,22 @@ const hourTitle = (hour: number, fired: boolean) => {
         >
           {{ waitAction }}
         </OButton>
+        <OButton
+          variant="link"
+          class="ms-1"
+          :aria-expanded="detailsOpen"
+          data-test="add-alert-backtest-toggle"
+          @click="detailsOpen = !detailsOpen"
+        >
+          {{ detailsOpen ? t("common.hide") : t("common.show") }}
+        </OButton>
       </p>
-      <div class="grid grid-cols-24 gap-0.5" :class="inPanel ? '' : 'mt-2'" aria-hidden="true">
+      <div
+        v-if="showsDetails"
+        class="grid grid-cols-24 gap-0.5"
+        :class="inPanel ? '' : 'mt-2'"
+        aria-hidden="true"
+      >
         <span
           v-for="(fired, hour) in day.hours"
           :key="hour"
@@ -514,12 +531,12 @@ const hourTitle = (hour: number, fired: boolean) => {
           :data-test="fired ? 'add-alert-backtest-hour-fired' : 'add-alert-backtest-hour'"
         />
       </div>
-      <div class="text-text-secondary mt-1 flex justify-between text-xs">
+      <div v-if="showsDetails" class="text-text-secondary mt-1 flex justify-between text-xs">
         <span>{{ t("alerts.sections.backtest.dayAgo") }}</span>
         <span>{{ t("alerts.sections.backtest.lastHour") }}</span>
       </div>
       <AlertLinkNote
-        v-if="!inPanel && !realTime && volumeText"
+        v-if="!inPanel && !realTime && volumeText && (detailsOpen || volume?.noisy)"
         class="mt-2"
         :text="volumeText"
         :action="waitAction"
@@ -536,7 +553,7 @@ const hourTitle = (hour: number, fired: boolean) => {
         @action="openHintTarget"
       />
       <AlertLinkNote
-        v-if="flapHint"
+        v-if="flapHint && showsDetails"
         class="mt-2"
         :text="flapHint.text"
         :action="flapHint.action"

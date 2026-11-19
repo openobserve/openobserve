@@ -101,14 +101,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="periodInline">
             <AlertLinkNote
               v-if="scheduleNote"
-              class="basis-full"
+              class="order-2 basis-full"
               :text="scheduleNote.text"
               :action="scheduleNote.action"
               :separated="scheduleNote.separated"
               data-test="alert-settings-check-every-link"
               @action="scheduleNote.run"
             />
-            <p v-else class="m-0 min-h-4 basis-full" aria-hidden="true" />
+            <p v-else class="order-2 m-0 min-h-4 basis-full" aria-hidden="true" />
           </template>
         </Teleport>
 
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             ref="silenceFieldRef"
             :label="t('alerts.form.remind.label')"
-            :description="
+            :info="
               isRealTime === 'true' ? t('alerts.form.remind.realtimeHelp') : notifyLines.remind
             "
             fill

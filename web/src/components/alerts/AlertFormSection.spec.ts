@@ -5,6 +5,7 @@ import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 import AlertFormSection from "./AlertFormSection.vue";
+import AlertStepNav from "./AlertStepNav.vue";
 import { ALERT_SECTIONS, type AlertSectionId } from "./alertFormSections";
 
 const OUT_OF_TAB_ORDER = /(^|:)(hidden|invisible)$/;
@@ -30,20 +31,15 @@ describe("AlertFormSection", () => {
     wrapper.unmount();
   });
 
-  const fourSteps = ALERT_SECTIONS.filter((section) => section.id !== "schedule");
   it.each([
-    [5, "watch", null, "condition"],
-    [5, "condition", "watch", "notify"],
-    [5, "details", "schedule", null],
-    [4, "notify", "condition", "details"],
-    [4, "details", "notify", null],
+    ["watch", null, "condition"],
+    ["condition", "watch", "notify"],
+    ["notify", "condition", null],
   ] as const)(
-    "in %i steps, %s's footer steps to its neighbours by name",
-    async (steps, id, back, next) => {
-      const sections = steps === 5 ? ALERT_SECTIONS : fourSteps;
-      const index = sections.findIndex((section) => section.id === id) + 1;
-      const wrapper = mount(AlertFormSection, {
-        props: { id, sections, title: raw("T"), help: raw("H") },
+    "the bar's Back and Next step from %s to its neighbours by name",
+    async (id, back, next) => {
+      const wrapper = mount(AlertStepNav, {
+        props: { sections: ALERT_SECTIONS, active: id },
         global: { plugins: [i18n] },
       });
       const nav = (target: AlertSectionId) =>
@@ -52,8 +48,8 @@ describe("AlertFormSection", () => {
         ["back", back],
         ["next", next],
       ] as const) {
-        const button = wrapper.find(`[data-test="add-alert-section-${index}-${dir}"]`);
-        expect(button.exists()).toBe(target !== null);
+        const button = wrapper.get(`[data-test="add-alert-step-${dir}"]`);
+        expect(button.attributes("disabled") !== undefined).toBe(target === null);
         if (target === null) continue;
         expect(button.text()).toContain(nav(target));
         await button.trigger("click");
