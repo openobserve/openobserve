@@ -731,6 +731,18 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
     );
 
     it.each(["visualize", "build"])(
+      "%s: ignores pending flags left over from Search once the chart has loaded",
+      async (mode) => {
+        const searchObj = await loadChartThenMoveTime(mode);
+        searchObj.meta.runPending = true;
+        await flushPromises();
+        const run = wrapper!.find('[data-test="logs-search-bar-visualize-refresh-btn"]');
+        expect(run.attributes("data-run-pending")).toBeUndefined();
+        expect(wrapper!.vm.panelRunPending).toBe(false);
+      },
+    );
+
+    it.each(["visualize", "build"])(
       "%s: shows Cancel, not pending, while the chart's query runs",
       async (mode) => {
         config.isEnterprise = "true";
@@ -738,7 +750,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         const searchObj = await loadChartThenMoveTime(mode);
         searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
         await flushPromises();
-        expect(wrapper!.vm.showRunQueryPending).toBe(true);
+        expect(wrapper!.vm.panelRunPending).toBe(true);
         expect(wrapper!.vm.visualizeRunPending).toBe(false);
         expect(wrapper!.find('[data-test="logs-search-bar-visualize-cancel-btn"]').exists()).toBe(
           true,
