@@ -61,9 +61,13 @@ describe("alertIntents", () => {
     ["traces", false, ["countWhere", "percentile", "anyEvent", "compareLastWeek"]],
     ["metrics", true, ["metricAbove", "ratio", "unusualChange", "promql"]],
     ["metrics", false, ["metricAbove", "ratio", "promql"]],
-  ])("offers %s intents (anomaly %s)", (type, anomaly, ids) => {
-    expect(intentsFor(type, { anomaly })).toEqual(ids);
-  });
+    ["metrics", true, ["percentile", "unusualChange", "promql"], true],
+  ] as const)(
+    "offers %s intents (anomaly %s): %j, histogram buckets %s",
+    (type, anomaly, ids, bucket) => {
+      expect(intentsFor(type, { anomaly, bucket })).toEqual(ids);
+    },
+  );
 
   it("does not offer a per-event intent once When unusual is picked", () => {
     expect(intentsFor("logs", { anomaly: true, howItChecks: "anomaly" })).not.toContain("anyEvent");
@@ -206,13 +210,34 @@ describe("alertIntents", () => {
       { lib: "flagd", svc: "flagd", route: "/eval", code: "200", node: "c" },
     ];
     const profile = labelProfile(series);
-    expect(rankMetricCategory(profile).fit[0]).toBe("lib");
-    expect(rankMetricCategory(profile, { group: "svc", series }).fit[0]).toBe("code");
+    expect(rankMetricCategory(profile).fit).toContain("lib");
+    expect(rankMetricCategory(profile, { group: "svc", series }).fit).not.toContain("lib");
     const oneCode = labelProfile([
       { code: "200", node: "a" },
       { code: "200", node: "b" },
     ]);
     expect(rankMetricCategory(oneCode)).toEqual({ fit: [], all: ["code", "node"] });
+  });
+
+  const lopsided = (label: string, [major, minor]: string[]) =>
+    [major, major, major, minor].map((v, i) => ({ [label]: v, node: `n${i}` }));
+  it.each([
+    ["status codes over a version", ["flavor", ["1.1", "2"]], ["code", ["200", "500"]], "code"],
+    [
+      "outcomes over a library",
+      ["lib", ["aspnet", "flagd"]],
+      ["status", ["Ok", "Error"]],
+      "status",
+    ],
+    ["a plain number over a version", ["flavor", ["1.1", "2.0"]], ["proto", ["3", "2"]], "proto"],
+  ])("a share filters on %s", (_, [a, av], [b, bv], first) => {
+    const series = lopsided(a as string, av as string[]).map((one, i) => ({
+      ...one,
+      ...lopsided(b as string, bv as string[])[i],
+    }));
+    const ranked = rankMetricCategory(labelProfile(series));
+    expect(ranked.fit[0]).toBe(first);
+    expect(ranked.fit).not.toContain("flavor");
   });
 
   it("ranks numbers by tail weight, heavy-tailed first", () => {
@@ -446,6 +471,18 @@ describe("alertIntents", () => {
     { intent: "metricAbove", counter: true, group: undefined, promql: "rate(m[10m])" },
     { intent: "promql", counter: true, group: undefined, promql: "rate(m[10m])" },
     { intent: "promql", counter: false, group: undefined, promql: "m" },
+    {
+      intent: "percentile",
+      counter: true,
+      group: "svc",
+      promql: "histogram_quantile(0.95, sum by (le, svc) (rate(m[10m])))",
+    },
+    {
+      intent: "percentile",
+      counter: false,
+      group: undefined,
+      promql: "histogram_quantile(0.95, sum by (le) (rate(m[10m])))",
+    },
   ] as const)(
     "$intent on a counter $counter per $group reads $promql",
     ({ intent, counter, group, promql }) => {
@@ -490,6 +527,7 @@ describe("alertIntents", () => {
     ["gauge above a value", mt("metricAbove", { counter: false }), HAVING],
     ["counter above a value", mt("metricAbove", { counter: true }), PROMQL],
     ["error-rate share", mt("ratio", { label: "code", values: ["5"] }), PROMQL],
+    ["histogram percentile", mt("percentile", {}), PROMQL],
     ["as it happens", ev("anyEvent", {}), null],
     ["compare with last week", ev("compareLastWeek", {}), null],
     ["unusual volume", ev("unusualVolume", {}), null],
@@ -518,9 +556,9 @@ describe("alertIntents", () => {
 
   it("ranks metric labels for grouping by how many series carry them", () => {
     const profile = labelProfile([
-      { __name__: "m", host: "a", cpu: "0", job: "x" },
-      { __name__: "m", host: "a", cpu: "1", job: "x" },
-      { __name__: "m", host: "b", cpu: "2" },
+      { __name__: "m", host: "a", cpu: "0", job: "x", le: "0.5" },
+      { __name__: "m", host: "a", cpu: "1", job: "x", le: "1" },
+      { __name__: "m", host: "b", cpu: "2", le: "+Inf" },
     ]);
     expect(rankMetricGroup(profile).all).toEqual(["cpu", "host", "job"]);
   });

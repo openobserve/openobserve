@@ -108,7 +108,11 @@ export const METRIC_INTENTS: readonly IntentId[] = [
   "unusualChange",
   "promql",
 ];
+// A histogram's bucket series only reads as a percentile; a share or a raw rate of its buckets means nothing.
+const BUCKET_INTENTS: readonly IntentId[] = ["percentile", "unusualChange", "promql"];
 const ANOMALY_INTENTS = new Set<IntentId>(["unusualVolume", "unusualChange"]);
+/** The label a histogram's bucket series carry (the Prometheus bucket bound). */
+export const BUCKET_LABEL = "le";
 
 /** Fields asked about in the one shape search; a wider stream ranks its first ones only. */
 export const SHAPE_STRING_CAP = 24;
@@ -146,9 +150,10 @@ const ENTITY_TOKEN_MAX_SHARE = 0.25;
  */
 export function intentsFor(
   streamType: string,
-  opts: { anomaly: boolean; howItChecks?: string },
+  opts: { anomaly: boolean; howItChecks?: string; bucket?: boolean },
 ): IntentId[] {
-  const all = streamType === "metrics" ? METRIC_INTENTS : EVENT_INTENTS;
+  const metrics = opts.bucket ? BUCKET_INTENTS : METRIC_INTENTS;
+  const all = streamType === "metrics" ? metrics : EVENT_INTENTS;
   return all
     .filter((id) => opts.anomaly || !ANOMALY_INTENTS.has(id))
     .filter((id) => opts.howItChecks !== "anomaly" || id !== "anyEvent");
@@ -708,6 +713,16 @@ export function metricPromql(
   return `${opts.counter ? "sum" : "avg"} by (${opts.group}) (${read})`;
 }
 
+/** p95 over a histogram's bucket series; buckets are cumulative counters, so they are read as a rate. */
+export function percentilePromql(
+  metric: string,
+  opts: { group?: string; windowMinutes: number },
+): string {
+  const window = `${Math.max(1, Math.round(opts.windowMinutes))}m`;
+  const by = [BUCKET_LABEL, ...(opts.group ? [opts.group] : [])].join(", ");
+  return `histogram_quantile(0.95, sum by (${by}) (rate(${metric}[${window}])))`;
+}
+
 /** A metric intent as the values it writes. */
 export function buildMetricFill(
   intent: IntentId,
@@ -726,6 +741,23 @@ export function buildMetricFill(
         detection_function: "avg",
         detection_function_field: "value",
         ...anomalySchedule(),
+      },
+    };
+  }
+  if (intent === "percentile") {
+    return {
+      intent,
+      howItChecks: "false",
+      aggregation: false,
+      vrl: false,
+      values: {
+        "query_condition.type": "promql",
+        "query_condition.promql": percentilePromql(slots.metric, {
+          group: slots.group,
+          windowMinutes: ctx.periodMinutes,
+        }),
+        "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
+        "query_condition.promql_multi_alert": !!slots.group,
       },
     };
   }
@@ -949,11 +981,12 @@ export function rankMetricGroup(
   profile: ReturnType<typeof labelProfile>,
   opts: { metric?: string; orgUse?: ReadonlyMap<string, number> } = {},
 ): Ranked {
-  const labels = profile.map((p) => p.label);
+  const usable = profile.filter((p) => p.label !== BUCKET_LABEL);
+  const labels = usable.map((p) => p.label);
   const entity = (p: (typeof profile)[number]) =>
     opts.metric && wordValues(p) ? entityScore(opts.metric, p.label, labels) : 0;
   const use = (p: (typeof profile)[number]) => opts.orgUse?.get(p.label) ?? 0;
-  const fit = profile
+  const fit = usable
     .filter(
       (p) =>
         p.coverage >= CATEGORY_MIN_COVERAGE &&
@@ -999,8 +1032,21 @@ const seriesTopShare = (p: ReturnType<typeof labelProfile>[number]) => {
   return total ? (p.values[0]?.count ?? 0) / total : 0;
 };
 
-/** Labels ranked for "where [label] matches": few values, a majority of series beside a minority, on
- * nearly every series, never one the group already fixes (each group's share would be 0 or 100 %). */
+const VERSION_VALUE = /^\d+(\.\d+)*$/;
+const STATUS_CODE = /^\d{3}$/;
+const OUTCOME_WORD =
+  /(^|[^a-z])(ok|error|err|success|succeeded|fail|failed|failure|timeout|unset)([^a-z]|$)/i;
+/** Numbers such as 1.1 and 2 name a version, which never splits good from bad. */
+const versionLike = (p: ReturnType<typeof labelProfile>[number]) =>
+  p.values.every((v) => VERSION_VALUE.test(v.value) && !STATUS_CODE.test(v.value)) &&
+  p.values.some((v) => v.value.includes("."));
+/** Three-digit codes or outcome words: what an error rate filters on. */
+const statusLike = (p: ReturnType<typeof labelProfile>[number]) =>
+  p.values.every((v) => STATUS_CODE.test(v.value)) ||
+  p.values.some((v) => OUTCOME_WORD.test(v.value));
+
+/** Labels ranked for "where [label] matches": lopsided, on nearly every series, not fixed by the group
+ * (its share would be 0 or 100 %); status-like labels lead and version-like ones never fit. */
 export function rankMetricCategory(
   profile: ReturnType<typeof labelProfile>,
   opts: { group?: string; series?: readonly SeriesLabels[] } = {},
@@ -1013,9 +1059,15 @@ export function rankMetricCategory(
         p.values.length >= 2 &&
         p.values.length <= CATEGORY_MAX_DISTINCT &&
         seriesTopShare(p) >= MAJORITY_SHARE &&
+        !versionLike(p) &&
         (!group || fixedByGroup(series, p.label, group) < FIXED_BY_GROUP),
     )
-    .sort((a, b) => seriesTopShare(b) - seriesTopShare(a) || b.coverage - a.coverage)
+    .sort(
+      (a, b) =>
+        Number(statusLike(b)) - Number(statusLike(a)) ||
+        seriesTopShare(b) - seriesTopShare(a) ||
+        b.coverage - a.coverage,
+    )
     .map((p) => p.label);
   return ranked(
     fit,
