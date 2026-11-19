@@ -1714,6 +1714,8 @@ function restoreUrlQueryParams() {
 
   if (queryParams.query) {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+  } else if (queryParams.stream) {
+    searchObj.data.editorValue = "";
   }
 
   searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);

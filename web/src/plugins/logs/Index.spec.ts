@@ -1490,8 +1490,10 @@ describe("Logs Index", async () => {
       selectedStream = ["app_logs"],
       errorMsg = "",
       filterErrMsg = "",
+      streamType = "logs",
     } = {}) => {
       const { searchObj } = wrapper.vm;
+      searchObj.data.stream.streamType = streamType;
       searchObj.loadingStream = false;
       searchObj.data.stream.streamLists = [{ label: "app_logs", value: "app_logs" }];
       searchObj.data.stream.selectedStream = selectedStream;
@@ -1523,6 +1525,21 @@ describe("Logs Index", async () => {
         logSamples: hits,
         analysisType: "volume",
       });
+    });
+
+    it.each(["traces", "metrics"])(
+      "passes the %s stream type to the dashboard instead of logs",
+      async (streamType) => {
+        await enterDrillDown({ streamType });
+
+        expect(dashboard().props("streamType")).toBe(streamType);
+      },
+    );
+
+    it("falls back to logs when the stream type is empty", async () => {
+      await enterDrillDown({ streamType: "" });
+
+      expect(dashboard().props("streamType")).toBe("logs");
     });
 
     it("hides the search results section while active", async () => {
@@ -1669,5 +1686,28 @@ describe("Logs Index", async () => {
 
       await router.replace({ path: router.currentRoute.value.path, query: {} });
     });
+
+    it.each(["bogus", "patterns"])(
+      "opens Search for a %s tab the build cannot show",
+      async (toggle) => {
+        wrapper.unmount();
+        (store.state as any).logs.isInitialized = false;
+        await router.replace({
+          path: router.currentRoute.value.path,
+          query: { stream: "app_logs", logs_visualize_toggle: toggle },
+        });
+        loaderCalls.length = 0;
+
+        wrapper = mount(Index, {
+          attachTo: "#app",
+          global: { provide: { store }, plugins: [i18n, router] },
+        });
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+
+        await router.replace({ path: router.currentRoute.value.path, query: {} });
+      },
+    );
   });
 });

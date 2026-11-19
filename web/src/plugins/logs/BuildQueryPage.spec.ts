@@ -399,6 +399,37 @@ describe("BuildQueryPage Component", () => {
       expect(mockDashboardPanelData.data.queries[0].fields.stream_type).toBe("logs");
     });
 
+    it.each(["traces", "metrics"])(
+      "keeps the %s stream type of the selected stream when no query",
+      async (streamType) => {
+        wrapper = createWrapper({
+          searchQuery: "",
+          selectedStream: "my_stream",
+          selectedStreamType: streamType,
+        });
+        await flushPromises();
+
+        expect(mockDashboardPanelData.data.queries[0].fields.stream).toBe("my_stream");
+        expect(mockDashboardPanelData.data.queries[0].fields.stream_type).toBe(streamType);
+      },
+    );
+
+    it("parses the SQL query with the selected stream type", async () => {
+      const { parseSQL } = await import("@/utils/query/sqlQueryParser");
+      (parseSQL as any).mockClear();
+      wrapper = createWrapper({
+        searchQuery: 'SELECT count(_timestamp) as "y_axis_1" FROM "my_stream"',
+        selectedStream: "my_stream",
+        selectedStreamType: "traces",
+      });
+      await flushPromises();
+
+      expect(parseSQL).toHaveBeenCalledWith(
+        'SELECT count(_timestamp) as "y_axis_1" FROM "my_stream"',
+        "traces",
+      );
+    });
+
     it("should call updateGroupedFields when stream is set", async () => {
       wrapper = createWrapper({
         searchQuery: "",
