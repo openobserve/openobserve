@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import BuildQueryPage from "./BuildQueryPage.vue";
+import type { ParsedQuery } from "@/utils/query/sqlQueryParser";
 import { searchState } from "@/composables/useLogs/searchState";
 
 // Mock vuex store
@@ -104,6 +105,7 @@ const mockDashboardPanelData = reactive({
       {
         query: "",
         customQuery: false,
+        config: { limit: 0 },
         fields: {
           stream: "",
           stream_type: "logs",
@@ -755,11 +757,12 @@ describe("BuildQueryPage Component", () => {
       });
 
       wrapper = createWrapper({
-        searchQuery: 'SELECT * FROM "test_stream"',
+        searchQuery: "SELECT * FROM \"test_stream\" WHERE level = 'error'",
         selectedStream: "test_stream",
       });
       await flushPromises();
 
+      expect(parseSQL).toHaveBeenCalled();
       expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(false);
     });
 
@@ -775,6 +778,105 @@ describe("BuildQueryPage Component", () => {
 
       expect(mockDashboardPanelData.data.type).toBe("table");
       expect(mockDashboardPanelData.data.config.table_dynamic_columns).toBe(true);
+    });
+
+    it("should open custom mode with the original SQL when the builder emits a query while parsing", async () => {
+      const { shouldUseCustomMode, parseSQL } = await import("@/utils/query/sqlQueryParser");
+      let resolveParse: (value: ParsedQuery) => void = () => {};
+      vi.mocked(parseSQL).mockReturnValueOnce(new Promise((resolve) => (resolveParse = resolve)));
+      vi.mocked(shouldUseCustomMode).mockReturnValueOnce(false);
+      const query = 'SELECT service, count(*) FROM "test_stream" GROUP BY service LIMIT 2 OFFSET 1';
+
+      wrapper = createWrapper({ searchQuery: query, selectedStream: "test_stream" });
+      await flushPromises();
+      wrapper.vm.onQueryGenerated("");
+      await wrapper.setProps({ searchQuery: "" });
+      resolveParse({
+        customQuery: true,
+        parseError: "Contains OFFSET or a non-numeric LIMIT",
+      } as ParsedQuery);
+      await flushPromises();
+      expect(wrapper.emitted("queryGenerated")?.flat() ?? []).not.toContain("");
+      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
+      expect(mockDashboardPanelData.data.queries[0].query).toBe(query);
+    });
+
+    it("should drop a parse result that resolves after a newer initialisation", async () => {
+      const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
+        await import("@/utils/query/sqlQueryParser");
+      let resolveStale: (value: unknown) => void = () => {};
+      vi.mocked(parseSQL)
+        .mockReturnValueOnce(new Promise((resolve) => (resolveStale = resolve)))
+        .mockResolvedValueOnce({ customQuery: true } as Awaited<ReturnType<typeof parseSQL>>);
+      vi.mocked(shouldUseCustomMode).mockReturnValueOnce(false).mockReturnValueOnce(false);
+      const query = 'SELECT service, count(*) FROM "test_stream" GROUP BY service';
+
+      wrapper = createWrapper({ searchQuery: query, selectedStream: "test_stream" });
+      await flushPromises();
+      searchState().searchObj.meta.savedBuildConfig = { config: {} };
+      await flushPromises();
+      resolveStale({ customQuery: false, stream: "test_stream" });
+      await flushPromises();
+
+      expect(parseSQL).toHaveBeenCalledTimes(2);
+      expect(parsedQueryToPanelFields).not.toHaveBeenCalled();
+      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
+      expect(mockDashboardPanelData.data.queries[0].query).toBe(query);
+    });
+
+    it("should carry the parsed LIMIT into the builder query config", async () => {
+      const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
+        await import("@/utils/query/sqlQueryParser");
+      vi.mocked(parseSQL).mockResolvedValueOnce({
+        customQuery: false,
+        stream: "test_stream",
+      } as ParsedQuery);
+      vi.mocked(parsedQueryToPanelFields).mockReturnValueOnce({
+        stream: "test_stream",
+        stream_type: "logs",
+        x: [{ column: "service", alias: "x_axis_1" }],
+        y: [{ column: "_timestamp", alias: "y_axis_1", functionName: "count" }],
+        breakdown: [],
+        filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+        limit: 2,
+      });
+      vi.mocked(shouldUseCustomMode).mockReturnValueOnce(false);
+
+      wrapper = createWrapper({
+        searchQuery: 'SELECT service, count(*) FROM "test_stream" GROUP BY service LIMIT 2',
+        selectedStream: "test_stream",
+      });
+      await vi.waitFor(() =>
+        expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(false),
+      );
+      expect(mockDashboardPanelData.data.queries[0].config.limit).toBe(2);
+    });
+
+    it("should restore the LIMIT from a shared link's build_data", async () => {
+      const { decodeBuildConfig } = await import("@/composables/useLogs/logsVisualization");
+      vi.mocked(decodeBuildConfig).mockReturnValueOnce({
+        type: "bar",
+        fields: {
+          stream: "test_stream",
+          x: [{ column: "service", alias: "x_axis_1" }],
+          y: [{ column: "_timestamp", alias: "y_axis_1", functionName: "count" }],
+        },
+        limit: 7,
+        customQuery: false,
+      });
+      mockRouter.currentRoute.value.query = { build_data: "encoded" };
+
+      try {
+        wrapper = createWrapper({ selectedStream: "test_stream" });
+        await flushPromises();
+      } finally {
+        mockRouter.currentRoute.value.query = {};
+      }
+
+      expect(mockDashboardPanelData.data.queries[0].fields.x).toEqual([
+        { column: "service", alias: "x_axis_1" },
+      ]);
+      expect(mockDashboardPanelData.data.queries[0].config.limit).toBe(7);
     });
 
     it.each(["NOT (level = 'info')", "status BETWEEN 400 AND 450", "lower(level) = 'info'"])(

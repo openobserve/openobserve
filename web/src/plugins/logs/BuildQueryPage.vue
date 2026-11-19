@@ -255,6 +255,7 @@ const restoreConfigFromUrl = (): {
   config?: any;
   fields?: any;
   joins?: any[];
+  limit?: number;
   customQuery?: boolean;
   query?: string;
 } => {
@@ -274,6 +275,7 @@ const restoreConfigFromUrl = (): {
       config: decoded.config,
       fields: decoded.fields,
       joins: decoded.joins,
+      limit: decoded.limit,
       customQuery: decoded.customQuery,
       query: decoded.query,
     };
@@ -351,6 +353,7 @@ const initializeFromQuery = async () => {
     if (urlConfig.joins) {
       dashboardPanelData.data.queries[0].joins = urlConfig.joins;
     }
+    dashboardPanelData.data.queries[0].config.limit = urlConfig.limit ?? 0;
     if (urlConfig.query) {
       dashboardPanelData.data.queries[0].query = urlConfig.query;
     }
@@ -472,14 +475,22 @@ const initializeFromQuery = async () => {
     }
     dashboardPanelData.data.config.table_dynamic_columns = true;
   } else {
+    // Stay in custom mode while parsing, or the empty builder writes its own SQL over the query.
+    const searchQuery = props.searchQuery;
+    dashboardPanelData.data.queries[0].query = searchQuery;
+    dashboardPanelData.data.queries[0].customQuery = true;
+    holdGeneratedQuery.value = true;
     try {
       // Try to parse the query
-      const parsed = await parseSQL(props.searchQuery, props.selectedStreamType || "logs");
+      const parsed = await parseSQL(searchQuery, props.selectedStreamType || "logs");
+      if (seq !== initSeq) return;
+      holdGeneratedQuery.value = false;
 
-      const sqlWhere = parsed.customQuery ? "" : await extractWhereClause(props.searchQuery);
+      const sqlWhere = parsed.customQuery ? "" : await extractWhereClause(searchQuery);
       // A WHERE the builder cannot hold would chart every row, so run the SQL as written.
       const whereHeld =
         !!sqlWhere.trim() && !(await parseWhereClauseToFilterChecked(sqlWhere)).complete;
+      if (seq !== initSeq) return;
 
       if (parsed.customQuery || whereHeld) {
         // Parsing failed or complex query detected
@@ -488,7 +499,7 @@ const initializeFromQuery = async () => {
           dashboardPanelData.data.queries[0].fields.stream_type =
             props.selectedStreamType || "logs";
         }
-        dashboardPanelData.data.queries[0].query = props.searchQuery;
+        dashboardPanelData.data.queries[0].query = searchQuery;
         dashboardPanelData.data.queries[0].customQuery = true;
         // Use table chart with dynamic columns for custom mode (unless chart type from URL)
         if (shouldAutoSelectChartType) {
@@ -516,6 +527,7 @@ const initializeFromQuery = async () => {
         if (panelFields.joins && panelFields.joins.length > 0) {
           dashboardPanelData.data.queries[0].joins = panelFields.joins;
         }
+        dashboardPanelData.data.queries[0].config.limit = panelFields.limit;
 
         // Auto-select chart type based on fields (unless chart type from URL):
         // - If useTableChart flag is set (more than 2 GROUP BY fields) → use "table" chart
@@ -540,13 +552,15 @@ const initializeFromQuery = async () => {
         }
       }
     } catch (error) {
+      if (seq !== initSeq) return;
+      holdGeneratedQuery.value = false;
       console.error("Error parsing query:", error);
       // Fall back to custom mode
       if (props.selectedStream) {
         dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
         dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
       }
-      dashboardPanelData.data.queries[0].query = props.searchQuery;
+      dashboardPanelData.data.queries[0].query = searchQuery;
       dashboardPanelData.data.queries[0].customQuery = true;
       // Use table chart with dynamic columns for custom mode (unless chart type from URL on first toggle)
       if (shouldAutoSelectChartType) {
