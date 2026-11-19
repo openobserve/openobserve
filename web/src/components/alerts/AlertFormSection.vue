@@ -93,7 +93,7 @@ provide(SETTING_ROW_GRID_KEY, true);
           {{ title }}
         </h2>
         <span
-          class="text-text-secondary text-xs whitespace-nowrap"
+          class="text-text-secondary text-xs whitespace-nowrap max-xl:sr-only"
           :data-test="`add-alert-section-${id}-eyebrow`"
         >
           {{ t("alerts.sections.eyebrow", { n: index, total }) }}

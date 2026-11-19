@@ -70,9 +70,14 @@ describe("pickSuggestion", () => {
   it.each<
     [string, ReadonlySet<AlertSuggestionId>, { id: AlertSuggestionId; queued: number } | null]
   >([
-    ["two qualify: the first, one queued", new Set(), { id: "recovery", queued: 1 }],
-    ["the first dismissed: the second", new Set(["recovery"]), { id: "oncall", queued: 0 }],
-    ["none left", new Set(["recovery", "oncall"]), null],
+    ["three qualify: the first, two queued", new Set(), { id: "recovery", queued: 2 }],
+    ["the first dismissed: the second", new Set(["recovery"]), { id: "oncall", queued: 1 }],
+    [
+      "the name's step adds priority last",
+      new Set(["recovery", "oncall"]),
+      { id: "priority", queued: 0 },
+    ],
+    ["none left", new Set(["recovery", "oncall", "priority"]), null],
   ])("%s", (_name, dismissed, expected) => {
     expect(pickSuggestion("notify", both, dismissed)).toEqual(expected);
   });

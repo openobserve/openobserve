@@ -24,6 +24,7 @@ import { computed, defineComponent, h, ref } from "vue";
 import { describe, it, expect, vi, afterEach, beforeEach, onTestFinished } from "vitest";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import AlertFormSection from "@/components/alerts/AlertFormSection.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import alertsService from "@/services/alerts";
@@ -1862,16 +1863,21 @@ describe("AddAlert (OForm owner)", () => {
       rects.mockRestore();
     });
 
-    it("names the alert types as ways of checking, keeping their ids", async () => {
-      wrapper = mountAlert();
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-type-tab-false"]').text()).toContain(
-        "On a schedule",
-      );
-      expect(wrapper.find('[data-test="add-alert-type-tab-true"]').text()).toContain(
-        "As it happens",
-      );
-    });
+    it.each([
+      ["false", "alerts.scheduled", "alerts.sections.typeHelp.scheduled"],
+      ["true", "alerts.realTime", "alerts.sections.typeHelp.realtime"],
+    ])(
+      "names alert type %s by its short name and says what it does in a tooltip",
+      async (id, label, help) => {
+        wrapper = mountAlert();
+        await flushPromises();
+        const item = wrapper
+          .findAllComponents(OToggleGroupItem)
+          .find((candidate) => candidate.props("value") === id)!;
+        expect(item.text()).toContain(i18n.global.t(label));
+        expect(item.props("tooltip")).toBe(i18n.global.t(help));
+      },
+    );
 
     it.each([
       ["false", "alerts.sections.condition.help"],

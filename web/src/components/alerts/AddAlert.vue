@@ -327,53 +327,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="lock" size="xs" />
                 {{ t("alerts.form.watch.locked") }}
               </p>
-              <OSettingRow
-                :label="t('alerts.sections.howItChecks')"
-                fill
-                wide
-                data-test="add-alert-how-it-checks-row"
-              >
-                <OToggleGroup
-                  :model-value="formData.is_real_time"
-                  :aria-label="t('alerts.sections.howItChecks')"
-                  :disabled="beingUpdated || anomalyEditMode"
-                  class="min-w-0 flex-wrap"
-                  mobile-dropdown
-                  data-test="add-alert-type-tabs"
-                  @update:model-value="onAlertTypeChange($event as string)"
+              <div class="[container-type:inline-size] [container-name:stream-config]">
+                <div
+                  class="border-border-default flex items-center gap-0 border-b py-2.5"
+                  data-test="add-alert-how-it-checks-row"
                 >
-                  <OToggleGroupItem
-                    v-for="option in alertTypeOptions"
-                    :key="option.value"
-                    :value="option.value"
-                    size="sm"
-                    :icon-left="option.icon"
-                    :disabled="option.disabled"
-                    :focusable-unavailable="option.disabled"
-                    :tooltip="option.description"
-                    :data-test="option.dataTest"
+                  <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+                  <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
+                    t("alerts.alertType")
+                  }}</span>
+                  <OToggleGroup
+                    :model-value="formData.is_real_time"
+                    :disabled="beingUpdated || anomalyEditMode"
+                    class="min-w-0"
+                    mobile-dropdown
+                    data-test="add-alert-type-tabs"
+                    @update:model-value="onAlertTypeChange($event as string)"
                   >
-                    {{ option.label }}
-                  </OToggleGroupItem>
-                </OToggleGroup>
-              </OSettingRow>
-              <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
-                <OSettingRow :label="t('alerts.sections.rows.streamLabel')" required fill>
-                  <div class="flex min-w-0 flex-wrap items-center gap-2">
-                    <OFormSelect
-                      ref="streamTypeRef"
-                      name="stream_type"
-                      :aria-label="t('alerts.streamType')"
-                      data-test="add-alert-stream-type-select-dropdown"
-                      :options="streamTypeOptions"
-                      :searchable="false"
-                      class="w-28! max-md:w-full!"
-                      :disabled="beingUpdated || anomalyEditMode"
-                      @update:model-value="onStreamTypeChange"
-                    />
-                    <div
-                      class="max-w-75 min-w-36 flex-1 max-md:w-full max-md:max-w-none max-md:basis-full"
+                    <OToggleGroupItem
+                      v-for="option in alertTypeOptions"
+                      :key="option.value"
+                      :value="option.value"
+                      size="sm"
+                      :disabled="option.disabled"
+                      :focusable-unavailable="option.disabled"
+                      :tooltip="option.description"
+                      :data-test="option.dataTest"
                     >
+                      <template #icon-left>
+                        <OIcon :name="option.disabled ? 'lock' : option.icon!" size="sm" />
+                      </template>
+                      {{ option.label }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                </div>
+                <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
+                  <div class="flex items-center gap-4 py-2 max-md:flex-wrap max-md:gap-2">
+                    <div class="flex items-center gap-1.5">
+                      <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                        {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
+                      </div>
+                      <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
+                      <OFormSelect
+                        ref="streamTypeRef"
+                        name="stream_type"
+                        :aria-label="t('alerts.streamType')"
+                        data-test="add-alert-stream-type-select-dropdown"
+                        :options="streamTypeOptions"
+                        :searchable="false"
+                        class="stream-type-select w-37.5! @max-[900px]/stream-config:w-27.5! @max-[600px]/stream-config:w-17.5!"
+                        :disabled="beingUpdated || anomalyEditMode"
+                        @update:model-value="onStreamTypeChange"
+                      />
+                      <!-- eslint-enable local/no-hardcoded-px -->
+                    </div>
+                    <div class="flex min-w-0 flex-1 items-center gap-1.5 max-md:basis-full">
+                      <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                        {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
+                      </div>
                       <OFormSelect
                         ref="streamNameRef"
                         name="stream_name"
@@ -386,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : undefined
                         "
                         :loading="isFetchingStreams"
-                        class="w-full"
+                        class="w-full! max-w-75 min-w-0"
                         :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                         @update:model-value="updateStreamFields($event)"
                       >
@@ -400,22 +411,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
-                </OSettingRow>
-                <OCollapsible
-                  v-if="formData.stream_name && !isAnomalyMode"
-                  :label="t('alerts.form.watch.streamContents')"
-                  data-test="add-alert-stream-contents"
-                >
-                  <AlertMetricLabels
-                    v-if="formData.stream_type === 'metrics'"
-                    :stream-name="formData.stream_name"
-                    @insert="onMetricLabelInsert"
-                  />
-                  <AlertSampleEvents
-                    :stream-name="formData.stream_name"
-                    :stream-type="formData.stream_type"
-                  />
-                </OCollapsible>
+                  <OCollapsible
+                    v-if="formData.stream_name && !isAnomalyMode"
+                    :label="t('alerts.form.watch.streamContents')"
+                    data-test="add-alert-stream-contents"
+                  >
+                    <AlertMetricLabels
+                      v-if="formData.stream_type === 'metrics'"
+                      :stream-name="formData.stream_name"
+                      @insert="onMetricLabelInsert"
+                    />
+                    <AlertSampleEvents
+                      :stream-name="formData.stream_name"
+                      :stream-type="formData.stream_type"
+                    />
+                  </OCollapsible>
+                </div>
               </div>
               <AlertIntentStart
                 v-if="showsIntentStart"
@@ -1727,14 +1738,14 @@ export default defineComponent({
     );
     const alertTypeOptions = computed<ChoiceCardOption[]>(() => [
       {
-        label: alertForm.t("alerts.sections.onSchedule"),
+        label: alertForm.t("alerts.scheduled"),
         description: alertForm.t("alerts.sections.typeHelp.scheduled"),
         value: "false",
         icon: "schedule",
         dataTest: "add-alert-type-tab-false",
       },
       {
-        label: alertForm.t("alerts.sections.asItHappens"),
+        label: alertForm.t("alerts.realTime"),
         description: alertForm.t("alerts.sections.typeHelp.realtime"),
         value: "true",
         icon: "bolt",
@@ -1743,7 +1754,7 @@ export default defineComponent({
       ...(isAnomalyDetectionEnabled.value || anomalyLicenseLocked.value
         ? [
             {
-              label: alertForm.t("alerts.sections.whenUnusual"),
+              label: alertForm.t("alerts.anomalyDetection"),
               description: anomalyLicenseLocked.value
                 ? anomalyLockedReason.value
                 : alertForm.t("alerts.sections.typeHelp.anomaly"),
@@ -1758,7 +1769,7 @@ export default defineComponent({
       isCompositeMode.value
         ? [
             {
-              label: alertForm.t("alerts.sections.whenCombined"),
+              label: alertForm.t("alerts.compositeAlert"),
               description: alertForm.t("alerts.sections.typeHelp.composite"),
               value: "composite",
               icon: "account-tree" as const,
