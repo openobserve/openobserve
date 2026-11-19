@@ -19,8 +19,14 @@ const NO_ENTRANCE = { animationDuration: 0, animationDurationUpdate: 0 };
 export const withoutEntrance = (options: Record<string, unknown>): Record<string, unknown> => {
   const { series } = options;
   // A series' own duration overrides the root one, so each series is zeroed too.
-  const still = (entry: unknown) =>
-    entry && typeof entry === "object" ? { ...entry, ...NO_ENTRANCE } : entry;
+  const still = (entry: unknown) => {
+    if (!entry || typeof entry !== "object") return entry;
+    // A treemap stuck at a 0 update duration never lands a zoom; switched off, it draws every render and zoom at once.
+    if ((entry as { type?: unknown }).type === "treemap") {
+      return { ...entry, ...NO_ENTRANCE, animation: false };
+    }
+    return { ...entry, ...NO_ENTRANCE };
+  };
   return {
     ...options,
     ...NO_ENTRANCE,
