@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import BuildQueryPage from "./BuildQueryPage.vue";
+import type { ParsedQuery } from "@/utils/query/sqlQueryParser";
 import { searchState } from "@/composables/useLogs/searchState";
 
 // Mock vuex store
@@ -750,16 +751,19 @@ describe("BuildQueryPage Component", () => {
 
     it("should open custom mode with the original SQL when the builder emits a query while parsing", async () => {
       const { shouldUseCustomMode, parseSQL } = await import("@/utils/query/sqlQueryParser");
-      let resolveParse: (value: unknown) => void = () => {};
-      (parseSQL as any).mockReturnValueOnce(new Promise((resolve) => (resolveParse = resolve)));
-      (shouldUseCustomMode as any).mockReturnValueOnce(false);
+      let resolveParse: (value: ParsedQuery) => void = () => {};
+      vi.mocked(parseSQL).mockReturnValueOnce(new Promise((resolve) => (resolveParse = resolve)));
+      vi.mocked(shouldUseCustomMode).mockReturnValueOnce(false);
       const query = 'SELECT service, count(*) FROM "test_stream" GROUP BY service LIMIT 2 OFFSET 1';
 
       wrapper = createWrapper({ searchQuery: query, selectedStream: "test_stream" });
       await flushPromises();
       wrapper.vm.onQueryGenerated("");
       await wrapper.setProps({ searchQuery: "" });
-      resolveParse({ customQuery: true, parseError: "Contains OFFSET or a non-numeric LIMIT" });
+      resolveParse({
+        customQuery: true,
+        parseError: "Contains OFFSET or a non-numeric LIMIT",
+      } as ParsedQuery);
       await flushPromises();
       expect(wrapper.emitted("queryGenerated")?.flat() ?? []).not.toContain("");
       expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
@@ -769,8 +773,11 @@ describe("BuildQueryPage Component", () => {
     it("should carry the parsed LIMIT into the builder query config", async () => {
       const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
         await import("@/utils/query/sqlQueryParser");
-      (parseSQL as any).mockResolvedValueOnce({ customQuery: false, stream: "test_stream" });
-      (parsedQueryToPanelFields as any).mockReturnValueOnce({
+      vi.mocked(parseSQL).mockResolvedValueOnce({
+        customQuery: false,
+        stream: "test_stream",
+      } as ParsedQuery);
+      vi.mocked(parsedQueryToPanelFields).mockReturnValueOnce({
         stream: "test_stream",
         stream_type: "logs",
         x: [{ column: "service", alias: "x_axis_1" }],
@@ -779,7 +786,7 @@ describe("BuildQueryPage Component", () => {
         filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
         limit: 2,
       });
-      (shouldUseCustomMode as any).mockReturnValueOnce(false);
+      vi.mocked(shouldUseCustomMode).mockReturnValueOnce(false);
 
       wrapper = createWrapper({
         searchQuery: 'SELECT service, count(*) FROM "test_stream" GROUP BY service LIMIT 2',

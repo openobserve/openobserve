@@ -3999,9 +3999,12 @@ describe("sqlUtils", () => {
 
 describe("applyQueryClauses", () => {
   const clausesOf = async (query: string) => {
-    const { default: sqlParser }: any =
-      await import("@openobserve/node-sql-parser/build/datafusionsql");
-    const ast = new sqlParser.Parser().astify(query);
+    const parserModule = (await import("@openobserve/node-sql-parser/build/datafusionsql")) as {
+      default: {
+        Parser: new () => { astify: (sql: string) => Parameters<typeof applyQueryClauses>[0] };
+      };
+    };
+    const ast = new parserModule.default.Parser().astify(query);
     const fields = extractFields(ast, "_timestamp");
     return { fields, ...applyQueryClauses(ast, fields, "_timestamp") };
   };
