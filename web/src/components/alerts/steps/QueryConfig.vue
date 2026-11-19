@@ -958,7 +958,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-alert-query-label-guard"
               >
                 <OIcon name="error-outline" size="xs" class="mt-0.5 shrink-0" />
-                <span class="min-w-0">{{ promqlLabelIssue }}</span>
+                <span class="min-w-0 wrap-anywhere">{{ promqlLabelIssue }}</span>
               </span>
               <span
                 v-else-if="sqlOneRowWarning"
@@ -967,9 +967,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="add-alert-query-one-row-guard"
               >
                 <OIcon name="warning" size="xs" class="mt-0.5 shrink-0" />
-                <span class="min-w-0">{{ sqlOneRowWarning }}</span>
+                <span class="min-w-0 wrap-anywhere">{{ sqlOneRowWarning }}</span>
               </span>
-              <span v-else class="block">{{ whichEventsHelp }}</span>
+              <!-- A metric name has no spaces, so it breaks mid-word rather than run under the editor. -->
+              <span v-else class="block wrap-anywhere">{{ whichEventsHelp }}</span>
               <OButton
                 data-test="step2-view-editor-btn"
                 variant="link"
