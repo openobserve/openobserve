@@ -1147,7 +1147,9 @@ pub async fn remove_user_from_org(
         Ok(id) => id,
         Err(e) => {
             log::error!("error resolving the id of {email_id}: {e}");
-            None
+            return Ok(MetaHttpResponse::internal_error(
+                "could not resolve the user to remove",
+            ));
         }
     };
 
@@ -1169,7 +1171,7 @@ pub async fn remove_user_from_org(
 
     let removal =
         if user.organizations.len() == 1 && is_sole_membership(&membership, email_id).await {
-            remove_user_with_last_membership(&user, &membership).await
+            remove_user_with_last_membership(&user, &membership, user_id.as_deref()).await
         } else {
             remove_one_membership(&user, &membership).await
         };
@@ -1205,20 +1207,30 @@ pub async fn remove_user_from_org(
 }
 
 pub async fn delete_user(email_id: &str) -> Result<Response, Error> {
-    if let Ok(Some(user_id)) = infra::table::users::get_id_by_email(email_id).await {
+    let user_id = match infra::table::users::get_id_by_email(email_id).await {
+        Ok(id) => id,
+        Err(e) => {
+            log::error!("error resolving the id of {email_id}: {e}");
+            return Ok(MetaHttpResponse::internal_error(
+                "could not resolve the user to delete",
+            ));
+        }
+    };
+    if let Some(user_id) = &user_id {
         let now = config::utils::time::now_micros();
-        if let Err(e) = infra::table::ai_chat_shares::revoke_for_creator(None, &user_id, now).await
-        {
+        if let Err(e) = infra::table::ai_chat_shares::revoke_for_creator(None, user_id, now).await {
             log::error!("error revoking AI chat shares of {email_id}: {e}");
         }
     }
-    #[cfg(feature = "enterprise")]
-    if let Ok(user) = db::user::get_db_user(email_id).await {
-        let orgs: Vec<String> = user.organizations.iter().map(|o| o.name.clone()).collect();
-        delete_ai_chats(&orgs, email_id).await;
+    let orgs: Vec<String> = match db::user::get_db_user(email_id).await {
+        Ok(user) => user.organizations.iter().map(|o| o.name.clone()).collect(),
+        Err(_) => vec![],
+    };
+    let deleted = db::user::delete(email_id).await;
+    if deleted.is_ok() {
+        delete_ai_chats(&orgs, email_id, user_id.as_deref()).await;
     }
-    let result = db::user::delete(email_id).await;
-    match result {
+    match deleted.and_then(|d| d.notified) {
         Ok(_) => {
             if let Err(e) = infra::table::query_history::delete_by_email(email_id).await {
                 log::error!("error deleting query history of {email_id}: {e}");
@@ -1441,14 +1453,20 @@ async fn is_sole_membership(membership: &UserOrg, email_id: &str) -> bool {
 }
 
 /// Deletes the user row together with its only membership; `Some` is the refusal or error.
-async fn remove_user_with_last_membership(user: &DBUser, membership: &UserOrg) -> Option<Response> {
+async fn remove_user_with_last_membership(
+    user: &DBUser,
+    membership: &UserOrg,
+    user_id: Option<&str>,
+) -> Option<Response> {
     if membership.role.eq(&UserRole::ServiceAccount) && user.is_external {
         return Some(MetaHttpResponse::forbidden("Not Allowed"));
     }
-    // The user row goes with the last org; their chats must not outlive it.
-    #[cfg(feature = "enterprise")]
-    delete_ai_chats(std::slice::from_ref(&membership.name), &user.email).await;
-    if let Err(e) = db::user::delete(&user.email).await {
+    let deleted = db::user::delete(&user.email).await;
+    // The user row went with the last org; their chats must not outlive it.
+    if deleted.is_ok() {
+        delete_ai_chats(std::slice::from_ref(&membership.name), &user.email, user_id).await;
+    }
+    if let Err(e) = deleted.and_then(|d| d.notified) {
         log::error!("error deleting user from db : {e}");
         return Some(MetaHttpResponse::internal_error(e.to_string()));
     }
@@ -1540,25 +1558,23 @@ async fn delete_cloud_invites(org_id: &str, email_id: &str) -> Option<Response> 
     ))
 }
 
-/// Deletes the user's chats in `orgs` while their `users.id` still resolves (replicas: the sweep).
+/// Deletes the user's chats in `orgs` by their stable id, once the user row is gone.
 #[cfg(feature = "enterprise")]
-async fn delete_ai_chats(orgs: &[String], email_id: &str) {
-    let user_id = match infra::table::users::get_id_by_email(email_id).await {
-        Ok(Some(id)) => id,
-        Ok(None) => return,
-        Err(e) => {
-            log::error!("error resolving {email_id} to delete their AI chats: {e}");
-            return;
-        }
+async fn delete_ai_chats(orgs: &[String], email_id: &str, user_id: Option<&str>) {
+    let Some(user_id) = user_id else {
+        return;
     };
     for org_id in orgs {
-        match crate::ai_chat::delete_all_for_user(org_id, &user_id).await {
+        match crate::ai_chat::delete_all_for_user(org_id, user_id).await {
             Ok(ids) if ids.is_empty() => {}
             Ok(ids) => log::info!("deleted {} AI chats of {email_id} in {org_id}", ids.len()),
             Err(e) => log::error!("error deleting AI chats of {email_id} in {org_id}: {e}"),
         }
     }
 }
+
+#[cfg(not(feature = "enterprise"))]
+async fn delete_ai_chats(_orgs: &[String], _email_id: &str, _user_id: Option<&str>) {}
 
 /// Creates a service account user record if it doesn't already exist
 /// This is used when creating organizations with a specified service account
@@ -1962,6 +1978,125 @@ mod tests {
         assert_eq!(resp.status(), http::StatusCode::OK);
         assert_eq!(history_count("dummy", email).await, 0);
         assert_eq!(history_count("other", email).await, 1);
+    }
+
+    async fn write_user_memory(org: &str, user_id: &str) {
+        use infra::table::ai_memory::{Change, MemoryKey};
+        let submission = db::ai_memory::Submission {
+            key: MemoryKey::user(org, user_id),
+            toolset_id: None,
+            base_rev: 0,
+            change: Change::Content("notes".to_string()),
+            settings: Default::default(),
+            author: config::meta::ai::memory::Author::User(user_id.to_string()),
+            is_memory_admin: false,
+            reason: None,
+            evidence: None,
+        };
+        db::ai_memory::submit(submission).await.unwrap();
+    }
+
+    async fn user_memory_exists(org: &str, user_id: &str) -> bool {
+        let key = infra::table::ai_memory::MemoryKey::user(org, user_id);
+        db::ai_memory::get(&key).await.unwrap().is_some()
+    }
+
+    /// Makes deleting this user's memory in `org` fail, as a broken meta store would.
+    async fn block_memory_delete(org: &str, user_id: &str, block: bool) {
+        use sea_orm::ConnectionTrait;
+        let conn = get_orm_client_rw().await;
+        let id: String = user_id
+            .chars()
+            .filter(char::is_ascii_alphanumeric)
+            .collect();
+        let name = format!("block_{}", id.to_ascii_lowercase());
+        let sql = match (conn.get_database_backend(), block) {
+            (sea_orm::DatabaseBackend::Postgres, true) => format!(
+                "CREATE FUNCTION {name}() RETURNS trigger AS $$ BEGIN IF OLD.org = '{org}' AND \
+                 OLD.scope_key = '{user_id}' THEN RAISE EXCEPTION 'blocked'; END IF; RETURN OLD; \
+                 END $$ LANGUAGE plpgsql; CREATE TRIGGER {name} BEFORE DELETE ON ai_memory FOR \
+                 EACH ROW EXECUTE FUNCTION {name}();"
+            ),
+            (sea_orm::DatabaseBackend::Postgres, false) => {
+                format!("DROP TRIGGER {name} ON ai_memory; DROP FUNCTION {name}();")
+            }
+            (_, true) => format!(
+                "CREATE TRIGGER {name} BEFORE DELETE ON ai_memory WHEN OLD.org = '{org}' AND \
+                 OLD.scope_key = '{user_id}' BEGIN SELECT RAISE(ABORT, 'blocked'); END;"
+            ),
+            (_, false) => format!("DROP TRIGGER {name};"),
+        };
+        conn.execute_unprepared(&sql).await.unwrap();
+    }
+
+    async fn meta_store_with_memory() -> bool {
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return false;
+        }
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        infra::table::cipher::boot(None).await.expect("cipher");
+        true
+    }
+
+    #[tokio::test]
+    async fn a_failed_memory_delete_rolls_back_the_removal_and_a_retry_finishes_it() {
+        if !meta_store_with_memory().await {
+            return;
+        }
+        let _guard = set_up().await;
+        let email = format!("memory-leaver-{}@example.com", config::ider::uuid());
+        create_user_with_history(&email).await;
+        let user_id = infra_table::users::get_id_by_email(&email)
+            .await
+            .unwrap()
+            .unwrap();
+        write_user_memory("dummy", &user_id).await;
+        let chat = config::ider::uuid();
+        infra_table::ai_chat_sessions::get_or_create("dummy", &chat, &user_id, &email, "chat", 1)
+            .await
+            .unwrap();
+        let active_chats = || infra_table::ai_chat_sessions::active_ids_for_user("dummy", &user_id);
+
+        block_memory_delete("dummy", &user_id, true).await;
+        let resp = remove_user_from_org("dummy", &email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        block_memory_delete("dummy", &user_id, false).await;
+        assert_eq!(resp.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
+        assert!(infra_table::org_users::get("dummy", &email).await.is_ok());
+        assert!(user_memory_exists("dummy", &user_id).await);
+        assert_eq!(active_chats().await.unwrap(), std::slice::from_ref(&chat));
+
+        let resp = remove_user_from_org("dummy", &email, "admin@zo.dev", RemovalTarget::User)
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert!(!user_memory_exists("dummy", &user_id).await);
+        #[cfg(feature = "enterprise")]
+        assert!(active_chats().await.unwrap().is_empty());
+        // A private write that lost the race to the removal finds no membership to write under.
+        write_user_memory("dummy", &user_id).await;
+        assert!(!user_memory_exists("dummy", &user_id).await);
+    }
+
+    #[tokio::test]
+    async fn deleting_a_user_deletes_their_memory_with_the_user_row() {
+        if !meta_store_with_memory().await {
+            return;
+        }
+        let _guard = set_up().await;
+        let email = format!("memory-deleted-{}@example.com", config::ider::uuid());
+        create_user_with_history(&email).await;
+        let user_id = infra_table::users::get_id_by_email(&email)
+            .await
+            .unwrap()
+            .unwrap();
+        write_user_memory("dummy", &user_id).await;
+        let resp = delete_user(&email).await.unwrap();
+        assert_eq!(resp.status(), http::StatusCode::OK);
+        assert!(!user_memory_exists("dummy", &user_id).await);
     }
 
     #[tokio::test]

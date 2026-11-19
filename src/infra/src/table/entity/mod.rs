@@ -5,6 +5,8 @@ pub mod prelude;
 pub mod ai_chat_sessions;
 pub mod ai_chat_shares;
 pub mod ai_chat_turns;
+pub mod ai_memory;
+pub mod ai_memory_revisions;
 pub mod ai_toolset_health;
 pub mod ai_toolset_tombstones;
 pub mod alert_acks;

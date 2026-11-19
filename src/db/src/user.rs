@@ -46,6 +46,12 @@ pub const USER_RECORD_KEY: &str = "/user_record/";
 /// on the instance, so a sweep publishes one event here and each node rebuilds its cache instead.
 pub const USER_BULK_REFRESH_KEY: &str = "/user_bulk_refresh/";
 
+/// A user delete that committed locally; `notified` is whether the other nodes and regions heard.
+#[derive(Debug)]
+pub struct UserDeleted {
+    pub notified: Result<(), anyhow::Error>,
+}
+
 /// Tell every node its users cache is stale.
 ///
 /// Callers that bypass the per-user write path — bulk `UPDATE`s straight to the table — must call
@@ -263,22 +269,17 @@ pub async fn update(
     Ok(())
 }
 
-pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
-    let key = format!("{USER_RECORD_KEY}{name}");
+/// `Err` when the local delete did not commit; once it did, telling the other nodes and regions
+/// can still fail, which `UserDeleted::notified` reports.
+pub async fn delete(name: &str) -> Result<UserDeleted, anyhow::Error> {
     // One transaction: a failed notification must not leave a users row whose memberships are gone.
     users::remove_with_memberships(name).await.map_err(|e| {
         log::error!("Error deleting user: {e}");
         anyhow::anyhow!("Error deleting user: {}", e)
     })?;
-    org_users::notify_removed_by_user(name).await?;
-    delete_from_db_coordinator(&key, false, true, None)
-        .await
-        .inspect_err(|e| {
-            log::error!("error sending delete user to nats {name} : {e}");
-        })?;
-    #[cfg(feature = "enterprise")]
-    super_cluster::delete_user_from_super_cluster(name).await?;
-    Ok(())
+    Ok(UserDeleted {
+        notified: notify_user_deleted(name).await,
+    })
 }
 
 /// Evicts a user from every node's cache and leaves its row in place.
@@ -491,6 +492,19 @@ mod super_cluster {
         }
         Ok(())
     }
+}
+
+async fn notify_user_deleted(name: &str) -> Result<(), anyhow::Error> {
+    org_users::notify_removed_by_user(name).await?;
+    let key = format!("{USER_RECORD_KEY}{name}");
+    delete_from_db_coordinator(&key, false, true, None)
+        .await
+        .inspect_err(|e| {
+            log::error!("error sending delete user to nats {name} : {e}");
+        })?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::delete_user_from_super_cluster(name).await?;
+    Ok(())
 }
 
 #[cfg(test)]

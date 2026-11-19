@@ -1488,7 +1488,7 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
                         .await
                         .is_ok_and(|user| user.email != email)
                     {
-                        db::user::delete(&email).await?;
+                        db::user::delete(&email).await?.notified?;
                     }
                     create_service_account_if_not_exists(&email).await?;
 

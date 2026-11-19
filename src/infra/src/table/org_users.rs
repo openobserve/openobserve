@@ -264,16 +264,11 @@ pub async fn add_with_flags(
     }
 }
 
+/// Removes the membership and the user's AI memory in that org in one transaction. [strong]
 pub async fn remove(org_id: &str, email: &str) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
-    Entity::delete_many()
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
-        .exec(client)
+    remove_on(get_orm_client_rw().await, org_id, email)
         .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    Ok(())
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
 pub async fn remove_by_user(email: &str) -> Result<(), errors::Error> {
@@ -720,11 +715,88 @@ async fn remove_orphaned_users<C: ConnectionTrait>(
     Ok(removed.into_iter().map(|e| e.to_lowercase()).collect())
 }
 
+// The membership row goes first: a private memory write holds it until that write commits.
+async fn remove_on<C: TransactionTrait>(
+    client: &C,
+    org_id: &str,
+    email: &str,
+) -> Result<(), sea_orm::DbErr> {
+    let txn = client.begin().await?;
+    let user_id = users::Entity::find()
+        .select_only()
+        .column(users::Column::Id)
+        .filter(Expr::expr(Func::lower(Expr::col(users::Column::Email))).eq(email.to_lowercase()))
+        .into_tuple::<String>()
+        .one(&txn)
+        .await?;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
+        .exec(&txn)
+        .await?;
+    let ids: Vec<String> = user_id.into_iter().collect();
+    super::ai_memory::delete_users_memory_on(&txn, Some(org_id), &ids).await?;
+    txn.commit().await
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::user::UserRole;
 
     use super::*;
+
+    async fn members_db() -> sea_orm::DatabaseConnection {
+        use crate::table::ai_memory::{add_member_for_test, insert_user_memory_for_test};
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        crate::table::migration::create_ai_memory_tables(&db)
+            .await
+            .unwrap();
+        for org in ["org1", "org2"] {
+            add_member_for_test(&db, org, "u1").await;
+            insert_user_memory_for_test(&db, org, "u1").await;
+        }
+        db
+    }
+
+    async fn left(db: &sea_orm::DatabaseConnection, org: &str) -> [u64; 3] {
+        use crate::table::entity::{ai_memory, ai_memory_revisions};
+        let members = Entity::find()
+            .filter(Column::OrgId.eq(org))
+            .count(db)
+            .await
+            .unwrap();
+        let memories = ai_memory::Entity::find()
+            .filter(ai_memory::Column::Org.eq(org))
+            .count(db)
+            .await
+            .unwrap();
+        let revisions = ai_memory_revisions::Entity::find()
+            .filter(ai_memory_revisions::Column::Org.eq(org))
+            .count(db)
+            .await
+            .unwrap();
+        [members, memories, revisions]
+    }
+
+    #[tokio::test]
+    async fn leaving_an_org_takes_the_memory_there_with_the_membership_or_neither() {
+        let db = members_db().await;
+        db.execute_unprepared(
+            "CREATE TRIGGER memory_delete_fails BEFORE DELETE ON ai_memory \
+             BEGIN SELECT RAISE(ABORT, 'injected'); END",
+        )
+        .await
+        .unwrap();
+        assert!(remove_on(&db, "org1", "U1@Example.com").await.is_err());
+        assert_eq!(left(&db, "org1").await, [1, 1, 1]);
+
+        db.execute_unprepared("DROP TRIGGER memory_delete_fails")
+            .await
+            .unwrap();
+        remove_on(&db, "org1", "U1@Example.com").await.unwrap();
+        assert_eq!(left(&db, "org1").await, [0, 0, 0]);
+        assert_eq!(left(&db, "org2").await, [1, 1, 1]);
+    }
 
     #[test]
     fn test_org_user_record_new_fields() {

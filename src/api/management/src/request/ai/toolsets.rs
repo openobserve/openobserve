@@ -20,7 +20,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::utils::time::now_micros;
-use infra::table::org_ai_toolsets::OrgToolset;
+use infra::table::{ai_memory::ToolsetDelete, org_ai_toolsets::OrgToolset};
 use o2_enterprise::enterprise::{
     ai::{
         client::{DiscoverError, DiscoveredTool, McpEntry, get_agent_client},
@@ -493,7 +493,7 @@ pub async fn discover(
     tag = "AI",
     operation_id = "DeleteAiToolset",
     summary = "Delete an AI toolset",
-    description = "Permanently deletes an AI toolset. Only available in enterprise deployments.",
+    description = "Permanently deletes an AI toolset with its AI memory, which stays while another toolset has the same normalized name. Only available in enterprise deployments.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Toolset id (KSUID)"),
@@ -509,16 +509,21 @@ pub async fn discover(
 pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     let (org_id, id) = path;
 
-    // Verify existence before deleting.
+    // Read first: the replication tombstone needs the row's name and "this region only" switch.
     let row = match infra::table::org_ai_toolsets::get(&org_id, &id).await {
         Ok(Some(row)) => row,
         Ok(None) => return MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
+    // Deletes the toolset with its AI memory, which stays while another toolset shares its name.
+    match ::db::ai_memory::delete_toolset(&org_id, &id, normalize_tool_name).await {
+        Ok(ToolsetDelete::Deleted { .. }) => {}
+        Ok(ToolsetDelete::NotFound) => {
+            return MetaHttpResponse::not_found(format!("toolset '{id}' not found"));
+        }
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
 
-    if let Err(e) = infra::table::org_ai_toolsets::remove(&org_id, &id).await {
-        return MetaHttpResponse::internal_error(e);
-    }
     let name = row.name.clone();
     if let Err(e) = db::ai_toolsets::published_delete(&row, now_micros()).await {
         log::error!("[SUPER_CLUSTER:sync] toolset '{name}' in org={org_id} wasn't replicated: {e}");

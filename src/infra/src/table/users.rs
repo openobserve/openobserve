@@ -407,6 +407,13 @@ async fn remove_on<C: TransactionTrait>(
 ) -> Result<(), sea_orm::DbErr> {
     let lowered: Vec<String> = emails.iter().map(|e| e.to_lowercase()).collect();
     let txn = client.begin().await?;
+    let ids: Vec<String> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).is_in(lowered.clone()))
+        .into_tuple()
+        .all(&txn)
+        .await?;
     // In the user's transaction: once the users row is gone, no retry can find these by email.
     super::user_password_history::delete_all_for_users_on(&txn, emails).await?;
     super::user_auth_state::delete_for_users_on(&txn, emails).await?;
@@ -418,6 +425,8 @@ async fn remove_on<C: TransactionTrait>(
             .exec(&txn)
             .await?;
     }
+    // After the memberships: a private memory write holds its membership row until it commits.
+    super::ai_memory::delete_users_memory_on(&txn, None, &ids).await?;
     Entity::delete_many()
         .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).is_in(lowered))
         .exec(&txn)
@@ -478,6 +487,9 @@ mod tests {
                 .await
                 .unwrap();
         }
+        crate::table::migration::create_ai_memory_tables(&db)
+            .await
+            .unwrap();
         ActiveModel {
             id: Set("u1".to_string()),
             email: Set(email.to_string()),
@@ -541,6 +553,49 @@ mod tests {
             .unwrap();
         assert_eq!(org_users::Entity::find().count(&db).await.unwrap(), 0);
         assert_eq!(Entity::find().count(&db).await.unwrap(), 0);
+    }
+
+    /// Rows of `memory_ids` still stored, and of revisions still pointing at them.
+    async fn memory_count(db: &sea_orm::DatabaseConnection, memory_ids: &[String]) -> [u64; 2] {
+        use crate::table::entity::{ai_memory, ai_memory_revisions};
+        let memories = ai_memory::Entity::find()
+            .filter(ai_memory::Column::Id.is_in(memory_ids.iter().cloned()))
+            .count(db)
+            .await
+            .unwrap();
+        let revisions = ai_memory_revisions::Entity::find()
+            .filter(ai_memory_revisions::Column::MemoryId.is_in(memory_ids.iter().cloned()))
+            .count(db)
+            .await
+            .unwrap();
+        [memories, revisions]
+    }
+
+    #[tokio::test]
+    async fn test_a_deleted_user_takes_their_memory_in_every_org_or_nothing() {
+        use crate::table::ai_memory::insert_user_memory_for_test;
+        let db = user_and_membership_db("Member@Example.com").await;
+        let mut memory_ids = vec![];
+        // The memory query is by the stable id, so an org the user has no membership row in counts.
+        for org in ["org1", "org2"] {
+            memory_ids.push(insert_user_memory_for_test(&db, org, "u1").await.id);
+        }
+        db.execute_unprepared(
+            "CREATE TRIGGER users_delete_fails BEFORE DELETE ON users \
+             BEGIN SELECT RAISE(ABORT, 'injected'); END",
+        )
+        .await
+        .unwrap();
+        let emails = ["member@example.com".to_string()];
+        assert!(remove_on(&db, &emails, true).await.is_err());
+        assert_eq!(memory_count(&db, &memory_ids).await, [2, 2]);
+        assert_eq!(org_users::Entity::find().count(&db).await.unwrap(), 1);
+
+        db.execute_unprepared("DROP TRIGGER users_delete_fails")
+            .await
+            .unwrap();
+        remove_on(&db, &emails, true).await.unwrap();
+        assert_eq!(memory_count(&db, &memory_ids).await, [0, 0]);
     }
 
     async fn user_with_auth_side_rows_db(email: &str) -> sea_orm::DatabaseConnection {

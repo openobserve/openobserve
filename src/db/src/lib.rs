@@ -22,6 +22,7 @@ use {
 };
 
 pub mod agent_signals;
+pub mod ai_memory;
 #[cfg(feature = "enterprise")]
 pub mod ai_toolsets;
 pub mod alerts;
