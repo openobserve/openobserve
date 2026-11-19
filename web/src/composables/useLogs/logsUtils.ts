@@ -54,6 +54,7 @@ import {
 } from "@/composables/useLogs/useLogsUrl";
 import { activePermalink, columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
+import { copyAnomalyLinkParams } from "@/utils/alerts/anomalyLinkParams";
 
 interface SQLColumn {
   expr?: {
@@ -641,6 +642,7 @@ export const logsUtils = () => {
 
     writeGridViewState(query, inputs);
     if (!isShareLink) writeLineLinkState(query);
+    copyAnomalyLinkParams(router.currentRoute.value?.query, query);
 
     return query;
   };

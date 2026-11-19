@@ -137,10 +137,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('search.showPatternsLabel')"
               value="patterns"
               size="toolbar"
+              :disabled="patternsUnavailableForStreamType"
               :tooltip="
-                patternsAccess.allowed && toolbarToggleIconOnly
-                  ? t('search.showPatternsLabel')
-                  : undefined
+                patternsUnavailableForStreamType
+                  ? t('search.patternsLogsOnly')
+                  : patternsAccess.allowed && toolbarToggleIconOnly
+                    ? t('search.showPatternsLabel')
+                    : undefined
               "
             >
               <template #icon-left>
@@ -2215,6 +2218,11 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
+    // The patterns API only reads logs streams, so a traces or metrics stream of the same name must not reach it.
+    const patternsUnavailableForStreamType = computed(
+      () => !!searchObj.data.stream.streamType && searchObj.data.stream.streamType !== "logs",
+    );
+
     // Log-pattern mining ("Patterns" toggle) — shown locked (not hidden) in
     // builds that don't unlock it, with the shared nav/settings tooltip.
     const patternsAccess = computed(() =>
@@ -2830,7 +2838,7 @@ export default defineComponent({
               value: "patterns",
               icon: "layers",
               label: t("search.showPatternsLabel"),
-              disabled: false,
+              disabled: patternsUnavailableForStreamType.value,
             },
           ]
         : []),
@@ -4927,10 +4935,17 @@ export default defineComponent({
       return !sameSignature(autoRun.readSignature(), baseline);
     };
 
+    watch(patternsUnavailableForStreamType, (unavailable) => {
+      if (unavailable && searchObj.meta.logsVisualizeToggle === "patterns") {
+        onLogsVisualizeToggleUpdate("logs");
+      }
+    });
+
     const onLogsVisualizeToggleUpdate = async (value: any) => {
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // here is what keeps the locked Patterns view from becoming active —
       // clicking it opens the upgrade dialog instead of switching.
+      if (value === "patterns" && patternsUnavailableForStreamType.value) return;
       if (value === "patterns" && !patternsAccess.value.allowed) {
         openUpgradeDialog();
         return;
@@ -5557,6 +5572,7 @@ export default defineComponent({
       loadSavedView,
       config,
       patternsAccess,
+      patternsUnavailableForStreamType,
       scheduledSearchAccess,
       openUpgradeDialog,
       handleRegionsSelection,

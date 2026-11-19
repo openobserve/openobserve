@@ -26,6 +26,12 @@ pub const ALERT_SLACK_EVENT_VERSION: u8 = 1;
 /// The largest `slack_alert_messages.content` the table stores, in bytes of JSON.
 pub const SLACK_ALERT_MESSAGE_CONTENT_MAX_BYTES: usize = 16 * 1024;
 
+/// Group key of an anomaly thread row and of the `Post` events that thread.
+pub const ANOMALY_GROUP_KEY: &str = "anomaly";
+
+/// Group key of the per destination and detector order watermark row.
+pub const ANOMALY_MARK_GROUP_KEY: &str = "anomaly-mark";
+
 /// Consumer email domains: never a link domain, and they turn automatic linking off at install.
 pub const PUBLIC_EMAIL_DOMAINS: &[&str] = &[
     "gmail.com",
@@ -469,6 +475,29 @@ pub struct AlertSlackEvent {
     pub chart_png_b64: Option<String>,
     pub level: AlertLevel,
     pub at: i64,
+    /// Set only on an anomaly `Post` with group key "anomaly"; an older leader ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anomaly: Option<AnomalyThreadInfo>,
+}
+
+/// What the leader needs to thread one anomaly message.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AnomalyThreadInfo {
+    /// Earliest anomalous bucket of the episode; the root row's `first_fired_at`.
+    pub first_anomaly_us: Option<i64>,
+    /// Query end of the judged window; orders events.
+    pub data_us: i64,
+    /// End of the run window, in bucket time; drives the gap.
+    pub bucket_end_us: i64,
+    pub gap_us: i64,
+    /// True on a recovery, which replies and closes the thread.
+    pub closes: bool,
+    pub thread_headline: Option<String>,
+    pub model_version: Option<i64>,
+    /// Recovery only: when the value came back, for the reply text; older events omit it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recovered_at_us: Option<i64>,
 }
 
 /// The `slack_alert_messages.content` JSON, kept so a re-render can rebuild the message.
@@ -490,6 +519,15 @@ pub struct SlackMessageContent {
     /// The Slack error that ended the row as `failed`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub failed: Option<String>,
+    /// Anomaly rows only: the `data_us` of the last event applied, the order watermark.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_data_us: Option<i64>,
+    /// Anomaly rows only: bucket time of the last event, for the thread gap.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_bucket_end_us: Option<i64>,
+    /// Anomaly root rows only: the model that the thread reports.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_version: Option<i64>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -719,6 +757,7 @@ mod tests {
             chart_png_b64: None,
             level: AlertLevel::Critical,
             at: 11,
+            anomaly: None,
         };
         let json = serde_json::to_value(&event).unwrap();
         assert_eq!(json["kind"], "level_up");
