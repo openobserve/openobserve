@@ -29,18 +29,13 @@ import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 
 const library = vi.hoisted(() => ({
   down: false,
-  matcher: false,
+  livePromql: false,
   lastIngested: 0,
   onlyType: "",
   version: "",
   description: "d1",
   threshold: 3,
   schemas: {} as Record<string, string[]>,
-}));
-vi.mock("@/constants/starterPacks", () => ({
-  get STARTER_PACKS_ENABLED() {
-    return library.matcher;
-  },
 }));
 const fake = vi.hoisted(() => {
   type Row = Record<string, any>;
@@ -219,21 +214,21 @@ vi.mock("@/composables/alerts/useAlertLibrary", async () => {
           enabled: true,
           description: library.description,
           trigger_condition: { threshold: library.threshold },
-          query_condition: { type: "promql", promql: library.matcher ? "kube_present" : "s" },
+          query_condition: { type: "promql", promql: library.livePromql ? "kube_present" : "s" },
         };
       },
     }),
   };
 });
 
-import { useStarterPacks } from "./useStarterPacks";
+import { contentHash } from "./useInstallRecords";
+import { alertBody, useStarterPacks } from "./useStarterPacks";
 
 loadCatalogFixture();
 
 const PACK: StarterPack = {
   id: "kubernetes",
   titleKey: "starterPacks.packs.kubernetes.title",
-  descriptionKey: "starterPacks.packs.kubernetes.description",
   folder: { name: "Kubernetes", description: "pack" },
   dashboards: [{ id: "overview", title: "Overview", load: async () => ({ version: 8, tabs: [] }) }],
   alerts: ["k8s/one", "k8s/two"],
@@ -331,6 +326,37 @@ describe("useStarterPacks", () => {
       expect(record.items.filter(({ copyOf }) => copyOf === "k8s/one")).toHaveLength(1);
     });
 
+    const withCopies = {
+      repairs: [{ from: "s", to: "a", also: ["b"] }],
+      copies: [
+        { copyOf: "k8s/one", stream: "a" },
+        { copyOf: "k8s/one", stream: "b" },
+      ],
+    };
+
+    it("makes the base alert even when per-stream copies of it already exist", async () => {
+      const api = packs();
+      const one = { ...PACK, alerts: ["k8s/one"] };
+      await api.installPack(one, withCopies);
+      const record = await api.installPack(one);
+      const base = record.items.find(({ itemId }) => itemId === "k8s/one");
+      expect(fake.state.alerts).toHaveLength(3);
+      const made = fake.state.alerts.find(({ id }) => id === base?.id);
+      expect(made?.tags.some((tag: string) => tag.startsWith("stream:"))).toBe(false);
+    });
+
+    it("reports each kept per-stream copy once on Remove", async () => {
+      const api = packs();
+      const one = { ...PACK, alerts: ["k8s/one"] };
+      await api.installPack(one, withCopies);
+      for (const alert of fake.state.alerts) alert.description = "edited";
+
+      const result = await api.removePack(one);
+
+      const alerts = result.kept.filter(({ kind }) => kind === "alert");
+      expect(alerts.map(({ itemId }) => itemId).sort()).toEqual(["k8s/one@a", "k8s/one@b"]);
+    });
+
     it("repoints the saved view at the repaired stream", async () => {
       await packs().installPack(PACK, { repairs: [{ from: "e", to: "renamed" }] });
       expect(JSON.stringify(fake.state.views[0])).toContain("renamed");
@@ -345,15 +371,6 @@ describe("useStarterPacks", () => {
     });
   });
 
-  it("keeps editing the other alerts after one recorded alert was deleted", async () => {
-    const api = packs();
-    const record = await api.installPack(PACK);
-    const [gone, kept] = record.items.filter(({ kind }) => kind === "alert");
-    fake.state.alerts = fake.state.alerts.filter((alert) => alert.id !== gone.id);
-    const work = vi.fn(async () => "done");
-    expect(await api.trackAlertEdit(PACK, [gone.id!, kept.id!], work)).toBe("done");
-  });
-
   it("marks an alert failed, not skipped, when the check is down", async () => {
     fake.state.parseFails = 503;
     const record = await packs().installPack(PACK, { repairs: [{ from: "s", to: "r" }] });
@@ -366,30 +383,6 @@ describe("useStarterPacks", () => {
       const record = await packs().installPack(PACK, { folderName: "Platform" });
       expect(fake.state.folders.alerts[0].name).toBe("Platform");
       expect(record.folderName).toBe("Platform");
-    });
-  });
-
-  describe("trackAlertEdit", () => {
-    it("lets Undo remove an alert the pack itself changed", async () => {
-      const api = packs();
-      const record = await api.installPack(PACK);
-      await api.trackAlertEdit(PACK, [fake.state.alerts[0].id], async () => {
-        fake.state.alerts[0].enabled = true;
-      });
-      const { kept } = await api.undoPack(PACK, record.installId);
-      expect(kept).toEqual([]);
-      expect(fake.state.alerts).toHaveLength(0);
-    });
-
-    it("still detects an edit the user made first", async () => {
-      const api = packs();
-      const record = await api.installPack(PACK);
-      fake.state.alerts[0].description = "mine";
-      await api.trackAlertEdit(PACK, [fake.state.alerts[0].id], async () => {
-        fake.state.alerts[0].enabled = true;
-      });
-      const { kept } = await api.undoPack(PACK, record.installId);
-      expect(kept.map(({ reason }) => reason)).toContain("changed");
     });
   });
 
@@ -474,7 +467,7 @@ describe("useStarterPacks", () => {
       }
     });
 
-    it("stores only ids, kinds, hashes, status and the library's own fields in the record", async () => {
+    it("stores only ids, kinds, the content hash and status in the record", async () => {
       await packs().installPack(PACK);
 
       const [value] = [...fake.state.kv.values()];
@@ -482,17 +475,7 @@ describe("useStarterPacks", () => {
       for (const item of record.items) {
         expect(
           Object.keys(item).every((key) =>
-            [
-              "kind",
-              "itemId",
-              "status",
-              "id",
-              "folderId",
-              "sourceHash",
-              "libraryHash",
-              "base",
-              "panelHashes",
-            ].includes(key),
+            ["kind", "itemId", "status", "id", "folderId", "sourceHash"].includes(key),
           ),
         ).toBe(true);
       }
@@ -513,6 +496,67 @@ describe("useStarterPacks", () => {
 
       expect(counts()).toEqual(FULL);
       expect(second.items.every((item) => item.status === "existing")).toBe(true);
+    });
+
+    describe("an alert already installed from the Alert Library", () => {
+      const seedLibraryAlert = (stream = "s") =>
+        fake.state.alerts.push({
+          id: "lib1",
+          name: "k8s/one",
+          tags: ["pack:k8s"],
+          folder_id: "default",
+          stream_name: stream,
+          context_attributes: { library_id: "k8s/one", library_hash: "hash-k8s/one" },
+        });
+
+      it("plans it as already there and creates no second copy", async () => {
+        seedLibraryAlert();
+        const api = packs();
+        const preview = await api.previewPack(PACK);
+        expect(preview.notIncluded).toContainEqual({
+          kind: "alert",
+          itemId: "k8s/one",
+          name: "k8s/one",
+          reason: "already_have",
+        });
+
+        const record = await api.installPack(PACK);
+
+        const one = record.items.find(({ itemId }) => itemId === "k8s/one");
+        expect(one).toMatchObject({ status: "existing", id: "lib1" });
+        expect(fake.state.alerts.filter(({ name }) => name === "k8s/one")).toHaveLength(1);
+        expect(counts().alerts).toBe(2);
+      });
+
+      it("leaves it alone on Undo and Remove", async () => {
+        seedLibraryAlert();
+        const api = packs();
+        const record = await api.installPack(PACK);
+
+        await api.undoPack(PACK, record.installId);
+        await api.removePack(PACK);
+
+        expect(fake.state.alerts.map(({ id }) => id)).toEqual(["lib1"]);
+      });
+
+      it("matches a per-stream copy only on the same stream", async () => {
+        seedLibraryAlert("a");
+        const record = await packs().installPack(
+          { ...PACK, alerts: ["k8s/one"] },
+          {
+            repairs: [{ from: "s", to: "a", also: ["b"] }],
+            copies: [
+              { copyOf: "k8s/one", stream: "a" },
+              { copyOf: "k8s/one", stream: "b" },
+            ],
+          },
+        );
+
+        const status = (itemId: string) => record.items.find((item) => item.itemId === itemId);
+        expect(status("k8s/one@a")).toMatchObject({ status: "existing", id: "lib1" });
+        expect(status("k8s/one@b")?.status).toBe("created");
+        expect(fake.state.alerts.map((alert) => alert.stream_name)).toEqual(["a", "b"]);
+      });
     });
 
     it("does not duplicate an alert whose create errored after it committed", async () => {
@@ -614,8 +658,8 @@ describe("useStarterPacks", () => {
   });
 
   describe("previewPack", () => {
-    it("leaves out an alert the shared matcher rejects once the constant is on", async () => {
-      library.matcher = true;
+    it("leaves out an alert the shared matcher rejects", async () => {
+      library.livePromql = true;
       const stale = (Date.now() - 3 * 24 * 60 * 60 * 1000) * 1000;
       const reasons = async (lastIngested: number) => {
         library.lastIngested = lastIngested;
@@ -627,7 +671,7 @@ describe("useStarterPacks", () => {
         await reasons(stale),
         await reasons(0),
       ];
-      library.matcher = false;
+      library.livePromql = false;
       library.lastIngested = 0;
       expect(live).not.toContain("k8s/one");
       expect(old).not.toContain("k8s/one");
@@ -694,7 +738,7 @@ describe("useStarterPacks", () => {
 
     it("lists a left-out alert once, with its plain title, across Use all copies", async () => {
       const api = packs();
-      library.matcher = false;
+      library.livePromql = false;
       const preview = await api.previewPack({
         ...PACK,
         alerts: ["k8s/two"],
@@ -726,10 +770,14 @@ describe("useStarterPacks", () => {
 
     it("names items and gives a reason for each one left out, creating nothing", async () => {
       fake.state.views.push({ view_id: "v9", view_name: "Events", data: {}, view_type: "logs" });
+      library.livePromql = true;
+      library.lastIngested = Date.now() * 1000;
       const preview = await packs().previewPack({
         ...PACK,
         alerts: ["k8s/one", "k8s/two", "k8s/lost"],
       });
+      library.livePromql = false;
+      library.lastIngested = 0;
       expect(preview.names["k8s/one"]).toBe("k8s/one");
       expect(preview.notIncluded.map(({ itemId, reason }) => [itemId, reason])).toEqual([
         ["k8s/two", "no_data"],
@@ -1156,6 +1204,71 @@ describe("useStarterPacks", () => {
       expect(await api.listInstalls(PACK.id)).toHaveLength(1);
     });
 
+    const pointRecordAt = (itemId: string, patch: Record<string, unknown>) => {
+      const key = [...fake.state.kv.keys()][0];
+      const stored = JSON.parse(fake.state.kv.get(key)!);
+      Object.assign(
+        stored.items.find((item: { itemId: string }) => item.itemId === itemId),
+        patch,
+      );
+      fake.state.kv.set(key, JSON.stringify(stored));
+    };
+
+    it("still lists and undoes a record that carries the older update fields", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      pointRecordAt("k8s/one", { libraryHash: "h1", base: { description: "x" } });
+      pointRecordAt("overview", { panelHashes: { p1: "h2" } });
+
+      expect(await api.listInstalls(PACK.id)).toHaveLength(1);
+      const result = await api.undoPack(PACK, record.installId);
+      expect(result.kept).toEqual([]);
+    });
+
+    it("keeps an alert the record names when it lacks this pack's tags", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      const victim = { id: "theirs", name: "theirs", folder_id: "default", tags: ["team"] };
+      fake.state.alerts.push(victim);
+      pointRecordAt("k8s/one", {
+        id: "theirs",
+        folderId: "default",
+        sourceHash: contentHash(alertBody({ ...victim })),
+      });
+
+      const result = await api.undoPack(PACK, record.installId);
+
+      expect(fake.state.alerts.map(({ id }) => id)).toContain("theirs");
+      expect(result.kept).toContainEqual({ kind: "alert", itemId: "k8s/one", reason: "changed" });
+      expect(result.removed.map(({ id }) => id)).not.toContain("theirs");
+    });
+
+    it("keeps a dashboard the record names when it is outside the pack's folder", async () => {
+      const api = packs();
+      const record = await api.installPack(PACK);
+      const body = { title: "Theirs", tabs: [] };
+      fake.state.dashboards.push({
+        dashboard_id: "theirs",
+        title: "Theirs",
+        folder_id: "default",
+        body,
+      });
+      pointRecordAt("overview", {
+        id: "theirs",
+        folderId: "default",
+        sourceHash: contentHash(body),
+      });
+
+      const result = await api.undoPack(PACK, record.installId);
+
+      expect(fake.state.dashboards.map(({ dashboard_id }) => dashboard_id)).toContain("theirs");
+      expect(result.kept).toContainEqual({
+        kind: "dashboard",
+        itemId: "overview",
+        reason: "changed",
+      });
+    });
+
     it("removePack reports a tagged alert no record accounts for", async () => {
       const api = packs();
       await api.installPack(PACK);
@@ -1167,6 +1280,29 @@ describe("useStarterPacks", () => {
         PACK.alerts.map((itemId) => ({ kind: "alert", itemId, reason: "unrecorded" })),
       );
       expect(fake.state.alerts).toHaveLength(2);
+    });
+
+    it("removePack waits for an install of the pack still in flight", async () => {
+      const api = packs();
+      const install = api.installPack(PACK);
+      const result = await api.removePack(PACK);
+      await install;
+
+      expect(result.kept).toEqual([]);
+      expect(counts()).toEqual(EMPTY);
+      expect(fake.state.kv.size).toBe(0);
+    });
+
+    it("undoPack waits for an install of the pack still in flight", async () => {
+      const api = packs();
+      const first = await api.installPack(PACK);
+      fake.state.kv.clear();
+      fake.state.alerts = [];
+      const rerun = api.installPack(PACK);
+      const order: string[] = [];
+      void rerun.then(() => order.push("install"));
+      await api.undoPack(PACK, first.installId).then(() => order.push("undo"));
+      expect(order).toEqual(["install", "undo"]);
     });
 
     it("removePack walks every install of the pack", async () => {

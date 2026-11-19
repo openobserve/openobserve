@@ -60,7 +60,7 @@ export interface PackBundledAlert {
 }
 
 /** A shared stream is narrowed to the records the user picked. */
-export interface PackStreamFilter {
+interface PackStreamFilter {
   field: string;
   value: string;
 }
@@ -108,7 +108,7 @@ export interface PackFlavourAlert {
 }
 
 /** The same source under another metric family, chosen when the shipped names are absent. */
-export interface PackFlavour {
+interface PackFlavour {
   id: string;
   titleKey: I18nKey;
   /** Any of these present means the org sends this flavour. */
@@ -125,7 +125,7 @@ export interface PackDetectStream {
 }
 
 /** The list screen's "What gets created" tile text, one per item kind. */
-export interface PackTileSummaries {
+interface PackTileSummaries {
   dashboards?: string;
   alerts?: string;
   savedViews?: string;
@@ -137,7 +137,6 @@ export interface StarterPack {
   /** The catalog's own title, shown when this build has no text for the pack. */
   title: string;
   titleKey: I18nKey;
-  descriptionKey: I18nKey;
   /** Created in both the dashboards and the alerts module. */
   folder: { name: string; description: string };
   dashboards: PackDashboard[];
@@ -165,8 +164,6 @@ export interface StarterPack {
   detector?: "kubernetes";
   /** Image path under assets, shown beside the pack title on Home. */
   logo?: string;
-  /** What goes unnoticed while the pack's alerts are paused, as the end of a sentence. */
-  pausedImpactKey?: I18nKey;
   /** One line per Library alert id on what it fires for. */
   alertSummaries?: Record<string, string>;
   tileSummaries?: PackTileSummaries;
@@ -185,44 +182,6 @@ export interface PackRecordItem {
   /** Library alert this Use all copy came from. */
   copyOf?: string;
   stream?: string;
-  /** Library content hash this alert was installed or last updated from. */
-  libraryHash?: string;
-  /** Updatable fields as the library shipped them, the base of a field-by-field merge. */
-  base?: Record<string, unknown>;
-  /** The last applied update, kept so Revert can restore the version before it. */
-  update?: PackAppliedUpdate;
-  /** Panel content hashes right after the pack wrote them, so a repair can tell user edits. */
-  panelHashes?: Record<string, string>;
-}
-
-export type PackUpdateOutcome = "updated" | "kept";
-
-/** One field that differs between the user's alert and the new library version. */
-export interface PackUpdateRow {
-  field: string;
-  installed: unknown;
-  yours: unknown;
-  library: unknown;
-  outcome: PackUpdateOutcome;
-}
-
-/** One alert's pending update: the merged body and the rows the drawer lists. */
-export interface PackUpdate {
-  itemId: string;
-  name: string;
-  fromHash: string;
-  hash: string;
-  rows: PackUpdateRow[];
-  /** The installed fields the check merged from; null when nobody can tell. */
-  base: Record<string, unknown> | null;
-  /** The alert as the new library version would install it here. */
-  next: Record<string, any>;
-}
-
-export interface PackAppliedUpdate {
-  fromHash: string;
-  fromBase?: Record<string, unknown>;
-  rows: PackUpdateRow[];
 }
 
 export interface PackInstallRecord {
@@ -275,7 +234,7 @@ export interface PackCandidate {
   samples: string[];
 }
 
-export type PackQuestionKind = "confirm" | "shared" | "none";
+type PackQuestionKind = "confirm" | "shared" | "none";
 
 /** One expected stream the data does not name; answered ones stay listed so they can change. */
 export interface PackQuestion {

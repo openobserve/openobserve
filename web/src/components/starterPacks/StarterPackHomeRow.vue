@@ -34,6 +34,7 @@ import { useStarterPackPopup } from "@/composables/starterPacks/useStarterPackPo
 import type { PackItemKind } from "@/composables/starterPacks/types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
+import { KIND_CHIPS } from "./packKindChips";
 
 const props = defineProps<{ item: HomePackRowItem; first?: boolean }>();
 
@@ -51,15 +52,15 @@ const GRID_COLS = ["grid-cols-1", "grid-cols-1", "grid-cols-2", "grid-cols-3"];
 const KIND_TINTS: Record<ResourceKind, { card: string; chip: string }> = {
   dashboard: {
     card: "bg-ingest-tint-blue border-ingest-accent-blue/25",
-    chip: "bg-ingest-accent-blue",
+    chip: KIND_CHIPS.dashboard,
   },
   alert: {
     card: "bg-ingest-tint-orange border-ingest-accent-orange/25",
-    chip: "bg-ingest-accent-orange",
+    chip: KIND_CHIPS.alert,
   },
   savedView: {
     card: "bg-ingest-tint-purple border-ingest-accent-purple/25",
-    chip: "bg-ingest-accent-purple",
+    chip: KIND_CHIPS.savedView,
   },
 };
 
@@ -290,7 +291,7 @@ const nothingFits = computed(() => !cards.value.length && flow.previewState.valu
               :data-test="id(`home-pack-card-row-${card.kind}`)"
             >
               <span
-                class="rounded-default flex size-6 shrink-0 items-center justify-center text-white"
+                class="rounded-default flex size-6 shrink-0 items-center justify-center"
                 :class="KIND_TINTS[card.kind].chip"
               >
                 <OIcon

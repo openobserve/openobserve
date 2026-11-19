@@ -16,7 +16,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  limitPromqlClusters,
   limitSqlClusters,
   promqlMetricTokens,
   rewriteAlert,
@@ -127,42 +126,6 @@ describe("rewritePromql", () => {
       promql: vi.fn().mockResolvedValue({ type: "unsupported", kind: "vector matching" }),
     };
     expect(await rewritePromql("up / on(a) other", map, checks)).toBe("o2_up / on(a) other");
-  });
-});
-
-describe("limitPromqlClusters", () => {
-  it("adds the matcher to bare selectors and ones with labels", async () => {
-    const out = await limitPromqlClusters(
-      'sum by (k8s_cluster) (a{x="1"}) / b',
-      "k8s_cluster",
-      ["eu-1", "us.2"],
-      [],
-      checksFor(scan),
-    );
-    expect(out).toBe(
-      'sum by (k8s_cluster) (a{k8s_cluster=~"eu-1|us\\\\.2",x="1"}) / b{k8s_cluster=~"eu-1|us\\\\.2"}',
-    );
-  });
-
-  it("replaces its own limit and clears it when none is chosen", async () => {
-    const checks = checksFor(scan);
-    const once = await limitPromqlClusters('a{y="1"} + b', "c", ["x"], [], checks);
-    const other = await limitPromqlClusters(once, "c", ["z"], ["x"], checks);
-    expect(other).toBe('a{c=~"z",y="1"} + b{c=~"z"}');
-    expect(await limitPromqlClusters(other, "c", [], ["z"], checks)).toBe('a{y="1"} + b');
-  });
-
-  it("leaves the query alone, unchecked, when nothing is chosen or was applied", async () => {
-    const checks = checksFor(scan);
-    const authored = 'a{c=~"prod.*"}';
-    expect(await limitPromqlClusters(authored, "c", [], [], checks)).toBe(authored);
-    expect(checks.promql).not.toHaveBeenCalled();
-  });
-
-  it("keeps an authored matcher when replacing the pack's limit", async () => {
-    const checks = checksFor(scan);
-    const out = await limitPromqlClusters('a{c=~"x",c=~"prod.*"}', "c", [], ["x"], checks);
-    expect(out).toBe('a{c=~"prod.*"}');
   });
 });
 

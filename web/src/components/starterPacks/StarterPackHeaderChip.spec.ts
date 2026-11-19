@@ -142,20 +142,15 @@ const source = (packId: string, items: FindMoreSource["items"] = []): FindMoreSo
   label: packId,
   streams: [`${packId}_metrics`, `${packId}_logs`],
   items,
-  queriesPerDay: 0,
 });
 
 const K8S = source("kubernetes", [
-  { kind: "dashboard", id: "overview", name: "Kubernetes Overview", queries: 0 },
-  { kind: "alert", id: "k8s/pod_crashloop_backoff", name: "Pod Crashloop Backoff", queries: 0 },
-  { kind: "alert", id: "k8s/pod_oom_killed", name: "Pod Oom Killed", queries: 0 },
+  { kind: "dashboard", id: "overview", name: "Kubernetes Overview" },
+  { kind: "alert", id: "k8s/pod_crashloop_backoff", name: "Pod Crashloop Backoff" },
+  { kind: "alert", id: "k8s/pod_oom_killed", name: "Pod Oom Killed" },
 ]);
-const HOSTS = source("hosts", [
-  { kind: "dashboard", id: "host_metrics", name: "Host Metrics", queries: 0 },
-]);
-const DOCKER = source("docker", [
-  { kind: "dashboard", id: "overview", name: "Docker Overview", queries: 0 },
-]);
+const HOSTS = source("hosts", [{ kind: "dashboard", id: "host_metrics", name: "Host Metrics" }]);
+const DOCKER = source("docker", [{ kind: "dashboard", id: "overview", name: "Docker Overview" }]);
 
 // The browser copy and the install records agree, as they do after a check.
 const save = (sources: FindMoreSource[], installed: string[] = []) => {
@@ -227,6 +222,18 @@ describe("StarterPackHeaderChip", () => {
     expect(find(render({ kioskMode: true }), "header-starter-packs-btn").exists()).toBe(false);
     fake.gateVisible = false;
     expect(find(render(), "header-starter-packs-btn").exists()).toBe(false);
+  });
+
+  it("reads no pack record or plan for an org past onboarding, even with the popup open", async () => {
+    save([K8S, HOSTS]);
+    fake.gateVisible = false;
+    const wrapper = render();
+    useStarterPackPopup(ORG).openList();
+    await flushPromises();
+    expect(fake.flows.kubernetes.load).not.toHaveBeenCalled();
+    expect(fake.flows.kubernetes.loadPreview).not.toHaveBeenCalled();
+    expect(fake.matchers.every(({ checkShared }) => !checkShared.mock.calls.length)).toBe(true);
+    wrapper.unmount();
   });
 
   it("opens the list with every matching pack in catalog order and the first one selected", async () => {

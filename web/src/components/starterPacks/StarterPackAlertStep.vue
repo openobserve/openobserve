@@ -33,6 +33,8 @@ const props = defineProps<{
   count: number;
   /** Alert destinations the select offers; null while they load. */
   destinations: AlertStepDestination[] | null;
+  /** The destinations read failed, so Send to stays off rather than offering Email me. */
+  destinationsFailed?: boolean;
   /** The server is known to have no SMTP, so Email me cannot be offered. */
   smtpOff: boolean;
   email: string;
@@ -44,6 +46,7 @@ const destination = defineModel<string>("destination", { default: "" });
 const { t } = useI18nTyped();
 
 const mode = computed<"loading" | "select" | "email" | "none">(() => {
+  if (props.destinationsFailed) return "none";
   if (props.destinations === null) return "loading";
   if (props.destinations.length) return "select";
   return props.smtpOff ? "none" : "email";
@@ -154,6 +157,14 @@ const pickDestination = (value: unknown) => {
         data-test="starter-pack-alert-setup-email-note"
         >{{ t("starterPacks.alertStep.emailCreateNote") }}</OText
       >
+      <span
+        v-else-if="destinationsFailed"
+        class="text-status-error-text flex items-start gap-2 ps-7 text-xs"
+        data-test="starter-pack-alert-setup-destinations-failed"
+      >
+        <OIcon name="error" size="sm" class="mt-px shrink-0" />
+        <span>{{ t("starterPacks.alertStep.destinationsFailed") }}</span>
+      </span>
       <span
         v-else-if="mode === 'none'"
         class="text-text-secondary flex items-start gap-2 ps-7 text-xs"

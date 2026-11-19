@@ -38,9 +38,6 @@ const KUBERNETES_PACK = packById("kubernetes")!;
 const fake = vi.hoisted(() => ({
   flows: {} as Record<string, any>,
   matchers: {} as Record<string, any>,
-  dismissal: null as any,
-  dismissals: {} as Record<string, any>,
-  org: null as any,
   hasUserData: null as any,
   noResources: null as any,
   browser: {
@@ -54,11 +51,6 @@ vi.mock("@/composables/starterPacks/useStarterPackFlow", () => ({
 vi.mock("@/composables/starterPacks/useStarterPackMatcher", () => ({
   useStarterPackMatcher: (_org: string, { pack }: { pack: { id: string } }) =>
     fake.matchers[pack.id],
-}));
-vi.mock("@/composables/starterPacks/packDismissal", () => ({
-  usePackDismissal: (_surface: string, _org: string, packId: string) =>
-    fake.dismissals[packId] ?? fake.dismissal,
-  usePackHiddenForOrg: () => fake.org,
 }));
 vi.mock("@/composables/useOrgHasUserData", () => ({
   useOrgHasUserData: () => ({ hasUserData: fake.hasUserData }),
@@ -87,15 +79,6 @@ const matcherDouble = (state = "matched", streams = ["k8s_events"]) => {
   };
 };
 
-const dismissalDouble = () => {
-  const double = {
-    dismissed: ref(false),
-    dismiss: vi.fn(() => (double.dismissed.value = true)),
-    restore: vi.fn(() => (double.dismissed.value = false)),
-  };
-  return double;
-};
-
 const render = async (packs = [KUBERNETES_PACK]) => {
   for (const pack of packs) fake.flows[pack.id].loaded.value = false;
   const wrapper = mount(StarterPackHomeSection, {
@@ -103,7 +86,6 @@ const render = async (packs = [KUBERNETES_PACK]) => {
     global: {
       plugins: [i18n],
       stubs: {
-        StarterPackUndoDialog: true,
         OIcon: true,
         OTooltip: { template: '<div><slot /><slot name="content" /></div>' },
       },
@@ -123,18 +105,9 @@ describe("StarterPackHomeSection", () => {
     fake.gate = true;
     fake.flows = { kubernetes: fakeFlow(), hosts: fakeFlow({ pack: HOSTS_PACK }) };
     fake.matchers = { kubernetes: matcherDouble(), hosts: matcherDouble() };
-    fake.dismissal = dismissalDouble();
-    fake.dismissals = {};
     fake.hasUserData = ref(true);
     fake.noResources = ref(true);
     fake.browser.saveBuiltIn.mockClear();
-    fake.org = {
-      hidden: ref(false),
-      loaded: ref(true),
-      load: vi.fn(),
-      show: vi.fn(),
-      hide: vi.fn(),
-    };
   });
 
   it("keeps a skeleton while checking, and offers the pack once matched", async () => {
@@ -296,42 +269,14 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-list-tile-summary-alert")).toBe(false);
   });
 
-  it("has no Not now button and brings a dismissed pack back with Show again", async () => {
-    const wrapper = await render();
-    expect(has(wrapper, "home-pack-card-dismiss-btn")).toBe(false);
-    fake.dismissal.dismiss();
-    await nextTick();
-    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
-    await wrapper.get('[data-test="home-pack-card-show-again-btn"]').trigger("click");
-    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
-  });
-
-  it("has no Hide button on the strip, even for an admin", async () => {
-    fake.flows.kubernetes.isAdmin.value = true;
+  it("has no Hide button on the strip", async () => {
     const wrapper = await render();
     expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
     expect(has(wrapper, "home-pack-card-hide-all-btn")).toBe(false);
     expect(wrapper.text()).not.toContain("Hide");
   });
 
-  it("shows nothing for a pack hidden for everyone, and spends nothing on its matcher", async () => {
-    fake.org.hidden.value = true;
-    const wrapper = await render();
-    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
-    expect(has(wrapper, "home-pack-empty")).toBe(false);
-    expect(fake.matchers.kubernetes.check).not.toHaveBeenCalled();
-  });
-
-  it("lets an admin undo Hide for everyone", async () => {
-    fake.org.hidden.value = true;
-    fake.flows.kubernetes.isAdmin.value = true;
-    const wrapper = await render();
-    await wrapper.get('[data-test="home-pack-card-show-all-btn"]').trigger("click");
-    expect(fake.org.show).toHaveBeenCalled();
-  });
-
   it("drops the section once a pack is set up", async () => {
-    fake.org.hidden.value = true;
     fake.flows.kubernetes.record = shallowRef({ status: "complete" });
     const wrapper = await render();
     expect(has(wrapper, "home-pack-offer")).toBe(false);
@@ -339,11 +284,8 @@ describe("StarterPackHomeSection", () => {
     expect(home).not.toHaveProperty("showMenu");
   });
 
-  it("spends nothing on the matcher for an installed or dismissed pack", async () => {
+  it("spends nothing on the matcher for an installed pack", async () => {
     fake.flows.kubernetes.record = shallowRef({ status: "complete" });
-    await render();
-    fake.flows.kubernetes = fakeFlow();
-    fake.dismissal.dismissed.value = true;
     await render();
     expect(fake.matchers.kubernetes.check).not.toHaveBeenCalled();
   });
@@ -384,6 +326,14 @@ describe("StarterPackHomeSection", () => {
     const wrapper = await render();
     expect(has(wrapper, "home-pack-section")).toBe(false);
     expect(wrapper.emitted("ready")!.at(-1)).toEqual([null]);
+  });
+
+  it("reads no pack record and runs no match for an org past onboarding", async () => {
+    fake.gate = false;
+    await render();
+    expect(fake.flows.kubernetes.load).not.toHaveBeenCalled();
+    expect(fake.matchers.kubernetes.checkShared).not.toHaveBeenCalled();
+    expect(fake.flows.kubernetes.loadPreview).not.toHaveBeenCalled();
   });
 
   it("shows nothing while the org has no data of its own", async () => {
@@ -449,31 +399,7 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-interrupted")).toBe(true);
   });
 
-  it("shows the hidden-for-you line under the label only in an empty org", async () => {
-    fake.dismissal.dismissed.value = true;
-    const wrapper = await render();
-    expect(has(wrapper, "home-pack-label")).toBe(true);
-    expect(has(wrapper, "home-pack-dismissed")).toBe(true);
-    expect(homeOf(wrapper).offerShown.value).toBe(false);
-    fake.noResources.value = false;
-    await nextTick();
-    expect(has(wrapper, "home-pack-label")).toBe(false);
-    expect(has(wrapper, "home-pack-dismissed")).toBe(false);
-  });
-
-  it("holds no skeleton over Overview for a dismissed pack whose record is still loading", async () => {
-    fake.dismissal.dismissed.value = true;
-    const wrapper = await render();
-    fake.flows.kubernetes.loaded.value = false;
-    await nextTick();
-    expect(homeOf(wrapper).items[0].view.value).toBe("loading");
-    expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
-    expect(homeOf(wrapper).offerShown.value).toBe(false);
-  });
-
-  it("holds the skeleton, not the strip, while a dismissed pack's record loads beside a matched pack", async () => {
-    fake.dismissals.hosts = dismissalDouble();
-    fake.dismissals.hosts.dismissed.value = true;
+  it("holds the skeleton, not the strip, while a pack's record loads beside a matched pack", async () => {
     const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
     expect(has(wrapper, "home-pack-offer")).toBe(true);
     fake.flows.hosts.loaded.value = false;

@@ -234,6 +234,22 @@ describe("adaptSavedView", () => {
     expect(next.data.query).toBe("service_name = 'o''k'");
   });
 
+  it("brackets the view's own query before adding the filter", () => {
+    const own = { data: { ...search.data, query: "level = 'error' OR level = 'warn'" } };
+    const filter = { field: "service_name", value: "api" };
+    const next = adaptSavedView(own, [{ from: "k8s_events", to: "default", filter }]);
+    expect(next.data.query).toBe("(level = 'error' OR level = 'warn') AND service_name = 'api'");
+  });
+
+  it("adds no filter to a SQL-mode view, whose query is a whole statement", () => {
+    const sql = 'SELECT * FROM "k8s_events"';
+    const own = { meta: { sqlMode: true }, data: { ...search.data, query: sql } };
+    const filter = { field: "service_name", value: "api" };
+    const next = adaptSavedView(own, [{ from: "k8s_events", to: "default", filter }]);
+    expect(next.data.query).toBe(sql);
+    expect(next.data.stream.selectedStream).toEqual(["default"]);
+  });
+
   it("leaves the pack's own view untouched", () => {
     adaptSavedView(search, [{ from: "k8s_events", to: "x" }]);
     expect(search.data.stream.selectedStream).toEqual(["k8s_events"]);

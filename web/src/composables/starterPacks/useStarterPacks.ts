@@ -47,7 +47,6 @@ import { viewTypeOf } from "@/services/saved_views";
 import { streamNameListQuery } from "@/services/stream.queries";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
-import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import { buildSavedViewPayload } from "@/utils/logs/savedViewPayload";
 import { getUUID } from "@/utils/uuid";
 
@@ -87,9 +86,8 @@ import {
   readSchemaColumns,
 } from "./packMatchData";
 import { MAX_STREAM_COPIES } from "./streamCandidates";
-import { contentHash, panelHash, useInstallRecords } from "./useInstallRecords";
+import { contentHash, useInstallRecords } from "./useInstallRecords";
 import { catalogVersion } from "./usePackCatalog";
-import { pickFields } from "./packUpdate";
 import { StreamRewriteError } from "./streamRewriter";
 import { useRewriteChecks } from "./useRewriteChecks";
 import { useStreamValues } from "./useStreamValues";
@@ -106,6 +104,12 @@ interface PackItemAdapter {
   /** The user-editable body the source hash covers. */
   snapshot: (found: FoundItem) => Promise<unknown>;
   remove: (found: FoundItem) => Promise<void>;
+}
+
+interface LibraryInstall {
+  libraryId: string;
+  stream?: string;
+  found: FoundItem;
 }
 
 const FOLDER_TYPES: PackFolderType[] = ["dashboards", "alerts"];
@@ -126,7 +130,7 @@ export const alertBody = (alert: Record<string, any>) => {
 };
 
 /** The dashboard body a source hash covers, from a detail read. */
-export const dashboardBody = (data: Record<string, any>) => {
+const dashboardBody = (data: Record<string, any>) => {
   const { updatedAt: _updatedAt, ...body } = data[`v${data.version}`];
   return body;
 };
@@ -338,7 +342,10 @@ export function useStarterPacks(org: string) {
       lookup: async () => {
         const { copyOf, itemId, stream } = item;
         const tags = alertTags(pack.id, copyOf ?? itemId, stream);
-        const rows = await readQuery(alertsByTagsQuery(org, tags), true);
+        // The tag filter is a subset match, so the base alert must skip per-stream copies.
+        const rows = (await readQuery(alertsByTagsQuery(org, tags), true)).filter(
+          (row) => !!stream || !(row.tags ?? []).some((tag: string) => tag.startsWith("stream:")),
+        );
         if (rows[0]) return { id: rows[0].alert_id, folderId: rows[0].folder_id };
         // The server's tag search reads a cache that trails a create, so trust the id it returned.
         return savedId ? { id: savedId, folderId: folderIdOf(items, "alerts") } : null;
@@ -431,13 +438,51 @@ export function useStarterPacks(org: string) {
     return savedViewAdapter(pack, item.itemId, adaptation);
   };
 
+  // A Library install tags only `pack:<group>` and keeps its entry id in `library_id`.
+  const readLibraryInstalls = async (
+    pack: StarterPack,
+    entries: Map<string, AlertLibraryEntry>,
+  ): Promise<LibraryInstall[]> => {
+    const groups = [...new Set(pack.alerts.flatMap((id) => entries.get(id)?.pack ?? []))];
+    const perGroup = await Promise.all(
+      groups.map(async (group) => {
+        const tags = [`pack:${group}`.toLowerCase()];
+        const rows = await readQuery(alertsByTagsQuery(org, tags), true).catch(() => []);
+        // A pack's own alert carries a `library:` tag, which the tag lookup already answers.
+        const installed = rows.filter(
+          (row) => !(row.tags ?? []).some((tag: string) => tag.startsWith("library:")),
+        );
+        const details = await Promise.all(
+          installed.map((row) => readQuery(alertDetailQuery(org, row.alert_id)).catch(() => null)),
+        );
+        return installed.flatMap((row, index) => {
+          const libraryId = details[index]?.context_attributes?.library_id;
+          if (typeof libraryId !== "string") return [];
+          const found = { id: row.alert_id, folderId: row.folder_id };
+          return [{ libraryId, stream: details[index]?.stream_name, found }];
+        });
+      }),
+    );
+    return perGroup.flat();
+  };
+
   const planItems = async (
     pack: StarterPack,
+    entries: Map<string, AlertLibraryEntry>,
     copies?: PackPreview["copies"],
   ): Promise<PackRecordItem[]> => {
+    const installs = await readLibraryInstalls(pack, entries);
+    // A per-stream copy is only the Library alert when both read the same stream.
+    const fromLibrary = ({ kind, copyOf, itemId, stream }: PackRecordItem) =>
+      kind === "alert"
+        ? installs.find(
+            (row) => row.libraryId === (copyOf ?? itemId) && (!stream || row.stream === stream),
+          )?.found
+        : undefined;
     const planned: PackRecordItem[] = [];
     for (const item of packItems(pack, copies)) {
-      const found = await adapterFor(pack, item, planned, new Map()).lookup();
+      const found =
+        (await adapterFor(pack, item, planned, new Map()).lookup()) ?? fromLibrary(item);
       planned.push(found ? { ...item, ...found, status: "existing" } : item);
     }
     return planned;
@@ -550,20 +595,18 @@ export function useStarterPacks(org: string) {
     const plan = await adaptationFor(pack, listed, loaded, choices);
     const { repairs, bindings, flavours, alerts, unsupported, streams } = plan;
     const flavoured = listed.map((entry) => flavouredEntry(pack, entry, flavours[entry.id]));
-    const verdicts = STARTER_PACKS_ENABLED
-      ? await matchAlerts(org, flavoured, streams, {
-          loadFile: async (entry) => {
-            const file = await alertFile(pack, entry);
-            const variant = flavourAlert(pack, flavours[entry.id], entry.id);
-            if (!file || !variant) return file as AlertLibraryFile;
-            const original = file.query_condition as Record<string, unknown> | undefined;
-            const condition = { ...original, promql: variant.promql };
-            return { ...file, query_condition: condition } as AlertLibraryFile;
-          },
-          packs: [pack],
-          repairs,
-        })
-      : null;
+    const verdicts = await matchAlerts(org, flavoured, streams, {
+      loadFile: async (entry) => {
+        const file = await alertFile(pack, entry);
+        const variant = flavourAlert(pack, flavours[entry.id], entry.id);
+        if (!file || !variant) return file as AlertLibraryFile;
+        const original = file.query_condition as Record<string, unknown> | undefined;
+        const condition = { ...original, promql: variant.promql };
+        return { ...file, query_condition: condition } as AlertLibraryFile;
+      },
+      packs: [pack],
+      repairs,
+    });
     const names: Record<string, string> = {};
     for (const { id, title } of pack.dashboards) names[id] = title;
     for (const { id, name } of pack.savedViews) names[id] = name;
@@ -602,14 +645,8 @@ export function useStarterPacks(org: string) {
     }
 
     const alertReason = (id: string): PackNotIncludedReason | null => {
-      const entry = entries.get(id);
-      if (!entry) return "unavailable";
-      const fits = verdicts
-        ? verdicts.get(id)
-        : flavouredEntry(pack, entry, flavours[id]).required_streams.every((name) =>
-            locateStream(name, entry.stream_type, { streams, repairs }),
-          );
-      if (fits) return null;
+      if (!entries.get(id)) return "unavailable";
+      if (verdicts.get(id)) return null;
       return unsupported.has(id) ? "no_flavour" : "no_data";
     };
 
@@ -624,7 +661,7 @@ export function useStarterPacks(org: string) {
     const notIncluded: PackNotIncludedItem[] = [];
     const items: PackRecordItem[] = [];
     const reported = new Set<string>();
-    for (const item of await planItems(pack, copies)) {
+    for (const item of await planItems(pack, entries, copies)) {
       const name = names[item.itemId] ?? item.itemId;
       const unfit =
         item.kind === "dashboard" && item.status !== "existing" && noFit.get(item.itemId);
@@ -665,21 +702,6 @@ export function useStarterPacks(org: string) {
     };
   };
 
-  /** What a later update or repair compares against, taken from the body as created. */
-  const updateMarks = (
-    item: PackRecordItem,
-    body: Record<string, any>,
-    entries: Map<string, AlertLibraryEntry>,
-  ): Partial<PackRecordItem> => {
-    if (item.kind === "dashboard") {
-      const panels = (body.tabs ?? []).flatMap((tab: Record<string, any>) => tab.panels ?? []);
-      return { panelHashes: Object.fromEntries(panels.map((p: any) => [p.id, panelHash(p)])) };
-    }
-    if (item.kind !== "alert") return {};
-    const libraryHash = entries.get(item.copyOf ?? item.itemId)?.content_hash;
-    return { ...(libraryHash ? { libraryHash } : {}), base: pickFields(body) };
-  };
-
   const settleItem = async (
     pack: StarterPack,
     item: PackRecordItem,
@@ -716,7 +738,7 @@ export function useStarterPacks(org: string) {
       if (made === false) return { ...item, ...found, status: "existing" };
       const body = (await adapter.snapshot(found)) as Record<string, any>;
       const settled = { ...item, ...found, status: "created" as const };
-      return { ...settled, sourceHash: contentHash(body), ...updateMarks(item, body, entries) };
+      return { ...settled, sourceHash: contentHash(body) };
     } catch (error) {
       return { ...item, status: error instanceof StreamRewriteError ? "skipped" : "failed" };
     }
@@ -782,7 +804,7 @@ export function useStarterPacks(org: string) {
           ...(Object.keys(flavours).length ? { flavours } : {}),
           ...(folderName ? { folderName } : {}),
           ...choice,
-          items: (await planItems(pack, copies)).filter((item) => !excluded(item)),
+          items: (await planItems(pack, entries, copies)).filter((item) => !excluded(item)),
         };
     await writeFirstRecord(record);
     onProgress?.(record);
@@ -823,12 +845,19 @@ export function useStarterPacks(org: string) {
     return record;
   };
 
+  const flightKey = (pack: StarterPack) => `${org}\u0000${pack.id}`;
+
+  // Removing while an install runs would leave whatever it creates after the removal read.
+  const installSettled = async (pack: StarterPack) => {
+    await inFlight.get(flightKey(pack))?.catch(() => null);
+  };
+
   /** Installs the pack, or resumes this pack's interrupted install instead of starting another. */
   const installPack = (
     pack: StarterPack,
     options: PackInstallOptions = {},
   ): Promise<PackInstallRecord> => {
-    const key = `${org}\u0000${pack.id}`;
+    const key = flightKey(pack);
     const pending = inFlight.get(key);
     if (pending) return pending;
     const run = runInstall(pack, options).finally(() => {
@@ -846,6 +875,28 @@ export function useStarterPacks(org: string) {
     return rows.length === 0;
   };
 
+  // Org members can edit the install record, so only server-side marks prove the pack made an item.
+  const ownsItem = async (
+    pack: StarterPack,
+    item: PackRecordItem,
+    items: PackRecordItem[],
+    adapter: PackItemAdapter,
+    found: FoundItem,
+    body: Record<string, any>,
+  ): Promise<boolean> => {
+    if (item.kind === "alert") {
+      const tags: string[] = body.tags ?? [];
+      const own = alertTags(pack.id, item.copyOf ?? item.itemId, item.stream);
+      return own.every((tag) => tags.includes(tag));
+    }
+    if (item.kind !== "dashboard") return true;
+    if (isShared(pack, item)) return (await adapter.lookup())?.id === found.id;
+    const folderId = folderIdOf(items, "dashboards");
+    if (!folderId || found.folderId !== folderId) return false;
+    const rows = await readQuery(dashboardsByFolderQuery(org, folderId), true);
+    return rows.some((row) => row.dashboard_id === found.id);
+  };
+
   /** The reason an item stays, or null once it is gone. */
   const disposeItem = async (
     pack: StarterPack,
@@ -858,8 +909,10 @@ export function useStarterPacks(org: string) {
       const found = { id: item.id, folderId: item.folderId };
       if (item.kind === "folder") {
         if (!(await isFolderEmpty(item.itemId as PackFolderType, item.id))) return "not_empty";
-      } else if (contentHash(await adapter.snapshot(found)) !== item.sourceHash) {
-        return "changed";
+      } else {
+        const body = (await adapter.snapshot(found)) as Record<string, any>;
+        if (contentHash(body) !== item.sourceHash) return "changed";
+        if (!(await ownsItem(pack, item, items, adapter, found, body))) return "changed";
       }
       await adapter.remove(found);
       return null;
@@ -896,6 +949,7 @@ export function useStarterPacks(org: string) {
 
   /** Removes one install's unchanged items and reports the rest. */
   const undoPack = async (pack: StarterPack, installId: string): Promise<PackRemovalResult> => {
+    await installSettled(pack);
     const record = await records.read(pack.id, installId);
     return record ? removeInstall(pack, record) : { removed: [], kept: [] };
   };
@@ -903,6 +957,7 @@ export function useStarterPacks(org: string) {
   /** Removes the unchanged items of every install of the pack and reports the rest. */
   const removePack = async (pack: StarterPack): Promise<PackRemovalResult> => {
     const result: PackRemovalResult = { removed: [], kept: [] };
+    await installSettled(pack);
     for (const record of await records.list(pack.id)) {
       const { removed, kept } = await removeInstall(pack, record);
       result.removed.push(...removed);
@@ -917,52 +972,11 @@ export function useStarterPacks(org: string) {
     return result;
   };
 
-  // Null once the alert is gone, which must not stop edits to the alerts that remain.
-  const hashOf = async (pack: StarterPack, item: PackRecordItem): Promise<string | null> => {
-    const found = { id: item.id!, folderId: item.folderId };
-    try {
-      return contentHash(await adapterFor(pack, item, [], new Map()).snapshot(found));
-    } catch (error) {
-      if (isNotFound(error)) return null;
-      throw error;
-    }
-  };
-
-  /** Runs a pack's own edit of these alerts so Undo still sees them as unchanged; user edits stay detected. */
-  const trackAlertEdit = async <T>(
-    pack: StarterPack,
-    alertIds: string[],
-    work: () => Promise<T>,
-  ): Promise<T> => {
-    const live = (await records.list(pack.id)).filter(({ status }) => status !== "removed");
-    const owned = await Promise.all(
-      live.map(async (record) => {
-        const alerts = record.items.filter(
-          ({ kind, id }) => kind === "alert" && !!id && alertIds.includes(id),
-        );
-        const hashes = await Promise.all(alerts.map((item) => hashOf(pack, item)));
-        return alerts.filter((item, index) => hashes[index] === item.sourceHash);
-      }),
-    );
-    const result = await work();
-    await Promise.all(
-      live.map(async (record, index) => {
-        if (!owned[index].length) return;
-        for (const item of owned[index]) {
-          item.sourceHash = (await hashOf(pack, item)) ?? item.sourceHash;
-        }
-        await records.write(record);
-      }),
-    );
-    return result;
-  };
-
   return {
     installPack,
     previewPack,
     undoPack,
     removePack,
-    trackAlertEdit,
     listInstalls: records.list,
   };
 }

@@ -172,15 +172,14 @@ describe("StarterPackDrawer", () => {
     for (const id of ["dashboard", "alert", "savedView"]) {
       expect(header(id).some((name) => name.startsWith("bg-"))).toBe(false);
     }
-    expect(chip("dashboard")).toEqual(
-      expect.arrayContaining(["bg-ingest-accent-blue", "dark:bg-icon-chip-info-bg"]),
-    );
-    expect(chip("alert")).toEqual(
-      expect.arrayContaining(["bg-ingest-accent-orange", "dark:bg-icon-chip-orange-bg"]),
-    );
-    expect(chip("savedView")).toEqual(
-      expect.arrayContaining(["bg-ingest-accent-purple", "dark:bg-icon-chip-purple-bg"]),
-    );
+    expect(chip("dashboard")).toEqual(expect.arrayContaining(["bg-icon-chip-info-bg"]));
+    expect(chip("alert")).toEqual(expect.arrayContaining(["bg-icon-chip-orange-bg"]));
+    expect(chip("savedView")).toEqual(expect.arrayContaining(["bg-icon-chip-purple-bg"]));
+    for (const id of ["dashboard", "alert", "savedView"]) {
+      expect(chip(id).some((name) => name.startsWith("dark:") || name === "text-white")).toBe(
+        false,
+      );
+    }
   });
 
   it("goes back to the list from Back and closes from the close button", async () => {
@@ -246,18 +245,6 @@ describe("StarterPackDrawer", () => {
     await flushPromises();
     expect(flow.install).toHaveBeenCalledWith(undefined, {
       exclude: ["a1"],
-      enableAlerts: true,
-      destination: undefined,
-    });
-  });
-
-  it("sets up into the folder its host chose", async () => {
-    const flow = ready();
-    const wrapper = await shown(flow, { folderName: "Team K8s" });
-    await submit(wrapper).trigger("click");
-    await flushPromises();
-    expect(flow.install).toHaveBeenCalledWith("Team K8s", {
-      exclude: [],
       enableAlerts: true,
       destination: undefined,
     });
@@ -439,6 +426,40 @@ describe("StarterPackDrawer", () => {
       expect(box(wrapper, "turn-on-check").attributes("aria-checked")).toBe("true");
       expect(has(wrapper, "starter-pack-alert-setup-no-destination")).toBe(true);
       quiet(wrapper);
+    });
+
+    it("keeps Send to unavailable with a note when the destinations read fails", async () => {
+      mocks.read = () => Promise.reject(new Error("down"));
+      const flow = ready();
+      const wrapper = await shown(flow);
+      expect(box(wrapper, "send-to").attributes("disabled")).toBeDefined();
+      expect(has(wrapper, "starter-pack-alert-setup-email-me")).toBe(false);
+      expect(has(wrapper, "starter-pack-alert-setup-destinations-failed")).toBe(true);
+      await submit(wrapper).trigger("click");
+      await flushPromises();
+      expect(mocks.ensure).not.toHaveBeenCalled();
+      expect(flow.install).toHaveBeenCalledWith(undefined, {
+        exclude: [],
+        enableAlerts: true,
+        destination: undefined,
+      });
+    });
+
+    it("never creates Email me while Turn on is unticked", async () => {
+      mocks.destinations = [];
+      mocks.ensure.mockResolvedValue({ name: "email-user@example.com" });
+      const flow = ready();
+      const wrapper = await shown(flow);
+      await box(wrapper, "send-to").trigger("click");
+      await box(wrapper, "turn-on-check").trigger("click");
+      await submit(wrapper).trigger("click");
+      await flushPromises();
+      expect(mocks.ensure).not.toHaveBeenCalled();
+      expect(flow.install).toHaveBeenCalledWith(undefined, {
+        exclude: [],
+        enableAlerts: false,
+        destination: undefined,
+      });
     });
 
     it("waits for the destinations before Set up, drawn with the D14 defaults", () => {
@@ -802,7 +823,6 @@ describe("StarterPackDrawer", () => {
     expect(flow.land).not.toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
     expect(wrapper.emitted("close")).toBeUndefined();
-    expect(wrapper.emitted("installed")).toHaveLength(1);
   });
 
   it("drops the installed pack from this browser's header matches", async () => {
@@ -814,7 +834,6 @@ describe("StarterPackDrawer", () => {
       label: "kubernetes",
       streams: [],
       items: [],
-      queriesPerDay: 0,
     };
     useBrowserMatches("org").saveFull({ checkedAt: 1, sources: [source], dismissed: 0 }, []);
     const wrapper = await shown();
@@ -835,7 +854,6 @@ describe("StarterPackDrawer", () => {
       label: "kubernetes",
       streams: [],
       items: [],
-      queriesPerDay: 0,
     };
     useBrowserMatches("org").saveFull({ checkedAt: 1, sources: [source], dismissed: 0 }, []);
     const flow = ready({ install: vi.fn(async () => false) });
@@ -1153,7 +1171,6 @@ describe("StarterPackDrawer", () => {
       await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
       await flushPromises();
       expect(flow.undo).toHaveBeenCalled();
-      expect(wrapper.emitted("done")).toHaveLength(1);
       expect(wrapper.emitted("back")).toHaveLength(1);
       expect(mocks.push).not.toHaveBeenCalled();
     });
@@ -1260,19 +1277,48 @@ describe("StarterPackDrawer", () => {
     expect(has(wrapper, "starter-pack-alert-setup")).toBe(true);
   });
 
-  it("reports done after an inline Remove or Undo succeeds, and not when it fails", async () => {
+  it("goes back after an inline Remove or Undo succeeds, and not when it fails", async () => {
     const removed = render(fakeFlow({ installed: ref(true), canUndo: ref(false) }));
     await removed.get('[data-test="starter-pack-page-remove-btn"]').trigger("click");
     await removed.get('[data-test="starter-pack-remove-confirm-btn"]').trigger("click");
     await flushPromises();
-    expect(removed.emitted("done")).toHaveLength(1);
+    expect(removed.emitted("back")).toHaveLength(1);
     const failed = render(
       fakeFlow({ installed: ref(true), canUndo: ref(true), undo: vi.fn(async () => false) }),
     );
     await failed.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
     await failed.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
     await flushPromises();
-    expect(failed.emitted("done")).toBeUndefined();
+    expect(failed.emitted("back")).toBeUndefined();
+  });
+
+  it("stays and says how many items it kept after an Undo or Remove", async () => {
+    const removal = shallowRef<unknown>(null);
+    const kept = {
+      removed: [],
+      kept: [
+        { kind: "alert", itemId: "a1", reason: "changed" },
+        { kind: "folder", itemId: "alerts", reason: "not_empty" },
+      ],
+    };
+    const flow = fakeFlow({
+      installed: ref(true),
+      canUndo: ref(true),
+      removal,
+      undo: vi.fn(async () => {
+        removal.value = kept;
+        flow.installed.value = false;
+        return true;
+      }),
+    });
+    const wrapper = render(flow);
+    await wrapper.get('[data-test="starter-pack-progress-undo-btn"]').trigger("click");
+    await wrapper.get('[data-test="starter-pack-undo-confirm-btn"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("back")).toBeUndefined();
+    expect(wrapper.get('[data-test="starter-pack-drawer-summary"]').text()).toBe(
+      "Kept 2 items that were changed or are still in use. Delete them on their own pages.",
+    );
   });
 
   it("names the built-in pack calmly when the Library is out of reach", () => {
