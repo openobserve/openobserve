@@ -30,6 +30,16 @@ export interface ToolsetUpdateRequest {
   data?: Record<string, any>;
 }
 
+export interface ToolsetMcpConfig {
+  url: string;
+  headers: Record<string, string>;
+  timeout_seconds: number;
+}
+
+/** An unsaved MCP config, or a saved toolset with unsaved changes (its `***` values are kept). */
+export type ToolsetDiscoverRequest =
+  ToolsetMcpConfig | { id: string; overrides?: Partial<ToolsetMcpConfig> };
+
 const aiToolsets = {
   list: (org_identifier: string, params?: { name?: string; kind?: string; limit?: number }) => {
     return http().get(`/api/${org_identifier}/ai/toolsets`, { params });
@@ -47,6 +57,9 @@ const aiToolsets = {
   },
   update: (org_identifier: string, id: string, data: ToolsetUpdateRequest) => {
     return http().put(`/api/${org_identifier}/ai/toolsets/${id}`, data);
+  },
+  discover: (org_identifier: string, body: ToolsetDiscoverRequest) => {
+    return http().post(`/api/${org_identifier}/ai/toolsets/_discover`, body);
   },
   delete: (org_identifier: string, id: string) => {
     return http().delete(`/api/${org_identifier}/ai/toolsets/${id}`);

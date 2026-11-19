@@ -39,6 +39,7 @@ vi.mock("@/services/ai_toolsets", () => ({
     create: vi.fn(() => Promise.resolve({ data: {} })),
     update: vi.fn(() => Promise.resolve({ data: {} })),
     delete: vi.fn(() => Promise.resolve({ data: {} })),
+    discover: vi.fn(() => Promise.resolve({ data: { tools: [] } })),
   },
 }));
 
