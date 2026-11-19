@@ -2684,7 +2684,14 @@ export default defineComponent({
     });
     const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
     const conditionNote = computed(() => ratioHint.value ?? formContext?.conditionNote?.value);
-    const conditionHelp = computed(() => valueRangeText(props.previewValueRange, t));
+    const conditionHelp = computed(() =>
+      valueRangeText(
+        props.previewValueRange,
+        t,
+        undefined,
+        isSpanDuration.value ? durationUnit.value : undefined,
+      ),
+    );
     const thresholdHandlers: Record<string, (value: any) => void> = {
       "trigger_condition.operator": (v) => onTriggerOperatorChange(v),
       "trigger_condition.threshold": (v) => onTriggerThresholdChange(v),

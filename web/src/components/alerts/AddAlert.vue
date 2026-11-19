@@ -1364,9 +1364,13 @@ import AlertMessageLine from "./AlertMessageLine.vue";
 import {
   carriedThreshold,
   compareFactor,
+  describeIntent,
+  intentAlertName,
+  slotsFromForm,
   type IntentFill,
   type IntentId,
 } from "@/utils/alerts/alertIntents";
+import { useIntentState } from "@/composables/alerts/useIntentState";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 import type { ValueRange } from "@/utils/alerts/ratioThreshold";
 import { buildPrefillFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
@@ -2521,11 +2525,23 @@ export default defineComponent({
     // Offered only once the user reaches the name (or saves), so the name never renames itself mid-form.
     const nameDue = ref(false);
     const libraryName = ref("");
+    // A starter's name says what it watches, read from the form so step 2's changes reach it.
+    const intentState = useIntentState(alertForm.form);
+    const intentName = computed(() => {
+      const intent = intentState.intent;
+      const data = alertForm.formData.value;
+      if (!intent || !data.stream_name) return "";
+      const read = (path: string) => get(data, path);
+      const slots = { ...intentState.slots, ...slotsFromForm(intent, read, intentState.slots) };
+      const metrics = data.stream_type === "metrics";
+      const d = describeIntent(intent, slots, { stream: data.stream_name, metrics });
+      return intentAlertName(d, data.stream_type);
+    });
     const alertNameSuggestion = computed(() =>
       unusedAlertName(
         suggestedAlertName(buildAlertAutoName(alertForm.formData.value, alertForm.t), {
           due: nameDue.value,
-          fromLibrary: libraryName.value,
+          fromLibrary: libraryName.value || intentName.value,
         }),
         takenAlertNames.value,
       ),
@@ -2687,7 +2703,7 @@ export default defineComponent({
         unusedAlertName(
           suggestedAlertName(buildAlertAutoName(alertForm.formData.value, alertForm.t), {
             due: true,
-            fromLibrary: libraryName.value,
+            fromLibrary: libraryName.value || intentName.value,
           }),
           takenAlertNames.value,
         ),
@@ -2746,13 +2762,15 @@ export default defineComponent({
         alertForm.anomalyConfig.value = { ...alertForm.anomalyConfig.value, ...fill.anomaly };
       if (fill.vrl) alertForm.showVrlFunction.value = true;
       alertForm.isAggregationEnabled.value = fill.aggregation;
+      // Set before the tick: a re-render without the intent unmounts step 1's rows and drops the
+      // field being typed in (its value and focus).
+      appliedIntent.value = { fill, label };
       await nextTick();
       if (fill.values["query_condition.type"] === "custom") {
         (
           alertForm.step2Ref.value as { syncMeasureFromForm?: () => void } | null
         )?.syncMeasureFromForm?.();
       }
-      appliedIntent.value = { fill, label };
       if (fill.intent === "promql") goToSection("condition");
     };
 

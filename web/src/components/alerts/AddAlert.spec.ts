@@ -35,6 +35,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
+import { buildEventFill } from "@/utils/alerts/alertIntents";
 
 // Shared so the SQL → stream-name sync tests can parse a FROM clause and fail a
 // stream lookup; the defaults match the old per-call mocks.
@@ -2336,6 +2337,17 @@ describe("AddAlert (OForm owner)", () => {
       wrapper.vm.startFromScratch();
       await flushPromises();
       expect(wrapper.vm.form.getFieldValue("tags")).toEqual([]);
+    });
+
+    it("re-applying a starter keeps it applied throughout, so step 1's sentence never drops the field being typed in", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("stream_name", "app_logs");
+      const fill = buildEventFill("countWhere", {}, { stream: "app_logs", id: () => "g1" });
+      await wrapper.vm.applyIntent({ fill, label: "Count" });
+      const again = wrapper.vm.applyIntent({ fill, label: "Count" });
+      expect(wrapper.vm.appliedIntent?.fill?.intent).toBe("countWhere");
+      await again;
     });
 
     it.each([
