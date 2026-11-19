@@ -91,6 +91,7 @@ pub mod short_url;
 pub mod slack;
 pub mod slos;
 pub mod sourcemaps;
+pub mod starter_packs;
 pub mod status;
 pub mod status_pages;
 pub mod stream;
