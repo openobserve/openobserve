@@ -26,7 +26,6 @@ vi.mock("@/stores", async () => {
 import router from "@/test/unit/helpers/router";
 import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import { searchState } from "@/composables/useLogs/searchState";
-import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 
 // Mock CSS.supports for test environment
 Object.defineProperty(global, "CSS", {
@@ -1361,15 +1360,6 @@ describe("Logs Index", async () => {
         wrapper.vm.onBuildQueryGenerated(testQuery);
         await flushPromises();
 
-        expect(wrapper.vm.searchObj.data.query).toBe("level = 'ERROR'");
-      });
-
-      it("a Build run can wait for the WHERE clause sync before noting its scope", async () => {
-        wrapper.vm.searchObj.meta.sqlMode = false;
-        wrapper.vm.searchObj.data.query = "stale filter";
-        wrapper.vm.onBuildQueryGenerated("SELECT count(*) FROM \"logs\" WHERE level = 'ERROR'");
-        expect(wrapper.vm.searchObj.data.query).toBe("stale filter");
-        await useLogsAutoRun().panelQuerySynced();
         expect(wrapper.vm.searchObj.data.query).toBe("level = 'ERROR'");
       });
 

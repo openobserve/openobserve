@@ -161,7 +161,6 @@ const persistReasonMock = vi.hoisted(() => ({ value: null as string | null }));
 const openPanelRunMock = vi.hoisted(() => vi.fn(() => 1));
 const markPanelDispatchedMock = vi.hoisted(() => vi.fn());
 const endPanelRunMock = vi.hoisted(() => vi.fn());
-const panelQuerySyncedMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("@/composables/useLogs/logsAutoRun", () => ({
   setAutoRunTransport: vi.fn(),
   useLogsAutoRun: () => ({
@@ -170,7 +169,6 @@ vi.mock("@/composables/useLogs/logsAutoRun", () => ({
     markPanelDispatched: markPanelDispatchedMock,
     hasPanelRun: () => true,
     endPanelRun: endPanelRunMock,
-    panelQuerySynced: panelQuerySyncedMock,
   }),
 }));
 
@@ -598,31 +596,6 @@ describe("BuildQueryPage Component", () => {
       await wrapper.vm.runQuery(false, 7);
       await wrapper.vm.runQuery(false);
       expect(order).toEqual(["run", "mark:7", "run", "mark:11"]);
-    });
-
-    it("dispatches a builder run only after the parent has synced the generated query", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-      const order: string[] = [];
-      let finishSync: () => void = () => undefined;
-      mockMakeAutoSQLQuery.mockResolvedValueOnce('SELECT count(*) FROM "s"');
-      panelQuerySyncedMock.mockImplementationOnce(
-        () =>
-          new Promise<void>((resolve) => {
-            finishSync = () => {
-              order.push("synced");
-              resolve();
-            };
-          }),
-      );
-      wrapper.vm.panelEditorRef = { runQuery: vi.fn(() => order.push("run")) };
-      markPanelDispatchedMock.mockImplementation((id: number) => order.push(`mark:${id}`));
-      const running = wrapper.vm.runQuery(false, 7);
-      await flushPromises();
-      expect(order).toEqual([]);
-      finishSync();
-      await running;
-      expect(order).toEqual(["synced", "run", "mark:7"]);
     });
 
     it("should not show AddToDashboard drawer initially", async () => {

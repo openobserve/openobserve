@@ -3326,7 +3326,7 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
-    const syncBuildQuery = async (query: string) => {
+    const onBuildQueryGenerated = async (query: string) => {
       if (searchObj.meta.sqlMode) {
         // SQL mode ON: sync the full generated SQL to the search bar
         searchObj.data.query = query;
@@ -3339,9 +3339,6 @@ export default defineComponent({
         searchObj.data.editorValue = whereClause;
       }
     };
-
-    const onBuildQueryGenerated = (query: string) =>
-      autoRun.trackPanelQuerySync(syncBuildQuery(query));
 
     const onCustomQueryModeChanged = (isCustomMode: boolean) => {
       // Disable query editor in build mode when customQuery is false (builder mode)
