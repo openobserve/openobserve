@@ -15651,7 +15651,8 @@
     "form": {
       "warning": {
         "label": "Warning",
-        "placeholder": "No warning"
+        "placeholder": "No warning",
+        "add": "Add a warning level"
       },
       "showAll": "Show all settings",
       "change": "Change",
@@ -15896,7 +15897,8 @@
         "usedBy": "Not used by any alert yet | Used by {count} alert | Used by {count} alerts"
       },
       "window": {
-        "inTheLast": "in the last {n} minute | in the last {n} minutes"
+        "inTheLast": "in the last {n} minute | in the last {n} minutes",
+        "queryReads": "The query reads the last {n} minute | The query reads the last {n} minutes"
       }
     },
     "copy": {
@@ -16067,7 +16069,11 @@
         "timesLastWeek": "more than {factor} times the same window last week",
         "pickField": "Pick a field",
         "pickLabel": "Pick a label",
-        "thresholdWaits": "Pick what is missing above first"
+        "thresholdWaits": "Pick what is missing above first",
+        "aggOfMeasure": "{agg} of {measure}"
+      },
+      "scratch": {
+        "label": "Build it myself"
       }
     },
     "librarySuggest": {
