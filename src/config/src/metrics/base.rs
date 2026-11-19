@@ -1379,6 +1379,20 @@ pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+/// `op` is the sidecar call; `outcome` is `failed_run` or `tolerated` (the fourth-run fallback).
+pub static ANOMALY_SIDECAR_FAILURES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "anomaly_sidecar_failures_total",
+            "Anomaly detection sidecar read or delete failures, by operation and outcome",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["op", "outcome"],
+    )
+    .expect("Metric created")
+});
+
 pub static ALERT_RUNS_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -3508,6 +3522,9 @@ pub(crate) fn register(registry: &Registry) {
     registry
         .register(Box::new(ALERT_CHART_EVENTS_TOTAL.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(ANOMALY_SIDECAR_FAILURES_TOTAL.clone()))
+        .expect("Metric registered");
 
     registry
         .register(Box::new(ALERT_RUNS_SUPPRESSED_TOTAL.clone()))
@@ -4004,6 +4021,9 @@ mod tests {
     fn test_statics_alert_chart_and_suppression() {
         let _ = ALERT_CHART_EVENTS_TOTAL.clone();
         let _ = ALERT_RUNS_SUPPRESSED_TOTAL.clone();
+        ANOMALY_SIDECAR_FAILURES_TOTAL
+            .with_label_values(&["anchor_read", "failed_run"])
+            .inc();
     }
 
     #[test]
