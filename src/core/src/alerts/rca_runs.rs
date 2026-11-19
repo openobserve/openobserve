@@ -618,6 +618,7 @@ pub(crate) mod tests {
                     schema.create_table_from_entity(
                         infra::table::entity::alert_pair_verdicts::Entity,
                     ),
+                    schema.create_table_from_entity(infra::table::entity::kv_store::Entity),
                 ] {
                     conn.execute(backend.build(table.if_not_exists()))
                         .await
