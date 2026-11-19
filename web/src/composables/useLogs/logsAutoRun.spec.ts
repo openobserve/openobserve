@@ -636,6 +636,17 @@ describe("refinement de-duplication and search-around", () => {
     expect(sa.indexTimestamp).toBe(-1);
   });
 
+  it("stops reporting search-around to the share check once a normal run starts, before any chunk lands", () => {
+    run().setExecutors({ logs: () => "dispatched" as any });
+    run().invalidateExecuted("search-around");
+    expect(run().engine.canPersistOrShare("logs", "share-link")).toMatchObject({
+      code: "search-around",
+    });
+    run().request("run");
+    const decision = run().engine.canPersistOrShare("logs", "share-link");
+    expect(decision.ok || decision.code !== "search-around").toBe(true);
+  });
+
   it("keeps the shown rows when search-around invalidates the record", () => {
     fakeSearchObj.value.data.queryResults = { hits: [{ a: 1 }] };
     run().invalidateExecuted("search-around");

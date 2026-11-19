@@ -349,6 +349,7 @@ function createLogsAutoRun() {
   }
 
   function leaveSearchAround(): void {
+    engine.clearSearchAroundInvalidation();
     searchAroundShown.value = false;
     const around = searchObj().data.searchAround;
     if (!around) return;
