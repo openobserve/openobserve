@@ -34,6 +34,7 @@ import type { SyntheticsLocation } from "@/types/synthetics";
 import {
   cantBuild,
   readStreamFields,
+  usuallyFor,
   type BulkKind,
   type BulkRow,
   type StreamFields,
@@ -157,12 +158,11 @@ const draftsOf = (
   return DRAFT_ORDER.filter((k) => kinds.includes(k));
 };
 
-// Errors and latency rows carry no usual level: the review list measures it over 7 days when it opens.
 const bulkRowOf = (row: CoverageRow, kind: BulkKind, owned: OwnedAlert[]): BulkRow => ({
   key: `${row.identity?.serviceId ?? row.service}:${kind}`,
   kind,
   scope: scopeOf(row, kind === "latency" ? streamOf(row, "traces")! : rowStream(row)!),
-  usually: null,
+  usually: usuallyFor(kind, row.identity?.trafficPerHour),
   ...ownership(nameOf(row), owned),
   ...(kind === "latency" ? { inputs: { durationField: "duration", p95Ms: null } } : {}),
 });

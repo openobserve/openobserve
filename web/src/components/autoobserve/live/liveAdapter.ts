@@ -43,6 +43,7 @@ import {
   agoText,
   coverageWord,
   formatDay,
+  NAMES_SHOWN,
   placeLabels,
   placeOf,
   whereText,
@@ -386,8 +387,11 @@ const toRow = (
       cluster: row.cluster,
       namespace: row.namespace,
       streams: row.streams ?? [],
+      trafficPerHour: row.traffic_per_hour ?? null,
     },
     status: { state, label: coverageWord(t, state) },
+    traffic: row.traffic_per_hour ?? null,
+    engine: row,
     extra: EXTRA_CLASSES.map((cls) => {
       const label = t(CLASS_LABEL[cls]);
       return { key: cls, label, cell: toCell(t, row.cells[cls], label, locale) };
@@ -557,9 +561,8 @@ const cappedList = (
   );
 };
 
-// The approved copy names the first destination and counts the rest, and up to three services.
+// The approved copy names the first destination and counts the rest.
 const DESTINATION_CAP = 1;
-const SERVICE_CAP = 3;
 
 const blindParts = (
   t: TranslateFn,
@@ -620,7 +623,7 @@ const silentParts = (t: TranslateFn, locale: string, s: AutoObserveSuggestion): 
     why: services.length
       ? t("autoobserveLive.suggestions.body.silentWhy", {
           monitor,
-          services: cappedList(t, locale, services, count, SERVICE_CAP),
+          services: cappedList(t, locale, services, count, NAMES_SHOWN),
         })
       : t("autoobserveLive.suggestions.body.silentWhyNoNames", { monitor }),
     next: t("autoobserveLive.suggestions.body.silentNext"),
