@@ -39,80 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :class="sectionTargets ? '' : 'px-3 py-2'">
       <div>
         <Teleport
-          v-if="isScheduled && !isForecastMode"
-          :to="sectionTargets?.settingsSchedule"
-          :disabled="!sectionTargets?.settingsSchedule"
-        >
-          <!-- Without cron the look-back is the second half of the Check every row the page draws. -->
-          <component
-            :is="periodInline ? 'div' : 'OSettingRow'"
-            ref="periodFieldRef"
-            v-bind="periodWrapper"
-          >
-            <div class="flex w-fit max-w-full flex-col gap-1" :class="periodInline ? '' : 'pe-2'">
-              <div class="flex flex-wrap items-center gap-2">
-                <span v-if="periodInline" class="text-text-body text-sm">{{
-                  t("alerts.form.schedule.lookingAt")
-                }}</span>
-                <div class="flex min-w-0 items-center gap-2">
-                  <div class="min-w-0">
-                    <OFormInput
-                      :aria-label="t('alerts.form.names.lookBack')"
-                      name="trigger_condition.period"
-                      type="number"
-                      fit-content
-                      min="1"
-                      :debounce="300"
-                      data-test="alert-settings-period-input"
-                      @update:model-value="handlePeriodChange"
-                    >
-                      <!-- Message rendered below at pair width — see periodError. -->
-                      <template #error />
-                    </OFormInput>
-                  </div>
-                  <span class="text-text-body text-sm">{{ t("alerts.form.units.minutes") }}</span>
-                </div>
-              </div>
-              <div
-                v-if="periodError"
-                class="text-input-error-text w-0 min-w-full text-xs"
-                data-test="alert-settings-period-error"
-                role="alert"
-              >
-                {{ periodError }}
-              </div>
-              <div
-                v-if="isCron"
-                class="text-text-secondary text-xs"
-                data-test="alert-settings-period-cron-note"
-              >
-                {{ t("alerts.form.schedule.cron", { period: fv("trigger_condition.period") }) }}
-              </div>
-              <AlertLinkNote
-                v-if="!periodInline && scheduleNote"
-                :text="scheduleNote.text"
-                :action="scheduleNote.action"
-                :separated="scheduleNote.separated"
-                data-test="alert-settings-check-every-link"
-                @action="scheduleNote.run"
-              />
-            </div>
-          </component>
-          <template v-if="periodInline">
-            <AlertLinkNote
-              v-if="scheduleNote"
-              class="order-2"
-              :text="scheduleNote.text"
-              :action="scheduleNote.action"
-              :separated="scheduleNote.separated"
-              data-test="alert-settings-check-every-link"
-              @action="scheduleNote.run"
-            />
-            <p v-else class="order-2 m-0 min-h-4" aria-hidden="true" />
-          </template>
-        </Teleport>
-
-        <Teleport
           v-if="isScheduled || isComposite"
           :to="sectionTargets?.settingsHold"
           :disabled="!sectionTargets?.settingsHold"
@@ -507,7 +433,7 @@ import {
   watchEffect,
   type PropType,
 } from "vue";
-import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import config from "@/aws-exports";
@@ -522,7 +448,6 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
-import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
 import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
 import { ALERT_FORM_CONTEXT_KEY, type AlertLineNote } from "@/components/alerts/alertFormContext";
 import { describeDestinations } from "@/utils/alerts/destinationDescription";
@@ -552,7 +477,6 @@ import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { visibleFieldError } from "@/lib/forms/Form/fieldError";
 import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
-import { useLookBackLink, type LinkedField } from "@/composables/alerts/useLookBackLink";
 
 // Below this many groups firing at once, a repeat per group is not a flood.
 const MANY_GROUPS = 5;
@@ -568,7 +492,6 @@ export default defineComponent({
     AlertDestinationsField,
     AlertSentenceRow,
     AlertTierPlace,
-    AlertLinkNote,
     AlertMessageLine,
   },
   props: {
@@ -654,7 +577,6 @@ export default defineComponent({
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
     // step ref). Scheduled-only.
-    const periodFieldRef = ref<any>(null);
     const silenceFieldRef = ref<any>(null);
     const destinationsFieldRef = ref<any>(null);
     const pendingPeriodFieldRef = ref<any>(null);
@@ -669,7 +591,6 @@ export default defineComponent({
     // OFormInput would have surfaced — single source of truth, wider display.
     const form: any = inject(FORM_CONTEXT_KEY, null);
     const fieldError = (path: string) => shownFieldError(form, path);
-    const periodError = fieldError("trigger_condition.period");
     const silenceError = fieldError("trigger_condition.silence");
     // AlertDestinationsField is not an OForm* wrapper, so it cannot render its own schema error.
     const destinationsError = fieldError("destinations");
@@ -909,15 +830,14 @@ export default defineComponent({
       Math.ceil(Number(store.state?.zoConfig?.min_auto_refresh_interval) / 60) || 1;
     // Spread the FRESH form value, not `props.formData.trigger_condition`: the prop refreshes
     // only on the next render, and the parent writes back the whole trigger object.
-    const lookBack = useLookBackLink({
-      trigger: () => fv("trigger_condition") ?? props.formData?.trigger_condition ?? {},
-      period: () => props.formData?.trigger_condition?.period,
-      frequency: () => fv("trigger_condition.frequency"),
-      formSeed: () => fv("query_condition"),
-      minFrequency,
-      emit: (trigger) => emit("update:trigger", trigger),
-    });
-    const { handlePeriodChange } = lookBack;
+    const currentTrigger = () => fv("trigger_condition") ?? props.formData?.trigger_condition ?? {};
+    // The look back is only the window: Check every and its cron schedule never follow it.
+    const handlePeriodChange = (value: unknown) => {
+      const next = { ...currentTrigger(), period: value };
+      if (Number(value) > 0 && !next.timezone)
+        next.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      emit("update:trigger", next);
+    };
     // Checking more often never moves the look back, since that is the window the condition reads.
     const checkEveryFix = (spanMinutes: number | undefined) => {
       const minutes = spanMinutes ? finerCheckMinutes(spanMinutes, minFrequency()) : undefined;
@@ -925,47 +845,9 @@ export default defineComponent({
       return {
         action: t("alerts.guard.checkEvery", { every: everyWords(minutes, t) }),
         separated: false,
-        run: () => lookBack.setCheckEvery(minutes),
+        run: () => emit("update:trigger", { ...currentTrigger(), frequency: minutes }),
       };
     };
-    const LINKED_LABEL: Record<LinkedField, I18nKey> = {
-      period: "alerts.form.names.lookBack",
-      frequency: "alerts.queryConfig.checkEvery",
-    };
-    interface LinkNote {
-      text: I18nText | null;
-      action: I18nText | null;
-      separated: boolean;
-      run: () => void;
-    }
-    // Null while the look back is empty or a cron runs the alert: there is nothing to link.
-    const scheduleNote = computed<LinkNote | null>(() => {
-      const move = lookBack.lastMove.value;
-      if (move)
-        return {
-          text: t("alerts.form.link.alsoSet", {
-            fields: t(LINKED_LABEL[move.field]),
-            duration: durationWords(move.value, t),
-          }),
-          action: t("alerts.form.link.undo"),
-          separated: false,
-          run: lookBack.undo,
-        };
-      if (isCron.value || !(Number(fv("trigger_condition.period")) > 0)) return null;
-      return lookBack.isLinked()
-        ? {
-            text: t("alerts.form.link.linked"),
-            action: t("alerts.form.link.unlink"),
-            separated: true,
-            run: lookBack.unlink,
-          }
-        : {
-            text: t("alerts.form.link.separate"),
-            action: t("alerts.form.link.link"),
-            separated: true,
-            run: lookBack.relink,
-          };
-    });
     const notifyLines = computed(() => notifyHelp(fv("query_condition"), t));
     // A wait shorter than the checks never holds a notification back, so it says so instead of moving it.
     const silenceHint = computed<AlertLineNote | null>(() => {
@@ -1130,17 +1012,6 @@ export default defineComponent({
     const isScheduled = computed(() => props.isRealTime === "false");
     const isComposite = computed(() => props.isRealTime === "composite");
     const isCron = computed(() => fv("trigger_condition.frequency_type") === "cron");
-    const periodInline = computed(() => !!props.sectionTargets?.settingsSchedule && !isCron.value);
-    const periodWrapper = computed(() =>
-      periodInline.value
-        ? { class: "flex min-w-0", "data-test": "alert-settings-period-inline" }
-        : {
-            label: t("alerts.form.schedule.lookingAtRow"),
-            required: true,
-            fill: true,
-            "data-test": "alert-settings-period-row",
-          },
-    );
 
     // ── Typed interval + unit ───────────────────────────────────────────────
     const formField = form?.Field ?? null;
@@ -1299,8 +1170,6 @@ export default defineComponent({
       isScheduled,
       isComposite,
       isCron,
-      periodInline,
-      periodWrapper,
       formField,
       fieldInvalid,
       silence,
@@ -1324,7 +1193,6 @@ export default defineComponent({
       incidentsEnabled,
       repeatSuppressionAvailable,
       handlePeriodChange,
-      scheduleNote,
       silenceHint,
       holdWindowNote,
       setPendingPeriodMinutes,
@@ -1332,12 +1200,10 @@ export default defineComponent({
       destinationDetails,
       refreshDestinations,
       // Field refs for the parent focus manager
-      periodFieldRef,
       silenceFieldRef,
       destinationsFieldRef,
       pendingPeriodFieldRef,
       keepFiringForFieldRef,
-      periodError,
       isForecastMode,
       silenceError,
       destinationsError,

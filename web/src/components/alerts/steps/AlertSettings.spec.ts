@@ -243,7 +243,6 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
   });
 
   it.each([
-    ["look-back", "alert-settings-period-input", "alert-settings-period-error", "0", "5"],
     ["remind", "alert-settings-silence-duration-input", "alert-settings-silence-error", "-1", "5"],
     [
       "must last",
@@ -291,22 +290,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(parentForm.state.isValid).toBe(false);
   });
 
-  it("requires period >= 1 in scheduled mode (schema, not a * gate)", async () => {
-    const host = mountDescendant("false", {
-      destinations: ["dest-a"],
-      trigger_condition: { silence: 10, period: 0 },
-    });
-    const parentForm = hostForm(host);
-
-    await parentForm.handleSubmit();
-    await flushPromises();
-    await nextTick();
-
-    expect(parentForm.state.isValid).toBe(false);
-    expect(host.text()).toContain("Look back must be at least 1 minute.");
-  });
-
-  it("a look-back edit sets Check every and cron, and never Notify at most every", () => {
+  it("a look-back edit leaves Check every, its cron and Notify at most every alone", () => {
     // AddAlert writes the emitted trigger_condition back into the ONE form (setFieldValue).
     const host = mountDescendant("false");
     const step = host.findComponent(AlertSettings);
@@ -315,12 +299,13 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
 
     const events = step.emitted("update:trigger") as any[];
     const trigger = events[events.length - 1][0];
-    expect(trigger).toMatchObject({ period: "15", frequency: 15, silence: 10 });
-    expect(trigger.cron.length).toBeGreaterThan(0);
+    expect(trigger).toMatchObject({ period: "15", silence: 10 });
+    expect(trigger.frequency).toBeUndefined();
+    expect(trigger.cron).toBeUndefined();
     expect(trigger.timezone).toBeTruthy();
   });
 
-  describe("Look back and Check every move together while linked", () => {
+  describe("Check every, look back and Notify at most every", () => {
     type TriggerValues = Record<string, unknown>;
     interface LiveForm {
       useStore: <T>(
@@ -398,10 +383,9 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       return liveForm(host).state.values.trigger_condition;
     };
 
+    // The look back's field sits on the condition line; it reaches the step as handlePeriodChange.
     const typePeriod = async (host: VueWrapper, value: string) => {
-      await host.find('[data-test="alert-settings-period-input"] input').setValue(value);
-      // The period input debounces its update by 300ms.
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      (host.findComponent(AlertSettings).vm as any).handlePeriodChange(value);
       await flushPromises();
       return liveForm(host).state.values.trigger_condition;
     };
@@ -415,72 +399,13 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       return form.state.values.trigger_condition;
     };
 
-    it.each([
-      {
-        name: "look back typed across keystrokes",
-        edit: async (host: VueWrapper) => (await typePeriod(host, "3"), typePeriod(host, "30")),
-        expected: { period: "30", frequency: 30 },
-      },
-      {
-        name: "Check every typed",
-        edit: (host: VueWrapper) => typeCheckEvery(host, 5),
-        expected: { period: 5, frequency: 5 },
-      },
-      {
-        name: "look back raised, then lowered",
-        edit: async (host: VueWrapper) => (await typePeriod(host, "60"), typePeriod(host, "20")),
-        expected: { period: "20", frequency: 20 },
-      },
-      {
-        name: "Check every, then look back",
-        edit: async (host: VueWrapper) => (await typeCheckEvery(host, 5), typePeriod(host, "20")),
-        expected: { period: "20", frequency: 20 },
-      },
-      {
-        name: "a form mounted without a period, first look back typed",
-        trigger: { frequency: 10, silence: 10, frequency_type: "minutes" },
-        edit: (host: VueWrapper) => typePeriod(host, "20"),
-        expected: { period: "20", frequency: 20 },
-      },
-      {
-        name: "a default raised to the refresh floor",
-        trigger: { ...defaults, frequency: 30 },
-        floor: 1800,
-        edit: (host: VueWrapper) => typePeriod(host, "60"),
-        expected: { period: "60", frequency: 60 },
-      },
-      {
-        name: "an org without a refresh floor",
-        floor: 0,
-        edit: (host: VueWrapper) => typePeriod(host, "5"),
-        expected: { period: "5", frequency: 5 },
-      },
-    ])(
-      "$name: the other one follows; an untouched Notify at most every never sits under the checks",
-      async (row) => {
-        const host = mountLive(row.trigger ?? defaults, row.floor ?? 60);
-
-        const trigger = await row.edit(host);
-
-        expect(trigger).toMatchObject({
-          ...row.expected,
-          silence: Math.max(10, Number(row.expected.frequency)),
-        });
-      },
-    );
-
-    const saved = { period: 15, frequency: 5, silence: 30, frequency_type: "minutes" };
-
-    it.each([
-      { name: "a different look back", trigger: saved },
-      { name: "the same look back", trigger: { ...saved, period: 10 } },
-    ])("a saved alert loaded after mount with $name keeps its own Check every", async (row) => {
+    it("editing Check every leaves the look back alone", async () => {
       const host = mountLive();
 
-      expect(await loadTrigger(host, row.trigger)).toMatchObject(row.trigger);
-      expect(await typeCheckEvery(host, 7)).toMatchObject({ period: row.trigger.period });
-      expect(await typePeriod(host, "20")).toMatchObject({ period: "20", frequency: 7 });
+      expect(await typeCheckEvery(host, 5)).toMatchObject({ period: 10, frequency: 5 });
     });
+
+    const saved = { period: 15, frequency: 5, silence: 30, frequency_type: "minutes" };
 
     it("keeps a hand-written cron schedule when only the period changes", async () => {
       const host = mountLive();
@@ -503,43 +428,6 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       await flushPromises();
       return liveForm(host).state.values.trigger_condition;
     };
-    const LINE = "alert-settings-check-every-link";
-    const alsoSet = (field: string, minutes: number) =>
-      t("alerts.form.link.alsoSet", {
-        fields: t(field),
-        duration: durationWords(minutes, i18n.global.t as any),
-      });
-
-    it("the row's line names what moved; Undo puts it back and unlinks", async () => {
-      const host = mountLive();
-      expect(note(host, `${LINE}-text`).text()).toBe(t("alerts.form.link.linked"));
-
-      await typeCheckEvery(host, 5);
-      expect(note(host, `${LINE}-text`).text()).toBe(alsoSet("alerts.form.names.lookBack", 5));
-
-      expect(await click(host, LINE)).toMatchObject({ period: 10, frequency: 5 });
-      expect(note(host, `${LINE}-text`).text()).toBe(t("alerts.form.link.separate"));
-      expect(await typePeriod(host, "20")).toMatchObject({ period: "20", frequency: 5 });
-    });
-
-    it("Unlink stops the cascade; Link them sets Check every to the look back, with Undo", async () => {
-      const host = mountLive();
-      await click(host, LINE);
-
-      expect(await typeCheckEvery(host, 5)).toMatchObject({ period: 10, frequency: 5 });
-      expect(await click(host, LINE)).toMatchObject({ period: 10, frequency: 10 });
-      expect(note(host, `${LINE}-text`).text()).toBe(alsoSet("alerts.queryConfig.checkEvery", 10));
-      expect(await typeCheckEvery(host, 15)).toMatchObject({ period: 15, frequency: 15 });
-    });
-
-    it("a form re-seeded without remount re-links fields that match its new period", async () => {
-      const host = mountLive();
-      await typePeriod(host, "20");
-      await loadTrigger(host, { ...defaults, period: 15, frequency: 15 });
-
-      expect(await typePeriod(host, "40")).toMatchObject({ frequency: 40 });
-    });
-
     it.each([
       { name: "an untouched default follows them silently", warns: false },
       { name: "a value the user typed stays and warns in amber", typed: "10", warns: true },
@@ -553,7 +441,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
         await new Promise((resolve) => setTimeout(resolve, 350));
       }
 
-      const trigger = await typePeriod(host, "60");
+      const trigger = await typeCheckEvery(host, 60);
 
       expect(trigger.silence).toBe(row.warns ? 10 : 60);
       expect(note(host, "alert-settings-silence-hint").exists()).toBe(row.warns);
@@ -594,7 +482,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       const hint = () => note(host, "alert-settings-silence-hint");
       expect(hint().exists()).toBe(false);
 
-      await typePeriod(host, "60");
+      await typeCheckEvery(host, 60);
       expect(note(host, "alert-settings-silence-hint-text").text()).toBe(
         t("alerts.form.remind.noEffect", { every: everyWords(60, i18n.global.t as any) }),
       );
@@ -629,7 +517,6 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
 
         expect(await click(host, row.line)).toMatchObject({ period: 10, frequency: 2 });
         expect(note(host, row.line).exists()).toBe(false);
-        expect(await typePeriod(host, "20")).toMatchObject({ period: "20", frequency: 2 });
       },
     );
   });
@@ -692,26 +579,9 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(trigger.silence).toBe(10);
   });
 
-  it("hides the period in Forecast mode, whose query reads its own history window", async () => {
-    const host = mountDescendant("false", {
-      _ui: { forecast: { U: "up", T: 1, direction: "rises", W: "2d", H: 7 } },
-    });
-    expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(false);
-    hostForm(host).setFieldValue("_ui.forecast", null);
-    await flushPromises();
-    expect(host.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
-  });
-
-  it("marks the look-back as required, as before", () => {
-    expect(mountDescendant("false").text()).toContain(
-      `${t("alerts.form.schedule.lookingAtRow")} *`,
-    );
-  });
-
   it("preserves every data-test (scheduled branch)", () => {
     const host = mountDescendant("false");
     for (const dt of [
-      "alert-settings-period-input",
       "alert-settings-silence-duration-input",
       "alert-destinations-select",
       "alert-settings-refresh-destinations-btn",
@@ -1379,27 +1249,5 @@ describe("AlertSettings — notify and timing in their sections", () => {
     const { inSlot } = mountSectioned("composite", {}, { reveal: ["holdFor"] });
     expect(inSlot("settingsHold", "add-alert-hold-for-row")).toBe(true);
     expect(inSlot("settingsSchedule", "alert-settings-pending-period-input")).toBe(false);
-  });
-
-  it.each([
-    ["minutes", false],
-    ["cron", true],
-  ])("the look-back sits beside Check every, or in its own row with cron (%s)", (type, row) => {
-    const { inSlot, targets } = mountSectioned("false", {
-      trigger_condition: {
-        silence: 10,
-        period: 60,
-        frequency: 5,
-        frequency_type: type,
-        cron: "0 9 * * 1-5",
-      },
-    });
-    expect(inSlot("settingsSchedule", "alert-settings-period-input")).toBe(true);
-    expect(inSlot("settingsSchedule", "alert-settings-period-row")).toBe(row);
-    expect(
-      targets.settingsSchedule.textContent?.includes(
-        t("alerts.form.schedule.cron", { period: 60 }),
-      ),
-    ).toBe(row);
   });
 });

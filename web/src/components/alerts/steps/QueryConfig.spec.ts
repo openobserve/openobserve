@@ -2377,11 +2377,12 @@ describe("QueryConfig.vue", () => {
       vi.useFakeTimers();
       try {
         remount({ ...sectioned, triggerCondition: { period: 10 } });
-        const input = host.find('[data-test="alert-condition-window-input"] input');
+        const input = host.find('[data-test="alert-settings-period-input"] input');
         expect((input.element as HTMLInputElement).value).toBe("10");
         await input.setValue("5");
         vi.advanceTimersByTime(300);
         expect(wrapper.emitted("update:period")?.at(-1)).toEqual([5]);
+        expect(hostForm().state.values.trigger_condition.period).toBe("5");
       } finally {
         vi.useRealTimers();
       }

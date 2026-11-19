@@ -136,8 +136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       fill
                     >
-                      <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
-                        <div class="contents">
+                      <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <div
+                          class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1.5"
+                          data-test="alert-condition-measure"
+                        >
                           <div class="flex min-w-0 items-start gap-2">
                             <div class="w-36 min-w-28 shrink">
                               <OSelect
@@ -186,93 +189,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )
                             }}</span
                           >
+                          <AlertWindowPhrase
+                            class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
+                            :minutes="periodMinutes"
+                            @update:minutes="emit('update:period', $event)"
+                          />
                         </div>
 
-                        <!-- COUNT mode severity rows -->
-                        <template v-if="selectedFunction === 'total_events'">
-                          <div class="contents">
-                            <div class="flex shrink-0 items-start gap-2">
-                              <OTag
-                                v-if="warningOffered"
-                                type="alertLevel"
-                                value="critical"
-                                size="sm"
-                                class="my-auto shrink-0"
-                                data-test="alert-threshold-level"
-                              />
-                              <OFormSelect
-                                :aria-label="t('alerts.form.names.comparison')"
-                                name="trigger_condition.operator"
-                                :options="plainOperators"
-                                class="w-32!"
-                                data-test="alert-trigger-operator-select"
-                                :searchable="false"
-                                @update:model-value="onTriggerOperatorChange"
-                              />
-                            </div>
+                        <AlertThresholdLevels
+                          v-if="selectedFunction === 'total_events'"
+                          operator-name="trigger_condition.operator"
+                          value-name="trigger_condition.threshold"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="trigger_condition.warning_threshold"
+                          :warning-shown="countWarningVisible"
+                          :warning-operator="operatorLabel(triggerOperator)"
+                          value-min="1"
+                          operator-data-test="alert-trigger-operator-select"
+                          value-data-test="alert-trigger-threshold-input"
+                          warning-input-data-test="alert-warning-threshold-input-136"
+                          :error="thresholdError"
+                          error-data-test="alert-if-row-logs-error"
+                          :warning-error="warningThresholdError"
+                          warning-error-data-test="alert-warning-threshold-error-136"
+                          :window-error="periodError"
+                          :note="conditionNote"
+                          :help="conditionHelp"
+                          message-data-test="alert-condition-message"
+                          @operator="onTriggerOperatorChange"
+                          @value="onTriggerThresholdChange($event)"
+                          @value-blur="restoreDefaultThreshold"
+                          @add-warning="addCountWarning"
+                          @remove-warning="removeCountWarning"
+                        ></AlertThresholdLevels>
+                        <AlertThresholdLevels
+                          v-else
+                          operator-name="query_condition.aggregation.having.operator"
+                          value-name="query_condition.aggregation.having.value"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="query_condition.aggregation.warning_value"
+                          :warning-shown="aggWarningVisible"
+                          :warning-operator="operatorLabel(conditionOperator)"
+                          operator-data-test="alert-condition-operator-select"
+                          warning-input-data-test="alert-aggregation-warning-value-input-182"
+                          :error="havingValueError"
+                          error-data-test="alert-if-row-logs-value-error"
+                          :warning-error="aggregationWarningError"
+                          warning-error-data-test="alert-aggregation-warning-value-error-182"
+                          :window-error="periodError"
+                          :note="conditionNote"
+                          :help="conditionHelp"
+                          message-data-test="alert-condition-message"
+                          @operator="onConditionOperatorChange"
+                          @value="onConditionValueChange($event)"
+                          @add-warning="addAggWarning"
+                          @remove-warning="removeAggWarning"
+                        >
+                          <template v-if="isSpanDuration" #value>
                             <OFormInput
-                              :aria-label="t('alerts.alertIfNoOfEvents')"
-                              name="trigger_condition.threshold"
-                              type="number"
-                              fit-content
-                              data-test="alert-trigger-threshold-input"
-                              @blur="restoreDefaultThreshold"
-                              min="1"
-                              @update:model-value="onTriggerThresholdChange($event)"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <AlertWindowPhrase
-                              class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                              :minutes="periodMinutes"
-                              @update:minutes="emit('update:period', $event)"
-                            />
-                            <OButton
-                              v-if="!countWarningVisible && warningOffered"
-                              variant="ghost-primary"
-                              size="sm"
-                              icon-left="add"
-                              class="self-center"
-                              data-test="alert-add-warning-button"
-                              @click="addCountWarning"
-                            >
-                              {{ t("alerts.addWarning") }}
-                            </OButton>
-                            <AlertMessageLine
-                              class="basis-full"
-                              :error="thresholdError"
-                              error-data-test="alert-if-row-logs-error"
-                              :note="conditionNote"
-                              :help="conditionHelp"
-                              data-test="alert-condition-message"
-                            />
-                          </div>
-                        </template>
-
-                        <!-- MEASURE mode severity rows -->
-                        <template v-else>
-                          <div class="contents">
-                            <div class="flex shrink-0 items-start gap-2">
-                              <OTag
-                                v-if="warningOffered"
-                                type="alertLevel"
-                                value="critical"
-                                size="sm"
-                                class="my-auto shrink-0"
-                                data-test="alert-threshold-level"
-                              />
-                              <OFormSelect
-                                :aria-label="t('alerts.form.names.comparison')"
-                                name="query_condition.aggregation.having.operator"
-                                :options="plainOperators"
-                                :searchable="false"
-                                class="w-32!"
-                                data-test="alert-condition-operator-select"
-                                @update:model-value="onConditionOperatorChange"
-                              />
-                            </div>
-                            <OFormInput
-                              v-if="isSpanDuration"
                               :aria-label="t('alerts.alertIfNoOfEvents')"
                               name="_ui.durationValue"
                               type="number"
@@ -284,19 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               <template #error />
                             </OFormInput>
-                            <OFormInput
-                              v-else
-                              :aria-label="t('alerts.alertIfNoOfEvents')"
-                              name="query_condition.aggregation.having.value"
-                              type="number"
-                              fit-content
-                              :placeholder="t('alerts.placeholders.value')"
-                              @update:model-value="onConditionValueChange($event)"
-                            >
-                              <template #error />
-                            </OFormInput>
                             <OSelect
-                              v-if="isSpanDuration"
                               :aria-label="
                                 t('common.unitFor', { label: t('alerts.alertIfNoOfEvents') })
                               "
@@ -309,52 +273,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="alert-duration-unit-select"
                               @update:model-value="onDurationUnitChange"
                             />
-                            <AlertWindowPhrase
-                              class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                              :minutes="periodMinutes"
-                              @update:minutes="emit('update:period', $event)"
-                            />
-                            <OButton
-                              v-if="!aggWarningVisible && warningOffered"
-                              variant="ghost-primary"
-                              size="sm"
-                              icon-left="add"
-                              class="self-center"
-                              data-test="alert-add-warning-button"
-                              @click="addAggWarning"
-                            >
-                              {{ t("alerts.addWarning") }}
-                            </OButton>
-                            <AlertMessageLine
-                              class="basis-full"
-                              :error="havingValueError"
-                              error-data-test="alert-if-row-logs-value-error"
-                              :note="conditionNote"
-                              :help="conditionHelp"
-                              data-test="alert-condition-message"
-                            />
-                          </div>
-                        </template>
+                          </template>
+                        </AlertThresholdLevels>
                       </div>
                     </OSettingRow>
-                    <AlertWarningRow
-                      v-if="selectedFunction === 'total_events' && countWarningVisible"
-                      name="trigger_condition.warning_threshold"
-                      :operator="operatorLabel(triggerOperator)"
-                      :error="warningThresholdError"
-                      input-data-test="alert-warning-threshold-input-136"
-                      error-data-test="alert-warning-threshold-error-136"
-                      @remove="removeCountWarning"
-                    />
-                    <AlertWarningRow
-                      v-if="selectedFunction !== 'total_events' && aggWarningVisible"
-                      name="query_condition.aggregation.warning_value"
-                      :operator="operatorLabel(conditionOperator)"
-                      :error="aggregationWarningError"
-                      input-data-test="alert-aggregation-warning-value-input-182"
-                      error-data-test="alert-aggregation-warning-value-error-182"
-                      @remove="removeAggWarning"
-                    />
 
                     <!-- group by row (hidden for count mode) -->
                     <AlertTierPlace id="groupBy">
@@ -451,8 +373,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else>
                     <!-- Alert if row -->
                     <OSettingRow :label="t('alerts.plain.notifyMeWhen')" fill wide>
-                      <div class="flex min-w-0 flex-1 flex-wrap items-start gap-x-2 gap-y-1.5">
-                        <div class="contents">
+                      <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <div
+                          class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1.5"
+                          data-test="alert-condition-measure"
+                        >
                           <div class="flex min-w-0 items-start gap-2">
                             <div class="w-36 min-w-28 shrink">
                               <OSelect
@@ -529,149 +454,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             class="text-text-secondary text-compact leading-8.5 font-semibold whitespace-nowrap"
                             >{{ t("alerts.matchingMetricsFound") }}</span
                           >
+                          <AlertWindowPhrase
+                            class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
+                            :minutes="periodMinutes"
+                            @update:minutes="emit('update:period', $event)"
+                          />
                         </div>
 
-                        <!-- Count mode severity rows -->
-                        <template v-if="selectedFunction === 'total_events'">
-                          <div class="contents">
-                            <div class="flex shrink-0 items-start gap-2">
-                              <OTag
-                                v-if="warningOffered"
-                                type="alertLevel"
-                                value="critical"
-                                size="sm"
-                                class="my-auto shrink-0"
-                                data-test="alert-threshold-level"
-                              />
-                              <OFormSelect
-                                :aria-label="t('alerts.form.names.comparison')"
-                                name="trigger_condition.operator"
-                                :options="plainOperators"
-                                :searchable="false"
-                                class="w-32!"
-                                @update:model-value="onTriggerOperatorChange"
-                              />
-                            </div>
-                            <OFormInput
-                              :aria-label="t('alerts.alertIfNoOfEvents')"
-                              name="trigger_condition.threshold"
-                              type="number"
-                              fit-content
-                              @update:model-value="onTriggerThresholdChange($event)"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <AlertWindowPhrase
-                              class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                              :minutes="periodMinutes"
-                              @update:minutes="emit('update:period', $event)"
-                            />
-                            <OButton
-                              v-if="!countWarningVisible && warningOffered"
-                              variant="ghost-primary"
-                              size="sm"
-                              icon-left="add"
-                              class="self-center"
-                              data-test="alert-add-warning-button"
-                              @click="addCountWarning"
-                            >
-                              {{ t("alerts.addWarning") }}
-                            </OButton>
-                            <AlertMessageLine
-                              class="basis-full"
-                              :error="thresholdError"
-                              error-data-test="alert-if-row-metrics-error"
-                              :note="conditionNote"
-                              :help="conditionHelp"
-                              data-test="alert-condition-message"
-                            />
-                          </div>
-                        </template>
-
-                        <!-- Measure mode severity rows -->
-                        <template v-else>
-                          <div class="contents">
-                            <div class="flex shrink-0 items-start gap-2">
-                              <OTag
-                                v-if="warningOffered"
-                                type="alertLevel"
-                                value="critical"
-                                size="sm"
-                                class="my-auto shrink-0"
-                                data-test="alert-threshold-level"
-                              />
-                              <OFormSelect
-                                :aria-label="t('alerts.form.names.comparison')"
-                                name="query_condition.aggregation.having.operator"
-                                :options="plainOperators"
-                                :searchable="false"
-                                class="w-32!"
-                                @update:model-value="onConditionOperatorChange"
-                              />
-                            </div>
-                            <OFormInput
-                              :aria-label="t('alerts.alertIfNoOfEvents')"
-                              name="query_condition.aggregation.having.value"
-                              type="number"
-                              fit-content
-                              :placeholder="t('alerts.placeholders.value')"
-                              @update:model-value="onConditionValueChange($event)"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <span
-                              v-if="thresholdUnit"
-                              class="text-text-secondary text-compact leading-8.5"
-                              data-test="alert-threshold-unit"
-                              >{{ thresholdUnit }}</span
-                            >
-                            <AlertWindowPhrase
-                              class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
-                              :minutes="periodMinutes"
-                              @update:minutes="emit('update:period', $event)"
-                            />
-                            <OButton
-                              v-if="!aggWarningVisible && warningOffered"
-                              variant="ghost-primary"
-                              size="sm"
-                              icon-left="add"
-                              class="self-center"
-                              data-test="alert-add-warning-button"
-                              @click="addAggWarning"
-                            >
-                              {{ t("alerts.addWarning") }}
-                            </OButton>
-                            <AlertMessageLine
-                              class="basis-full"
-                              :error="havingValueError"
-                              error-data-test="alert-if-row-metrics-value-error"
-                              :note="conditionNote"
-                              :help="conditionHelp"
-                              data-test="alert-condition-message"
-                            />
-                          </div>
-                        </template>
+                        <AlertThresholdLevels
+                          v-if="selectedFunction === 'total_events'"
+                          operator-name="trigger_condition.operator"
+                          value-name="trigger_condition.threshold"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="trigger_condition.warning_threshold"
+                          :warning-shown="countWarningVisible"
+                          :warning-operator="operatorLabel(triggerOperator)"
+                          warning-input-data-test="alert-warning-threshold-input-381"
+                          :error="thresholdError"
+                          error-data-test="alert-if-row-metrics-error"
+                          :warning-error="warningThresholdError"
+                          warning-error-data-test="alert-warning-threshold-error-381"
+                          :window-error="periodError"
+                          :note="conditionNote"
+                          :help="conditionHelp"
+                          message-data-test="alert-condition-message"
+                          @operator="onTriggerOperatorChange"
+                          @value="onTriggerThresholdChange($event)"
+                          @add-warning="addCountWarning"
+                          @remove-warning="removeCountWarning"
+                        ></AlertThresholdLevels>
+                        <AlertThresholdLevels
+                          v-else
+                          operator-name="query_condition.aggregation.having.operator"
+                          value-name="query_condition.aggregation.having.value"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="query_condition.aggregation.warning_value"
+                          :warning-shown="aggWarningVisible"
+                          :warning-operator="operatorLabel(conditionOperator)"
+                          :unit="thresholdUnit || null"
+                          warning-input-data-test="alert-aggregation-warning-value-input-413"
+                          :error="havingValueError"
+                          error-data-test="alert-if-row-metrics-value-error"
+                          :warning-error="aggregationWarningError"
+                          warning-error-data-test="alert-aggregation-warning-value-error-413"
+                          :window-error="periodError"
+                          :note="conditionNote"
+                          :help="conditionHelp"
+                          message-data-test="alert-condition-message"
+                          @operator="onConditionOperatorChange"
+                          @value="onConditionValueChange($event)"
+                          @add-warning="addAggWarning"
+                          @remove-warning="removeAggWarning"
+                        ></AlertThresholdLevels>
                       </div>
                     </OSettingRow>
-                    <AlertWarningRow
-                      v-if="selectedFunction === 'total_events' && countWarningVisible"
-                      name="trigger_condition.warning_threshold"
-                      :operator="operatorLabel(triggerOperator)"
-                      :error="warningThresholdError"
-                      input-data-test="alert-warning-threshold-input-381"
-                      error-data-test="alert-warning-threshold-error-381"
-                      @remove="removeCountWarning"
-                    />
-                    <AlertWarningRow
-                      v-if="selectedFunction !== 'total_events' && aggWarningVisible"
-                      name="query_condition.aggregation.warning_value"
-                      :unit="thresholdUnit || undefined"
-                      :operator="operatorLabel(conditionOperator)"
-                      :error="aggregationWarningError"
-                      input-data-test="alert-aggregation-warning-value-input-413"
-                      error-data-test="alert-aggregation-warning-value-error-413"
-                      @remove="removeAggWarning"
-                    />
 
                     <!-- group by row — hidden for count mode -->
                     <AlertTierPlace id="groupBy">
@@ -1365,58 +1203,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       wide
                     >
                       <div class="flex min-w-0 flex-col gap-1.5">
-                        <span
+                        <AlertWindowPhrase
+                          v-if="localTab === 'sql' || isPromRuleMode"
+                          keypath="alerts.form.window.queryReads"
+                          class="text-text-body text-sm leading-8.5"
+                          :minutes="periodMinutes"
+                          @update:minutes="emit('update:period', $event)"
+                        />
+                        <AlertThresholdLevels
                           v-if="sqlPlainLimit"
-                          class="text-text-body flex flex-wrap items-start gap-x-1 gap-y-1 text-sm"
-                        >
-                          <OTag
-                            v-if="warningOffered"
-                            type="alertLevel"
-                            value="critical"
-                            size="sm"
-                            class="my-auto shrink-0"
-                            data-test="alert-threshold-level"
-                          />
-                          <OFormSelect
-                            :aria-label="t('alerts.form.names.comparison')"
-                            name="trigger_condition.operator"
-                            :options="plainOperators"
-                            :searchable="false"
-                            class="w-32!"
-                            data-test="alert-trigger-operator-select"
-                            @update:model-value="onTriggerOperatorChange"
-                          />
-                          <OFormInput
-                            :aria-label="t('alerts.alertIfNoOfEvents')"
-                            name="trigger_condition.threshold"
-                            type="number"
-                            fit-content
-                            min="1"
-                            data-test="alert-trigger-threshold-input"
-                            @update:model-value="onTriggerThresholdChange($event)"
-                            @blur="restoreDefaultThreshold"
-                          >
-                            <template #error />
-                          </OFormInput>
-                          <span class="leading-8.5">{{ rowsNoun }}</span>
-                          <OButton
-                            v-if="!countWarningVisible && warningOffered"
-                            variant="ghost-primary"
-                            size="sm"
-                            icon-left="add"
-                            class="self-center"
-                            data-test="alert-add-warning-button"
-                            @click="addCountWarning"
-                          >
-                            {{ t("alerts.addWarning") }}
-                          </OButton>
-                          <AlertMessageLine
-                            class="basis-full"
-                            :error="thresholdError"
-                            error-data-test="alert-trigger-threshold-error"
-                            data-test="alert-condition-message"
-                          />
-                        </span>
+                          operator-name="trigger_condition.operator"
+                          value-name="trigger_condition.threshold"
+                          :operators="plainOperators"
+                          :levels="warningOffered"
+                          warning-name="trigger_condition.warning_threshold"
+                          :warning-shown="countWarningVisible"
+                          :warning-operator="operatorLabel(triggerOperator)"
+                          :tail="rowsNoun"
+                          value-min="1"
+                          operator-data-test="alert-trigger-operator-select"
+                          value-data-test="alert-trigger-threshold-input"
+                          warning-input-data-test="alert-warning-threshold-input-1020"
+                          :error="thresholdError"
+                          error-data-test="alert-trigger-threshold-error"
+                          :warning-error="warningThresholdError"
+                          warning-error-data-test="alert-warning-threshold-error-1020"
+                          :window-error="periodError"
+                          message-data-test="alert-condition-message"
+                          @operator="onTriggerOperatorChange"
+                          @value="onTriggerThresholdChange($event)"
+                          @value-blur="restoreDefaultThreshold"
+                          @add-warning="addCountWarning"
+                          @remove-warning="removeCountWarning"
+                        ></AlertThresholdLevels>
                         <template v-else>
                           <div class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
                             <OToggleGroup
@@ -1507,124 +1326,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             data-test="alert-group-limit-message"
                           />
                           <template v-if="localTab === 'sql'">
-                            <div
+                            <AlertThresholdLevels
                               v-if="groupAnswer === 'one'"
-                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                              operator-name="trigger_condition.operator"
+                              value-name="trigger_condition.threshold"
+                              :operators="plainOperators"
+                              :levels="warningOffered"
+                              warning-name="trigger_condition.warning_threshold"
+                              :warning-shown="countWarningVisible"
+                              :warning-operator="operatorLabel(triggerOperator)"
+                              :tail="rowsNoun"
+                              value-min="1"
+                              :operator-data-test="countTestIds.operator"
+                              :value-data-test="countTestIds.threshold"
+                              warning-input-data-test="alert-warning-threshold-input-1020"
+                              :error="thresholdError"
+                              :error-data-test="countErrorTest"
+                              :warning-error="warningThresholdError"
+                              warning-error-data-test="alert-warning-threshold-error-1020"
+                              :window-error="periodError"
+                              message-data-test="alert-group-limit-message"
                               data-test="add-alert-group-limit"
-                            >
-                              <OTag
-                                v-if="warningOffered"
-                                type="alertLevel"
-                                value="critical"
-                                size="sm"
-                                class="my-auto shrink-0"
-                                data-test="alert-threshold-level"
-                              />
-                              <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
-                              <OFormSelect
-                                :aria-label="t('alerts.form.names.comparison')"
-                                name="trigger_condition.operator"
-                                :options="plainOperators"
-                                :searchable="false"
-                                class="w-32!"
-                                :data-test="countTestIds.operator"
-                                @update:model-value="onTriggerOperatorChange"
-                              />
-                              <OFormInput
-                                :aria-label="t('alerts.alertIfNoOfEvents')"
-                                name="trigger_condition.threshold"
-                                type="number"
-                                fit-content
-                                min="1"
-                                :data-test="countTestIds.threshold"
-                                @update:model-value="onTriggerThresholdChange($event)"
-                                @blur="restoreDefaultThreshold"
-                              >
-                                <template #error />
-                              </OFormInput>
-                              <span class="leading-8.5">{{ rowsNoun }}</span>
-                              <OButton
-                                v-if="!countWarningVisible && warningOffered"
-                                variant="ghost-primary"
-                                size="sm"
-                                icon-left="add"
-                                class="self-center"
-                                data-test="alert-add-warning-button"
-                                @click="addCountWarning"
-                              >
-                                {{ t("alerts.addWarning") }}
-                              </OButton>
-                              <AlertMessageLine
-                                class="basis-full"
-                                :error="thresholdError"
-                                :error-data-test="countErrorTest"
-                                data-test="alert-group-limit-message"
-                              />
-                            </div>
-                            <div
+                              @operator="onTriggerOperatorChange"
+                              @value="onTriggerThresholdChange($event)"
+                              @value-blur="restoreDefaultThreshold"
+                              @add-warning="addCountWarning"
+                              @remove-warning="removeCountWarning"
+                            ></AlertThresholdLevels>
+                            <AlertThresholdLevels
                               v-else
-                              class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
+                              operator-name="query_condition.aggregation.having.operator"
+                              value-name="query_condition.aggregation.having.value"
+                              :operators="plainOperators"
+                              :levels="warningOffered"
+                              warning-name="query_condition.aggregation.warning_value"
+                              :warning-shown="aggWarningVisible"
+                              :warning-operator="operatorLabel(conditionOperator)"
+                              :warning-subject="raw(havingColumn)"
+                              operator-data-test="alert-sql-agg-operator-select"
+                              value-data-test="alert-sql-agg-value-input"
+                              warning-input-data-test="alert-sql-agg-warning-value-input"
+                              :error="havingValueError"
+                              error-data-test="alert-sql-agg-value-error"
+                              :warning-error="aggregationWarningError"
+                              warning-error-data-test="alert-sql-agg-warning-value-error"
+                              :window-error="periodError"
+                              :note="conditionNote"
+                              :help="conditionHelp"
+                              message-data-test="alert-condition-message"
                               data-test="add-alert-group-limit"
+                              @operator="onConditionOperatorChange"
+                              @value="onConditionValueChange($event)"
+                              @add-warning="addAggWarning"
+                              @remove-warning="removeAggWarning"
                             >
-                              <OTag
-                                v-if="warningOffered"
-                                type="alertLevel"
-                                value="critical"
-                                size="sm"
-                                class="my-auto shrink-0"
-                                data-test="alert-threshold-level"
-                              />
-                              <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
-                              <OFormSelect
-                                :aria-label="t('alerts.form.names.field')"
-                                name="query_condition.aggregation.having.column"
-                                :options="sqlAggColumnOptions"
-                                searchable
-                                class="w-50! min-w-0"
-                                data-test="alert-sql-agg-column-select"
-                                :placeholder="t('alerts.placeholders.selectColumn')"
-                                @update:model-value="onLogMeasureColumnChange($event)"
-                              />
-                              <OFormSelect
-                                :aria-label="t('alerts.form.names.comparison')"
-                                name="query_condition.aggregation.having.operator"
-                                :options="plainOperators"
-                                :searchable="false"
-                                class="w-32!"
-                                data-test="alert-sql-agg-operator-select"
-                                @update:model-value="onConditionOperatorChange"
-                              />
-                              <OFormInput
-                                :aria-label="t('alerts.alertIfNoOfEvents')"
-                                name="query_condition.aggregation.having.value"
-                                type="number"
-                                fit-content
-                                data-test="alert-sql-agg-value-input"
-                                :placeholder="t('alerts.placeholders.value')"
-                                @update:model-value="onConditionValueChange($event)"
-                              >
-                                <template #error />
-                              </OFormInput>
-                              <OButton
-                                v-if="!aggWarningVisible && warningOffered"
-                                variant="ghost-primary"
-                                size="sm"
-                                icon-left="add"
-                                class="self-center"
-                                data-test="alert-add-warning-button"
-                                @click="addAggWarning"
-                              >
-                                {{ t("alerts.addWarning") }}
-                              </OButton>
-                              <AlertMessageLine
-                                class="basis-full"
-                                :error="havingValueError"
-                                error-data-test="alert-sql-agg-value-error"
-                                :note="conditionNote"
-                                :help="conditionHelp"
-                                data-test="alert-condition-message"
-                              />
-                            </div>
+                              <template #subject>
+                                <OFormSelect
+                                  :aria-label="t('alerts.form.names.field')"
+                                  name="query_condition.aggregation.having.column"
+                                  :options="sqlAggColumnOptions"
+                                  searchable
+                                  class="w-50! min-w-0"
+                                  data-test="alert-sql-agg-column-select"
+                                  :placeholder="t('alerts.placeholders.selectColumn')"
+                                  @update:model-value="onLogMeasureColumnChange($event)"
+                                />
+                              </template>
+                            </AlertThresholdLevels>
                           </template>
                         </template>
                         <p v-if="isRuleMultiRequired" class="text-text-secondary text-xs">
@@ -1632,39 +1400,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </p>
                       </div>
                     </OSettingRow>
-                    <AlertWarningRow
-                      v-if="
-                        (sqlPlainLimit ||
-                          (groupQuestion.offered &&
-                            (localTab === 'sql' || promqlCondition || isPromRuleMode))) &&
-                        localTab === 'sql' &&
-                        groupAnswer === 'one' &&
-                        countWarningVisible
-                      "
-                      name="trigger_condition.warning_threshold"
-                      :operator="operatorLabel(triggerOperator)"
-                      :error="warningThresholdError"
-                      input-data-test="alert-warning-threshold-input-1020"
-                      error-data-test="alert-warning-threshold-error-1020"
-                      @remove="removeCountWarning"
-                    />
-                    <AlertWarningRow
-                      v-if="
-                        (sqlPlainLimit ||
-                          (groupQuestion.offered &&
-                            (localTab === 'sql' || promqlCondition || isPromRuleMode))) &&
-                        localTab === 'sql' &&
-                        groupAnswer !== 'one' &&
-                        aggWarningVisible
-                      "
-                      name="query_condition.aggregation.warning_value"
-                      :operator="operatorLabel(conditionOperator)"
-                      :error="aggregationWarningError"
-                      input-data-test="alert-sql-agg-warning-value-input"
-                      error-data-test="alert-sql-agg-warning-value-error"
-                      @remove="removeAggWarning"
-                    />
-
                     <ForecastAlertFields
                       v-if="localTab === 'promql' && isForecastMode"
                       @remove="onPromqlModeChange('threshold')"
@@ -1693,73 +1428,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OButton>
                         </template>
                         <div class="flex flex-col gap-1.5">
-                          <div class="flex flex-wrap items-start gap-2">
-                            <OTag
-                              v-if="warningOffered"
-                              type="alertLevel"
-                              value="critical"
-                              size="sm"
-                              class="my-auto shrink-0"
-                              data-test="alert-threshold-level"
-                            />
-                            <OFormSelect
-                              :aria-label="t('alerts.alertIfValueIs')"
-                              name="query_condition.promql_condition.operator"
-                              :options="plainOperators"
-                              :searchable="false"
-                              data-test="alert-threshold-operator-select"
-                              class="w-32!"
-                              @update:model-value="onPromqlOperatorChange"
-                            />
-                            <OFormInput
-                              :aria-label="t('alerts.alertIfValueIs')"
-                              name="query_condition.promql_condition.value"
-                              type="number"
-                              fit-content
-                              data-test="alert-threshold-value-input"
-                              :debounce="300"
-                              @update:model-value="onPromqlValueChange"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <span
-                              v-if="thresholdUnit"
-                              class="text-text-secondary text-compact leading-8.5"
-                              data-test="alert-threshold-unit"
-                              >{{ thresholdUnit }}</span
-                            >
-                            <!-- PromQL bakes the threshold into the query, so the warning sits on the value, not the series count. -->
-                            <OButton
-                              v-if="!promqlWarningVisible && warningOffered"
-                              variant="ghost-primary"
-                              size="sm"
-                              icon-left="add"
-                              class="self-center"
-                              data-test="alert-add-warning-button"
-                              @click="addPromqlWarning"
-                            >
-                              {{ t("alerts.addWarning") }}
-                            </OButton>
-                          </div>
-                          <AlertMessageLine
+                          <AlertWindowPhrase
+                            keypath="alerts.form.window.queryReads"
+                            class="text-text-body text-sm leading-8.5"
+                            :minutes="periodMinutes"
+                            @update:minutes="emit('update:period', $event)"
+                          />
+                          <AlertThresholdLevels
+                            operator-name="query_condition.promql_condition.operator"
+                            value-name="query_condition.promql_condition.value"
+                            :operators="plainOperators"
+                            :levels="warningOffered"
+                            warning-name="query_condition.promql_warning_value"
+                            :warning-shown="promqlWarningVisible"
+                            :warning-operator="operatorLabel(promqlOperatorEcho)"
+                            :unit="thresholdUnit || null"
+                            :value-debounce="300"
+                            :value-placeholder="t('alerts.placeholders.value')"
+                            operator-data-test="alert-threshold-operator-select"
+                            value-data-test="alert-threshold-value-input"
+                            warning-input-data-test="alert-promql-warning-value-input"
                             :error="promqlValueError"
                             error-data-test="alert-threshold-value-error"
+                            :warning-error="promqlWarningError"
+                            warning-error-data-test="alert-promql-warning-value-error"
+                            :window-error="periodError"
                             :note="conditionNote"
                             :help="conditionHelp"
-                            data-test="alert-condition-message"
-                          />
+                            message-data-test="alert-condition-message"
+                            @operator="onPromqlOperatorChange"
+                            @value="onPromqlValueChange"
+                            @add-warning="addPromqlWarning"
+                            @remove-warning="removePromqlWarning"
+                          ></AlertThresholdLevels>
                         </div>
                       </OSettingRow>
-                      <AlertWarningRow
-                        v-if="!isPromRuleMode && promqlWarningVisible"
-                        name="query_condition.promql_warning_value"
-                        :unit="thresholdUnit || undefined"
-                        :operator="operatorLabel(promqlOperatorEcho)"
-                        :error="promqlWarningError"
-                        input-data-test="alert-promql-warning-value-input"
-                        error-data-test="alert-promql-warning-value-error"
-                        @remove="removePromqlWarning"
-                      />
                     </template></div
                 ></Teleport>
               </div>
@@ -1982,7 +1685,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import AlertWarningRow from "@/components/alerts/AlertWarningRow.vue";
+import AlertThresholdLevels from "@/components/alerts/AlertThresholdLevels.vue";
 import AlertWindowPhrase from "@/components/alerts/AlertWindowPhrase.vue";
 import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
 import {
@@ -2071,7 +1774,7 @@ export default defineComponent({
   name: "Step2QueryConfig",
   components: {
     AlertMessageLine,
-    AlertWarningRow,
+    AlertThresholdLevels,
     AlertWindowPhrase,
     OTag,
     ForecastAlertFields,
@@ -2926,6 +2629,10 @@ export default defineComponent({
     };
     const checkEveryError = shownFieldError(form, "_ui.checkEvery");
     const havingValueError = shownFieldError(form, "query_condition.aggregation.having.value");
+    const periodError = shownFieldError(form, "trigger_condition.period");
+    const havingColumn = form.useStore((s: any) =>
+      String(s.values?.query_condition?.aggregation?.having?.column ?? ""),
+    );
     const cronError = shownFieldError(form, "trigger_condition.cron");
     const sqlRequiredError = shownFieldError(form, "query_condition.sql");
     const promqlRequiredError = shownFieldError(form, "query_condition.promql");
@@ -4912,6 +4619,8 @@ export default defineComponent({
       promqlValueError,
       checkEveryError,
       havingValueError,
+      periodError,
+      havingColumn,
       filteredTimezones,
       timezoneSelectOptions,
       onFrequencyUnitChange,
