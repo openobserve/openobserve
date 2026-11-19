@@ -99,7 +99,7 @@ const openHistory = () =>
   </template>
   <div
     v-else-if="part === 'state'"
-    class="flex min-w-0 items-center gap-2"
+    class="flex shrink-0 items-center gap-2"
     data-test="add-alert-edit-status"
   >
     <OTag
