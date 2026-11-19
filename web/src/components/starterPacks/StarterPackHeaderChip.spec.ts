@@ -299,7 +299,7 @@ describe("StarterPackHeaderChip", () => {
     const wrapper = render();
     await open(wrapper);
     await find(wrapper, "starter-pack-list-row-hosts").trigger("click");
-    expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("Review and Set Up");
+    expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("Review Pack");
     await find(wrapper, "starter-pack-list-primary-btn").trigger("click");
     expect(find(wrapper, "pane-hosts").exists()).toBe(true);
     await find(wrapper, "pane-back").trigger("click");
