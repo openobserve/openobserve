@@ -174,12 +174,14 @@ const restoreTriggerFocus = async () => {
   if (!isEditing.value) triggerRef.value?.focus();
 };
 
-// Enter commits AND submits the owning form — Enter in the boxed name field
-// this replaced is how a panel got saved from the keyboard, and that has to
-// survive the field becoming a title (`submitOnEnter: false` opts out). The browser's own implicit
-// submission can't carry it: closing the editor unmounts the input before the
-// keypress that would have triggered it, so ask the form directly. A title with
-// no form owner (a workflow name, an incident title) submits nothing.
+// Enter commits AND submits the owning form. In the boxed name field this title
+// replaced, Enter saved the panel, alert or function; that has to survive the
+// field becoming a title. Keep form-owned header titles on this default so Enter
+// behaves the same across editors; `submitOnEnter: false` is a per-editor
+// exception (downtimes). The browser's own implicit submission can't carry it:
+// closing the editor unmounts the input before the keypress that would have
+// triggered it, so ask the form directly. A title with no form owner (a workflow
+// name, an incident title, the new-pipeline name) submits nothing.
 const onEnter = (event: KeyboardEvent) => {
   // Without the submit, the browser's implicit submission must not fire either.
   if (!props.submitOnEnter) event.preventDefault();

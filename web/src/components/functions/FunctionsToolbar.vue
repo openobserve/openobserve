@@ -24,8 +24,9 @@
     <template #title>
       <!-- Embedded (workflow NDV): no inline function name here — the name is asked at
            SAVE time in the Update|Create dialog, mirroring the Logs editor.
-           Enter only commits the name: a function is named before its body is
-           tested, so saving waits for the Save button. -->
+           Enter saves the function, as Enter in the panel and alert titles does
+           (OInlineEdit `submitOnEnter`). A new function does nothing until a
+           pipeline or query uses it, so saving before its body is tested is harmless. -->
       <OFormInlineEdit
         v-if="!embedded"
         name="name"
@@ -35,7 +36,6 @@
         :edit-hint="t('function.renameHint')"
         :readonly="disableName"
         :disabled="disableName"
-        :submit-on-enter="false"
       />
     </template>
     <template #tabs>

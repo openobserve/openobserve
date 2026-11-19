@@ -54,7 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            actions teleport above. Owned here, alongside savePipeline, which
            validates it via the OForm schema. Rendered as inline-edited heading
            text rather than a boxed field, matching the panel and alert editors;
-           the shell's own breadcrumb already carries "Pipelines ›". -->
+           the shell's own breadcrumb already carries "Pipelines ›".
+           Unlike those editors, Enter here only commits the name: the field has
+           no <form> owner (see the headless form below), so there is nothing for
+           OInlineEdit's submit-on-Enter to submit. -->
       <Teleport v-if="isCreatePipeline" defer to="#o2-page-title">
         <OFormInlineEdit
           name="name"
