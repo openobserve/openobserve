@@ -185,20 +185,13 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import { buildInstallPayload } from "@/components/alertLibrary/libraryInstall";
-import { alertTypeOf, packLabel } from "@/components/alertLibrary/libraryFacets";
+import { packLabel } from "@/components/alertLibrary/libraryFacets";
 import { fileForInstall } from "@/components/alertLibrary/libraryTunables";
 import type { StarterScope } from "@/components/create-starter/createStarter.types";
-import { useStartPreference } from "@/components/create-starter/useStartPreference";
 import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
-import {
-  streamDataState,
-  toStreamsByType,
-  useAlertLibrary,
-  useAnomalyLibraryAccess,
-} from "@/composables/alerts/useAlertLibrary";
+import { streamDataState, useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import { queryClient } from "@/composables/query/queryClient";
 import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
-import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
@@ -208,7 +201,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { librarySuggestionsQuery } from "@/services/alert_library.queries";
 import { streamSchemaQuery } from "@/services/stream.queries";
-import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types/alertLibrary";
+import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { formatNumber } from "@/utils/alerts/alertCopy";
 import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
@@ -223,6 +216,7 @@ import {
   prefillSummary,
   SCOPE_STREAM_TYPES,
   useLibraryDryRun,
+  useLibraryReadiness,
   useStarterScopeOptions,
   orderRows,
   selectAllNext,
@@ -236,7 +230,6 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "count", value: number | null): void;
   (e: "opened"): void;
   (e: "update:selected", value: string[]): void;
   (e: "update:scope", value: StarterScope): void;
@@ -256,11 +249,12 @@ const store = useStore();
 const router = useRouter();
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 
-const { manifest, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
-const anomalyAccess = useAnomalyLibraryAccess();
-const { getStreams } = useStreams(t);
+const { loadAlertFile } = useAlertLibrary();
+const { entries, ready, busy, failed, streamsByType, load } = useLibraryReadiness(
+  () => props.alertType,
+);
+const showSkeleton = useDelayedFlag(busy);
 const { openAlertCreation } = useAlertCreation();
-const { recordUse } = useStartPreference("alert");
 const scopeData = useStarterScopeOptions();
 const dryRun = useLibraryDryRun(org);
 
@@ -275,52 +269,7 @@ const scope = computed<StarterScope>({
 });
 const pack = ref("all");
 
-// ── readiness: the Alert Library page's own check, so "N match your data" is one number ──
-const streamsByType = shallowRef<StreamsByType>({});
-const readinessKnown = ref(false);
-const streamsFailed = ref(false);
-
-const loadStreams = async (force = false) => {
-  try {
-    const payload = (await getStreams("all", false, false, force)) as {
-      list?: Array<{ name?: string; stream_type?: string }>;
-    };
-    streamsByType.value = toStreamsByType(payload?.list);
-    readinessKnown.value = true;
-    streamsFailed.value = false;
-  } catch {
-    streamsFailed.value = true;
-  }
-};
-
-const entries = computed<AlertLibraryEntry[]>(() => {
-  if (props.alertType === "scheduled") {
-    return (manifest.value?.alerts ?? []).filter((entry) => alertTypeOf(entry) === "scheduled");
-  }
-  if (anomalyAccess.value !== "enabled") return [];
-  return (manifest.value?.anomaly_alerts ?? []).map((entry) => ({
-    ...entry,
-    alert_type: "anomaly_detection" as const,
-  }));
-});
-
-const failed = computed(
-  () => (!!error.value && !manifest.value) || (streamsFailed.value && !readinessKnown.value),
-);
-const busy = computed(() => !failed.value && (!manifest.value || !readinessKnown.value));
-const showSkeleton = useDelayedFlag(busy);
-
-const ready = computed(() =>
-  readinessKnown.value ? entries.value.filter((entry) => isReady(entry, streamsByType.value)) : [],
-);
 const notReadyCount = computed(() => entries.value.length - ready.value.length);
-
-// null while loading or failed; a real 0 lets New skip a starter with nothing to offer.
-watch(
-  () => (busy.value || failed.value ? null : ready.value.length),
-  (count) => emit("count", count),
-  { immediate: true },
-);
 
 // ── filters ──
 const scopeOption = computed(() =>
@@ -591,10 +540,7 @@ const onEmptyAction = () => {
   browseAll();
 };
 
-const retry = () => {
-  void loadManifest({ force: true }).catch(() => undefined);
-  void loadStreams(true);
-};
+const retry = () => load(true);
 
 const browseAll = () => {
   void router.push({ name: "alertLibrary", query: { org_identifier: org.value } });
@@ -639,7 +585,6 @@ const openEntry = async (entry: AlertLibraryEntry) => {
       }));
     }
     if (!openAlertCreation(prefill)) throw new Error("not opened");
-    recordUse("library");
     if (reason) {
       toast({ variant: "info", message: t(SKIP_KEYS[reason], { name: raw(scopeName.value) }) });
     }
@@ -658,8 +603,5 @@ const entriesById = (ids: string[]): AlertLibraryEntry[] => {
 
 defineExpose({ entriesById });
 
-onMounted(() => {
-  void loadManifest().catch(() => undefined);
-  void loadStreams();
-});
+onMounted(() => load());
 </script>

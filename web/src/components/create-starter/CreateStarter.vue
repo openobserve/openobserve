@@ -14,10 +14,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The starter under a New button: one switch of panes, a link to the form, and the remembered default. -->
+<!-- The starter under a New button: one row of ways to start, nothing picked until the user picks. -->
 <template>
   <span ref="anchorEl" class="inline-flex" data-test="create-starter-trigger">
-    <slot :open="open" :starts-with-form="resolved === 'form'" :toggle="toggle" :start="start" />
+    <slot :open="open" :toggle="toggle" />
     <!-- A zero-height strip on the bottom edge: anchoring above it turns the popover into a bottom sheet.
          The positioner counts a zero-height anchor as detached, so the sheet never hides on that. -->
     <span
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :side-offset="isSheet ? 0 : 4"
       :hide-when-detached="!isSheet"
       flip-align
-      :aria-label="opensWithLabel"
+      :aria-label="label"
       content-class="flex w-[min(42.5rem,calc(100vw-1.5rem))] flex-col max-sm:rounded-b-none"
       @update:open="onOpenChange"
       @pointer-down-outside="keepOpenForTrigger"
@@ -42,22 +42,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex min-h-0 flex-col" data-test="create-starter">
         <OContent
-          class="border-border-default flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-3"
+          class="border-border-default flex flex-wrap items-center gap-x-3 gap-y-2 py-3"
+          :class="{ 'border-b': activePane || $slots.resume }"
           data-test="create-starter-switch-row"
         >
           <OTooltip
-            v-if="switchable.length"
+            v-if="listed.length"
             :content="t('createStarter.switchHint')"
             shortcut-id="createStarterSwitchPane"
             :disabled="switchable.length < 2"
           >
-            <OToggleGroup :model-value="activePane ?? undefined" @update:model-value="selectPane">
+            <OToggleGroup :model-value="activePane" @update:model-value="selectPane">
               <OToggleGroupItem
-                v-for="pane in switchable"
+                v-for="pane in listed"
                 :key="pane.id"
                 :value="pane.id"
                 size="sm"
-                :icon-left="PANE_ICON[pane.id]"
+                :icon-left="pane.availability === 'locked' ? 'lock' : PANE_ICON[pane.id]"
+                :disabled="pane.availability === 'locked'"
+                :focusable-unavailable="pane.availability === 'locked'"
+                :tooltip="pane.availability === 'locked' ? pane.lockedReason : undefined"
                 :data-test="`create-starter-pane-${pane.id}`"
               >
                 {{ pane.label }}
@@ -73,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
           </OTooltip>
           <span
-            v-if="switchable.length"
+            v-if="listed.length"
             class="bg-border-default h-5 w-px shrink-0 max-sm:hidden"
             aria-hidden="true"
           />
@@ -99,20 +103,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <slot v-else name="pane-library" />
         </OContent>
         <OContent
-          class="border-border-default flex flex-wrap items-center justify-between gap-2 border-t py-2"
+          v-if="activePane"
+          class="border-border-default flex items-center justify-end gap-2 border-t py-2"
           data-test="create-starter-footer"
         >
-          <StartWithSelect
-            :model-value="pref.def.value"
-            :label="opensWithLabel"
-            :choices="choices"
-            :last-now="lastNow"
-            :opens-now="resolved"
-            @update:model-value="pref.setDefault"
-          />
           <!-- Holds a small button's height, so an action landing here never grows the footer. -->
           <div class="flex min-h-8.5 items-center gap-2">
-            <slot name="footer-end" />
+            <slot name="footer-end" :pane="activePane" />
           </div>
         </OContent>
       </div>
@@ -130,9 +127,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import StartWithSelect, { type StartWithChoice } from "./StartWithSelect.vue";
-import { resolveStart, useStartPreference, type StartCandidate } from "./useStartPreference";
-import type { StartChoice, StarterKind, StarterPane } from "./createStarter.types";
+import type { StarterPane } from "./createStarter.types";
 
 type PaneId = StarterPane["id"];
 
@@ -141,71 +136,41 @@ const PANE_ICON = { ai: "auto-awesome", library: "menu-book" } as const;
 const SHEET_QUERY = "(max-width: 39.9375rem)";
 
 const props = defineProps<{
-  kind: StarterKind;
+  /** Listed in row order; a locked pane shows with its reason, a hidden one is left out. */
   panes: readonly StarterPane[];
-  /** The link beside the switch: "Use the form". */
+  /** The link after the switch: "Use the form". */
   formLabel: I18nText;
-  /** The form as a default in the footer menu: "The form". */
-  formChoiceLabel: I18nText;
-  /** The footer line: "New alert opens with". */
-  opensWithLabel: I18nText;
+  /** The popover's accessible name. */
+  label: I18nText;
 }>();
 
-const emit = defineEmits<{
-  "open-form": [];
-  "pane-change": [PaneId];
-}>();
+const emit = defineEmits<{ "open-form": [] }>();
 
 const open = defineModel<boolean>("open", { default: false });
 
 const slots = defineSlots<{
-  default?(props: {
-    open: boolean;
-    startsWithForm: boolean;
-    toggle: () => void;
-    start: () => void;
-  }): unknown;
+  default?(props: { open: boolean; toggle: () => void }): unknown;
   "pane-ai"?(): unknown;
   "pane-library"?(): unknown;
-  "footer-end"?(): unknown;
+  "footer-end"?(props: { pane: PaneId }): unknown;
   resume?(): unknown;
 }>();
 const { t, locale } = useI18nTyped();
-const pref = useStartPreference(props.kind);
 
 const anchorEl = ref<HTMLElement | null>(null);
 const sheetAnchor = ref<HTMLElement | null>(null);
+// null, not undefined: the toggle group stays controlled, so clicking the picked item never clears it.
 const activePane = ref<PaneId | null>(null);
 
-// A pane is offered only when it is on AND its host gave it a body to show.
-const openable = (p: StarterPane) => p.availability === "on" && !!slots[`pane-${p.id}`];
-const switchable = computed(() => props.panes.filter(openable));
-const candidates = computed<StartCandidate[]>(() =>
-  props.panes.map((p) => ({ id: p.id, openable: openable(p), count: p.count })),
-);
-const resolved = computed(() => resolveStart(pref.def.value, pref.last.value, candidates.value));
-const lastNow = computed(() => resolveStart("last", pref.last.value, candidates.value));
-const choices = computed<StartWithChoice[]>(() => [
-  ...props.panes.map((p) => ({
-    value: p.id,
-    label: p.label,
-    state: openable(p)
-      ? ("on" as const)
-      : p.availability === "locked"
-        ? ("locked" as const)
-        : ("hidden" as const),
-  })),
-  { value: "form", label: props.formChoiceLabel, state: "on" },
-]);
+const hasBody = (p: StarterPane) => !!slots[`pane-${p.id}`];
+const listed = computed(() => props.panes.filter((p) => p.availability !== "hidden" && hasBody(p)));
+const switchable = computed(() => listed.value.filter((p) => p.availability === "on"));
 
 const formatCount = (n: number) => new Intl.NumberFormat(locale.value).format(n);
 
-const isPane = (c: StartChoice): c is PaneId => c !== "form";
-
-const openStarter = (pane?: PaneId) => {
-  const first = resolved.value;
-  const fromDefault = isPane(first) && switchable.value.some((p) => p.id === first) ? first : null;
-  activePane.value = pane ?? fromDefault ?? switchable.value[0]?.id ?? null;
+/** Always opens on the row alone: nothing is picked until the user picks. */
+const openStarter = () => {
+  activePane.value = null;
   open.value = true;
 };
 
@@ -214,19 +179,13 @@ const close = () => onOpenChange(false);
 const toggle = () => (open.value ? close() : openStarter());
 
 const useForm = () => {
-  pref.recordUse("form");
   close();
   emit("open-form");
 };
 
-/** What New does: the form straight away when that is how it opens, else the starter. */
-const start = () => (resolved.value === "form" ? useForm() : openStarter());
-
 const selectPane = (v: unknown) => {
   const pane = switchable.value.find((p) => p.id === v);
-  if (!pane) return;
-  activePane.value = pane.id;
-  emit("pane-change", pane.id);
+  if (pane) activePane.value = pane.id;
 };
 
 const cyclePane = () => {
@@ -270,5 +229,5 @@ onMounted(() => {
 });
 onBeforeUnmount(() => sheetMql?.removeEventListener?.("change", onSheetChange));
 
-defineExpose({ start, openStarter, toggle, close, resolved });
+defineExpose({ openStarter });
 </script>

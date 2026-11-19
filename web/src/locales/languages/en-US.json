@@ -35810,18 +35810,28 @@
     },
     "shell": {
       "useForm": "Use the form",
-      "theForm": "The form",
-      "opensWith": "New alert opens with",
+      "starterLabel": "Ways to start a new alert",
       "anotherWay": "Start another way",
-      "splitTooltip": "New alert opens the form. Use ▾ for other ways to start, or to change this.",
-      "otherWays": "Other ways to start",
       "resume": "Resume",
       "draftWaiting": "You have an unsaved new alert.",
       "draftWaitingSince": "You have an unsaved new alert from {date}.",
       "addSelected": "Add {count} alert | Add {count} alerts",
       "createWithAi": "Create with AI",
-      "library": "Library",
-      "shortcutOpenStarter": "Other ways to start a new alert"
+      "library": "Library"
+    },
+    "ai": {
+      "describe": "Describe the alert",
+      "try": "Try",
+      "draft": "Draft",
+      "draftUnavailable": "Drafting from a description isn't available yet",
+      "example": {
+        "logsJump": "Log volume in {stream} jumps well above usual",
+        "logsSilent": "No logs from {stream} for 15 minutes",
+        "metricsJump": "{stream} rises well above usual",
+        "metricsSilent": "{stream} stops reporting for 15 minutes",
+        "tracesSlower": "Requests in {stream} get much slower than usual",
+        "tracesSilent": "No spans from {stream} for 15 minutes"
+      }
     },
     "library": {
       "searchPlaceholder": "Search the library",
@@ -35894,14 +35904,8 @@
     }
   },
   "createStarter": {
-    "saveDefaultFailed": "Couldn't save how this opens. It still opens the way it did.",
     "switchHint": "Switch between ways to start",
     "matchCount": "{count} matches your data | {count} match your data",
-    "whateverLast": "Whatever I used last",
-    "lastNow": "now: {choice}",
-    "personalNote": "Just for you, in this organization",
-    "pausedAiOff": "Paused: AI is off in this organization, so it opens on {choice}.",
-    "pausedUnavailable": "Paused: {stored} isn't available here, so it opens on {choice}.",
     "shortcuts": {
       "page": "Ways to start",
       "switchPane": "Switch between ways to start"

@@ -15,9 +15,6 @@
 
 import type { I18nText } from "@/types/i18n";
 
-export type StartChoice = "ai" | "library" | "form";
-export type StartDefault = StartChoice | "last";
-export type StarterKind = "alert" | "dashboard";
 export type ChoiceAvailability = "on" | "locked" | "hidden";
 
 export interface StarterPane {
@@ -26,6 +23,8 @@ export interface StarterPane {
   /** "44 match your data"; 0 = none match (no count shown); null = loading or failed. */
   count: number | null;
   availability: ChoiceAvailability;
+  /** Why a locked choice cannot be picked; shown on hover and focus. */
+  lockedReason?: I18nText;
 }
 
 /** Library scope; "all" = every service. Dimension names come from service_streams identity config, never hard-coded. */

@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, onBeforeUnmount, shallowRef, type ComputedRef } from "vue";
+import { computed, onBeforeUnmount, ref, shallowRef, type ComputedRef } from "vue";
 import { useQueries, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 
-import { severityRank } from "@/components/alertLibrary/libraryFacets";
+import { alertTypeOf, severityRank } from "@/components/alertLibrary/libraryFacets";
 import type { StarterScope } from "@/components/create-starter/createStarter.types";
 import {
   identityConfigQuery,
@@ -25,8 +25,15 @@ import {
   servicesListQuery,
 } from "@/services/service_streams.queries";
 import { streamNameListQuery } from "@/services/stream.queries";
+import {
+  toStreamsByType,
+  useAlertLibrary,
+  useAnomalyLibraryAccess,
+} from "@/composables/alerts/useAlertLibrary";
+import useStreams from "@/composables/useStreams";
 import alertsService from "@/services/alerts";
-import type { AlertLibraryEntry } from "@/types/alertLibrary";
+import type { AlertLibraryEntry, StreamsByType } from "@/types/alertLibrary";
+import { useI18nTyped } from "@/types/i18n";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { formatNumber } from "@/utils/alerts/alertCopy";
 import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
@@ -52,6 +59,63 @@ const FAILED: DayVerdict = { state: "failed", reason: null };
 
 /** Kept across pane opens, so reopening the starter repeats no dry run. */
 const verdictCache = new Map<string, { verdict: DayVerdict; at: number }>();
+
+/**
+ * The Alert Library page's own readiness check, shared by the starter's row and its Library pane,
+ * so "N match your data" is one number. `count` is null while loading or failed.
+ */
+export function useLibraryReadiness(alertType: () => "scheduled" | "anomaly_detection") {
+  const { t } = useI18nTyped();
+  const { manifest, error, loadManifest, isReady } = useAlertLibrary();
+  const anomalyAccess = useAnomalyLibraryAccess();
+  const { getStreams } = useStreams(t);
+
+  const streamsByType = shallowRef<StreamsByType>({});
+  const readinessKnown = ref(false);
+  const streamsFailed = ref(false);
+
+  const loadStreams = async (force: boolean) => {
+    try {
+      const payload = (await getStreams("all", false, false, force)) as {
+        list?: Array<{ name?: string; stream_type?: string }>;
+      };
+      streamsByType.value = toStreamsByType(payload?.list);
+      readinessKnown.value = true;
+      streamsFailed.value = false;
+    } catch {
+      streamsFailed.value = true;
+    }
+  };
+
+  const entries = computed<AlertLibraryEntry[]>(() => {
+    if (alertType() === "scheduled") {
+      return (manifest.value?.alerts ?? []).filter((entry) => alertTypeOf(entry) === "scheduled");
+    }
+    if (anomalyAccess.value !== "enabled") return [];
+    return (manifest.value?.anomaly_alerts ?? []).map((entry) => ({
+      ...entry,
+      alert_type: "anomaly_detection" as const,
+    }));
+  });
+
+  const failed = computed(
+    () => (!!error.value && !manifest.value) || (streamsFailed.value && !readinessKnown.value),
+  );
+  const busy = computed(() => !failed.value && (!manifest.value || !readinessKnown.value));
+  const ready = computed(() =>
+    readinessKnown.value
+      ? entries.value.filter((entry) => isReady(entry, streamsByType.value))
+      : [],
+  );
+  const count = computed(() => (busy.value || failed.value ? null : ready.value.length));
+
+  const load = (force = false) => {
+    void loadManifest({ force }).catch(() => undefined);
+    void loadStreams(force);
+  };
+
+  return { entries, ready, busy, failed, count, streamsByType, load };
+}
 
 /** The org's scope choices, from the same cached reads Discovered services and correlation use. */
 export function useStarterScopeOptions() {

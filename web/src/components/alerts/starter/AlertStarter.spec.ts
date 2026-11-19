@@ -15,67 +15,119 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
+import { ref } from "vue";
 import { createStore } from "vuex";
-import { queryClient } from "@/composables/query/queryClient";
 
-vi.mock("@/services/settings", async (importOriginal) => {
-  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
-  return overlayServiceMock(await importOriginal(), {
-    default: { getSetting: vi.fn(), setUserSetting: vi.fn() },
-  });
-});
+const edition = vi.hoisted(() => ({ isEnterprise: "true", isCloud: "false" }));
+
+vi.mock("@/aws-exports", () => ({ default: edition }));
+vi.mock("./libraryPaneData", () => ({
+  useLibraryReadiness: () => ({ count: ref(44), load: vi.fn() }),
+}));
 vi.mock("@/components/alerts/starter/AlertLibraryPane.vue", () => ({
   default: { name: "AlertLibraryPane", template: "<div data-test='library-pane-stub' />" },
+}));
+vi.mock("@/components/alerts/starter/AlertAiPane.vue", () => ({
+  default: { name: "AlertAiPane", template: "<div data-test='ai-pane-stub' />" },
 }));
 vi.mock("@/components/alerts/starter/BulkAddReview.vue", () => ({
   default: { name: "BulkAddReview", template: "<div />" },
 }));
 
-import settings from "@/services/settings";
 import AlertStarter from "./AlertStarter.vue";
 
-const store = createStore({
-  state: {
-    selectedOrganization: { identifier: "org1" },
-    userInfo: { email: "me@example.com" },
-    zoConfig: {},
-  },
-});
+const q = (sel: string) => document.body.querySelector<HTMLElement>(`[data-test="${sel}"]`);
 
-const render = async (stored: string | null) => {
-  (settings.getSetting as any).mockResolvedValue({ data: { setting_value: stored } });
+const openStarter = async (zoConfig: Record<string, unknown> = { ai_enabled: true }) => {
+  const store = createStore({
+    state: { selectedOrganization: { identifier: "org1" }, zoConfig },
+  });
   const w = mount(AlertStarter, { attachTo: document.body, global: { plugins: [store] } });
+  await w.find("[data-test=alert-list-add-alert-btn]").trigger("click");
   await flushPromises();
   return w;
 };
 
 describe("AlertStarter", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    queryClient.clear();
-    window.localStorage.clear();
+    edition.isEnterprise = "true";
     document.body.innerHTML = "";
   });
 
   it.each([
-    ["the form", "form", true],
-    ["the library", "library", false],
-  ])("New alert set to %s", async (_name, stored, split) => {
-    const w = await render(stored);
-    expect(w.find("[data-test=alert-starter-caret]").exists()).toBe(split);
-    await w.find("[data-test=alert-list-add-alert-btn]").trigger("click");
-    await flushPromises();
-    expect(!!w.emitted("open-form")).toBe(split);
-    expect(!!document.body.querySelector("[data-test=library-pane-stub]")).toBe(!split);
+    { name: "on", enterprise: "true", zo: { ai_enabled: true }, ai: "on" },
+    {
+      name: "locked by the licence",
+      enterprise: "true",
+      zo: { ai_enabled: true, features: { ai_assistant: "locked" } },
+      ai: "locked",
+    },
+    { name: "locked by the edition", enterprise: "false", zo: {}, ai: "locked" },
+    { name: "off in the org", enterprise: "true", zo: { ai_enabled: false }, ai: "hidden" },
+  ])("opens on the row alone, nothing picked, with Create with AI $name", async (c) => {
+    edition.isEnterprise = c.enterprise;
+    const w = await openStarter(c.zo);
+    const items = [...document.body.querySelectorAll("[data-test^=create-starter-pane-]")]
+      .map((el) => el.getAttribute("data-test"))
+      .filter((id) => !id?.endsWith("-count"));
+    const aiItem = q("create-starter-pane-ai");
+    expect({
+      items,
+      ai: !aiItem ? "hidden" : aiItem.hasAttribute("data-disabled") ? "locked" : "on",
+      picked: document.body.querySelector("[data-test^=create-starter-pane-][data-state=on]"),
+      body: document.body.querySelector("[data-test^=create-starter-body-]"),
+      count: q("create-starter-pane-library-count")?.textContent,
+    }).toEqual({
+      items:
+        c.ai === "hidden"
+          ? ["create-starter-pane-library"]
+          : ["create-starter-pane-library", "create-starter-pane-ai"],
+      ai: c.ai,
+      picked: null,
+      body: null,
+      count: "44 match your data",
+    });
     w.unmount();
   });
 
-  it("opens the starter from the caret even when New alert opens the form", async () => {
-    const w = await render("form");
-    await w.find("[data-test=alert-starter-caret]").trigger("click");
+  it.each([
+    { choice: "create-starter-pane-library", opens: "library-pane-stub" },
+    { choice: "create-starter-pane-ai", opens: "ai-pane-stub" },
+  ])("$choice opens its pane, and picking it again keeps it", async ({ choice, opens }) => {
+    const w = await openStarter();
+    for (let i = 0; i < 2; i++) {
+      q(choice)!.click();
+      await flushPromises();
+      expect(q(opens)).not.toBeNull();
+    }
+    w.unmount();
+  });
+
+  it("Use the form opens the form", async () => {
+    const w = await openStarter();
+    q("create-starter-use-form")!.click();
     await flushPromises();
-    expect(w.emitted("open-form")).toBeUndefined();
-    expect(document.body.querySelector("[data-test=library-pane-stub]")).not.toBeNull();
+    expect(w.emitted("open-form")).toHaveLength(1);
+    w.unmount();
+  });
+
+  it("Ctrl . moves Library, then AI, then Library", async () => {
+    const w = await openStarter();
+    const seen: Array<string | null> = [];
+    for (let i = 0; i < 3; i++) {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: ".", ctrlKey: true }));
+      await flushPromises();
+      seen.push(
+        document.body
+          .querySelector("[data-test^=create-starter-body-]")
+          ?.getAttribute("data-test") ?? null,
+      );
+    }
+    expect(seen).toEqual([
+      "create-starter-body-library",
+      "create-starter-body-ai",
+      "create-starter-body-library",
+    ]);
     w.unmount();
   });
 });

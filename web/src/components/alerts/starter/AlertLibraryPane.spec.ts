@@ -15,7 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { computed, defineComponent, ref } from "vue";
+import { computed, defineComponent } from "vue";
 import { createStore } from "vuex";
 
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
@@ -26,19 +26,9 @@ const evaluate = vi.hoisted(() => vi.fn());
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: streams.list }),
 }));
-vi.mock("@/components/create-starter/useStartPreference", () => ({
-  useStartPreference: () => ({ recordUse: vi.fn() }),
-}));
 vi.mock("@/services/alerts", () => ({ default: { evaluate } }));
-vi.mock("./StarterScopeSelect.vue", () => ({ default: { template: "<div />" } }));
-vi.mock("./libraryPaneData", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./libraryPaneData")>()),
-  useStarterScopeOptions: () => ({ optionFor: () => null, groups: ref([]) }),
-  useLibraryDryRun: () => ({ verdicts: ref({}), request: vi.fn() }),
-}));
 
-import AlertLibraryPane from "./AlertLibraryPane.vue";
-import { orderRows, selectAllNext } from "./libraryPaneData";
+import { orderRows, selectAllNext, useLibraryDryRun, useLibraryReadiness } from "./libraryPaneData";
 
 const entry = (id: string, stream: string, severity = "warning", title = id) =>
   ({
@@ -60,8 +50,8 @@ const manifest = {
   alerts: [entry("apm/a", "app"), entry("apm/b", "app"), entry("apm/c", "missing")],
 };
 
-const render = (cached: object | null) => {
-  const store = createStore({
+const libraryStore = (cached: object | null) =>
+  createStore({
     state: {
       selectedOrganization: { identifier: "org1" },
       zoConfig: {},
@@ -74,11 +64,6 @@ const render = (cached: object | null) => {
     },
     mutations: { setAlertLibraryManifest: () => undefined },
   });
-  return mount(AlertLibraryPane, {
-    props: { alertType: "scheduled", selected: [] },
-    global: { plugins: [store] },
-  });
-};
 
 describe("AlertLibraryPane", () => {
   beforeEach(() => {
@@ -91,15 +76,25 @@ describe("AlertLibraryPane", () => {
     { name: "0 when nothing matches", cached: manifest, list: ["other"], count: 0 },
     { name: "no count when the catalogue is down", cached: null, list: ["app"], count: null },
     { name: "no count while the streams load", cached: manifest, list: null, count: null },
-  ])("emits $name", async ({ cached, list, count }) => {
+  ])("counts $name", async ({ cached, list, count }) => {
     streams.list.mockReturnValue(
       list
         ? Promise.resolve({ list: list.map((name) => ({ name, stream_type: "logs" })) })
         : new Promise(() => undefined),
     );
-    const w = render(cached);
+    let readiness!: ReturnType<typeof useLibraryReadiness>;
+    mount(
+      defineComponent({
+        setup: () => {
+          readiness = useLibraryReadiness(() => "scheduled");
+          readiness.load();
+          return () => null;
+        },
+      }),
+      { global: { plugins: [libraryStore(cached)] } },
+    );
     await flushPromises();
-    expect(w.emitted("count")?.at(-1)).toEqual([count]);
+    expect(readiness.count.value).toBe(count);
   });
 
   it("gives up on a dry run that never answers, so its row stops loading", async () => {
@@ -108,8 +103,6 @@ describe("AlertLibraryPane", () => {
       (_org, _body, _folder, signal: AbortSignal) =>
         new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("x")))),
     );
-    const { useLibraryDryRun } =
-      await vi.importActual<typeof import("./libraryPaneData")>("./libraryPaneData");
     let run!: ReturnType<typeof useLibraryDryRun>;
     const store = createStore({ state: {} });
     mount(

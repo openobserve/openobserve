@@ -4276,9 +4276,9 @@ export default defineComponent({
         },
       });
     };
-    // New alert honours the user's default; with the button locked away, the form opens as before.
+    // New alert opens the starter; with the button locked away, the form opens as before.
     const startNewAlert = () =>
-      alertStarterRef.value ? alertStarterRef.value.start() : showAddUpdateFn({});
+      alertStarterRef.value ? alertStarterRef.value.openStarter() : showAddUpdateFn({});
 
     // Raw split (no trim), the same rule AlertSectionTabs hides the Library tab by.
     const showAlertLibrary = computed(
@@ -5049,13 +5049,6 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused() || !templates.value.length) return;
           startNewAlert();
-        },
-      },
-      {
-        id: "alertsOpenStarter",
-        handler: () => {
-          if (isInputFocused() || !templates.value.length) return;
-          alertStarterRef.value?.openStarter();
         },
       },
       {

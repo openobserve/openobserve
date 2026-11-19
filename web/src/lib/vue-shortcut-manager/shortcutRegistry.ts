@@ -598,11 +598,10 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.alerts",
     scope: "alerts",
     shortcuts: [
-      { id: "alertsCreate", key: "n", descriptionKey: "shortcuts.actions.alertsCreate" },
       {
-        id: "alertsOpenStarter",
-        key: "shift+n",
-        descriptionKey: "alertStarter.shell.shortcutOpenStarter",
+        id: "alertsCreate",
+        keys: ["n", "shift+n"],
+        descriptionKey: "shortcuts.actions.alertsCreate",
       },
       { id: "alertsImport", key: "i", descriptionKey: "shortcuts.actions.alertsImport" },
       { id: "alertsRefresh", key: "r", descriptionKey: "shortcuts.actions.alertsRefresh" },

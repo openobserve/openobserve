@@ -14,19 +14,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- New alert's button and its starter: the library, bulk add, and the form; the AI pane joins in phase 2. -->
+<!-- New alert's button and its starter: the library, the AI pane, and the form. -->
 <template>
   <CreateStarter
     ref="starterRef"
     v-model:open="open"
-    kind="alert"
     :panes="panes"
     :form-label="t('alertStarter.shell.useForm')"
-    :form-choice-label="t('alertStarter.shell.theForm')"
-    :opens-with-label="t('alertStarter.shell.opensWith')"
+    :label="t('alertStarter.shell.starterLabel')"
     @open-form="emit('open-form')"
   >
-    <template #default="{ open: isOpen, startsWithForm, toggle, start }">
+    <template #default="{ open: isOpen, toggle }">
       <OButton
         v-if="trigger === 'another-way'"
         variant="outline"
@@ -38,41 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="toggle"
         >{{ t("alertStarter.shell.anotherWay") }}</OButton
       >
-      <OButtonGroup v-else-if="startsWithForm" data-test="alert-starter-split">
-        <OButton
-          variant="primary"
-          size="sm"
-          :disabled="disabled"
-          :aria-label="newLabel"
-          data-test="alert-list-add-alert-btn"
-          @click="start"
-          >{{ t("alerts.add") }}
-          <EditorDraftDot
-            v-if="hasDraft"
-            :saved-at="draftSavedAt ?? null"
-            corner
-            :tooltip="false"
-            data-test="alert-list-add-alert-draft-dot"
-          />
-          <OTooltip
-            :content="t('alertStarter.shell.splitTooltip')"
-            shortcut-id="alertsOpenStarter"
-          />
-        </OButton>
-        <OButton
-          variant="primary"
-          size="icon-toolbar"
-          icon-left="expand-more"
-          :disabled="disabled"
-          :aria-label="t('alertStarter.shell.otherWays')"
-          aria-haspopup="dialog"
-          :aria-expanded="isOpen"
-          data-test="alert-starter-caret"
-          @click="toggle"
-        >
-          <OTooltip :content="t('alertStarter.shell.otherWays')" shortcut-id="alertsOpenStarter" />
-        </OButton>
-      </OButtonGroup>
       <OButton
         v-else
         variant="primary"
@@ -119,14 +82,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:selected="selected"
         v-model:scope="scope"
         :alert-type="alertType"
-        @count="onCount"
         @opened="open = false"
       />
     </template>
 
-    <template #footer-end>
+    <template #pane-ai>
+      <AlertAiPane v-model:prompt="aiPrompt" />
+    </template>
+
+    <template #footer-end="{ pane }">
+      <OTooltip v-if="pane === 'ai'" :content="t('alertStarter.ai.draftUnavailable')">
+        <span class="inline-flex">
+          <OButton
+            variant="primary"
+            size="sm"
+            icon-left="auto-awesome"
+            disabled
+            data-test="alert-starter-ai-draft"
+            >{{ t("alertStarter.ai.draft") }}</OButton
+          >
+        </span>
+      </OTooltip>
       <OButton
-        v-if="selected.length && !reviewing"
+        v-else-if="selected.length && !reviewing"
         variant="primary"
         size="sm"
         data-test="alert-starter-add-selected"
@@ -140,29 +118,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import CreateStarter from "@/components/create-starter/CreateStarter.vue";
-import { useStartPreference } from "@/components/create-starter/useStartPreference";
 import type {
   ChoiceAvailability,
   StarterPane,
   StarterScope,
 } from "@/components/create-starter/createStarter.types";
+import AlertAiPane from "@/components/alerts/starter/AlertAiPane.vue";
 import AlertLibraryPane from "@/components/alerts/starter/AlertLibraryPane.vue";
 import BulkAddReview from "@/components/alerts/starter/BulkAddReview.vue";
+import { useLibraryReadiness } from "@/components/alerts/starter/libraryPaneData";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { menuState } from "@/utils/featureGate";
+import { useFeatureNames } from "@/composables/useFeatureLock";
 import { formatEditorDraftTime } from "@/utils/drafts/editorDraftStore";
 import { useI18nTyped } from "@/types/i18n";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
-
-// Last count each library pane reported, so a reopened starter shows it from its first frame.
-const reportedCounts = ref<Record<string, number | null>>({});
 
 const props = withDefaults(
   defineProps<{
@@ -191,7 +167,7 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t, locale } = useI18nTyped();
-const pref = useStartPreference("alert");
+const { featureName } = useFeatureNames();
 
 const open = ref(false);
 const starterRef = ref<InstanceType<typeof CreateStarter> | null>(null);
@@ -200,18 +176,29 @@ const selected = ref<string[]>([]);
 const scope = ref<StarterScope>({ kind: "all" });
 const reviewing = ref(false);
 const reviewEntries = ref<AlertLibraryEntry[]>([]);
+const aiPrompt = ref("");
 
-const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-const countKey = computed(() => `${org.value}:${props.alertType}`);
+// Read before the starter opens, so the Library count is there from its first frame.
+const library = useLibraryReadiness(() => props.alertType);
+onMounted(() => library.load());
 
 // The same gates as the header assistant: edition, licence, then the org's own switch.
+const aiAccess = computed(() =>
+  checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig ?? {})),
+);
 const aiAvailability = computed<ChoiceAvailability>(() => {
   const zo = store.state.zoConfig ?? {};
-  const access = checkFeatureAccess("aiAssistant", buildFeatureGateContext(zo));
-  if (!access.allowed) return access.visible ? "locked" : "hidden";
+  if (!aiAccess.value.allowed) return aiAccess.value.visible ? "locked" : "hidden";
   const state = menuState(zo.features, "ai_assistant", Boolean(zo.ai_enabled));
   return state === "enabled" ? "on" : state;
 });
+const aiLockedReason = computed(() =>
+  aiAccess.value.allowed
+    ? t("featureLock.headerLocked", {
+        feature: featureName("ai_assistant") ?? t("featureLock.thisFeature"),
+      })
+    : t("featureLock.availableInEnterprise", { feature: t("menu.aiAssistant") }),
+);
 
 // Raw split, the same rule AlertSectionTabs hides the Library tab by.
 const libraryAvailability = computed<ChoiceAvailability>(() =>
@@ -222,16 +209,17 @@ const libraryAvailability = computed<ChoiceAvailability>(() =>
 
 const panes = computed<StarterPane[]>(() => [
   {
+    id: "library",
+    label: t("alertStarter.shell.library"),
+    count: library.count.value,
+    availability: libraryAvailability.value,
+  },
+  {
     id: "ai",
     label: t("alertStarter.shell.createWithAi"),
     count: null,
     availability: aiAvailability.value,
-  },
-  {
-    id: "library",
-    label: t("alertStarter.shell.library"),
-    count: reportedCounts.value[countKey.value] ?? null,
-    availability: libraryAvailability.value,
+    lockedReason: aiLockedReason.value,
   },
 ]);
 
@@ -251,18 +239,14 @@ const draftLine = computed(() =>
       }),
 );
 
-// A pane reports null while it loads; that must not blank the count kept from the last open.
-let countedThisOpen = false;
 watch(open, (now) => {
-  if (now) countedThisOpen = false;
-  else reviewing.value = false;
+  if (now) {
+    library.load();
+    return;
+  }
+  reviewing.value = false;
+  aiPrompt.value = "";
 });
-const onCount = (n: number | null) => {
-  const kept = reportedCounts.value[countKey.value];
-  if (n === null && !countedThisOpen && typeof kept === "number") return;
-  if (n !== null) countedThisOpen = true;
-  reportedCounts.value = { ...reportedCounts.value, [countKey.value]: n };
-};
 
 const review = () => {
   reviewEntries.value = libraryRef.value?.entriesById(selected.value) ?? [];
@@ -270,7 +254,6 @@ const review = () => {
 };
 
 const onBulkDone = (created: number) => {
-  pref.recordUse("library");
   selected.value = [];
   open.value = false;
   emit("created", created);
@@ -282,9 +265,7 @@ const resume = () => {
 };
 
 defineExpose({
-  /** `n` and the empty state: honours the stored default. */
-  start: () => starterRef.value?.start(),
-  /** The caret and Shift N: always the starter. */
+  /** New alert, `n`, `Shift N` and the empty state: the starter, nothing picked. */
   openStarter: () => starterRef.value?.openStarter(),
 });
 </script>

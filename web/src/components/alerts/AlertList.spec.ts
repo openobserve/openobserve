@@ -99,7 +99,6 @@ import AlertService from "@/services/alerts";
 import DowntimeService from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
-import { settingKeys } from "@/services/settings.querykeys";
 import { fenceAlertWrite } from "@/services/alerts.readFence";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { setMutationNotifier } from "@/composables/query/queryClient";
@@ -4539,27 +4538,15 @@ describe("AlertList - first run and the alert library", () => {
     ]);
   });
 
-  it.each([
-    ["opens the form when New alert is set to the form", "form", true],
-    ["opens the starter otherwise", "library", false],
-  ])(
-    "starts a new alert from the empty state as the header's New alert does: %s",
-    async (_n, stored, form) => {
-      const org = store.state.selectedOrganization.identifier;
-      const user = String(store.state.userInfo?.email ?? "");
-      queryClient.setQueryData(settingKeys.one(org, "start_with_alert", user), stored);
-      const wrapper = await mountEmpty();
-      const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
-      await wrapper.find('[data-test="alert-list-empty-new-alert"]').trigger("click");
-      await flushPromises();
-      const toForm = push.mock.calls.some(([to]: any[]) => to?.query?.action === "add");
-      expect([toForm, !!document.body.querySelector('[data-test="create-starter"]')]).toEqual([
-        form,
-        !form,
-      ]);
-      wrapper.unmount();
-    },
-  );
+  it("opens the starter from the empty state's New alert, as the header's does", async () => {
+    const wrapper = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-new-alert"]').trigger("click");
+    await flushPromises();
+    expect(push).not.toHaveBeenCalled();
+    expect(document.body.querySelector('[data-test="create-starter"]')).not.toBeNull();
+    wrapper.unmount();
+  });
 
   it("opens the library from the empty state", async () => {
     const wrapper = await mountEmpty();
