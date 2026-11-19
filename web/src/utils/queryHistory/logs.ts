@@ -53,7 +53,10 @@ const RECORDED_REASONS = new Set<RunReason>([
 export const LOGS_REAPPLY_TYPE = "search_history_re_apply";
 
 /** Bumped once per restore, so restoring the same row twice is two requests even when the URL does not change. */
-export const logsReapplyRequest = ref<{ seq: number; run: boolean }>({ seq: 0, run: false });
+export const logsReapplyRequest = ref<{ seq: number; run: boolean; reason?: "url" }>({
+  seq: 0,
+  run: false,
+});
 
 export interface LogsRunRecordInput {
   signature: LogsSignature;
@@ -157,8 +160,8 @@ export const logsEntryFunction = (entry: QueryHistoryEntry): string =>
   entry.source === "logs" ? b64DecodeUnicodeSafe(entry.context.page?.functionContent ?? "") : "";
 
 /** Asks the Logs page to apply the route it is on, and to run it when `run` is set. */
-export const requestLogsReapply = (run: boolean) => {
-  logsReapplyRequest.value = { seq: logsReapplyRequest.value.seq + 1, run };
+export const requestLogsReapply = (run: boolean, reason?: "url") => {
+  logsReapplyRequest.value = { seq: logsReapplyRequest.value.seq + 1, run, reason };
 };
 
 /** The SQL template a new Logs search starts from counts as an empty editor. */

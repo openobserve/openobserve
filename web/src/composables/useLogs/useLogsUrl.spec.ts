@@ -19,8 +19,10 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import {
   bindLogsUrlRouter,
   changedParams,
+  replaceNextLogsWrite,
   decodeColumns,
   dropLineLinkParams,
+  endLogsArrival,
   encodeColumns,
   initShownSearchFromUrl,
   pageFromRequest,
@@ -224,6 +226,20 @@ describe("useLogsUrl (4c C7b)", () => {
     it("pushes when a search input changes", () => {
       const current = { stream: "app", period: "15m" };
       expect(urlWriteMode(current, { ...current, period: "1h" })).toBe("push");
+      expect(urlWriteMode(current, { ...current, query: "x" })).toBe("push");
+    });
+
+    it("replaces only the next write after a history step re-applies a search", () => {
+      const current = { stream: "app", period: "15m" };
+      replaceNextLogsWrite();
+      expect(urlWriteMode(current, { ...current, sql_mode: "true" })).toBe("replace");
+      expect(urlWriteMode(current, { ...current, sql_mode: "true" })).toBe("push");
+    });
+
+    it("pushes again once a skipped history re-run ends the arrival", () => {
+      const current = { stream: "app", period: "15m" };
+      replaceNextLogsWrite();
+      endLogsArrival();
       expect(urlWriteMode(current, { ...current, query: "x" })).toBe("push");
     });
 
