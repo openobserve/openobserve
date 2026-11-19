@@ -1792,9 +1792,12 @@ export function useAlertForm(
         // [data-inline-edit-trigger] is OInlineEdit's display-mode button: an
         // inline-edited field has NO input in the DOM until it is opened, so
         // without this the header name field would never be reachable here.
-        const control = node.querySelector<HTMLElement>(
-          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup], [data-inline-edit-trigger]',
-        );
+        // A sentence's message line sits under its other slots; it marks the field it reports on.
+        const control =
+          node.querySelector<HTMLElement>("[data-error-focus] input") ??
+          node.querySelector<HTMLElement>(
+            'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup], [data-inline-edit-trigger]',
+          );
         if (control) {
           if (hooks.revealControl) {
             control.focus({ preventScroll: true });

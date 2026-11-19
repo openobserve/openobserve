@@ -418,7 +418,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @scratch="startFromScratch"
                 @open-alert="openExistingAlert"
                 @update:period="setLookBack"
-              />
+                @threshold="sentenceThreshold = true"
+              >
+                <template #defaults>
+                  <AlertDefaultsLine :defaults="saveDefaults" :name="defaultsName" />
+                </template>
+              </AlertIntentStart>
             </AlertFormSection>
 
             <AlertFormSection
@@ -1284,6 +1289,7 @@ import {
   onMounted,
   onBeforeUnmount,
   nextTick,
+  shallowRef,
 } from "vue";
 import { useStore } from "vuex";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -1345,10 +1351,15 @@ import type { ChoiceCardOption } from "@/lib/forms/ChoiceCards/OChoiceCards.type
 import AlertSampleEvents from "./AlertSampleEvents.vue";
 import AlertStreamOption from "./AlertStreamOption.vue";
 import AlertIntentStart from "./AlertIntentStart.vue";
+import AlertDefaultsLine from "./AlertDefaultsLine.vue";
 import AlertLookAlike from "./AlertLookAlike.vue";
 import AlertMessageLine from "./AlertMessageLine.vue";
-import type { IntentFill, IntentId } from "@/utils/alerts/alertIntents";
-import { compareFactor } from "@/utils/alerts/alertIntents";
+import {
+  carriedThreshold,
+  compareFactor,
+  type IntentFill,
+  type IntentId,
+} from "@/utils/alerts/alertIntents";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 import type { ValueRange } from "@/utils/alerts/ratioThreshold";
 import { buildPrefillFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
@@ -1529,6 +1540,7 @@ export default defineComponent({
     AlertSampleEvents,
     AlertStreamOption,
     AlertIntentStart,
+    AlertDefaultsLine,
     AlertLookAlike,
     AlertMessageLine,
     AlertMetricLabels,
@@ -1905,6 +1917,8 @@ export default defineComponent({
     const { lgUp, xlUp } = useBreakpoint();
     const activeSection = ref<AlertSectionId>("watch");
     const visitedSections = ref<ReadonlySet<AlertSectionId>>(new Set());
+    // A threshold typed in the step-1 sentence is the user's, as one typed in step 2 is.
+    const sentenceThreshold = ref(false);
     const leftWatch = ref(false);
     const foldDue = ref(false);
     // A jump glides past section 2; folding section 1 mid-glide would cut it short, so the fold waits until scrolling stops.
@@ -2114,6 +2128,7 @@ export default defineComponent({
       items: sectionItems,
       errorCounts,
       review: reviewLines,
+      defaults: saveDefaults,
     } = useAlertFormSections({
       // The server's SQL check is not a schema rule, so a failed one is counted here.
       extraErrors: computed(() => ({
@@ -2209,7 +2224,8 @@ export default defineComponent({
       const undecided =
         !isEditingAlert.value &&
         !visitedSections.value.has("condition") &&
-        activeSection.value !== "condition";
+        activeSection.value !== "condition" &&
+        !sentenceThreshold.value;
       if (undecided && (status.grouped || fd.query_condition?.type === "promql")) return null;
       // An empty value threshold leaves nothing to judge; a measured value still helps pick one.
       const noThreshold = alertForm.valueThresholdMissing.value;
@@ -2348,6 +2364,7 @@ export default defineComponent({
       reveal: (el: HTMLElement) => snapScrollRef.value?.revealElement(el),
       openSetting: (id: string) => settingFind.select(id),
       conditionNote: ref(null),
+      thresholdGuide: shallowRef(null),
       previewStatus: activeEvaluationStatus,
     });
 
@@ -2635,6 +2652,18 @@ export default defineComponent({
       return Math.max(org, folder ?? 0);
     });
     const appliedIntent = ref<{ fill: IntentFill | null; label: I18nText } | null>(null);
+    // Shown before Save, but the name field stays empty until the user reaches it (FR1-D3).
+    const defaultsName = computed(
+      () =>
+        String(alertForm.formData.value.name ?? "").trim() ||
+        unusedAlertName(
+          suggestedAlertName(buildAlertAutoName(alertForm.formData.value, alertForm.t), {
+            due: true,
+            fromLibrary: libraryName.value,
+          }),
+          takenAlertNames.value,
+        ),
+    );
     // A chosen intent whose sentence still has an empty filter or measure: nothing is written or previewed.
     const pendingIntent = ref<IntentId | null>(null);
     let pendingQuery = "";
@@ -2670,6 +2699,9 @@ export default defineComponent({
     };
 
     const applyIntent = async ({ fill, label }: { fill: IntentFill; label: I18nText }) => {
+      const carried = carriedThreshold(appliedIntent.value?.fill, fill, (path) =>
+        get(alertForm.formData.value, path),
+      );
       holdBaseline();
       restoreIntent();
       if (String(alertForm.formData.value.is_real_time) !== fill.howItChecks) {
@@ -2677,7 +2709,7 @@ export default defineComponent({
         intentPaths.add("query_condition.type");
         onAlertTypeChange(fill.howItChecks);
       }
-      Object.entries(fill.values).forEach(([path, value]) => {
+      Object.entries({ ...fill.values, ...carried }).forEach(([path, value]) => {
         intentPaths.add(path);
         alertForm.setF(path, cloneDeep(value));
       });
@@ -2770,6 +2802,7 @@ export default defineComponent({
       () => {
         appliedIntent.value = null;
         pendingIntent.value = null;
+        sentenceThreshold.value = false;
         intentBaseline = null;
         intentPaths.clear();
       },
@@ -2785,6 +2818,9 @@ export default defineComponent({
       orgAlertCount,
       appliedIntent,
       pendingIntent,
+      sentenceThreshold,
+      saveDefaults,
+      defaultsName,
       applyIntent,
       setLookBack,
       onIntentPending,

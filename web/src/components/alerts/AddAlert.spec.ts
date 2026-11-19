@@ -2758,6 +2758,22 @@ describe("AddAlert (OForm owner)", () => {
       expect(document.activeElement).not.toBe(later);
     });
 
+    it("focuses the field a sentence's message reports on, not the slot ahead of it", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
+      await flushPromises();
+      const body = wrapper.find('[data-test="add-alert-section-watch"]').element;
+      const sentence = document.createElement("div");
+      sentence.innerHTML =
+        '<button aria-haspopup="listbox">severity</button><span data-error-focus><input /></span>' +
+        '<div><span role="alert">Enter a threshold</span></div>';
+      body.appendChild(sentence);
+
+      wrapper.vm.focusOnFirstError();
+      await flushPromises();
+
+      expect(document.activeElement).toBe(sentence.querySelector("input"));
+    });
+
     it("skips a stale message in a slice the current mode hides", async () => {
       wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
