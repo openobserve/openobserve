@@ -12142,7 +12142,8 @@
         "neverCompare": "It would not have alerted. If you expected it to, check the comparison.",
         "noisySustained": "That is often, so people may start to ignore it. The {fn} over the look back already ignores short spikes; a higher threshold makes it quieter.",
         "noisySustainedLower": "That is often, so people may start to ignore it. The {fn} over the look back already ignores short dips; a lower threshold makes it quieter.",
-        "changeThreshold": "Change the threshold"
+        "changeThreshold": "Change the threshold",
+        "hourUntested": "{from}–{to}: not tested"
       },
       "filtersMode": "Filters",
       "typeHelp": {
@@ -12261,8 +12262,8 @@
         "anomalyLearnsHas": "Learns what is normal from the {count} day this stream has. | Learns what is normal from the {count} days this stream has.",
         "anomalyLearnsFlat": "Learns what is normal from the {count} day this stream has, the same at every hour of the day. | Learns what is normal from the {count} days this stream has, the same at every hour of the day.",
         "anomalyLearnsWaits": "Starts learning once it has {measures} measures (about {duration}).",
-        "compareNeedsBaseline": "Stays quiet while the earlier window has no data, so a rise from zero never fires.",
-        "compareAnyBaseline": "While the earlier window has no data, any match fires."
+        "compareAnyBaseline": "While the earlier window has no data, any match fires.",
+        "compareNeedsHistory": "Stays quiet while the earlier window has no events; a rise from zero matches still fires."
       },
       "watch": {
         "title": "What should we watch?",
@@ -15848,8 +15849,8 @@
         "factorLine": "Fires at more than {factor} times that window's count",
         "factor": "Times the past window",
         "needsBaseline": "Only fire once the past window has data",
-        "needsBaselineOn": "A rise from zero never fires, and nothing fires until the stream has history.",
-        "needsBaselineOff": "Any match fires while the earlier window is empty, such as on a new stream."
+        "needsBaselineOff": "Any match fires while the earlier window is empty, such as on a new stream.",
+        "needsHistoryOn": "Quiet while the earlier window has no events; a rise from zero matches fires."
       },
       "forecast": {
         "thresholdPlaceholder": "e.g. 90",
@@ -15979,12 +15980,16 @@
       "countWhere": {
         "label": "Count matching {noun}",
         "sentence": "Count of {noun} where {field} is {value} {window}, per {group}",
-        "sentenceAll": "Count of {noun} where {field} is {value} {window}"
+        "sentenceAll": "Count of {noun} where {field} is {value} {window}",
+        "sentenceAbove": "Count of {noun} where {field} is {value} {window}, per {group}, is {threshold}",
+        "sentenceAllAbove": "Count of {noun} where {field} is {value} {window} is {threshold}"
       },
       "percentile": {
         "label": "Percentile of a field",
         "sentencePer": "p95 of {measure} per {group} {window}",
-        "sentenceAll": "p95 of {measure} {window}"
+        "sentenceAll": "p95 of {measure} {window}",
+        "sentencePerAbove": "p95 of {measure} per {group} {window} is {threshold}",
+        "sentenceAllAbove": "p95 of {measure} {window} is {threshold}"
       },
       "anyEvent": {
         "label": "Any matching event (as it happens)",
@@ -16004,14 +16009,20 @@
         "sentencePer": "{metric} per {group} {window}, above a value",
         "sentenceAll": "{metric} {window}, above a value",
         "rateSentencePer": "{metric} per second, per {group} {window}, above a value",
-        "rateSentenceAll": "{metric} per second {window}, above a value"
+        "rateSentenceAll": "{metric} per second {window}, above a value",
+        "sentencePerAbove": "{agg} of {metric} per {group} {window} is {threshold}",
+        "sentenceAllAbove": "{agg} of {metric} {window} is {threshold}",
+        "rateSentencePerAbove": "{metric} per second, per {group} {window}, is {threshold}",
+        "rateSentenceAllAbove": "{metric} per second {window} is {threshold}"
       },
       "ratio": {
         "label": "Share of one metric over another (error rate)",
         "sentenceWhere": "Share of {metric} where {label} matches {value}, per {group}, {window}",
         "sentenceWhereAll": "Share of {metric} where {label} matches {value}, {window}",
         "alsoCovers": "Also covers {metrics}",
-        "memberReads": "{metric} (reads {labels})"
+        "memberReads": "{metric} (reads {labels})",
+        "sentenceWhereAbove": "Share of {metric} where {label} matches {value}, per {group}, {window}, is {threshold}",
+        "sentenceWhereAllAbove": "Share of {metric} where {label} matches {value}, {window}, is {threshold}"
       },
       "unusualChange": {
         "label": "Unusual change",
@@ -16032,7 +16043,7 @@
         "patternOption": "Every value like {pattern}",
         "valueHelpSeries": "Numbers are series seen in the last 24 hours. Type a value, or a pattern like {example}, and press Enter to add it.",
         "valueHelpEvents": "Numbers are {noun} in the last 24 hours. Type a value and press Enter to add it.",
-        "valueHelpEventsAnyCase": "Numbers are {noun} in the last 24 hours. Values that differ only in case match too. Type a value and press Enter to add it."
+        "valueHelpEventsCaseAdded": "Numbers are {noun} in the last 24 hours. Picking a value also adds any spelling listed here that differs from it only in case. Type a value and press Enter to add it."
       },
       "noGroup": "No grouping",
       "addGroup": "Add a group",
@@ -16045,7 +16056,16 @@
       "addFilter": "Add a filter",
       "noFilter": "No filter",
       "useInstead": "Use {value} instead",
-      "alsoMatch": "Also match {values}"
+      "alsoMatch": "Also match {values}",
+      "defaults": {
+        "sendsTo": "Sends to {targets}",
+        "tellsNobody": "Tells no one yet",
+        "pickDestination": "Pick a destination",
+        "checksEvery": "checks every {every}",
+        "repeatsEvery": "repeats every {every}",
+        "repeatsEveryPer": "repeats every {every} per {group}",
+        "named": "named {name}"
+      }
     },
     "librarySuggest": {
       "suggestedStarter": "Suggested starter",
@@ -16089,9 +16109,6 @@
       "noAnswer": "no answer from the server",
       "sendConfirm": "This posts a real message, marked [TEST], to {targets}.",
       "region": "Test result",
-      "groupChecksAbove": "above the threshold in {count} check | above the threshold in {count} checks",
-      "groupChecksBelow": "below the threshold in {count} check | below the threshold in {count} checks",
-      "groupChecksMatched": "matched the condition in {count} check | matched the condition in {count} checks",
       "runAgain": "Run again",
       "staleRunAgain": "The alert changed after this test. Run again for the new answer.",
       "elapsed": "{seconds} s so far. A busy stream can take a minute or more.",
@@ -16112,7 +16129,16 @@
       "latestSeriesMatched": "At the latest check ({time}), no series matched the condition. | At the latest check ({time}), {count} series matched the condition. | At the latest check ({time}), {count} series matched the condition.",
       "firedInChecksGroupsSent": "Over the last 24 hours this would have fired in {fired} of {checks} checks, for {groups}, and sent notifications in {count} of them ({times}).",
       "heldGroups": "In the other check, every firing group was within {wait} of its last notification, so Notify at most every held them back. | In the other {count} checks, every firing group was within {wait} of its last notification, so Notify at most every held them back.",
-      "heldWait": "The other firing came within {wait} of a notification, so Notify at most every held it back. | The other {count} firings came within {wait} of a notification, so Notify at most every held them back."
+      "heldWait": "The other firing came within {wait} of a notification, so Notify at most every held it back. | The other {count} firings came within {wait} of a notification, so Notify at most every held them back.",
+      "paused": "Notify at most every paused the other check: after a notification the alert waits {wait} before it checks again. | Notify at most every paused the other {count} checks: after a notification the alert waits {wait} before it checks again.",
+      "neverFiredSpan": "Over the last {span} this would not have fired.",
+      "firedInChecksSpan": "Over the last {span} this would have fired in {fired} of {checks} checks and notified {count} time ({times}). | Over the last {span} this would have fired in {fired} of {checks} checks and notified {count} times ({times}).",
+      "firedInChecksGroupsSentSpan": "Over the last {span} this would have fired in {fired} of {checks} checks, for {groups}, and sent notifications in {count} of them ({times}).",
+      "truncatedSpan": "The test reached its time limit, so the {rest} before that were not tested.",
+      "groupsAbove": "Most often above the threshold:",
+      "groupsBelow": "Most often below the threshold:",
+      "groupsMatched": "Most often matching the condition:",
+      "checkCount": "{count} check | {count} checks"
     },
     "conditionCountWith": "{noun} with",
     "lookAlike": {
