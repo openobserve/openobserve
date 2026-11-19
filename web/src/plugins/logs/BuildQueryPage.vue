@@ -666,9 +666,6 @@ const runQuery = async (withoutCache?: boolean, generationId?: number): Promise<
     if (runBlocked.value) return abandon();
     if (generatedQuery !== undefined) {
       emit("queryGenerated", generatedQuery);
-      // The run's scope is noted from the search bar, which the parent fills asynchronously.
-      await autoRun.panelQuerySynced();
-      if (runBlocked.value) return abandon();
     }
   }
 

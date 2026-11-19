@@ -566,7 +566,6 @@ function createLogsAutoRun() {
   const panelScopes = shallowReactive<Partial<Record<"visualize" | "build", LogsSignature>>>({});
   // A chart fetches with the window and query it was last handed, never the picker's live ones.
   const appliedScopes: Partial<Record<"visualize" | "build", LogsSignature>> = {};
-  let panelQuerySync: Promise<unknown> = Promise.resolve();
 
   function panelSurface(): "visualize" | "build" | null {
     const mode = searchModeOf(searchObj().meta.logsVisualizeToggle);
@@ -576,7 +575,12 @@ function createLogsAutoRun() {
   function isPanelScopeStale(): boolean {
     const surface = panelSurface();
     const loaded = surface ? panelScopes[surface] : undefined;
-    return !!loaded && !sameSignature(readLogsSignature(searchObj()), loaded);
+    if (!loaded) return false;
+    const live = readLogsSignature(searchObj());
+    if (surface !== "build") return !sameSignature(live, loaded);
+    // Build's chart runs its own generated SQL, so only the search bar's wording and SQL mode differ there.
+    const { query, sqlMode, quickMode, quickModeFields } = loaded;
+    return !sameSignature({ ...live, query, sqlMode, quickMode, quickModeFields }, loaded);
   }
 
   function currentPanelScope(): PanelScope | null {
@@ -596,15 +600,6 @@ function createLogsAutoRun() {
     return surface && signature ? { surface, signature } : null;
   }
 
-  function trackPanelQuerySync<T>(task: Promise<T>): Promise<T> {
-    panelQuerySync = Promise.allSettled([panelQuerySync, task]);
-    return task;
-  }
-
-  async function panelQuerySynced(): Promise<void> {
-    await panelQuerySync;
-  }
-
   // A cancelled or failed load never showed the new scope, so only a load that ends cleanly counts.
   function commitPanelScope(scope: PanelScope | null): void {
     if (scope) panelScopes[scope.surface] = scope.signature;
@@ -615,12 +610,14 @@ function createLogsAutoRun() {
     delete panelScopes.build;
     delete appliedScopes.visualize;
     delete appliedScopes.build;
+    outsideRunLoad = null;
   }
 
   // Logs results reused by Visualize carry the time window they ran with, not the picker's.
   function executedTimeMatches(): boolean {
     const executed = searchObj().meta.executed as AutoRunMeta["executed"];
-    return !executed || isEqual(executed.signature.time, readLogsSignature(searchObj()).time);
+    // A Search run in flight has cleared the record but may already show its new window's rows.
+    return !!executed && isEqual(executed.signature.time, readLogsSignature(searchObj()).time);
   }
 
   function beginPanelRun(generationId: number, abort?: () => void): void {
@@ -725,8 +722,6 @@ function createLogsAutoRun() {
     panelLoadingChanged,
     cancelPanelLoad,
     notePanelScopeApplied,
-    trackPanelQuerySync,
-    panelQuerySynced,
     isPanelScopeStale,
     executedTimeMatches,
     hasPanelRun,

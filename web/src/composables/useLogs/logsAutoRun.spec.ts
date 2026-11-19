@@ -710,35 +710,18 @@ describe("panel records for Visualize and Build (J7)", () => {
     expect(run().isPanelScopeStale()).toBe(false);
   });
 
-  it("a Build run waits for the search bar query sync so its scope holds the query it ran", async () => {
+  it("Build ignores the search bar's wording and SQL mode but not a time move", () => {
     run().setPanelConfigReader(() => ({ type: "bar" }));
     fakeSearchObj.value.meta.logsVisualizeToggle = "build";
-    fakeSearchObj.value.data.query = "level = 'info'";
     fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
-    let finishSync: () => void = () => undefined;
-    run().trackPanelQuerySync(
-      new Promise<void>((resolve) => {
-        finishSync = () => {
-          fakeSearchObj.value.data.query = "level = 'error'";
-          resolve();
-        };
-      }),
-    );
-    const synced = run().panelQuerySynced();
-    finishSync();
-    await synced;
+    fakeSearchObj.value.data.query = 'SELECT count(*) FROM "logs"';
     run().markPanelDispatched(run().openPanelRun());
     run().endPanelRun(true);
+    fakeSearchObj.value.meta.sqlMode = !fakeSearchObj.value.meta.sqlMode;
+    fakeSearchObj.value.data.query = "level = 'error'";
     expect(run().isPanelScopeStale()).toBe(false);
-    fakeSearchObj.value.data.query = "level = 'info'";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
     expect(run().isPanelScopeStale()).toBe(true);
-  });
-
-  it("a failed query sync still lets the Build run go ahead", async () => {
-    run()
-      .trackPanelQuerySync(Promise.reject(new Error("parser")))
-      .catch(() => undefined);
-    await expect(run().panelQuerySynced()).resolves.toBeUndefined();
   });
 
   it("a dispatched panel run notes its scope even when its loading is not reported to the logs page", () => {
@@ -799,7 +782,7 @@ describe("panel records for Visualize and Build (J7)", () => {
 
   it("Logs results are reusable by Visualize only while the time selection matches the run that produced them", () => {
     fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
-    expect(run().executedTimeMatches()).toBe(true);
+    expect(run().executedTimeMatches()).toBe(false);
     fakeSearchObj.value.meta.executed = { signature: run().readSignature(), complete: true };
     expect(run().executedTimeMatches()).toBe(true);
     fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
