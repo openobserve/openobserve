@@ -170,6 +170,7 @@ describe("Build Configuration Functions", () => {
           filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
         },
         joins: [],
+        limit: 0,
         customQuery: false,
         query: "",
       });

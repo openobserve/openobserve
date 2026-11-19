@@ -28,6 +28,8 @@ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
  * Tools for correlating logs, traces, and metrics using service_streams data
  */
 
+const CORRELATION_WINDOW_US = 5 * 60 * 1_000_000;
+
 export type TelemetryType = "logs" | "traces" | "metrics";
 
 export interface TelemetryContext {
@@ -317,6 +319,34 @@ export function buildSqlCondition(field: string, value: string, spellings?: stri
   return `${quoteSqlIdentifier(field)} = ${quoteSqlLiteral(value)}`;
 }
 
+/** A filter field and each alias of it the stream holds; a filter edited onto an alias finds its group too. */
+export function filterAliasFields(
+  field: string,
+  aliases: Readonly<Record<string, readonly string[]>> = {},
+): string[] {
+  const group = Object.entries(aliases).find(
+    ([key, others]) => key === field || others.includes(field),
+  );
+  return group ? [...new Set([field, group[0], ...group[1]])] : [field];
+}
+
+/** A stream filter matched on its field or any alias of it, each under the filter's spellings. */
+export function buildStreamFilterCondition(
+  stream:
+    | ({ filter_aliases?: Readonly<Record<string, readonly string[]>> } & Pick<
+        StreamInfo,
+        "filter_spellings"
+      >)
+    | undefined,
+  field: string,
+  value: string,
+): string {
+  const fields = filterAliasFields(field, stream?.filter_aliases);
+  const spellings = fields.map((f) => stream?.filter_spellings?.[f]).find(Boolean);
+  const matches = fields.map((f) => buildSqlCondition(f, value, spellings));
+  return matches.length > 1 ? `(${matches.join(" OR ")})` : matches[0];
+}
+
 /**
  * Build WHERE clause conditions using exact field names from StreamInfo.filters
  *
@@ -532,4 +562,12 @@ export function findMatchingService(
   }
 
   return bestMatch;
+}
+
+/** The _correlate search range: 5 minutes either side of a record, never past now (microseconds). */
+export function correlationWindow(timestampUs: number): { start: number; end: number } {
+  return {
+    start: timestampUs - CORRELATION_WINDOW_US,
+    end: Math.min(timestampUs + CORRELATION_WINDOW_US, Date.now() * 1000),
+  };
 }

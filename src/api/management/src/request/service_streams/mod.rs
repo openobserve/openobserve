@@ -334,9 +334,10 @@ pub async fn correlate_streams(
             semantic_groups.len()
         );
 
-        match o2_enterprise::enterprise::service_streams::storage::correlate(
+        match correlate_record(
             &org_id,
-            &req.available_dimensions,
+            &user_email.user_id,
+            &req,
             &identity_config,
             &semantic_groups,
         )
@@ -409,6 +410,28 @@ pub struct CorrelationRequest {
     pub source_type: String,
     /// Available dimensions from the source event
     pub available_dimensions: std::collections::HashMap<String, String>,
+    /// Name the record's own service from all its dimensions, not the first match
+    #[serde(default)]
+    pub resolve_from_source: bool,
+    /// Every semantic dimension of the record, untracked ones included; names its own service
+    #[serde(default)]
+    pub source_dimensions: Option<std::collections::HashMap<String, String>>,
+    /// Correlation window start in microseconds; spans are read over the last hour without it
+    #[serde(default)]
+    pub start_time: Option<i64>,
+    /// Correlation window end in microseconds
+    #[serde(default)]
+    pub end_time: Option<i64>,
+}
+
+#[cfg(feature = "enterprise")]
+impl CorrelationRequest {
+    /// An older client sends only `available_dimensions`, so those stand in for the record.
+    fn record_dims(&self) -> &std::collections::HashMap<String, String> {
+        self.source_dimensions
+            .as_ref()
+            .unwrap_or(&self.available_dimensions)
+    }
 }
 
 #[utoipa::path(
@@ -753,6 +776,36 @@ fn without_o2_streams(
     (kept > 0 || dropped == 0).then_some(record)
 }
 
+/// `correlate` once, from the record's own dimensions when the caller asks for it.
+#[cfg(feature = "enterprise")]
+async fn correlate_record(
+    org_id: &str,
+    user_id: &str,
+    req: &CorrelationRequest,
+    identity_config: &config::meta::correlation::ServiceIdentityConfig,
+    semantic_groups: &[config::meta::correlation::FieldAlias],
+) -> anyhow::Result<Option<config::meta::service_streams::CorrelationResponse>> {
+    use o2_enterprise::enterprise::service_streams::storage::correlate;
+    use openobserve_core::service_identity::signals::record_services::{
+        Reader, Spans, correlate_from_source, window,
+    };
+    let dims = &req.available_dimensions;
+    if !req.resolve_from_source {
+        return correlate(org_id, dims, identity_config, semantic_groups, None).await;
+    }
+    let now = config::utils::time::now_micros();
+    correlate_from_source(
+        org_id,
+        Reader::User(user_id),
+        dims,
+        req.record_dims(),
+        Spans::Window(window(req.start_time, req.end_time, now)),
+        identity_config,
+        semantic_groups,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -784,6 +837,7 @@ mod tests {
         let req: CorrelationRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.source_stream, "default");
         assert_eq!(req.source_type, "logs");
+        assert!(!req.resolve_from_source, "an old client keeps today's pick");
         assert_eq!(req.available_dimensions.len(), 2);
         assert_eq!(req.available_dimensions.get("k8s-cluster").unwrap(), "prod");
         assert_eq!(
@@ -801,6 +855,10 @@ mod tests {
             source_stream: "my_stream".to_string(),
             source_type: "traces".to_string(),
             available_dimensions: dims,
+            resolve_from_source: true,
+            source_dimensions: None,
+            start_time: None,
+            end_time: None,
         };
 
         let json = serde_json::to_string(&req).unwrap();
@@ -808,6 +866,7 @@ mod tests {
 
         assert_eq!(deserialized.source_stream, "my_stream");
         assert_eq!(deserialized.source_type, "traces");
+        assert!(deserialized.resolve_from_source);
         assert_eq!(
             deserialized.available_dimensions.get("host").unwrap(),
             "node-1"

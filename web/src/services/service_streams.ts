@@ -55,6 +55,8 @@ export interface StreamInfo {
   filters?: Record<string, string>; // omitted by backend when empty (skip_serializing_if)
   /** Lowercased spellings a filter field matches case-insensitively (the service key's spellings). */
   filter_spellings?: Record<string, string[]>;
+  /** Other fields of a filter's group this stream holds, keyed by the filter field; each matches the same value. */
+  filter_aliases?: Record<string, string[]>;
   /** Identity dimensions the backend could not resolve on this stream's schema (query is wider than chips imply). */
   dropped_dimensions?: string[];
 }
@@ -70,6 +72,13 @@ export interface CorrelationRequest {
   source_stream: string;
   source_type: string;
   available_dimensions: Record<string, string>;
+  /** Pick the record's own service from all its dimensions instead of the first match. */
+  resolve_from_source?: boolean;
+  /** Every semantic dimension of the record, untracked ones included; resolves its own service. */
+  source_dimensions?: Record<string, string>;
+  /** The drawer's window in microseconds; the record's spans are read over the last hour without it. */
+  start_time?: number;
+  end_time?: number;
 }
 
 export interface CorrelationResponse extends ServiceDisplayFields {

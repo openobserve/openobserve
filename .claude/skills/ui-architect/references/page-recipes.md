@@ -147,7 +147,7 @@ for every list — don't ship a listing page without them.
   <!-- filters + search on the LEFT of the toolbar (fills the row); max-md:contents +
        mobile-dropdown keep the phone toolbar on one row -->
   <template #toolbar>
-    <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+    <div class="flex flex-1 items-center gap-2 max-md:contents">
       <OToggleGroup
         mobile-dropdown
         :model-value="typeFilter"
@@ -198,7 +198,7 @@ for every list — don't ship a listing page without them.
 ```
 
 **Toolbar layout is fixed by `OTable`:** `#toolbar` sits on the left (make it fill
-with `w-full`/`flex-1`), the **column-visibility toggle is auto-injected**, and
+with `flex-1`, never `w-full` or `min-w-0`), the **column-visibility toggle is auto-injected**, and
 `#toolbar-trailing` (refresh) sits on the right. When a page has filters, put the
 filter controls **and** the search box together in `#toolbar` and set
 `:show-global-filter="false"` (the built-in global filter is only for the simplest

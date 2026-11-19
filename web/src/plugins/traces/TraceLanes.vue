@@ -129,7 +129,11 @@ import type { StreamInfo } from "@/services/service_streams";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
-import { buildSqlCondition, quoteSqlIdentifier } from "@/utils/telemetryCorrelation";
+import {
+  buildStreamFilterCondition,
+  correlationWindow,
+  quoteSqlIdentifier,
+} from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
   resolveLogSeverity,
@@ -229,6 +233,7 @@ const correlate = (span: any, onFail: () => void) =>
     "traces",
     5,
     props.streamName,
+    correlationWindow(Math.floor(Number(span.start_time) / 1000)),
   )
     .then((result) => result?.correlationData ?? null)
     .catch(() => {
@@ -256,7 +261,9 @@ async function loadLogs(correlated: Correlated[], from: number, to: number, onFa
 
   const pages = await Promise.all(
     queries.flatMap(({ service, stream }) => {
-      const where = filterPairs(stream).map(([field, value]) => buildSqlCondition(field, value));
+      const where = filterPairs(stream).map(([field, value]) =>
+        buildStreamFilterCondition(stream, field, value),
+      );
       return (["ASC", "DESC"] as const).map((order) => {
         const sql = `SELECT * FROM ${quoteSqlIdentifier(stream.stream_name)} WHERE ${where.join(" AND ")} ORDER BY ${quoteSqlIdentifier(ts)} ${order}`;
         return searchService

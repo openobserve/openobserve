@@ -18,7 +18,7 @@ import type { TranslateFn } from "@/types/i18n";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
   buildFieldToGroupIdMap,
-  buildSqlCondition,
+  buildStreamFilterCondition,
   mergeSubjectOverrides,
 } from "@/utils/telemetryCorrelation";
 
@@ -179,7 +179,7 @@ export function useMetricsCorrelationDashboard(t: TranslateFn) {
         return !skip;
       })
       .map(([field, value]) => {
-        return buildSqlCondition(field, value, stream.filter_spellings?.[field]);
+        return buildStreamFilterCondition(stream, field, value);
       })
       .join(" AND ");
 
@@ -339,7 +339,7 @@ ORDER BY x_axis_1`;
     // Determine stream and filters based on available data
     let streamName: string;
     let filters: Record<string, string>;
-    let spellings: Record<string, string[]> = {};
+    let source: StreamInfo | undefined;
 
     if (config.sourceType === "logs" && config.sourceStream) {
       // When viewing from logs page, prefer source stream
@@ -351,13 +351,13 @@ ORDER BY x_axis_1`;
       // "No field named X" or a silently-wrong predicate.
       const matchingStream = streams?.find((s) => s.stream_name === config.sourceStream);
       filters = matchingStream?.filters ?? {};
-      spellings = matchingStream?.filter_spellings ?? {};
+      source = matchingStream;
     } else if (streams && streams.length > 0) {
       // Use first correlated log stream from API response
       const primaryStream = streams[0];
       streamName = primaryStream.stream_name;
       filters = primaryStream.filters ?? {};
-      spellings = primaryStream.filter_spellings ?? {};
+      source = primaryStream;
     } else {
       // No logs available
       return null;
@@ -371,7 +371,7 @@ ORDER BY x_axis_1`;
         return typeof value === "string" && !field.startsWith("_") && value !== SELECT_ALL_VALUE;
       })
       .map(([field, value]) => {
-        return buildSqlCondition(field, value, spellings[field]);
+        return buildStreamFilterCondition(source, field, value);
       })
       .join(" AND ");
 

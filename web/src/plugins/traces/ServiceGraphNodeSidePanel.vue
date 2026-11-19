@@ -504,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         rowClick: (row: any) =>
                           navigateToTraces({
                             operationName: row.operation,
-                            callerService: isInferred ? row.caller : undefined,
+                            callerService: operationRowCaller(row),
                           }),
                       }
                 "
@@ -563,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="
                       navigateToTraces({
                         operationName: row.operation,
-                        callerService: isInferred ? row.caller : undefined,
+                        callerService: operationRowCaller(row),
                         errorsOnly: column.id === 'errors',
                         minDurationMicros: isDurationColumn(column.id)
                           ? (row as Record<string, any>)[column.id]
@@ -892,6 +892,7 @@ import {
   buildChipDimensionsFromFilters,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
+import { buildStreamFilterCondition } from "@/utils/telemetryCorrelation";
 import { serviceNamesSql } from "@/utils/serviceCount";
 import {
   escapeSingleQuotes,
@@ -2967,6 +2968,17 @@ export default defineComponent({
       },
     );
 
+    const isGenAiNode = computed(() =>
+      ["agent", "tool", "model"].includes(props.selectedNode?.service_type),
+    );
+
+    // A tool or model row's caller is usually an agent name,
+    // which no service_name filter matches.
+    const operationRowCaller = (row: { caller?: string }): string | undefined => {
+      const st = props.selectedNode?.service_type;
+      return st && st !== "tool" && st !== "model" ? row.caller : undefined;
+    };
+
     // Navigate to traces explore page with contextual filters
     const navigateToTraces = (params: {
       operationName?: string;
@@ -2990,6 +3002,7 @@ export default defineComponent({
         serviceName:
           props.selectedNode?.name || props.selectedNode?.label || props.selectedNode?.id,
         serviceType: props.selectedNode?.service_type,
+        ...(isGenAiNode.value ? { identityExpr: serviceNameField.value } : {}),
         ...(props.selectedNode?.service_names?.length && !props.selectedNode?.service_type
           ? { serviceNames: spanServiceNames() }
           : {}),
@@ -3069,7 +3082,7 @@ export default defineComponent({
           // Build filter from the stream's resolved field names
           const filters: Record<string, string> = firstLogStream.filters || {};
           const filterParts = Object.entries(filters)
-            .map(([field, value]) => `${field}='${escapeSingleQuotes(value)}'`)
+            .map(([field, value]) => buildStreamFilterCondition(firstLogStream, field, value))
             .join(" AND ");
           if (filterParts) {
             filterQuery = filterParts;
@@ -3246,6 +3259,7 @@ export default defineComponent({
       operationsTableColumns,
       operationsTableRows,
       navigateToTraces,
+      operationRowCaller,
       // Dynamic resource tabs (OTEL platforms)
       availableResourceTabConfigs,
       resourceTabsSettled,

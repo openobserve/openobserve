@@ -326,9 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <LogsNoEventsState
                         class="min-h-0 flex-1"
-                        :sql-mode="searchObj.meta.sqlMode"
-                        :query="searchObj.data.query"
-                        :editor-value="searchObj.data.editorValue"
+                        :sql-mode="shownResultsQuery.sqlMode"
+                        :query="shownResultsQuery.query"
                         :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
                         :date-type="searchObj.data.datetime.type || 'relative'"
                         :ai-enabled="isAiEnabled"
@@ -599,9 +598,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <LogsNoEventsState
                 v-else-if="searchObj.meta.searchApplied == true"
                 data-test="logs-drill-down-no-events-found-text"
-                :sql-mode="searchObj.meta.sqlMode"
-                :query="searchObj.data.query"
-                :editor-value="searchObj.data.editorValue"
+                :sql-mode="shownResultsQuery.sqlMode"
+                :query="shownResultsQuery.query"
                 :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
                 :date-type="searchObj.data.datetime.type || 'relative'"
                 :ai-enabled="isAiEnabled"
@@ -1009,8 +1007,13 @@ export default defineComponent({
       patchUrlViewState,
       addTraceId,
     } = logsUtils();
-    const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
-      useSearchStream(t);
+    const {
+      getHistogramData,
+      buildWebSocketPayload,
+      buildSearch,
+      initializeSearchConnection,
+      resolveFilterForStreams,
+    } = useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
     const { extractPatterns, patternsState, cancelPatterns, clearPatterns } = usePatterns(t);
@@ -1085,7 +1088,8 @@ export default defineComponent({
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
-    const { showErrorNotification, showAliasErrorForVisualization } = useNotifications();
+    const { showErrorNotification, showAliasErrorForVisualization, showInfoNotification } =
+      useNotifications();
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
@@ -1373,11 +1377,7 @@ export default defineComponent({
      * Common method to extract patterns
      * Handles validation, loading states, and error handling
      */
-    const extractPatternsForCurrentQuery = async (
-      clear_cache = false,
-      generationId?: number,
-      ranQuery?: string,
-    ) => {
+    const extractPatternsForCurrentQuery = async (generationId?: number, ranQuery?: string) => {
       const engine = autoRun.engine;
       const settle = () => {
         if (generationId !== null && generationId !== undefined)
@@ -1456,18 +1456,6 @@ export default defineComponent({
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsComplete(generationId);
 
-        // Only update histogram for patterns mode, don't fetch logs data
-        // Patterns have their own separate state and don't need logs data
-        searchObj.meta.clearCache = clear_cache;
-        searchObj.meta.refreshHistogram = true;
-
-        // Fetch histogram data only (not logs) for patterns mode. It needs the
-        // same request the extraction ran on: called with no arguments it threw
-        // on `queryReq.query`, and because the throw happens inside the
-        // manager's own promise it escaped this try/catch as an unhandled
-        // rejection rather than surfacing as a search error.
-        await getHistogramData(queryReq, { clear_cache });
-        refreshHistogramChart();
         settle();
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);
@@ -1481,11 +1469,9 @@ export default defineComponent({
 
     const executePatternsRun = async (ctx: RunContext) => {
       autoRun.engine.registerAbort(ctx.generation.id, () => cancelPatterns());
-      await extractPatternsForCurrentQuery(
-        !!searchObj.meta.clearCache,
-        ctx.generation.id,
-        ctx.signature.query,
-      );
+      // Extraction has no cache to bypass; a leftover one-shot flag would skip the next Search run's cache.
+      searchObj.meta.clearCache = false;
+      await extractPatternsForCurrentQuery(ctx.generation.id, ctx.signature.query);
     };
 
     // // Watch for patterns mode switch - completely separate from logs flow
@@ -1940,16 +1926,30 @@ export default defineComponent({
 
             searchObj.data.query = "";
             const streams = searchObj.data.stream.selectedStream;
+            // Normal mode skips a stream that lacks a filter field and maps a semantic-group field per
+            // stream, so the SQL leaves that arm out and writes the mapped field.
+            const resolved = streams.length > 1 ? resolveFilterForStreams(currentQuery) : null;
+            const usable = resolved?.errors.length === 0 ? resolved : null;
+            const missing = usable?.excluded.map((entry) => entry.stream) ?? [];
+            const skipped = missing.length < streams.length ? missing : [];
+            if (skipped.length) showInfoNotification(searchObj.data.missingStreamMessage);
+            let arms = 0;
 
             streams.forEach((stream: string, index: number) => {
+              if (skipped.includes(stream)) return;
               // BY NAME merges differing columns; ALL keeps events duplicated across streams.
-              if (index > 0) {
+              if (arms++ > 0) {
                 // A -- comment runs to the end of the line, so the next arm must start a new one.
                 searchObj.data.query += hasLineComment(searchObj.data.query)
                   ? "\nUNION ALL BY NAME "
                   : " UNION ALL BY NAME ";
               }
-              const armWhere = textWhere ? `WHERE ${textWhere[index]}` : whereClause;
+              const rewrite = usable?.armRewrites.get(stream);
+              const armWhere = textWhere
+                ? `WHERE ${textWhere[index]}`
+                : rewrite
+                  ? `WHERE ${rewrite}`
+                  : whereClause;
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${armWhere}`;
             });
 
@@ -2169,6 +2169,14 @@ export default defineComponent({
       searchObj.data.datetime.type = "relative";
       autoRun.engine.requestRun("run");
     };
+
+    // The empty state describes the results on screen, so an unrun edit must not change its copy.
+    // A result set no recorded run produced (a search job) has only the live query to go by.
+    const shownResultsQuery = computed(() => {
+      const ran = searchObj.meta.executed?.signature;
+      if (ran) return { sqlMode: ran.sqlMode, query: ran.query };
+      return { sqlMode: !!searchObj.meta.sqlMode, query: String(searchObj.data.query ?? "") };
+    });
 
     // Microsecond bounds of the selected streams' data (union across all selected streams).
     // undefined when no stream is selected or stats are unavailable.
@@ -2829,7 +2837,9 @@ export default defineComponent({
               return s.replace(/\s+/g, " ").trim().toLowerCase();
             };
             const queryMatchesResults =
-              !!lastRunSql && normalizeSQL(currentSql) === normalizeSQL(lastRunSql);
+              !!lastRunSql &&
+              normalizeSQL(currentSql) === normalizeSQL(lastRunSql) &&
+              autoRun.executedTimeMatches();
 
             // Only reuse cached search results when the current query
             // matches the query that produced them. When they differ (e.g.
@@ -2951,6 +2961,7 @@ export default defineComponent({
               dashboardPanelData.data.config.table_dynamic_columns = true;
             }
 
+            autoRun.notePanelScopeApplied();
             // run query
             await copyDashboardDataToVisualize();
 
@@ -3771,12 +3782,15 @@ export default defineComponent({
     };
 
     // Listen to global cancelQuery event (fired by useCancelQuery composable)
+    const cancelPanelLoad = () => autoRun.cancelPanelLoad();
     onMounted(() => {
       window.addEventListener("cancelQuery", cancelFieldExtraction);
+      window.addEventListener("cancelQuery", cancelPanelLoad);
     });
 
     onBeforeUnmount(() => {
       window.removeEventListener("cancelQuery", cancelFieldExtraction);
+      window.removeEventListener("cancelQuery", cancelPanelLoad);
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components
@@ -4289,6 +4303,7 @@ export default defineComponent({
       onAskAiFixQuery,
       streamDocTimeRange,
       queryWindowUs,
+      shownResultsQuery,
       onJumpToStreamData,
       onFixQuery,
       onConfigureStream,

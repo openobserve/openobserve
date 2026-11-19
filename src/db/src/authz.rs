@@ -172,6 +172,18 @@ pub async fn list_permitted_objects(
     Ok(Some(objects))
 }
 
+/// Folders of the OpenFGA `folder_type` the user may list, whatever `list_only_permitted` says;
+/// `None` is every folder.
+#[cfg(feature = "enterprise")]
+pub async fn listable_folders(
+    org_id: &str,
+    user_id: &str,
+    folder_type: &str,
+) -> anyhow::Result<Option<Vec<String>>> {
+    let objects = list_permitted_objects(org_id, user_id, "LIST", folder_type).await?;
+    Ok(objects.and_then(|objects| folder_ids(folder_type, org_id, &objects)))
+}
+
 /// OpenFGA object and parent type of `obj`; `None` when either type is unmapped.
 #[cfg(feature = "enterprise")]
 fn ofga_object(obj_type: &str, obj: &Authz) -> Option<(String, &'static str)> {
@@ -200,10 +212,46 @@ fn ofga_object(obj_type: &str, obj: &Authz) -> Option<(String, &'static str)> {
     Some((format!("{}:{}", model.key, obj.obj_id), parent_type))
 }
 
-#[cfg(all(test, feature = "enterprise"))]
+/// Folder ids out of `folder_type` grants; `None` when one of them is the org-wide grant.
+#[cfg(any(feature = "enterprise", test))]
+fn folder_ids(folder_type: &str, org_id: &str, objects: &[String]) -> Option<Vec<String>> {
+    if objects.contains(&format!("{folder_type}:_all_{org_id}")) {
+        return None;
+    }
+    let prefix = format!("{folder_type}:");
+    Some(
+        objects
+            .iter()
+            .filter_map(|object| object.strip_prefix(&prefix))
+            .map(str::to_string)
+            .collect(),
+    )
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_folder_ids_are_the_granted_folders_unless_one_is_org_wide() {
+        let strings = |values: &[&str]| values.iter().map(|v| v.to_string()).collect::<Vec<_>>();
+        let cases: [(&[&str], Option<&[&str]>); 5] = [
+            (&["afolder:a", "afolder:b"], Some(&["a", "b"])),
+            (&["afolder:a", "afolder:_all_o"], None),
+            (&[], Some(&[])),
+            (&["afolder:_all_other"], Some(&["_all_other"])),
+            (&["synthetic_folder:a", "afolder:b"], Some(&["b"])),
+        ];
+        for (objects, want) in cases {
+            assert_eq!(
+                folder_ids("afolder", "o", &strings(objects)),
+                want.map(strings),
+                "{objects:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
     #[test]
     fn test_ofga_object_skips_unmapped_types() {
         assert!(ofga_object("no_such_type", &Authz::new("s")).is_none());

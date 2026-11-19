@@ -416,6 +416,9 @@ pub async fn get_semantic_field_groups(org_id: &str) -> Vec<config::meta::correl
         && let Ok(groups) = serde_json::from_value::<Vec<FieldAlias>>(setting.setting_value)
         && !groups.is_empty()
     {
+        #[cfg(feature = "enterprise")]
+        let groups =
+            o2_enterprise::enterprise::common::semantic_config::without_metric_name(groups);
         return groups;
     }
 

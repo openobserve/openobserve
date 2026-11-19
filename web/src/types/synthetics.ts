@@ -723,6 +723,7 @@ export interface SyntheticLocation {
   checks_count: number;
   monitors_count?: number;
   checks_per_min: number;
+  in_use?: boolean;
 }
 
 /** A self-registered agent shown on the location detail page (read-only). */

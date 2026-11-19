@@ -1049,7 +1049,7 @@ async function onSaved() {
         @row-click="(r: MatchRow) => openIndicator(r.match.indicator)"
       >
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex flex-1 items-center gap-2">
             <OSearchInput
               v-model="search"
               :placeholder="t('siem.intel.search')"
@@ -1198,7 +1198,7 @@ async function onSaved() {
         @row-click="(r: IndicatorRow) => openIndicator(r.indicator)"
       >
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex flex-1 items-center gap-2">
             <OSearchInput
               v-model="search"
               :placeholder="t('siem.intel.search')"

@@ -285,6 +285,22 @@ async function deleteFixtureAlerts(fx) {
   }
 }
 
+/** Until cleared, the mock answers every chat.postMessage with this Slack error, as Slack does for an archived channel. */
+async function refuseAllPosts(request, error) {
+  const r = await request.post(`${MOCK()}/_mock/mode`, { data: { method: 'chat.postMessage', http_status: 200, error } });
+  if (r.status() !== 200) throw new Error(`POST /_mock/mode -> ${r.status()}`);
+}
+
+async function acceptPostsAgain(request) {
+  await request.post(`${MOCK()}/_mock/mode`, { data: { method: 'chat.postMessage', clear: true } });
+}
+
+/** `health.refused_posts` of the org's one installation, or null while it has none. */
+async function refusedPosts(request, org) {
+  const { installations } = await listInstallations(request, org);
+  return installations[0]?.health?.refused_posts ?? null;
+}
+
 /** Top-level chat.postMessage calls in `channelId` that the mock answered and whose text names `name`. */
 async function channelPostsNaming(request, channelId, name) {
   const calls = await mockRequests(request, 'chat.postMessage');
@@ -309,6 +325,9 @@ async function expectEveryAlertPosted(request, channelId, names, { timeout, mess
 }
 
 module.exports = {
+  refuseAllPosts,
+  acceptPostsAgain,
+  refusedPosts,
   addMockTeam,
   alertPostFixture,
   disposeAlertPostFixture,

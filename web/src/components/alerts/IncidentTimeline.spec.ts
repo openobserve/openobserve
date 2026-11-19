@@ -33,6 +33,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import IncidentTimeline from "@/components/alerts/IncidentTimeline.vue";
 import incidentsService from "@/services/incidents";
+import { makeAlertSectionRouter } from "@/test/unit/helpers/alertSectionRouter";
 
 const makeEvent = (overrides: Record<string, any> = {}) => ({
   type: "Alert",
@@ -436,6 +437,61 @@ describe("IncidentTimeline - getInlineEventText", () => {
     await flushPromises();
     const text = (w.vm as any).getInlineEventText({ type: "UnknownXYZ", data: {} });
     expect(text).toBe("");
+  });
+});
+
+describe("IncidentTimeline - a moved alert's own incident", () => {
+  it("opens with where the alert came from, linked, and what found it unrelated", async () => {
+    const split = (inferred_by: string, from_title?: string) =>
+      makeEvent({
+        type: "SplitFrom",
+        data: {
+          from_incident_id: "inc-0",
+          from_title,
+          alert_id: "a1",
+          alert_name: "Cache latency",
+          inferred_by,
+          reason: "Different workload.",
+        },
+      });
+    vi.mocked(incidentsService.getEvents).mockResolvedValue({
+      data: { events: [split("ai", "Checkout errors")] },
+    } as any);
+    const router = makeAlertSectionRouter();
+    const w = mount(IncidentTimeline, {
+      props: { orgId: "default", incidentId: "incident-1", visible: true },
+      global: { plugins: [i18n, store, router] },
+    });
+    await flushPromises();
+    const entry = w.find('[data-test="incident-timeline-split-from"]');
+    expect(entry.text()).toContain("Cache latency was found unrelated to Checkout errors");
+    expect(entry.text()).toContain("Inferred by AI SRE");
+    const link = w.find('[data-test="incident-timeline-split-from-link"]');
+    expect(link.attributes("href")).toContain("/incidents/inc-0");
+    const vm = w.vm as any;
+    expect(vm.getEventBadgeText(split("ai"))).toBe("Opened on its own");
+    expect(vm.getFailureTooltip(split("ai"))).toBe("Different workload.");
+    for (const [source, wording] of [
+      ["alert_history", "Inferred from alert history"],
+      ["service_graph", "Inferred from service graph"],
+      ["workload", "Inferred from workload"],
+      ["user", null],
+    ]) {
+      expect(vm.splitSource(split(source))).toBe(wording);
+    }
+  });
+
+  it("a put-back of the level reads lowered, a raise upgraded", async () => {
+    vi.mocked(incidentsService.getEvents).mockResolvedValue({ data: { events: [] } } as any);
+    const vm = (await mountComp()).vm as any;
+    const change = (from: string, to: string, reason?: string) =>
+      makeEvent({ type: "SeverityUpgrade", data: { from, to, reason } });
+    expect(vm.getInlineEventText(change("P1", "P3", "no remaining alert needs it"))).toMatch(
+      /^Severity lowered from .*P1.* to .*P3.* - no remaining alert needs it$/,
+    );
+    expect(vm.getInlineEventText(change("P2", "P3"))).toMatch(/^Severity lowered from/);
+    expect(vm.getInlineEventText(change("P3", "P1"))).toMatch(/^Severity upgraded from/);
+    expect(vm.getEventBadgeText(change("P2", "P3"))).toBe("Severity lowered");
   });
 });
 

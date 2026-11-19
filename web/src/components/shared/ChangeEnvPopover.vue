@@ -22,7 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     content-class="w-[27rem]"
   >
     <template #trigger><slot /></template>
-    <div class="flex flex-col px-4 py-3.5 text-sm" data-test="svcver-env-popover" @click.stop>
+    <div
+      class="flex flex-col px-4 py-3.5 text-sm lg:max-h-[calc(var(--reka-popper-available-height,75vh)-0.125rem)] lg:overflow-y-auto"
+      data-test="svcver-env-popover"
+      @click.stop
+    >
       <div class="flex items-center gap-2">
         <span class="text-text-heading font-semibold">{{
           t("serviceVersions.envEdit.title")
@@ -71,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t("serviceVersions.actions.retry")
         }}</OButton>
       </div>
-      <div v-else class="flex flex-col gap-3">
+      <div v-else class="flex min-h-0 flex-col gap-3">
         <div class="flex flex-col gap-1">
           <span class="text-text-secondary text-xs font-medium">{{
             t("serviceVersions.envEdit.appliesTo")
@@ -112,70 +116,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}
           </div>
         </div>
-        <div class="flex flex-col gap-1">
+        <div class="flex min-h-0 flex-col gap-1">
           <span class="text-text-secondary text-xs font-medium">{{
             t("serviceVersions.envEdit.setTo")
           }}</span>
-          <div
-            class="rounded-default border-border-default flex flex-col border p-1"
-            role="listbox"
-          >
-            <button
-              v-for="row in rows"
-              :key="row.env"
-              type="button"
-              role="option"
-              :aria-selected="row.current"
-              :disabled="row.current || busy"
-              :class="[
-                'rounded-default flex items-center justify-between gap-3 px-2 py-1.5 text-start',
-                row.current ? 'opacity-55' : 'hover:bg-dropdown-item-hover-bg cursor-pointer',
-              ]"
-              :data-test="`svcver-env-option-${row.env}`"
-              @click="apply(row.env)"
+          <div class="rounded-default border-border-default flex min-h-0 flex-col border">
+            <div
+              v-if="rows.length"
+              class="flex min-h-0 flex-col overflow-y-auto p-1"
+              role="listbox"
+              :aria-label="t('serviceVersions.envEdit.setTo')"
             >
-              <ODimensionChip
-                dim-key="env"
-                :key-label="t('serviceVersions.compare.envChip')"
-                :value="row.env"
-                variant="success-soft"
-                :value-tooltip="false"
-              />
-              <span class="text-text-secondary text-xs tabular-nums">{{ row.note }}</span>
-            </button>
-            <OSeparator class="my-1" />
-            <form
-              v-if="adding"
-              class="flex flex-col gap-1 px-1 py-1"
-              data-test="svcver-env-new-form"
-              @submit.prevent="submitNew"
-            >
-              <OInput
-                v-model="newValue"
-                size="sm"
-                autofocus
-                :placeholder="t('serviceVersions.envEdit.newPlaceholder')"
-                :error="Boolean(newError)"
-                :error-message="newError"
-                :disabled="busy"
-                data-test="svcver-env-new-input"
-              />
-            </form>
-            <button
-              v-else
-              type="button"
-              class="text-text-link hover:bg-dropdown-item-hover-bg rounded-default flex cursor-pointer items-center justify-between gap-3 px-2 py-1.5 text-start"
-              data-test="svcver-env-new"
-              :disabled="busy"
-              @click="adding = true"
-            >
-              <span class="flex items-center gap-1"
-                ><OIcon name="add" size="xs" />{{ t("serviceVersions.envEdit.new") }}</span
+              <button
+                v-for="row in rows"
+                :key="row.env"
+                type="button"
+                role="option"
+                :aria-selected="row.current"
+                :disabled="row.current || busy"
+                :class="[
+                  'rounded-default flex items-center justify-between gap-3 px-2 py-1.5 text-start',
+                  row.current ? 'opacity-55' : 'hover:bg-dropdown-item-hover-bg cursor-pointer',
+                ]"
+                :data-test="`svcver-env-option-${row.env}`"
+                @click="apply(row.env)"
               >
-              <span class="text-text-secondary text-xs">{{
-                t("serviceVersions.envEdit.newHint")
-              }}</span>
-            </button>
+                <ODimensionChip
+                  dim-key="env"
+                  :key-label="t('serviceVersions.compare.envChip')"
+                  :value="row.env"
+                  variant="success-soft"
+                  :value-tooltip="false"
+                />
+                <span class="text-text-secondary text-xs tabular-nums">{{ row.note }}</span>
+              </button>
+            </div>
+            <OSeparator v-if="rows.length" />
+            <div class="p-1">
+              <form
+                v-if="adding"
+                class="flex flex-col gap-1 px-1 py-1"
+                data-test="svcver-env-new-form"
+                @submit.prevent="submitNew"
+              >
+                <OInput
+                  v-model="newValue"
+                  size="sm"
+                  autofocus
+                  :placeholder="t('serviceVersions.envEdit.newPlaceholder')"
+                  :error="Boolean(newError)"
+                  :error-message="newError"
+                  :disabled="busy"
+                  data-test="svcver-env-new-input"
+                />
+              </form>
+              <button
+                v-else
+                type="button"
+                class="text-text-link hover:bg-dropdown-item-hover-bg rounded-default flex cursor-pointer items-center justify-between gap-3 px-2 py-1.5 text-start"
+                data-test="svcver-env-new"
+                :disabled="busy"
+                @click="adding = true"
+              >
+                <span class="flex items-center gap-1"
+                  ><OIcon name="add" size="xs" />{{ t("serviceVersions.envEdit.new") }}</span
+                >
+                <span class="text-text-secondary text-xs">{{
+                  t("serviceVersions.envEdit.newHint")
+                }}</span>
+              </button>
+            </div>
           </div>
         </div>
         <div

@@ -155,6 +155,7 @@ mod tests {
                     filters: HashMap::new(),
                     dropped_dimensions: vec![],
                     filter_spellings: HashMap::new(),
+                    filter_aliases: HashMap::new(),
                 }]),
                 ..Default::default()
             },

@@ -37,14 +37,15 @@ use config::{
 };
 use infra::errors::{DbError, Error as InfraError};
 use o2_enterprise::enterprise::autoobserve::{
+    context::{ChangeAsk, ChangeRecord, Checked},
     contract::DAY_US,
     engine::MAX_HOOK_TIMEOUT,
     job::MODULE_KEY,
     names::streams::STREAM_PRESENCE,
     ports::{
-        AiPermit, AiUsagePort, HourRecords, KvWritePort, Ports, QueryRejected, SearchPage,
-        SearchPort, StreamHistory, StreamSinkPort, StreamStat, StreamStatsPort, TriggerPort,
-        stats_refresh_us,
+        AiPermit, AiUsagePort, ContextReadPort, HourRecords, KvWritePort, OssSource, Ports,
+        QueryRejected, SearchPage, SearchPort, StreamHistory, StreamSinkPort, StreamStat,
+        StreamStatsPort, TriggerPort, stats_refresh_us,
     },
     stream_silence::PRESENCE_RETENTION_DAYS,
 };
@@ -413,15 +414,78 @@ impl StreamStatsPort for StreamStatsAdapter {
 /// Each org's engine streams, by type then name.
 type OrgIndex = HashMap<String, Vec<(StreamType, String)>>;
 
-/// No reason text is generated until AI metering is wired to the engine, so every ask is refused.
-pub struct NoAiUsage;
+/// The engine's only AI is the incident's own analysis, so its gates decide; the run charges
+/// itself when it starts, so asking here never deducts.
+pub struct IncidentAiUsage;
 
 #[async_trait]
-impl AiUsagePort for NoAiUsage {
-    async fn authorize(&self, _org: &str) -> anyhow::Result<AiPermit> {
-        Ok(AiPermit::Refused(
-            "AI usage metering is not connected to the engine".to_string(),
-        ))
+impl AiUsagePort for IncidentAiUsage {
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
+    async fn authorize(&self, org: &str) -> anyhow::Result<AiPermit> {
+        if let Some(off) = crate::alerts::incidents::rca_not_run_reason() {
+            return Ok(AiPermit::Refused(off.to_string()));
+        }
+        #[cfg(feature = "cloud")]
+        if let Err(e) = crate::trial_quota::precheck_ai_usage(
+            org,
+            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+            crate::alerts::incidents::SYSTEM_USER_EMAIL,
+        )
+        .await
+        {
+            return Ok(AiPermit::Refused(e.to_string()));
+        }
+        Ok(AiPermit::Allowed)
+    }
+}
+
+/// The OSS reads behind the context providers; a source not read yet says it is not recorded.
+pub struct ContextReads;
+
+#[async_trait]
+impl ContextReadPort for ContextReads {
+    async fn changes(&self, source: OssSource, ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
+        match source {
+            OssSource::PipelineErrors => super::causes::pipeline::read(ask).await,
+            OssSource::IngestRefusals => (Checked::NotRecorded, Vec::new()),
+            OssSource::AuditTrail => super::causes::audit::read(ask).await,
+            OssSource::Deploys => super::causes::deploy::read(ask).await,
+        }
+    }
+
+    async fn security_sources(&self, org: &str) -> (Checked, Vec<(String, String)>) {
+        use o2_enterprise::enterprise::security::sources::selection::{StreamRef, resolve_sources};
+        let streams = match db::schema::list(org, Some(StreamType::Logs), false).await {
+            Ok(streams) => streams,
+            Err(e) => {
+                return (
+                    Checked::Failed(format!("reading stream settings: {e}")),
+                    Vec::new(),
+                );
+            }
+        };
+        let settings: Vec<(&str, Option<StreamSettings>)> = streams
+            .iter()
+            .map(|s| {
+                (
+                    s.stream_name.as_str(),
+                    infra::schema::unwrap_stream_settings(&s.schema),
+                )
+            })
+            .collect();
+        let refs: Vec<StreamRef<'_>> = settings
+            .iter()
+            .map(|(name, s)| StreamRef {
+                name,
+                setting: s.as_ref().and_then(|s| s.security.as_ref()),
+            })
+            .collect();
+        let logs = StreamType::Logs.to_string();
+        let sources = resolve_sources(org, &refs)
+            .into_iter()
+            .map(|e| (logs.clone(), e.name))
+            .collect();
+        (Checked::Ok, sources)
     }
 }
 
@@ -484,9 +548,10 @@ pub fn ports() -> Ports {
         sink: Arc::new(MetaSink),
         kv: Arc::new(KvAdapter),
         stream_stats: Arc::new(StreamStatsAdapter::default()),
-        ai_usage: Arc::new(NoAiUsage),
+        ai_usage: Arc::new(IncidentAiUsage),
         investigation: Some(Arc::new(super::incidents::IncidentInvestigation)),
         triggers: Arc::new(EngineTrigger),
+        context: Arc::new(ContextReads),
     }
 }
 
@@ -734,7 +799,7 @@ mod tests {
     use std::cell::Cell;
 
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::stream::{FileKey, FileMeta};
+    use config::meta::stream::{FileKey, FileMeta, SecuritySourceSetting};
     use infra::{errors::ErrorCodes, schema::SchemaCache};
     use o2_enterprise::enterprise::autoobserve::decision_log::engine_reads;
 
@@ -1088,10 +1153,62 @@ mod tests {
         assert_eq!((week.doc_num, empty.doc_num), (Some(700), None));
     }
 
+    /// Tests run without an agent target, so the incident's analysis is off and so is the port.
     #[tokio::test]
-    async fn ai_is_refused_until_metering_is_connected() {
-        let permit = NoAiUsage.authorize("default").await.unwrap();
-        assert!(matches!(permit, AiPermit::Refused(_)));
+    async fn ai_usage_follows_the_incident_analysis_and_never_deducts() {
+        let off = crate::alerts::incidents::rca_not_run_reason().expect("no agent in tests");
+        #[cfg(feature = "cloud")]
+        let pool = crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis.pool();
+        #[cfg(feature = "cloud")]
+        let used = crate::trial_quota::get_used_for_pool("default", pool);
+        let permit = IncidentAiUsage.authorize("default").await.unwrap();
+        assert_eq!(permit, AiPermit::Refused(off.to_string()));
+        #[cfg(feature = "cloud")]
+        assert_eq!(crate::trial_quota::get_used_for_pool("default", pool), used);
+    }
+
+    #[tokio::test]
+    async fn security_sources_are_the_chosen_logs_streams_minus_internal_ones() {
+        let org = format!("ao_sec_{}", config::utils::time::now_micros());
+        let cached = |included: bool| {
+            let settings = StreamSettings {
+                security: Some(SecuritySourceSetting {
+                    included: Some(included),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            let meta = std::collections::HashMap::from([(
+                "settings".to_string(),
+                serde_json::to_string(&settings).unwrap(),
+            )]);
+            SchemaCache::new(Schema::empty().with_metadata(meta))
+        };
+        let keys = [
+            (format!("{org}/logs/okta_system_log"), true),
+            (format!("{org}/logs/app"), false),
+            (format!("{org}/logs/_o2_autoobserve_health"), true),
+        ];
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            for (key, included) in &keys {
+                w.insert(key.clone(), cached(*included));
+            }
+        }
+        let got = ContextReads.security_sources(&org).await;
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            for (key, _) in &keys {
+                w.remove(key);
+            }
+        }
+        assert_eq!(
+            got,
+            (
+                Checked::Ok,
+                vec![("logs".to_string(), "okta_system_log".to_string())]
+            )
+        );
     }
 
     #[tokio::test]

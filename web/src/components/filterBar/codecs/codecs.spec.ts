@@ -102,7 +102,7 @@ describe("engine codec (alerts, pipelines, workflows, evals, annotations)", () =
       },
       {
         filterType: "group",
-        logicalOperator: "AND",
+        logicalOperator: "OR",
         groupId: "g1",
         conditions: [
           {
@@ -174,7 +174,7 @@ describe("engine codec (alerts, pipelines, workflows, evals, annotations)", () =
     expect(status).toMatchObject({ operator: "gte", values: ["500"] });
     expect(traceId).toMatchObject({ operator: "is_null", values: [], connector: "OR" });
     expect(namespace).toMatchObject({ operator: "in", values: ["prod", "staging"] });
-    expect(tree.items[2]).toMatchObject({ kind: "group", connector: "AND" });
+    expect(tree.items[2]).toMatchObject({ kind: "group", connector: "OR" });
   });
 
   it("changes only the edited leaf and keeps the others' saved objects", () => {
@@ -532,12 +532,12 @@ describe("dashboard filter codec", () => {
             filterType: "condition",
             operator: "Is Not Null",
             value: "",
-            logicalOperator: "AND",
+            logicalOperator: "OR",
             values: [],
           },
         ],
         filterType: "group",
-        logicalOperator: "AND",
+        logicalOperator: "OR",
       },
     ],
   };
@@ -967,6 +967,73 @@ describe("sql codec", () => {
   });
 });
 
+describe("a saved AND/OR mix, loaded with SQL's AND-before-OR as groups", () => {
+  const mixed = <T>(make: (column: string, value: string, connector: string) => T) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions: [make("level", "a", "AND"), make("level", "b", "OR"), make("status", "1", "AND")],
+  });
+
+  it("sql: writes the untouched text back as typed, and an edit keeps the grouping", () => {
+    const codec = sqlCodec();
+    const typed = "level = 'a' OR level = 'b' AND status = 1";
+    expectRoundTrip(codec, typed);
+    const tree = codec.parse(typed, context);
+    expect(codec.serialize(edit(tree, 0, { values: ["c"] }), context)).toBe(
+      "level = 'c' OR (level = 'b' AND status = 1)",
+    );
+  });
+
+  it("dashboard: saves the untouched panel filter back, and an edit keeps the panel SQL", () => {
+    const codec = dashboardFilterCodec();
+    const saved = mixed((field, value, logicalOperator) => ({
+      type: "condition",
+      column: { field },
+      filterType: "condition",
+      operator: "=",
+      value,
+      logicalOperator,
+      values: [],
+    }));
+    expectRoundTrip(codec, saved as never);
+    const tree = codec.parse(clone(saved) as never, context);
+    expect(tree.items.map((item) => item.kind)).toEqual(["condition", "group"]);
+    const out = codec.serialize(edit(tree, 0, { values: ["c"] }), context) as any;
+    expect(out.conditions[1]).toEqual({
+      filterType: "group",
+      logicalOperator: "OR",
+      conditions: saved.conditions.slice(1),
+    });
+    const panel = {
+      data: { queries: [{ fields: { stream: "s" }, joins: [] }] },
+      layout: { currentQueryIndex: 0 },
+      meta: { streamFields: { groupedFields: [] } },
+    };
+    expect(buildCondition(saved, panel)).toBe("(level = 'a' OR level = 'b' AND status = 1)");
+    expect(buildCondition(out, panel)).toBe("(level = 'c' OR (level = 'b' AND status = 1))");
+  });
+
+  it("engine: saves the untouched tree back, and an edit writes the AND run as a group", () => {
+    const codec = engineCodec();
+    const saved = mixed((column, value, logicalOperator) => ({
+      filterType: "condition",
+      column,
+      operator: "=",
+      value,
+      logicalOperator,
+    }));
+    expectRoundTrip(codec, saved as never);
+    const tree = codec.parse(clone(saved) as never, context);
+    expect(tree.items.map((item) => item.kind)).toEqual(["condition", "group"]);
+    const out = codec.serialize(edit(tree, 0, { values: ["c"] }), context) as any;
+    expect(out.conditions[1]).toMatchObject({
+      filterType: "group",
+      logicalOperator: "OR",
+      conditions: saved.conditions.slice(1),
+    });
+  });
+});
+
 describe("dashboard filter codec, an IN list with a $variable", () => {
   const codec = dashboardFilterCodec();
   const panel = {
@@ -1166,11 +1233,11 @@ describe("anomaly codec, IN values and the V2 group", () => {
       conditions: [
         grouped.conditions[0],
         { ...grouped.conditions[1], operator: "future_op", logicalOperator: "AND" },
-        { ...grouped.conditions[0], column: "host", logicalOperator: "OR" },
+        { ...grouped.conditions[0], column: "host", logicalOperator: "AND" },
       ],
     };
     const tree = codec.parse(clone(withLocked) as never, context);
-    const out = codec.serialize(toggleConnector(tree, tree.items[2].id), context) as any;
+    const out = codec.serialize(edit(tree, 1, { values: ["db"] }), context) as any;
     expect(out.filterType).toBe("group");
     expect(out.conditions[1]).toEqual(withLocked.conditions[1]);
   });

@@ -194,6 +194,10 @@ class AnomalyDetectionPage {
         await tab.click();
         await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 10000 });
         await this.page.locator(this.selectors.listTable).waitFor({ state: 'visible', timeout: 30000 });
+        // The list opens on Firing, so a detector the test just made needs the Total tile.
+        const total = this.page.locator('[data-test="alert-summary-total"]').first();
+        await total.waitFor({ state: 'visible', timeout: 15000 });
+        await total.click();
         testLogger.info('Anomaly Detection tab loaded');
     }
 
@@ -716,6 +720,15 @@ class AnomalyDetectionPage {
         if (outcome !== 'saved') {
             throw new Error('Save neither completed nor reported an error');
         }
+    }
+
+    async saveAndCaptureCreate() {
+        const [request] = await Promise.all([
+            this.page.waitForRequest((r) => r.method() === 'POST' && /\/api\/v2\/[^/]+\/alerts(\?|$)/.test(r.url()), { timeout: 30000 }),
+            this.save(),
+        ]);
+        const response = await request.response();
+        return { body: request.postDataJSON(), status: response?.status(), text: await response?.text() };
     }
 
     /**

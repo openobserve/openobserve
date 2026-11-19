@@ -56,7 +56,7 @@ use crate::{
             AlertError, AlertExt, NotificationOutcome, get_alert_start_end_time, get_by_id_db,
             get_row_column_map, has_delivery_target, send_attempted,
         },
-        derived_streams::DerivedStreamExt,
+        derived_streams::{DerivedStreamExt, derived_stream_delay_micros},
     },
     dashboards::reports::{
         SendReport, TRIGGER_SOURCE_SCHEDULED, apply_send_result, record_run, run_row,
@@ -96,6 +96,32 @@ enum TriggerKeyCheck {
     /// The only trigger of a renamed pipeline: it runs, then moves to this full key.
     MoveAfterRun(config::meta::pipeline::Pipeline, String),
     Deleted,
+}
+
+/// How a scheduled pipeline run ended, for the choice of its next run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum RunEnd {
+    /// The start was not before the aligned end.
+    Skipped,
+    /// The run started with no retries left.
+    MaxRetries,
+    /// The window ended before the slot, so the next window can run at once.
+    CatchUp { end: i64 },
+    /// A finished run, or a failure that used the last retry.
+    Normal,
+}
+
+/// The window of one scheduled pipeline run.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct RunPlan {
+    /// `None` for a run without a cursor and without `start_at`: the window is one period.
+    start: Option<i64>,
+    /// The window end, aligned to the period boundary for an interval pipeline.
+    end: i64,
+    /// The end before the alignment, for the run record.
+    unaligned_end: i64,
+    skip: bool,
+    catch_up: bool,
 }
 
 /// Why a stored pipeline's scheduled source cannot run.
@@ -330,13 +356,7 @@ async fn persist_alert_run_state_deferred(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        nudge_composite_parents(
-            &alert.org_id,
-            alert_id,
-            infra::table::alert_composites::ChildKind::Alert,
-            now,
-        )
-        .await;
+        nudge_composite_parents(&alert.org_id, alert_id, now).await;
     }
     Some(vec![])
 }
@@ -421,13 +441,7 @@ async fn persist_group_run_state(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        nudge_composite_parents(
-            &alert.org_id,
-            alert_id,
-            infra::table::alert_composites::ChildKind::Alert,
-            at,
-        )
-        .await;
+        nudge_composite_parents(&alert.org_id, alert_id, at).await;
     }
     Some(
         write
@@ -1272,16 +1286,11 @@ fn composite_stale_k() -> i64 {
 /// they observe (a level/outcome transition, or a stale-to-fresh return at the
 /// same level). Idempotent and coalesced: `next_run_at` is only ever pulled
 /// earlier, never pushed out.
-async fn nudge_composite_parents(
-    org: &str,
-    child_id: &str,
-    child_kind: infra::table::alert_composites::ChildKind,
-    now: i64,
-) {
+async fn nudge_composite_parents(org: &str, child_id: &str, now: i64) {
     let parents = match infra::table::alert_composites::list_parents(
         get_orm_client_ro().await,
         org,
-        child_kind,
+        infra::table::alert_composites::ChildKind::Alert,
         child_id,
     )
     .await
@@ -1328,6 +1337,30 @@ async fn nudge_composite_parents(
     }
 }
 
+/// Pauses a composite that references another composite; only legacy rows do, and none can run.
+async fn pause_if_nested(
+    composite: &infra::table::alert_composites::CompositeWithChildren,
+) -> Result<bool, anyhow::Error> {
+    use infra::table::alert_composites::ChildKind;
+
+    let Some(child) = composite
+        .children
+        .iter()
+        .find(|child| child.child_kind == ChildKind::Composite as i16)
+    else {
+        return Ok(false);
+    };
+    let definition = &composite.definition;
+    log::warn!(
+        "[COMPOSITE_ALERT] pausing {}/{}: child {} is a composite, which composites no longer reference",
+        definition.org,
+        definition.id,
+        child.child_alert_id
+    );
+    crate::alerts::composite::set_composite_enabled(&definition.org, &definition.id, false).await?;
+    Ok(true)
+}
+
 /// Composite jobs are routed explicitly by their append-only scheduler
 /// module. The definition/evaluation service is intentionally separate from
 /// the query-alert handler so a composite can never execute child queries.
@@ -1335,19 +1368,6 @@ async fn handle_composite_alert_trigger(
     trace_id: &str,
     mut trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        infra::scheduler::delete(
-            &trigger.org,
-            db::scheduler::TriggerModule::CompositeAlert,
-            &trigger.module_key,
-        )
-        .await?;
-        return Ok(());
-    }
     // Until a production database-backed evaluator can obtain the metadata
     // transaction used for state fencing, a missing/stale definition is
     // completed safely through the epoch-fenced scheduler seam. This path is
@@ -1371,6 +1391,9 @@ async fn handle_composite_alert_trigger(
             &trigger.module_key,
         )
         .await?;
+        return Ok(());
+    }
+    if pause_if_nested(&definition).await? {
         return Ok(());
     }
     let mut scheduled_data: config::meta::triggers::ScheduledTriggerData =
@@ -1397,7 +1420,6 @@ async fn handle_composite_alert_trigger(
     let resolved =
         infra::table::alert_composites::resolve_many(db, &trigger.org, &child_ids).await?;
     let stale_k = composite_stale_k();
-    let composite_sweep_seconds = composite_sweep_secs();
     let mut children = Vec::with_capacity(definition.children.len());
     for child in &definition.children {
         let state = states.get(&child.child_alert_id);
@@ -1431,18 +1453,9 @@ async fn handle_composite_alert_trigger(
                         stale_deadline,
                     )
                 }
-                Some(infra::table::alert_composites::Resolution::Composite(model)) => (
-                    model.name.clone(),
-                    "composite",
-                    model.enabled,
-                    composite_sweep_seconds,
-                    state.and_then(|state| state.level_at).and_then(|level_at| {
-                        composite_sweep_seconds
-                            .checked_mul(stale_k)
-                            .and_then(|seconds| seconds.checked_mul(1_000_000))
-                            .and_then(|window| level_at.checked_add(window))
-                    }),
-                ),
+                Some(infra::table::alert_composites::Resolution::Composite(_)) => {
+                    anyhow::bail!("composite child is not eligible")
+                }
                 _ => anyhow::bail!("composite child definition missing"),
             };
         children.push(crate::alerts::composite::CompositeStateInput {
@@ -1549,8 +1562,7 @@ async fn handle_composite_alert_trigger(
         let _ = infra::scheduler::complete_claim(trigger).await?;
         return Ok(());
     }
-    infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
-    transaction.commit().await?;
+    db::alerts::alert_states::persist_and_commit(transaction, &update).await?;
     if let Some(c) = crate::alerts::lifecycle::update_clear(
         previous.as_ref(),
         &update,
@@ -1823,31 +1835,6 @@ async fn handle_composite_alert_trigger(
         next_run_at: trigger.next_run_at,
         ..Default::default()
     });
-
-    let significant = previous.as_ref().is_none_or(|previous| {
-        previous.level != Some(evaluated.level)
-            || previous.last_outcome.as_ref() != Some(&outcome)
-            || previous.level_at.is_some_and(|level_at| {
-                // Composite staleness is measured against
-                // `ZO_ALERT_COMPOSITE_STALE_K * ZO_ALERT_COMPOSITE_SWEEP_SECS`.
-                // If the composite was stale before this run and just wrote a
-                // fresh `level_at`, its parent must re-evaluate even at an
-                // unchanged level.
-                let window = composite_stale_k()
-                    .saturating_mul(composite_sweep_secs())
-                    .saturating_mul(1_000_000);
-                now.saturating_sub(level_at) > window
-            })
-    });
-    if significant {
-        nudge_composite_parents(
-            &trigger.org,
-            &definition.definition.id,
-            infra::table::alert_composites::ChildKind::Composite,
-            now,
-        )
-        .await;
-    }
 
     // A list kept past the cycle would skip those destinations on the next firing.
     if delivery_retry_at.is_none() {
@@ -2811,6 +2798,7 @@ async fn trigger_rca_for_alert_firing(
             alert_name: Some(alert_name.clone()),
             stream: Some(stream_name.clone()),
             dimensions,
+            evidence: None,
         };
 
         // The turn's finalizer delivers the report to `oncall_subjects` or releases them.
@@ -5474,6 +5462,27 @@ fn report_next_run(
     })
 }
 
+/// The end is cut to the minute later, so a cron time in `t0`'s minute (seconds field
+/// not 0) would give an empty window that never moves `t0`: take a later minute.
+fn cron_window_end(
+    trigger_condition: &TriggerCondition,
+    tz_offset: i32,
+    t0: i64,
+    supposed_to_be_run_at: i64,
+) -> Result<i64, anyhow::Error> {
+    let minute_of = |t: i64| {
+        TriggerCondition::align_time(t, tz_offset, None, trigger_condition.timezone.as_deref())
+    };
+    let mut next = trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(t0))?;
+    if minute_of(next) <= t0 {
+        // The last second of t0's minute, so the next cron time is in a later minute.
+        let last_second = minute_of(t0) + second_micros(59);
+        next =
+            trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(last_second))?;
+    }
+    Ok(std::cmp::min(supposed_to_be_run_at, next))
+}
+
 async fn handle_derived_stream_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -5714,116 +5723,26 @@ async fn handle_derived_stream_triggers(
             ));
         }
     };
-    // Search excludes a window's end, so the next window starts exactly there.
-    let start_time = new_trigger_data.period_end_time;
-
-    // in case the range [start_time, end_time] is greater than querying period, it needs to
-    // evaluate and ingest 1 period at a time.
-    let user_defined_delay = derived_stream
-        .delay
-        .and_then(|delay_in_mins| {
-            chrono::Duration::try_minutes(delay_in_mins as _).and_then(|td| td.num_microseconds())
-        })
-        .unwrap_or_default();
-    let supposed_to_be_run_at = trigger.next_run_at - user_defined_delay;
-    let is_cron_frequency = derived_stream
-        .trigger_condition
-        .frequency_type
-        .eq(&config::meta::alerts::FrequencyType::Cron);
+    let plan = plan_derived_stream_run(
+        &derived_stream,
+        trigger.next_run_at,
+        new_trigger_data.period_end_time,
+        trigger.data.is_empty(),
+    )?;
+    log::debug!(
+        "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, start: {:?}, end: {}, skip: {}, catch_up: {}",
+        new_trigger.module_key,
+        plan.start,
+        plan.end,
+        plan.skip,
+        plan.catch_up,
+    );
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
         .unwrap();
-    let aligned_supposed_to_be_run_at = if !is_cron_frequency {
-        TriggerCondition::align_time(
-            supposed_to_be_run_at,
-            derived_stream.tz_offset,
-            Some(derived_stream.trigger_condition.period * 60),
-            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
-                                                                   * timezone string yet */
-        )
-    } else {
-        // For cron frequency, we don't need to align the end time as it is already aligned (the
-        // cron crate takes care of it)
-        TriggerCondition::align_time(
-            supposed_to_be_run_at,
-            derived_stream.tz_offset,
-            None,
-            derived_stream.trigger_condition.timezone.as_deref(),
-        )
-    };
-
-    let (mut start, mut end) = if derived_stream.start_at.is_some() && trigger.data.is_empty() {
-        (derived_stream.start_at, supposed_to_be_run_at)
-    } else if let Some(t0) = start_time {
-        // If the delay is equal to or greater than the frequency, we need to ingest data one by
-        // one If the delay is less than the frequency, we need to ingest data for
-        // the "next run at" period, For example, if the current time is 5:19pm,
-        // frequency is 5 mins, and delay is 4mins (supposed to be run at 5:15pm),
-        // we need to ingest data for the period from 5:10pm to 5:15pm only. The
-        // next run at will be 5:20pm which will query for the period from 5:15pm to
-        // 5:20pm. But, if the suppossed to be run at is 5:10pm, then we need ingest
-        // data for the period from 5:05pm to 5:15pm. Which is to cover the skipped
-        // period from 5:05pm to 5:15pm.
-        log::debug!(
-            "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, supposed_to_be_run_at: {}, t0 + supposed_to_be_run_at: {}, supposed_to_be_run_smaller: {}",
-            new_trigger.module_key,
-            chrono::DateTime::from_timestamp_micros(supposed_to_be_run_at)
-                .unwrap()
-                .time(),
-            chrono::DateTime::from_timestamp_micros(t0 + period_num_microseconds)
-                .unwrap()
-                .time(),
-            supposed_to_be_run_at < t0 + period_num_microseconds,
-        );
-        (
-            Some(t0),
-            if is_cron_frequency {
-                // For cron frequency, don't believe the period, the period can be dynamic for cron.
-                // For example, if cron expression evaluates to "run every weekend 12am", the period
-                // is dynamic here.
-                std::cmp::min(
-                    supposed_to_be_run_at,
-                    derived_stream.trigger_condition.get_next_trigger_time(
-                        false,
-                        derived_stream.tz_offset,
-                        false,
-                        Some(t0),
-                    )?,
-                )
-            } else {
-                std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds)
-            },
-        )
-    } else {
-        (None, supposed_to_be_run_at)
-    };
-    // For derived stream, period is in minutes, so we need to convert it to seconds for align_time
-    let aligned_end_time = if !is_cron_frequency {
-        // For non-cron frequency, we need to align the current time so that the end_time is
-        // divisible by the period For example, if the current time is 5:19pm, period is 5
-        // mins, and delay is 4mins (supposed to be run at 5:15pm), we need to ingest data
-        // for the period from 5:10pm to 5:15pm only. The next run at will be 5:24pm which
-        // will query for the period from 5:15pm to 5:20pm. But, if the suppossed to be run
-        // at is 5:10pm, then we need ingest data for the period from 5:05pm to 5:15pm.
-        // Which is to cover the skipped period from 5:05pm to 5:15pm.
-        TriggerCondition::align_time(
-            end,
-            derived_stream.tz_offset,
-            Some(derived_stream.trigger_condition.period * 60),
-            derived_stream.trigger_condition.timezone.as_deref(), /* Derived streams don't have
-                                                                   * timezone string yet */
-        )
-    } else {
-        // For cron frequency, we don't need to align the end time as it is already aligned (the
-        // cron crate takes care of it)
-        TriggerCondition::align_time(
-            end,
-            derived_stream.tz_offset,
-            None,
-            derived_stream.trigger_condition.timezone.as_deref(),
-        )
-    };
+    let mut start = plan.start;
+    let end = plan.end;
 
     let mut trigger_data_stream = TriggerData {
         _timestamp: now_micros(),
@@ -5837,9 +5756,9 @@ async fn handle_derived_stream_triggers(
         start_time: if let Some(start) = start {
             start
         } else {
-            end - period_num_microseconds
+            plan.unaligned_end - period_num_microseconds
         },
-        end_time: end,
+        end_time: plan.unaligned_end,
         retries: new_trigger.retries,
         error: None,
         success_response: None,
@@ -5853,34 +5772,24 @@ async fn handle_derived_stream_triggers(
         ..Default::default()
     };
 
-    // conditionally modify supposed_to_be_run_at
-    if start.is_none_or(|t0| t0 < aligned_end_time) {
-        end = aligned_end_time;
-    } else {
-        // either t0 = aligned_end_time or t0 > aligned_end_time
-        // in both cases, we need to skip to next run because, we should always use
-        // aligned_curr_time as the end time
-        // Invalid timerange, most probably due to non-zero delay
-        // Don't do any further processing, just skip to next run
-        let start_time = start.unwrap();
+    if let Some(start_time) = start.filter(|_| plan.skip) {
+        // The start is not before the aligned end, most often after a changed save in the
+        // middle of a period. Don't do any further processing, just skip to next run.
         log::warn!(
             "[SCHEDULER trace_id {scheduler_trace_id}] module key: {}, Invalid timerange. Skipping to next run. start: {}, end: {}",
             new_trigger.module_key,
             start_time,
-            end,
+            plan.unaligned_end,
         );
-        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
-            false,
-            derived_stream.tz_offset,
-            false,
-            Some(trigger.next_run_at),
-        )?;
+        new_trigger.next_run_at =
+            next_run_after(&derived_stream, RunEnd::Skipped, trigger.next_run_at)?;
         trigger_data_stream.status = RunOutcome::Skipped;
-        trigger_data_stream.end_time = aligned_end_time;
+        trigger_data_stream.end_time = end;
         trigger_data_stream.next_run_at = new_trigger.next_run_at;
         trigger_data_stream.start_time = start_time;
         trigger_data_stream.error = Some(format!(
-            "Invalid timerange - start: {start_time}, end: {end}, should be fixed in the next run"
+            "Invalid timerange - start: {start_time}, end: {}, should be fixed in the next run",
+            plan.unaligned_end
         ));
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
         publish_triggers_usage(trigger_data_stream);
@@ -5895,12 +5804,8 @@ async fn handle_derived_stream_triggers(
             new_trigger.module_key
         );
         // Go to the next nun at, but use the same trigger start time
-        new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
-            false,
-            derived_stream.tz_offset,
-            false,
-            Some(trigger.next_run_at),
-        )?;
+        new_trigger.next_run_at =
+            next_run_after(&derived_stream, RunEnd::MaxRetries, trigger.next_run_at)?;
         // Start over next time
         new_trigger.retries = 0;
         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
@@ -6145,7 +6050,7 @@ async fn handle_derived_stream_triggers(
     // at the next batch immediately Once it reaches max retries, the trigger
     // will be run again at the next scheduled time.
     if !(trigger_data_stream.status == RunOutcome::Error && new_trigger.retries < max_retries) {
-        let need_to_catch_up = end < aligned_supposed_to_be_run_at;
+        let need_to_catch_up = plan.catch_up;
         // If the trigger didn't fail, we need to reset the `retries` count.
         // Only cumulative failures should be used to check with `max_retries`
         if trigger_data_stream.status != RunOutcome::Error {
@@ -6154,22 +6059,14 @@ async fn handle_derived_stream_triggers(
 
         if trigger_data_stream.status != RunOutcome::Error && need_to_catch_up {
             // Go to the next nun at, but use the same trigger start time
-            new_trigger.next_run_at = derived_stream.trigger_condition.get_next_trigger_time(
-                false,
-                derived_stream.tz_offset,
-                false,
-                Some(end),
+            new_trigger.next_run_at = next_run_after(
+                &derived_stream,
+                RunEnd::CatchUp { end },
+                trigger.next_run_at,
             )?;
         } else {
-            // Go to the next nun at, but use the same trigger start time
-            new_trigger.next_run_at = derived_stream
-                .trigger_condition
-                .get_next_trigger_time_non_aligned(
-                    false,
-                    derived_stream.tz_offset,
-                    false,
-                    Some(trigger.next_run_at),
-                )?;
+            new_trigger.next_run_at =
+                next_run_after(&derived_stream, RunEnd::Normal, trigger.next_run_at)?;
         }
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
@@ -6213,6 +6110,122 @@ async fn handle_derived_stream_triggers(
     }
 
     Ok(())
+}
+
+/// The window of a scheduled pipeline run whose stored run time is `next_run_at`.
+fn plan_derived_stream_run(
+    derived_stream: &DerivedStream,
+    next_run_at: i64,
+    cursor: Option<i64>,
+    first_run: bool,
+) -> Result<RunPlan, anyhow::Error> {
+    let trigger_condition = &derived_stream.trigger_condition;
+    let tz_offset = derived_stream.tz_offset;
+    // The slot: the scheduled time without the delay.
+    let supposed_to_be_run_at = next_run_at - derived_stream_delay_micros(derived_stream);
+    let is_cron_frequency =
+        trigger_condition.frequency_type == config::meta::alerts::FrequencyType::Cron;
+    let period_num_microseconds = Duration::try_minutes(trigger_condition.period)
+        .unwrap()
+        .num_microseconds()
+        .unwrap();
+    // For cron frequency, only the seconds are cut: the cron crate aligns the time.
+    // Derived streams don't have a timezone string yet.
+    let align = |t: i64| {
+        TriggerCondition::align_time(
+            t,
+            tz_offset,
+            (!is_cron_frequency).then_some(trigger_condition.period * 60),
+            trigger_condition.timezone.as_deref(),
+        )
+    };
+    let aligned_supposed_to_be_run_at = align(supposed_to_be_run_at);
+
+    // A window larger than the period is ingested one period at a time.
+    let (start, end) = if derived_stream.start_at.is_some() && first_run {
+        (derived_stream.start_at, supposed_to_be_run_at)
+    } else if let Some(t0) = cursor {
+        (
+            Some(t0),
+            if is_cron_frequency {
+                // For cron frequency, don't believe the period, the period can be dynamic for cron.
+                // For example, if cron expression evaluates to "run every weekend 12am", the period
+                // is dynamic here.
+                cron_window_end(trigger_condition, tz_offset, t0, supposed_to_be_run_at)?
+            } else {
+                std::cmp::min(supposed_to_be_run_at, t0 + period_num_microseconds)
+            },
+        )
+    } else {
+        (None, supposed_to_be_run_at)
+    };
+    let aligned_end_time = align(end);
+
+    Ok(RunPlan {
+        start,
+        end: aligned_end_time,
+        unaligned_end: end,
+        skip: start.is_some_and(|t0| t0 >= aligned_end_time),
+        catch_up: aligned_end_time < aligned_supposed_to_be_run_at,
+    })
+}
+
+/// The next run of a scheduled pipeline: the next slot after `base`, plus the delay.
+/// With a delay, the tolerance is drawn after the alignment, so that it is not rounded away.
+fn next_derived_stream_run(
+    trigger_condition: &TriggerCondition,
+    tz_offset: i32,
+    base: i64,
+    delay_micros: i64,
+) -> Result<i64, anyhow::Error> {
+    if delay_micros <= 0 {
+        return trigger_condition.get_next_trigger_time(false, tz_offset, false, Some(base));
+    }
+    let without_tolerance = TriggerCondition {
+        tolerance_in_secs: None,
+        ..trigger_condition.clone()
+    };
+    let next_slot = without_tolerance.get_next_trigger_time(false, tz_offset, false, Some(base))?;
+    let tolerance = match trigger_condition.tolerance_in_secs {
+        Some(tolerance) if tolerance > 0 => {
+            second_micros(get_rand_num_within(0, tolerance as u64) as i64)
+        }
+        _ => 0,
+    };
+    next_slot
+        .checked_add(delay_micros)
+        .and_then(|t| t.checked_add(tolerance))
+        .ok_or_else(|| anyhow::anyhow!("delay is out of range"))
+}
+
+/// The next run after a run whose stored run time is `next_run_at`.
+fn next_run_after(
+    derived_stream: &DerivedStream,
+    run_end: RunEnd,
+    next_run_at: i64,
+) -> Result<i64, anyhow::Error> {
+    let trigger_condition = &derived_stream.trigger_condition;
+    let tz_offset = derived_stream.tz_offset;
+    let delay = derived_stream_delay_micros(derived_stream);
+    let slot = next_run_at - delay;
+    match run_end {
+        RunEnd::Skipped | RunEnd::MaxRetries => {
+            next_derived_stream_run(trigger_condition, tz_offset, slot, delay)
+        }
+        RunEnd::CatchUp { end } => {
+            next_derived_stream_run(trigger_condition, tz_offset, end, delay)
+        }
+        // A delay needs a slot on the boundary, so the run time is aligned.
+        RunEnd::Normal if delay > 0 => {
+            next_derived_stream_run(trigger_condition, tz_offset, slot, delay)
+        }
+        RunEnd::Normal => trigger_condition.get_next_trigger_time_non_aligned(
+            false,
+            tz_offset,
+            false,
+            Some(next_run_at),
+        ),
+    }
 }
 
 /// Compares full keys, because a parsed key holds only the first part of a name with a slash.
@@ -6694,10 +6707,15 @@ async fn handle_backfill_triggers(
 
                 // Initiate deletion for all streams
                 let mut deletion_job_ids = Vec::new();
-                let mut failed = false;
-                let mut error_msg = String::new();
+                // every range is validated before any deletion is queued: a queued one stays
+                let (start, end) = (config.start_time, config.end_time);
+                let ranges =
+                    validated_deletion_ranges(&org_id, &destination_streams, start, end).await;
+                let mut error_msg = ranges.as_ref().err().cloned().unwrap_or_default();
+                let mut failed = ranges.is_err();
 
-                for (idx, stream) in destination_streams.iter().enumerate() {
+                let validated = destination_streams.iter().zip(ranges.unwrap_or_default());
+                for (idx, (stream, range)) in validated.enumerate() {
                     log::debug!(
                         "[BACKFILL trace_id {trace_id}] [job_id: {}] Initiating deletion for stream {}/{} ({}/{})",
                         job_id,
@@ -6707,14 +6725,7 @@ async fn handle_backfill_triggers(
                         destination_streams.len()
                     );
 
-                    match initiate_stream_deletion(
-                        &trigger.org,
-                        stream,
-                        config.start_time,
-                        config.end_time,
-                    )
-                    .await
-                    {
+                    match initiate_stream_deletion(&trigger.org, stream, &range).await {
                         Ok(deletion_job_id) => {
                             deletion_job_ids.push(deletion_job_id.clone());
                             log::debug!(
@@ -7543,40 +7554,66 @@ fn get_destination_stream_from_pipeline(
     }
 }
 
-/// Helper function to initiate stream deletion
+/// The deletion range of every destination, or the reason the first unsafe one is refused.
+async fn validated_deletion_ranges(
+    org_id: &str,
+    streams: &[StreamParams],
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<(String, String)>, String> {
+    let mut ranges = Vec::with_capacity(streams.len());
+    for stream in streams {
+        let range = match crate::alerts::backfill::delete_covers_daily_days(
+            org_id, stream, start_time, end_time,
+        )
+        .await
+        {
+            Ok(whole_days) => deletion_range(start_time, end_time, whole_days),
+            Err(e) => Err(e),
+        };
+        ranges.push(range.map_err(|e| {
+            let msg = format!(
+                "Failed to initiate deletion for stream {}/{}: {e}",
+                stream.stream_type, stream.stream_name
+            );
+            log::error!("[BACKFILL] [org_id: {org_id}] {msg}");
+            msg
+        })?);
+    }
+    Ok(ranges)
+}
+
+/// Only a logs delete outside a daily day is sent by the hour; every other one is sent by date.
+fn deletion_range(
+    start_time: i64,
+    end_time: i64,
+    whole_days: bool,
+) -> Result<(String, String), anyhow::Error> {
+    use chrono::TimeZone;
+
+    let format = if whole_days {
+        "%Y-%m-%d"
+    } else {
+        "%Y-%m-%dT%H:00:00Z"
+    };
+    let formatted = |micros: i64, name: &str| {
+        Utc.timestamp_micros(micros)
+            .single()
+            .map(|ts| ts.format(format).to_string())
+            .ok_or_else(|| anyhow::anyhow!("Invalid {name}"))
+    };
+    Ok((
+        formatted(start_time, "start_time")?,
+        formatted(end_time, "end_time")?,
+    ))
+}
+
+/// Queues the deletion of one validated range.
 async fn initiate_stream_deletion(
     org_id: &str,
     stream: &StreamParams,
-    start_time: i64,
-    end_time: i64,
+    (time_range_start, time_range_end): &(String, String),
 ) -> Result<String, anyhow::Error> {
-    use chrono::TimeZone;
-    use config::meta::stream::StreamType;
-
-    // Convert microseconds to formatted time range strings
-    let time_range_start = {
-        let ts = Utc
-            .timestamp_micros(start_time)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
-        if stream.stream_type == StreamType::Logs {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
-    let time_range_end = {
-        let ts = Utc
-            .timestamp_micros(end_time)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
-        if stream.stream_type == StreamType::Logs {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
-
     // Create deletion job using existing retention service
     let (key, _created) = crate::db::compact::retention::delete_stream(
         org_id,
@@ -7776,6 +7813,10 @@ fn publish_slo_pass_timed(
         ..Default::default()
     });
 }
+
+#[cfg(test)]
+#[path = "derived_stream_run_tests.rs"]
+mod derived_stream_run_tests;
 
 #[cfg(test)]
 mod tests {
@@ -10790,5 +10831,191 @@ mod tests {
         );
         handle_triggers("t", row).await.unwrap();
         assert!(infra::scheduler::get(&org, module, "engine").await.is_err());
+    }
+
+    /// Stores an enabled composite over `children` and returns its claimed scheduler job.
+    async fn claimed_composite(
+        org: &str,
+        id: &str,
+        expression: String,
+        children: &[(&str, infra::table::alert_composites::ChildKind)],
+    ) -> db::scheduler::Trigger {
+        use infra::table::entity::{alert_composite_children, alert_composites};
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
+
+        let definition = alert_composites::Model {
+            id: id.to_string(),
+            org: org.to_string(),
+            folder_id: "default".to_string(),
+            name: id.to_string(),
+            expression,
+            destinations: serde_json::json!([]),
+            workflows: serde_json::json!([]),
+            enabled: true,
+            ..Default::default()
+        };
+        let rows = children
+            .iter()
+            .enumerate()
+            .map(
+                |(order, (child, kind))| alert_composite_children::ActiveModel {
+                    composite_id: Set(id.to_string()),
+                    child_alert_id: Set(child.to_string()),
+                    child_kind: Set(*kind as i16),
+                    display_order: Set(order as i32),
+                },
+            )
+            .collect();
+        infra::table::alert_composites::create_with_children(
+            infra::db::get_orm_client_rw().await,
+            alert_composites::ActiveModel::from(definition).reset_all(),
+            rows,
+        )
+        .await
+        .unwrap();
+        let module = db::scheduler::TriggerModule::CompositeAlert;
+        infra::scheduler::push(db::scheduler::Trigger {
+            org: org.to_string(),
+            module: module.clone(),
+            module_key: id.to_string(),
+            next_run_at: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let status = db::scheduler::TriggerStatus::Processing;
+        infra::scheduler::update_status(org, module.clone(), id, status, 0, None)
+            .await
+            .unwrap();
+        infra::scheduler::get(org, module, id).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_composite_with_a_composite_child_is_paused_and_an_ordinary_one_evaluates() {
+        use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+        use infra::table::alert_composites::ChildKind;
+        use svix_ksuid::KsuidLike;
+
+        let Some(alert) = stored_host_alert("composite_nesting", &[], 0).await else {
+            return;
+        };
+        let org = alert.org_id.as_str();
+        let child = alert.id.unwrap().to_string();
+        let new_id = || svix_ksuid::Ksuid::new(None, None).to_string();
+        let (plain, legacy) = (new_id(), new_id());
+
+        let job = claimed_composite(
+            org,
+            &plain,
+            format!("{{{child}}}"),
+            &[(&child, ChildKind::Alert)],
+        )
+        .await;
+        handle_composite_alert_trigger("t", job).await.unwrap();
+        let rollup = infra::table::alert_states::get(&plain, ROLLUP_GROUP_KEY).await;
+        assert!(rollup.unwrap().is_some(), "an ordinary composite evaluates");
+
+        let job = claimed_composite(
+            org,
+            &legacy,
+            format!("{{{plain}}} && {{{child}}}"),
+            &[(&plain, ChildKind::Composite), (&child, ChildKind::Alert)],
+        )
+        .await;
+        handle_composite_alert_trigger("t", job).await.unwrap();
+        let stored = infra::table::alert_composites::get_by_id(
+            infra::db::get_orm_client_rw().await,
+            org,
+            &legacy,
+        )
+        .await
+        .unwrap()
+        .expect("a paused composite is kept");
+        assert!(!stored.definition.enabled, "a nested composite is paused");
+        let module = db::scheduler::TriggerModule::CompositeAlert;
+        let job = infra::scheduler::get(org, module, &legacy).await;
+        assert!(job.is_err(), "a paused composite is never scheduled again");
+        let rollup = infra::table::alert_states::get(&legacy, ROLLUP_GROUP_KEY).await;
+        assert!(rollup.unwrap().is_none(), "a paused run writes no state");
+    }
+
+    /// 2026-11-16 at `h:m:s` UTC, in microseconds.
+    fn nov16_micros(h: u32, m: u32, s: u32) -> i64 {
+        chrono::NaiveDate::from_ymd_opt(2026, 11, 16)
+            .unwrap()
+            .and_hms_opt(h, m, s)
+            .unwrap()
+            .and_utc()
+            .timestamp_micros()
+    }
+
+    fn cron_condition(cron: &str) -> TriggerCondition {
+        TriggerCondition {
+            frequency_type: config::meta::alerts::FrequencyType::Cron,
+            cron: cron.to_string(),
+            period: 2,
+            ..Default::default()
+        }
+    }
+
+    /// The window end the derived stream handler searches to, after the minute cut.
+    fn aligned_cron_end(tc: &TriggerCondition, t0: i64, supposed_to_be_run_at: i64) -> i64 {
+        let end = cron_window_end(tc, 0, t0, supposed_to_be_run_at).unwrap();
+        TriggerCondition::align_time(end, 0, None, None)
+    }
+
+    #[test]
+    fn cron_with_seconds_moves_the_window_forward_on_every_run() {
+        let tc = cron_condition("7 */2 * * * *");
+        // The first run (no cursor) searched 09:30:00 to 09:32:00.
+        let mut t0 = nov16_micros(9, 32, 0);
+        for (run_at, want_end) in [
+            (nov16_micros(9, 34, 7), nov16_micros(9, 34, 0)),
+            (nov16_micros(9, 36, 7), nov16_micros(9, 36, 0)),
+        ] {
+            let end = aligned_cron_end(&tc, t0, run_at);
+            assert_eq!(end, want_end);
+            assert!(t0 < end, "the window must not be empty");
+            t0 = end;
+        }
+    }
+
+    #[test]
+    fn cron_with_seconds_recovers_a_stalled_cursor() {
+        let tc = cron_condition("7 */2 * * * *");
+        // A trigger stalled today keeps the cursor at 09:32:00 while runs go on.
+        let end = aligned_cron_end(&tc, nov16_micros(9, 32, 0), nov16_micros(10, 0, 7));
+        assert_eq!(end, nov16_micros(9, 34, 0));
+    }
+
+    #[test]
+    fn cron_with_seconds_and_delay_gets_a_window() {
+        let tc = cron_condition("7 */2 * * * *");
+        // Run at 09:34:07 with a 2 minute delay.
+        let end = aligned_cron_end(&tc, nov16_micros(9, 30, 0), nov16_micros(9, 32, 7));
+        assert_eq!(end, nov16_micros(9, 32, 0));
+    }
+
+    #[test]
+    fn cron_with_zero_seconds_is_unchanged() {
+        let tc = cron_condition("0 */2 * * * *");
+        let mut t0 = nov16_micros(9, 32, 0);
+        for run_at in [
+            nov16_micros(9, 34, 0),
+            nov16_micros(9, 36, 0),
+            nov16_micros(10, 0, 0),
+        ] {
+            let before = std::cmp::min(
+                run_at,
+                tc.get_next_trigger_time(false, 0, false, Some(t0)).unwrap(),
+            );
+            let end = cron_window_end(&tc, 0, t0, run_at).unwrap();
+            assert_eq!(end, before);
+            assert_eq!(
+                TriggerCondition::align_time(end, 0, None, None),
+                t0 + second_micros(120)
+            );
+            t0 = end;
+        }
     }
 }

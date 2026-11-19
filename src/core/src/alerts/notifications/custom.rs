@@ -28,9 +28,31 @@ use super::context::NotificationContext;
 
 /// Render `tpl` against `ctx`. Pure: no I/O, no clock, no DB.
 pub fn apply_custom_template(tpl: &str, ctx: &NotificationContext, is_email: bool) -> String {
+    render_custom(tpl, ctx, is_email, false)
+}
+
+/// Render a stored Custom template. An unchanged shipped prebuilt body also escapes alert values,
+/// so an alert named `cpu "high"` still sends valid JSON. Any body a user wrote or edited keeps
+/// the raw insert, because it may place a value outside a JSON string.
+pub fn apply_template_body(
+    template: &config::meta::destinations::Template,
+    ctx: &NotificationContext,
+    is_email: bool,
+) -> String {
+    let shipped = config::prebuilt_loader::is_shipped_prebuilt_body(&template.name, &template.body);
+    render_custom(&template.body, ctx, is_email, shipped)
+}
+
+fn render_custom(
+    tpl: &str,
+    ctx: &NotificationContext,
+    is_email: bool,
+    escape_alert: bool,
+) -> String {
     // Another kind's names and text are free (a downtime "deploy" <db>), so a JSON body escapes
     // them as it escapes attributes; plain text such as an SNS message gets them as written.
-    let json_body = ctx.kind != NotificationKind::Alert && !is_email && looks_like_json(tpl);
+    let json_body =
+        (ctx.kind != NotificationKind::Alert || escape_alert) && !is_email && looks_like_json(tpl);
     let prepared = super::modifiers::prepare_modifiers(
         tpl,
         |field| {
@@ -107,6 +129,9 @@ pub(crate) fn apply_custom_template_plain(
     };
     let mut resp = tpl
         // Newer tokens run first so a value inserted below is never re-scanned for them.
+        .replace("{alert_url_label}", &esc(&ctx.alert_url_label))
+        .replace("{alert_detail_url}", &esc(&ctx.alert_detail_url))
+        .replace("{alert_detail_label}", &esc(&ctx.alert_detail_label))
         .replace("{notification_kind}", ctx.kind.as_str())
         .replace("{notification_event}", ctx.event.as_str())
         .replace("{notification_kind_label}", ctx.kind.label())
@@ -672,6 +697,38 @@ mod golden {
     }
 
     #[test]
+    fn a_shipped_prebuilt_body_escapes_alert_values_and_an_edited_one_does_not() {
+        let ctx = NotificationContext {
+            alert_name: "cpu \"high\"\nnow".into(),
+            alert_description: r#"{"cpu":99}"#.into(),
+            ..Default::default()
+        };
+        for kind in [
+            "slack",
+            "msteams",
+            "discord",
+            "webhook",
+            "opsgenie",
+            "pagerduty",
+        ] {
+            let template = config::prebuilt_loader::get_prebuilt_template(kind).unwrap();
+            let body = apply_template_body(&template, &ctx, false);
+            let json: serde_json::Value =
+                serde_json::from_str(&body).unwrap_or_else(|e| panic!("{kind}: {e}: {body}"));
+            assert!(
+                json.to_string().contains(r#"cpu \"high\"\nnow"#),
+                "{kind}: {body}"
+            );
+        }
+        let mut edited = config::prebuilt_loader::get_prebuilt_template("webhook").unwrap();
+        edited.body = r#"{"data": {alert_description}}"#.into();
+        assert_eq!(
+            apply_template_body(&edited, &ctx, false),
+            r#"{"data": {"cpu":99}}"#
+        );
+    }
+
+    #[test]
     fn a_synthetics_email_body_html_escapes_the_scalars() {
         let mut ctx = NotificationContext {
             kind: NotificationKind::Synthetics,
@@ -1134,5 +1191,28 @@ mod golden {
         };
         let rendered = apply_custom_template(r#"{"text":"{alert_name}"}"#, &ctx, false);
         assert_eq!(rendered, r#"{"text":"cpu-{notification_kind}"}"#);
+        let ctx = NotificationContext {
+            alert_name: "cpu-{alert_url_label}".into(),
+            alert_url: "https://o2/s/1".into(),
+            alert_url_label: "View logs".into(),
+            alert_detail_url: "https://o2/web/alerts/detail/a1".into(),
+            alert_detail_label: "Open alert".into(),
+            ..Default::default()
+        };
+        let rendered =
+            apply_custom_template(r#"{"t":"{alert_name}","u":"{alert_url}"}"#, &ctx, false);
+        assert_eq!(
+            rendered,
+            r#"{"t":"cpu-{alert_url_label}","u":"https://o2/s/1"}"#
+        );
+        let rendered = apply_custom_template(
+            "{alert_url_label} {alert_url} {alert_detail_label} {alert_detail_url}",
+            &ctx,
+            false,
+        );
+        assert_eq!(
+            rendered,
+            "View logs https://o2/s/1 Open alert https://o2/web/alerts/detail/a1"
+        );
     }
 }

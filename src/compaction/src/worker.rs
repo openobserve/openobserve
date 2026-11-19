@@ -22,6 +22,8 @@ use config::{
 use search::merge::MergeMode;
 use tokio::sync::{Mutex, mpsc};
 
+use crate::merge::MergeWindow;
+
 #[derive(Clone)]
 pub struct MergeBatch {
     pub batch_id: usize,
@@ -32,6 +34,26 @@ pub struct MergeBatch {
     pub files: Vec<FileKey>,
     /// What the merge produces; decided by the scheduler, read by the worker.
     pub mode: MergeMode,
+}
+
+impl MergeBatch {
+    pub(crate) fn new(
+        window: &MergeWindow,
+        batch_id: usize,
+        prefix: &str,
+        files: Vec<FileKey>,
+        mode: MergeMode,
+    ) -> Self {
+        Self {
+            batch_id,
+            org_id: window.org_id.clone(),
+            stream_type: window.stream_type,
+            stream_name: window.stream_name.clone(),
+            prefix: prefix.to_string(),
+            files,
+            mode,
+        }
+    }
 }
 
 pub struct MergeResult {

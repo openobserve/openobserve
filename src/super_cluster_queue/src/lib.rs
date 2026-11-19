@@ -16,6 +16,7 @@
 #![cfg(feature = "enterprise")]
 
 mod alert_acks;
+mod alert_composites;
 mod alert_states;
 mod alerts;
 mod anomaly_detection;
@@ -95,10 +96,11 @@ fn parse_eval_key(
     }
 }
 
-/// The `incidents` key carries two payloads; byte 94 is the unmute an older region skips.
+/// The `incidents` key carries three payloads; older regions skip bytes 94 and 103.
 async fn incident_msg(msg: Message) -> infra::errors::Result<()> {
     match msg.message_type {
         MessageType::IncidentUnmute => incidents::process_unmute(msg).await,
+        MessageType::IncidentMembership => incidents::process_membership(msg).await,
         _ => incidents::process(msg).await,
     }
 }
@@ -117,6 +119,14 @@ async fn service_identity_msg(msg: Message) -> infra::errors::Result<()> {
         |org, message| async move { db::service_identity_sync::apply_remote(&org, message).await },
     )
     .await
+}
+
+/// The JSON payload of a message whose type carries one struct; no payload is an error.
+pub(crate) fn payload<T: serde::de::DeserializeOwned>(msg: &Message) -> infra::errors::Result<T> {
+    let value = msg.value.as_ref().ok_or_else(|| {
+        infra::errors::Error::Message(format!("no payload in message {}", msg.key))
+    })?;
+    Ok(config::utils::json::from_slice(value)?)
 }
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -155,12 +165,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_alert_state_msg: alert_states::process,
         on_downtime_msg: downtimes::process,
         on_alert_ack_msg: alert_acks::process,
+        on_alert_composite_msg: alert_composites::process,
     };
     // On-call rides the scheduler topic with the triggers it belongs to, so a
     // response record always lands before the escalation timer that names it.
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,
         on_oncall_msg: oncall::process,
+        on_alert_state_msg: alert_states::process,
     };
     let search_jobs_queue = SearchJobsQueue {
         on_search_job_msg: search_job::process,

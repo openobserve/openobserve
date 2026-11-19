@@ -25,6 +25,7 @@ import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
 import i18n from "@/locales";
+import { PUBLIC_LINKS_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
 
 // Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
 // per navigation), so assert the English copy the key still resolves to — a typo'd
@@ -1428,6 +1429,22 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "alertList");
       expect(enTitle(route.meta.titleKey)).toBe("Alerts");
+    });
+
+    it("sends an old /alerts/firing bookmark to the Firing tile, or its selected alert to that alert's page", () => {
+      const firing = useRoutes().homeChildRoutes.find(
+        (route: any) => route.path === "alerts/firing",
+      );
+      expect(firing.component).toBeUndefined();
+      expect(firing.redirect({ query: { org_identifier: "o" } })).toEqual({
+        name: "alertList",
+        query: { org_identifier: "o", state: "firing", all_folders: "true" },
+      });
+      expect(firing.redirect({ query: { org_identifier: "o", alert: "a1" } })).toEqual({
+        name: "alertDetail",
+        params: { alert_id: "a1" },
+        query: { org_identifier: "o" },
+      });
     });
 
     it("should include addAlert route", () => {
@@ -3063,7 +3080,6 @@ describe("useRoutes (router.ts)", () => {
       ["viewDashboard", "dashboards"],
       ["dashboardTvPlaylist", "dashboards"],
       ["importDashboard", "dashboards"],
-      ["publicDashboardLinks", "dashboards"],
       ["addPanel", "dashboards"],
       ["reports", "reports"],
       ["reportDetail", "reports"],
@@ -3178,25 +3194,27 @@ describe("useRoutes (router.ts)", () => {
       ).toHaveBeenCalledWith({ name: "home", query: { org_identifier: "acme" } });
     });
 
-    it("opens locked public-dashboard links though public dashboards are off", () => {
+    it("sends the old public links URL to the rail entry, or to the list when the feature is off", () => {
       const previous = store.state.zoConfig;
       const run = (zoConfig: Record<string, unknown>) => {
         store.state.zoConfig = zoConfig;
-        const next = vi.fn();
-        findRoute(useRoutes().homeChildRoutes, "publicDashboardLinks").beforeEnter(
-          { query: { org_identifier: "acme" } },
-          {},
-          next,
-        );
-        return next;
+        return findRoute(useRoutes().homeChildRoutes, "publicDashboardLinks").redirect({
+          query: { org_identifier: "acme" },
+        });
+      };
+      const rail = {
+        name: "dashboards",
+        query: { org_identifier: "acme", folder: PUBLIC_LINKS_FOLDER_ID },
       };
       try {
+        expect(run({ public_dashboards_enabled: true })).toEqual(rail);
+        expect(run({})).toEqual(rail);
         expect(
           run({ public_dashboards_enabled: false, features: { dashboards: "locked" } }),
-        ).toHaveBeenCalledWith();
+        ).toEqual(rail);
         expect(
           run({ public_dashboards_enabled: false, features: { dashboards: "hidden" } }),
-        ).toHaveBeenCalledWith({ name: "dashboards", query: { org_identifier: "acme" } });
+        ).toEqual({ name: "dashboards", query: { org_identifier: "acme" } });
       } finally {
         store.state.zoConfig = previous;
       }

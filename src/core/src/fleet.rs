@@ -29,6 +29,8 @@ use config::{
 };
 use o2_enterprise::enterprise::common::auditor::AUDIT_STREAM;
 
+/// The OpenFGA object type of a fleet.
+pub const FLEETS: &str = "fleets";
 /// The engine ignores `step` on an instant query; any positive value works.
 const INSTANT_STEP_MICROS: i64 = 300_000_000;
 
@@ -37,6 +39,14 @@ pub fn enabled() -> bool {
     o2_enterprise::enterprise::common::config::get_config()
         .fleet
         .enabled
+}
+
+/// Fleet routes bypass route permissions, so this is the only fleet RBAC check.
+pub async fn fleet_allowed(org_id: &str, user_id: &str, fleet: &str, verb: &str) -> bool {
+    crate::auth::check_permissions(
+        fleet, org_id, user_id, FLEETS, verb, None, false, false, true,
+    )
+    .await
 }
 
 /// Region-local, because fleet state is region-local too; the queries run as the caller (N7).

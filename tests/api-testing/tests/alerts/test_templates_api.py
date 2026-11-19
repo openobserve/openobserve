@@ -124,7 +124,9 @@ def test_preview_renders_slack_payload_from_draft(client: OpenObserveClient):
     assert blocks[0]["type"] in ("section", "header"), blocks[0]
     assert "Sample CPU alert fired" in blocks[0]["text"]["text"], blocks[0]
     actions = next(b for b in blocks if b["type"] == "actions")
-    assert any(e["text"]["text"] == "View in OpenObserve" for e in actions["elements"]), actions
+    # The sample is a logs alert: the data button reads "View logs", the object button "Open alert".
+    labels = [e["text"]["text"] for e in actions["elements"]]
+    assert labels[:2] == ["View logs", "Open alert"], actions
     assert "hello" in body["preview_model"]["body_html"]
     assert "{alert_name}" not in resp.text, "placeholders must be resolved against the sample"
 

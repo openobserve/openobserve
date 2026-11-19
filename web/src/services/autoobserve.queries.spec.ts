@@ -19,6 +19,7 @@ import autoobserve, { type AutoObserveIncidentList } from "./autoobserve";
 import http from "./http";
 import {
   autoobserveGapSuggestionsQuery,
+  autoobserveIncidentItemQuery,
   autoobserveIncidentsPageQuery,
   autoobserveSuggestionsPageQuery,
 } from "./autoobserve.queries";
@@ -128,5 +129,23 @@ describe("autoobserveIncidentsPageQuery (D9-web)", () => {
     expect(interval({ state: { data: running } })).toBe(30_000);
     expect(interval({ state: { data: settled } })).toBe(false);
     expect(interval({ state: { data: undefined } })).toBe(false);
+  });
+
+  it("reads one incident by its id in one request, and null when AutoObserve did not open it", async () => {
+    const second = running.items[1];
+    const page = (items: unknown[]) => ({ data: { ...running, has_more: false, items } });
+    incidents.mockResolvedValueOnce(page([second]) as never);
+    const options = autoobserveIncidentItemQuery("demo-org", second.incident.id);
+    expect(options.queryKey.slice(0, 4)).toEqual(orgKey("demo-org", "autoobserve", "incidents"));
+    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: second });
+    expect(incidents).toHaveBeenCalledTimes(1);
+    expect(incidents).toHaveBeenLastCalledWith("demo-org", {
+      limit: 1,
+      offset: 0,
+      incident_id: second.incident.id,
+    });
+
+    incidents.mockResolvedValueOnce(page([]) as never);
+    expect(await new QueryClient().fetchQuery(options)).toEqual({ item: null });
   });
 });

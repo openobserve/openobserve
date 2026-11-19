@@ -53,8 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   v-model:sidebarWidth — bidirectional bind for the rail width (resizable mode).
 -->
 <template>
-  <!-- Named container so the header collapses on ITS width, not the viewport: the AI panel narrows the page without changing the viewport. -->
-  <div class="@container/page flex h-full flex-col">
+  <!-- Named container so the header collapses on ITS width, not the viewport: the AI panel narrows the page without changing the viewport.
+       Clipped so the body's entry slide never overflows MainLayout's scroll box and flashes its scrollbar. -->
+  <div class="@container/page flex h-full flex-col overflow-y-clip">
     <!-- ── Header (props → OPageHeader, or #header escape hatch) ── -->
     <!-- Just a shrink-0 slot: OPageHeader draws its OWN border-b (so the header
          is a consistent 60px). Don't add a border here — it would double the

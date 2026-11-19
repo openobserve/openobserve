@@ -1,6 +1,7 @@
 import type { Environment } from "@/services/service_versions";
 
 type EnvSet = Pick<Environment, "env" | "envs" | "no_env">;
+type EnvOrigin = Pick<Environment, "env" | "env_source" | "no_env">;
 
 // The Env filter's No env pick; the colon cannot appear in an env label, so no real env collides with it.
 export const NO_ENV = ":no_env";
@@ -18,6 +19,16 @@ export function envSet(scope: EnvSet): string[] {
 /** True when the env was read from a namespace, cluster or workload name rather than sent or set. */
 export function isInferredSource(source: string | undefined) {
   return INFERRED_SOURCES.includes(source || "");
+}
+
+/** True when the env was sent or set, not read from a name or left at the "no env" default. */
+export function isExplicitEnv(scope: EnvOrigin) {
+  return (
+    !!scope.env &&
+    !scope.no_env &&
+    scope.env_source !== "default" &&
+    !isInferredSource(scope.env_source)
+  );
 }
 
 /** The memberships the backend filters and counts a scope by, null for No env (label_env_entries). */

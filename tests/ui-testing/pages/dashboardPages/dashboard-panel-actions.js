@@ -60,6 +60,7 @@ export default class DashboardactionPage {
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
     this.errorToast = page.locator('[data-test-variant="error"]');
+    this.errorToastDismissBtn = this.errorToast.locator('[data-test="o-toast-dismiss"]');
     // Panel validation messages listed under the chart (DashboardErrors.vue)
     this.dashboardErrorItems = page.locator('[data-test="dashboard-errors-list-item"]');
     // Inline OForm field error under the panel name input (shown when the
@@ -258,6 +259,49 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  /** Dismiss every visible error toast and wait until none is left. */
+  async dismissErrorToasts() {
+    for (let i = 0; i < 10 && (await this.errorToastDismissBtn.count()) > 0; i++) {
+      await this.errorToastDismissBtn.first().click().catch(() => {});
+    }
+    await expect(this.errorToast).toHaveCount(0, { timeout: 10000 });
+  }
+
+  /**
+   * Click Save on a panel whose config is invalid and prove the save was blocked.
+   *
+   * savePanel() alone cannot prove this on a repeat attempt: an error toast left over
+   * from an earlier failed save resolves its wait at once, and the URL check that follows
+   * passes before any navigation could happen. So this clears old error toasts first,
+   * waits for a fresh toast naming the expected reason, and fails if the dashboard
+   * save request (PUT/POST /api/{org}/dashboards/{id}) was sent.
+   *
+   * @param {string} expectedError - text the new error toast must contain
+   */
+  async savePanelExpectingBlocked(expectedError) {
+    await this.dismissErrorToasts();
+    const saveRequests = [];
+    const onRequest = (request) => {
+      const { pathname } = new URL(request.url());
+      if (
+        ["PUT", "POST"].includes(request.method()) &&
+        /^\/api\/[^/]+\/dashboards\/(?!bulk$|move$)[^/]+$/.test(pathname)
+      ) {
+        saveRequests.push(`${request.method()} ${pathname}`);
+      }
+    };
+    this.page.on("request", onRequest);
+    try {
+      await this.panelSaveBtn.waitFor({ state: "visible" });
+      await this.panelSaveBtn.click();
+      await expect(this.getErrorToastWithText(expectedError)).toBeVisible({ timeout: 20000 });
+      await expect(this.page).toHaveURL(/\/add_panel/);
+    } finally {
+      this.page.off("request", onRequest);
+    }
+    expect(saveRequests, "a blocked save must not send the dashboard save request").toEqual([]);
   }
 
   /**
@@ -604,6 +648,14 @@ export default class DashboardactionPage {
       .toBe(true);
   }
 
+  /** Waits for a Custom Chart panel, which draws inside a sandboxed iframe, not in [data-test="chart-renderer"]. */
+  async expectSandboxChartRendered(expect, timeout = 20000) {
+    const frame = this.page
+      .frameLocator('[data-test="dashboard-custom-chart-sandbox"] iframe')
+      .first();
+    await expect(frame.locator("#chart[_echarts_instance_]")).toBeVisible({ timeout });
+  }
+
   /**
    * Wait for the dashboard table panel to render AND contain at least one
    * populated data cell. Encapsulates a `page.waitForFunction` scoped to the
@@ -948,6 +1000,58 @@ export default class DashboardactionPage {
       walk(document.querySelector("#app")?._vnode, 0);
       return charts;
     }, scopeSelector);
+  }
+
+  // Segments are [start, end, rowIndex, styleIndex] with styleIndex -1 for "no data" (dropped here);
+  // the hidden line series has one point per distinct sample time.
+  async getStateTimelineLayout(scopeSelector = this.chartRendererSelector) {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    if (!chart) return null;
+    const segmentSeries = chart.series.find((s) => s.type === "custom" && s.points.length > 0);
+    const sampleSeries = chart.series.find((s) => s.type === "line");
+    const rows = [];
+    for (const [start, end, rowIndex, styleIndex] of segmentSeries?.points ?? []) {
+      rows[rowIndex] ??= [];
+      if (styleIndex !== -1) rows[rowIndex].push({ start, end });
+    }
+    return { rows: Array.from(rows, (row) => row ?? []), sampleTimes: sampleSeries?.points.length ?? 0 };
+  }
+
+  // Polls because freshly ingested samples can miss the panel's first query.
+  async waitForStateTimelineLayout(rowCount, scopeSelector = this.chartRendererSelector) {
+    let layout = null;
+    await expect
+      .poll(
+        async () => {
+          layout = await this.getStateTimelineLayout(scopeSelector);
+          return layout ? layout.rows.filter((row) => row.length > 0).length : 0;
+        },
+        { timeout: 30000, message: `state timeline never drew ${rowCount} rows with data` },
+      )
+      .toBe(rowCount);
+    return layout;
+  }
+
+  async applyAndGetStateTimelineLayout(rowCount) {
+    await this.applyDashboardBtn();
+    await this.waitForChartToRender();
+    return this.waitForStateTimelineLayout(rowCount);
+  }
+
+  // Each seeded row holds one state, so Bands must join neighbours into segments wider than a bucket.
+  expectStateTimelineBands(layout, bucketMs) {
+    for (const row of layout.rows) {
+      expect(row.length).toBeLessThan(layout.sampleTimes);
+      expect(row.some((segment) => segment.end - segment.start > bucketMs)).toBe(true);
+    }
+  }
+
+  // Cells never join equal neighbours: one cell per sample, none wider than its bucket.
+  expectStateTimelineCells(layout, bucketMs) {
+    for (const row of layout.rows) {
+      expect(row.length).toBe(layout.sampleTimes);
+      expect(row.every((segment) => segment.end - segment.start <= bucketMs)).toBe(true);
+    }
   }
 
   async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {

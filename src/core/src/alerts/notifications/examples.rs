@@ -97,7 +97,7 @@ pub const DOWNTIME_VARIABLES: [&str; 9] = [
     "downtime_url",
 ];
 
-const COMMON_VARIABLES: [&str; 27] = [
+const COMMON_VARIABLES: [&str; 30] = [
     "org_name",
     "stream_type",
     "stream_name",
@@ -120,6 +120,9 @@ const COMMON_VARIABLES: [&str; 27] = [
     "alert_start_time",
     "alert_end_time",
     "alert_url",
+    "alert_url_label",
+    "alert_detail_url",
+    "alert_detail_label",
     "alert_trigger_time_str",
     "alert_time",
     "alert_description",
@@ -234,28 +237,12 @@ pub fn example_context_at(
     };
     let priority = sample_priority(level);
     let mut ctx = sample(kind, level == Some(AlertLevel::Ok), priority, check);
-    // The level a live send of this kind carries, so the dot and show_when match it.
-    match kind {
-        NotificationKind::Incident if level != Some(AlertLevel::Ok) => {
-            ctx.level = Some(match priority {
-                "P1" | "P2" => AlertLevel::Critical,
-                _ => AlertLevel::Warning,
-            });
-        }
-        NotificationKind::OnCall if level != Some(AlertLevel::Ok) => {
-            ctx.level = match priority {
-                "P1" => Some(AlertLevel::Critical),
-                "P2" => Some(AlertLevel::Warning),
-                _ => None,
-            };
-        }
-        NotificationKind::Anomaly => {
-            if let Some(level) = level {
-                ctx.level = Some(level);
-                ctx.alert_level = level.as_str().into();
-            }
-        }
-        _ => {}
+    // An incident and an on-call sample read their level from the priority in `sample`.
+    if kind == NotificationKind::Anomaly
+        && let Some(level) = level
+    {
+        ctx.level = Some(level);
+        ctx.alert_level = level.as_str().into();
     }
     ctx
 }
@@ -335,6 +322,7 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
     let mut ctx = base(NotificationKind::Anomaly, resolved, level);
     ctx.alert_name = "error rate on web-logs".into();
     ctx.alert_url = link.into();
+    ctx.alert_url_label = "Open detector".into();
     ctx.event = event_of(resolved);
     ctx.episode_id = Some("a1b2c3".into());
     let (start, end) = if resolved {
@@ -406,6 +394,7 @@ fn synthetics_example(check: CheckSample) -> NotificationContext {
     ctx.alert_level = String::new();
     ctx.alert_name = "checkout API".into();
     ctx.alert_url = url.into();
+    ctx.alert_url_label = "Open check".into();
     ctx.episode_id = Some("chk_9d".into());
     // A live degraded or flaky send is a notice, which platforms skip.
     ctx.event = match check {
@@ -504,6 +493,14 @@ fn on_call_example(resolved: bool, priority: &str) -> NotificationContext {
         AlertLevel::Critical
     };
     let mut ctx = base(NotificationKind::OnCall, resolved, level);
+    if !resolved {
+        // The level `on_call_context` gives a live page of this priority.
+        ctx.level = match priority {
+            "P1" => Some(AlertLevel::Critical),
+            "P2" => Some(AlertLevel::Warning),
+            _ => None,
+        };
+    }
     let (stage, reason, ack) = if resolved {
         ("resolved", "the incident was resolved", "")
     } else {
@@ -520,6 +517,7 @@ fn on_call_example(resolved: bool, priority: &str) -> NotificationContext {
     ctx.stream_name = String::new();
     ctx.alert_status = if resolved { "acknowledged" } else { "paged" }.into();
     ctx.alert_url = url.into();
+    ctx.alert_url_label = "Open page".into();
     ctx.episode_id = Some("resp_31".into());
     ctx.event = event_of(resolved);
     ctx.alert_trigger_time_str = "2026-11-02 10:05:00".into();
@@ -561,6 +559,7 @@ fn downtime_example(resolved: bool) -> NotificationContext {
     ctx.level = None;
     ctx.alert_name = "Nightly database upgrade".into();
     ctx.alert_url = url.into();
+    ctx.alert_url_label = "Open downtime".into();
     ctx.event = event_of(resolved);
     ctx.alert_start_time = "2026-11-02 22:00 UTC".into();
     ctx.alert_end_time = "2026-11-03 00:00 UTC".into();
@@ -598,13 +597,21 @@ fn downtime_example(resolved: bool) -> NotificationContext {
 }
 
 fn incident_example(resolved: bool, priority: &str) -> NotificationContext {
-    let url = "https://o2.acme.com/web/alerts/incidents/inc_7f3a?org_identifier=acme";
+    let url = "https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme";
     let level = if resolved {
         AlertLevel::Ok
     } else {
         AlertLevel::Critical
     };
     let mut ctx = base(NotificationKind::Incident, resolved, level);
+    if !resolved {
+        // The level a live incident of this severity gets; P4 is informational, so none.
+        ctx.level = match priority {
+            "P1" | "P2" => Some(AlertLevel::Critical),
+            "P3" => Some(AlertLevel::Warning),
+            _ => None,
+        };
+    }
     ctx.alert_name = "High error rate".into();
     // A live incident reads its severity as its level.
     ctx.alert_level = priority.into();
@@ -612,6 +619,10 @@ fn incident_example(resolved: bool, priority: &str) -> NotificationContext {
     ctx.alert_threshold = "5".into();
     ctx.alert_agg_value = "12.4".into();
     ctx.alert_url = url.into();
+    ctx.alert_url_label = "Open incident".into();
+    ctx.alert_id = "7Kx2".into();
+    ctx.alert_detail_url = "https://o2.acme.com/web/alerts/detail/7Kx2?org_identifier=acme".into();
+    ctx.alert_detail_label = "Open alert".into();
     ctx.incident_id = "inc_7f3a".into();
     ctx.episode_id = Some("inc_7f3a".into());
     let event = if resolved {
@@ -679,6 +690,7 @@ mod tests {
         resolve::resolve_content,
     };
 
+    const EXAMPLE_ALERT: &str = include_str!("render/testdata/examples/alert.json");
     const EXAMPLE_ANOMALY: &str = include_str!("render/testdata/examples/anomaly.json");
     const EXAMPLE_INCIDENT: &str = include_str!("render/testdata/examples/incident.json");
     const EXAMPLE_SYNTHETICS: &str = include_str!("render/testdata/examples/synthetics.json");
@@ -712,7 +724,27 @@ mod tests {
             "webhook_firing": rendered(kind, false, ChannelFormat::Webhook),
             "email_firing": rendered(kind, false, ChannelFormat::Email),
             "sns_firing": rendered(kind, false, ChannelFormat::Sns),
+            "teams_adaptive_firing": rendered(kind, false, ChannelFormat::TeamsAdaptiveCard),
+            "teams_message_firing": rendered(kind, false, ChannelFormat::TeamsMessageCard),
+            "discord_firing": rendered(kind, false, ChannelFormat::Discord),
+            "pagerduty_firing": rendered(kind, false, ChannelFormat::PagerDuty),
+            "opsgenie_firing": rendered(kind, false, ChannelFormat::Opsgenie),
+            "servicenow_firing": rendered(kind, false, ChannelFormat::ServiceNow),
         })
+    }
+
+    #[test]
+    fn golden_example_alert_has_the_data_and_object_buttons() {
+        let want: serde_json::Value = serde_json::from_str(EXAMPLE_ALERT).unwrap();
+        assert_eq!(example(NotificationKind::Alert), want);
+        let actions = want["slack_firing"]["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|b| b["type"] == "actions")
+            .unwrap();
+        assert_eq!(actions["elements"][0]["text"]["text"], "View logs");
+        assert_eq!(actions["elements"][1]["text"]["text"], "Open alert");
     }
 
     #[test]
@@ -744,6 +776,66 @@ mod tests {
         assert_eq!(example(NotificationKind::Synthetics), want);
         let title = &want["slack_firing"]["blocks"][0]["text"]["text"];
         assert!(title.as_str().unwrap().contains("🔴 checkout API failing"));
+    }
+
+    #[test]
+    fn an_on_call_sample_reads_its_level_from_its_priority() {
+        for (priority, level) in [
+            ("P1", Some(AlertLevel::Critical)),
+            ("P2", Some(AlertLevel::Warning)),
+            ("P3", None),
+        ] {
+            let ctx = sample(
+                NotificationKind::OnCall,
+                false,
+                priority,
+                CheckSample::Failing,
+            );
+            assert_eq!(ctx.level, level, "{priority}");
+        }
+        assert_eq!(
+            example_context(NotificationKind::OnCall, false).level,
+            Some(AlertLevel::Warning)
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_on_call_sample_reads_its_level_from_its_priority_as_a_live_page_does() {
+        use o2_enterprise::enterprise::oncall::sender::OnCallNotification;
+
+        use crate::alerts::notifications::oncall::on_call_context;
+        for priority in ["P1", "P2", "P3"] {
+            let live = on_call_context(&OnCallNotification {
+                priority: priority.into(),
+                ..Default::default()
+            });
+            let sample = sample(
+                NotificationKind::OnCall,
+                false,
+                priority,
+                CheckSample::Failing,
+            );
+            assert_eq!(sample.level, live.level, "{priority}");
+        }
+    }
+
+    #[test]
+    fn an_incident_sample_reads_its_level_from_its_priority() {
+        for (priority, level) in [
+            ("P1", Some(AlertLevel::Critical)),
+            ("P2", Some(AlertLevel::Critical)),
+            ("P3", Some(AlertLevel::Warning)),
+            ("P4", None),
+        ] {
+            let ctx = sample(
+                NotificationKind::Incident,
+                false,
+                priority,
+                CheckSample::Failing,
+            );
+            assert_eq!(ctx.level, level, "{priority}");
+        }
     }
 
     #[test]
@@ -819,6 +911,7 @@ mod tests {
         );
         std::fs::create_dir_all(dir).unwrap();
         for (kind, file) in [
+            (NotificationKind::Alert, "alert.json"),
             (NotificationKind::Anomaly, "anomaly.json"),
             (NotificationKind::Incident, "incident.json"),
             (NotificationKind::Synthetics, "synthetics.json"),

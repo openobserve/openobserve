@@ -6,6 +6,8 @@
  * Excluded from the OSS regression workflow and appended via the enterprise overlay.
  */
 
+const fs = require('fs');
+const path = require('path');
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
@@ -13,30 +15,47 @@ const {
   generateFullTopology,
   ingestTraces,
   waitForServiceGraphData,
+  countTopologyNodes,
+  SERVICE_GRAPH_READY_FLOOR_MS,
 } = require('../../utils/service-graph-ingestion.js');
 
+const SERVICE_GRAPH_WAIT_MS = SERVICE_GRAPH_READY_FLOOR_MS + 120000;
+const EMPTY_TOPOLOGY_MESSAGE =
+  `Service graph topology is still empty ${SERVICE_GRAPH_WAIT_MS / 60000} minutes after ingesting traces: the service-graph jobs are not producing data on this environment (check O2_SERVICE_GRAPH_ENABLED).`;
 const TARGET_SERVICE = 'api-gateway';
 const LATENCY_COLUMNS = ['p75', 'p95', 'p99'];
 
 test.describe('Service Graph Side Panel Regression', () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
+  let topologyEmpty = false;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
     // The rollup daemon wakes on an interval, so the wait dominates this setup.
-    test.setTimeout(600000);
+    test.setTimeout(SERVICE_GRAPH_WAIT_MS + 180000);
+    // Every retry starts a new worker; this marker stops each one from repeating the full wait for a graph that never fills.
+    const emptyTopologyMarker = path.join(testInfo.project.outputDir, 'service-graph-side-panel-empty-topology.marker');
     const context = await browser.newContext({
       storageState: 'playwright-tests/utils/auth/user.json',
     });
     const page = await context.newPage();
     try {
+      if (fs.existsSync(emptyTopologyMarker)) {
+        topologyEmpty = (await countTopologyNodes(page)) === 0;
+        return;
+      }
       await ingestTraces(page, generateFullTopology({ tracesPerFlow: 3, errorRate: 0.2 }), { delayMs: 50 });
       const result = await waitForServiceGraphData(page, {
-        maxWaitMs: 240000,
+        maxWaitMs: SERVICE_GRAPH_WAIT_MS,
         pollIntervalMs: 10000,
         expectedMinEdges: 5,
       });
       testLogger.info(`Service graph setup: success=${result.success} edges=${(result.edges || []).length}`);
+      topologyEmpty = (await countTopologyNodes(page)) === 0;
+      if (topologyEmpty) {
+        fs.mkdirSync(testInfo.project.outputDir, { recursive: true });
+        fs.writeFileSync(emptyTopologyMarker, new Date().toISOString());
+      }
     } finally {
       await page.close();
       await context.close();
@@ -45,6 +64,8 @@ test.describe('Service Graph Side Panel Regression', () => {
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
+    // Failing here rather than in beforeAll keeps every test reported as failed instead of "did not run".
+    expect(topologyEmpty, EMPTY_TOPOLOGY_MESSAGE).toBe(false);
     await navigateToBase(page);
     pm = new PageManager(page);
     // The panel reads the stream filter from localStorage, which may carry another run's value.

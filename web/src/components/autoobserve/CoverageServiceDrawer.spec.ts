@@ -370,7 +370,7 @@ describe("CoverageServiceDrawer in live mode", () => {
     expect(wrapper.text()).not.toContain("No scoped monitor");
   });
 
-  it("lists each learning stream with the paired engine's reason", () => {
+  it("shows a learning service no alert watches as a gap that lists each learning stream's reason", () => {
     const until = (Date.now() + 5 * 86_400_000) * 1000;
     const streams = [
       {
@@ -392,17 +392,22 @@ describe("CoverageServiceDrawer in live mode", () => {
       { errors: cell("none"), latency: cell("none"), absence: cell("none") },
       streams as never,
     );
-    const rows = mountDrawer(row, "gap")
+    const wrapper = mountDrawer(row, row.status!.state as "gap");
+    const rows = wrapper
       .findAll('[data-test="autoobserve-coverage-drawer-learning-stream"]')
       .map((r) => r.text());
     expect(rows).toEqual([
       expect.stringMatching(/^fresh.*9 of 14/),
       expect.stringMatching(/^kept.*less than 14/),
     ]);
-    const learning = mountDrawer(row, "learning");
-    const chips = learning.findAll('[data-test^="autoobserve-coverage-drawer-chip-"]');
-    expect(chips.map((c) => c.text()).every((text) => text.endsWith("Learning"))).toBe(true);
-    expect(learning.text()).not.toContain("Coverage gap");
+    expect(wrapper.find('[data-test="autoobserve-coverage-drawer-state"]').text()).toBe(
+      "Coverage gap",
+    );
+    expect(chips(wrapper).map((c) => c.text())).toEqual([
+      "Errors: Coverage gap",
+      "Latency: Coverage gap",
+      "Stops sending: Coverage gap",
+    ]);
   });
 
   it("has no learning line when the server sends no learning_until", () => {
@@ -691,23 +696,55 @@ describe("CoverageServiceDrawer gap CTA counts what it can build", () => {
 });
 
 describe("CoverageServiceDrawer Service Catalog link", () => {
-  it("opens the catalog filtered to the service", async () => {
+  it("opens the catalog on the trace stream correlation charts, filtered to the service", async () => {
     api.push.mockReset();
-    const row = liveRow(
-      {
-        errors: cell("covered", "e"),
-        latency: cell("covered", "l"),
-        absence: cell("covered", "a"),
+    const { resetCorrelationCache } = await import("./live/useServiceCharts");
+    resetCorrelationCache();
+    api.correlate.mockResolvedValue({
+      data: {
+        service_name: "checkout",
+        related_streams: {
+          traces: [
+            {
+              stream_name: "otel_traces",
+              stream_type: "traces",
+              filters: { service_name: "checkout" },
+            },
+          ],
+          logs: [],
+        },
       },
-      [{ type: "traces", name: "default" }],
-    );
-    const wrapper = mountDrawer(row, "watched");
-    await wrapper.find('[data-test="autoobserve-coverage-drawer-catalog"]').trigger("click");
-    expect(api.push).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: "traces",
-        query: expect.objectContaining({ tab: "services-catalog", service: "checkout" }),
-      }),
-    );
+    });
+    api.getStream.mockResolvedValue({ schema: [] });
+    try {
+      const row = liveRow(
+        {
+          errors: cell("covered", "e"),
+          latency: cell("covered", "l"),
+          absence: cell("covered", "a"),
+        },
+        [
+          { type: "traces", name: "old_traces" },
+          { type: "traces", name: "otel_traces" },
+        ],
+      );
+      const wrapper = mountDrawer(row, "watched");
+      await flushPromises();
+      await wrapper.find('[data-test="autoobserve-coverage-drawer-catalog"]').trigger("click");
+      expect(api.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "traces",
+          query: expect.objectContaining({
+            tab: "services-catalog",
+            stream: "otel_traces",
+            service: "checkout",
+          }),
+        }),
+      );
+    } finally {
+      api.correlate.mockReset();
+      api.getStream.mockReset();
+      resetCorrelationCache();
+    }
   });
 });

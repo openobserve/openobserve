@@ -22,7 +22,7 @@ import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
 import {
-  runJavaScriptCode,
+  prepareCustomChartRun,
   validateUserCode,
   type CustomChartContext,
 } from "./convertCustomChartData";
@@ -360,11 +360,9 @@ export const convertPanelData = async (
           : data.length > 0 && data[0].length > 0;
 
       if (hasData) {
-        const result = await runJavaScriptCode(panelSchema, data, customChartContext);
-        const safeResult = result && typeof result === "object" ? result : {};
         return {
           chartType: panelSchema.type,
-          ...safeResult,
+          run: prepareCustomChartRun(panelSchema, data, customChartContext),
         };
       }
     }

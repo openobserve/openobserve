@@ -845,6 +845,26 @@ describe("useTraces", () => {
       expect(mockSearch).not.toHaveBeenCalled();
     });
 
+    it("matches a stream dimension filter on each alias of it the stream holds", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-1c", null);
+
+      await navigateToCorrelatedLogs({
+        ...correlationProps(),
+        logStreams: [
+          {
+            stream_name: "app-logs",
+            filters: { namespace: "prod" },
+            filter_aliases: { namespace: ["k8s_namespace_name"] },
+          },
+        ],
+      });
+
+      expect(pushedQuery()).toBe(
+        "(namespace = 'prod' or k8s_namespace_name = 'prod') and span_id = 'span-1c'",
+      );
+    });
+
     it("stays put and reports none when no stream holds the trace", async () => {
       mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 0 }] } });
       const { navigateToCorrelatedLogs } = useTraces();
@@ -1234,6 +1254,18 @@ describe("useTraces", () => {
       const { tracesShareURL, resetSearchObj } = useTraces();
       resetSearchObj();
       expect(tracesShareURL.value).toMatch(/^https?:\/\//);
+    });
+
+    it("leaves trace_id out when the page has none", () => {
+      const route = mockCurrentRoute.value;
+      mockCurrentRoute.value = { ...route, query: {} };
+      try {
+        const { tracesShareURL, resetSearchObj } = useTraces();
+        resetSearchObj();
+        expect(new URL(tracesShareURL.value).searchParams.has("trace_id")).toBe(false);
+      } finally {
+        mockCurrentRoute.value = route;
+      }
     });
   });
 

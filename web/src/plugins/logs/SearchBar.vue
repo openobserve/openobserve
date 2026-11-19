@@ -993,31 +993,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
-                  variant="ghost"
+                  :data-run-pending="panelRunPending ? 'true' : undefined"
+                  :aria-label="panelRunPending ? t('search.runQueryPendingLabel') : undefined"
+                  :variant="panelRunPending ? 'pending' : 'ghost'"
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
                   size="sm-toolbar"
-                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
-                  :class="runButtonTone"
+                  class="rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  :class="
+                    panelRunPending
+                      ? 'border-e-button-pending-hover-bg!'
+                      : [
+                          runButtonTone,
+                          'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                        ]
+                  "
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-8.5! w-px" vertical />
+                <OSeparator v-if="!visualizeRunPending" class="h-8.5! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
-                      variant="ghost"
+                      :variant="visualizeRunPending ? 'pending' : 'ghost'"
                       size="icon-toolbar"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : [
-                              runButtonTone,
-                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                            ],
+                          : visualizeRunPending
+                            ? 'border-s-0'
+                            : [
+                                runButtonTone,
+                                'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                              ],
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1054,31 +1065,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
-                  variant="ghost"
+                  :data-run-pending="panelRunPending ? 'true' : undefined"
+                  :aria-label="panelRunPending ? t('search.runQueryPendingLabel') : undefined"
+                  :variant="panelRunPending ? 'pending' : 'ghost'"
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
                   size="sm-toolbar"
-                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
-                  :class="runButtonTone"
+                  class="rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  :class="
+                    panelRunPending
+                      ? 'border-e-button-pending-hover-bg!'
+                      : [
+                          runButtonTone,
+                          'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                        ]
+                  "
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-8.5! w-px" vertical />
+                <OSeparator v-if="!visualizeRunPending" class="h-8.5! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
-                      variant="ghost"
+                      :variant="visualizeRunPending ? 'pending' : 'ghost'"
                       size="icon-toolbar"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
                       data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : [
-                              runButtonTone,
-                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                            ],
+                          : visualizeRunPending
+                            ? 'border-s-0'
+                            : [
+                                runButtonTone,
+                                'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                              ],
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1330,6 +1352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :fields="filterBuilderFields"
                   :load-values="loadFilterBuilderValues"
                   :fields-loading="searchObj.loadingStream"
+                  :free-text="streamsSearchFullText"
                   :extra-suggestions="recentFilterSection"
                   :max-rows="isFocused ? 0 : 3"
                   data-test="logs-search-bar-filter-builder"
@@ -1381,6 +1404,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
                 :recent-queries="recentQueries"
+                :full-text-search="streamsSearchFullText"
+                :values-time-range="valuesWindow"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -1864,7 +1889,9 @@ import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
 import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
+import { getConsumableRelativeTime } from "@/utils/date";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
@@ -1920,10 +1947,13 @@ import {
   clearPermalink,
   noteUserScopeChange,
 } from "@/composables/useLogs/useLogPermalink";
-import type {
-  PersistAction,
-  PersistSurface,
-  PersistReasonCode,
+import {
+  isAutoRunActive,
+  sameSignature,
+  type LogsSignature,
+  type PersistAction,
+  type PersistSurface,
+  type PersistReasonCode,
 } from "@/composables/useLogs/useAutoRun";
 import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transientSearchKeys";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -1938,7 +1968,11 @@ import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
-import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
+import {
+  hasFieldCondition,
+  qualifyFieldConditions,
+  removeFieldCondition,
+} from "@/plugins/logs/filterUtils";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -2310,6 +2344,15 @@ export default defineComponent({
         !!searchObj.meta.editorDirty ||
         (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isRunDirty()),
     );
+    // Logs-mode pending flags (a guard block, a dirty-time run) say nothing about a freshly loaded chart.
+    const panelRunPending = computed(
+      () => !!searchObj.meta.editorDirty || autoRun.isPanelScopeStale(),
+    );
+    const visualizeRunPending = computed(
+      () =>
+        panelRunPending.value &&
+        !(config.isEnterprise === "true" && visualizeSearchRequestTraceIds.value.length),
+    );
     const isRunQueryCancelShown = computed(
       () =>
         (searchObj.meta.logsVisualizeToggle === "patterns" && patternsState.value.loading) ||
@@ -2377,8 +2420,23 @@ export default defineComponent({
     const openAiFromBuilder = () =>
       (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
     const filterBuilderFields = computed(() =>
-      toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
+      toFilterFields(
+        searchObj.data.stream.selectedStreamFields ?? [],
+        (searchObj.data.streamResults?.list ?? [])
+          .filter((stream: { name: string }) =>
+            searchObj.data.stream.selectedStream.includes(stream.name),
+          )
+          .map((stream: { schema?: { name: string; type: string }[] }) => stream.schema ?? []),
+      ),
     );
+    // match_all fails on any selected stream that has no full-text search field.
+    const streamsSearchFullText = computed(() => {
+      const selected: string[] = searchObj.data.stream.selectedStream ?? [];
+      const { targets } = buildFilterContext(searchObj, store.state.zoConfig, {
+        ignoreFailures: true,
+      });
+      return selected.length > 0 && selected.every((name) => targets[name]?.mode === "fts");
+    });
     const loadFilterBuilderValues = (field: string, search: string) =>
       resolveFieldValues(field, { prefix: search });
     const onFilterBuilderQuery = (sql: string) => {
@@ -2548,7 +2606,19 @@ export default defineComponent({
       updateFunctionKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
+
+    const currentValuesWindow = () =>
+      pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
+    setValuesTimeRange(currentValuesWindow);
+    // A lookup keeps the function it began with, so a new one tells a lookup in flight the range changed.
+    watch(
+      () => pageValuesSetting(searchObj.data.datetime ?? {}),
+      () => setValuesTimeRange(() => currentValuesWindow()),
+    );
+    // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
+    const valuesWindow = computed(currentValuesWindow);
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
@@ -3780,7 +3850,6 @@ export default defineComponent({
       clearPermalink();
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
-      searchObj.meta.sqlMode = false;
       const viewOrg = store.state.selectedOrganization.identifier;
       const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
@@ -3845,8 +3914,13 @@ export default defineComponent({
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
-                throw new Error(errMsg);
+                throw Object.assign(new Error(errMsg), { userFacing: true });
               }
+              // Reset only once the view is known to apply, so a failed view keeps the SQL query.
+              searchObj.meta.sqlMode = false;
+              // Let the SQL-mode watcher clear the old query before the view's query is merged.
+              await nextTick();
+              if (leftViewOrg()) return;
               // extractedObj.data.stream.selectedStream = [];
               // extractedObj.data.stream.selectedStream = selectedStreams;
               delete extractedObj.data.stream.streamLists;
@@ -4026,6 +4100,9 @@ export default defineComponent({
               if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
+              searchObj.meta.sqlMode = false;
+              await nextTick();
+              if (leftViewOrg()) return;
               resetStreamData();
               searchObj.data.stream.streamType = extractedObj.data.stream.streamType;
 
@@ -4094,7 +4171,7 @@ export default defineComponent({
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
-                throw new Error(errMsg);
+                throw Object.assign(new Error(errMsg), { userFacing: true });
               }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -4198,7 +4275,7 @@ export default defineComponent({
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
             toast({
-              message: err.message || t("search.errorWhileApplyingSavedView"),
+              message: res.data?.message || t("search.errorWhileApplyingSavedView"),
               variant: "error",
             });
           }
@@ -4208,7 +4285,10 @@ export default defineComponent({
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
-            message: t("logs.searchBar.errorApplyingSavedView"),
+            message:
+              (err?.userFacing && err.message) ||
+              err?.response?.data?.message ||
+              t("logs.searchBar.errorApplyingSavedView"),
             variant: "error",
           });
           console.log("Error while applying saved view", err);
@@ -4813,6 +4893,29 @@ export default defineComponent({
       emit("buildModeToggle", false); // isCustomMode = false
     };
 
+    const GRID_TABS = ["logs", "drilldown"];
+    const AWAY_TABS = ["visualize", "build", "patterns"];
+    let scopeWhenGridLeft: LogsSignature | null = null;
+
+    // Build writes its own SQL and SQL/quick mode into the search, which is not a scope move.
+    const absorbBuildRewrite = (baseline: LogsSignature): LogsSignature => {
+      const { query, sqlMode, quickMode, quickModeFields } = autoRun.readSignature();
+      return { ...baseline, query, sqlMode, quickMode, quickModeFields };
+    };
+
+    const trackScopeAwayFromGrid = (from: string, to: string): boolean => {
+      if (GRID_TABS.includes(from) && AWAY_TABS.includes(to)) {
+        scopeWhenGridLeft = autoRun.readSignature();
+        return false;
+      }
+      if (!scopeWhenGridLeft || !AWAY_TABS.includes(from)) return false;
+      if (from === "build") scopeWhenGridLeft = absorbBuildRewrite(scopeWhenGridLeft);
+      if (!GRID_TABS.includes(to)) return false;
+      const baseline = scopeWhenGridLeft;
+      scopeWhenGridLeft = null;
+      return !sameSignature(autoRun.readSignature(), baseline);
+    };
+
     const onLogsVisualizeToggleUpdate = async (value: any) => {
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // here is what keeps the locked Patterns view from becoming active —
@@ -4947,6 +5050,11 @@ export default defineComponent({
           }
         }
       }
+      if (
+        trackScopeAwayFromGrid(searchObj.meta.logsVisualizeToggle, value) &&
+        isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta)
+      )
+        tabRunPending = "tab";
       searchObj.meta.logsVisualizeToggle = value;
       patchUrlViewState();
       if (tabRunPending) autoRun.request(tabRunPending);
@@ -5299,6 +5407,8 @@ export default defineComponent({
       visualizeReason,
       isGridInFlight,
       showRunQueryPending,
+      visualizeRunPending,
+      panelRunPending,
       isRunQueryCancelShown,
       blockWithReason,
       flushEditorValue,
@@ -5355,6 +5465,8 @@ export default defineComponent({
       pickRecentFilterRow,
       onFilterBuilderFocus,
       recentQueries,
+      streamsSearchFullText,
+      valuesWindow,
       recentExamples,
       onRecentEditorKeydown,
       noteEditorPointer,
@@ -5618,7 +5730,7 @@ export default defineComponent({
               const parsedSQL = this.fnParsedSQL();
               const streamPrefix: string =
                 parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
-              filter = `"${streamPrefix}".${filter}`;
+              filter = qualifyFieldConditions(filter, streamPrefix);
             }
 
             // if query contains order by clause or limit clause then add where clause before that

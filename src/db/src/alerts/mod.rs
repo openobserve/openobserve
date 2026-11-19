@@ -15,6 +15,7 @@
 
 pub mod alert;
 pub mod alert_acks;
+pub mod alert_composites;
 pub mod alert_states;
 pub mod destinations;
 pub mod realtime_triggers;
