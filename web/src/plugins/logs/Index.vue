@@ -1321,7 +1321,8 @@ export default defineComponent({
           refreshData();
           // A newer restore started meanwhile; it carries its own run decision.
           if (runRequested && logsReapplyRequest.value.seq === seq) {
-            runQueryFn(logsReapplyRequest.value.reason);
+            const result = await runQueryFn(logsReapplyRequest.value.reason);
+            if (result !== "scheduled" && result !== "dispatched") endLogsArrival();
           }
         }
       },
@@ -1353,9 +1354,9 @@ export default defineComponent({
       searchObj.runQuery = false;
       if (!searchObj.data.stream.selectedStream.length) {
         searchObj.loading = false;
-        return;
+        return "skipped";
       }
-      autoRun.engine.requestRun(reason === "url" ? "url" : "run");
+      return autoRun.engine.requestRun(reason === "url" ? "url" : "run");
     };
 
     const showRanFilter = (generationId: number, ranQuery: string) => {
