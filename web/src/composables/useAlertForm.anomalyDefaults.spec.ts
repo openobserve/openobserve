@@ -17,12 +17,18 @@ import {
 } from "@/composables/useAlertForm";
 
 describe("defaultAnomalyConfig", () => {
-  it("defaults the training window to 28 days", () => {
-    expect(defaultAnomalyConfig().training_window_days).toBe(28);
-  });
-
-  it("defaults threshold to the 97th percentile", () => {
-    expect(defaultAnomalyConfig().threshold).toBe(97);
+  // The schedule is the starters' one: check every 5-minute bucket, look back 30 minutes.
+  it.each([
+    ["training_window_days", 28],
+    ["threshold", 97],
+    ["schedule_interval_value", 5],
+    ["schedule_interval_unit", "m"],
+    ["detection_window_value", 30],
+    ["detection_window_unit", "m"],
+  ])("defaults %s to %s", (field, value) => {
+    expect(defaultAnomalyConfig()[field as keyof ReturnType<typeof defaultAnomalyConfig>]).toBe(
+      value,
+    );
   });
 });
 

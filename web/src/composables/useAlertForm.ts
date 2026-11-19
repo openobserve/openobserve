@@ -132,6 +132,7 @@ import { invalidateSiemDetections } from "@/composables/security/useSiemDetectio
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { shownFieldMeta } from "@/composables/alerts/shownFieldError";
 import { isIngestArtifact } from "@/composables/alerts/useStreamDiscovery";
+import { anomalySchedule } from "@/utils/alerts/alertIntents";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import type { AlertSectionId } from "@/components/alerts/alertFormSections";
 import {
@@ -374,13 +375,8 @@ export const defaultAnomalyConfig = () => ({
   custom_sql: "",
   detection_function: "count",
   detection_function_field: "",
-  histogram_interval_value: 5,
-  histogram_interval_unit: "m" as AnomalyIntervalUnit,
-  schedule_interval_value: 1,
-  schedule_interval_unit: "h" as AnomalyIntervalUnit,
-  // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
-  detection_window_value: 3,
-  detection_window_unit: "h" as AnomalyIntervalUnit,
+  // The starters' schedule, so an alert begun without one also waits at most one bucket.
+  ...anomalySchedule(),
   training_window_days: 28,
   retrain_interval_days: 7,
   threshold: 97,

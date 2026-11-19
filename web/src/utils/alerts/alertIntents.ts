@@ -17,6 +17,7 @@
 // by type and value shape. No field, label or metric name is written into this logic.
 
 import type { ValueCount } from "@/composables/alerts/useStreamDiscovery";
+import type { AnomalyIntervalUnit } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import type { SeriesLabels } from "./promqlNoSeries";
 import { promqlByLabels, sqlGroupByLabels } from "./queryGroupLabels";
 
@@ -613,11 +614,11 @@ export function anomalySchedule(bucketMinutes = ANOMALY_BUCKET_MINUTES) {
   const recommended = 2 * (bucketMinutes + bucketMinutes) + 10;
   return {
     histogram_interval_value: bucketMinutes,
-    histogram_interval_unit: "m",
+    histogram_interval_unit: "m" as AnomalyIntervalUnit,
     schedule_interval_value: bucketMinutes,
-    schedule_interval_unit: "m",
+    schedule_interval_unit: "m" as AnomalyIntervalUnit,
     detection_window_value: Math.ceil(recommended / bucketMinutes) * bucketMinutes,
-    detection_window_unit: "m",
+    detection_window_unit: "m" as AnomalyIntervalUnit,
   };
 }
 
