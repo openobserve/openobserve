@@ -28,8 +28,9 @@ import { streamNameListQuery } from "@/services/stream.queries";
 import alertsService from "@/services/alerts";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
+import { formatNumber } from "@/utils/alerts/alertCopy";
 import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
-import { limitText } from "@/utils/alerts/alertReadBack";
+import { operatorSymbol } from "@/utils/alerts/alertReadBack";
 import { dayVerdict, type DayVerdict } from "@/utils/alerts/alertTestRun";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import {
@@ -45,6 +46,9 @@ export const SCOPE_STREAM_TYPES: readonly ScopeStreamType[] = ["logs", "metrics"
 /** The dry runs a pane may have in flight at once. */
 const DRY_RUN_CONCURRENCY = 3;
 const DRY_RUN_TTL_MS = 10 * 60_000;
+/** A dry run still unanswered after this says nothing, so no row loads forever. */
+const DRY_RUN_TIMEOUT_MS = 60_000;
+const FAILED: DayVerdict = { state: "failed", reason: null };
 
 /** Kept across pane opens, so reopening the starter repeats no dry run. */
 const verdictCache = new Map<string, { verdict: DayVerdict; at: number }>();
@@ -143,11 +147,14 @@ export function prefillSummary(prefill: AlertPrefill): { per: string[]; conditio
       : sqlGroupByLabels(prefill.sql ?? "").filter((label) => !label.includes("("));
   const promql = prefill.promqlCondition;
   const having = prefill.aggregation?.having;
+  // A row has no sentence around the number, so even "at least" keeps its sign.
+  const limit = (op: string | undefined, value: unknown) =>
+    `${operatorSymbol(op || ">=")} ${formatNumber(value)}`;
   const condition = promql
-    ? limitText(promql.operator, promql.value)
+    ? limit(promql.operator, promql.value)
     : having
-      ? limitText(having.operator, having.value)
-      : limitText(prefill.triggerOperator, prefill.triggerThreshold ?? 1);
+      ? limit(having.operator, having.value)
+      : limit(prefill.triggerOperator, prefill.triggerThreshold ?? 1);
   return { per, condition };
 }
 
@@ -168,11 +175,26 @@ export function useLibraryDryRun(org: ComputedRef<string>) {
       const job = queue.shift()!;
       const controller = new AbortController();
       running.set(job.key, controller);
+      let done = false;
+      const finish = (verdict: DayVerdict | null, cache = false) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        running.delete(job.key);
+        if (verdict) settle(job.key, verdict, cache);
+        pump();
+      };
+      // A cancel is not an answer; a refusal, failure or timeout is asked again next open.
+      const timer = setTimeout(() => {
+        const cancelled = controller.signal.aborted;
+        controller.abort();
+        finish(cancelled ? null : FAILED);
+      }, DRY_RUN_TIMEOUT_MS);
       void (async () => {
         try {
           const body = await job.body();
-          if (controller.signal.aborted) return;
-          if (!body) return settle(job.key, { state: "failed", reason: null }, true);
+          if (controller.signal.aborted) return finish(null);
+          if (!body) return finish(FAILED, true);
           const response = await alertsService.evaluate(
             org.value,
             { alert: body },
@@ -180,13 +202,9 @@ export function useLibraryDryRun(org: ComputedRef<string>) {
             controller.signal,
             { track: false },
           );
-          settle(job.key, dayVerdict(response.data), true);
+          finish(dayVerdict(response.data), true);
         } catch {
-          // A cancel is not an answer; a refusal or failure is asked again next open.
-          if (!controller.signal.aborted) settle(job.key, { state: "failed", reason: null }, false);
-        } finally {
-          running.delete(job.key);
-          pump();
+          finish(controller.signal.aborted ? null : FAILED);
         }
       })();
     }

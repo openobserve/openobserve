@@ -15,12 +15,13 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { ref } from "vue";
+import { computed, defineComponent, ref } from "vue";
 import { createStore } from "vuex";
 
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 
 const streams = vi.hoisted(() => ({ list: vi.fn() }));
+const evaluate = vi.hoisted(() => vi.fn());
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: streams.list }),
@@ -28,6 +29,7 @@ vi.mock("@/composables/useStreams", () => ({
 vi.mock("@/components/create-starter/useStartPreference", () => ({
   useStartPreference: () => ({ recordUse: vi.fn() }),
 }));
+vi.mock("@/services/alerts", () => ({ default: { evaluate } }));
 vi.mock("./StarterScopeSelect.vue", () => ({ default: { template: "<div />" } }));
 vi.mock("./libraryPaneData", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./libraryPaneData")>()),
@@ -98,6 +100,31 @@ describe("AlertLibraryPane", () => {
     const w = render(cached);
     await flushPromises();
     expect(w.emitted("count")?.at(-1)).toEqual([count]);
+  });
+
+  it("gives up on a dry run that never answers, so its row stops loading", async () => {
+    vi.useFakeTimers();
+    evaluate.mockImplementation(
+      (_org, _body, _folder, signal: AbortSignal) =>
+        new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("x")))),
+    );
+    const { useLibraryDryRun } =
+      await vi.importActual<typeof import("./libraryPaneData")>("./libraryPaneData");
+    let run!: ReturnType<typeof useLibraryDryRun>;
+    const store = createStore({ state: {} });
+    mount(
+      defineComponent({
+        setup: () => {
+          run = useLibraryDryRun(computed(() => "org1"));
+          return () => null;
+        },
+      }),
+      { global: { plugins: [store] } },
+    );
+    run.request("k", async () => ({}) as never);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(run.verdicts.value.k).toEqual({ state: "failed", reason: null });
+    vi.useRealTimers();
   });
 
   it("puts the alerts the org already runs last, hottest first otherwise", () => {

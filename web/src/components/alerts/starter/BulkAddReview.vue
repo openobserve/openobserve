@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div class="min-w-0" data-test="alerts-bulk-add-review-scope">
-        <StarterScopeSelect v-model="scope" />
+        <StarterScopeSelect v-model="scope" :label="t('alertStarter.library.scopeLabel')" />
       </div>
       <div class="flex min-w-0 flex-col gap-1 sm:col-span-2" data-test="alerts-bulk-add-review-who">
         <WhoToTell
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Always one line, so choosing a destination never moves the rows below. -->
         <p
           class="flex items-center gap-1 text-xs"
-          :class="destinations.length ? 'text-text-secondary' : 'text-status-warning'"
+          :class="destinations.length ? 'text-text-secondary' : 'text-status-warning-text'"
           data-test="alerts-bulk-add-review-who-line"
         >
           <OIcon v-if="!destinations.length" name="warning" size="xs" class="shrink-0" />

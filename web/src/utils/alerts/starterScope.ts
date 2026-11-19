@@ -155,7 +155,24 @@ export function buildScopeOptions(
     return [{ id, label, options: options.sort(byLabel) }];
   });
 
-  return { services: [...services.values()].sort(byLabel), dimensions };
+  return { services: withDistinctLabels([...services.values()]).sort(byLabel), dimensions };
+}
+
+/** Options sharing a label gain the dimension values that tell them apart: "cadvisor · shop". */
+function withDistinctLabels<T extends ScopeOption>(options: T[]): T[] {
+  const sameLabel = new Map<string, T[]>();
+  options.forEach((o) => sameLabel.set(o.label, [...(sameLabel.get(o.label) ?? []), o]));
+  return [...sameLabel.values()].flatMap((same) => {
+    if (same.length < 2) return same;
+    const dims = (o: T) => (o.scope.kind === "service" ? o.scope.dimensions : {});
+    const fields = Object.keys(dims(same[0])).filter(
+      (field) => new Set(same.map((o) => dims(o)[field])).size > 1,
+    );
+    return same.map((o) => ({
+      ...o,
+      label: [o.label, ...fields.map((field) => dims(o)[field]).filter(Boolean)].join(" · "),
+    }));
+  });
 }
 
 const byLabel = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label);

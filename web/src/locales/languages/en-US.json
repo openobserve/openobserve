@@ -35824,7 +35824,7 @@
       "shortcutOpenStarter": "Other ways to start a new alert"
     },
     "library": {
-      "searchPlaceholder": "Search ready-made alerts",
+      "searchPlaceholder": "Search the library",
       "scopeLabel": "Which services the alerts watch",
       "scopeSearch": "Find a service or stream",
       "scopeEvery": "For every service",

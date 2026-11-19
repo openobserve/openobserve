@@ -177,4 +177,15 @@ describe("buildScopeOptions", () => {
     expect(entryInScope(entry("cpu", "logs"), shop.scope, shop)).toBe(false);
     expect(entryInScope(entry("cpu", "metrics"), shop.scope, shop)).toBe(true);
   });
+
+  it("names what differs when one service runs in several places", () => {
+    const twin = (ns: string) => ({
+      service_name: "cadvisor",
+      disambiguation: { cluster: "c1", ns },
+      all_dimensions: { service: "cadvisor", cluster: "c1", ns },
+      field_name_mapping: { service: "svc_field", cluster: "cl_field", ns: "ns_field" },
+    });
+    const { services } = buildScopeOptions([twin("shop"), twin("auth"), rows[1]], null, groups);
+    expect(services.map((o) => o.label)).toEqual(["cadvisor · auth", "cadvisor · shop", "cart"]);
+  });
 });

@@ -70,16 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('alertStarter.library.loading')"
         />
         <template v-if="own.length">
-          <OTag
-            variant="default-outline"
-            size="xs"
-            :label="t('alertStarter.library.youHave', { count: own.length }, own.length)"
-            :data-test="`alert-starter-library-row-own-${entry.id}`"
-          />
+          <!-- Plain text and a link keep the line one text-height tall when this lands late. -->
+          <span class="text-text-body" :data-test="`alert-starter-library-row-own-${entry.id}`">{{
+            t("alertStarter.library.youHave", { count: own.length }, own.length)
+          }}</span>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="ghost-primary"
+                variant="link"
                 size="xs"
                 :data-test="`alert-starter-library-row-own-open-${entry.id}`"
                 @click.stop

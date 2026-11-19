@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @keydown="markActed"
     @wheel.passive="markActed"
   >
-    <div class="flex items-center gap-2">
+    <div class="flex shrink-0 items-center gap-2">
       <OSearchInput
         v-model="search"
         size="sm"
@@ -35,12 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :placeholder="t('alertStarter.library.searchPlaceholder')"
         data-test="alert-starter-library-search"
       />
-      <StarterScopeSelect v-model="scope" class="shrink-0" />
+      <!-- Sized to its value, so the search keeps the rest of the row. -->
+      <div class="flex max-w-1/2 shrink-0">
+        <StarterScopeSelect v-model="scope" />
+      </div>
     </div>
 
     <div
       v-if="!failed"
-      class="flex min-h-7 flex-wrap items-center gap-1.5"
+      class="flex min-h-7 shrink-0 flex-wrap items-center gap-1.5"
       role="group"
       :aria-label="t('alertStarter.library.packsLabel')"
       data-test="alert-starter-library-packs"
@@ -58,9 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="chip in packChips"
         v-else
         :key="chip.id"
-        variant="outline"
+        :variant="pack === chip.id ? 'outline-primary' : 'outline'"
         size="chip"
-        :active="pack === chip.id"
         :aria-pressed="pack === chip.id"
         :data-test="`alert-starter-library-pack-${chip.id}`"
         @click="pack = chip.id"
@@ -70,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <div v-if="!failed" class="flex min-h-6 items-center justify-between gap-3 text-xs">
+    <div v-if="!failed" class="flex min-h-6 shrink-0 items-center justify-between gap-3 text-xs">
       <OSkeleton
         v-if="busy"
         animation="none"
@@ -157,10 +159,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="!busy && !failed && notReadyCount > 0 && ready.length > 0"
-      class="border-border-subtle text-text-secondary flex items-center justify-between gap-3 border-t pt-2 text-xs"
+      class="border-border-subtle text-text-secondary flex shrink-0 items-center justify-between gap-3 border-t pt-2 text-xs"
       data-test="alert-starter-library-more"
     >
-      <span>{{ t("alertStarter.library.needData", { count: notReadyCount }, notReadyCount) }}</span>
+      <span>{{
+        t("alertStarter.library.needData", { count: formatNumber(notReadyCount) }, notReadyCount)
+      }}</span>
       <OButton
         variant="ghost-primary"
         size="xs"
@@ -340,14 +344,15 @@ const filtered = computed(() =>
   pack.value === "all" ? searched.value : searched.value.filter((e) => e.pack === pack.value),
 );
 
-/** Every pack the ready set holds stays listed, so a chip never vanishes under the pointer. */
+/** Every pack the ready set holds stays listed in one order, so a chip never moves under the pointer. */
 const packChips = computed(() => {
+  const sizes = new Map<string, number>();
+  for (const entry of ready.value) sizes.set(entry.pack, (sizes.get(entry.pack) ?? 0) + 1);
   const counts = new Map<string, number>();
-  for (const entry of ready.value) counts.set(entry.pack, 0);
   for (const entry of searched.value) counts.set(entry.pack, (counts.get(entry.pack) ?? 0) + 1);
-  const packs = [...counts.entries()]
+  const packs = [...sizes.entries()]
     .sort((a, b) => b[1] - a[1] || String(packLabel(a[0])).localeCompare(String(packLabel(b[0]))))
-    .map(([id, count]) => ({ id, label: packLabel(id), count }));
+    .map(([id]) => ({ id, label: packLabel(id), count: counts.get(id) ?? 0 }));
   return [
     { id: "all", label: t("alertStarter.library.packAll"), count: searched.value.length },
     ...packs,
@@ -467,6 +472,8 @@ const rows = computed(() => {
   const rest = filtered.value.filter((entry) => !order.value.includes(entry.id));
   return [...placed.map((id) => byId.get(id)!), ...rest];
 });
+// Detail and dry runs are asked in the order the rows show, so the top of the list answers first.
+const seenRows = computed(() => rows.value.filter((entry) => seen.value.has(entry.id)));
 
 // ── per-row detail: the alert file, then what it groups by and fires on ──
 // Absent while loading; null once it failed, so a failure stops the skeleton.
@@ -475,7 +482,7 @@ const requestedFiles = new Set<string>();
 const keepFile = (id: string, file: AlertLibraryFile | null) => {
   files.value = { ...files.value, [id]: file };
 };
-watch(seenEntries, (list) => {
+watch(seenRows, (list) => {
   for (const entry of list) {
     if (requestedFiles.has(entry.id)) continue;
     requestedFiles.add(entry.id);
@@ -513,15 +520,18 @@ const evaluateBody = async (entry: AlertLibraryEntry): Promise<EvaluateAlertBody
     timezone: store.state.timezone,
   }) as unknown as EvaluateAlertBody;
 };
-watch(seenEntries, (list) => {
+watch(seenRows, (list) => {
   for (const entry of list) {
     if (canDryRun(entry) && !ownById.value[entry.id]) {
       dryRun.request(dryRunKey(entry), () => evaluateBody(entry));
     }
   }
 });
+// A row is pending only once it has been in view and asked; others say nothing yet.
 const verdictFor = (entry: AlertLibraryEntry): DayVerdict | "pending" | null =>
-  canDryRun(entry) ? (dryRun.verdicts.value[dryRunKey(entry)] ?? "pending") : null;
+  canDryRun(entry) && seen.value.has(entry.id)
+    ? (dryRun.verdicts.value[dryRunKey(entry)] ?? "pending")
+    : null;
 
 // ── selection ──
 const selectedSet = computed(() => new Set(props.selected));

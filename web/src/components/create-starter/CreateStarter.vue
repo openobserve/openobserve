@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <span ref="anchorEl" class="inline-flex" data-test="create-starter-trigger">
     <slot :open="open" :starts-with-form="resolved === 'form'" :toggle="toggle" :start="start" />
-    <!-- A zero-height strip on the bottom edge: anchoring above it turns the popover into a bottom sheet. -->
+    <!-- A zero-height strip on the bottom edge: anchoring above it turns the popover into a bottom sheet.
+         The positioner counts a zero-height anchor as detached, so the sheet never hides on that. -->
     <span
       v-if="isSheet"
       ref="sheetAnchor"
@@ -31,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :side="isSheet ? 'top' : 'bottom'"
       :align="isSheet ? 'center' : 'end'"
       :side-offset="isSheet ? 0 : 4"
+      :hide-when-detached="!isSheet"
       flip-align
       :aria-label="opensWithLabel"
       content-class="flex w-[min(42.5rem,calc(100vw-1.5rem))] flex-col max-sm:rounded-b-none"
@@ -39,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @focus-outside="keepOpenForTrigger"
     >
       <div class="flex min-h-0 flex-col" data-test="create-starter">
-        <div
-          class="border-border-default flex flex-wrap items-center gap-x-3 gap-y-2 border-b p-3"
+        <OContent
+          class="border-border-default flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-3"
           data-test="create-starter-switch-row"
         >
           <OTooltip
@@ -72,31 +74,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
           <span
             v-if="switchable.length"
-            class="bg-border-default h-5 w-px shrink-0"
+            class="bg-border-default h-5 w-px shrink-0 max-sm:hidden"
             aria-hidden="true"
           />
           <OButton
-            variant="ghost"
+            variant="ghost-primary"
             size="sm"
             icon-right="arrow-forward"
             data-test="create-starter-use-form"
             @click="useForm"
             >{{ formLabel }}</OButton
           >
-        </div>
-        <div v-if="$slots.resume" class="px-3 pt-2" data-test="create-starter-resume">
+        </OContent>
+        <OContent v-if="$slots.resume" class="pt-2" data-test="create-starter-resume">
           <slot name="resume" />
-        </div>
-        <div
+        </OContent>
+        <OContent
           v-if="activePane"
-          class="max-h-[60vh] min-h-0 flex-1 overflow-y-auto"
+          y
+          class="flex max-h-[60vh] min-h-0 flex-1 flex-col overflow-y-auto"
           :data-test="`create-starter-body-${activePane}`"
         >
           <slot v-if="activePane === 'ai'" name="pane-ai" />
           <slot v-else name="pane-library" />
-        </div>
-        <div
-          class="border-border-default flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2"
+        </OContent>
+        <OContent
+          class="border-border-default flex flex-wrap items-center justify-between gap-2 border-t py-2"
           data-test="create-starter-footer"
         >
           <StartWithSelect
@@ -107,10 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :opens-now="resolved"
             @update:model-value="pref.setDefault"
           />
-          <div class="flex items-center gap-2">
+          <!-- Holds a small button's height, so an action landing here never grows the footer. -->
+          <div class="flex min-h-8.5 items-center gap-2">
             <slot name="footer-end" />
           </div>
-        </div>
+        </OContent>
       </div>
     </OPopover>
   </span>
@@ -123,6 +127,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OContent from "@/lib/core/Content/OContent.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import StartWithSelect, { type StartWithChoice } from "./StartWithSelect.vue";
