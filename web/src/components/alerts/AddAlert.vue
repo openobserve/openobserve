@@ -1973,7 +1973,12 @@ export default defineComponent({
       !!document.activeElement?.closest('[data-snap-section]:not([data-snap-section="watch"])');
     watch(activeSection, (now, left) => {
       if (now === "notify") nameDue.value = true;
-      visitedSections.value = new Set([...visitedSections.value, left]);
+      // A jump past a step (a read-back link, the rail) passes it too, so the rail ticks it or says what it needs.
+      const passed = ALERT_SECTIONS.slice(
+        0,
+        ALERT_SECTIONS.findIndex((s) => s.id === now),
+      );
+      visitedSections.value = new Set([...visitedSections.value, left, ...passed.map((s) => s.id)]);
       if (now === "watch") foldDue.value = false;
       // Scrolling past section 1 keeps it open; a jump, or focus moving on from it, folds it.
       else if (

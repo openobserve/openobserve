@@ -1733,16 +1733,19 @@ describe("AddAlert (OForm owner)", () => {
       }
     });
 
-    it("ticks a section with a value once the user moves past it", async () => {
+    it.each([
+      ["step by step", ["condition", "notify"]],
+      ["by a jump that skips it", ["notify"]],
+    ])("ticks a section with a value once the user moves past it %s", async (_, path) => {
       wrapper = mountAlert();
       await flushPromises();
       const state = (id: string) =>
         wrapper.vm.sectionItems.find((item: { id: string }) => item.id === id).state;
       wrapper.vm.form.setFieldValue("stream_name", "k8s_logs");
-      wrapper.vm.activeSection = "condition";
-      await flushPromises();
-      wrapper.vm.activeSection = "notify";
-      await flushPromises();
+      for (const section of path) {
+        wrapper.vm.activeSection = section;
+        await flushPromises();
+      }
       expect(state("condition")).toBe("done");
     });
 
