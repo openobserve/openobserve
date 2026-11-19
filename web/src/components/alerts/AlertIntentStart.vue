@@ -341,9 +341,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('alerts.sections.condition.noThreshold')"
           />
         </template>
-        <span v-else class="text-text-secondary" data-test="add-alert-intent-threshold-waits">{{
-          t("alerts.intent.rows.thresholdWaits")
-        }}</span>
+        <span
+          v-else
+          class="text-text-secondary leading-8.5"
+          data-test="add-alert-intent-threshold-waits"
+          >{{ t("alerts.intent.rows.thresholdWaits") }}</span
+        >
         <template #note>
           <AlertMessageLine
             :error="threshold ? thresholdError : null"
