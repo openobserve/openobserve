@@ -58,6 +58,9 @@ export function findControl(
   return null;
 }
 
+/** How long a jump's landing row stays tinted. */
+export const LANDED_MS = 2000;
+
 /** Focus the control itself, or the first focusable element inside its wrapper. */
 export function focusControl(el: HTMLElement): void {
   const target = el.matches(FOCUSABLE) ? el : (el.querySelector<HTMLElement>(FOCUSABLE) ?? el);
@@ -109,6 +112,18 @@ export function useAlertSettingFind(opts: {
   );
   const emptyText = computed(() => t("alerts.find.empty", { query: query.value.trim() }));
 
+  // A link in one step can open a setting in another; the tint shows where the jump went.
+  let landed: { row: HTMLElement; timer: ReturnType<typeof setTimeout> } | null = null;
+  const markLanded = (control: HTMLElement): void => {
+    if (landed) {
+      clearTimeout(landed.timer);
+      landed.row.removeAttribute("data-landed");
+    }
+    const row = control.closest<HTMLElement>("[data-o-setting-row]") ?? control;
+    row.setAttribute("data-landed", "");
+    landed = { row, timer: setTimeout(() => row.removeAttribute("data-landed"), LANDED_MS) };
+  };
+
   const select = async (id: string): Promise<void> => {
     const entry = ALERT_FIND_ENTRIES.find((e) => e.id === id);
     if (!entry) return;
@@ -132,6 +147,7 @@ export function useAlertSettingFind(opts: {
     }
     opts.reveal(control);
     focusControl(control);
+    markLanded(control);
   };
 
   return { query, items, countText, emptyText, select };

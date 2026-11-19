@@ -136,7 +136,7 @@ provide(SETTING_ROW_GRID_KEY, true);
         </div>
       </header>
       <div
-        class="[&_[data-o-setting-row]]:border-border-default -mt-px flex flex-col px-4 pb-2 [&_[data-o-setting-row]]:border-t [&_[data-o-setting-row]]:py-2"
+        class="[&_[data-o-setting-row]]:border-border-default [&_[data-landed]]:bg-accent/8 -mt-px flex flex-col px-4 pb-2 [&_[data-o-setting-row]]:border-t [&_[data-o-setting-row]]:py-2 motion-safe:[&_[data-o-setting-row]]:transition-colors"
         data-section-body
       >
         <slot />
@@ -148,8 +148,10 @@ provide(SETTING_ROW_GRID_KEY, true);
       >
         <slot name="optional" />
       </div>
+      <!-- The current step's footer sticks, so its Next is never cut off; a later card's would cover its own body. -->
       <footer
-        class="border-border-default rounded-b-surface flex flex-wrap items-center gap-2 border-t px-4 py-1.5 max-md:flex-col max-md:items-stretch"
+        class="border-border-default rounded-b-surface bg-surface-overlay flex flex-wrap items-center gap-2 border-t px-4 py-1.5 max-md:flex-col max-md:items-stretch"
+        :class="current !== false && 'sticky bottom-0 z-30 max-lg:static max-lg:z-auto'"
         :data-test="`add-alert-section-${index}-footer`"
       >
         <OButton

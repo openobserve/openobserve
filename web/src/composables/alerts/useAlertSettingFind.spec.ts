@@ -6,7 +6,7 @@ import i18n from "@/locales";
 import type { TranslateFn } from "@/types/i18n";
 import type { AlertSettingId } from "@/components/alerts/alertSettingTiers";
 import type { AlertSettingTiers } from "./useAlertSettingTiers";
-import { findControl, focusControl, useAlertSettingFind } from "./useAlertSettingFind";
+import { findControl, focusControl, LANDED_MS, useAlertSettingFind } from "./useAlertSettingFind";
 import { ALERT_FIND_ENTRIES } from "@/components/alerts/alertSettingFind";
 
 const t = i18n.global.t as unknown as TranslateFn;
@@ -82,6 +82,20 @@ describe("useAlertSettingFind", () => {
     );
     expect(reveal).toHaveBeenCalledWith(control);
     expect(document.activeElement).toBe(control?.querySelector("input"));
+  });
+
+  it("marks the row it lands on for a moment, so a jump to another step shows where it went", async () => {
+    vi.useFakeTimers();
+    const { find } = setup();
+    const row = document.createElement("div");
+    row.setAttribute("data-o-setting-row", "");
+    document.body.appendChild(row);
+    row.appendChild(mountControl("alert-settings-silence-duration-input"));
+    await find.select("cooldown");
+    expect(row.hasAttribute("data-landed")).toBe(true);
+    vi.advanceTimersByTime(LANDED_MS);
+    expect(row.hasAttribute("data-landed")).toBe(false);
+    vi.useRealTimers();
   });
 
   it("lands on a + add link without adding the setting", async () => {
