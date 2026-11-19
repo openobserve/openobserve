@@ -213,6 +213,73 @@ describe("treemap through convertPanelData", () => {
     expect(options.series[0].upperLabel.show).toBe(false);
   });
 
+  it("does not zoom on click when the breadcrumb that leads back out is hidden", async () => {
+    const { options } = await viaPanel(
+      panel("treemap", { x: [serviceX], y: [count] }, { treemap_show_breadcrumb: false }),
+      [rows],
+    );
+    expect(options.series[0].nodeClick).toBe(false);
+  });
+
+  it("reports the rows left out for a size that is not a positive number", async () => {
+    const { options, extras } = await viaPanel(panel("treemap", { x: [serviceX], y: [count] }), [
+      [...rows, { x_axis_1: "api", y_axis_1: -500 }],
+    ]);
+    expect(extras.treemapNotice).toEqual({ skippedRows: 3 });
+    expect(options.series[0].data.find((node: any) => node.name === "api").value).toBe(40);
+  });
+
+  it("draws only the first visible query of a saved multi-query panel, never a sum of measures", async () => {
+    const schema: any = panel("treemap", { x: [serviceX], y: [count] });
+    const second = JSON.parse(JSON.stringify(schema.queries[0]));
+    schema.queries = [{ ...schema.queries[0], config: { hide: true } }, second, second];
+    const { options } = await viaPanel(schema, [
+      [{ x_axis_1: "api", y_axis_1: 1000 }],
+      [{ x_axis_1: "api", y_axis_1: 7 }],
+      [{ x_axis_1: "api", y_axis_1: 500 }],
+    ]);
+    expect(options.series[0].data.map((node: any) => [node.name, node.value])).toEqual([
+      ["api", 7],
+    ]);
+  });
+
+  it("shows No Data with the skipped rows when no row has a positive size", async () => {
+    const { options, extras } = await viaPanel(panel("treemap", { x: [serviceX], y: [count] }), [
+      [
+        { x_axis_1: "neg", y_axis_1: -500 },
+        { x_axis_1: "zero", y_axis_1: 0 },
+      ],
+    ]);
+    expect(options.series).toEqual([]);
+    expect(extras.treemapNotice).toEqual({ skippedRows: 2 });
+  });
+
+  it("shows a count as a whole number whatever the decimals, unless a unit is set", async () => {
+    const label = async (size: any, config: Record<string, any>) => {
+      const { options } = await viaPanel(panel("treemap", { x: [serviceX], y: [size] }, config), [
+        rows,
+      ]);
+      return options.series[0].label.formatter({ name: "api", value: 40 });
+    };
+    expect(await label(count, { decimals: undefined })).toBe("api\n40");
+    expect(await label(count, { decimals: 2 })).toBe("api\n40");
+    expect(await label(field("y_axis_1", "Bytes", "sum"), { decimals: 2 })).toBe("api\n40.00");
+    expect(await label(count, { decimals: 2, unit: "percent" })).toBe("api\n40.00%");
+  });
+
+  it("draws every level when the breadcrumb is hidden, since a click cannot zoom", async () => {
+    const levels = {
+      x: [field("x_axis_1", "Region"), field("x_axis_2", "Service"), field("x_axis_3", "Host")],
+      y: [count],
+    };
+    const deep = [{ x_axis_1: "eu", x_axis_2: "api", x_axis_3: "h1", y_axis_1: 5 }];
+    const [series] = (
+      await viaPanel(panel("treemap", levels, { treemap_show_breadcrumb: false }), [deep])
+    ).options.series;
+    expect(series.nodeClick).toBe(false);
+    expect(series.leafDepth).toBeUndefined();
+  });
+
   it("gives each tile the label colour that reads on it, with no halo, and the root the body colour", async () => {
     const { options } = await viaPanel(
       panel("treemap", { x: [serviceX], y: [count], breakdown: [regionB] }),

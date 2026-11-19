@@ -269,9 +269,22 @@ export function usePanelDrilldown({
       return boxplotDrilldownSeries(panelData?.value?.options, params);
     }
     return {
-      __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
+      // A tile standing in for a missing or empty group carries the blank its drilldown filters on.
+      __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type)
+        ? params?.data?.rawName !== undefined
+          ? (params.data.rawName ?? "")
+          : params?.name
+        : params?.seriesName,
       __value: value,
       __axisValue: params?.value?.[0] ?? params?.name,
+      // Tiles of the same name sit under different parents, so the path tells them apart; each value is encoded so a "/" in it stays one segment.
+      ...(panelSchema.value.type === "treemap"
+        ? {
+            __path: ((params?.data?.rawPath ?? params?.data?.path ?? []) as (string | null)[])
+              .map((segment) => encodeURIComponent(segment ?? ""))
+              .join("/"),
+          }
+        : {}),
     };
   };
 
