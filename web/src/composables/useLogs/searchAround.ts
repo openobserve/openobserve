@@ -220,7 +220,7 @@ export const useSearchAround = () => {
           updateGridColumns();
           await filterHitsColumns();
 
-          if (searchObj.meta.showHistogram) {
+          if (isCurrent() && searchObj.meta.showHistogram) {
             searchObj.meta.showHistogram = false;
             searchObj.data.searchAround.histogramHide = true;
           }
