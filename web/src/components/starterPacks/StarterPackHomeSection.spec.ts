@@ -535,15 +535,17 @@ describe("StarterPackHomeSection", () => {
     expect(wrapper.findAll('[data-test="home-pack-label"]')).toHaveLength(1);
   });
 
-  it("tints each tile by its kind", async () => {
+  it("borders each tile in its kind's colour with no fill", async () => {
     const wrapper = await render();
-    const tints = {
-      dashboard: "bg-ingest-tint-blue",
-      alert: "bg-ingest-tint-orange",
-      savedView: "bg-ingest-tint-purple",
+    const borders = {
+      dashboard: "border-ingest-accent-blue/25",
+      alert: "border-ingest-accent-orange/25",
+      savedView: "border-ingest-accent-purple/25",
     };
-    for (const [kind, tint] of Object.entries(tints)) {
-      expect(wrapper.get(`[data-test="home-pack-list-tile-${kind}"]`).classes()).toContain(tint);
+    for (const [kind, border] of Object.entries(borders)) {
+      const classes = wrapper.get(`[data-test="home-pack-list-tile-${kind}"]`).classes();
+      expect(classes).toContain(border);
+      expect(classes.some((name) => name.startsWith("bg-"))).toBe(false);
     }
   });
 

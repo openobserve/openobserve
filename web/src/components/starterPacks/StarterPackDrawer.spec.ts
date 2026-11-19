@@ -54,7 +54,7 @@ const freshChoices = (): PackReviewChoices =>
 
 const render = (flow = fakeFlow(), props: Record<string, unknown> = {}) =>
   mount(StarterPackDrawer, {
-    props: { flow, clusters: ["staging-eu-1"], choices: freshChoices(), ...props },
+    props: { flow, clusters: ["staging-eu-1"], choices: freshChoices(), showBack: true, ...props },
     global: {
       plugins: [i18n],
       stubs: {
@@ -163,15 +163,15 @@ describe("StarterPackDrawer", () => {
     );
   });
 
-  it("tints each kind's header and gives its chip the kind's colour from tokens", async () => {
+  it("leaves each kind's header unfilled and gives its chip the kind's colour from tokens", async () => {
     const wrapper = await shown();
     const header = (id: string) =>
       wrapper.get(`[data-test="starter-pack-drawer-group-header-${id}"]`).classes();
     const chip = (id: string) =>
       wrapper.get(`[data-test="starter-pack-drawer-group-chip-${id}"]`).classes();
-    expect(header("dashboard")).toContain("bg-ingest-tint-blue");
-    expect(header("alert")).toContain("bg-ingest-tint-orange");
-    expect(header("savedView")).toContain("bg-ingest-tint-purple");
+    for (const id of ["dashboard", "alert", "savedView"]) {
+      expect(header(id).some((name) => name.startsWith("bg-"))).toBe(false);
+    }
     expect(chip("dashboard")).toEqual(
       expect.arrayContaining(["bg-ingest-accent-blue", "dark:bg-icon-chip-info-bg"]),
     );
@@ -190,6 +190,12 @@ describe("StarterPackDrawer", () => {
     expect(wrapper.emitted("back")).toHaveLength(1);
     expect(wrapper.emitted("close")).toHaveLength(1);
     expect(wrapper.text()).not.toMatch(/not now/i);
+  });
+
+  it("shows no Back when the pack was not opened from the popup's list", async () => {
+    const wrapper = await shown(ready(), { showBack: false });
+    expect(wrapper.find('[data-test="starter-pack-drawer-back-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="starter-pack-drawer-submit-btn"]').exists()).toBe(true);
   });
 
   it("remembers ticks and expansion in the popup's choices, so a reopen keeps them", async () => {

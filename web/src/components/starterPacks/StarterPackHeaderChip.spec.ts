@@ -118,12 +118,12 @@ vi.mock("./StarterPackDrawer.vue", async () => {
   const { defineComponent, h } = await import("vue");
   return {
     default: defineComponent({
-      props: { flow: { type: Object, required: true } },
+      props: { flow: { type: Object, required: true }, showBack: Boolean },
       emits: ["close", "back"],
       setup:
         (props, { emit }) =>
         () =>
-          h("div", { "data-test": `pane-${props.flow.pack.id}` }, [
+          h("div", { "data-test": `pane-${props.flow.pack.id}`, "data-back": props.showBack }, [
             h("button", { "data-test": "pane-back", onClick: () => emit("back") }),
             h("button", { "data-test": "pane-close", onClick: () => emit("close") }),
           ]),
@@ -301,7 +301,11 @@ describe("StarterPackHeaderChip", () => {
     await find(wrapper, "starter-pack-list-row-hosts").trigger("click");
     expect(find(wrapper, "starter-pack-list-primary-btn").text()).toBe("Review Pack");
     await find(wrapper, "starter-pack-list-primary-btn").trigger("click");
-    expect(find(wrapper, "pane-hosts").exists()).toBe(true);
+    expect(find(wrapper, "starter-pack-list").exists()).toBe(true);
+    expect(find(wrapper, "starter-pack-list-primary-btn").attributes("disabled")).toBeDefined();
+    fake.flows.hosts.previewState.value = "ready";
+    await flushPromises();
+    expect(find(wrapper, "pane-hosts").attributes("data-back")).toBe("true");
     await find(wrapper, "pane-back").trigger("click");
     expect(find(wrapper, "starter-pack-list").exists()).toBe(true);
     expect(find(wrapper, "starter-pack-list-hero").text()).toContain("Hosts");
@@ -329,7 +333,9 @@ describe("StarterPackHeaderChip", () => {
     save([K8S]);
     const wrapper = render();
     await open(wrapper);
+    fake.flows.kubernetes.previewState.value = "ready";
     await find(wrapper, "starter-pack-list-primary-btn").trigger("click");
+    await flushPromises();
     const flow = fake.flows.kubernetes;
     flow.running.value = true;
     flow.made.value = [{}, {}];

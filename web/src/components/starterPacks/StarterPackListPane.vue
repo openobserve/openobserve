@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -25,6 +25,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { LibrarySeverity } from "@/constants/alertLibrary";
 import { ageText } from "@/composables/starterPacks/packCopy";
 import { packTitle } from "@/composables/starterPacks/usePackCatalog";
+import { useStreamFit } from "@/composables/starterPacks/streamFit";
 import type { RailPack } from "@/composables/starterPacks/useStarterPackPopup";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
@@ -57,17 +58,17 @@ const KINDS: Kind[] = ["dashboard", "alert", "savedView"];
 const SEVERITY_ORDER: LibrarySeverity[] = ["critical", "warning", "info"];
 const TILE_LOOKS: Record<Kind, { tile: string; chip: string; icon: IconName }> = {
   dashboard: {
-    tile: "bg-ingest-tint-blue border-ingest-accent-blue/25",
+    tile: "border-ingest-accent-blue/25",
     chip: "bg-ingest-accent-blue text-white dark:bg-icon-chip-info-bg dark:text-icon-chip-info-text",
     icon: "dashboard",
   },
   alert: {
-    tile: "bg-ingest-tint-orange border-ingest-accent-orange/25",
+    tile: "border-ingest-accent-orange/25",
     chip: "bg-ingest-accent-orange text-white dark:bg-icon-chip-orange-bg dark:text-icon-chip-orange-text",
     icon: "notifications",
   },
   savedView: {
-    tile: "bg-ingest-tint-purple border-ingest-accent-purple/25",
+    tile: "border-ingest-accent-purple/25",
     chip: "bg-ingest-accent-purple text-white dark:bg-icon-chip-purple-bg dark:text-icon-chip-purple-text",
     icon: "bookmark",
   },
@@ -76,6 +77,11 @@ const TILE_LOOKS: Record<Kind, { tile: string; chip: string; icon: IconName }> =
 const selected = computed(
   () => props.rows.find(({ entry }) => entry.pack.id === props.selectedId) ?? props.rows[0] ?? null,
 );
+const streams = computed(() => selected.value?.source?.streams ?? []);
+const streamRow = ref<HTMLElement | null>(null);
+const streamSizer = ref<HTMLElement | null>(null);
+const shownStreams = useStreamFit(streamRow, streamSizer, () => streams.value);
+const hiddenStreams = computed(() => streams.value.slice(shownStreams.value));
 const bestStart = computed(
   () => !!selected.value && selected.value.entry.pack.id === props.bestStartId,
 );
@@ -249,7 +255,7 @@ const tiles = computed<Tile[]>(() => {
           />
           <OIcon v-else name="package-2" size="sm" class="text-text-secondary" />
         </span>
-        <div class="flex min-w-0 flex-col gap-0.5">
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
           <span class="text-text-heading flex items-center gap-2 text-base font-bold">
             {{ packTitle(selected.entry.pack) }}
             <OBadge
@@ -271,34 +277,50 @@ const tiles = computed<Tile[]>(() => {
             }}</OText
           >
           <span
-            v-if="selected.source?.streams.length"
-            class="flex min-w-0 items-center gap-1.5 text-xs"
+            v-if="streams.length"
+            ref="streamRow"
+            class="relative flex min-w-0 items-center gap-1.5 text-xs"
             :data-test="`${testPrefix}-streams`"
           >
             <span class="bg-status-success-text size-1.5 shrink-0 rounded-full" />
             <OTruncatedText class="text-text-body min-w-0 font-mono">{{
-              raw(selected.source.streams[0])
+              raw(streams.slice(0, shownStreams).join(", "))
             }}</OTruncatedText>
-            <OTooltip v-if="selected.source.streams.length > 1" side="bottom" align="start">
+            <OTooltip v-if="hiddenStreams.length" side="bottom" align="start">
               <span tabindex="0" class="text-accent shrink-0 font-semibold">{{
                 t(
                   "starterPacks.home.moreStreams",
-                  { count: selected.source.streams.length - 1 },
-                  selected.source.streams.length - 1,
+                  { count: hiddenStreams.length },
+                  hiddenStreams.length,
                 )
               }}</span>
               <template #content>
                 <ul class="m-0 flex max-h-60 list-none flex-col gap-1 overflow-y-auto p-0">
-                  <li
-                    v-for="stream in selected.source.streams.slice(1)"
-                    :key="stream"
-                    class="font-mono"
-                  >
+                  <li v-for="stream in hiddenStreams" :key="stream" class="font-mono">
                     {{ raw(stream) }}
                   </li>
                 </ul>
               </template>
             </OTooltip>
+            <span
+              ref="streamSizer"
+              aria-hidden="true"
+              class="pointer-events-none invisible absolute size-0 overflow-hidden"
+            >
+              <span class="flex w-max whitespace-nowrap">
+                <span data-fit-fixed class="w-3 shrink-0" />
+                <span
+                  v-for="(stream, index) in streams"
+                  :key="stream"
+                  data-fit-item
+                  class="shrink-0 font-mono"
+                  >{{ raw(index ? `, ${stream}` : stream) }}</span
+                >
+                <span data-fit-more class="shrink-0 ps-1.5 font-semibold">{{
+                  t("starterPacks.home.moreStreams", { count: streams.length }, streams.length)
+                }}</span>
+              </span>
+            </span>
           </span>
         </div>
       </div>

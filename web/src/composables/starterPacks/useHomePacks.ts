@@ -94,7 +94,7 @@ function useHomePack(org: string, pack: StarterPack) {
   // Install starts only from the popup's own button, after the user has seen and chosen the items.
   const openPack = () => {
     void matcher.checkShared();
-    popup.openPack(pack.id);
+    void popup.openWhenReady({ pack, flow, matcher });
   };
   const startSetup = openPack;
   const retry = () => Promise.all([flow.load(), matcher.retry()]);

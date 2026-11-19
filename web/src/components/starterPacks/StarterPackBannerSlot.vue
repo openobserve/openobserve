@@ -39,7 +39,7 @@ const gate = usePackGate(props.org);
 // The typed cluster names the scope until the pack's own match sees it.
 const openPack = () => {
   void entry.matcher.checkShared();
-  popup.openPack(pack.id, props.clusterName ? [props.clusterName] : []);
+  void popup.openWhenReady(entry, { clusters: props.clusterName ? [props.clusterName] : [] });
 };
 
 onMounted(() => {
