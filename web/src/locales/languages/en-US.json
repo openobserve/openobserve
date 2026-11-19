@@ -12637,7 +12637,7 @@
       "linkUrlInvalid": "Link \"{label}\": {reason}",
       "linkUrlNotAUrl": "Enter a valid URL — for example https://example.com/runbook, a path like /web/logs, or a {'{'}variable{'}'}.",
       "cronSixFields": "Cron needs 6 fields: second, minute, hour, day of month, month, day of week.",
-      "nameTaken": "An alert named {name} already exists in folder {folder}"
+      "nameTakenHere": "Name already used in this folder"
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
@@ -12818,7 +12818,9 @@
         "alertMeWhenHours": "Alert me when {condition} occur in any {count}-hour period",
         "pendingPeriodClause": ", after holding for {duration}",
         "cooldownClause": ", but no more than once every {cooldown}",
-        "defaultConditions": "Alert me when the configured conditions are met"
+        "defaultConditions": "Alert me when the configured conditions are met",
+        "conditionFewer": "fewer than {threshold} {noun}",
+        "conditionNone": "no {noun}"
       }
     },
     "placeholders": {
@@ -15962,7 +15964,9 @@
       "ratioUse": "Use {fix}",
       "valueRange": "Values here run from {min} to {max}.",
       "valueRangePending": "The preview shows recent values to compare with.",
-      "breachStraddles": "A breach under {duration} can straddle two checks and be missed."
+      "breachStraddles": "A breach under {duration} can straddle two checks and be missed.",
+      "valueSteady": "Values here stay at {value}.",
+      "ratioSteady": "Values here stay at {value}, so {typed} % is {fix}."
     },
     "discovery": {
       "lastEvent": "Last event {ago} ago · {rate}/h",
@@ -15988,55 +15992,35 @@
       "question": "What do you want to know about {stream}?",
       "fromIntent": "from {intent}",
       "countWhere": {
-        "label": "Count matching {noun}",
-        "sentence": "Count of {noun} where {field} is {value} {window}, per {group}",
-        "sentenceAll": "Count of {noun} where {field} is {value} {window}",
-        "sentenceAbove": "Count of {noun} where {field} is {value} {window}, per {group}, is {threshold}",
-        "sentenceAllAbove": "Count of {noun} where {field} is {value} {window} is {threshold}"
+        "label": "Count matching {noun}"
       },
       "percentile": {
         "label": "Percentile of a field",
-        "sentencePer": "p95 of {measure} per {group} {window}",
-        "sentenceAll": "p95 of {measure} {window}",
-        "sentencePerAbove": "p95 of {measure} per {group} {window} is {threshold}",
-        "sentenceAllAbove": "p95 of {measure} {window} is {threshold}"
+        "labelMetric": "Percentile of this histogram"
       },
       "anyEvent": {
-        "label": "Any matching event (as it happens)",
-        "sentence": "Fires on each {noun} where {field} is {value}, as it happens"
+        "label": "Any matching event (as it happens)"
       },
       "unusualVolume": {
-        "label": "Unusual volume",
-        "sentence": "Unusual number of {noun} per {bucket}",
-        "sentenceWhere": "Unusual number of {noun} where {field} is {value}, per {bucket}"
+        "label": "Unusual volume"
       },
       "compareLastWeek": {
-        "label": "Compare with last week",
-        "sentenceWhere": "Count of {noun} where {field} is {value} {window}, more than {factor} times the same window last week"
+        "label": "Compare with last week"
       },
       "metricAbove": {
         "label": "Above a value",
-        "sentencePer": "{metric} per {group} {window}, above a value",
-        "sentenceAll": "{metric} {window}, above a value",
         "rateSentencePer": "{metric} per second, per {group} {window}, above a value",
         "rateSentenceAll": "{metric} per second {window}, above a value",
-        "sentencePerAbove": "{agg} of {metric} per {group} {window} is {threshold}",
-        "sentenceAllAbove": "{agg} of {metric} {window} is {threshold}",
         "rateSentencePerAbove": "{metric} per second, per {group} {window}, is {threshold}",
         "rateSentenceAllAbove": "{metric} per second {window} is {threshold}"
       },
       "ratio": {
         "label": "Share of one metric over another (error rate)",
-        "sentenceWhere": "Share of {metric} where {label} matches {value}, per {group}, {window}",
-        "sentenceWhereAll": "Share of {metric} where {label} matches {value}, {window}",
         "alsoCovers": "Also covers {metrics}",
-        "memberReads": "{metric} (reads {labels})",
-        "sentenceWhereAbove": "Share of {metric} where {label} matches {value}, per {group}, {window}, is {threshold}",
-        "sentenceWhereAllAbove": "Share of {metric} where {label} matches {value}, {window}, is {threshold}"
+        "memberReads": "{metric} (reads {labels})"
       },
       "unusualChange": {
-        "label": "Unusual change",
-        "sentence": "Unusual change in {metric}"
+        "label": "Unusual change"
       },
       "slots": {
         "field": "Field",
@@ -16046,10 +16030,6 @@
         "measure": "Measured field",
         "label": "Label",
         "factor": "Times last week",
-        "fieldPrompt": "pick a field",
-        "labelPrompt": "pick a label",
-        "groupPrompt": "pick a group",
-        "valuePrompt": "pick values",
         "patternOption": "Every value like {pattern}",
         "valueHelpSeries": "Numbers are series seen in the last 24 hours. Type a value, or a pattern like {example}, and press Enter to add it.",
         "valueHelpEvents": "Numbers are {noun} in the last 24 hours. Type a value and press Enter to add it.",
@@ -16076,10 +16056,31 @@
         "repeatsEveryPer": "repeats every {every} per {group}",
         "named": "named {name}"
       },
-      "lead": "What to know"
+      "lead": "What to know",
+      "rows": {
+        "watch": "Watch",
+        "where": "Where",
+        "per": "Per",
+        "over": "Over",
+        "alertWhen": "Alert when",
+        "countOf": "Count of {noun}",
+        "percentileOf": "p95 of {measure}",
+        "eachEvent": "Each {noun}, as it happens",
+        "unusualNumber": "Unusual number of {noun} per {bucket}",
+        "aggOf": "{agg} of {metric}",
+        "perSecond": "{metric} per second",
+        "shareOf": "Share of {metric}",
+        "unusualChange": "Unusual change in {metric}",
+        "fieldIs": "{field} is {value}",
+        "labelMatches": "{label} matches {value}",
+        "lastMinutes": "the last {n} minute | the last {n} minutes",
+        "timesLastWeek": "more than {factor} times the same window last week",
+        "pickField": "Pick a field",
+        "pickLabel": "Pick a label",
+        "thresholdWaits": "Pick what is missing above first"
+      }
     },
     "librarySuggest": {
-      "suggestedStarter": "Suggested starter",
       "startFromScratch": "Start from scratch",
       "fits": "Fits your data",
       "likely": "Likely fits",
