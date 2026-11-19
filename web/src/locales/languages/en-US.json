@@ -16122,7 +16122,8 @@
       "fired": "Fired {time}",
       "firedTooltip": "Last fired at {time}. It checks each event as it arrives.",
       "noMatchYet": "No match yet",
-      "noMatchTooltip": "It checks each event as it arrives and notifies on the first match."
+      "noMatchTooltip": "It checks each event as it arrives and notifies on the first match.",
+      "notified": "Notified"
     }
   },
   "alert_dependencies": {
