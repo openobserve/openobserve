@@ -20834,7 +20834,7 @@
         "producesEmpty": "Bộ chấm điểm này không ghi vào bất kỳ cấu hình điểm số nào.",
         "promptSection": "Lời nhắc đánh giá",
         "requestTemplateSection": "Mẫu yêu cầu",
-        "variablesSuffix": "biến",
+        "variablesSuffix": "biến | biến",
         "outputSchemaSection": "Lược đồ đầu ra",
         "usedByIntro": "Các job và thử nghiệm tham chiếu đến bộ chấm điểm này.",
         "usedByEmpty": "Chưa có job hoặc thử nghiệm nào tham chiếu đến bộ chấm điểm này.",
