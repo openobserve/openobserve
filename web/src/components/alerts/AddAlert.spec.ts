@@ -2054,9 +2054,7 @@ describe("AddAlert (OForm owner)", () => {
       } as any);
       await wrapper.vm.saveAlert();
       await flushPromises();
-      expect(wrapper.vm.nameFieldError).toBe(
-        i18n.global.t("alerts.validation.nameTaken", { name: "cpu_high", folder: "default" }),
-      );
+      expect(wrapper.vm.nameFieldError).toBe(i18n.global.t("alerts.validation.nameTakenHere"));
     });
   });
 

@@ -129,7 +129,7 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
     const issues = (name: string, mode = "false") =>
       taken.safeParse(validScheduled({ name, is_real_time: mode })).error?.issues ?? [];
     expect(issues("cpu_high").map((i) => i.message)).toEqual([
-      t("alerts.validation.nameTaken", { name: "cpu_high", folder: "default" }),
+      t("alerts.validation.nameTakenHere"),
     ]);
     expect(issues("cpu_high", "composite").some((i) => i.path[0] === "name")).toBe(true);
     expect(issues("cpu_other")).toEqual([]);

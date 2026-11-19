@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ notifyLines.scope }}</span
               >
               <AlertMessageLine
-                class="min-w-0 flex-1 basis-48"
+                class="w-0 min-w-full"
                 :error="silenceError"
                 error-data-test="alert-settings-silence-error"
                 :note="isScheduled ? silenceHint : null"

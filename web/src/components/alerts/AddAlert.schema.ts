@@ -117,7 +117,7 @@ const addNameTaken = (
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["name"],
-      message: t("alerts.validation.nameTaken", { name: name.trim(), folder }),
+      message: t("alerts.validation.nameTakenHere"),
     });
   }
 };
