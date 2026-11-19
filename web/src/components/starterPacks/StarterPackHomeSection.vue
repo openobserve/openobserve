@@ -56,17 +56,13 @@ const rows = computed<RailPack[]>(() =>
   })),
 );
 const selectedId = ref<string | null>(null);
-const selected = computed(
-  () =>
-    home.offered.value.find((item) => item.pack.id === selectedId.value) ??
-    home.offered.value[0] ??
-    null,
-);
-const busy = computed(
-  () =>
-    !!selected.value &&
-    (selected.value.flow.running.value || selected.value.view.value === "loading"),
-);
+// Opens on a pack the user can start, so an Ask an admin pack never hides the button.
+const selected = computed(() => {
+  const offered = home.offered.value;
+  const id = selectedId.value ?? bestStartId.value;
+  return offered.find((item) => item.pack.id === id) ?? offered[0] ?? null;
+});
+const busy = computed(() => !!selected.value?.flow.running.value);
 </script>
 
 <template>
