@@ -333,9 +333,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-how-it-checks-row"
                 >
                   <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
-                  <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
-                    t("alerts.alertType")
-                  }}</span>
+                  <span
+                    class="text-compact me-3 shrink-0 font-semibold tracking-[0.01em] whitespace-nowrap"
+                    >{{ t("alerts.alertType") }}</span
+                  >
                   <OToggleGroup
                     :model-value="formData.is_real_time"
                     :disabled="beingUpdated || anomalyEditMode"
@@ -355,7 +356,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="option.dataTest"
                     >
                       <template #icon-left>
-                        <OIcon :name="option.disabled ? 'lock' : option.icon!" size="sm" />
+                        <OIcon
+                          :name="option.disabled ? 'lock' : option.icon!"
+                          size="sm"
+                          :class="!option.disabled && '@max-lg/stream-config:hidden'"
+                        />
                       </template>
                       {{ option.label }}
                     </OToggleGroupItem>
@@ -375,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="add-alert-stream-type-select-dropdown"
                         :options="streamTypeOptions"
                         :searchable="false"
-                        class="stream-type-select w-37.5! @max-[900px]/stream-config:w-27.5! @max-[600px]/stream-config:w-17.5!"
+                        class="stream-type-select w-37.5! @max-[900px]/stream-config:w-27.5! @max-[600px]/stream-config:w-25!"
                         :disabled="beingUpdated || anomalyEditMode"
                         @update:model-value="onStreamTypeChange"
                       />
