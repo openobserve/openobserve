@@ -3848,6 +3848,9 @@ export default defineComponent({
               }
               // Reset only once the view is known to apply, so a failed view keeps the SQL query.
               searchObj.meta.sqlMode = false;
+              // Let the SQL-mode watcher clear the old query before the view's query is merged.
+              await nextTick();
+              if (leftViewOrg()) return;
               // extractedObj.data.stream.selectedStream = [];
               // extractedObj.data.stream.selectedStream = selectedStreams;
               delete extractedObj.data.stream.streamLists;
@@ -4028,6 +4031,8 @@ export default defineComponent({
             } else {
               // ----- Here we are explicitly handling stream change -----
               searchObj.meta.sqlMode = false;
+              await nextTick();
+              if (leftViewOrg()) return;
               resetStreamData();
               searchObj.data.stream.streamType = extractedObj.data.stream.streamType;
 
