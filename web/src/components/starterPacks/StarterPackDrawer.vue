@@ -58,6 +58,8 @@ const props = defineProps<{
   choices: PackReviewChoices;
   /** The folder the host's own picker chose; absent means the pack's folder. */
   folderName?: string;
+  /** Back shows only when the pack was opened from the popup's list. */
+  showBack?: boolean;
 }>();
 const emit = defineEmits<{ close: []; back: []; done: []; installed: [] }>();
 
@@ -129,23 +131,20 @@ const GROUP_ICONS: Record<GroupId, IconName> = {
   not: "block",
   adapted: "tune",
 };
-const GROUP_LOOKS: Partial<Record<GroupId, { header: string; chip: string; row: string }>> = {
+const GROUP_LOOKS: Partial<Record<GroupId, { chip: string; row: string }>> = {
   dashboard: {
-    header: "bg-ingest-tint-blue",
     chip: "bg-ingest-accent-blue text-white dark:bg-icon-chip-info-bg dark:text-icon-chip-info-text",
     row: "text-icon-chip-info-text",
   },
   alert: {
-    header: "bg-ingest-tint-orange",
     chip: "bg-ingest-accent-orange text-white dark:bg-icon-chip-orange-bg dark:text-icon-chip-orange-text",
     row: "text-icon-chip-orange-text",
   },
   savedView: {
-    header: "bg-ingest-tint-purple",
     chip: "bg-ingest-accent-purple text-white dark:bg-icon-chip-purple-bg dark:text-icon-chip-purple-text",
     row: "text-icon-chip-purple-text",
   },
-  view: { header: "", chip: "bg-icon-chip-primary-bg text-icon-chip-primary-text", row: "" },
+  view: { chip: "bg-icon-chip-primary-bg text-icon-chip-primary-text", row: "" },
 };
 const SEVERITY: Record<
   LibrarySeverity,
@@ -825,7 +824,6 @@ const confirmDone = () => {
               <div
                 :class="[
                   'flex items-center gap-3 px-3 py-2.5',
-                  GROUP_LOOKS[group.id]?.header,
                   expandable(group) && 'cursor-pointer',
                 ]"
                 :data-test="`starter-pack-drawer-group-header-${group.id}`"
@@ -1101,7 +1099,7 @@ const confirmDone = () => {
           </template>
         </span>
         <OButton
-          v-if="step !== 'setup' || !flow.running.value"
+          v-if="showBack && (step !== 'setup' || !flow.running.value)"
           variant="outline"
           size="sm-action"
           data-test="starter-pack-drawer-back-btn"

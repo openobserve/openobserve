@@ -20,7 +20,7 @@ import { defineComponent, h, nextTick, ref } from "vue";
 import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
 
 import { packById } from "./usePackCatalog";
-import { resetStarterPackPopups, useStarterPackPopup } from "./useStarterPackPopup";
+import { resetStarterPackPopups, useStarterPackPopup, type PackEntry } from "./useStarterPackPopup";
 
 const made = vi.hoisted(() => ({ flows: 0, matchers: 0, last: null as any }));
 vi.mock("./useStarterPackFlow", () => ({
@@ -54,6 +54,16 @@ const mounted = <T>(run: () => T) => {
   );
   return { result, wrapper };
 };
+
+const entryWith = (state: string, installed = false) =>
+  ({
+    pack: packById("kubernetes")!,
+    flow: {
+      previewState: ref(state),
+      installed: ref(installed),
+      loadPreview: vi.fn(),
+    },
+  }) as unknown as PackEntry;
 
 describe("useStarterPackPopup", () => {
   beforeEach(() => {
@@ -139,5 +149,58 @@ describe("useStarterPackPopup", () => {
     await nextTick();
     use();
     expect(made.flows).toBe(2);
+  });
+  it("marks a pack opened from the list, and only from the list", () => {
+    const popup = useStarterPackPopup("org");
+    popup.openPack("kubernetes", [], { fromList: true });
+    expect(popup.fromList.value).toBe(true);
+    popup.openPack("kubernetes");
+    expect(popup.fromList.value).toBe(false);
+  });
+
+  it("keeps the list up, with the pack marked opening, until the pack's plan has loaded", async () => {
+    const popup = useStarterPackPopup("org");
+    popup.openList();
+    const entry = entryWith("loading");
+    const opened = popup.openWhenReady(entry, { fromList: true });
+    await nextTick();
+    expect([popup.screen.value, popup.opening.value]).toEqual(["list", "kubernetes"]);
+    (entry.flow.previewState as any).value = "ready";
+    await opened;
+    expect([popup.screen.value, popup.packId.value, popup.fromList.value]).toEqual([
+      "pack",
+      "kubernetes",
+      true,
+    ]);
+    expect(popup.opening.value).toBeNull();
+  });
+
+  it("starts an idle plan load, and opens on a failed one so the review shows Retry", async () => {
+    const popup = useStarterPackPopup("org");
+    const entry = entryWith("idle");
+    const opened = popup.openWhenReady(entry);
+    expect(entry.flow.loadPreview).toHaveBeenCalledTimes(1);
+    (entry.flow.previewState as any).value = "error";
+    await opened;
+    expect([popup.open.value, popup.screen.value]).toEqual([true, "pack"]);
+  });
+
+  it("opens a ready or set-up pack at once", async () => {
+    const popup = useStarterPackPopup("org");
+    await popup.openWhenReady(entryWith("ready"));
+    expect(popup.screen.value).toBe("pack");
+    popup.back();
+    await popup.openWhenReady(entryWith("idle", true));
+    expect(popup.screen.value).toBe("pack");
+  });
+  it("drops a pending open when the popup closes first", async () => {
+    const popup = useStarterPackPopup("org");
+    popup.openList();
+    const entry = entryWith("loading");
+    const opened = popup.openWhenReady(entry, { fromList: true });
+    popup.close();
+    (entry.flow.previewState as any).value = "ready";
+    await opened;
+    expect([popup.open.value, popup.screen.value]).toEqual([false, "list"]);
   });
 });

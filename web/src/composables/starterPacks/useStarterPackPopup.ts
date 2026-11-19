@@ -59,6 +59,10 @@ interface PopupOrg {
   open: Ref<boolean>;
   screen: Ref<PopupScreen>;
   packId: Ref<string | null>;
+  /** Whether the open pack was reached from the list, so its review can go back to it. */
+  fromList: Ref<boolean>;
+  /** The pack whose review waits for its plan before it opens. */
+  opening: Ref<string | null>;
   entries: Map<string, PackEntry>;
   choices: Map<string, PackReviewChoices>;
   /** Clusters a surface knows before the pack's own match sees them, such as a typed name. */
@@ -78,6 +82,8 @@ const stateOf = (org: string): PopupOrg => {
       open: ref(false),
       screen: ref<PopupScreen>("list"),
       packId: ref<string | null>(null),
+      fromList: ref(false),
+      opening: ref<string | null>(null),
       entries: new Map(),
       choices: new Map(),
       hints: new Map(),
@@ -163,11 +169,34 @@ export function useStarterPackPopup(org: string) {
     state.open.value = true;
   };
 
-  const openPack = (packId: string, clusters: string[] = []) => {
+  const openPack = (packId: string, clusters: string[] = [], { fromList = false } = {}) => {
     if (clusters.length) state.hints.set(packId, clusters);
     state.packId.value = packId;
+    state.fromList.value = fromList;
     state.screen.value = "pack";
     state.open.value = true;
+  };
+
+  // The review opens fully drawn, so it never swaps the list for skeleton rows.
+  const openWhenReady = async (
+    { pack, flow }: PackEntry,
+    options: { fromList?: boolean; clusters?: string[] } = {},
+  ) => {
+    const pending = () => ["idle", "loading"].includes(flow.previewState.value);
+    if (!flow.installed.value && pending()) {
+      if (flow.previewState.value === "idle") void flow.loadPreview();
+      state.opening.value = pack.id;
+      await new Promise<void>((resolve) => {
+        const stop = watch(pending, (waiting) => {
+          if (waiting) return;
+          stop();
+          resolve();
+        });
+      });
+      if (state.opening.value !== pack.id) return;
+      state.opening.value = null;
+    }
+    openPack(pack.id, options.clusters, { fromList: options.fromList });
   };
 
   const clustersOf = (packId: string, seen: string[]) => [
@@ -179,6 +208,7 @@ export function useStarterPackPopup(org: string) {
   };
 
   const close = () => {
+    state.opening.value = null;
     state.open.value = false;
   };
 
@@ -186,11 +216,14 @@ export function useStarterPackPopup(org: string) {
     open: state.open,
     screen: state.screen,
     packId: state.packId,
+    fromList: state.fromList,
+    opening: state.opening,
     entryOf,
     choicesOf,
     clustersOf,
     openList,
     openPack,
+    openWhenReady,
     back,
     close,
   };
