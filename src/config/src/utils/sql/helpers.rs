@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sqlparser::ast::{Expr, Function, GroupByExpr, Query, SelectItem, SetExpr, TableFactor};
+use sqlparser::ast::{Expr, Function, GroupByExpr, Query, SelectItem, SetExpr};
 
 use super::AGGREGATE_UDF_LIST;
 
@@ -83,17 +83,6 @@ pub(super) fn has_join(query: &Query) -> bool {
     } else {
         false
     }
-}
-
-/// True unless the query reads from exactly one plain table, e.g. `FROM (SELECT ...)`.
-pub(super) fn reads_from_derived_table(query: &Query) -> bool {
-    let SetExpr::Select(ref select) = *query.body else {
-        return true;
-    };
-    !matches!(
-        select.from.as_slice(),
-        [table] if table.joins.is_empty() && matches!(table.relation, TableFactor::Table { .. })
-    )
 }
 
 pub(super) fn has_cte(query: &Query) -> bool {

@@ -16,124 +16,87 @@
 use sqlparser::{ast::Statement, dialect::GenericDialect, parser::Parser};
 
 use super::{
-    helpers::{has_cte, has_join, has_limit, reads_from_derived_table},
+    helpers::{has_cte, has_join, has_limit},
     visitors::{has_distinct, has_subquery, has_union, is_multi_search_eligible_for_histogram},
 };
 
-/// Returns `(eligible, reads_from_derived_table)`; the histogram keeps the WHERE only when false.
+/// The histogram reuses only the WHERE on one stream, so it is exact only for a plain
+/// single-table query; anything else gets its total from a page-count query instead.
 pub fn is_eligible_for_histogram(
     query: &str,
     is_multi_stream_search: bool,
-) -> Result<(bool, bool), sqlparser::parser::ParserError> {
+) -> Result<bool, sqlparser::parser::ParserError> {
     if is_multi_stream_search {
-        let is_eligible = is_multi_search_eligible_for_histogram(query)?;
-        return Ok((is_eligible, false));
+        return is_multi_search_eligible_for_histogram(query);
     }
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
-    for statement in ast.iter() {
-        if let Statement::Query(query) = statement {
-            if has_subquery(statement) {
-                return Ok((true, reads_from_derived_table(query)));
-            } else if has_distinct(statement)
+    let eligible = ast.iter().all(|statement| match statement {
+        Statement::Query(query) => {
+            !(has_subquery(statement)
+                || has_distinct(statement)
                 || has_limit(query)
                 || has_cte(query)
                 || has_join(query)
-                || has_union(query)
-            {
-                return Ok((false, false));
-            }
+                || has_union(query))
         }
-    }
-    Ok((true, false))
+        _ => true,
+    });
+    Ok(eligible)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn eligible(query: &str) -> bool {
+        is_eligible_for_histogram(query, false).unwrap()
+    }
+
     #[test]
-    fn check_is_eligible_for_histogram_for_queries_should_be_true() {
-        let queries = [
-            r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
-            r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,
-        ];
-        for query in queries.iter() {
-            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
-            assert!(is_eligible);
-            assert!(!is_sub_query);
+    fn test_is_eligible_for_histogram_plain_queries() {
+        assert!(eligible("SELECT x FROM t"));
+        assert!(eligible(
+            r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND level = 'error'"#
+        ));
+        assert!(eligible("SELECT x, count(*) FROM t WHERE y > 1 GROUP BY x"));
+    }
+
+    #[test]
+    fn test_is_eligible_for_histogram_rejects_non_plain_queries() {
+        for query in [
+            "SELECT DISTINCT x FROM t",
+            "SELECT x FROM t LIMIT 10",
+            "WITH cte AS (SELECT x FROM t) SELECT x FROM cte",
+            "SELECT x FROM t1 JOIN t2 ON t1.id = t2.id",
+            "SELECT x FROM t1, t2",
+            "SELECT x FROM t1 UNION SELECT x FROM t2",
+        ] {
+            assert!(!eligible(query), "{query}");
         }
     }
 
     #[test]
-    fn check_is_eligible_for_histogram_for_queries_should_be_false() {
-        let queries = [
-            r#"WITH cte AS (SELECT * FROM "olympics") SELECT * FROM cte"#,
-            r#"SELECT DISTINCT * FROM "olympics""#,
-            r#"SELECT * FROM "olympics" LIMIT 100"#,
-        ];
-        for query in queries.iter() {
-            let (is_eligible, is_sub_query) = is_eligible_for_histogram(query, false).unwrap();
-            assert!(!is_eligible);
-            if query.contains("SELECT * FROM (SELECT") {
-                assert!(is_sub_query);
-            } else {
-                assert!(!is_sub_query);
-            }
+    fn test_is_eligible_for_histogram_rejects_subqueries() {
+        for query in [
+            "SELECT x FROM (SELECT x FROM t)",
+            "SELECT x FROM t WHERE x IN (SELECT x FROM u)",
+            "SELECT x FROM t WHERE EXISTS (SELECT 1 FROM u WHERE u.x = t.x)",
+            "SELECT x FROM t WHERE x > (SELECT max(x) FROM u)",
+            "SELECT (SELECT max(x) FROM u) AS m FROM t",
+            "WITH ids AS (SELECT x FROM u) SELECT x FROM t WHERE x IN (SELECT x FROM ids)",
+            "SELECT x FROM t WHERE x IN (SELECT x FROM u) LIMIT 10",
+        ] {
+            assert!(!eligible(query), "{query}");
         }
-    }
-
-    #[test]
-    fn test_is_eligible_for_histogram_basic() {
-        let (eligible, is_sub) = is_eligible_for_histogram("SELECT x FROM t", false).unwrap();
-        assert!(eligible);
-        assert!(!is_sub);
-
-        let (eligible, _) = is_eligible_for_histogram("SELECT DISTINCT x FROM t", false).unwrap();
-        assert!(!eligible);
-
-        let (eligible, _) = is_eligible_for_histogram("SELECT x FROM t LIMIT 10", false).unwrap();
-        assert!(!eligible);
-
-        let (eligible, is_sub) =
-            is_eligible_for_histogram("SELECT x FROM (SELECT x FROM t)", false).unwrap();
-        assert!(eligible);
-        assert!(is_sub);
-
-        let (eligible, is_sub) =
-            is_eligible_for_histogram("SELECT x FROM t WHERE x IN (SELECT x FROM u)", false)
-                .unwrap();
-        assert!(eligible);
-        assert!(!is_sub);
-    }
-
-    #[test]
-    fn test_is_eligible_for_histogram_join_and_union_not_eligible() {
-        let (eligible, _) =
-            is_eligible_for_histogram("SELECT x FROM t1 JOIN t2 ON t1.id = t2.id", false).unwrap();
-        assert!(!eligible);
-
-        let (eligible, _) =
-            is_eligible_for_histogram("SELECT x FROM t1 UNION SELECT x FROM t2", false).unwrap();
-        assert!(!eligible);
     }
 
     #[test]
     fn test_is_eligible_for_histogram_multi_stream_union_all() {
-        let (eligible, is_sub) =
-            is_eligible_for_histogram("SELECT x FROM t1 UNION ALL SELECT x FROM t2", true).unwrap();
-        assert!(eligible);
-        assert!(!is_sub);
-
-        let (eligible, _) =
-            is_eligible_for_histogram("SELECT x FROM t1 UNION SELECT x FROM t2", true).unwrap();
-        assert!(!eligible);
-    }
-
-    #[test]
-    fn test_is_eligible_for_histogram_cte_not_eligible() {
-        let (eligible, _) =
-            is_eligible_for_histogram("WITH cte AS (SELECT x FROM t) SELECT x FROM cte", false)
-                .unwrap();
-        assert!(!eligible);
+        assert!(
+            is_eligible_for_histogram("SELECT x FROM t1 UNION ALL SELECT x FROM t2", true).unwrap()
+        );
+        assert!(
+            !is_eligible_for_histogram("SELECT x FROM t1 UNION SELECT x FROM t2", true).unwrap()
+        );
     }
 }
