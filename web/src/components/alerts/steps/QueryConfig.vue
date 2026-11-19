@@ -614,6 +614,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @remove="hideGeneratedSql"
                 >
                   <AlertQueryPreview :query="generatedSqlQuery" />
+                  <p
+                    v-if="generatedSqlThreshold"
+                    class="text-text-secondary mt-1 text-xs"
+                    data-test="add-alert-generated-sql-threshold"
+                  >
+                    {{ generatedSqlThreshold }}
+                  </p>
                 </AlertSentenceRow>
               </AlertTierPlace>
             </div>
@@ -1525,6 +1532,7 @@ import { promqlScaledToPercent, promqlWithMetric } from "@/utils/alerts/promqlMe
 import { groupRanking } from "@/composables/alerts/groupRanking";
 import { ratioThresholdFix, type ValueRange } from "@/utils/alerts/ratioThreshold";
 import { checkGapNote } from "@/utils/alerts/scheduleOverlap";
+import { generatedSqlNote } from "@/utils/alerts/generatedSqlNote";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
 import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
@@ -3759,6 +3767,40 @@ export default defineComponent({
         !!tiers?.isVisible("generatedSql"),
     );
     const hideGeneratedSql = () => tiers?.conceal("generatedSql");
+    const DURATION_UNIT_IDS: Record<string, string> = {
+      ns: "nanoseconds",
+      us: "microseconds",
+      ms: "milliseconds",
+      s: "seconds",
+    };
+    const numberOrNull = (v: unknown) =>
+      v === "" || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v);
+    // Readers look for the threshold in a HAVING the server never writes, so the row says where it applies.
+    const generatedSqlThreshold = computed(() => {
+      const base = { sql: props.generatedSqlQuery ?? "", grouped: groupByLabels.value.length > 0 };
+      if (selectedFunction.value === "total_events")
+        return generatedSqlNote({ ...base, value: numberOrNull(triggerThreshold.value) }, t);
+      if (isSpanDuration.value)
+        return generatedSqlNote(
+          {
+            ...base,
+            value: numberOrNull(fv("_ui.durationValue")),
+            unit: DURATION_UNIT_IDS[durationUnit.value],
+            stored: numberOrNull(conditionValue.value) ?? undefined,
+            storedUnit: DURATION_UNIT_IDS.us,
+          },
+          t,
+        );
+      const unit = unitMetric.value ? metricInfo.value[unitMetric.value]?.unit : undefined;
+      return generatedSqlNote(
+        {
+          ...base,
+          value: numberOrNull(conditionValue.value),
+          unit: normalizeDeclaredUnit(unit) ?? undefined,
+        },
+        t,
+      );
+    });
 
     const sqlOrPromqlQuery = computed(() => {
       return localTab.value === "sql" ? props.sqlQuery : props.promqlQuery;
@@ -4291,6 +4333,7 @@ export default defineComponent({
       removeFilters,
       showsGeneratedSql,
       hideGeneratedSql,
+      generatedSqlThreshold,
       sqlOrPromqlQuery,
       viewSqlEditor,
       localSqlQuery,
