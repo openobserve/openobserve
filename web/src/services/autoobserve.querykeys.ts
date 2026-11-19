@@ -28,6 +28,9 @@ export const autoobserveKeys = {
     orgKey(org, "autoobserve", "suggestions", "rank", id, kind ?? ""),
   gapSuggestions: (org: string, pageSize: number) =>
     orgKey(org, "autoobserve", "suggestions", "proposed", "coverage_gap", pageSize),
+  incidents: (org: string) => orgKey(org, "autoobserve", "incidents"),
+  incidentItem: (org: string, incidentId: string) =>
+    orgKey(org, "autoobserve", "incidents", "item", incidentId),
   incidentsPage: (org: string, limit: number, offset: number) =>
     orgKey(org, "autoobserve", "incidents", limit, offset),
   incidentsPages: (org: string, range: string, pageSize: number, cap: number) =>
