@@ -404,7 +404,10 @@ export default defineComponent({
 
     const removeFieldFromWhereStr = (whereClause: string, fieldName: string): string => {
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
+      const fieldPattern = new RegExp(
+        `^"?${escaped}"?\\s*(?:[=!<>]|is\\s+(?:not\\s+)?null\\b)`,
+        "i",
+      );
       return removeConditions(whereClause, (condition) => fieldPattern.test(condition));
     };
 
