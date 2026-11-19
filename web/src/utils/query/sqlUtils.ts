@@ -520,18 +520,18 @@ function flattenAnd(expr: AstExpr): AstExpr[] {
   return [expr];
 }
 
-/** Copies HAVING, ORDER BY and LIMIT onto the select-aligned fields, or names the clause the builder cannot express. */
+/** Copies HAVING, ORDER BY and LIMIT onto the select-aligned fields (orderedFields in ORDER BY key order), or names the clause the builder cannot express. */
 export function applyQueryClauses(
   ast: AstSelect,
   fields: ClauseField[],
   timeField: string,
-): { limit: number; hasOrderBy: boolean; unsupported?: string } {
+): { limit: number; orderedFields: ClauseField[]; unsupported?: string } {
   const columns = ast.columns ?? [];
   const fieldFor = (expr: AstExpr | undefined, allowPosition: boolean) => {
     const field = fields[resolveSelectIndex(expr, columns, timeField, allowPosition)];
     return field && (field.column || field.type === "raw") ? field : null;
   };
-  const result = { limit: 0, hasOrderBy: false };
+  const result = { limit: 0, orderedFields: [] as ClauseField[] };
 
   for (const condition of ast.having ? flattenAnd(ast.having) : []) {
     const operator = condition.operator ? HAVING_OPERATORS[condition.operator] : undefined;
@@ -543,19 +543,16 @@ export function applyQueryClauses(
     field.havingConditions = [{ operator, value }];
   }
 
-  const orderBy = ast.orderby ?? [];
-  if (orderBy.length > 1) {
-    return { ...result, unsupported: "Contains ORDER BY on more than one field" };
-  }
-  if (orderBy.length === 1) {
-    if (orderBy[0].nulls) {
-      return { ...result, unsupported: "Contains ORDER BY with NULLS placement" };
-    }
-    const field = fieldFor(orderBy[0].expr, true);
+  for (const key of ast.orderby ?? []) {
+    if (key.nulls) return { ...result, unsupported: "Contains ORDER BY with NULLS placement" };
+    const field = fieldFor(key.expr, true);
     if (!field)
       return { ...result, unsupported: "Contains ORDER BY on an expression not in SELECT" };
-    field.sortBy = orderBy[0].type?.toUpperCase() === "DESC" ? "DESC" : "ASC";
-    result.hasOrderBy = true;
+    if (result.orderedFields.includes(field)) {
+      return { ...result, unsupported: "Contains ORDER BY on the same field twice" };
+    }
+    field.sortBy = key.type?.toUpperCase() === "DESC" ? "DESC" : "ASC";
+    result.orderedFields.push(field);
   }
 
   const limitValues = ast.limit?.value ?? [];
@@ -1039,7 +1036,7 @@ export const getFieldsFromQuery = async (query: any, timeField: string = "_times
       streamName: null,
       joins: [],
       limit: 0,
-      hasOrderBy: false,
+      orderedFields: [],
     };
   }
 };
