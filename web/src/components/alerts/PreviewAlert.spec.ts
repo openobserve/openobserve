@@ -3548,10 +3548,10 @@ describe("PreviewAlert - a chart with many series", () => {
 
   it.each([
     ["a day checked every minute", "24h", 1, "60s"],
-    ["a day checked every 10 minutes", "24h", 10, "0"],
+    ["a day checked every 10 minutes", "24h", 10, "600s"],
     ["the default range", "checks", 1, "0"],
   ])(
-    "samples a PromQL chart of %s once per check only when it would skip checks",
+    "samples a PromQL chart of %s once per check in the 12 and 24 hour views",
     async (_, range, frequency, step) => {
       const formData: any = {
         stream_name: "cpu",
