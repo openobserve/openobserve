@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-busy="pending ? 'true' : undefined"
       :class="[
         'focus-visible:outline-accent/40 rounded-default min-w-0 cursor-text truncate text-start outline-offset-2 focus-visible:outline-2',
+        'max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
         textClasses,
         pending ? 'text-text-secondary' : '',
       ]"
