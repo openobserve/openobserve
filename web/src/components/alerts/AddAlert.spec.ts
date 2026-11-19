@@ -2545,6 +2545,7 @@ describe("AddAlert (OForm owner)", () => {
     });
 
     it("the header renames in place: Enter keeps the step and saves nothing", async () => {
+      onTestFinished(() => localStorage.clear());
       wrapper = withHeader();
       await flushPromises();
       const submit = vi.fn((e: Event) => e.preventDefault());
