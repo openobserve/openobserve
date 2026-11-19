@@ -1970,9 +1970,12 @@ mod tests {
             v.page_recommendation.action = PageAction::Suppress;
             let calls = [with_metric(1, "h1", "root_cause", "decisive")];
             let r = run(&calls, Some(&submit(v, vec![])), EndedBy::Agent, true);
-            let verdict = r.verdict.clone().unwrap();
+            let mut verdict = r.verdict.clone().unwrap();
             assert_eq!(r.record.claims.unwrap().confidence, Confidence::High);
             assert_eq!(verdict.confidence, Confidence::Medium);
+            // D'5: quieter paging also needs a healthy recovery probe; grant it so the
+            // band alone decides below.
+            verdict.recovery = Some(crate::meta::oncall::agent::RecoveryVerdict::Healthy);
             assert_eq!(r.record.grade.as_ref().unwrap().band, Confidence::Medium);
 
             let policy = L0Policy {

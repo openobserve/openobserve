@@ -277,7 +277,7 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 80] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 81] = [
     ("api/management/src/request/alert_calibration/digests.rs", "search_at", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -327,6 +327,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 80] = [
     ("core/src/alerts/mod.rs", "run_alert_count_query", Caller::Background("alert evaluation")),
     ("core/src/alerts/notifications/chart/mod.rs", "fetch_series", Caller::Background("notification charts")),
     ("core/src/alerts/prom_rule.rs", "evaluate", Caller::Background("alert evaluation of PromQL rules")),
+    ("core/src/alerts/rca_turn/recovery_probe.rs", "sample", Caller::Background("analysis-run recovery probe")),
     ("core/src/alerts/scheduler/query_optimization_recommendation.rs", "search", Caller::Background("query recommendation analysis")),
     ("core/src/anomaly_detection.rs", "execute_anomaly_query", Caller::Background("anomaly detection runs")),
     ("core/src/anomaly_detection/partitioned_search.rs", "plan", Caller::Background("anomaly detection runs")),

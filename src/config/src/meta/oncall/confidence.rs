@@ -1513,7 +1513,8 @@ mod tests {
             ("pull/812", "gh api repos/o2/app/pulls/812/files", true),
             ("MR !812", "glab mr diff 812", true),
             ("PR #812", "gh pr diff 8120", false),
-            ("checkout-api@4f2c1e9", "git show 4f2c1e9a77", true),
+            // F-15: a native `service@version` reference needs a comparison, never a diff read.
+            ("checkout-api@4f2c1e9", "git show 4f2c1e9a77", false),
             ("4f2c1e9a77", r#"{"sha":"4f2c1e9"}"#, true),
             ("4f2c1e9", "git show 4f2c1e8", false),
             ("querier v0.14.2", "git diff v0.14.1 querier v0.14.2", true),
@@ -1872,7 +1873,7 @@ mod tests {
         );
         assert_eq!(code.graded, Confidence::Medium);
 
-        let diff = grade_with(decisive("e2", "git_show", commit), "checkout-api@4f2c1e9");
+        let diff = grade_with(decisive("e2", "git_show", commit), "4f2c1e9");
         assert!(diff.unverified.is_empty(), "{:?}", diff.unverified);
         assert_eq!(
             diff.decisive_classes,
