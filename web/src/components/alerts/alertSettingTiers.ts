@@ -146,7 +146,9 @@ export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
   tierDef("compareWithPast", "condition", "more", "alerts.tiers.names.compareWithPast"),
   tierDef("vrl", "condition", "more", "alerts.tiers.names.vrl"),
   tierDef("ruleExpression", "condition", "smart", "alerts.tiers.names.queryComparison"),
-  tierDef("anomalyDirection", "condition", "smart", "alerts.tiers.names.anomalyDirection"),
+  tierDef("anomalyDirection", "condition", "smart", "alerts.tiers.names.anomalyDirection", {
+    always: true,
+  }),
   tierDef("anomalyWindow", "condition", "more", "alerts.tiers.names.anomalyWindow"),
   tierDef("anomalySqlPreview", "condition", "more", "alerts.tiers.names.anomalySqlPreview"),
   tierDef(

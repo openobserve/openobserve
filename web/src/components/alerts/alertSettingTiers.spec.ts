@@ -63,7 +63,7 @@ describe("sectionTierView: the More options line per mockup screen", () => {
       "E1 anomaly",
       "condition",
       { kind: "anomaly", shape: "anomaly" },
-      ["anomalyDirection", "anomalyWindow", "anomalySqlPreview"],
+      ["anomalyWindow", "anomalySqlPreview"],
     ],
     [
       "E1b anomaly notify",

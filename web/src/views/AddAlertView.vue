@@ -50,6 +50,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
+import { ALERT_LIST_SAVED_NEW } from "@/utils/alerts/alertListLanding";
 import {
   dropDraftOfMissingAlert,
   isNotFoundError,
@@ -190,7 +191,7 @@ export default defineComponent({
     const refreshTemplates = () => getTemplates(true);
 
     // Unfiltered, so the alert just saved or edited is in view rather than hidden by the list's Firing default.
-    const openAlertList = (folder: string) =>
+    const openAlertList = (folder: string, saved?: string) =>
       router.push({
         name: "alertList",
         query: {
@@ -198,6 +199,7 @@ export default defineComponent({
           folder,
           tab: route.query.tab || "all",
           state: ALERT_LIST_ALL_STATES,
+          saved,
         },
       });
 
@@ -225,7 +227,8 @@ export default defineComponent({
       // The leave dialog's Save is already on its way somewhere else.
       if (options?.navigate === false) return;
 
-      openAlertList(resolvedFolder);
+      const editedId = route.params.alert_id || route.params.anomaly_id;
+      openAlertList(resolvedFolder, editedId ? String(editedId) : ALERT_LIST_SAVED_NEW);
     };
 
     const handleCancel = () => openAlertList((route.query.folder as string) || "default");

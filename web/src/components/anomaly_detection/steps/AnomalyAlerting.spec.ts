@@ -314,7 +314,6 @@ describe("AnomalyAlerting - in the sectioned editor", () => {
   }
 
   it.each<[AlertSettingId, string, "anomalyConditionMore" | "anomalyDetails"]>([
-    ["anomalyDirection", "anomaly-alert-direction-row", "anomalyConditionMore"],
     ["anomalyWindow", "anomaly-window-share-row", "anomalyConditionMore"],
     ["anomalyPriority", "anomaly-priority-row", "anomalyDetails"],
     ["anomalyTags", "anomaly-tags-row", "anomalyDetails"],
@@ -325,6 +324,13 @@ describe("AnomalyAlerting - in the sectioned editor", () => {
     await flushPromises();
     expect(targets[slot].querySelector(`[data-test="${row}"]`)).not.toBeNull();
     expect(w.find(`[data-test="${row}"]`).exists()).toBe(false);
+  });
+
+  it("shows Direction on the main rows, without More options", async () => {
+    const { targets } = await mountSectioned();
+    expect(
+      targets.anomalyConditionMore.querySelector('[data-test="anomaly-alert-direction-row"]'),
+    ).not.toBeNull();
   });
 
   it("record only replaces the destination rows, and Remove brings them back", async () => {

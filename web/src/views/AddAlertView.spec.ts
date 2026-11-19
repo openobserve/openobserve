@@ -11,6 +11,7 @@ import { fenceAlertWrite } from "@/services/alerts.readFence";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
+import { ALERT_LIST_SAVED_NEW } from "@/utils/alerts/alertListLanding";
 import {
   readEditorDraft,
   writeEditorDraft,
@@ -201,38 +202,39 @@ describe("AddAlertView.vue", () => {
     expect(wrapper.vm.destinations).toEqual([]);
   });
 
-  it.each(["update:list", "cancel:hideform"])(
-    "opens the unfiltered alert list on %s, so the alert is in view",
-    async (event) => {
-      vi.mocked(destinationService.list).mockResolvedValue({
-        data: [{ id: 1, name: "Destination 1" }],
-      } as any);
+  it.each([
+    ["update:list", ALERT_LIST_SAVED_NEW],
+    ["cancel:hideform", undefined],
+  ])("opens the unfiltered alert list on %s, so the alert is in view", async (event, saved) => {
+    vi.mocked(destinationService.list).mockResolvedValue({
+      data: [{ id: 1, name: "Destination 1" }],
+    } as any);
 
-      const pushSpy = vi.spyOn(router, "push");
+    const pushSpy = vi.spyOn(router, "push");
 
-      const wrapper = mount(AddAlertView, {
-        global: {
-          plugins: [store, router],
-          stubs: { AddAlert: { name: "AddAlert", template: '<div class="add-alert-stub"></div>' } },
-        },
-      });
+    const wrapper = mount(AddAlertView, {
+      global: {
+        plugins: [store, router],
+        stubs: { AddAlert: { name: "AddAlert", template: '<div class="add-alert-stub"></div>' } },
+      },
+    });
 
-      await flushPromises();
+    await flushPromises();
 
-      wrapper.findComponent({ name: "AddAlert" }).vm.$emit(event);
-      await flushPromises();
+    wrapper.findComponent({ name: "AddAlert" }).vm.$emit(event);
+    await flushPromises();
 
-      expect(pushSpy).toHaveBeenCalledWith({
-        name: "alertList",
-        query: {
-          org_identifier: "test-org",
-          folder: "default",
-          tab: "all",
-          state: ALERT_LIST_ALL_STATES,
-        },
-      });
-    },
-  );
+    expect(pushSpy).toHaveBeenCalledWith({
+      name: "alertList",
+      query: {
+        org_identifier: "test-org",
+        folder: "default",
+        tab: "all",
+        state: ALERT_LIST_ALL_STATES,
+        saved,
+      },
+    });
+  });
 
   it("should refresh destinations when event is emitted", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
