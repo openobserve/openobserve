@@ -48,19 +48,38 @@ pub struct MemoryUpdateRequest {
     pub content: Option<String>,
     pub base_rev: Option<i64>,
     pub reason: Option<String>,
-    pub agent_memory_writes: Option<AgentMemoryWrites>,
+    pub agent_memory_writes: Option<WritesSetting>,
     pub max_bytes: Option<i64>,
     pub user_max_bytes: Option<i64>,
 }
 
 impl MemoryUpdateRequest {
     fn settings(&self) -> MemorySettings {
+        let writes = self.agent_memory_writes.and_then(|w| match w {
+            WritesSetting::Review => Some(AgentMemoryWrites::Review),
+            WritesSetting::Auto => Some(AgentMemoryWrites::Auto),
+            WritesSetting::Off => Some(AgentMemoryWrites::Off),
+            WritesSetting::On => Some(AgentMemoryWrites::On),
+            WritesSetting::Inherit => None,
+        });
         MemorySettings {
-            agent_memory_writes: self.agent_memory_writes,
+            agent_memory_writes: writes,
             max_bytes: self.max_bytes,
             user_max_bytes: self.user_max_bytes,
+            clear_agent_memory_writes: self.agent_memory_writes == Some(WritesSetting::Inherit),
         }
     }
+}
+
+/// An agent-write setting, or `inherit` to store none.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum WritesSetting {
+    Review,
+    Auto,
+    Off,
+    On,
+    Inherit,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -968,8 +987,8 @@ async fn memory_body(
     })
 }
 
-/// Shared-memory settings and whole-text writes need a memory admin; a user owns their own.
-/// Settings and text commit together, and nothing commits on a refusal. [strong]
+/// Shared settings need a memory admin; others' whole text is held (202). Settings and text
+/// commit together, and nothing commits on a refusal. [strong]
 async fn write_memory(
     key: &MemoryKey,
     toolset_id: Option<&str>,
@@ -1014,7 +1033,7 @@ fn check_write(
     is_memory_admin: bool,
 ) -> Result<(), Response> {
     let shared = scope != MemoryScope::User;
-    if shared && !is_memory_admin {
+    if shared && !is_memory_admin && (body.content.is_none() || !settings.is_empty()) {
         return Err(MetaHttpResponse::forbidden(
             "only a memory admin can change this memory",
         ));
@@ -1423,12 +1442,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_non_admin_cannot_put_shared_memory_or_its_settings() {
+    async fn a_non_admin_cannot_put_shared_memory_settings() {
         for key in [MemoryKey::org("o1"), MemoryKey::toolset("o1", "datadog")] {
-            let resp = write_memory(&key, None, text("x", 0), person(false)).await;
+            let with_cap = MemoryUpdateRequest {
+                max_bytes: Some(32 * 1024),
+                ..text("x", 0)
+            };
+            let resp = write_memory(&key, None, with_cap, person(false)).await;
             assert_eq!(resp.status(), StatusCode::FORBIDDEN);
             let settings = MemoryUpdateRequest {
-                agent_memory_writes: Some(AgentMemoryWrites::Auto),
+                agent_memory_writes: Some(WritesSetting::Auto),
                 ..Default::default()
             };
             let resp = write_memory(&key, None, settings, person(false)).await;
@@ -1461,7 +1484,7 @@ mod tests {
         };
         assert!(check(&own_cap, user, false).is_err());
         let off = MemoryUpdateRequest {
-            agent_memory_writes: Some(AgentMemoryWrites::Off),
+            agent_memory_writes: Some(WritesSetting::Off),
             ..Default::default()
         };
         assert!(check(&off, user, false).is_ok());
@@ -1524,7 +1547,7 @@ mod tests {
         let resp = write_memory(&key, None, text("## Notes\n", 0), person(true)).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let settings = MemoryUpdateRequest {
-            agent_memory_writes: Some(AgentMemoryWrites::Auto),
+            agent_memory_writes: Some(WritesSetting::Auto),
             max_bytes: Some(32 * 1024),
             ..Default::default()
         };
@@ -1534,6 +1557,66 @@ mod tests {
         let read = memory_body(&key, true).await.unwrap();
         assert_eq!((read.rev, read.max_bytes), (1, 32 * 1024));
         assert_eq!(read.agent_memory_writes_effective, AgentMemoryWrites::Auto);
+    }
+
+    #[tokio::test]
+    async fn a_non_admin_s_text_is_held_and_applies_only_on_its_base_rev() {
+        if !meta_store().await {
+            return;
+        }
+        let key = MemoryKey::org(&unique_org("memory_propose"));
+        let resp = write_memory(&key, None, text("a\n", 0), person(true)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let mut held = vec![];
+        for proposal in ["b\n", "c\n"] {
+            let resp = write_memory(&key, None, text(proposal, 1), person(false)).await;
+            assert_eq!(resp.status(), StatusCode::ACCEPTED);
+            held.push(
+                body_of(resp).await["revision_id"]
+                    .as_str()
+                    .unwrap()
+                    .to_string(),
+            );
+        }
+        let read = memory_body(&key, false).await.unwrap();
+        assert_eq!(
+            (read.rev, read.content.as_str(), read.pending_count),
+            (1, "a\n", 2)
+        );
+        let resp = decide(&key, &held[0], Decision::Accept, true).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let resp = decide(&key, &held[1], Decision::Accept, true).await;
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        let body = body_of(resp).await;
+        assert_eq!(
+            (&body["code"], &body["rev"]),
+            (&json!("rev_conflict"), &json!(2))
+        );
+        let read = memory_body(&key, true).await.unwrap();
+        assert_eq!((read.rev, read.content.as_str()), (2, "b\n"));
+    }
+
+    #[tokio::test]
+    async fn inherit_clears_a_toolset_s_own_agent_write_setting() {
+        let inherit: MemoryUpdateRequest =
+            serde_json::from_value(json!({"agent_memory_writes": "inherit"})).unwrap();
+        let settings = inherit.settings();
+        assert!(settings.clear_agent_memory_writes && settings.agent_memory_writes.is_none());
+        assert!(settings.validate(MemoryScope::User).is_err());
+        if !meta_store().await {
+            return;
+        }
+        let key = MemoryKey::org(&unique_org("memory_inherit"));
+        let off = MemoryUpdateRequest {
+            agent_memory_writes: Some(WritesSetting::Off),
+            ..Default::default()
+        };
+        let resp = write_memory(&key, None, off, person(true)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let resp = write_memory(&key, None, inherit, person(true)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let read = memory_body(&key, true).await.unwrap();
+        assert_eq!(read.agent_memory_writes, None);
     }
 
     /// A user who is a member of `org`; private memory is written only for members.
@@ -1675,13 +1758,13 @@ mod tests {
         let resp = write_memory(&key, None, text("## Notes\n", 0), person(true)).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let stale = MemoryUpdateRequest {
-            agent_memory_writes: Some(AgentMemoryWrites::Auto),
+            agent_memory_writes: Some(WritesSetting::Auto),
             ..text("## Stale\n", 0)
         };
         let resp = write_memory(&key, None, stale, person(true)).await;
         assert_eq!(resp.status(), StatusCode::CONFLICT);
         let too_big = MemoryUpdateRequest {
-            agent_memory_writes: Some(AgentMemoryWrites::Auto),
+            agent_memory_writes: Some(WritesSetting::Auto),
             max_bytes: Some(32 * 1024),
             ..text(&"x".repeat(40 * 1024), 1)
         };

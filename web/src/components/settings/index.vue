@@ -110,6 +110,7 @@ export default defineComponent({
       storageSettings: "storageSettings",
       cipherKeys: "cipher-keys",
       aiToolsets: "ai_toolsets",
+      aiMemory: "ai_memory",
       license: "license",
       orgnizationManagement: "organization_management",
       regexPatterns: "regex_patterns",
@@ -431,6 +432,22 @@ export default defineComponent({
           lockedMessage: aiToolsetsAccess.message,
           licenseLocked: aiToolsetsLicense === "locked" || aiAssistantLicense === "locked",
           dataTest: "ai-toolsets-tab",
+          group: "Integrations",
+        },
+        {
+          key: "ai_memory",
+          label: t("aiMemory.header"),
+          description: t("aiMemory.subtitle"),
+          icon: "psychology",
+          to: { name: "aiMemory", query: { org_identifier: org } },
+          visible:
+            aiToolsetsLicense !== "hidden" &&
+            aiAssistantLicense !== "hidden" &&
+            aiToolsetsAccess.visible,
+          locked: !aiToolsetsAccess.allowed,
+          lockedMessage: aiToolsetsAccess.message,
+          licenseLocked: aiToolsetsLicense === "locked" || aiAssistantLicense === "locked",
+          dataTest: "ai-memory-tab",
           group: "Integrations",
         },
         {

@@ -193,6 +193,14 @@ const useManagementRoutes = () => {
           },
           beforeEnter: withFeatureGate("aiToolsets", routeGuard),
         }),
+        // Memory belongs to the same AI feature as toolsets, so it shares their license and gate.
+        withLicenseFeature("ai_toolsets", {
+          path: "ai_memory",
+          name: "aiMemory",
+          component: () => import("@/components/settings/AiMemory.vue"),
+          meta: { titleKey: "aiMemory.header" },
+          beforeEnter: withFeatureGate("aiToolsets", routeGuard),
+        }),
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",

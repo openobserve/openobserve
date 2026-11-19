@@ -203,6 +203,8 @@ pub struct MemorySettings {
     pub agent_memory_writes: Option<AgentMemoryWrites>,
     pub max_bytes: Option<i64>,
     pub user_max_bytes: Option<i64>,
+    /// Stores no agent-write setting, so a toolset follows the org and the org the default.
+    pub clear_agent_memory_writes: bool,
 }
 
 impl MemorySettings {
@@ -210,11 +212,17 @@ impl MemorySettings {
         self.agent_memory_writes.is_none()
             && self.max_bytes.is_none()
             && self.user_max_bytes.is_none()
+            && !self.clear_agent_memory_writes
     }
 
     /// Caps range from the scope's default to its maximum; a user memory's cap is set on the org
     /// row.
     pub fn validate(&self, scope: MemoryScope) -> Result<(), String> {
+        if self.clear_agent_memory_writes
+            && (scope == MemoryScope::User || self.agent_memory_writes.is_some())
+        {
+            return Err("inherit is a shared-memory setting and can't come with a value".into());
+        }
         if let Some(writes) = self.agent_memory_writes
             && !writes.allowed_for(scope)
         {

@@ -93,7 +93,7 @@ pub struct Revision {
     pub state: RevisionState,
     pub base_rev: i64,
     pub edits: Option<Vec<MemoryEdit>>,
-    /// `None` on pending and discarded revisions, and in lists.
+    /// An applied snapshot, or a person's proposed whole text; `None` in history lists.
     pub content: Option<String>,
     pub updated_by: String,
     pub reason: Option<String>,
@@ -440,6 +440,55 @@ pub async fn hold_with<C: ConnectionTrait + TransactionTrait>(
             op_id: new_id(),
             meta,
             flags: &edit_flags(edits),
+        },
+    )
+    .await?;
+    finish(txn, Outcome::Pending { revision_id }).await
+}
+
+/// Holds a person's whole text for approval; accepting it needs the memory still at `base_rev`.
+/// [strong]
+pub async fn propose_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    dek: &[u8],
+    key: &MemoryKey,
+    toolset_id: Option<&str>,
+    base_rev: i64,
+    content: &str,
+    meta: &WriteMeta,
+) -> Result<Outcome, errors::Error> {
+    let txn = conn.begin().await?;
+    let Some(row) = open_in(&txn, dek, key, toolset_id, meta.now).await? else {
+        return finish(txn, Outcome::NotFound).await;
+    };
+    if row.rev != base_rev {
+        let current = decrypt(dek, &row.content)?;
+        return finish(
+            txn,
+            Outcome::RevConflict {
+                rev: row.rev,
+                content: current,
+            },
+        )
+        .await;
+    }
+    if let Err(e) = check_size(&txn, &row, content).await? {
+        return finish(txn, Outcome::Invalid(e)).await;
+    }
+    let revision_id = insert_revision(
+        &txn,
+        dek,
+        NewRevision {
+            memory_id: &row.id,
+            org: &key.org,
+            rev: None,
+            state: RevisionState::Pending,
+            base_rev,
+            edits: None,
+            content: Some(content),
+            op_id: new_id(),
+            meta,
+            flags: &[],
         },
     )
     .await?;
@@ -920,6 +969,13 @@ async fn save_settings(
         return Ok(row);
     }
     let mut update = ai_memory::Entity::update_many().filter(ai_memory::Column::Id.eq(&row.id));
+    if settings.clear_agent_memory_writes {
+        row.agent_memory_writes = None;
+        update = update.col_expr(
+            ai_memory::Column::AgentMemoryWrites,
+            Expr::value(Option::<String>::None),
+        );
+    }
     if let Some(writes) = settings.agent_memory_writes {
         row.agent_memory_writes = Some(writes.as_str().to_string());
         update = update.col_expr(
@@ -1020,18 +1076,30 @@ async fn accept_in(
     else {
         return Ok(Outcome::NotFound);
     };
-    let edits = pending
-        .edits
-        .as_deref()
-        .map(|e| decode_edits(dek, e))
-        .transpose()?
-        .unwrap_or_default();
     let Some(row) = find_row(txn, memory_id).await? else {
         return Ok(Outcome::NotFound);
     };
-    let content = match apply_edits(&decrypt(dek, &row.content)?, &edits) {
-        Ok(content) => content,
-        Err(e) => return Ok(Outcome::EditConflict(e)),
+    let current = decrypt(dek, &row.content)?;
+    let content = match (&pending.edits, &pending.content) {
+        // A proposed whole text replaces only the text it was written against.
+        (None, Some(_)) if row.rev != pending.base_rev => {
+            return Ok(Outcome::RevConflict {
+                rev: row.rev,
+                content: current,
+            });
+        }
+        (None, Some(proposed)) => decrypt(dek, proposed)?,
+        (edits, _) => {
+            let edits = edits
+                .as_deref()
+                .map(|e| decode_edits(dek, e))
+                .transpose()?
+                .unwrap_or_default();
+            match apply_edits(&current, &edits) {
+                Ok(content) => content,
+                Err(e) => return Ok(Outcome::EditConflict(e)),
+            }
+        }
     };
     if let Err(e) = check_size(txn, &row, &content).await? {
         return Ok(Outcome::Invalid(e));
@@ -1351,6 +1419,7 @@ fn to_memory(model: ai_memory::Model, dek: &[u8]) -> Result<Memory, errors::Erro
             agent_memory_writes,
             max_bytes: model.max_bytes,
             user_max_bytes: model.user_max_bytes,
+            clear_agent_memory_writes: false,
         },
     })
 }
@@ -1798,6 +1867,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_proposed_text_is_stored_pending_and_applies_only_on_its_base_rev() {
+        let dek = random_bytes(64);
+        for db in databases("ai_memory_propose").await {
+            let key = toolset();
+            apply(&db, &dek, &key, 0, &content("a\n"), &person(1))
+                .await
+                .unwrap();
+            let memory_id = get_with(&db, &dek, &key).await.unwrap().unwrap().id;
+            let stale = propose_with(&db, &dek, &key, None, 0, "x\n", &person(2))
+                .await
+                .unwrap();
+            assert!(
+                matches!(stale, Outcome::RevConflict { rev: 1, .. }),
+                "{stale:?}"
+            );
+            let mut ids = Vec::new();
+            for (text, now) in [("b\n", 3), ("c\n", 4)] {
+                match propose_with(&db, &dek, &key, None, 1, text, &person(now))
+                    .await
+                    .unwrap()
+                {
+                    Outcome::Pending { revision_id } => ids.push(revision_id),
+                    other => panic!("not held: {other:?}"),
+                }
+            }
+            let stored = ai_memory_revisions::Entity::find_by_id(ids[0].clone())
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_ne!(stored.content.as_deref(), Some("b\n"), "stored encrypted");
+            let held = get_revision_with(&db, &dek, &memory_id, &ids[0])
+                .await
+                .unwrap();
+            assert_eq!(held.unwrap().content.as_deref(), Some("b\n"));
+            assert_eq!(get_with(&db, &dek, &key).await.unwrap().unwrap().rev, 1);
+
+            let first = accept_with(&db, &dek, &memory_id, &ids[0], 5)
+                .await
+                .unwrap();
+            assert!(
+                matches!(first, Outcome::Applied { rev: 2, .. }),
+                "{first:?}"
+            );
+            let second = accept_with(&db, &dek, &memory_id, &ids[1], 6)
+                .await
+                .unwrap();
+            assert_eq!(
+                second,
+                Outcome::RevConflict {
+                    rev: 2,
+                    content: "b\n".to_string()
+                }
+            );
+            assert_eq!(
+                get_with(&db, &dek, &key).await.unwrap().unwrap().content,
+                "b\n"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn accept_and_discard_of_one_edit_never_both_win() {
         let dek = random_bytes(64);
         for db in databases("ai_memory_accept_discard").await {
@@ -2195,6 +2326,7 @@ mod tests {
                 agent_memory_writes: Some(AgentMemoryWrites::Auto),
                 max_bytes: Some(32 * 1024),
                 user_max_bytes: None,
+                clear_agent_memory_writes: false,
             };
             set(&db, &dek, &key, &settings, 10).await.unwrap();
             let memory = get_with(&db, &dek, &key).await.unwrap().unwrap();

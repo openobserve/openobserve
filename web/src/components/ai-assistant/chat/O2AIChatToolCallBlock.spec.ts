@@ -21,6 +21,9 @@ const { mockCopy } = vi.hoisted(() => ({ mockCopy: vi.fn() }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: mockCopy }));
 
 import O2AIChatToolCallBlock from "./O2AIChatToolCallBlock.vue";
+import store from "@/test/unit/helpers/store";
+import router from "@/test/unit/helpers/router";
+import { createMemoryHistory, createRouter } from "vue-router";
 
 const detailed = (extra: Record<string, unknown> = {}) => ({
   type: "tool_call",
@@ -46,6 +49,49 @@ function mountBlock(
 
 describe("O2AIChatToolCallBlock", () => {
   beforeEach(() => mockCopy.mockClear());
+
+  it("shows an update_memory result as one line linking to AI Memory", async () => {
+    const line = (resultMessage: string) =>
+      mount(O2AIChatToolCallBlock, {
+        global: { plugins: [i18n, store, router], provide: { store } },
+        props: {
+          block: { type: "tool_call", tool: "update_memory", success: true, resultMessage },
+          messageIndex: 0,
+          blockIndex: 0,
+          expandedKeys: new Set<string>(),
+        },
+      });
+    const saved = line("Saved to org memory · rev 4");
+    expect(saved.find('[data-test="o2-ai-chat-memory-line"]').text()).toContain(
+      "Saved to org memory · rev 4",
+    );
+    expect(saved.find('[data-test="o2-ai-chat-memory-link"]').attributes("href")).toContain(
+      "ai_memory",
+    );
+    expect(line("Sent for approval: org memory changes need…").text()).toContain(
+      "Sent for approval",
+    );
+    expect(line("Not saved: memory_too_large; trim it").text()).toContain(
+      "Not saved: memory_too_large",
+    );
+    const bare = createRouter({ history: createMemoryHistory(), routes: [] });
+    const noPage = mount(O2AIChatToolCallBlock, {
+      global: { plugins: [i18n, store, bare], provide: { store } },
+      props: {
+        block: {
+          type: "tool_call",
+          tool: "update_memory",
+          success: true,
+          resultMessage: "Saved to org memory · rev 4",
+        },
+        messageIndex: 0,
+        blockIndex: 0,
+        expandedKeys: new Set<string>(),
+      },
+    });
+    expect(noPage.find('[data-test="o2-ai-chat-memory-line"]').exists()).toBe(true);
+    expect(noPage.find('[data-test="o2-ai-chat-memory-link"]').exists()).toBe(false);
+  });
 
   it("expands only for its own positional key", () => {
     expect(
