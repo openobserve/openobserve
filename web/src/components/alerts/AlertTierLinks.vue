@@ -40,8 +40,11 @@ const SEP = raw(" · ");
 // Only the anomaly window hint has values, and a listed setting always holds its default.
 
 const links = computed(() => props.view.addLinks.filter((d) => !d.inline));
-const messageLinks = computed(() => links.value.filter((d) => d.row === "message"));
-const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
+// Message adders join the same wrapping line, so a step holds one row of optional settings.
+const ownLinks = computed(() => [
+  ...links.value.filter((d) => d.row === "message"),
+  ...links.value.filter((d) => d.row !== "message"),
+]);
 </script>
 
 <!-- A row like any other: "+ add" links and More options start at the control column, Show fewer takes More options' slot. -->
@@ -51,25 +54,6 @@ const ownLinks = computed(() => links.value.filter((d) => d.row !== "message"));
     class="flex flex-col"
     :data-test="`add-alert-section-${section}-tiers`"
   >
-    <OSettingRow
-      v-if="messageLinks.length"
-      :label="t('alerts.form.messageRow')"
-      :data-test="`add-alert-section-${section}-row-message`"
-    >
-      <div class="-ms-3.5 flex flex-wrap items-center gap-x-1 max-[85.5rem]:-ms-3">
-        <OButton
-          v-for="item in messageLinks"
-          :key="item.id"
-          variant="ghost-primary"
-          size="sm"
-          icon-left="add"
-          :data-test="`add-alert-add-${item.id}`"
-          @click="emit('add', item.id)"
-        >
-          {{ t(item.nameKey) }}
-        </OButton>
-      </div>
-    </OSettingRow>
     <OSettingRow
       v-if="ownLinks.length || view.more.length"
       :label="t('alerts.sections.optional.title')"

@@ -411,21 +411,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                   </div>
-                  <OCollapsible
+                  <AlertStreamContents
                     v-if="formData.stream_name && !isAnomalyMode"
-                    :label="t('alerts.form.watch.streamContents')"
-                    data-test="add-alert-stream-contents"
-                  >
-                    <AlertMetricLabels
-                      v-if="formData.stream_type === 'metrics'"
-                      :stream-name="formData.stream_name"
-                      @insert="onMetricLabelInsert"
-                    />
-                    <AlertSampleEvents
-                      :stream-name="formData.stream_name"
-                      :stream-type="formData.stream_type"
-                    />
-                  </OCollapsible>
+                    :stream-name="formData.stream_name"
+                    :stream-type="formData.stream_type"
+                    @insert="onMetricLabelInsert"
+                  />
                 </div>
               </div>
               <AlertIntentStart
@@ -560,7 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OToggleGroup
                     :model-value="activeConditionPreset"
                     :aria-label="t('alerts.sections.presets.label')"
-                    class="min-w-0 flex-wrap"
+                    class="min-w-0 flex-wrap self-start"
                     @update:model-value="applyConditionPreset($event as string)"
                   >
                     <OToggleGroupItem
@@ -696,19 +687,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
-                <OCollapsible
+                <AlertCheckTimeline
                   v-if="showsCheckTimeline"
-                  :label="t('alerts.sections.timeline.label')"
-                  data-test="add-alert-check-timeline-fold"
-                >
-                  <AlertCheckTimeline
-                    :frequency="Number(formData.trigger_condition.frequency)"
-                    :period="Number(formData.trigger_condition.period)"
-                    :forecast-window="checkTimelineForecastWindow"
-                    :query-condition="formData.query_condition"
-                    :aligned="formData.trigger_condition.align_time !== false"
-                  />
-                </OCollapsible>
+                  :frequency="Number(formData.trigger_condition.frequency)"
+                  :period="Number(formData.trigger_condition.period)"
+                  :forecast-window="checkTimelineForecastWindow"
+                  :query-condition="formData.query_condition"
+                  :aligned="formData.trigger_condition.align_time !== false"
+                />
                 <AlertSuggestionLine section="condition" anchor="end" />
                 <div
                   :ref="(el) => setSectionTarget('narrowPreview', el)"
@@ -1355,7 +1341,7 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OSectionNav from "@/lib/navigation/SectionNav/OSectionNav.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import type { ChoiceCardOption } from "@/lib/forms/ChoiceCards/OChoiceCards.types";
-import AlertSampleEvents from "./AlertSampleEvents.vue";
+import AlertStreamContents from "./AlertStreamContents.vue";
 import AlertStreamOption from "./AlertStreamOption.vue";
 import AlertIntentStart from "./AlertIntentStart.vue";
 import AlertDefaultsLine from "./AlertDefaultsLine.vue";
@@ -1371,7 +1357,6 @@ import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySugg
 import type { ValueRange } from "@/utils/alerts/ratioThreshold";
 import { buildPrefillFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
 import { withPackTag } from "@/components/alertLibrary/libraryInstall";
-import AlertMetricLabels from "./AlertMetricLabels.vue";
 import {
   insertLabelIntoPromql,
   recentActivity,
@@ -1546,13 +1531,12 @@ export default defineComponent({
     OSectionNav,
     OCollapsible,
     AlertStepNav,
-    AlertSampleEvents,
+    AlertStreamContents,
     AlertStreamOption,
     AlertIntentStart,
     AlertDefaultsLine,
     AlertLookAlike,
     AlertMessageLine,
-    AlertMetricLabels,
     AlertCheckTimeline,
     AlertBacktest,
     OCommandSearch,
