@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { watch } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -136,5 +137,27 @@ describe("SearchBar - applying a saved view that fails to load", () => {
     await wrapper!.vm.applySavedView({ view_id: "v1", view_name: "view" });
     await vi.waitFor(() => expect(searchObj.meta.sqlMode).toBe(false), { timeout: 4000 });
     expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a quick-mode view's filter when applied from SQL mode", async () => {
+    const searchObj = await setup();
+    wrapper!.vm.dateTimeRef = { setSavedDate: vi.fn() };
+    // Mirrors the fullSQLMode watcher in Index.vue.
+    watch(
+      () => searchObj.meta.sqlMode,
+      (on: boolean) => {
+        if (!on) {
+          searchObj.data.query = "";
+          searchObj.data.editorValue = "";
+        }
+      },
+    );
+    const view = viewFor("app_logs", false);
+    view.data.data.data.query = "status = 500";
+    getViewDetail.mockResolvedValueOnce(view);
+    await wrapper!.vm.applySavedView({ view_id: "v1", view_name: "view" });
+    await vi.waitFor(() => expect(searchObj.meta.sqlMode).toBe(false), { timeout: 4000 });
+    await flushPromises();
+    expect(searchObj.data.query).toBe("status = 500");
   });
 });
