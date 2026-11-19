@@ -210,6 +210,8 @@ impl Episode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AutomaticResolution {
     Kept,
+    /// Every firing recovered, but a person who acknowledged or was assigned it owns the close.
+    Owned,
     AlreadyResolved(Box<alert_incidents::Model>),
     Resolved {
         before: Box<alert_incidents::Model>,
@@ -931,17 +933,21 @@ pub async fn add_firing_once_with(
     Ok(Joining::Joined { new_alert_type })
 }
 
+/// `owned` reports an owner-held incident whose firings all recovered as
+/// [AutomaticResolution::Owned]; without it that incident is Kept before any link read.
 pub async fn resolve_if_recovered(
     org_id: &str,
     id: &str,
+    owned: bool,
 ) -> Result<AutomaticResolution, errors::Error> {
-    resolve_if_recovered_with(get_orm_client_rw().await, org_id, id).await
+    resolve_if_recovered_with(get_orm_client_rw().await, org_id, id, owned).await
 }
 
 pub async fn resolve_if_recovered_with(
     db: &sea_orm::DatabaseConnection,
     org_id: &str,
     id: &str,
+    owned: bool,
 ) -> Result<AutomaticResolution, errors::Error> {
     let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
     let txn = db.begin().await.map_err(db_err)?;
@@ -959,23 +965,29 @@ pub async fn resolve_if_recovered_with(
         txn.rollback().await.map_err(db_err)?;
         return Ok(AutomaticResolution::AlreadyResolved(Box::new(before)));
     }
+    let held =
+        before.status != "open" || before.acknowledged_by.is_some() || before.assigned_to.is_some();
     // A security case is an analyst's to close, whatever its detections do.
-    if before.status != "open"
-        || before.acknowledged_by.is_some()
-        || before.assigned_to.is_some()
-        || before.security_case
-    {
+    if before.security_case || (held && !owned) {
         txn.rollback().await.map_err(db_err)?;
         return Ok(AutomaticResolution::Kept);
     }
+    // Two single-row reads under the row lock, however many links a long-lived incident holds.
     let links = alert_incident_alerts::Entity::find()
-        .filter(alert_incident_alerts::Column::IncidentId.eq(id))
-        .all(&txn)
+        .filter(alert_incident_alerts::Column::IncidentId.eq(id));
+    let open_link = links
+        .clone()
+        .filter(alert_incident_alerts::Column::ResolvedAt.is_null())
+        .one(&txn)
         .await
         .map_err(db_err)?;
-    if links.is_empty() || links.iter().any(|link| link.resolved_at.is_none()) {
+    if open_link.is_some() || links.one(&txn).await.map_err(db_err)?.is_none() {
         txn.rollback().await.map_err(db_err)?;
         return Ok(AutomaticResolution::Kept);
+    }
+    if held {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(AutomaticResolution::Owned);
     }
     let now = chrono::Utc::now().timestamp_micros();
     let mut active: alert_incidents::ActiveModel = before.clone().into();
@@ -1555,6 +1567,7 @@ pub async fn list_with_cases<C: ConnectionTrait>(
 pub async fn list_by_alert_kind(
     org_id: &str,
     alert_kind: &str,
+    only: Option<&str>,
     limit: u64,
     offset: u64,
 ) -> Result<
@@ -1564,7 +1577,8 @@ pub async fn list_by_alert_kind(
     ),
     errors::Error,
 > {
-    list_by_alert_kind_with(get_orm_client_ro().await, org_id, alert_kind, limit, offset).await
+    let conn = get_orm_client_ro().await;
+    list_by_alert_kind_with(conn, org_id, alert_kind, only, limit, offset).await
 }
 
 /// [`list_by_alert_kind`] on a given connection; the flag says another page follows.
@@ -1572,6 +1586,7 @@ pub async fn list_by_alert_kind_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_kind: &str,
+    only: Option<&str>,
     limit: u64,
     offset: u64,
 ) -> Result<
@@ -1590,6 +1605,7 @@ pub async fn list_by_alert_kind_with<C: ConnectionTrait>(
     let mut incidents = alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Id.in_subquery(with_kind))
+        .apply_if(only, |q, id| q.filter(alert_incidents::Column::Id.eq(id)))
         .order_by_desc(alert_incidents::Column::FirstAlertAt)
         .order_by_desc(alert_incidents::Column::Id)
         .limit(limit.saturating_add(1))
@@ -1642,6 +1658,24 @@ pub async fn open_with_alert_kind_since(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// The org's `alert_kind` incidents of any status created since `since`, newest first, on the
+/// primary.
+pub async fn created_with_alert_kind_since(
+    org_id: &str,
+    alert_kind: &str,
+    since: i64,
+) -> Result<Vec<alert_incidents::Model>, errors::Error> {
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::CreatedAt.gte(since))
+        .filter(alert_incidents::Column::Id.in_subquery(with_alert_kind(alert_kind)))
+        .order_by_desc(alert_incidents::Column::CreatedAt)
+        .order_by_desc(alert_incidents::Column::Id)
+        .all(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// The org's newest incidents with an `alert_kind` trigger, any status, on the primary.
 pub async fn newest_with_alert_kind(
     org_id: &str,
@@ -1657,34 +1691,6 @@ pub async fn newest_with_alert_kind(
         .all(get_orm_client_rw().await)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
-}
-
-/// When each incident's newest `alert_kind` link was written, on the primary.
-pub async fn last_linked_at(
-    incident_ids: &[String],
-    alert_kind: &str,
-) -> Result<HashMap<String, i64>, errors::Error> {
-    if incident_ids.is_empty() {
-        return Ok(HashMap::new());
-    }
-    let rows: Vec<(String, Option<i64>)> = alert_incident_alerts::Entity::find()
-        .select_only()
-        .column(alert_incident_alerts::Column::IncidentId)
-        .column_as(alert_incident_alerts::Column::CreatedAt.max(), "linked_at")
-        .filter(
-            alert_incident_alerts::Column::IncidentId
-                .is_in(incident_ids.iter().map(String::as_str)),
-        )
-        .filter(alert_incident_alerts::Column::AlertKind.eq(alert_kind))
-        .group_by(alert_incident_alerts::Column::IncidentId)
-        .into_tuple()
-        .all(get_orm_client_rw().await)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(rows
-        .into_iter()
-        .filter_map(|(id, at)| Some((id, at?)))
-        .collect())
 }
 
 /// Every `alert_kind` link of these incidents, oldest firing first.
@@ -4407,7 +4413,7 @@ mod tests {
             let ids = |rows: &[(alert_incidents::Model, alert_incident_alerts::Model)]| {
                 rows.iter().map(|(i, _)| i.id.clone()).collect::<Vec<_>>()
             };
-            let (all, more) = list_by_alert_kind_with(&db, "demo-org", "autoobserve", 10, 0)
+            let (all, more) = list_by_alert_kind_with(&db, "demo-org", "autoobserve", None, 10, 0)
                 .await
                 .unwrap();
             assert_eq!(ids(&all), [newer.clone(), older.clone()], "{name}");
@@ -4416,20 +4422,28 @@ mod tests {
                 all.iter().all(|(_, l)| l.alert_kind == "autoobserve"),
                 "{name}"
             );
-            let (first, more) = list_by_alert_kind_with(&db, "demo-org", "autoobserve", 1, 0)
+            let (first, more) = list_by_alert_kind_with(&db, "demo-org", "autoobserve", None, 1, 0)
                 .await
                 .unwrap();
             assert_eq!(ids(&first), std::slice::from_ref(&newer), "{name}");
             assert!(more, "{name}");
-            let (second, more) = list_by_alert_kind_with(&db, "demo-org", "autoobserve", 1, 1)
-                .await
-                .unwrap();
+            let (second, more) =
+                list_by_alert_kind_with(&db, "demo-org", "autoobserve", None, 1, 1)
+                    .await
+                    .unwrap();
             assert_eq!(ids(&second), std::slice::from_ref(&older), "{name}");
             assert!(!more, "{name}");
-            let (none, _) = list_by_alert_kind_with(&db, "nobody", "autoobserve", 10, 0)
+            let (none, _) = list_by_alert_kind_with(&db, "nobody", "autoobserve", None, 10, 0)
                 .await
                 .unwrap();
             assert!(none.is_empty(), "{name}");
+            for (only, want) in [(&older, vec![older.clone()]), (&alert, vec![])] {
+                let (one, more) =
+                    list_by_alert_kind_with(&db, "demo-org", "autoobserve", Some(only), 10, 0)
+                        .await
+                        .unwrap();
+                assert_eq!((ids(&one), more), (want, false), "{name}: {only}");
+            }
             drop_kind_schema(schema).await;
         }
     }
@@ -4441,7 +4455,7 @@ mod tests {
             link_at(&db, &id, "autoobserve:a", "autoobserve", 100).await;
             link_at(&db, &id, "alert-1", "internal", 150).await;
             link_at(&db, &id, "autoobserve:a", "autoobserve", 200).await;
-            let (rows, more) = list_by_alert_kind_with(&db, "demo-org", "autoobserve", 10, 0)
+            let (rows, more) = list_by_alert_kind_with(&db, "demo-org", "autoobserve", None, 10, 0)
                 .await
                 .unwrap();
             assert_eq!(rows.len(), 1, "{name}: {rows:?}");
@@ -4691,12 +4705,15 @@ mod tests {
     #[tokio::test]
     async fn automatic_resolution_observes_ownership_and_current_links() {
         for (name, db, schema) in kind_backends().await {
-            for (case, acknowledged, assigned, unresolved, security_case) in [
-                ("ack", true, false, false, false),
-                ("assigned", false, true, false, false),
-                ("new-link", false, false, true, false),
-                ("security-case", false, false, false, true),
-                ("recovered", false, false, false, false),
+            for (case, acknowledged, assigned, unresolved, security_case, owned) in [
+                ("ack", true, false, false, false, true),
+                ("ack-unasked", true, false, false, false, false),
+                ("assigned", false, true, false, false, true),
+                ("assigned-unasked", false, true, false, false, false),
+                ("assigned-new-link", false, true, true, false, true),
+                ("new-link", false, false, true, false, true),
+                ("security-case", false, false, false, true, true),
+                ("recovered", false, false, false, false, false),
             ] {
                 let id = incident_at(&db, "demo-org", 100).await;
                 link_at(&db, &id, "finding", "autoobserve", 100).await;
@@ -4723,11 +4740,13 @@ mod tests {
                 if unresolved {
                     link_at(&db, &id, "new-finding", "autoobserve", 300).await;
                 }
-                let result = resolve_if_recovered_with(&db, "demo-org", &id)
+                let result = resolve_if_recovered_with(&db, "demo-org", &id, owned)
                     .await
                     .unwrap();
-                if acknowledged || assigned || unresolved || security_case {
+                if unresolved || security_case || ((acknowledged || assigned) && !owned) {
                     assert_eq!(result, AutomaticResolution::Kept, "{name}/{case}");
+                } else if acknowledged || assigned {
+                    assert_eq!(result, AutomaticResolution::Owned, "{name}/{case}");
                 } else {
                     let AutomaticResolution::Resolved { before, after } = result else {
                         panic!("{name}/{case}: expected resolution");
@@ -4736,7 +4755,7 @@ mod tests {
                     assert_eq!(after.status, "resolved");
                     assert!(after.resolved_at.is_some());
                     assert_eq!(
-                        resolve_if_recovered_with(&db, "demo-org", &id)
+                        resolve_if_recovered_with(&db, "demo-org", &id, owned)
                             .await
                             .unwrap(),
                         AutomaticResolution::AlreadyResolved(after),

@@ -26,6 +26,7 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
 import analytics from "@/services/product_analytics";
 import queryHistory from "@/services/query_history";
@@ -1735,6 +1736,65 @@ describe("Index.vue (Main Traces Page)", () => {
       await flushPromises();
       expect(record).not.toHaveBeenCalled();
       record.mockRestore();
+    });
+
+    describe("spans ORDER BY across pages", () => {
+      const field = (name: string) => ({ name });
+      const spansSql = async (
+        sortBy: string,
+        fields = ["duration", "trace_id", "span_id"],
+        sortOrder = "desc",
+      ) => {
+        await mountPage();
+        mockSearchObj.data.stream.selectedStreamFields = fields.map(field);
+        mockSearchObj.meta.resultGrid.sortBy = sortBy;
+        mockSearchObj.meta.resultGrid.sortOrder = sortOrder;
+        await wrapper.vm.getMoreData();
+        const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+        return b64DecodeUnicode((calls[calls.length - 1][0] as any).queryReq.query.sql);
+      };
+
+      afterEach(() => {
+        mockSearchObj.data.stream.selectedStreamFields = [];
+        mockSearchObj.meta.resultGrid.sortBy = "start_time";
+        mockSearchObj.meta.resultGrid.sortOrder = "desc";
+      });
+
+      it("adds trace and span id tie-breaks to a non-time sort", async () => {
+        expect(await spansSql("duration")).toBe(
+          'SELECT * FROM "default" ORDER BY duration DESC, trace_id ASC, span_id ASC',
+        );
+      });
+
+      it("keeps the time sort as a single key", async () => {
+        expect(await spansSql("start_time")).toBe(
+          'SELECT * FROM "default" ORDER BY _timestamp DESC',
+        );
+      });
+
+      it("does not repeat the sort column as a tie-break", async () => {
+        expect(await spansSql("span_id")).toBe(
+          'SELECT * FROM "default" ORDER BY span_id DESC, trace_id ASC',
+        );
+      });
+
+      it("skips a tie-break column the stream schema lacks", async () => {
+        expect(await spansSql("duration", ["duration", "trace_id"])).toBe(
+          'SELECT * FROM "default" ORDER BY duration DESC, trace_id ASC',
+        );
+      });
+
+      it("keeps both tie-breaks while the stream schema is not loaded", async () => {
+        expect(await spansSql("duration", [])).toBe(
+          'SELECT * FROM "default" ORDER BY duration DESC, trace_id ASC, span_id ASC',
+        );
+      });
+
+      it("keeps the tie-breaks ascending on an ascending sort", async () => {
+        expect(await spansSql("duration", undefined, "asc")).toBe(
+          'SELECT * FROM "default" ORDER BY duration ASC, trace_id ASC, span_id ASC',
+        );
+      });
     });
 
     describe("page landings and restores from another page", () => {

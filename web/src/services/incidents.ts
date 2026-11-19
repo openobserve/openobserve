@@ -78,7 +78,8 @@ export type RcaTrigger =
   | "reanalyze"
   | "oncall_page"
   | "resume"
-  | "legacy";
+  | "legacy"
+  | "evidence_settled";
 
 export type RcaRunMode = "fresh" | "build_on_previous";
 
