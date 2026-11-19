@@ -16,7 +16,7 @@
 use config::meta::folder::{Folder, FolderType};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    IntoActiveModel, QueryFilter, QueryOrder, Set, TryIntoModel,
+    IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -428,6 +428,20 @@ async fn publish_delete(org_id: &str, folder_type: FolderType, folder_id: &str) 
 /// Deletes all folders of the org and returns each one's `(folder_id, type)`.
 pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, i16)>, errors::Error> {
     let client = get_orm_client_rw().await;
+    // Events go first: a failed one leaves the rows, so the teardown retry finds them again.
+    let listed: Vec<(String, i16)> = Entity::find()
+        .select_only()
+        .column(Column::FolderId)
+        .column(Column::Type)
+        .filter(Column::Org.eq(org_id))
+        .into_tuple()
+        .all(client)
+        .await?;
+    for (folder_id, kind) in &listed {
+        if let Some(folder_type) = folder_type_from_i16(*kind) {
+            crate::coordinator::folders::emit_delete_event(org_id, folder_type, folder_id).await?;
+        }
+    }
     let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
     let deleted: Vec<(String, i16)> =
         super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?;
@@ -436,7 +450,6 @@ pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, i16)>, errors::E
             publish_delete(org_id, folder_type, folder_id).await;
         }
     }
-    crate::coordinator::folders::purge_org(org_id).await?;
     Ok(deleted)
 }
 

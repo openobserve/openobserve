@@ -247,9 +247,9 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
     Ok(updated)
 }
 
-/// Saves a partial edit and publishes it; `conn` must not be an open transaction.
-pub async fn save_changes<C: ConnectionTrait>(
-    conn: &C,
+/// Saves a partial edit and publishes it; a plain connection keeps the event after the commit.
+pub async fn save_changes(
+    conn: &sea_orm::DatabaseConnection,
     active: anomaly_detection_config::ActiveModel,
 ) -> Result<Model> {
     let updated: Model = active
@@ -316,6 +316,18 @@ pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str
 }
 
 pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<()> {
+    // Events go first: a failed one leaves the rows, so the teardown retry finds them again.
+    let listed = anomaly_detection_config::Entity::find()
+        .select_only()
+        .column(anomaly_detection_config::Column::AnomalyId)
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .into_tuple::<String>()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    for id in &listed {
+        crate::coordinator::anomaly_detection::emit_delete_event(org_id, id).await?;
+    }
     let delete = anomaly_detection_config::Entity::delete_many()
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id));
     let ids: Vec<String> = crate::table::delete_returning(
@@ -328,7 +340,7 @@ pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result
     for id in &ids {
         publish_delete(org_id, id).await;
     }
-    crate::coordinator::anomaly_detection::purge_org(org_id).await
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

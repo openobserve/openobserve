@@ -38,7 +38,7 @@ use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table::anomaly_detection::config as anomaly_config_table,
 };
-use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+use sea_orm::{IntoActiveModel, Set};
 use search_service as search;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
@@ -8561,7 +8561,7 @@ mod tests {
 
     mod p1_model_shape {
         use infra::table::entity::anomaly_detection_config::{Column, Entity, Model};
-        use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
+        use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 
         use super::{update_interval_validation::stored_config, *};
 
