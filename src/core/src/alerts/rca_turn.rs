@@ -531,6 +531,13 @@ async fn start_turn(
         })),
         on_commit: Some(on_commit),
     };
+    let spec = TurnSpec {
+        on_commit: Some(crate::ai_chat::toolset_calls::with_toolset_calls(
+            &spec.identity,
+            spec.on_commit,
+        )),
+        ..spec
+    };
     // No reader; the turn forwards no frames and goes on to its end.
     spawn_headless_turn(spec, settings);
     Ok(started)

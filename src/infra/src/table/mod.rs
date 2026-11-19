@@ -24,6 +24,7 @@ use crate::{db::get_orm_client_ddl, dist_lock};
 pub mod ai_chat_sessions;
 pub mod ai_chat_shares;
 pub mod ai_chat_turns;
+pub mod ai_toolset_health;
 pub mod alert_acks;
 pub mod alert_calibration;
 pub mod alert_composites;

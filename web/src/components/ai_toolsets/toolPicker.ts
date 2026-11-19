@@ -171,3 +171,23 @@ export function toolsetBadges(data: Record<string, any> | null | undefined): Too
   if (!data.tools_verified_at) badges.push("notVerified");
   return badges;
 }
+
+/** A toolset's last call outcomes, as `GET` toolsets returns them (microseconds). */
+export interface ToolsetHealth {
+  last_ok_at?: number | null;
+  last_error_at?: number | null;
+  failing_since?: number | null;
+  last_error?: string | null;
+}
+
+const FAILING_WINDOW_US = 15 * 60 * 1_000_000;
+
+/** "Failing since" shows only while every call of the last 15 minutes failed. */
+export function failingSince(
+  health: ToolsetHealth | null | undefined,
+  nowUs: number,
+): { since: number; error: string } | null {
+  if (!health?.failing_since || !health.last_error_at) return null;
+  if (nowUs - health.last_error_at > FAILING_WINDOW_US) return null;
+  return { since: health.failing_since, error: health.last_error ?? "" };
+}

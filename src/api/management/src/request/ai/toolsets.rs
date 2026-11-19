@@ -25,8 +25,8 @@ use o2_enterprise::enterprise::{
     ai::{
         client::{DiscoverError, DiscoveredTool, McpEntry, get_agent_client},
         toolsets::{
-            McpData, ToolsetCreateRequest, ToolsetKind, ToolsetListResponse, ToolsetResponse,
-            ToolsetUpdateRequest, merge_update_data,
+            McpData, ToolsetCreateRequest, ToolsetHealth, ToolsetKind, ToolsetListResponse,
+            ToolsetResponse, ToolsetUpdateRequest, merge_update_data,
             push::{colliding_names, normalize_tool_name},
             validate_data, validate_name,
         },
@@ -261,6 +261,7 @@ pub async fn get(
         Ok(Some(t)) => {
             let mut toolsets = [ToolsetResponse::from_toolset(t)];
             flag_renames(&org_id, &mut toolsets).await;
+            attach_health(&org_id, &mut toolsets).await;
             hide_mcp_urls(&org_id, &user_email.user_id, &mut toolsets).await;
             let [toolset] = toolsets;
             Json(toolset).into_response()
@@ -325,6 +326,7 @@ pub async fn list(
                     .collect(),
             };
             flag_renames(&org_id, &mut res.toolsets).await;
+            attach_health(&org_id, &mut res.toolsets).await;
             hide_mcp_urls(&org_id, &user_email.user_id, &mut res.toolsets).await;
             Json(res).into_response()
         }
@@ -476,14 +478,20 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
     let (org_id, id) = path;
 
     // Verify existence before deleting.
-    match infra::table::org_ai_toolsets::get(&org_id, &id).await {
-        Ok(Some(_)) => {}
+    let name = match infra::table::org_ai_toolsets::get(&org_id, &id).await {
+        Ok(Some(row)) => row.name,
         Ok(None) => return MetaHttpResponse::not_found(format!("toolset '{id}' not found")),
         Err(e) => return MetaHttpResponse::internal_error(e),
-    }
+    };
 
     if let Err(e) = infra::table::org_ai_toolsets::remove(&org_id, &id).await {
         return MetaHttpResponse::internal_error(e);
+    }
+    // A later toolset of the same name starts with no health history.
+    if let Err(e) =
+        infra::table::ai_toolset_health::remove(&org_id, &normalize_tool_name(&name)).await
+    {
+        log::warn!("failed to remove the health of toolset '{name}' in org={org_id}: {e}");
     }
 
     (
@@ -562,6 +570,30 @@ async fn write_update(
     Err(MetaHttpResponse::conflict(format!(
         "toolset '{id}' kept changing while it was being updated; reload it and retry"
     )))
+}
+
+/// Each toolset's last call outcomes in this region, keyed by the name the agent uses.
+async fn attach_health(org_id: &str, toolsets: &mut [ToolsetResponse]) {
+    match infra::table::ai_toolset_health::list(org_id).await {
+        Ok(rows) => fill_health(&rows, toolsets),
+        Err(e) => log::warn!("failed to read toolset health for org={org_id}: {e}"),
+    }
+}
+
+fn fill_health(
+    rows: &std::collections::HashMap<String, infra::table::ai_toolset_health::ToolsetHealth>,
+    toolsets: &mut [ToolsetResponse],
+) {
+    for toolset in toolsets {
+        toolset.health = rows
+            .get(&normalize_tool_name(&toolset.name))
+            .map(|row| ToolsetHealth {
+                last_ok_at: row.last_ok_at,
+                last_error_at: row.last_error_at,
+                failing_since: row.failing_since,
+                last_error: row.last_error.clone(),
+            });
+    }
 }
 
 /// Flags toolsets whose normalized name another row of the org shares; the agent is sent neither.
@@ -787,6 +819,7 @@ mod tests {
             created_at: 0,
             updated_at: 0,
             rename_needed: false,
+            health: None,
         }
     }
 
@@ -971,6 +1004,34 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("invalid mcp data"), "{err}");
+    }
+
+    #[test]
+    fn health_is_attached_by_the_name_the_agent_uses() {
+        use infra::table::ai_toolset_health::ToolsetHealth as Row;
+        let rows = std::collections::HashMap::from([(
+            "datadog-prod".to_string(),
+            Row {
+                org: "org".to_string(),
+                toolset: "datadog-prod".to_string(),
+                last_ok_at: Some(1),
+                last_error_at: Some(5),
+                failing_since: Some(3),
+                last_error: Some("401 Unauthorized".to_string()),
+            },
+        )]);
+        let mut toolsets = [response("datadog-prod"), response("github")];
+        fill_health(&rows, &mut toolsets);
+        assert_eq!(
+            toolsets[0].health,
+            Some(ToolsetHealth {
+                last_ok_at: Some(1),
+                last_error_at: Some(5),
+                failing_since: Some(3),
+                last_error: Some("401 Unauthorized".to_string()),
+            })
+        );
+        assert_eq!(toolsets[1].health, None);
     }
 
     #[test]

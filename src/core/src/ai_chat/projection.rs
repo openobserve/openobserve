@@ -560,6 +560,9 @@ pub(crate) struct GatewayCall<'a> {
     pub(crate) args: Option<&'a Map<String, Value>>,
     /// A `toolset_cli_run`, whose stdout is data: its outcome is the part status and `metadata`.
     pub(crate) cli: bool,
+    pub(crate) toolset: &'a str,
+    /// The vendor tool; `run` for a CLI.
+    pub(crate) tool: &'a str,
 }
 
 /// o2-ai's `project_events` output for ascending events, plus each turn's `first_seq`/`last_seq`.
@@ -759,6 +762,8 @@ pub(crate) fn gateway_call<'a>(
                 key: format!("{toolset}_{tool}"),
                 args: input.and_then(|i| obj(i.get("args"))),
                 cli: false,
+                toolset,
+                tool,
             })
         }
         TOOLSET_CLI_RUN => {
@@ -771,6 +776,8 @@ pub(crate) fn gateway_call<'a>(
                 key: format!("cli_{toolset}"),
                 args: input,
                 cli: true,
+                toolset,
+                tool: "run",
             })
         }
         _ => None,
