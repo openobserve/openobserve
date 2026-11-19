@@ -58,9 +58,12 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         await pm.logsPage.startToastRecorder();
         await page.goto(`${logsUrl}&stream_type=logs&stream=${streamA},${streamB}&logs_visualize_toggle=patterns`, { waitUntil: 'domcontentloaded' });
 
-        // Patterns is enterprise-gated: the toggle is present only on builds that allow it.
-        await expect(page.locator('[data-test="logs-visualize-toggle"]')).toBeVisible({ timeout: 30000 });
-        const patternsAllowed = await page.locator('[data-test="logs-patterns-toggle"]').isVisible();
+        // The Patterns toggle is always rendered (locked on OSS), so the build is told apart by
+        // whether the link opened the Patterns tab: a locked build falls back to Logs.
+        const patternsToggle = page.locator('[data-test="logs-patterns-toggle"]');
+        await expect(patternsToggle).toBeVisible({ timeout: 30000 });
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        const patternsAllowed = (await patternsToggle.getAttribute('data-state')) === 'on';
         if (patternsAllowed) {
             await pm.logsPage.expectMultiStreamPatternsToast();
         } else {
