@@ -442,20 +442,25 @@ export const logsUtils = () => {
     freeTextScan: searchObj.meta.freeTextScan,
   });
 
+  const isAutoRefreshOn = () => Number(searchObj.meta.refreshInterval ?? 0) > 0;
+
   const writeShownTime = (query: any, shown: ShownEntry | null, isShareLink: boolean) => {
     const date = searchObj.data.datetime;
+    // A live share must carry the relative period; a frozen window never gets new data.
+    const livePeriod = isShareLink && isAutoRefreshOn();
     if (!shown) {
-      if (date.type === "relative" && !isShareLink) query["period"] = date.relativeTimePeriod;
+      if (date.type === "relative" && (!isShareLink || livePeriod))
+        query["period"] = date.relativeTimePeriod;
       else if (date.type === "relative" || date.type === "absolute") {
         query["from"] = date.startTime;
         query["to"] = date.endTime;
       }
       return;
     }
-    if (isShareLink && shown.bounds) {
+    if (isShareLink && shown.bounds && !(livePeriod && shown.period.type === "relative")) {
       query["from"] = shown.bounds.start_time;
       query["to"] = shown.bounds.end_time;
-    } else if (shown.period.type === "relative" && !isShareLink) {
+    } else if (shown.period.type === "relative" && (!isShareLink || livePeriod)) {
       query["period"] = shown.period.period;
     } else if (shown.period.type === "absolute") {
       query["from"] = shown.period.startUs;
@@ -505,7 +510,12 @@ export const logsUtils = () => {
 
     writeShownTime(query, shown, isShareLink);
 
-    query["refresh"] = searchObj.meta.refreshInterval;
+    const shownType = shown ? shown.period.type : searchObj.data.datetime.type;
+    // A fixed range shared with refresh on would re-run the same past window forever.
+    query["refresh"] =
+      isShareLink && isAutoRefreshOn() && shownType !== "relative"
+        ? 0
+        : searchObj.meta.refreshInterval;
 
     if (inputs.query) {
       query["sql_mode"] = inputs.sqlMode;
