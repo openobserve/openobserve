@@ -365,8 +365,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OToggleGroup>
                 </div>
                 <div v-if="!isCompositeMode" data-test="add-alert-source-card" data-snap-stop>
-                  <div class="flex items-center gap-4 py-2 max-md:flex-wrap max-md:gap-2">
-                    <div class="flex items-center gap-1.5">
+                  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 py-2 max-md:gap-2">
+                    <div
+                      class="flex items-center gap-1.5 @max-[36rem]/stream-config:flex-col @max-[36rem]/stream-config:items-start @max-[36rem]/stream-config:gap-1"
+                    >
                       <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                         {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
                       </div>
@@ -384,7 +386,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <!-- eslint-enable local/no-hardcoded-px -->
                     </div>
-                    <div class="flex min-w-0 flex-1 items-center gap-1.5 max-md:basis-full">
+                    <div
+                      class="flex min-w-80 flex-1 items-center gap-1.5 max-md:min-w-0 max-md:basis-full @max-[36rem]/stream-config:basis-full @max-[36rem]/stream-config:flex-col @max-[36rem]/stream-config:items-stretch @max-[36rem]/stream-config:gap-1"
+                    >
                       <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                         {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                       </div>
@@ -400,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : undefined
                         "
                         :loading="isFetchingStreams"
-                        class="w-full! max-w-75 min-w-0"
+                        class="w-full! max-w-120 min-w-0"
                         :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
                         @update:model-value="updateStreamFields($event)"
                       >
