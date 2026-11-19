@@ -119,7 +119,7 @@ describe("StarterPackBannerSlot", () => {
     const wrapper = await render("typed");
     expect(has(wrapper, "first-event-status-pack-row-highlight")).toBe(true);
     expect(wrapper.get('[data-test="first-event-status-pack-card-setup-btn"]').text()).toBe(
-      "Review and set up",
+      "Review pack",
     );
     expect(wrapper.get('[data-test="first-event-status-pack-row-streams"]').text()).toContain(
       "k8s_events, k8s_node_cpu",
