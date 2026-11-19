@@ -174,8 +174,8 @@ const restoreTriggerFocus = async () => {
   if (!isEditing.value) triggerRef.value?.focus();
 };
 
-// Enter submits the owning form so form-backed titles save like the boxed field did. Implicit
-// submission can't: closing the editor unmounts the input first, so ask the form directly.
+// Closing the editor unmounts the input before implicit form submission fires, so ask the form
+// to submit directly.
 const onEnter = (event: KeyboardEvent) => {
   // Without the submit, the browser's implicit submission must not fire either.
   if (!props.submitOnEnter) event.preventDefault();

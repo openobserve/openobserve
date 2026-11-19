@@ -52,8 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <!-- h-full, not a viewport calc: one that ignores the drawer header and padding pushes the
-         footer off short screens. -->
     <div v-if="indexData.schema" class="h-full">
       <div class="m-0 h-full p-0">
         <div class="h-full" @submit.prevent="onSubmit">
