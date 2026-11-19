@@ -30,9 +30,9 @@ vi.mock("@/composables/starterPacks/usePackCatalog", () => ({
 
 import StarterPackCatalogGate from "./StarterPackCatalogGate.vue";
 
-const render = async (notice: boolean, props: Record<string, unknown> = {}) => {
+const render = async (props: Record<string, unknown> = {}) => {
   const wrapper = mount(StarterPackCatalogGate, {
-    props: { org: "default", notice, ...props },
+    props: { org: "default", ...props },
     slots: { default: '<div data-test="gated-content" />' },
     global: { plugins: [i18n] },
   });
@@ -51,10 +51,9 @@ describe("StarterPackCatalogGate", () => {
   });
 
   it("loads the catalog for its org and renders its content once it is ready", async () => {
-    const wrapper = await render(true);
+    const wrapper = await render();
     expect(fake.load).toHaveBeenCalledWith("default");
     expect(wrapper.find('[data-test="gated-content"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="starter-packs-unavailable"]').exists()).toBe(false);
   });
 
   it("renders nothing while the catalog loads", async () => {
@@ -62,43 +61,21 @@ describe("StarterPackCatalogGate", () => {
       fake.state.value = "loading";
       return new Promise(() => {});
     });
-    const wrapper = await render(true);
+    const wrapper = await render();
     expect(wrapper.find('[data-test="gated-content"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="starter-packs-unavailable"]').exists()).toBe(false);
   });
 
-  it("says Starter Packs are unavailable on a failed load and retries from the notice", async () => {
+  it("shows nothing on a failed load", async () => {
     fake.load = vi.fn(async () => {
       fake.state.value = "error";
       return false;
     });
-    const wrapper = await render(true);
-    const notice = wrapper.get('[data-test="starter-packs-unavailable"]');
-    expect(notice.text()).toContain("Starter Packs are unavailable right now.");
+    const wrapper = await render();
     expect(wrapper.find('[data-test="gated-content"]').exists()).toBe(false);
-
-    fake.load = vi.fn(async () => {
-      fake.state.value = "ready";
-      return true;
-    });
-    await notice.get("button").trigger("click");
-    await flushPromises();
-    expect(fake.load).toHaveBeenCalledWith("default");
-    expect(wrapper.find('[data-test="gated-content"]').exists()).toBe(true);
-  });
-
-  it("shows nothing on a failed load where no notice is asked for", async () => {
-    fake.load = vi.fn(async () => {
-      fake.state.value = "error";
-      return false;
-    });
-    const wrapper = await render(false);
-    expect(wrapper.find('[data-test="gated-content"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="starter-packs-unavailable"]').exists()).toBe(false);
   });
 
   it("waits for an org before loading, then loads once it is set", async () => {
-    const wrapper = await render(false, { org: undefined });
+    const wrapper = await render({ org: undefined });
     expect(fake.load).not.toHaveBeenCalled();
     expect(wrapper.find('[data-test="gated-content"]').exists()).toBe(false);
 
@@ -110,29 +87,14 @@ describe("StarterPackCatalogGate", () => {
 
   it("renders nothing when none of the packs its content needs is in the catalog", async () => {
     expect(
-      (await render(false, { requires: "kubernetes" }))
-        .find('[data-test="gated-content"]')
-        .exists(),
+      (await render({ requires: "kubernetes" })).find('[data-test="gated-content"]').exists(),
     ).toBe(true);
     expect(
-      (await render(false, { requires: ["", "kubernetes"] }))
-        .find('[data-test="gated-content"]')
-        .exists(),
+      (await render({ requires: ["", "kubernetes"] })).find('[data-test="gated-content"]').exists(),
     ).toBe(true);
     fake.ids = [];
     expect(
-      (await render(false, { requires: "kubernetes" }))
-        .find('[data-test="gated-content"]')
-        .exists(),
+      (await render({ requires: "kubernetes" })).find('[data-test="gated-content"]').exists(),
     ).toBe(false);
-  });
-
-  it("sends no request from Retry while it has no org", async () => {
-    fake.state.value = "error";
-    fake.load = vi.fn(async () => false);
-    const wrapper = await render(true, { org: undefined });
-    await wrapper.get('[data-test="starter-packs-unavailable"]').get("button").trigger("click");
-    await flushPromises();
-    expect(fake.load).not.toHaveBeenCalled();
   });
 });

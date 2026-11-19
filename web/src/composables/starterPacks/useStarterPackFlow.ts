@@ -74,8 +74,7 @@ const newestRecord = (rows: PackInstallRecord[]): PackInstallRecord | null => {
 export function useStarterPackFlow(org: string, pack: StarterPack) {
   const store = useStore();
   const router = useRouter();
-  const { installPack, previewPack, undoPack, removePack, listInstalls, trackAlertEdit } =
-    useStarterPacks(org);
+  const { installPack, previewPack, undoPack, removePack, listInstalls } = useStarterPacks(org);
 
   const record = shallowRef<PackInstallRecord | null>(null);
   const loaded = ref(false);
@@ -96,7 +95,6 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const clock = setInterval(() => (nowUs.value = Date.now() * 1000), CLOCK_TICK_MS);
   onScopeDispose(() => clearInterval(clock));
 
-  const isAdmin = computed(() => isOrgAdmin(store.state));
   const licensed = computed(
     () =>
       !!pack.nativeView &&
@@ -117,7 +115,6 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   const alertsTotal = computed(
     () => items.value.filter(({ kind, status }) => kind === "alert" && status === "created").length,
   );
-  const alertsOff = computed(() => Math.max(0, alertsTotal.value - alertsOn.value));
   const undoLeftUs = computed(() => {
     const at = record.value?.installedAt;
     return at ? Math.max(0, at + UNDO_WINDOW_US - nowUs.value) : 0;
@@ -176,11 +173,6 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
   };
 
   const nameOf = (itemId: string) => preview.value?.names[itemId] ?? itemId;
-  /** The library title of an installed alert, or its saved name until the preview has loaded. */
-  const alertTitle = (alertId: string, fallback: string) => {
-    const item = record.value?.items.find(({ kind, id }) => kind === "alert" && id === alertId);
-    return (item && preview.value?.names[item.itemId]) || fallback;
-  };
 
   const planned = (kind: PackRecordItem["kind"]) =>
     (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
@@ -332,8 +324,6 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
 
   return {
     alertCount,
-    alertTitle,
-    alertsOff,
     alertsOn,
     alertsRoute,
     alertsTotal,
@@ -352,7 +342,6 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     installFailed,
     installed,
     interrupted,
-    isAdmin,
     itemRoute,
     items,
     land,
@@ -375,7 +364,6 @@ export function useStarterPackFlow(org: string, pack: StarterPack) {
     running,
     skipped,
     toCreate,
-    trackAlertEdit,
     undo,
     undoLeftUs,
     viewCount,

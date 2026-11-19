@@ -13,16 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, ref, watch } from "vue";
+import { computed, watch } from "vue";
 
-import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18nTyped } from "@/types/i18n";
 import { useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import { useOrgHasNoResources } from "@/composables/useOrgResources";
 
 import type { FindMoreItem, FindMoreSource } from "./findMore";
 import { packs as allPacks, packTitle } from "./usePackCatalog";
-import { usePackDismissal, usePackHiddenForOrg } from "./packDismissal";
 import type { PackItemKind, StarterPack } from "./types";
 import { useBrowserMatches, type BrowserInterrupted } from "./useBrowserMatches";
 import { useStarterPackPopup } from "./useStarterPackPopup";
@@ -30,43 +27,31 @@ import { useStarterPackPopup } from "./useStarterPackPopup";
 const FIT_KINDS = new Set<PackItemKind>(["dashboard", "alert", "savedView"]);
 
 export type HomePackView =
-  | "hidden"
-  | "hiddenAdmin"
-  | "loading"
-  | "dismissed"
-  | "interrupted"
-  | "installed"
-  | "error"
-  | "forbidden"
-  | "offer"
-  | "empty";
+  "loading" | "interrupted" | "installed" | "error" | "forbidden" | "offer" | "empty";
 
 /** One pack's state on Home. */
-function useHomePack(org: string, pack: StarterPack) {
-  const { t } = useI18nTyped();
+function useHomePack(org: string, pack: StarterPack, active: () => boolean) {
   const title = packTitle(pack);
   const popup = useStarterPackPopup(org);
   // The popup's own pack state, so a setup started from Home shows in the header at once.
   const { flow, matcher } = popup.entryOf(pack);
-  const dismissal = usePackDismissal("home", org, pack.id);
-  const orgHide = usePackHiddenForOrg(org, pack.id);
-  const undoOpen = ref(false);
   // Kubernetes keeps the original ids, so existing tests still find its elements.
   const testId = (id: string) =>
     pack.id === "kubernetes" ? id : id.replace("home-pack", `home-pack-${pack.id}`);
 
-  void flow.load();
-  void orgHide.load();
+  let loadAsked = false;
+  watch(
+    active,
+    (on) => {
+      if (!on || loadAsked) return;
+      loadAsked = true;
+      void flow.load();
+    },
+    { immediate: true },
+  );
 
   // Home is the busiest page, so only a user who can reach the offer pays for the check.
-  const wantsMatch = computed(
-    () =>
-      flow.loaded.value &&
-      orgHide.loaded.value &&
-      !flow.record.value &&
-      !dismissal.dismissed.value &&
-      !orgHide.hidden.value,
-  );
+  const wantsMatch = computed(() => active() && flow.loaded.value && !flow.record.value);
   watch(
     wantsMatch,
     (wanted) => {
@@ -79,11 +64,9 @@ function useHomePack(org: string, pack: StarterPack) {
   });
 
   const view = computed<HomePackView>(() => {
-    if (!flow.loaded.value || !orgHide.loaded.value) return "loading";
+    if (!flow.loaded.value) return "loading";
     if (flow.interrupted.value) return "interrupted";
     if (flow.record.value && !flow.running.value) return "installed";
-    if (dismissal.dismissed.value) return "dismissed";
-    if (orgHide.hidden.value) return flow.isAdmin.value ? "hiddenAdmin" : "hidden";
     if (flow.loadFailed.value || matcher.state.value === "error") return "error";
     if (matcher.state.value === "checking") return "loading";
     if (flow.forbidden.value) return "forbidden";
@@ -98,15 +81,7 @@ function useHomePack(org: string, pack: StarterPack) {
   };
   const startSetup = openPack;
   const retry = () => Promise.all([flow.load(), matcher.retry()]);
-  const setHidden = async (work: () => Promise<void>) => {
-    try {
-      await work();
-    } catch {
-      toast({ variant: "error", message: t("starterPacks.home.hideFailed") });
-    }
-  };
   const openDetails = openPack;
-  const openUndo = () => (undoOpen.value = true);
 
   return {
     pack,
@@ -114,15 +89,10 @@ function useHomePack(org: string, pack: StarterPack) {
     testId,
     flow,
     matcher,
-    dismissal,
-    orgHide,
     view,
-    undoOpen,
     startSetup,
     retry,
-    setHidden,
     openDetails,
-    openUndo,
   };
 }
 
@@ -143,7 +113,6 @@ const matchItems = (item: HomePack): FindMoreItem[] => {
         kind: kind as FindMoreItem["kind"],
         id: itemId,
         name: flow.nameOf(itemId),
-        queries: 0,
       }));
   }
   return [
@@ -151,14 +120,12 @@ const matchItems = (item: HomePack): FindMoreItem[] => {
       kind: "dashboard" as const,
       id,
       name: title,
-      queries: 0,
     })),
-    ...pack.alerts.map((id) => ({ kind: "alert" as const, id, name: id, queries: 0 })),
+    ...pack.alerts.map((id) => ({ kind: "alert" as const, id, name: id })),
     ...pack.savedViews.map(({ id, name }) => ({
       kind: "savedView" as const,
       id,
       name,
-      queries: 0,
     })),
   ];
 };
@@ -170,7 +137,6 @@ export const matchSource = (item: HomePack): FindMoreSource => ({
   label: item.pack.id,
   streams: [...item.matcher.streams.value],
   items: matchItems(item),
-  queriesPerDay: 0,
 });
 
 const interruptedOf = (item: HomePack): BrowserInterrupted => ({
@@ -180,11 +146,13 @@ const interruptedOf = (item: HomePack): BrowserInterrupted => ({
   total: item.flow.toCreate.value.length,
 });
 
-const NOTICE_VIEWS: HomePackView[] = ["hiddenAdmin", "dismissed", "error"];
-
-/** Every pack Home offers, plus whether Home shows the setup section. */
-export function useHomePacks(org: string, packs: StarterPack[] = allPacks()) {
-  const items = packs.map((pack) => useHomePack(org, pack));
+/** Every pack Home offers; `active` false (an org past onboarding) starts no pack reads. */
+export function useHomePacks(
+  org: string,
+  packs: StarterPack[] = allPacks(),
+  active: () => boolean = () => true,
+) {
+  const items = packs.map((pack) => useHomePack(org, pack, active));
   const { hasUserData } = useOrgHasUserData(org);
   const { noResources } = useOrgHasNoResources(org, () => hasUserData.value === true);
   const browser = useBrowserMatches(org);
@@ -200,15 +168,9 @@ export function useHomePacks(org: string, packs: StarterPack[] = allPacks()) {
   const canCreate = computed(
     () => !offered.value.length || offered.value.some((item) => item.view.value === "offer"),
   );
-  // A dismissed pack is known at once, so its record read never holds a skeleton over Overview.
-  const offerLoading = computed(() =>
-    items.some((item) => item.view.value === "loading" && !item.dismissal.dismissed.value),
-  );
   const offerable = computed(() => orgEmpty.value && !anySetUp.value);
   // Covers whatever `answered` waits for once a pack is offered, so the strip replaces it with no gap.
-  const loading = computed(
-    () => offerable.value && anyLoading.value && (offerLoading.value || offered.value.length > 0),
-  );
+  const loading = computed(() => offerable.value && anyLoading.value);
   // Waits for every pack, so no card moves once the strip shows.
   const answered = computed(() => offerable.value && !anyLoading.value && offered.value.length > 0);
   const showSection = computed(() => answered.value && canCreate.value);
@@ -218,8 +180,7 @@ export function useHomePacks(org: string, packs: StarterPack[] = allPacks()) {
   const notices = computed(() =>
     items.filter(
       (item) =>
-        item.view.value === "interrupted" ||
-        (orgEmpty.value && NOTICE_VIEWS.includes(item.view.value)),
+        item.view.value === "interrupted" || (orgEmpty.value && item.view.value === "error"),
     ),
   );
   const labelShown = computed(() => offerShown.value || askAdmin.value || notices.value.length > 0);

@@ -47,6 +47,7 @@ import { useEmailMeDestination } from "@/composables/starterPacks/useEmailMeDest
 import StarterPackAdaptedRows from "./StarterPackAdaptedRows.vue";
 import StarterPackAlertStep, { type AlertStepDestination } from "./StarterPackAlertStep.vue";
 import StarterPackInlineConfirm from "./StarterPackInlineConfirm.vue";
+import { KIND_CHIPS } from "./packKindChips";
 import StarterPackProgress from "./StarterPackProgress.vue";
 import StarterPackReady, { type ReadyAlerts } from "./StarterPackReady.vue";
 import StarterPackStepSpinner from "./StarterPackStepSpinner.vue";
@@ -56,12 +57,10 @@ const props = defineProps<{
   clusters: string[];
   /** Ticks, expansion and alert options, kept by the popup while the app is open. */
   choices: PackReviewChoices;
-  /** The folder the host's own picker chose; absent means the pack's folder. */
-  folderName?: string;
   /** Back shows only when the pack was opened from the popup's list. */
   showBack?: boolean;
 }>();
-const emit = defineEmits<{ close: []; back: []; done: []; installed: [] }>();
+const emit = defineEmits<{ close: []; back: [] }>();
 
 type ShownKind = "dashboard" | "alert" | "savedView";
 type GroupId = "view" | ShownKind | "not" | "adapted";
@@ -132,18 +131,9 @@ const GROUP_ICONS: Record<GroupId, IconName> = {
   adapted: "tune",
 };
 const GROUP_LOOKS: Partial<Record<GroupId, { chip: string; row: string }>> = {
-  dashboard: {
-    chip: "bg-ingest-accent-blue text-white dark:bg-icon-chip-info-bg dark:text-icon-chip-info-text",
-    row: "text-icon-chip-info-text",
-  },
-  alert: {
-    chip: "bg-ingest-accent-orange text-white dark:bg-icon-chip-orange-bg dark:text-icon-chip-orange-text",
-    row: "text-icon-chip-orange-text",
-  },
-  savedView: {
-    chip: "bg-ingest-accent-purple text-white dark:bg-icon-chip-purple-bg dark:text-icon-chip-purple-text",
-    row: "text-icon-chip-purple-text",
-  },
+  dashboard: { chip: KIND_CHIPS.dashboard, row: "text-icon-chip-info-text" },
+  alert: { chip: KIND_CHIPS.alert, row: "text-icon-chip-orange-text" },
+  savedView: { chip: KIND_CHIPS.savedView, row: "text-icon-chip-purple-text" },
   view: { chip: "bg-icon-chip-primary-bg text-icon-chip-primary-text", row: "" },
 };
 const SEVERITY: Record<
@@ -166,10 +156,13 @@ const choices = props.choices;
 const title = packTitle(pack);
 const inlineConfirm = ref<"undo" | "remove" | null>(null);
 const destinations = ref<AlertStepDestination[] | null>(null);
+const destinationsFailed = ref(false);
 let ownRun = false;
 const preparing = ref(false);
 const readyShown = ref(false);
 const installedHere = ref(false);
+// Items Undo or Remove left in place; a failed delete never reaches here, so all were kept on purpose.
+const keptCount = ref(0);
 const outcome = ref<ReadyAlerts>({ turnOn: false, sendTo: false });
 const adapted = useAdaptedData(flow);
 const userEmail = computed<string>(() => store.state.userInfo?.email ?? "");
@@ -435,6 +428,7 @@ const step = computed<Step>(() => {
   return installed.value ? "installed" : "content";
 });
 const sendMode = computed<"loading" | "select" | "email" | "none">(() => {
+  if (destinationsFailed.value) return "none";
   if (destinations.value === null) return "loading";
   if (destinations.value.length) return "select";
   return smtpOff.value ? "none" : "email";
@@ -558,6 +552,10 @@ const footerNote = computed<{ icon?: IconName; error?: boolean; text: I18nText }
     };
   }
   if (step.value !== "content") return null;
+  if (keptCount.value) {
+    const count = keptCount.value;
+    return { icon: "info", text: t("starterPacks.undo.kept", { count }, count) };
+  }
   if (flow.forbidden.value) return { icon: "lock", text: t("starterPacks.noPermission") };
   if (flow.installFailed.value) {
     return { icon: "error", error: true, text: t("starterPacks.progress.installError") };
@@ -613,7 +611,12 @@ const destinationLabel = (row: Record<string, any>) => raw(`${row.name} · ${typ
 // No destination is picked for the user; a remembered pick that is gone is dropped.
 const loadDestinations = async () => {
   destinations.value = null;
-  const rows = await readQuery(destinationsQuery(flow.org, "alert")).catch(() => []);
+  destinationsFailed.value = false;
+  // A failed read is not an empty org, so it must not offer to create Email me.
+  const rows = await readQuery(destinationsQuery(flow.org, "alert")).catch(() => {
+    destinationsFailed.value = true;
+    return [];
+  });
   const usable = rows.filter((row) => !(smtpOff.value && row.type === "email"));
   destinations.value = usable.map((row) => ({ name: row.name, label: destinationLabel(row) }));
   if (!destinations.value.some(({ name }) => name === choices.destination))
@@ -677,6 +680,8 @@ const resolveSendTo = async (): Promise<{ alerts: ReadyAlerts; name?: string }> 
     return { alerts: { turnOn: wantsOn, sendTo: false } };
   }
   if (sendMode.value === "email") {
+    // Off alerts get no new destination; only a picked existing one is attached for later.
+    if (!wantsOn) return { alerts: { turnOn: false, sendTo: false } };
     const result = await emailMe.ensure(userEmail.value);
     if ("failure" in result) {
       return { alerts: { turnOn: wantsOn, sendTo: true, failure: result.failure } };
@@ -691,36 +696,33 @@ const resolveSendTo = async (): Promise<{ alerts: ReadyAlerts; name?: string }> 
   };
 };
 const startSetup = async () => {
+  keptCount.value = 0;
   preparing.value = true;
   const { alerts, name } = await resolveSendTo().finally(() => (preparing.value = false));
   outcome.value = alerts;
   ownRun = true;
-  const done = await flow.install(props.folderName, {
+  const done = await flow.install(undefined, {
     exclude: excludedIds.value,
     enableAlerts: alerts.turnOn && !alerts.failure,
     destination: name,
   });
   if (!done) return;
   useBrowserMatches(flow.org).markInstalled(pack.id, pack.id);
-  emit("installed");
 };
 const retry = async () => {
   outcome.value = storedOutcome();
   ownRun = true;
-  if (await flow.retry()) {
-    useBrowserMatches(flow.org).markInstalled(pack.id, pack.id);
-    emit("installed");
-  }
+  if (await flow.retry()) useBrowserMatches(flow.org).markInstalled(pack.id, pack.id);
 };
 const showReady = () => {
   readyShown.value = true;
 };
-// Undo and Remove take the pack away, so the popup goes back to the list.
+// Undo and Remove take the pack away, so the popup goes back to the list unless items stayed.
 const confirmDone = () => {
   inlineConfirm.value = null;
   readyShown.value = false;
-  emit("done");
-  emit("back");
+  keptCount.value = flow.removal.value?.kept.length ?? 0;
+  if (!keptCount.value) emit("back");
 };
 </script>
 
@@ -896,6 +898,7 @@ const confirmDone = () => {
                 class="border-border-default border-t"
                 :count="alertsPicked"
                 :destinations="destinations"
+                :destinations-failed="destinationsFailed"
                 :smtp-off="smtpOff"
                 :email="userEmail"
                 @update:turn-on="choices.turnOn = $event"

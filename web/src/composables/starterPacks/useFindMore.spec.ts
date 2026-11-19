@@ -23,18 +23,19 @@ import store from "@/test/unit/helpers/store";
 const fake = vi.hoisted(() => ({
   kv: new Map<string, string>(),
   readFails: false,
-  dismissalsStatus: 0,
+  urls: [] as string[],
+  loadAlertFile: null as unknown as (...args: unknown[]) => Promise<unknown>,
+  matchAlerts: null as unknown as (...args: unknown[]) => Promise<unknown>,
 }));
 
 vi.mock("@/services/http", () => ({
   default: () => ({
     get: async (url: string) => {
+      fake.urls.push(url);
+      if (url.includes("/alerts")) return { data: { list: [{ alert_id: "a1" }] } };
       if (fake.readFails) throw Object.assign(new Error("x"), { response: { status: 500 } });
       if (url.endsWith("/kv")) return { data: [] };
       const key = decodeURIComponent(url.split("/kv/")[1] ?? "");
-      if (key === "starter_pack_find.dismissed" && fake.dismissalsStatus) {
-        throw Object.assign(new Error("x"), { response: { status: fake.dismissalsStatus } });
-      }
       if (!fake.kv.has(key)) throw Object.assign(new Error("x"), { response: { status: 404 } });
       return { data: fake.kv.get(key) };
     },
@@ -50,7 +51,7 @@ vi.mock("@/composables/alerts/useAlertLibrary", () => ({
     loadManifest: async () => ({
       alerts: [{ id: "nginx/5xx", pack: "nginx", title: "5xx", required_streams: ["edge"] }],
     }),
-    loadAlertFile: async () => ({}),
+    loadAlertFile: (...args: unknown[]) => fake.loadAlertFile(...args),
   }),
 }));
 vi.mock("./usePackCatalog", () => ({
@@ -58,16 +59,24 @@ vi.mock("./usePackCatalog", () => ({
   packs: () => [
     {
       id: "kubernetes",
+      detector: "kubernetes",
       dashboards: [{ id: "overview" }],
       alerts: ["k8s/one", "k8s/two"],
       savedViews: [{ id: "events" }],
     },
   ],
 }));
+fake.loadAlertFile = vi.fn(async () => ({}));
+fake.matchAlerts = vi.fn(async () => new Map([["nginx/5xx", true]]));
 vi.mock("./packMatchData", () => ({
   readOrgStreams: async () => [],
-  matchPack: async () => ({ dashboards: new Map(), alerts: new Map(), views: new Map() }),
-  matchAlerts: async () => new Map([["nginx/5xx", true]]),
+  matchPack: async () => ({
+    dashboards: new Map(),
+    alerts: new Map([["k8s/one", true]]),
+    views: new Map(),
+    ready: true,
+  }),
+  matchAlerts: (...args: unknown[]) => fake.matchAlerts(...args),
 }));
 import { useFindMore } from "./useFindMore";
 
@@ -89,22 +98,23 @@ describe("useFindMore", () => {
   beforeEach(() => {
     queryClient.clear();
     fake.kv.clear();
-    fake.dismissalsStatus = 0;
+    fake.urls = [];
     vi.clearAllMocks();
   });
 
-  it("checks with no org dismissals when reading them is refused", async () => {
-    fake.dismissalsStatus = 403;
+  it("answers the check without writing anything to the org store", async () => {
     const api = finder();
     await api.check();
     expect(api.state.value).toBe("ready");
-    expect(api.result.value?.sources.map(({ id }) => id)).toEqual(["library-nginx"]);
+    expect(api.result.value?.sources.map(({ id }) => id)).toEqual(["kubernetes"]);
+    expect(fake.kv.size).toBe(0);
   });
 
-  it("still fails the check when the dismissals read fails another way", async () => {
-    fake.dismissalsStatus = 500;
+  it("matches only the packs, never reading Library alert files or org alerts", async () => {
     const api = finder();
     await api.check();
-    expect(api.state.value).toBe("error");
+    expect(fake.loadAlertFile).not.toHaveBeenCalled();
+    expect(fake.matchAlerts).not.toHaveBeenCalled();
+    expect(fake.urls.filter((url) => url.includes("/alerts"))).toEqual([]);
   });
 });

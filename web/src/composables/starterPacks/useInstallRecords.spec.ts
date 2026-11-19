@@ -15,13 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { contentHash, recordKey } from "./useInstallRecords";
-
-describe("recordKey", () => {
-  it("keeps one key per install", () => {
-    expect(recordKey("kubernetes", "abc")).toBe("starter_pack.kubernetes.abc");
-  });
-});
+import { contentHash } from "./useInstallRecords";
 
 describe("contentHash", () => {
   it("ignores key order at every depth", () => {

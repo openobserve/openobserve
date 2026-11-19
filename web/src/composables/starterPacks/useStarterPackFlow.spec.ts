@@ -193,21 +193,6 @@ describe("useStarterPackFlow", () => {
     });
   });
 
-  it("titles an installed alert from the preview, falling back to its saved name", async () => {
-    fake.installs = [record()];
-    const flow = setup();
-    await flow.load();
-    expect(flow.alertTitle("al1", "cluster_cpu")).toBe("cluster_cpu");
-    fake.previewPack.mockResolvedValue({
-      items: [],
-      names: { a1: "Cluster CPU" },
-      notIncluded: [],
-    });
-    await flow.loadPreview();
-    expect(flow.alertTitle("al1", "cluster_cpu")).toBe("Cluster CPU");
-    expect(flow.alertTitle("other", "other_alert")).toBe("other_alert");
-  });
-
   it("completes setup, excludes what the preview left out, and lands on the built-in view", async () => {
     fake.previewPack.mockResolvedValue({
       items: [],
@@ -326,7 +311,7 @@ describe("useStarterPackFlow", () => {
     expect(flow.alertsOn.value).toBe(0);
   });
 
-  it("counts alerts off from the alerts the install created", async () => {
+  it("counts only the alerts the install created", async () => {
     const items = record().items;
     fake.installs = [
       record({ items: [...items, { kind: "alert", itemId: "a2", status: "failed" }] }),
@@ -334,7 +319,6 @@ describe("useStarterPackFlow", () => {
     const flow = setup();
     await flow.load();
     expect(flow.alertsTotal.value).toBe(1);
-    expect(flow.alertsOff.value).toBe(1);
   });
 
   it("lands on the pack dashboard when the plan has no Kubernetes view", async () => {

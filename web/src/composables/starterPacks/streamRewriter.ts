@@ -328,10 +328,6 @@ const escapeLabelValue = (value: string) =>
 export const clusterMatcher = (label: string, clusters: string[]) =>
   `${label}=~"${clusters.map(escapeLabelValue).join("|")}"`;
 
-// Exact text only, so a matcher an author wrote on the same label survives.
-const withoutPromqlLimit = (query: string, matcher: string) =>
-  query.split(`{${matcher}}`).join("").split(`${matcher},`).join("");
-
 const withMatcher = async (
   query: string,
   tokens: MetricToken[],
@@ -353,21 +349,6 @@ const withMatcher = async (
     throw refusal(error, result);
   });
   return result;
-};
-
-/** Sets the clusters of every selector (D16), replacing only the limit the pack wrote before. */
-export const limitPromqlClusters = async (
-  query: string,
-  label: string,
-  clusters: string[],
-  previous: string[],
-  checks: RewriteChecks,
-): Promise<string> => {
-  if (!clusters.length && !previous.length) return query;
-  const base = previous.length ? withoutPromqlLimit(query, clusterMatcher(label, previous)) : query;
-  const tokens = await checkedTokens(base, checks);
-  if (!clusters.length) return base;
-  return withMatcher(base, tokens, clusterMatcher(label, clusters), checks);
 };
 
 /** Adds a chosen filter to the selectors of one shared stream only. */

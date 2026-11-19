@@ -13,22 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { I18nText } from "@/types/i18n";
-
-export type NoticeTone = "info" | "warning" | "error";
-
-export interface Notice {
-  key: string;
-  tone: NoticeTone;
-  text: I18nText;
-  actionLabel?: I18nText;
-  onAction?: () => void;
-  dataTest?: string;
-}
-
-export interface NoticeBarProps {
-  notices: Notice[];
-  dataTest?: string;
-  /** data-test of the expand toggle. */
-  toggleDataTest?: string;
-}
+/** The icon chip of each pack item kind; its tokens follow the theme. */
+export const KIND_CHIPS = {
+  dashboard: "bg-icon-chip-info-bg text-icon-chip-info-text",
+  alert: "bg-icon-chip-orange-bg text-icon-chip-orange-text",
+  savedView: "bg-icon-chip-purple-bg text-icon-chip-purple-text",
+} as const;

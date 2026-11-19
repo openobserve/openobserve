@@ -35,8 +35,8 @@ export function buildSavedViewPayload(
   delete saved.data.queryResults;
   delete saved.data.histogram;
   delete saved.data.sortedQueryResults;
-  delete saved.data.stream.streamLists;
-  delete saved.data.stream.functions;
+  delete saved.data.stream?.streamLists;
+  delete saved.data.stream?.functions;
   delete saved.data.streamResults;
   delete saved.data.savedViews;
   delete saved.data.transforms;
@@ -54,7 +54,7 @@ export function buildSavedViewPayload(
   if (options.buildData) saved.data.buildData = options.buildData;
 
   // Transient hand-off to BuildQueryPage, never part of a saved view.
-  delete saved.meta.savedBuildConfig;
+  delete saved.meta?.savedBuildConfig;
 
   return prepareSearchForSave(saved, search);
 }

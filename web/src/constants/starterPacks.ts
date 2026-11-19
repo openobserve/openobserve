@@ -15,8 +15,5 @@
 
 import config from "@/aws-exports";
 
-const KILL_SWITCH = true;
-
-/** Starter Packs ship in Enterprise and Cloud only; without it the routes are not registered, so the menu hides too. */
 export const STARTER_PACKS_ENABLED: boolean =
-  KILL_SWITCH && (config.isEnterprise == "true" || config.isCloud == "true");
+  config.isEnterprise == "true" || config.isCloud == "true";

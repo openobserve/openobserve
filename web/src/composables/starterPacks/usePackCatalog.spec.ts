@@ -43,8 +43,6 @@ const lookup = (key: string) =>
 
 const textKeys = (pack: StarterPack): string[] => [
   pack.titleKey,
-  pack.descriptionKey,
-  ...(pack.pausedImpactKey ? [pack.pausedImpactKey] : []),
   ...(pack.roles ?? []).map(({ titleKey }) => titleKey),
   ...(pack.flavours ?? []).map(({ titleKey }) => titleKey),
   ...Object.values(pack.aliasTitles ?? {}),
@@ -57,13 +55,11 @@ const answer = (body: unknown, ok = true) =>
 const kubernetesToday = {
   id: "kubernetes",
   titleKey: "starterPacks.packs.kubernetes.title",
-  descriptionKey: "starterPacks.packs.kubernetes.description",
   folder: { name: "Kubernetes", description: "Installed by the Kubernetes starter pack" },
   nativeView: { feature: "kubernetes_monitoring", route: "infraKubernetes" },
   clusterScoped: true,
   collectorRoute: "ingestFromKubernetes",
   logo: "images/common/kubernetes.svg",
-  pausedImpactKey: "starterPacks.packs.kubernetes.pausedImpact",
   version: "1.1.0",
   aliases: [
     ["k8s_cluster", "k8s_cluster_name", "cluster", "cluster_name"],
@@ -134,12 +130,10 @@ const hostsToday = {
   id: "hosts",
   version: "1.1.0",
   titleKey: "starterPacks.packs.hosts.title",
-  descriptionKey: "starterPacks.packs.hosts.description",
   folder: { name: "Hosts", description: "Installed by the Hosts starter pack" },
   savedViews: [],
   collectorRoute: "ingestFromLinux",
   logo: "images/common/linux.svg",
-  pausedImpactKey: "starterPacks.packs.hosts.pausedImpact",
   signals: [
     ["system_cpu_time", "node_cpu_seconds_total"],
     ["system_memory_usage", "node_memory_MemAvailable_bytes"],
@@ -356,17 +350,45 @@ describe("usePackCatalog", () => {
       expect(service.catalog).toHaveBeenCalledWith("default");
     });
 
-    it("sends one request for concurrent and later loads", async () => {
+    it("sends one request for concurrent and later loads of one org", async () => {
       let answerWith: (value: unknown) => void = () => {};
       service.catalog.mockReturnValue(new Promise((resolve) => (answerWith = resolve)));
       const fresh = await freshCatalog();
       const first = fresh.loadPackCatalog("default");
-      const second = fresh.loadPackCatalog("other");
+      const second = fresh.loadPackCatalog("default");
       expect(fresh.packCatalogState.value).toBe("loading");
       answerWith({ data: served });
       expect(await Promise.all([first, second])).toEqual([true, true]);
       expect(await fresh.loadPackCatalog("default")).toBe(true);
       expect(service.catalog).toHaveBeenCalledTimes(1);
+    });
+
+    it("reads the catalog again for another org", async () => {
+      service.catalog.mockResolvedValueOnce({ data: served });
+      service.catalog.mockResolvedValueOnce({
+        data: { ...served, catalog_version: "other", packs: catalog.packs.slice(0, 1) },
+      });
+      const fresh = await freshCatalog();
+      expect(await fresh.loadPackCatalog("default")).toBe(true);
+      expect(await fresh.loadPackCatalog("other")).toBe(true);
+      expect(service.catalog).toHaveBeenNthCalledWith(2, "other");
+      expect(fresh.catalogVersion()).toBe("other");
+      expect(fresh.packs()).toHaveLength(1);
+    });
+
+    it("keeps only the last org's catalog when an earlier org's answer lands late", async () => {
+      let answerFirst: (value: unknown) => void = () => {};
+      service.catalog.mockReturnValueOnce(new Promise((resolve) => (answerFirst = resolve)));
+      service.catalog.mockResolvedValueOnce({
+        data: { ...served, catalog_version: "other", packs: catalog.packs.slice(0, 1) },
+      });
+      const fresh = await freshCatalog();
+      const first = fresh.loadPackCatalog("default");
+      expect(await fresh.loadPackCatalog("other")).toBe(true);
+      answerFirst({ data: served });
+      await first;
+      expect(fresh.catalogVersion()).toBe("other");
+      expect(fresh.packCatalogState.value).toBe("ready");
     });
 
     it("leaves out a pack this build cannot build and keeps the rest", async () => {

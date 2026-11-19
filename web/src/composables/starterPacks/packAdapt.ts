@@ -315,8 +315,10 @@ export const adaptSavedView = (search: Doc, repairs: PackRepair[]): Doc => {
   const filters = applied.flatMap(({ filter }) =>
     filter ? [`${filter.field} = '${escapeQuotes(filter.value)}'`] : [],
   );
-  if (filters.length) {
-    next.data.query = [next.data.query, ...filters].filter(Boolean).join(" AND ");
+  // A SQL-mode query is a whole statement, so a trailing AND would break it.
+  if (filters.length && !next.meta?.sqlMode) {
+    const own = String(next.data.query ?? "").trim();
+    next.data.query = [own ? `(${own})` : "", ...filters].filter(Boolean).join(" AND ");
   }
   return next;
 };
