@@ -12137,7 +12137,12 @@
         "changeCompare": "Change the comparison",
         "hourFired": "{from}–{to}: would have alerted",
         "hourQuiet": "{from}–{to}: quiet",
-        "changeKeepFiring": "Change Keep firing for"
+        "changeKeepFiring": "Change Keep firing for",
+        "neverNoBaseline": "It would not have alerted: there was no data {offset} earlier to compare with. It can fire once there is.",
+        "neverCompare": "It would not have alerted. If you expected it to, check the comparison.",
+        "noisySustained": "That is often, so people may start to ignore it. The {fn} over the look back already ignores short spikes; a higher threshold makes it quieter.",
+        "noisySustainedLower": "That is often, so people may start to ignore it. The {fn} over the look back already ignores short dips; a lower threshold makes it quieter.",
+        "changeThreshold": "Change the threshold"
       },
       "filtersMode": "Filters",
       "typeHelp": {
@@ -15786,7 +15791,10 @@
         "ruleMatchNow": "no series match | {count} series matches | {count} series match",
         "compareNote": "The preview runs this window alone. Test it also reads the same window {offset} earlier.",
         "compareNoBaseline": "No data {offset} earlier to compare with, so any match may fire.",
-        "compareWaitsForBaseline": "No data {offset} earlier yet, so it stays quiet until there is."
+        "compareWaitsForBaseline": "No data {offset} earlier yet, so it stays quiet until there is.",
+        "plots": "Plotted: {what}",
+        "plotsEach": "Plotted: {what}, one line per {groups}",
+        "plotsAll": "Plotted: {what} across every series"
       },
       "anomaly": {
         "sensitivityAuto": "Auto",
@@ -16079,9 +16087,7 @@
       "staleRunAgain": "The alert changed after this test. Run again for the new answer.",
       "elapsed": "{seconds} s so far. A busy stream can take a minute or more.",
       "firedInChecks": "Over the last 24 hours this would have fired in {fired} of {checks} checks and notified {count} time ({times}). | Over the last 24 hours this would have fired in {fired} of {checks} checks and notified {count} times ({times}).",
-      "firedInChecksGroups": "Over the last 24 hours this would have fired in {fired} of {checks} checks, for {groups}, and notified {count} time ({times}). | Over the last 24 hours this would have fired in {fired} of {checks} checks, for {groups}, and notified {count} times ({times}).",
       "groupCount": "{count} group | {count} groups",
-      "heldOther": "Notify at most every held back the other {count} firing. | Notify at most every held back the other {count} firings.",
       "closest": "Closest: {series} reached {value} at {time}.",
       "closestValue": "Closest: {value} at {time}.",
       "latestAt": "the latest at {time}",
@@ -16094,7 +16100,10 @@
       "runningChecks": "Testing {count} check over the last 24 hours… | Testing {count} checks over the last 24 hours…",
       "latestSeriesAbove": "At the latest check ({time}), no series was above the threshold. | At the latest check ({time}), {count} series was above the threshold. | At the latest check ({time}), {count} series were above the threshold.",
       "latestSeriesBelow": "At the latest check ({time}), no series was below the threshold. | At the latest check ({time}), {count} series was below the threshold. | At the latest check ({time}), {count} series were below the threshold.",
-      "latestSeriesMatched": "At the latest check ({time}), no series matched the condition. | At the latest check ({time}), {count} series matched the condition. | At the latest check ({time}), {count} series matched the condition."
+      "latestSeriesMatched": "At the latest check ({time}), no series matched the condition. | At the latest check ({time}), {count} series matched the condition. | At the latest check ({time}), {count} series matched the condition.",
+      "firedInChecksGroupsSent": "Over the last 24 hours this would have fired in {fired} of {checks} checks, for {groups}, and sent notifications in {count} of them ({times}).",
+      "heldGroups": "In the other check, every firing group was within {wait} of its last notification, so Notify at most every held them back. | In the other {count} checks, every firing group was within {wait} of its last notification, so Notify at most every held them back.",
+      "heldWait": "The other firing came within {wait} of a notification, so Notify at most every held it back. | The other {count} firings came within {wait} of a notification, so Notify at most every held them back."
     },
     "conditionCountWith": "{noun} with",
     "promRuleModeHelp": "Every series the query returns alerts: the comparison is in the query (for example > 0.9), with no threshold here.",
