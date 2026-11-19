@@ -17,9 +17,9 @@
 //! here and ciphertext under the org DEK in the tables. Never publishes; `src/db` does.
 
 use config::meta::ai::memory::{
-    AgentMemoryWrites, Author, ContentError, EditError, Evidence, MemoryEdit, MemoryScope,
-    MemorySettings, RevisionState, WriteMode, apply_edits, effective_agent_writes,
-    validate_content, write_mode,
+    AgentMemoryWrites, Author, ContentError, EditError, EditFlag, Evidence, MemoryEdit,
+    MemoryScope, MemorySettings, RevisionState, WriteMode, apply_edits, edit_flags,
+    effective_agent_writes, validate_content, write_mode,
 };
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, PaginatorTrait, QueryFilter,
@@ -101,6 +101,8 @@ pub struct Revision {
     pub origin_region: String,
     pub op_id: String,
     pub created_at: i64,
+    /// Set on pending agent edits; empty otherwise.
+    pub flags: Vec<EditFlag>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -157,7 +159,8 @@ pub enum Outcome {
         content: String,
     },
     EditConflict(EditError),
-    TooLarge(ContentError),
+    /// Over the cap, or text that looks like a secret.
+    Invalid(ContentError),
     NotFound,
 }
 
@@ -225,6 +228,7 @@ struct NewRevision<'a> {
     content: Option<&'a str>,
     op_id: String,
     meta: &'a WriteMeta,
+    flags: &'a [EditFlag],
 }
 
 pub async fn get_with<C: ConnectionTrait>(
@@ -435,6 +439,7 @@ pub async fn hold_with<C: ConnectionTrait + TransactionTrait>(
             content: None,
             op_id: new_id(),
             meta,
+            flags: &edit_flags(edits),
         },
     )
     .await?;
@@ -771,7 +776,7 @@ async fn hold_in(
         return Ok(Outcome::Unchanged { rev: row.rev });
     }
     if let Err(e) = check_size(txn, row, &content).await? {
-        return Ok(Outcome::TooLarge(e));
+        return Ok(Outcome::Invalid(e));
     }
     let revision_id = insert_revision(
         txn,
@@ -786,6 +791,7 @@ async fn hold_in(
             content: None,
             op_id: new_id(),
             meta,
+            flags: &edit_flags(&write.edits),
         },
     )
     .await?;
@@ -801,7 +807,7 @@ async fn finish(txn: DatabaseTransaction, outcome: Outcome) -> Result<Outcome, e
         Outcome::Unchanged { .. }
         | Outcome::RevConflict { .. }
         | Outcome::EditConflict(_)
-        | Outcome::TooLarge(_)
+        | Outcome::Invalid(_)
         | Outcome::NotFound => txn.rollback().await?,
     }
     Ok(outcome)
@@ -965,7 +971,7 @@ async fn apply_in(
         return Ok(Outcome::Unchanged { rev: row.rev });
     }
     if let Err(e) = check_size(txn, &row, &content).await? {
-        return Ok(Outcome::TooLarge(e));
+        return Ok(Outcome::Invalid(e));
     }
     let op_id = new_id();
     let author = meta.author.to_string();
@@ -991,6 +997,7 @@ async fn apply_in(
             content: Some(&content),
             op_id: op_id.clone(),
             meta,
+            flags: &[],
         },
     )
     .await?;
@@ -1027,7 +1034,7 @@ async fn accept_in(
         Err(e) => return Ok(Outcome::EditConflict(e)),
     };
     if let Err(e) = check_size(txn, &row, &content).await? {
-        return Ok(Outcome::TooLarge(e));
+        return Ok(Outcome::Invalid(e));
     }
     let head = Head {
         content: &content,
@@ -1241,6 +1248,9 @@ async fn insert_revision<C: ConnectionTrait>(
         origin_region: Set(new.meta.origin_region.clone()),
         op_id: Set(new.op_id),
         created_at: Set(new.meta.now),
+        flags: Set((!new.flags.is_empty())
+            .then(|| serde_json::to_string(new.flags))
+            .transpose()?),
     };
     ai_memory_revisions::Entity::insert(row)
         .exec_without_returning(conn)
@@ -1372,6 +1382,12 @@ fn to_revision(model: ai_memory_revisions::Model, dek: &[u8]) -> Result<Revision
         origin_region: model.origin_region,
         op_id: model.op_id,
         created_at: model.created_at,
+        flags: model
+            .flags
+            .as_deref()
+            .map(serde_json::from_str)
+            .transpose()?
+            .unwrap_or_default(),
     })
 }
 
@@ -1509,6 +1525,7 @@ pub(crate) async fn insert_user_memory_for_test<C: ConnectionTrait>(
         content: Some("notes"),
         op_id: new_id(),
         meta: &meta,
+        flags: &[],
     };
     insert_revision(conn, &dek, revision).await.unwrap();
     memory
@@ -2111,7 +2128,7 @@ mod tests {
             )
             .await
             .unwrap();
-            assert!(matches!(too_large, Outcome::TooLarge(_)), "{too_large:?}");
+            assert!(matches!(too_large, Outcome::Invalid(_)), "{too_large:?}");
             let start = format!("## Quirks\n{}", &big[20..]);
             apply(&db, &dek, &key, 0, &content(&start), &person(11))
                 .await
@@ -2129,7 +2146,7 @@ mod tests {
                 .unwrap();
             assert_eq!(
                 refused,
-                Outcome::TooLarge(ContentError::TooLarge {
+                Outcome::Invalid(ContentError::TooLarge {
                     size_bytes: (start.len() + "\n".len() + 100 + "\n".len()) as i64,
                     max_bytes: TOOLSET_DEFAULT_MAX_BYTES
                 })
@@ -2156,7 +2173,7 @@ mod tests {
             let key = MemoryKey::user("o1", "u1");
             let text = content(&"x".repeat(3000));
             let refused = apply(&db, &dek, &key, 0, &text, &person(10)).await.unwrap();
-            assert!(matches!(refused, Outcome::TooLarge(_)), "{refused:?}");
+            assert!(matches!(refused, Outcome::Invalid(_)), "{refused:?}");
             let raised = MemorySettings {
                 user_max_bytes: Some(4096),
                 ..Default::default()
