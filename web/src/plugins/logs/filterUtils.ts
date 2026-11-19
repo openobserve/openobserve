@@ -27,6 +27,21 @@ export const getFieldFromExpression = (expression: string): string | null => {
   return match ? match[1] : null;
 };
 
+/** Puts `"prefix".` before the field of every condition in a filter built for one field, outside quoted values. */
+export const qualifyFieldConditions = (filter: string, prefix: string): string => {
+  const field = /^[\s(]*("(?:[^"]|"")+"|\w+)/.exec(filter)?.[1];
+  if (!field) return `"${prefix}".${filter}`;
+  const esc = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const condition = new RegExp(
+    `(^[\\s(]*|\\(\\s*|\\s(?:and|or)\\s+)${esc}(?=\\s*(?:[=!<>]|(?:is|in|like|not)\\b))`,
+    "gi",
+  );
+  return filter
+    .split(/('(?:[^']|'')*')/)
+    .map((part, i) => (i % 2 ? part : part.replace(condition, `$1"${prefix}".${field}`)))
+    .join("");
+};
+
 /**
  * Checks whether a query string already contains an existing condition for
  * the given field name (single value or parenthesized multi-value group).
