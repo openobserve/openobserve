@@ -15972,7 +15972,8 @@
       },
       "unusualVolume": {
         "label": "Unusual volume",
-        "sentence": "Unusual number of {noun} per {bucket}"
+        "sentence": "Unusual number of {noun} per {bucket}",
+        "sentenceWhere": "Unusual number of {noun} where {field} is {value}, per {bucket}"
       },
       "compareLastWeek": {
         "label": "Compare with last week",
@@ -16013,7 +16014,8 @@
         "valuePrompt": "pick values",
         "patternOption": "Every value like {pattern}",
         "valueHelpSeries": "Numbers are series seen in the last 24 hours. Type a value, or a pattern like {example}, and press Enter to add it.",
-        "valueHelpEvents": "Numbers are {noun} in the last 24 hours. Type a value and press Enter to add it."
+        "valueHelpEvents": "Numbers are {noun} in the last 24 hours. Type a value and press Enter to add it.",
+        "valueHelpEventsAnyCase": "Numbers are {noun} in the last 24 hours. Values that differ only in case match too. Type a value and press Enter to add it."
       },
       "noGroup": "No grouping",
       "addGroup": "Add a group",
@@ -16022,7 +16024,11 @@
       "previewWaits": "Pick what the sentence leaves empty to see a preview",
       "promql": {
         "label": "Write PromQL"
-      }
+      },
+      "addFilter": "Add a filter",
+      "noFilter": "No filter",
+      "useInstead": "Use {value} instead",
+      "alsoMatch": "Also match {values}"
     },
     "librarySuggest": {
       "suggestedStarter": "Suggested starter",
