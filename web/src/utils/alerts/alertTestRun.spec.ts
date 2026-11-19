@@ -40,6 +40,19 @@ const report = (r: unknown, extra: { silenceMinutes?: number; ratio?: boolean } 
   });
 const lines = (r: unknown, extra: { silenceMinutes?: number; ratio?: boolean } = {}) =>
   Object.fromEntries(report(r, extra).lines.map((l) => [l.id, l]));
+// Fired at the first check on two series, quiet since.
+const promqlFiredEarlier = {
+  ...noSeries,
+  checks: noSeries.checks.map((c, i) =>
+    i ? c : { ...c, state: "firing", fired: true, notified: true, matched: 2, reason: null },
+  ),
+  summary: {
+    ...noSeries.summary,
+    fired: 1,
+    notifications: 1,
+    notified_at: [noSeries.checks[0].time],
+  },
+};
 
 describe("testRunReport", () => {
   it.each([
@@ -49,7 +62,7 @@ describe("testRunReport", () => {
       {
         summary:
           "Over the last 24 hours this would have fired in 3 of 6 checks, for 2 groups, and notified 2 times (09:20 and 09:50).",
-        latestGroups: "At the latest check, no group was above the threshold.",
+        latestGroups: "At the latest check (10:00), no group was above the threshold.",
         held: "Notify at most every held back the other 1 firing.",
       },
     ],
@@ -59,6 +72,15 @@ describe("testRunReport", () => {
       {
         summary: "Over the last 24 hours this would not have fired.",
         noSeries: "The query matched no series; http_server_duration_count has 3 series.",
+      },
+    ],
+    [
+      "PromQL query that fired earlier, so its series matched",
+      promqlFiredEarlier,
+      {
+        summary:
+          "Over the last 24 hours this would have fired in 1 of 3 checks and notified 1 time (09:50).",
+        latestGroups: "At the latest check (10:00), no series was above the threshold.",
       },
     ],
     [

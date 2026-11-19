@@ -38,6 +38,11 @@ const LATEST_GROUPS_KEYS: Record<"above" | "below" | "none", I18nKey> = {
   below: "alerts.testRun.latestGroupsBelow",
   none: "alerts.testRun.latestGroupsMatched",
 };
+const LATEST_SERIES_KEYS: Record<"above" | "below" | "none", I18nKey> = {
+  above: "alerts.testRun.latestSeriesAbove",
+  below: "alerts.testRun.latestSeriesBelow",
+  none: "alerts.testRun.latestSeriesMatched",
+};
 
 export type TestRunTone = "body" | "secondary" | "warning" | "error";
 
@@ -246,10 +251,25 @@ function closestLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
   };
 }
 
-/** How many groups the latest check found past the threshold: what the preview calls "now". */
-function latestGroupsLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | null {
+/** How many groups the latest check found past the threshold; its time sets it apart from the preview's "now". */
+function latestGroupsLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
+  const { t } = o;
   const latest = r.checks[r.checks.length - 1];
-  if (!latest || latest.error || !r.summary.groups_fired.length) return null;
+  if (!latest || latest.error) return null;
+  const time = checkTimeText(latest.time, o.timeZone, o.nowMs);
+  // One PromQL alert has no groups; its filtered query returns just the series past the threshold.
+  if (!r.summary.groups_fired.length) {
+    if (r.query_type !== "promql" || !r.summary.fired) return null;
+    return {
+      id: "latestGroups",
+      text: t(
+        LATEST_SERIES_KEYS[thresholdSide(latest.operator) ?? "none"],
+        { count: formatNumber(latest.matched), time },
+        latest.matched,
+      ),
+      tone: "secondary",
+    };
+  }
   const over = (latest.groups ?? []).filter((g) => g.fired).length;
   // The server lists at most 100 groups, fired first; a full list of fired ones may hold more.
   const atLeast = over === (latest.groups ?? []).length && latest.groups_total > over;
@@ -258,15 +278,15 @@ function latestGroupsLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine
     : formatNumber(over);
   return {
     id: "latestGroups",
-    text: t(LATEST_GROUPS_KEYS[thresholdSide(latest.operator) ?? "none"], { count }, over),
+    text: t(LATEST_GROUPS_KEYS[thresholdSide(latest.operator) ?? "none"], { count, time }, over),
     tone: "secondary",
   };
 }
 
 function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn, ratio = false): TestRunLine | null {
   const metrics = r.diagnostics?.metrics ?? [];
-  const latest = r.checks[r.checks.length - 1];
-  if (!metrics.length || !latest || latest.matched > 0) return null;
+  // A check that fired matched, so the line is only for a day where none did.
+  if (!metrics.length || !r.checks.length || r.checks.some((c) => c.matched > 0)) return null;
   // Every metric has series, so the top part of a ratio found nothing to count: its share is 0.
   if (ratio && metrics.every((m) => m.series > 0))
     return { id: "noSeries", text: t("alerts.testRun.noValueRatio"), tone: "secondary" };
@@ -310,7 +330,7 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
   const answered = r.checks.filter((c) => !c.error);
   if (r.query_type !== "promql" && answered.length && answered.every((c) => c.reason === "no_data"))
     lines.push({ id: "matchedNothing", text: t("alerts.guard.matchedNothing"), tone: "secondary" });
-  const latestGroups = latestGroupsLine(r, t);
+  const latestGroups = latestGroupsLine(r, o);
   if (latestGroups) lines.push(latestGroups);
   const held = r.checks.filter((c) => c.held_by === "notify_at_most_every").length;
   if (held && !r.is_real_time)
