@@ -554,6 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :threshold="Number(formData.trigger_condition.threshold)"
                   :trigger-condition="formData.trigger_condition"
                   :real-time="formData.is_real_time === 'true'"
+                  :compares="!!formData.query_condition?.multi_time_range?.length"
                 />
                 <div
                   v-show="isCompositeMode"

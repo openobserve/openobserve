@@ -186,6 +186,7 @@ import {
   withoutTimeBucket,
 } from "@/utils/alerts/aggregationPreviewQuery";
 import { comparisonOffsetText, comparisonWindows } from "@/utils/alerts/previewCompare";
+import { compareRule } from "@/utils/alerts/alertIntents";
 import { getIntlLocale } from "@/locales";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
 import { cloneDeep, debounce } from "lodash-es";
@@ -2350,13 +2351,22 @@ const checkBaselines = async (endMicros: number) => {
   if (mine !== compareGeneration) return;
   compareTraceIds = [];
   const empty = windows.filter((_, i) => totals[i] === 0);
-  compareStatus.value = empty.length
-    ? {
-        wouldTrigger: false,
-        reason: t("alerts.form.preview.compareNoBaseline", { offset: offset(empty) }),
-        note: "warn",
-      }
-    : note;
+  const waits = compareRule(
+    smartDecodeVrlFunction(props.formData.query_condition?.vrl_function ?? ""),
+  )?.needsBaseline;
+  compareStatus.value = !empty.length
+    ? note
+    : waits
+      ? {
+          wouldTrigger: false,
+          reason: t("alerts.form.preview.compareWaitsForBaseline", { offset: offset(empty) }),
+          note: "note",
+        }
+      : {
+          wouldTrigger: false,
+          reason: t("alerts.form.preview.compareNoBaseline", { offset: offset(empty) }),
+          note: "warn",
+        };
 };
 watch(
   () => JSON.stringify(comparisons.value),

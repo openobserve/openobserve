@@ -523,8 +523,16 @@ describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", ()
       expect((host.vm as any).form.state.values.query_condition.vrl_function).toBe(
         compareFunction(3),
       );
+      // Holding it until the past has data keeps the factor, and a factor edit keeps the hold.
+      await host.find('[data-test="add-alert-compare-needs-baseline"] button').trigger("click");
+      await input.setValue("4");
+      vi.advanceTimersByTime(300);
+      expect((host.vm as any).form.state.values.query_condition.vrl_function).toBe(
+        compareFunction(4, true),
+      );
       const typed = mountHost([{ offSet: "1w", uuid: "u1" }], ".x = 1");
       expect(typed.find('[data-test="add-alert-compare-factor"]').exists()).toBe(false);
+      expect(typed.find('[data-test="add-alert-compare-needs-baseline"]').exists()).toBe(false);
     } finally {
       vi.useRealTimers();
     }

@@ -20,6 +20,7 @@ import {
   cardsFolded,
   compareFactor,
   compareFunction,
+  compareRule,
   fieldKind,
   fieldsBySamplePresence,
   intentsFor,
@@ -317,6 +318,10 @@ describe("alertIntents", () => {
     expect(compareFactor(compareFunction(2.5))).toBe(2.5);
     expect(compareFactor(compareFunction(3).replace(/\n\.$/, ""))).toBe(3);
     expect(compareFactor(compareFunction(3).replace("current > 0.0 && ", ""))).toBeUndefined();
+    // Only fire once the past window has data: an empty past no longer passes as "0 × factor".
+    expect(compareFunction(2, true)).toContain("previous > 0.0 && current > previous * 2.0");
+    expect(compareRule(compareFunction(2, true))).toEqual({ factor: 2, needsBaseline: true });
+    expect(compareRule(compareFunction(2))).toEqual({ factor: 2, needsBaseline: false });
   });
 
   it("covers every naming generation of a metric, each with its own label, in one share", () => {

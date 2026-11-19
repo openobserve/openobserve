@@ -85,6 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
       </i18n-t>
+      <OCheckbox
+        v-if="index === 0 && factor"
+        class="mt-2"
+        :model-value="needsBaseline"
+        :label="t('alerts.form.compare.needsBaseline')"
+        data-test="add-alert-compare-needs-baseline"
+        @update:model-value="setNeedsBaseline"
+      />
       <p
         v-if="index === 0 && !hasFunction"
         class="text-status-warning-text m-0 mt-1 text-xs"
@@ -153,7 +161,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import { compareFactor, compareFunction } from "@/utils/alerts/alertIntents";
+import { compareFunction, compareRule } from "@/utils/alerts/alertIntents";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 
 interface TimeShiftPicker {
   offSet: string;
@@ -164,6 +173,7 @@ export default defineComponent({
   name: "Step4CompareWithPast",
   components: {
     OButton,
+    OCheckbox,
     OInput,
     OSelect,
     OSettingRow,
@@ -298,10 +308,18 @@ export default defineComponent({
       (state: { values?: { query_condition?: { vrl_function?: string | null } } }) =>
         state.values?.query_condition?.vrl_function,
     );
-    const factor = computed(() => compareFactor(vrlStore?.value));
+    const rule = computed(() => compareRule(vrlStore?.value));
+    const factor = computed(() => rule.value?.factor);
+    // An empty past window makes any match "more than N times" it, so this holds the alert until it has data.
+    const needsBaseline = computed(() => rule.value?.needsBaseline ?? false);
+    const writeRule = (n: number, baseline: boolean) =>
+      injectedForm?.setFieldValue("query_condition.vrl_function", compareFunction(n, baseline));
     const setFactor = (value: unknown) => {
       const n = Number(value);
-      if (n > 0) injectedForm?.setFieldValue("query_condition.vrl_function", compareFunction(n));
+      if (n > 0) writeRule(n, needsBaseline.value);
+    };
+    const setNeedsBaseline = (value: unknown) => {
+      if (factor.value) writeRule(factor.value, value === true);
     };
 
     return {
@@ -310,6 +328,8 @@ export default defineComponent({
       store,
       factor,
       setFactor,
+      needsBaseline,
+      setNeedsBaseline,
       multiWindowContainerRef,
       localMultiTimeRange,
       addTimeShift,

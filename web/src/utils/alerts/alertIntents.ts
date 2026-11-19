@@ -581,20 +581,23 @@ const factorText = (f: number) => (Number.isInteger(f) ? f.toFixed(1) : String(f
 
 /** `#ResultArray#` gets one result array per window, now first; the alert fires on the rows it
  * returns, so it returns one only when now beats the past by the factor. Ends on `.` as saved. */
-export function compareFunction(factor: number): string {
+export function compareFunction(factor: number, needsBaseline = false): string {
   const f = Number.isFinite(factor) && factor > 0 ? factor : DEFAULT_FACTOR;
+  const baseline = needsBaseline ? "previous > 0.0 && " : "";
   return [
     "#ResultArray#",
     `current = to_float(get(., [0, 0, "${COMPARE_ALIAS}"]) ?? 0) ?? 0.0`,
     `previous = to_float(get(., [1, 0, "${COMPARE_ALIAS}"]) ?? 0) ?? 0.0`,
-    `. = if current > 0.0 && current > previous * ${factorText(f)} { [[{"${COMPARE_ALIAS}": current, "previous": previous}]] } else { [[]] }`,
+    `. = if current > 0.0 && ${baseline}current > previous * ${factorText(f)} { [[{"${COMPARE_ALIAS}": current, "previous": previous}]] } else { [[]] }`,
     ".",
   ].join("\n");
 }
 
-/** The factor of a function `compareFunction` wrote, with or without the `.` the server appends;
- * undefined for any other function. */
-export function compareFactor(vrl: string | null | undefined): number | undefined {
+/** The factor and baseline rule of a function `compareFunction` wrote, with or without the `.`
+ * the server appends; undefined for any other function. */
+export function compareRule(
+  vrl: string | null | undefined,
+): { factor: number; needsBaseline: boolean } | undefined {
   const bare = (text: string) =>
     text
       .trim()
@@ -602,7 +605,14 @@ export function compareFactor(vrl: string | null | undefined): number | undefine
       .trim();
   const factor = Number(/previous \* ([\d.]+) \{/.exec(vrl ?? "")?.[1]);
   if (!(factor > 0)) return undefined;
-  return bare(vrl ?? "") === bare(compareFunction(factor)) ? factor : undefined;
+  const needsBaseline = /previous > 0\.0 && /.test(vrl ?? "");
+  return bare(vrl ?? "") === bare(compareFunction(factor, needsBaseline))
+    ? { factor, needsBaseline }
+    : undefined;
+}
+
+export function compareFactor(vrl: string | null | undefined): number | undefined {
+  return compareRule(vrl)?.factor;
 }
 
 /** A metric as a PromQL query; a counter only ever grows, so it reads as its per-second rate. */

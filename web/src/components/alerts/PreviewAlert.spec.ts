@@ -74,6 +74,7 @@ vi.mock("@/composables/useStreams", () => ({
 
 // Imported after the mock above so it resolves to the mocked module.
 import searchService from "@/services/search";
+import { compareFunction } from "@/utils/alerts/alertIntents";
 import alertsService from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 
@@ -3347,14 +3348,15 @@ describe("PreviewAlert - a wide range asks the latest window alone for the verdi
   });
 
   it.each([
-    ["has no data", [], "warn"],
-    ["has data", [{ zo_sql_num: 3 }], "note"],
+    ["has no data", [], "#ResultArray#\n.", "warn"],
+    ["has data", [{ zo_sql_num: 3 }], "#ResultArray#\n.", "note"],
+    ["has no data, and the alert waits for it", [], compareFunction(2, true), "note"],
   ])(
     "a compare alert whose past window %s says so instead of judging this window alone",
-    async (_, hits, note) => {
+    async (_, hits, vrl, note) => {
       const formData: any = baseFormData();
       formData.query_condition.multi_time_range = [{ offSet: "1w" }];
-      formData.query_condition.vrl_function = btoa("#ResultArray#\n.");
+      formData.query_condition.vrl_function = btoa(vrl);
       const w = await mountComp({
         query: "SELECT count(*) AS events FROM logs WHERE level = 'error'",
         selectedTab: "sql",
