@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "В выбранных потоках нет полнотекстовых полей",
     "freeTextNoTextFields": "В этом потоке нет текстовых полей для поиска.",
     "freeTextNoTextFieldsNamed": "Без поиска: {streams} (нет текстовых полей).",
-    "freeTextBuildNotice": "В этом фильтре есть текстовый поиск; отредактируйте его в SQL."
+    "freeTextBuildNotice": "В этом фильтре есть текстовый поиск; отредактируйте его в SQL.",
+    "filterNotChartableNotice": "Этот фильтр нельзя построить в конструкторе. Фильтр поиска не изменён; переключитесь на Custom SQL, чтобы построить график."
   },
   "menu": {
     "alertCalibration": "Калибровка оповещений",

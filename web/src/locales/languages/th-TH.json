@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "The selected streams have no full-text fields",
     "freeTextNoTextFields": "This stream has no text fields to search.",
     "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
-    "freeTextBuildNotice": "This filter has text search; edit it in SQL."
+    "freeTextBuildNotice": "This filter has text search; edit it in SQL.",
+    "filterNotChartableNotice": "ตัวกรองนี้ไม่สามารถสร้างกราฟในตัวสร้างได้ ตัวกรองการค้นหาของคุณไม่เปลี่ยนแปลง สลับไปที่ Custom SQL เพื่อสร้างกราฟ"
   },
   "menu": {
     "alertCalibration": "การปรับเทียบการแจ้งเตือน",

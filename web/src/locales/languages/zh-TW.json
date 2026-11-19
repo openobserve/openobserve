@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "選取的串流沒有全文欄位",
     "freeTextNoTextFields": "此串流沒有可供搜尋的文字欄位。",
     "freeTextNoTextFieldsNamed": "未搜尋：{streams}（沒有文字欄位）。",
-    "freeTextBuildNotice": "此篩選條件包含文字搜尋；請在 SQL 中編輯。"
+    "freeTextBuildNotice": "此篩選條件包含文字搜尋；請在 SQL 中編輯。",
+    "filterNotChartableNotice": "此篩選條件無法在建構器中繪製圖表。您的搜尋篩選條件未變更；請切換至 Custom SQL 以繪製圖表。"
   },
   "menu": {
     "alertCalibration": "警示校準",

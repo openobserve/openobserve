@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "Seçilen akışlarda tam metin alanı yok",
     "freeTextNoTextFields": "Bu akışta aranacak metin alanı yok.",
     "freeTextNoTextFieldsNamed": "Aranmadı: {streams} (metin alanı yok).",
-    "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin."
+    "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin.",
+    "filterNotChartableNotice": "Bu filtre oluşturucuda grafiğe dökülemez. Arama filtreniz değişmedi; grafiğe dökmek için Custom SQL'e geçin."
   },
   "menu": {
     "alertCalibration": "Uyarı Kalibrasyonu",

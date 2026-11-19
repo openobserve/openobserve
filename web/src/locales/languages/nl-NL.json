@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "De geselecteerde streams hebben geen full-text velden",
     "freeTextNoTextFields": "Deze stream heeft geen tekstvelden om te doorzoeken.",
     "freeTextNoTextFieldsNamed": "Niet doorzocht: {streams} (geen tekstvelden).",
-    "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL."
+    "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL.",
+    "filterNotChartableNotice": "Dit filter kan niet in de builder worden weergegeven in een grafiek. Uw zoekfilter is ongewijzigd; schakel over naar Custom SQL om het weer te geven."
   },
   "menu": {
     "alertCalibration": "Alarmkalibratie",

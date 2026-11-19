@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "選択したストリームには全文検索フィールドがありません",
     "freeTextNoTextFields": "このストリームには検索可能なテキストフィールドがありません。",
     "freeTextNoTextFieldsNamed": "未検索: {streams}（テキストフィールドなし）。",
-    "freeTextBuildNotice": "このフィルターにはテキスト検索が含まれています。SQL で編集してください。"
+    "freeTextBuildNotice": "このフィルターにはテキスト検索が含まれています。SQL で編集してください。",
+    "filterNotChartableNotice": "このフィルターはビルダーではグラフ化できません。検索フィルターは変更されていません。グラフ化するには Custom SQL に切り替えてください。"
   },
   "menu": {
     "alertCalibration": "アラートキャリブレーション",

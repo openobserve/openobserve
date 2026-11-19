@@ -3411,7 +3411,12 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
+    const isBuildFilterHeld = () =>
+      !!(buildQueryPageRef.value as { freeTextNotice?: boolean } | null)?.freeTextNotice;
+
     const onBuildQueryGenerated = async (query: string) => {
+      // While the notice shows the builder has no SQL for the filter; "" would erase Search.
+      if (isBuildFilterHeld()) return;
       if (searchObj.meta.sqlMode) {
         // SQL mode ON: sync the full generated SQL to the search bar
         searchObj.data.query = query;
@@ -3439,6 +3444,16 @@ export default defineComponent({
 
         // Builder → Custom: show the generated SQL in the editor for editing
         if (isCustomMode) {
+          if (isBuildFilterHeld()) {
+            const page = buildQueryPageRef.value as { incompleteFilterNotice?: boolean } | null;
+            if (page?.incompleteFilterNotice && !searchObj.meta.sqlMode) {
+              const stream = searchObj.data.stream.selectedStream[0];
+              buildDashboardPanelData.data.queries[0].query =
+                `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 ` +
+                `FROM "${stream}" WHERE ${searchObj.data.query} GROUP BY x_axis_1 ORDER BY x_axis_1`;
+            }
+            return;
+          }
           const generatedQuery = buildDashboardPanelData.data.queries[0]?.query || "";
           if (searchObj.meta.sqlMode) {
             searchObj.data.query = generatedQuery;

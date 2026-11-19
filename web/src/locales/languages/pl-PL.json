@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "Wybrane strumienie nie mają pól pełnotekstowych",
     "freeTextNoTextFields": "Ten strumień nie ma pól tekstowych do przeszukania.",
     "freeTextNoTextFieldsNamed": "Nie przeszukano: {streams} (brak pól tekstowych).",
-    "freeTextBuildNotice": "Ten filtr zawiera wyszukiwanie tekstowe; edytuj go w SQL."
+    "freeTextBuildNotice": "Ten filtr zawiera wyszukiwanie tekstowe; edytuj go w SQL.",
+    "filterNotChartableNotice": "Tego filtra nie można przedstawić na wykresie w kreatorze. Filtr wyszukiwania pozostał bez zmian; przełącz na Custom SQL, aby go przedstawić na wykresie."
   },
   "menu": {
     "alertCalibration": "Kalibracja alertów",

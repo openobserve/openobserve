@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "Los streams seleccionados no tienen campos de texto completo",
     "freeTextNoTextFields": "Este stream no tiene campos de texto que buscar.",
     "freeTextNoTextFieldsNamed": "No se buscó en: {streams} (sin campos de texto).",
-    "freeTextBuildNotice": "Este filtro tiene búsqueda de texto; edítalo en SQL."
+    "freeTextBuildNotice": "Este filtro tiene búsqueda de texto; edítalo en SQL.",
+    "filterNotChartableNotice": "Este filtro no se puede representar en un gráfico con el generador. Tu filtro de búsqueda no ha cambiado; cambia a Custom SQL para graficarlo."
   },
   "menu": {
     "alertCalibration": "Calibración de alertas",

@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "Die ausgewählten Streams haben keine Volltextfelder",
     "freeTextNoTextFields": "Dieser Stream hat keine Textfelder zum Durchsuchen.",
     "freeTextNoTextFieldsNamed": "Nicht durchsucht: {streams} (keine Textfelder).",
-    "freeTextBuildNotice": "Dieser Filter enthält eine Textsuche; bearbeiten Sie ihn in SQL."
+    "freeTextBuildNotice": "Dieser Filter enthält eine Textsuche; bearbeiten Sie ihn in SQL.",
+    "filterNotChartableNotice": "Dieser Filter kann im Builder nicht als Diagramm dargestellt werden. Ihr Suchfilter bleibt unverändert; wechseln Sie zu Custom SQL, um ihn darzustellen."
   },
   "menu": {
     "alertCalibration": "Alarmkalibrierung",

@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "Các stream đã chọn không có trường toàn văn",
     "freeTextNoTextFields": "Stream này không có trường văn bản nào để tìm kiếm.",
     "freeTextNoTextFieldsNamed": "Không tìm kiếm: {streams} (không có trường văn bản).",
-    "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL."
+    "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL.",
+    "filterNotChartableNotice": "Bộ lọc này không thể vẽ biểu đồ trong trình tạo. Bộ lọc tìm kiếm của bạn không thay đổi; hãy chuyển sang Custom SQL để vẽ biểu đồ."
   },
   "menu": {
     "alertCalibration": "Hiệu chỉnh cảnh báo",

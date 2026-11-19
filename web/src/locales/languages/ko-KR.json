@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "선택한 스트림에 전체 텍스트 필드가 없습니다",
     "freeTextNoTextFields": "이 스트림에는 검색할 텍스트 필드가 없습니다.",
     "freeTextNoTextFieldsNamed": "검색하지 않음: {streams}(텍스트 필드 없음).",
-    "freeTextBuildNotice": "이 필터에는 텍스트 검색이 있습니다. SQL에서 편집하세요."
+    "freeTextBuildNotice": "이 필터에는 텍스트 검색이 있습니다. SQL에서 편집하세요.",
+    "filterNotChartableNotice": "이 필터는 빌더에서 차트로 만들 수 없습니다. 검색 필터는 변경되지 않았습니다. 차트로 만들려면 Custom SQL로 전환하세요."
   },
   "menu": {
     "alertCalibration": "알림 캘리브레이션",

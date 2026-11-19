@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "لا تحتوي التدفقات المحددة على حقول نص كامل",
     "freeTextNoTextFields": "لا يحتوي هذا التدفق على حقول نصية للبحث.",
     "freeTextNoTextFieldsNamed": "لم يتم البحث: {streams} (لا توجد حقول نصية).",
-    "freeTextBuildNotice": "يحتوي هذا المُرشِّح على بحث نصي؛ حرّره في SQL."
+    "freeTextBuildNotice": "يحتوي هذا المُرشِّح على بحث نصي؛ حرّره في SQL.",
+    "filterNotChartableNotice": "لا يمكن رسم هذا الفلتر في المنشئ. فلتر البحث لديك لم يتغير؛ انتقل إلى Custom SQL لرسمه."
   },
   "menu": {
     "alertCalibration": "معايرة التنبيهات",

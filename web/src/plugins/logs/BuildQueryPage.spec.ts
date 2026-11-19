@@ -975,6 +975,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
   afterEach(() => wrapper?.unmount());
 
   const notice = () => wrapper.find('[data-test="logs-build-free-text-notice"]');
+  const incompleteNotice = () => wrapper.find('[data-test="logs-build-incomplete-filter-notice"]');
   const initialized = () => vi.waitFor(() => expect(wrapper.emitted("initialized")).toBeTruthy());
 
   it("keeps rendered match_all units as builder conditions and runs", async () => {
@@ -1010,6 +1011,23 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     expect(notice().text()).toContain("search.freeTextBuildNotice");
     expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
     expect(wrapper.emitted("initialized")).toBeTruthy();
+  });
+
+  it("shows the not-chartable notice and never applies a partial filter without free text", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT (level = 'info')",
+      freeTextFilter: false,
+    });
+    await initialized();
+    await flushPromises();
+
+    expect(incompleteNotice().exists()).toBe(true);
+    expect(notice().exists()).toBe(false);
+    expect(incompleteNotice().text()).toContain("search.filterNotChartableNotice");
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+    expect(wrapper.emitted("queryGenerated")).toBeFalsy();
   });
 
   it("refuses Run after the notice: no panel run opens and the editor never queries", async () => {
@@ -1165,7 +1183,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
   });
 
-  it("leaves a SQL filter on today's path", async () => {
+  it("holds back a SQL filter the builder cannot represent", async () => {
     wrapper = createWrapper({
       isSqlMode: false,
       selectedStream: "fts_a",
@@ -1175,7 +1193,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     await initialized();
     await flushPromises();
 
-    expect(notice().exists()).toBe(false);
-    expect(mockMakeAutoSQLQuery).toHaveBeenCalled();
+    expect(incompleteNotice().exists()).toBe(true);
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
   });
 });

@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "Les flux sélectionnés n'ont aucun champ en texte intégral",
     "freeTextNoTextFields": "Ce flux n'a aucun champ texte à rechercher.",
     "freeTextNoTextFieldsNamed": "Non recherché : {streams} (aucun champ texte).",
-    "freeTextBuildNotice": "Ce filtre comporte une recherche textuelle ; modifiez-le en SQL."
+    "freeTextBuildNotice": "Ce filtre comporte une recherche textuelle ; modifiez-le en SQL.",
+    "filterNotChartableNotice": "Ce filtre ne peut pas être représenté dans le générateur. Votre filtre de recherche est inchangé ; passez à Custom SQL pour le représenter."
   },
   "menu": {
     "alertCalibration": "Calibration des alertes",

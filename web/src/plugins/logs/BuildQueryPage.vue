@@ -20,13 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="logs-build-query-page"
   >
     <OBanner
-      v-if="freeTextNotice"
+      v-if="incompleteFilterNotice"
+      variant="warning"
+      icon="warning"
+      dense
+      data-test="logs-build-incomplete-filter-notice"
+    >
+      {{ t("search.filterNotChartableNotice") }}
+    </OBanner>
+    <OBanner
+      v-else-if="freeTextNotice"
       variant="info"
       icon="info"
       dense
       data-test="logs-build-free-text-notice"
     >
-      {{ heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice") }}
+      {{ noticeText }}
     </OBanner>
     <OBanner
       v-if="parserLoadFailed || retryingParser"
@@ -193,6 +202,7 @@ const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 const freeTextNotice = ref(false);
+const incompleteFilterNotice = ref(false);
 const parserLoadFailed = ref(false);
 const retryingParser = ref(false);
 const needsFilterInit = () =>
@@ -208,6 +218,10 @@ const {
   makeAutoSQLQuery,
   validatePanel,
 } = useDashboardPanelData("build", t);
+
+const noticeText = computed(() =>
+  props.heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice"),
+);
 
 const runBlocked = computed(
   () =>
@@ -272,6 +286,7 @@ const restoreConfigFromUrl = (): {
 const initializeFromQuery = async () => {
   const seq = ++initSeq;
   freeTextNotice.value = false;
+  incompleteFilterNotice.value = false;
   parserLoadFailed.value = false;
   filterInitPending.value = needsFilterInit();
   holdGeneratedQuery.value = !props.isSqlMode && props.freeTextFilter;
@@ -388,7 +403,8 @@ const initializeFromQuery = async () => {
       }
       const { filter, complete } = parsed;
       if (seq !== initSeq) return;
-      if (freeTextFilter && (!whereClause?.trim() || !complete)) {
+      if ((freeTextFilter && !whereClause?.trim()) || !complete) {
+        incompleteFilterNotice.value = !freeTextFilter;
         freeTextNotice.value = true;
         filterInitPending.value = false;
         emit("initialized");
@@ -679,5 +695,7 @@ defineExpose({
   runBlocked,
   panelEditorRef,
   dashboardPanelData,
+  freeTextNotice,
+  incompleteFilterNotice,
 });
 </script>

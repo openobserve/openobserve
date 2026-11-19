@@ -150,6 +150,45 @@ describe(
       await flushPromises();
     };
 
+    describe("a filter the builder cannot chart", () => {
+      const where = "NOT (level = 'info')";
+      const openIncomplete = async () => {
+        showBuild(where);
+        await vi.waitFor(
+          () =>
+            expect(wrapper.find('[data-test="logs-build-incomplete-filter-notice"]').exists()).toBe(
+              true,
+            ),
+          { timeout: 15000 },
+        );
+        await flushPromises();
+      };
+
+      it("keeps the Search query when switching Builder to Custom and seeds the chart query", async () => {
+        await openIncomplete();
+        await wrapper.vm.onBuildModeToggle(true);
+        await flushPromises();
+
+        const { searchObj, buildDashboardPanelData } = wrapper.vm;
+        expect(searchObj.data.query).toBe(where);
+        expect(searchObj.data.editorValue).toBe(where);
+        expect(buildDashboardPanelData.data.queries[0].query).toBe(
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM "fts_a" WHERE ${where} GROUP BY x_axis_1 ORDER BY x_axis_1`,
+        );
+      });
+
+      it("keeps the Search query when SQL mode is toggled", async () => {
+        await openIncomplete();
+        wrapper.vm.searchObj.meta.sqlMode = true;
+        await flushPromises();
+        wrapper.vm.searchObj.meta.sqlMode = false;
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.data.query).toBe(where);
+        expect(wrapper.vm.searchObj.data.editorValue).toBe(where);
+      });
+    });
+
     it("disables Run, and a Run click or Ctrl+Enter sends no search", async () => {
       await openBuildWith("NOT timeout");
       expect(panelRuns).toEqual([]);

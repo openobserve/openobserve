@@ -2063,7 +2063,8 @@
     "freeTextNoFtsTitleMulti": "The selected streams have no full-text fields",
     "freeTextNoTextFields": "This stream has no text fields to search.",
     "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
-    "freeTextBuildNotice": "This filter has text search; edit it in SQL."
+    "freeTextBuildNotice": "This filter has text search; edit it in SQL.",
+    "filterNotChartableNotice": "This filter can't be charted in the builder. Your Search filter is unchanged; switch to Custom SQL to chart it."
   },
   "menu": {
     "alertCalibration": "Alert Calibration",

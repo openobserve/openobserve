@@ -783,6 +783,23 @@ function countWhereLeaves(node: any): number {
   return 1;
 }
 
+const COMPARISON_OPERATORS = ["=", "!=", "<>", "<", ">", "<=", ">="];
+const LITERAL_TYPES = ["number", "bool", "null", "string", "single_quote_string"];
+
+// A leaf the builder cannot hold: a non-column left side (e.g. lower(level)) or a
+// non-literal comparison value (e.g. a = b). Literal lefts (`1=1`) keep charting.
+function hasUnchartableLeaf(node: any): boolean {
+  if (!node) return false;
+  if (node.type === "binary_expr" && (node.operator === "AND" || node.operator === "OR")) {
+    return hasUnchartableLeaf(node.left) || hasUnchartableLeaf(node.right);
+  }
+  if (node.type !== "binary_expr" || !node.left) return false;
+  const leftIsExpr = !node.left.column && !LITERAL_TYPES.includes(node.left.type);
+  const rightIsExpr =
+    COMPARISON_OPERATORS.includes(node.operator) && !LITERAL_TYPES.includes(node.right?.type);
+  return leftIsExpr || rightIsExpr;
+}
+
 function countFilterConditions(filter: any): number {
   if (!filter) return 0;
   if (filter.filterType === "condition") return 1;
@@ -1362,7 +1379,12 @@ export const parseWhereClauseToFilterChecked = async (
   const filter = await parseWhereClauseToFilter(whereClauseText);
   try {
     const ast: any = parser.astify(`SELECT * FROM "dummy" WHERE ${whereClauseText}`);
-    return { filter, complete: countWhereLeaves(ast?.where) === countFilterConditions(filter) };
+    return {
+      filter,
+      complete:
+        !hasUnchartableLeaf(ast?.where) &&
+        countWhereLeaves(ast?.where) === countFilterConditions(filter),
+    };
   } catch {
     return { filter, complete: false };
   }

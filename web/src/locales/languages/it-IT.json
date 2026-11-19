@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "Gli stream selezionati non hanno campi full-text",
     "freeTextNoTextFields": "Questo stream non ha campi di testo da cercare.",
     "freeTextNoTextFieldsNamed": "Non cercati: {streams} (nessun campo di testo).",
-    "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL."
+    "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL.",
+    "filterNotChartableNotice": "Questo filtro non può essere rappresentato in un grafico nel builder. Il filtro di ricerca è invariato; passa a Custom SQL per visualizzarlo."
   },
   "menu": {
     "alertCalibration": "Calibrazione avvisi",

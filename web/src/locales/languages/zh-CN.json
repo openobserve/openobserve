@@ -1927,7 +1927,8 @@
     "freeTextNoFtsTitleMulti": "所选数据流没有全文检索字段",
     "freeTextNoTextFields": "此数据流没有可搜索的文本字段。",
     "freeTextNoTextFieldsNamed": "未搜索：{streams}（无文本字段）。",
-    "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。"
+    "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。",
+    "filterNotChartableNotice": "此筛选条件无法在构建器中绘制图表。您的搜索筛选条件未更改；请切换到 Custom SQL 以绘制图表。"
   },
   "menu": {
     "alertCalibration": "告警校准",
