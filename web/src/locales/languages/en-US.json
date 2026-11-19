@@ -12304,7 +12304,8 @@
         "nobody": "No one yet",
         "incident": "Opens an incident",
         "incidentForTeam": "Opens an incident for {team}",
-        "targetsAndIncident": "{targets} and an incident"
+        "targetsAndIncident": "{targets} and an incident",
+        "helpNamed": "Choose where the message goes and what to call the alert."
       },
       "schedule": {
         "title": "How often should we check?",
@@ -12322,7 +12323,8 @@
         "folder": "Folder",
         "unnamed": "Add a name",
         "autoName": "Suggested; type to replace",
-        "useSuggestion": "Use suggested name: {name}"
+        "useSuggestion": "Use suggested name: {name}",
+        "inFolder": "in folder"
       },
       "rows": {
         "query": "Query",
@@ -12336,7 +12338,8 @@
         "rowTemplate": "How each row reads",
         "descriptionPlaceholder": "What should someone do when this fires?",
         "whichEventsSqlSpans": "Each returned row counts. To alert on a value, filter it with HAVING. Span duration is stored in microseconds: 500 ms is 500000."
-      }
+      },
+      "aboutStep": "About this step"
     },
     "moreActions": "More actions",
     "promRulePreview": "{count} returned series match now. Each series must complete the pending period before firing.",
@@ -15661,7 +15664,12 @@
         "library": "Or {link}",
         "libraryLink": "start from the alert library",
         "summary": "{type} · {stream} · {how}",
-        "locked": "Can't change after the alert is created"
+        "locked": "Can't change after the alert is created",
+        "streamContentsLine": "What's in this stream: {parts}",
+        "labelCount": "no labels | {count} label | {count} labels",
+        "labelsFailed": "labels couldn't load",
+        "sampleCount": "nothing in the last hour | {count} recent {noun} | {count} recent {noun}",
+        "samplesFailed": "recent {noun} couldn't load"
       },
       "filter": {
         "label": "Filters",
@@ -15724,7 +15732,9 @@
         "manyGroups": "{count} group over now: up to {count} message every {wait}. | {count} groups over now: up to {count} messages every {wait}.",
         "manyGroupsAtLeast": "{count}+ groups over now: {count}+ messages every {wait}.",
         "manySeries": "{count} series over now: up to {count} message every {wait}. | {count} series over now: up to {count} messages every {wait}.",
-        "manySeriesAtLeast": "{count}+ series over now: {count}+ messages every {wait}."
+        "manySeriesAtLeast": "{count}+ series over now: {count}+ messages every {wait}.",
+        "per": "per {labels}",
+        "perSeries": "per series"
       },
       "units": {
         "days": "days",
@@ -16065,7 +16075,8 @@
         "repeatsEvery": "repeats every {every}",
         "repeatsEveryPer": "repeats every {every} per {group}",
         "named": "named {name}"
-      }
+      },
+      "lead": "What to know"
     },
     "librarySuggest": {
       "suggestedStarter": "Suggested starter",
