@@ -40,14 +40,14 @@ use o2_enterprise::enterprise::{
         INTERVAL_SECS,
         api::{Deps, Page},
         context::{
-            self, IssueContext, IssueIncident, IssueRef, ViewerResolver, for_issues, issue_by_id,
-            issue_for,
+            self, COHORT_NAMES_SHOWN, CohortStreams, IssueContext, IssueIncident, IssueRef,
+            SpentPage, ViewerResolver, for_issues, issue_by_id, issue_for,
         },
         contract::ActionRequest,
         decisions::{Action, Change, DecisionView},
         names::decision_kinds,
         outcomes::{self, OutcomeReport, OutcomeSource, OutcomeSubject},
-        page_routing::{catalogue, cohort_dimensions, stream_service},
+        page_routing::{catalogue, cohort_dimensions, compatible, stream_dimensions},
         paging_enabled_for,
         plugins::stream::{PageSubject, cohort_title, finding_id, page_subject},
         ports::{ActionRefused, InvestigationPort, Recovery},
@@ -58,9 +58,10 @@ use serde::{Deserialize, Serialize};
 
 use super::ports::SearchAdapter;
 use crate::alerts::incidents::{
-    AutoStart, FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION,
-    FINDING_STREAM_TYPE_DIMENSION, FindingIncident, FindingPager, OncallPager, finding_dimensions,
-    incidents_enabled, open_finding_incident, resolve_finding_firing, start_automatic_rca,
+    AutoStart, BudgetedPage, FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION,
+    FINDING_STREAM_TYPE_DIMENSION, FindingIncident, FindingPager, OncallPager, budgeted_page,
+    finding_dimensions, incidents_enabled, open_finding_incident, resolve_finding_firing,
+    start_automatic_rca,
 };
 
 /// Prefixes every finding's trigger id, so it can never equal an alert's id in `alert_id`.
@@ -210,6 +211,8 @@ pub enum PageOutcome {
     Failed,
     /// Opened under two ticks ago and not routed yet.
     Pending,
+    /// The org's page budget was spent, so it opened and was analysed but paged nobody.
+    Budgeted,
 }
 
 /// Kind and stream are null when the incident's group values cannot be read.
@@ -286,12 +289,12 @@ impl RespondedAs {
 
 /// The pure half of `start`: the subject the incident path correlates on, scoped by `records`.
 pub fn finding_incident(s: &PageSubject, org: &str, records: &[ServiceRecord]) -> FindingIncident {
-    let scope = stream_service(records, &s.stream_type, &s.stream_name);
+    let dims = stream_dimensions(records, &s.stream_type, &s.stream_name);
     let mut streams = vec![(s.stream_type.clone(), s.stream_name.clone())];
     streams.extend(
         s.cohort
             .iter()
-            .filter(|(t, n)| stream_service(records, t, n) == scope)
+            .filter(|(t, n)| compatible(&stream_dimensions(records, t, n), &dims))
             .cloned(),
     );
     FindingIncident {
@@ -308,7 +311,7 @@ pub fn finding_incident(s: &PageSubject, org: &str, records: &[ServiceRecord]) -
         ),
         streams,
         cohort: true,
-        scope,
+        dims,
     }
 }
 
@@ -666,13 +669,23 @@ fn member_firings(
 
 fn issue_incident(
     org: &str,
-    incident: &IncidentView,
+    item: &AutoObserveIncident,
     page: &PageView,
     record: Option<&Response>,
+    budget_spent_by: Option<SpentPage>,
 ) -> IssueIncident {
+    let members = &item.members;
+    let cohort = (members.len() >= 2).then(|| CohortStreams {
+        streams: u32::try_from(members.len()).unwrap_or(u32::MAX),
+        names: members
+            .iter()
+            .filter_map(|m| m.stream_name.clone())
+            .take(COHORT_NAMES_SHOWN)
+            .collect(),
+    });
     IssueIncident {
-        incident_id: incident.id.clone(),
-        status: incident.status.clone(),
+        incident_id: item.incident.id.clone(),
+        status: item.incident.status.clone(),
         paged: page.outcome == PageOutcome::Paged,
         page_failed: page.outcome == PageOutcome::Failed,
         response_id: record.map(|r| r.id.clone()),
@@ -683,6 +696,11 @@ fn issue_incident(
             let cfg = config::get_config();
             page_url(&cfg.common.web_url, &cfg.common.base_uri, org, &r.id)
         }),
+        cohort,
+        budget_spent_by,
+        paged_at: record
+            .filter(|_| page.outcome == PageOutcome::Paged)
+            .map(|r| r.opened_at),
     }
 }
 
@@ -803,8 +821,23 @@ async fn page_of(
     now: i64,
 ) -> anyhow::Result<(PageView, IssueIncident)> {
     let record = OncallPager.record(org, &item.incident.id).await?;
-    let page = page_view(org, item, record.as_ref(), unrouted, staffed_since, now).await?;
-    let incident = issue_incident(org, &item.incident, &page, record.as_ref());
+    let budgeted = budgeted_page(org, &item.incident.id).await?;
+    let held = budgeted.is_some();
+    let page = page_view(
+        org,
+        item,
+        record.as_ref(),
+        held,
+        unrouted,
+        staffed_since,
+        now,
+    )
+    .await?;
+    let spent = match &budgeted {
+        Some(budgeted) => spent_page(org, budgeted).await?,
+        None => None,
+    };
+    let incident = issue_incident(org, item, &page, record.as_ref(), spent);
     Ok((page, incident))
 }
 
@@ -812,6 +845,7 @@ async fn page_view(
     org: &str,
     item: &AutoObserveIncident,
     record: Option<&Response>,
+    budgeted: bool,
     unrouted: &HashSet<String>,
     staffed_since: Option<i64>,
     now: i64,
@@ -830,7 +864,9 @@ async fn page_view(
     // Paging ran when it opened, so a team added later never makes it pending or failed.
     let staffed = staffed_since.is_some_and(|at| at <= item.incident.created_at);
     // A teamless record is how on-call keeps a page nobody owns: it woke no one.
-    let outcome = if !staffed || record.is_some() || unrouted.contains(id) {
+    let outcome = if budgeted {
+        PageOutcome::Budgeted
+    } else if !staffed || record.is_some() || unrouted.contains(id) {
         PageOutcome::Unrouted
     } else if now - item.incident.created_at < PAGE_PENDING_US {
         PageOutcome::Pending
@@ -844,6 +880,48 @@ async fn page_view(
         team_id: None,
         team_name: None,
     })
+}
+
+/// The page that used the budget; None once on-call no longer has its record.
+async fn spent_page(org: &str, budgeted: &BudgetedPage) -> anyhow::Result<Option<SpentPage>> {
+    // Columns only, so a page whose state this build cannot decode is still named.
+    let Some(page) = infra::table::oncall_responses::team_page(org, &budgeted.record_id).await?
+    else {
+        return Ok(None);
+    };
+    let team_name = match &page.team_id {
+        Some(team) => infra::table::oncall_teams::get_cached(org, team)
+            .await?
+            .map(|t| t.name),
+        None => None,
+    };
+    let incident_id = page.source_id();
+    // The primary: a replica that lags the incident's links or row would title it empty.
+    let links = infra::table::alert_incidents::get_incident_alerts_rw(incident_id).await?;
+    let members: HashSet<&str> = links
+        .iter()
+        .filter(|l| l.alert_kind == AlertKind::AutoObserve.as_str())
+        .map(|l| l.alert_id.as_str())
+        .collect();
+    // The incident keeps its first member's dimensions, the stream its post was titled by.
+    let stream_name = infra::table::alert_incidents::get_rw(org, incident_id)
+        .await?
+        .and_then(|i| {
+            let name = i.group_values.get(FINDING_STREAM_NAME_DIMENSION)?;
+            name.as_str().map(str::to_string)
+        })
+        .unwrap_or_default();
+    Ok(Some(SpentPage {
+        team_name,
+        paged_at: page.opened_at,
+        page_url: Some({
+            let cfg = config::get_config();
+            page_url(&cfg.common.web_url, &cfg.common.base_uri, org, &page.id)
+        }),
+        pages_per_day: budgeted.pages_per_day,
+        streams: u32::try_from(members.len()).unwrap_or(u32::MAX),
+        stream_name,
+    }))
 }
 
 /// Routing decided now, for an incident whose queue sample a later page of its path replaced.
@@ -973,8 +1051,37 @@ mod tests {
 
     #[test]
     fn a_page_subject_maps_to_an_alert_id_incident_at_the_onset() {
-        let s = subject();
-        let f = finding_incident(&s, "demo-org", &[]);
+        let record = |service: &str, logs: &[&str]| ServiceRecord {
+            id: config::ider::generate(),
+            org_id: "demo-org".into(),
+            service_name: service.into(),
+            set_id: "default".into(),
+            disambiguation: serde_json::json!({}),
+            all_dimensions: serde_json::json!({}),
+            logs_streams: serde_json::json!(logs),
+            traces_streams: serde_json::json!([]),
+            metrics_streams: serde_json::json!([]),
+            profiles_streams: serde_json::json!([]),
+            field_name_mapping: None,
+            last_seen: 1,
+        };
+        let records = [
+            record("checkout", &["checkout", "cart"]),
+            record("payments", &["payments"]),
+        ];
+        let peer = |n: &str| ("logs".to_string(), n.to_string());
+        let s = PageSubject {
+            cohort: vec![peer("cart"), peer("payments")],
+            ..subject()
+        };
+        let f = finding_incident(&s, "demo-org", &records);
+        assert_eq!(
+            f.streams,
+            [peer("checkout"), peer("cart")],
+            "a peer of another service opens its own incident, so the page leaves it out"
+        );
+        assert_eq!(f.dims, stream_dimensions(&records, "logs", "checkout"));
+        assert!(!f.dims.is_empty());
         assert_eq!(f.org_id, "demo-org");
         assert_eq!(f.subject_id, format!("autoobserve:{}", s.finding_id));
         assert_eq!(
