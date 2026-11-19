@@ -184,7 +184,7 @@ async fn chat_agent_and_context(
     let rca = match incident_id {
         Some(id) if can_run_incident_rca(org_id, user_id, &id).await => Some(
             o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
-                org_id, &id, None,
+                org_id, &id, None, None,
             )
             .await,
         ),
@@ -2338,6 +2338,7 @@ mod tests {
             alert_name: None,
             stream: None,
             dimensions: None,
+            evidence: None,
         }
     }
 

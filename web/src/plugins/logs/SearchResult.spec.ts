@@ -287,6 +287,22 @@ describe("SearchResult Component", () => {
       );
     });
 
+    it.each([
+      [undefined, "k is null"],
+      [null, "k is null"],
+      ["", "k = ''"],
+      ["null", "k = 'null'"],
+    ])("includes a cell holding %j as %s", (cellValue, expression) => {
+      wrapper.vm.searchObj.data.stream.selectedStream = ["logs"];
+      wrapper.vm.searchObj.data.streamResults.list = [
+        { name: "logs", schema: [{ name: "k", type: "Utf8" }] },
+      ];
+
+      wrapper.vm.addSearchTerm("k", wrapper.vm.toSearchTermValue(cellValue), "include");
+
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(expression);
+    });
+
     it("should toggle error details", async () => {
       wrapper.vm.disableMoreErrorDetails = false;
 

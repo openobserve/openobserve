@@ -79,6 +79,7 @@ describe("rcaThread utils", () => {
 
   it("labels every trigger with the user's local part", () => {
     expect(rcaTriggerLabel("auto_new_incident", "system")).toBe("Auto on incident open");
+    expect(rcaTriggerLabel("evidence_settled", "system")).toBe("Auto on new evidence");
     expect(rcaTriggerLabel("reanalyze", "j.okafor@acme.io")).toBe("Re-analyze by j.okafor");
     expect(rcaTriggerLabel("manual", "a.rao@acme.io")).toBe("Analysis by a.rao");
     expect(rcaTriggerLabel("oncall_page", "system")).toBe("On-call page");
