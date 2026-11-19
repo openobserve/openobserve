@@ -1287,6 +1287,7 @@ mod tests {
             (Incident, Firing, None, "🔵", "#4A90D9"),
             (OnCall, Firing, None, "🔵", "#4A90D9"),
             (Incident, Firing, Some(AlertLevel::Warning), "🟠", "#F2952F"),
+            (Alert, Firing, Some(AlertLevel::NoData), "🟠", "#F2952F"),
             (OnCall, Firing, Some(AlertLevel::Critical), "🔴", "#E01E5A"),
             (Incident, Resolved, None, "🟢", "#2EB67D"),
             (Alert, Firing, Some(AlertLevel::Ok), "🟢", "#2EB67D"),
