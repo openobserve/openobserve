@@ -20,7 +20,10 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { b64DecodeUnicode } from "@/utils/zincutils";
-import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
+import {
+  ALERT_BACKTEST_SIGNAL_KEY,
+  ALERT_SUGGESTIONS_KEY,
+} from "@/composables/alerts/useAlertSuggestions";
 import type { BacktestSignal } from "./alertSuggestions";
 import { ALERT_TEST_RUN_KEY, createAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import grouped from "@/test/fixtures/alerts/evaluate-grouped-fired.json";
@@ -63,7 +66,7 @@ const TRIGGER = { frequency: 5, frequency_type: "minutes", silence: 0 };
 const mountBacktest = (
   query = SQL("default"),
   signal: Ref<BacktestSignal | null> = ref(null),
-  { testRun, formContext, ...extra }: Record<string, unknown> = {},
+  { testRun, formContext, suggestions, ...extra }: Record<string, unknown> = {},
 ): VueWrapper =>
   mount(AlertBacktest, {
     props: {
@@ -81,6 +84,7 @@ const mountBacktest = (
         [ALERT_BACKTEST_SIGNAL_KEY]: signal,
         ...(testRun ? { [ALERT_TEST_RUN_KEY]: testRun } : {}),
         ...(formContext ? { [ALERT_FORM_CONTEXT_KEY]: formContext } : {}),
+        ...(suggestions ? { [ALERT_SUGGESTIONS_KEY]: suggestions } : {}),
       },
     },
   });
@@ -278,7 +282,13 @@ describe("AlertBacktest", () => {
 
     const panelSignal = ref<BacktestSignal | null>(null);
     const formContext = { goToSection: vi.fn(), openSetting: vi.fn() };
-    const panel = mountBacktest("", panelSignal, { testRun, tested: grouped, formContext });
+    const suggestions = { add: vi.fn() };
+    const panel = mountBacktest("", panelSignal, {
+      testRun,
+      tested: grouped,
+      formContext,
+      suggestions,
+    });
     await vi.advanceTimersByTimeAsync(700);
     expect(calls).toHaveLength(0);
     expect(panel.find('[data-test="alert-test-run-day"]').exists()).toBe(true);
@@ -288,9 +298,9 @@ describe("AlertBacktest", () => {
     // Must last may sit under More options, so its advice opens it by name.
     await panel.find('[data-test="add-alert-backtest-hint-action"]').trigger("click");
     expect(formContext.openSetting).toHaveBeenCalledWith("holdFor");
-    // With no row feeding step 3, the panel itself offers Keep firing for, until it is set.
+    // With no row feeding step 3, the panel offers step 3's Keep firing for, at the value it names.
     await panel.find('[data-test="add-alert-backtest-flap-action"]').trigger("click");
-    expect(formContext.openSetting).toHaveBeenCalledWith("keepFiring");
+    expect(suggestions.add).toHaveBeenCalledWith("keepFiring");
     await panel.setProps({ keepFiringFor: 600 });
     expect(panel.find('[data-test="add-alert-backtest-flap"]').exists()).toBe(false);
     panel.unmount();

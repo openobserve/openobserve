@@ -33,7 +33,10 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import { durationWords, formatNumber } from "@/utils/alerts/alertCopy";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
-import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggestions";
+import {
+  ALERT_BACKTEST_SIGNAL_KEY,
+  ALERT_SUGGESTIONS_KEY,
+} from "@/composables/alerts/useAlertSuggestions";
 import { ALERT_TEST_RUN_KEY } from "@/composables/alerts/useAlertTestRun";
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 import { checkTimeText, testRunDay } from "@/utils/alerts/alertTestRun";
@@ -101,6 +104,7 @@ const { t } = useI18nTyped();
 const search = useAlertStreamQuery();
 
 const signal = inject(ALERT_BACKTEST_SIGNAL_KEY, null);
+const suggestions = inject(ALERT_SUGGESTIONS_KEY, null);
 const inPanel = computed(() => props.tested !== undefined);
 // Once Test it has run the alert as it stands, the day is the server's answer, for any query.
 const testRun = inject(ALERT_TEST_RUN_KEY, null);
@@ -378,10 +382,11 @@ const flapHint = computed(() => {
       { count: formatNumber(refires), minutes: formatNumber(2 * frequencyMinutes.value) },
       refires,
     ),
-    action: formContext?.openSetting ? t("alerts.sections.backtest.changeKeepFiring") : null,
+    action: suggestions ? t("alerts.sections.backtest.changeKeepFiring") : null,
   };
 });
-const openKeepFiring = () => formContext?.openSetting?.("keepFiring");
+// Step 3's own suggestion writes the span this advice names, so both say one value.
+const openKeepFiring = () => suggestions?.add("keepFiring");
 const openHintTarget = async () => {
   const setting = hint.value?.setting;
   // Must last can sit under More options, which only the setting search opens.
