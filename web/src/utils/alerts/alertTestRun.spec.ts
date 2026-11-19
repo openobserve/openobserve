@@ -22,23 +22,29 @@ import noSeries from "@/test/fixtures/alerts/evaluate-promql-no-series.json";
 import errorsTruncated from "@/test/fixtures/alerts/evaluate-errors-truncated.json";
 import {
   checkTimeText,
+  conditionsRoot,
   evaluateAlertBody,
   requestFailureReason,
   testRunDay,
   testRunKey,
   testRunReport,
   testValueText,
+  promqlPreviewStepSeconds,
+  seriesPeak,
+  valueSplitFilter,
+  valueSplitText,
 } from "./alertTestRun";
 
 const t = i18n.global.t as unknown as TranslateFn;
-const report = (r: unknown, extra: { silenceMinutes?: number; ratio?: boolean } = {}) =>
+type Extra = Partial<Omit<Parameters<typeof testRunReport>[1], "t" | "nowMs">>;
+const report = (r: unknown, extra: Extra = {}) =>
   testRunReport(r as EvaluateAlertResponse, {
     t,
     timeZone: "UTC",
     nowMs: (r as EvaluateAlertResponse).end / 1000,
     ...extra,
   });
-const lines = (r: unknown, extra: { silenceMinutes?: number; ratio?: boolean } = {}) =>
+const lines = (r: unknown, extra: Extra = {}) =>
   Object.fromEntries(report(r, extra).lines.map((l) => [l.id, l]));
 // Fired at the first check on two series, quiet since.
 const promqlFiredEarlier = {
@@ -97,7 +103,7 @@ describe("testRunReport", () => {
       noSeries,
       {
         summary: "Over the last 24 hours this would not have fired.",
-        noSeries: "The query matched no series; http_server_duration_count has 3 series.",
+        noSeries: "http_server_duration_count has data, but nothing matched the query in 24 hours.",
       },
     ],
     [
@@ -209,21 +215,6 @@ describe("testRunReport", () => {
     ]);
   });
 
-  it("names the series of every metric when the query reads several", () => {
-    const two = {
-      ...noSeries,
-      diagnostics: {
-        metrics: [
-          { name: "a_total", series: 3 },
-          { name: "b_total", series: 0 },
-        ],
-      },
-    };
-    expect(String(lines(two).noSeries.text)).toBe(
-      "The query matched no series. Series per metric: a_total has 3 and b_total has 0.",
-    );
-  });
-
   it("says when every check found nothing to count", () => {
     const empty = {
       ...grouped,
@@ -263,12 +254,6 @@ describe("testRunReport", () => {
     },
   );
 
-  it("says a ratio with nothing in its top part is 0, not a broken query", () => {
-    expect(String(lines(noSeries, { ratio: true }).noSeries.text)).toBe(
-      "The query returned no value: the top of its ratio matched nothing in the latest check, so the share was 0.",
-    );
-  });
-
   it("names only the latest time once there are more than three", () => {
     const many = {
       ...grouped,
@@ -285,11 +270,70 @@ describe("testRunReport", () => {
   });
 
   it.each([
-    ["has series, so the filters matched nothing then", 3, "secondary"],
-    ["has none, so the query reads nothing", 0, "warning"],
-  ])("tells a metric that %s apart by tone", (_case, series, tone) => {
-    const r = { ...noSeries, diagnostics: { metrics: [{ name: "a_total", series }] } };
-    expect(lines(r).noSeries.tone).toBe(tone);
+    [
+      "one metric with data",
+      [3],
+      {},
+      "a_total has data, but nothing matched the query in 24 hours.",
+      "secondary",
+    ],
+    [
+      "one metric without data",
+      [0],
+      {},
+      "a_total has no data in the latest check, so the query has nothing to read.",
+      "warning",
+    ],
+    [
+      "metrics that all have data",
+      [3, 1],
+      {},
+      "a_total and b_total have data, but nothing matched the query in 24 hours.",
+      "secondary",
+    ],
+    [
+      "metrics that have none",
+      [0, 0],
+      {},
+      "None of a_total and b_total has data in the latest check, so the query has nothing to read.",
+      "warning",
+    ],
+    [
+      "a metric missing from a query that needs both",
+      [3, 0],
+      {},
+      "Nothing matched the query in 24 hours, and b_total has no data in the latest check.",
+      "warning",
+    ],
+    [
+      "a missing alternative of an or",
+      [3, 0],
+      { alternatives: true },
+      "Nothing matched the query in 24 hours, and b_total has no data in the latest check.",
+      "secondary",
+    ],
+    [
+      "a ratio whose top part matched nothing",
+      [3, 1],
+      { ratio: true },
+      "Nothing matched the top part of the ratio in 24 hours, so the share stayed at 0.",
+      "secondary",
+    ],
+    [
+      "a ratio of two alternatives, one without data",
+      [1, 0],
+      { ratio: true, alternatives: true },
+      "Nothing matched the top part of the ratio in 24 hours, so the share stayed at 0.",
+      "secondary",
+    ],
+  ])("says in words why a PromQL day matched nothing: %s", (_case, counts, extra, text, tone) => {
+    const names = ["a_total", "b_total"];
+    const r = {
+      ...noSeries,
+      diagnostics: { metrics: counts.map((series, i) => ({ name: names[i], series })) },
+    };
+    const line = lines(r, extra).noSeries;
+    expect([String(line.text), line.tone]).toEqual([text, tone]);
   });
 
   it.each([
@@ -310,6 +354,35 @@ describe("testRunReport", () => {
     };
     expect(String(lines(r).closest.text)).toBe("Closest: b reached 0.97 at 09:41.");
   });
+  it.each([
+    ["a peak past every check", 90.7, "above", true],
+    ["a peak no higher than a check", 0.97, "above", false],
+    ["a dip past every check of a below alert", 0.5, "below", true],
+  ])("says checks miss short peaks between them: %s", (_case, value, side, shown) => {
+    const check = { ...errorsTruncated.checks[0], state: "quiet", error: null };
+    const operator = side === "above" ? ">" : "<";
+    const r = {
+      ...errorsTruncated,
+      query_type: "promql",
+      truncated: false,
+      checks: [0.93, 0.97].map((v, i) => ({
+        ...check,
+        operator,
+        time: check.time + i * 300_000_000,
+        groups: [{ key: "n", labels: { n: "a" }, value: v }],
+      })),
+      summary: { ...errorsTruncated.summary, errors: 0, pending: 0 },
+    };
+    const line = lines(r, {
+      checkEveryMinutes: 5,
+      previewPeak: { value, atMs: check.time / 1000 + 120_000 },
+    }).betweenChecks;
+    expect(line ? String(line.text) : null).toBe(
+      shown
+        ? `Checks read the value every 5 minutes; short peaks between checks (up to ${value} at 09:42) are not seen.`
+        : null,
+    );
+  });
 });
 
 describe("testRunDay", () => {
@@ -319,6 +392,9 @@ describe("testRunDay", () => {
     // Fired, fired, clear, fired: one refire, and the last firing is a single-check spike.
     expect([day.refires, day.singleCheckSpikes]).toEqual([1, 1]);
     expect(day.hours.map((h, i) => (h ? i : -1)).filter((i) => i >= 0)).toEqual([23]);
+    // The firing hour is shaded by how many of its checks fired, so busy hours stand apart.
+    expect(day.hourShares[23]).toBeCloseTo(3 / 6);
+    expect(day.hourShares[0]).toBe(0);
     expect(day.events).toBeUndefined();
     expect(day.untestedHours).toBe(0);
   });
@@ -404,5 +480,90 @@ describe("evaluateAlertBody", () => {
     );
     expect(testRunKey(a)).toBe(testRunKey(b));
     expect(testRunKey(a)).not.toBe(testRunKey(c));
+  });
+});
+
+describe("previewPeak and value split", () => {
+  it.each([
+    [
+      "above",
+      [
+        [1000, 1],
+        [2000, 9],
+        [3000, 4],
+      ],
+      { value: 9, atMs: 2000 },
+    ],
+    [
+      "below",
+      [
+        [1000, 1],
+        [2000, 9],
+        [3000, null],
+      ],
+      { value: 1, atMs: 1000 },
+    ],
+    ["above", [], null],
+  ] as const)("finds the %s-most drawn sample with its time", (side, data, peak) => {
+    expect(seriesPeak([{ data: data as unknown[] }], side)).toEqual(peak);
+  });
+
+  it.each([
+    ["the 24-hour view of a 5-minute check", 1440, 5, true, 300],
+    ["the 12-hour view of a 10-minute check", 720, 10, true, 600],
+    ["the short view, where the server's step is finer", 30, 5, false, 0],
+    ["a long default view the server would draw coarser than the checks", 4320, 5, false, 300],
+    ["a one-minute check over 24 hours", 1440, 1, true, 60],
+  ])("samples the preview at check times for %s", (_case, range, every, fixed, step) => {
+    expect(promqlPreviewStepSeconds(range, every, fixed)).toBe(step);
+  });
+
+  it.each([
+    [
+      "one filter with several values",
+      [{ column: "reason", operator: "in", value: ["A", "B"] }],
+      { column: "reason", values: ["A", "B"] },
+    ],
+    ["a single value", [{ column: "reason", operator: "in", value: ["A"] }], null],
+    [
+      "two multi-value filters",
+      [
+        { column: "a", operator: "in", value: ["A", "B"] },
+        { column: "b", operator: "in", value: ["C", "D"] },
+      ],
+      null,
+    ],
+  ])("splits a real-time day by %s", (_case, conditions, split) => {
+    const group = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: conditions.map((c) => ({
+        filterType: "condition",
+        logicalOperator: "AND",
+        ...c,
+      })),
+    };
+    expect(valueSplitFilter({ version: 2, conditions: group })).toEqual(split);
+    // The saved form wraps the group; the WHERE builder needs the bare group either way.
+    expect([conditionsRoot({ version: 2, conditions: group }), conditionsRoot(group)]).toEqual([
+      group,
+      group,
+    ]);
+  });
+
+  it("counts each value, a value never seen as 0, and folds the rest past five", () => {
+    expect(String(valueSplitText(["Killing", "OOMKilled"], [{ v: "Killing", n: 59038 }], t))).toBe(
+      "Of these: Killing 59,038 and OOMKilled 0.",
+    );
+    const many = ["a", "b", "c", "d", "e", "f", "g"];
+    expect(
+      String(
+        valueSplitText(
+          many,
+          many.map((v, i) => ({ v, n: i + 1 })),
+          t,
+        ),
+      ),
+    ).toBe("Of these: g 7, f 6, e 5, d 4, c 3, and 2 more.");
   });
 });

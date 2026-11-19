@@ -76,6 +76,10 @@ export interface TestRunDay {
   total: number;
   /** One flag per hour of the tested day, oldest first. */
   hours: boolean[];
+  /** Per hour, the share of its checks that fired (real time: of its events, against the busiest hour). */
+  hourShares: number[];
+  /** Per hour, its checks, the ones that fired, and the events they counted. */
+  hourTallies: { checks: number; fired: number; events: number }[];
   /** 0 when no check found a matching event; unknown otherwise. */
   events?: number;
   /** Checks that matched but were held back by Must last. */
@@ -190,6 +194,17 @@ const listWithMore = (items: I18nText[], total: number, t: TranslateFn): I18nTex
   );
 };
 
+/** The most extreme value the preview drew, which may fall between two checks. */
+export interface PreviewPeak {
+  value: number;
+  atMs: number;
+}
+
+export interface ValueSplit {
+  column: string;
+  values: string[];
+}
+
 export interface TestRunReportOptions {
   t: TranslateFn;
   timeZone?: string;
@@ -200,6 +215,11 @@ export interface TestRunReportOptions {
   ratio?: boolean;
   /** A real-time alert's events as the 24-hour row counted them; the dry run's counts stop at a cap. */
   eventDay?: { events: number; windows: EventWindow[] } | null;
+  /** The PromQL query unions alternatives with `or`, so one metric without data breaks nothing. */
+  alternatives?: boolean;
+  /** Check every, in minutes; absent for a cron schedule. */
+  checkEveryMinutes?: number;
+  previewPeak?: PreviewPeak | null;
 }
 
 // A few times are listed; past that only the latest says when, since the first ones are a day old.
@@ -376,33 +396,58 @@ function latestGroupsLine(r: EvaluateAlertResponse, o: TestRunReportOptions): Te
   };
 }
 
-function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn, ratio = false): TestRunLine | null {
+function noSeriesLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
+  const { t } = o;
   const metrics = r.diagnostics?.metrics ?? [];
   // A check that fired matched, so the line is only for a day where none did.
   if (!metrics.length || !r.checks.length || r.checks.some((c) => c.matched > 0)) return null;
-  // Every metric has series, so the top part of a ratio found nothing to count: its share is 0.
-  if (ratio && metrics.every((m) => m.series > 0))
-    return { id: "noSeries", text: t("alerts.testRun.noValueRatio"), tone: "secondary" };
-  if (metrics.length === 1) {
-    const [{ name, series }] = metrics;
-    // A metric with series that matched nothing is an answer; a metric with none is a broken query.
-    return {
-      id: "noSeries",
-      text: t(
-        "alerts.testRun.noSeries",
-        { metric: raw(name), count: formatNumber(series) },
-        series,
-      ),
-      tone: series > 0 ? "secondary" : "warning",
-    };
-  }
-  const list = metrics.map((m) =>
-    t("alerts.testRun.metricSeries", { metric: raw(m.name), count: formatNumber(m.series) }),
+  const present = metrics.filter((m) => m.series > 0).map((m) => m.name);
+  const missing = metrics.filter((m) => m.series === 0).map((m) => m.name);
+  const line = (text: I18nText, tone: TestRunTone): TestRunLine => ({ id: "noSeries", text, tone });
+  // The ratio's parts all read data, so its top part found nothing to count: the share is 0.
+  if (o.ratio && present.length && (!missing.length || o.alternatives))
+    return line(t("alerts.testRun.noValueRatioDay"), "secondary");
+  if (!present.length)
+    return metrics.length === 1
+      ? line(t("alerts.testRun.noDataOne", { metric: raw(missing[0]) }), "warning")
+      : line(t("alerts.testRun.noDataAny", { metrics: joinList(missing) }), "warning");
+  if (!missing.length)
+    return line(
+      t("alerts.testRun.dataNoMatch", { metrics: joinList(present) }, present.length === 1 ? 1 : 2),
+      "secondary",
+    );
+  // Without `or`, every metric the query reads must have data for it to return anything.
+  return line(
+    t("alerts.testRun.noMatchSomeMissing", { metrics: joinList(missing) }, missing.length),
+    o.alternatives ? "secondary" : "warning",
   );
+}
+
+/** Each check reads the value at its own time, so a peak the preview drew between two checks is never seen. */
+function betweenChecksLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
+  const peak = o.previewPeak;
+  const every = o.checkEveryMinutes ?? 0;
+  const side = thresholdSide(r.checks[0]?.operator);
+  if (!peak || every <= 0 || r.query_type !== "promql" || r.is_real_time || !side) return null;
+  const at = peak.atMs * 1000;
+  const ran = r.checks.filter((c) => !c.error && !c.skipped);
+  const before = ran.findLast((c) => c.time <= at);
+  const after = ran.find((c) => c.time >= at);
+  if (!before || !after) return null;
+  // The two checks around the peak read less than it, across every series they saw.
+  const seen = [before, after]
+    .flatMap((c) => (c.groups?.length ? c.groups.map((g) => g.value) : [c.value]))
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const beyond = (v: number) => (side === "above" ? peak.value > v : peak.value < v);
+  if (!seen.length || !seen.every(beyond)) return null;
   return {
-    id: "noSeries",
-    text: t("alerts.testRun.noSeriesMany", { list: joinList(list) }),
-    tone: metrics.every((m) => m.series > 0) ? "secondary" : "warning",
+    id: "betweenChecks",
+    text: o.t("alerts.testRun.betweenChecks", {
+      every: durationWords(every, o.t),
+      value: testValueText(peak.value, null, o.t),
+      time: checkTimeText(at, o.timeZone, o.nowMs),
+    }),
+    tone: "secondary",
   };
 }
 
@@ -483,7 +528,9 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
   if (paused) lines.push(paused);
   const held = heldLine(r, o);
   if (held) lines.push(held);
-  const noSeries = noSeriesLine(r, t, o.ratio);
+  const between = betweenChecksLine(r, o);
+  if (between) lines.push(between);
+  const noSeries = noSeriesLine(r, o);
   if (noSeries) lines.push(noSeries);
   const failed = r.checks.find((c) => c.error);
   if (s.errors && failed?.error)
@@ -514,12 +561,27 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
 /** The tested day by the hour, for the 24-hour strip. */
 export function testRunDay(r: EvaluateAlertResponse): TestRunDay {
   const hours = Array.from({ length: DAY_HOURS }, () => false);
+  const ran = r.checks.filter((c) => !c.skipped);
+  const perHour = Array.from({ length: DAY_HOURS }, () => ({ checks: 0, fired: 0, events: 0 }));
   const dayStart = r.end - DAY_HOURS * HOUR_MICROS;
+  const hourOf = (time: number) =>
+    Math.min(DAY_HOURS - 1, Math.max(0, Math.floor((time - dayStart) / HOUR_MICROS)));
   for (const check of r.checks) {
     if (!check.fired) continue;
-    const hour = Math.floor((check.time - dayStart) / HOUR_MICROS);
-    hours[Math.min(DAY_HOURS - 1, Math.max(0, hour))] = true;
+    hours[hourOf(check.time)] = true;
   }
+  for (const check of ran) {
+    const slot = perHour[hourOf(check.time)];
+    slot.checks += 1;
+    slot.fired += check.fired ? 1 : 0;
+    slot.events += check.error ? 0 : (check.value ?? 0);
+  }
+  const busiest = Math.max(0, ...perHour.map((h) => h.events));
+  const hourShares = perHour.map((h, i) => {
+    if (!hours[i]) return 0;
+    if (r.is_real_time) return busiest > 0 ? h.events / busiest : 1;
+    return h.checks ? h.fired / h.checks : 1;
+  });
   const answered = r.checks.filter((c) => !c.error);
   const empty = answered.length > 0 && answered.every((c) => c.reason === "no_data");
   const events = r.is_real_time
@@ -527,7 +589,6 @@ export function testRunDay(r: EvaluateAlertResponse): TestRunDay {
     : empty
       ? 0
       : undefined;
-  const ran = r.checks.filter((c) => !c.skipped);
   const firing = ran.map((c) => c.fired);
   let refires = 0;
   let singleCheckSpikes = 0;
@@ -544,11 +605,110 @@ export function testRunDay(r: EvaluateAlertResponse): TestRunDay {
     total: r.summary.checks,
     pending: r.summary.pending ?? 0,
     hours,
+    hourShares,
+    hourTallies: perHour,
     refires,
     singleCheckSpikes,
     untestedHours: tested === null ? 0 : Math.floor((DAY_MINUTES - tested) / 60),
     ...(events === undefined ? {} : { events }),
   };
+}
+
+/** The drawn sample furthest past the threshold's side, with its time; gaps are skipped. */
+export function seriesPeak(
+  series: ReadonlyArray<{ data?: unknown }>,
+  side: "above" | "below",
+): PreviewPeak | null {
+  let peak: PreviewPeak | null = null;
+  for (const { data } of series) {
+    if (!Array.isArray(data)) continue;
+    for (const point of data) {
+      if (!Array.isArray(point) || point[1] === null || point[1] === "") continue;
+      const value = Number(point[1]);
+      const x = point[0];
+      const atMs =
+        x instanceof Date ? x.getTime() : typeof x === "string" ? Date.parse(x) : Number(x);
+      if (!Number.isFinite(value) || !Number.isFinite(atMs)) continue;
+      if (peak && (side === "above" ? value <= peak.value : value >= peak.value)) continue;
+      peak = { value, atMs };
+    }
+  }
+  return peak;
+}
+
+/**
+ * The PromQL preview's step: the 12 and 24 hour views sample at check times, as the checks read the
+ * value; the default view keeps the server's finer step unless that skips most checks.
+ */
+export function promqlPreviewStepSeconds(
+  rangeMinutes: number,
+  everyMinutes: number,
+  fixedRange: boolean,
+): number {
+  if (!(everyMinutes > 0) || rangeMinutes / everyMinutes > DAY_MINUTES) return 0;
+  const serverCoarser = rangeMinutes / 300 > everyMinutes;
+  return fixedRange || serverCoarser ? everyMinutes * 60 : 0;
+}
+
+type ConditionNode = {
+  filterType?: string;
+  logicalOperator?: string;
+  column?: string;
+  operator?: string;
+  value?: unknown;
+  conditions?: ConditionNode[];
+};
+
+/** The filter's root group, from either the saved `{ version, conditions }` form or the bare group. */
+export const conditionsRoot = (conditions: unknown): ConditionNode | undefined => {
+  const node = conditions as (ConditionNode & { version?: unknown }) | null | undefined;
+  if (!node) return undefined;
+  return node.filterType === "group" ? node : (node.conditions as ConditionNode | undefined);
+};
+
+/** The one filter that names several values, when an all-AND filter has exactly one; null otherwise. */
+export function valueSplitFilter(conditions: unknown): ValueSplit | null {
+  const root = conditionsRoot(conditions);
+  const found: ValueSplit[] = [];
+  let anyOr = false;
+  const walk = (node: ConditionNode | undefined) => {
+    if (!node) return;
+    if (node.filterType === "group") {
+      if (
+        String(node.logicalOperator ?? "AND").toUpperCase() !== "AND" &&
+        (node.conditions?.length ?? 0) > 1
+      )
+        anyOr = true;
+      node.conditions?.forEach(walk);
+      return;
+    }
+    if (String(node.logicalOperator ?? "AND").toUpperCase() === "OR") anyOr = true;
+    const values = Array.isArray(node.value) ? node.value.map(String) : [];
+    if (node.column && String(node.operator).toLowerCase() === "in" && values.length > 1)
+      found.push({ column: node.column, values });
+  };
+  walk(root);
+  return !anyOr && found.length === 1 ? found[0] : null;
+}
+
+/** Each filter value's matching events, busiest first; a value with none reads 0. */
+export function valueSplitText(
+  values: readonly string[],
+  rows: ReadonlyArray<{ v?: unknown; n?: unknown }>,
+  t: TranslateFn,
+): I18nText {
+  const counts = new Map(values.map((v) => [v, 0]));
+  for (const row of rows) {
+    const key = String(row.v);
+    if (counts.has(key)) counts.set(key, Number(row.n) || 0);
+  }
+  const sorted = [...counts].sort((a, b) => b[1] - a[1]);
+  const items = sorted
+    .slice(0, SHOWN_GROUPS)
+    .map(([value, n]) =>
+      t("alerts.testRun.valueCount", { value: raw(value), count: formatNumber(n) }),
+    );
+  return t("alerts.testRun.byValue", { list: listWithMore(items, sorted.length, t) });
 }
 
 /** What failed, from the server's own message when it gave one. */

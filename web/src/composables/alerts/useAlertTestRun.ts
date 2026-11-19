@@ -51,6 +51,8 @@ export interface AlertTestRun {
 export interface RealtimeEventDay {
   events: number;
   windows: EventWindow[];
+  /** Where the counted day starts, so a breakdown of it counts the same events. */
+  startMs?: number;
 }
 
 export const ALERT_TEST_RUN_KEY: InjectionKey<AlertTestRun> = Symbol("alertTestRun");

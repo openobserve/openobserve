@@ -31,6 +31,24 @@ vi.mock("@/services/alerts", () => ({
 vi.mock("@/services/alert_destination", () => ({
   default: { testSend: (...a: unknown[]) => testSend(...a) },
 }));
+const splitRun = vi.fn();
+vi.mock("@/composables/alerts/useAlertStreamQuery", async () => {
+  const { ref } = await import("vue");
+  const state = ref("idle");
+  const hits = ref<Record<string, unknown>[]>([]);
+  return {
+    useAlertStreamQuery: () => ({
+      state,
+      hits,
+      cancel: () => {},
+      run: (req: unknown) => {
+        splitRun(req);
+        hits.value = [{ v: "Killing", n: 900 }];
+        state.value = "ready";
+      },
+    }),
+  };
+});
 
 const BODY = {
   stream_type: "logs",
@@ -73,6 +91,40 @@ describe("AlertTestRun", () => {
 
     await wrapper.find('[data-test="alert-test-run-rerun"]').trigger("click");
     expect(evaluate).toHaveBeenCalledTimes(2);
+  });
+
+  it("splits a real-time day by the filter's values and counts the day from that split", async () => {
+    const group = {
+      filterType: "group",
+      logicalOperator: "AND",
+      conditions: [
+        { filterType: "condition", column: "reason", operator: "in", value: ["Killing", "OOM"] },
+      ],
+    };
+    const body = {
+      ...BODY,
+      is_real_time: true,
+      query_condition: { type: "custom", conditions: { version: 2, conditions: group } },
+    };
+    const realTime = {
+      ...grouped,
+      is_real_time: true,
+      checks: grouped.checks.map((c) => ({ ...c, value: 10 })),
+      summary: { ...grouped.summary, groups_fired: [] },
+    };
+    evaluate.mockResolvedValue({ data: realTime });
+    const run = createAlertTestRun();
+    run.currentKey.value = testRunKey(body);
+    run.eventDay.value = { events: 880, windows: [{ events: 880, minutes: 60 }], startMs: 1000 };
+    const wrapper = mount(AlertTestRun, {
+      props: { body, destinations: [] },
+      global: { plugins: [i18n, store], provide: { [ALERT_TEST_RUN_KEY]: run } },
+    });
+    await flushPromises();
+    expect(splitRun.mock.calls[0][0]).toMatchObject({ startTime: 1_000_000 });
+    expect(splitRun.mock.calls[0][0].sql).toContain("WHERE reason IN ('Killing', 'OOM')");
+    expect(text(wrapper, "by-value")).toBe("Of these: Killing 900 and OOM 0.");
+    expect(text(wrapper, "summary")).toContain("900 matching events");
   });
 
   it("says in red what stopped the test", async () => {

@@ -288,7 +288,7 @@ watchEffect(() => {
   if (!testRun || inPanel.value || !props.realTime) return;
   const ready = status.value === "ready" && !!sql.value;
   const own = ready ? realtimeDay(search.hits.value, { startMs, hours: HOURS }) : null;
-  testRun.eventDay.value = own ? { events: own.events, windows: own.windows } : null;
+  testRun.eventDay.value = own ? { events: own.events, windows: own.windows, startMs } : null;
 });
 
 // Without a WHERE, an empty day means the stream itself was quiet, not the filters.
@@ -460,7 +460,27 @@ const hourTitle = (hour: number, fired: boolean) => {
   const dayStartMs = server.value ? server.value.end / 1000 - DAY_MS : startMs;
   const at = (ms: number) => checkTimeText(ms * 1000, store.state.timezone, Date.now());
   const from = dayStartMs + hour * 3_600_000;
-  return t(HOUR_KEYS[hourState(hour, fired)], { from: at(from), to: at(from + 3_600_000) });
+  const span = { from: at(from), to: at(from + 3_600_000) };
+  const tally = serverDay.value?.hourTallies[hour];
+  if (fired && tally && server.value?.is_real_time)
+    return t(
+      "alerts.sections.backtest.hourEvents",
+      { ...span, count: formatNumber(tally.events) },
+      tally.events,
+    );
+  if (fired && tally?.checks)
+    return t("alerts.sections.backtest.hourFiredShare", {
+      ...span,
+      count: formatNumber(tally.fired),
+      total: formatNumber(tally.checks),
+    });
+  return t(HOUR_KEYS[hourState(hour, fired)], span);
+};
+// A firing hour fills by how much of it fired, so a day that fired every hour still shows its busy ones.
+const FILL_CLASSES = ["h-1/4", "h-2/4", "h-3/4", "h-full"];
+const hourFill = (hour: number) => {
+  const share = serverDay.value?.hourShares[hour] ?? 1;
+  return FILL_CLASSES[Math.min(3, Math.max(0, Math.ceil(share * 4) - 1))];
 };
 </script>
 
@@ -540,15 +560,16 @@ const hourTitle = (hour: number, fired: boolean) => {
         <span
           v-for="(fired, hour) in day.hours"
           :key="hour"
-          class="rounded-default h-4"
+          class="rounded-default flex h-4 items-end overflow-hidden"
           :class="{
-            'bg-accent': hourState(hour, fired) === 'fired',
-            'bg-surface-subtle': hourState(hour, fired) === 'quiet',
+            'bg-surface-subtle': hourState(hour, fired) !== 'untested',
             'border-border-default border border-dashed': hourState(hour, fired) === 'untested',
           }"
           :title="hourTitle(hour, fired)"
           :data-test="fired ? 'add-alert-backtest-hour-fired' : 'add-alert-backtest-hour'"
-        />
+        >
+          <span v-if="fired" class="bg-accent w-full" :class="hourFill(hour)" />
+        </span>
       </div>
       <div v-if="showsDetails" class="text-text-secondary mt-1 flex justify-between text-xs">
         <span>{{ t("alerts.sections.backtest.dayAgo") }}</span>

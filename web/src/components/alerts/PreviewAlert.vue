@@ -159,6 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :body="testBody"
       :blocked-reason="testGapText"
       :baseline-empty="baselineEmptyText"
+      :preview-peak="previewPeak"
       :folder="testFolder"
       :destinations="formData.destinations ?? []"
       :template="formData.template || null"
@@ -196,7 +197,14 @@ import {
 import { durationText, durationWords, formatNumber, thresholdSide } from "@/utils/alerts/alertCopy";
 import { filterNotSeenText } from "@/composables/alerts/useStreamDiscovery";
 import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
-import { evaluateAlertBody, testRunKey, testValueText } from "@/utils/alerts/alertTestRun";
+import {
+  evaluateAlertBody,
+  promqlPreviewStepSeconds,
+  seriesPeak,
+  testRunKey,
+  testValueText,
+  type PreviewPeak,
+} from "@/utils/alerts/alertTestRun";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import AlertTestRun from "./AlertTestRun.vue";
 import {
@@ -2008,6 +2016,10 @@ const countAllSeries = async (
   }
 };
 
+// The chart's drawn extreme when it samples finer than the checks; Test it says when no check saw it.
+const previewPeak = ref<PreviewPeak | null>(null);
+let chartStepSeconds = 0;
+
 const chartDataSeries = (seriesData: any): any[] =>
   (Array.isArray(seriesData?.options?.series) ? seriesData.options.series : []).filter((s: any) => {
     const hasData = Array.isArray(s?.data);
@@ -2019,8 +2031,12 @@ const chartDataSeries = (seriesData: any): any[] =>
 // Counts the drawn series in every mode; judges the verdict for PromQL only (every other mode is
 // evaluated from partition metadata in handleChartDataUpdate).
 const handleSeriesDataUpdate = (seriesData: any) => {
+  previewPeak.value = null;
   if (previewError.value?.message) return emit("value-range", null);
   emit("value-range", seriesValueRange(chartDataSeries(seriesData)));
+  const side = thresholdSide(props.formData.query_condition?.promql_condition?.operator);
+  if (props.selectedTab === "promql" && side && !chartStepSeconds)
+    previewPeak.value = seriesPeak(chartDataSeries(seriesData), side);
   const named = chartDataSeries(seriesData).length;
   const limit = seriesData?.extras?.seriesLimit;
   drawnSeries.value = { shown: named, total: Math.max(Number(limit?.total) || 0, named) };
@@ -2130,12 +2146,15 @@ const refreshRulePreview = async (at: number) => {
   }
 };
 
-// The server's own step gives about 300 points, which on a wide range skips most checks.
+// The wide views sample at check times, so they draw what the checks read; see promqlPreviewStepSeconds.
 const promqlCheckStepSeconds = (rangeMinutes: number): number => {
   const tc = props.formData.trigger_condition ?? {};
-  const minutes = Number(tc.frequency) || 0;
-  if (tc.frequency_type === "cron" || minutes <= 0) return 0;
-  return rangeMinutes / 300 > minutes && rangeMinutes / minutes <= 1440 ? minutes * 60 : 0;
+  if (tc.frequency_type === "cron") return 0;
+  return promqlPreviewStepSeconds(
+    rangeMinutes,
+    Number(tc.frequency) || 0,
+    shownRange.value !== "checks",
+  );
 };
 
 let lastRunKey = "";
@@ -2192,6 +2211,7 @@ const refreshData = () => {
     props.formData._ui?.forecast,
     new_relative_time,
     verdictNeedsOwnSearch() && alertWindowMinutes(),
+    props.selectedTab === "promql" && promqlCheckStepSeconds(new_relative_time),
   ]);
   if (runKey === lastRunKey) return;
   lastRunKey = runKey;
@@ -2199,6 +2219,7 @@ const refreshData = () => {
   // A sample per check keeps the peaks a check sees; aligned, the samples fall on the check times.
   const stepSeconds =
     props.selectedTab === "promql" ? promqlCheckStepSeconds(new_relative_time) : 0;
+  chartStepSeconds = stepSeconds;
   const stepMicros = stepSeconds * 1_000_000;
   const now = new Date().getTime() * 1000;
   const endTime = stepMicros ? Math.floor(now / stepMicros) * stepMicros : now;

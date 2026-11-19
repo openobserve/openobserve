@@ -24,11 +24,21 @@ import AlertBacktest from "@/components/alerts/AlertBacktest.vue";
 import { starterContentSpec } from "@/components/alerts/template-content/contentSpec";
 import destinationService from "@/services/alert_destination";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
+import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
+import { generateWhereClause } from "@/utils/alerts/alertQueryBuilder";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatNumber, joinList, joinListMore } from "@/utils/alerts/alertCopy";
 import { crossesOnlyWhenEverySampleDoes } from "@/utils/alerts/checkCadence";
 import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
-import { requestFailureReason, testRunReport, type TestRunTone } from "@/utils/alerts/alertTestRun";
+import {
+  conditionsRoot,
+  requestFailureReason,
+  testRunReport,
+  valueSplitFilter,
+  valueSplitText,
+  type PreviewPeak,
+  type TestRunTone,
+} from "@/utils/alerts/alertTestRun";
 
 const props = defineProps<{
   /** The unsaved alert, or null when the form can't build one yet. */
@@ -41,6 +51,8 @@ const props = defineProps<{
   blockedReason?: I18nText | null;
   /** The past window a comparison reads, when it holds no data. */
   baselineEmpty?: I18nText | null;
+  /** The most extreme value the preview drew, which may sit between two checks. */
+  previewPeak?: PreviewPeak | null;
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -66,9 +78,14 @@ onMounted(() => {
   if (testRun.state.value !== "running") run();
 });
 
+const DAY_MS = 24 * 3_600_000;
+const split = useAlertStreamQuery();
+const splitAsked = ref(false);
 // Without an answer to show, a cancelled test leaves nothing to read.
 const cancelRun = () => {
   testRun.cancel();
+  split.cancel();
+  splitAsked.value = false;
   if (!testRun.result.value) emit("close");
 };
 
@@ -92,20 +109,71 @@ watch(
 );
 onBeforeUnmount(() => clearInterval(ticker));
 const sameAlert = computed(() => testRun.testedKey.value === testRun.currentKey.value);
+// A real-time filter on several values notifies on any of them, so the day is also told per value.
+const splitFilter = computed(() =>
+  props.body?.is_real_time ? valueSplitFilter(props.body.query_condition?.conditions) : null,
+);
+watch(
+  () =>
+    [
+      testRun.testedKey.value,
+      testRun.result.value?.end,
+      splitFilter.value?.column,
+      testRun.eventDay.value?.startMs,
+    ] as const,
+  ([, end, column]) => {
+    split.cancel();
+    splitAsked.value = false;
+    const body = props.body;
+    if (!body || !end || !column || testRun.testedKey.value !== testRun.currentKey.value) return;
+    const where = generateWhereClause(conditionsRoot(body.query_condition.conditions), {});
+    if (!where.trim()) return;
+    splitAsked.value = true;
+    const dayStart = testRun.eventDay.value?.startMs ?? end / 1000 - DAY_MS;
+    split.run({
+      sql: `SELECT "${column}" AS v, COUNT(*) AS n FROM "${body.stream_name}" ${where} GROUP BY v`,
+      streamType: body.stream_type,
+      // The summary counts the 24-hour row's day when it has one, so the breakdown reads that day too.
+      startTime: dayStart * 1000,
+      endTime: (dayStart + DAY_MS) * 1000,
+      size: (splitFilter.value?.values.length ?? 0) + 1,
+    });
+  },
+  { immediate: true },
+);
+// The answer waits for its per-value line, so the line never pushes the day strip down.
+const splitPending = computed(() => splitAsked.value && split.state.value === "loading");
+const splitText = computed(() =>
+  splitFilter.value && splitAsked.value && split.state.value === "ready"
+    ? valueSplitText(splitFilter.value.values, split.hits.value, t)
+    : null,
+);
+// The breakdown's query is the alert's own filter, so its sum is the day's events, counted once.
+const splitTotal = computed(() =>
+  splitText.value ? split.hits.value.reduce((sum, row) => sum + (Number(row.n) || 0), 0) : null,
+);
 // A re-run of the same alert keeps its last answer, dimmed; another alert's answer is not shown.
 const report = computed(() => {
   const result = testRun.result.value;
   if (!result || (running.value && !sameAlert.value)) return null;
   const tc = props.body?.trigger_condition;
+  const promql = props.body?.query_condition?.promql ?? "";
   return testRunReport(result, {
     t,
     timeZone: store.state.timezone,
     nowMs: Date.now(),
     silenceMinutes: Number(tc?.silence) || 0,
-    ratio: /\)\s*\/|\s\/\s/.test(props.body?.query_condition?.promql ?? ""),
-    eventDay: testRun.eventDay.value,
+    ratio: /\)\s*\/|\s\/\s/.test(promql),
+    alternatives: /\bor\b/.test(promql),
+    eventDay:
+      splitTotal.value === null || !testRun.eventDay.value
+        ? testRun.eventDay.value
+        : { ...testRun.eventDay.value, events: splitTotal.value },
+    checkEveryMinutes: tc?.frequency_type === "cron" ? 0 : Number(tc?.frequency) || 0,
+    previewPeak: props.previewPeak,
   });
 });
+
 // A lowest value above (or highest below) over the look back is already sustained by its window.
 const sustainedFn = computed(() => {
   const qc = props.body?.query_condition;
@@ -116,7 +184,9 @@ const sustainedFn = computed(() => {
     ? agg.function
     : null;
 });
-const shownResult = computed(() => (report.value ? testRun.result.value : null));
+const shownResult = computed(() =>
+  report.value && !splitPending.value ? testRun.result.value : null,
+);
 // The run is one request with no progress of its own, so the wait names how much it replays.
 const runningText = computed(() => {
   const tc = props.body?.trigger_condition;
@@ -200,7 +270,7 @@ const send = async () => {
       <div class="flex items-start gap-2">
         <div class="flex min-w-0 flex-1 flex-col gap-1" aria-live="polite">
           <p
-            v-if="running && !report"
+            v-if="(running && !report) || splitPending"
             class="text-text-secondary m-0 text-sm"
             data-test="alert-test-run-running"
           >
@@ -224,7 +294,7 @@ const send = async () => {
           >
             {{ t("alerts.testRun.failed", { reason: testRun.failure.value ?? "" }) }}
           </p>
-          <template v-else-if="report">
+          <template v-else-if="report && !splitPending">
             <p v-if="stale" class="text-text-body m-0 text-sm" data-test="alert-test-run-stale">
               {{ blockedReason || t("alerts.testRun.staleRunAgain") }}
             </p>
@@ -236,6 +306,14 @@ const send = async () => {
               :data-test="`alert-test-run-${line.id}`"
             >
               {{ line.text }}
+            </p>
+            <p
+              v-if="splitText"
+              class="m-0"
+              :class="[TONE_CLASS.secondary, dimmed && 'opacity-60']"
+              data-test="alert-test-run-by-value"
+            >
+              {{ splitText }}
             </p>
           </template>
         </div>
@@ -265,14 +343,14 @@ const send = async () => {
         :sustained-fn="sustainedFn"
       />
       <p
-        v-if="report?.groupsHeading"
+        v-if="shownResult && report?.groupsHeading"
         class="text-text-secondary m-0 text-xs"
         :class="dimmed ? 'opacity-60' : ''"
       >
         {{ report.groupsHeading }}
       </p>
       <ul
-        v-if="report && report.groups.length"
+        v-if="shownResult && report && report.groups.length"
         class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs"
         :class="dimmed ? 'opacity-60' : ''"
         data-test="alert-test-run-groups"
