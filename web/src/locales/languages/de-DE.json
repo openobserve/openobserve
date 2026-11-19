@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "Ausschließen",
       "createAlertAction": "Alarm erstellen",
       "noMatchTerms": "Dieses Muster hat keinen unterscheidbaren Text zum Filtern.",
+      "noDistinctTextTooltip": "Jeder feste Text in diesem Muster kommt auch in einem anderen Muster vor, daher würde ein Filter auch deren Logs treffen.",
       "noStreamSelected": "Kein Stream ausgewählt. Bitte wählen Sie einen Stream aus, bevor Sie einen Alarm erstellen.",
       "alertBroadMatch": "Dieses Muster hat keinen unterscheidbaren konstanten Text – die Alarmabfrage wird weitgehend übereinstimmen. Erwägen Sie das Hinzufügen manueller Filter."
     },

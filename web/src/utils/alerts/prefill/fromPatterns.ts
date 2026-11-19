@@ -35,7 +35,7 @@ import {
 } from "../alertPrefill";
 import {
   buildPatternSetSqlQuery,
-  extractConstantsFromPattern,
+  resolvePatternMatchTerms,
 } from "@/plugins/logs/patterns/patternUtils";
 
 export interface PatternsPrefillInput {
@@ -46,6 +46,8 @@ export interface PatternsPrefillInput {
    * which the dialog states explicitly rather than leaving implicit.
    */
   templates?: string[];
+  /** Every extracted template, so a pattern's terms are checked against all of them, not only the visible ones. */
+  allTemplates?: string[];
   /** Every extracted pattern, for the "N of M" line. */
   totalCount?: number;
   /** True when the severity chips are narrowing the list. */
@@ -75,8 +77,8 @@ export interface PatternsPrefillInput {
   select?: "rows" | "count";
 }
 
-const usable = (templates: string[]) =>
-  templates.filter((t) => extractConstantsFromPattern(t).length > 0);
+const usable = (templates: string[], all?: string[]) =>
+  templates.filter((t) => resolvePatternMatchTerms(t, all) !== null);
 
 const filterDropped = (input: PatternsPrefillInput) =>
   !!(input.baseFilterDropped || input.textFilterDropped || input.heldFilterDropped);
@@ -92,7 +94,8 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
 
   // A pattern with no invariant constants has nothing that identifies it — its
   // wildcards are per-log samples, not something to match on.
-  const templates = usable(requested);
+  const allTemplates = input.allTemplates;
+  const templates = usable(requested, allTemplates);
   if (requested.length && templates.length < requested.length) {
     warnings.push(warn("noConstants", "warning"));
   }
@@ -148,6 +151,7 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
     includes: effectiveMode === "include" ? applied : [],
     excludes: effectiveMode === "exclude" ? applied : [],
     baseFilter,
+    allTemplates,
     select,
   });
 

@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "Excluir",
       "createAlertAction": "Crear alerta",
       "noMatchTerms": "Este patrón no tiene texto distintivo para filtrar.",
+      "noDistinctTextTooltip": "Cada fragmento de texto fijo de este patrón también aparece en otro patrón, por lo que un filtro coincidiría también con sus registros.",
       "noStreamSelected": "No se ha seleccionado ningún stream. Seleccione un stream antes de crear una alerta.",
       "alertBroadMatch": "Este patrón no tiene texto constante distintivo: la consulta de alerta coincidirá ampliamente. Considere agregar filtros manuales."
     },

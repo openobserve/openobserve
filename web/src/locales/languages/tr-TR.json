@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "Hariç tut",
       "createAlertAction": "Uyarı oluştur",
       "noMatchTerms": "Bu desenin filtrelenecek ayırt edici metni yok.",
+      "noDistinctTextTooltip": "Bu desendeki sabit metnin her parçası başka bir desende de geçiyor, bu nedenle bir filtre onların günlüklerini de eşleştirir.",
       "noStreamSelected": "Akış seçilmedi. Uyarı oluşturmadan önce lütfen bir akış seçin.",
       "alertBroadMatch": "Bu desenin ayırt edici sabit metni yok — uyarı sorgusu geniş bir şekilde eşleşecek. Manuel filtre eklemeyi düşünün."
     },

@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "Loại trừ",
       "createAlertAction": "Tạo cảnh báo",
       "noMatchTerms": "Mẫu này không có văn bản đặc biệt để lọc.",
+      "noDistinctTextTooltip": "Mọi đoạn văn bản cố định trong mẫu này cũng xuất hiện trong mẫu khác, nên bộ lọc sẽ khớp cả nhật ký của chúng.",
       "noStreamSelected": "Chưa chọn stream. Vui lòng chọn stream trước khi tạo cảnh báo.",
       "alertBroadMatch": "Mẫu này không có văn bản hằng số đặc biệt — truy vấn cảnh báo sẽ khớp rộng. Cân nhắc thêm bộ lọc thủ công."
     },

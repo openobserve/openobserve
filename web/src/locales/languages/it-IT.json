@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "Escludi",
       "createAlertAction": "Crea avviso",
       "noMatchTerms": "Questo pattern non ha testo distintivo su cui filtrare.",
+      "noDistinctTextTooltip": "Ogni parte di testo fisso di questo pattern compare anche in un altro pattern, quindi un filtro corrisponderebbe anche ai loro log.",
       "noStreamSelected": "Nessuno stream selezionato. Seleziona uno stream prima di creare un avviso.",
       "alertBroadMatch": "Questo pattern non ha testo costante distintivo — la query dell'avviso corrisponderà ampiamente. Considera di aggiungere filtri manuali."
     },

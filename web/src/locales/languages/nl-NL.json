@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "Uitsluiten",
       "createAlertAction": "Alarm maken",
       "noMatchTerms": "Dit patroon heeft geen onderscheidende tekst om op te filteren.",
+      "noDistinctTextTooltip": "Elk vast stuk tekst in dit patroon komt ook voor in een ander patroon, dus een filter zou ook hun logs matchen.",
       "noStreamSelected": "Geen stream geselecteerd. Selecteer een stream voordat u een alarm maakt.",
       "alertBroadMatch": "Dit patroon heeft geen onderscheidende constante tekst — de alarmquery zal breed matchen. Overweeg handmatige filters toe te voegen."
     },

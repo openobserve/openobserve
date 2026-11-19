@@ -20724,6 +20724,7 @@
       "excludeFromQuery": "排除",
       "createAlertAction": "建立警示",
       "noMatchTerms": "此模式沒有可篩選的獨特文字。",
+      "noDistinctTextTooltip": "此模式中的每段固定文字也出現在其他模式中，因此篩選器也會比對它們的日誌。",
       "noStreamSelected": "未選取串流。請在建立警示前選取一個串流。",
       "alertBroadMatch": "此模式沒有獨特的常數文字 — 警示查詢將廣泛匹配。請考慮加入手動篩選器。"
     },

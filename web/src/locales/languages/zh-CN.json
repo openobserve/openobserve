@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "排除",
       "createAlertAction": "创建告警",
       "noMatchTerms": "此模式没有可筛选的独特文本。",
+      "noDistinctTextTooltip": "此模式中的每段固定文本也出现在其他模式中，因此筛选器也会匹配它们的日志。",
       "noStreamSelected": "未选择数据流。请先选择数据流再创建告警。",
       "alertBroadMatch": "此模式没有独特的常量文本 — 告警查询将匹配广泛。请考虑添加手动筛选。"
     },

@@ -245,4 +245,43 @@ describe("buildPrefillFromPatterns", () => {
       );
     });
   });
+
+  describe("patterns that share a long prefix", () => {
+    const A = "core event seq=<:NUM> info from <*> status 500";
+    const B = "core event seq=<:NUM> warn from <*> status 404";
+    const SHARED = "core event seq=<:NUM> info from <*>";
+
+    it("builds the include query from every distinguishing term", () => {
+      const p = buildPrefillFromPatterns(
+        patterns({ templates: [A], allTemplates: [A, B], mode: "include" }),
+      );
+
+      expect(p.sql).toBe(
+        "SELECT count(*) AS cnt FROM 'k8s_logs' WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500')",
+      );
+    });
+
+    it("checks against all templates, not only the visible ones", () => {
+      const p = buildPrefillFromPatterns(
+        patterns({ templates: [A], allTemplates: [A, B], mode: "exclude" }),
+      );
+
+      expect(p.sql).toBe(
+        "SELECT count(*) AS cnt FROM 'k8s_logs' WHERE NOT (match_all('core event seq=') AND match_all('info from') AND match_all('status 500'))",
+      );
+    });
+
+    it("treats a pattern nothing separates from the others as unusable", () => {
+      const p = buildPrefillFromPatterns(
+        patterns({
+          templates: [SHARED],
+          allTemplates: [SHARED, A],
+          mode: "include",
+          requirePatterns: true,
+        }),
+      );
+
+      expect(p.warnings.some((w) => w.key === "noConstants" && w.level === "blocking")).toBe(true);
+    });
+  });
 });

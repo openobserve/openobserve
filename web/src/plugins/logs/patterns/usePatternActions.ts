@@ -20,9 +20,11 @@ import { searchState } from "@/composables/useLogs/searchState";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
-  extractConstantsFromPattern,
+  resolvePatternMatchTerms,
+  patternFilterBlockedReason,
   escapeForMatchAll,
   patternSeverityKeyForPattern,
+  type PatternFilterBlock,
   type PatternSeverityKey,
 } from "./patternUtils";
 import { buildPrefillFromPatterns } from "@/utils/alerts/prefill/fromPatterns";
@@ -98,17 +100,23 @@ export const usePatternActions = () => {
     }
   };
 
-  const addPatternToSearch = (pattern: any, action: "include" | "exclude") => {
-    // Only the pattern's invariant constant text identifies the pattern. An
-    // all-wildcard template has none — its sample values are per-log examples,
-    // not invariants — so there's no reliable filter and we warn instead of
-    // applying a misleading one (see extractConstantsFromPattern).
-    const terms = extractConstantsFromPattern(pattern.template);
+  const allTemplates = (): string[] =>
+    (patternsState.value.patterns?.patterns ?? []).map((p: any) => p.template);
 
-    if (terms.length === 0) {
+  /** Why a filter cannot be built for the pattern, or null when it can. */
+  const filterBlockedReason = (pattern: any): PatternFilterBlock | null =>
+    pattern ? patternFilterBlockedReason(pattern.template, allTemplates()) : "none";
+
+  const addPatternToSearch = (pattern: any, action: "include" | "exclude") => {
+    const terms = resolvePatternMatchTerms(pattern.template, allTemplates());
+
+    if (!terms) {
+      const shared = filterBlockedReason(pattern) === "shared";
       toast({
         variant: "warning",
-        message: t("logs.patternList.noMatchTerms"),
+        message: t(
+          shared ? "logs.patternList.noDistinctTextTooltip" : "logs.patternList.noMatchTerms",
+        ),
       });
       return;
     }
@@ -179,6 +187,7 @@ export const usePatternActions = () => {
       streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
       streamType: searchObj.data.stream.streamType,
       templates: visible.map((p: any) => p.template),
+      allTemplates: allTemplates(),
       totalCount: all.length,
       filtered: visible.length !== all.length,
       mode: options.patternMode ?? "exclude",
@@ -206,6 +215,7 @@ export const usePatternActions = () => {
       streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
       streamType: searchObj.data.stream.streamType,
       templates: [pattern?.template ?? ""],
+      allTemplates: allTemplates(),
       totalCount: 1,
       mode: "include",
       // The user named this pattern; falling back to an alert on the whole
@@ -230,6 +240,7 @@ export const usePatternActions = () => {
     navigatePatternDetail,
     navTotal,
     addPatternToSearch,
+    filterBlockedReason,
     addWildcardValueToSearch,
     activeSeverities,
     setActiveSeverities,

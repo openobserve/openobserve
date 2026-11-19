@@ -16,6 +16,8 @@
 import { describe, expect, it } from "vitest";
 import {
   extractConstantsFromPattern,
+  resolvePatternMatchTerms,
+  patternFilterBlockedReason,
   escapeForMatchAll,
   buildPatternSqlQuery,
   buildPatternSetSqlQuery,
@@ -409,5 +411,101 @@ describe("pattern severity buckets", () => {
     ["user logged in <*>", "uncategorized"],
   ])("template %s → %s", (template, bucket) => {
     expect(patternSeverityKey(template)).toBe(bucket);
+  });
+});
+
+describe("resolvePatternMatchTerms", () => {
+  const A = "core event seq=<:NUM> info from <*> status 500";
+  const B = "core event seq=<:NUM> warn from <*> status 404";
+  const C = "core event seq=<:NUM> debug via <*> status 200";
+
+  it("keeps the long-constant rule when it already selects the pattern", () => {
+    const t = "User authentication failed for <*> from host <*>";
+    const other = "Disk usage exceeded threshold on <*>";
+    expect(resolvePatternMatchTerms(t, [t, other])).toEqual(extractConstantsFromPattern(t));
+  });
+
+  it("keeps the long-constant rule when no template list is available", () => {
+    expect(resolvePatternMatchTerms(A)).toEqual(["core event seq="]);
+  });
+
+  it("falls back to every constant segment when the long ones are shared", () => {
+    expect(resolvePatternMatchTerms(A, [A, B, C])).toEqual([
+      "core event seq=",
+      "info from",
+      "status 500",
+    ]);
+  });
+
+  it("returns null when even every constant is shared with another pattern", () => {
+    const x = "core event seq=<:NUM> info from <*>";
+    const y = "core event seq=<:NUM> info from <*> status 500";
+    expect(resolvePatternMatchTerms(x, [x, y])).toBeNull();
+  });
+
+  it("returns null for an all-wildcard template", () => {
+    expect(resolvePatternMatchTerms("<*> <*>", ["<*> <*>", A])).toBeNull();
+  });
+
+  it("is not fooled by the pattern's own entry in the list", () => {
+    expect(resolvePatternMatchTerms(A, [A])).toEqual(["core event seq="]);
+  });
+});
+
+describe("patternFilterBlockedReason", () => {
+  const A = "core event seq=<:NUM> info from <*> status 500";
+  const B = "core event seq=<:NUM> warn from <*> status 404";
+
+  it("is null when the pattern can be filtered", () => {
+    expect(patternFilterBlockedReason(A, [A, B])).toBeNull();
+  });
+
+  it("is 'none' for a template with no constant text", () => {
+    expect(patternFilterBlockedReason("<*> <:NUM>", ["<*> <:NUM>", A])).toBe("none");
+  });
+
+  it("is 'shared' when every constant also sits in another template", () => {
+    const x = "core event seq=<:NUM> info from <*>";
+    expect(patternFilterBlockedReason(x, [x, A])).toBe("shared");
+  });
+});
+
+describe("pattern clauses for templates that share a long prefix", () => {
+  const A = "core event seq=<:NUM> info from <*> status 500";
+  const B = "core event seq=<:NUM> warn from <*> status 404";
+  const SHARED = "core event seq=<:NUM> info from <*>";
+  const ALL = [A, B];
+
+  it("builds the single-pattern query from every distinguishing term", () => {
+    expect(buildPatternSqlQuery(A, "s", ALL)).toBe(
+      "SELECT * FROM 's' WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500')",
+    );
+  });
+
+  it("keeps the long-constants-only query without a template list", () => {
+    expect(buildPatternSqlQuery(A, "s")).toBe(
+      "SELECT * FROM 's' WHERE match_all('core event seq=')",
+    );
+  });
+
+  it("ORs and negates the full term sets in a set query", () => {
+    expect(
+      buildPatternSetSqlQuery({ streamName: "s", includes: [A], excludes: [B], allTemplates: ALL }),
+    ).toBe(
+      "SELECT * FROM 's' WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500') AND NOT (match_all('core event seq=') AND match_all('warn from') AND match_all('status 404'))",
+    );
+  });
+
+  it("drops a pattern nothing separates from the others", () => {
+    expect(
+      buildPatternSetSqlQuery({ streamName: "s", includes: [SHARED], allTemplates: [SHARED, A] }),
+    ).toBe("SELECT * FROM 's'");
+  });
+
+  it("threads the template list through buildPatternAlertData", () => {
+    const data = buildPatternAlertData({ template: A, pattern_id: "p" }, "s", 5, 100, ALL);
+    expect(data.sqlQuery).toBe(
+      "SELECT * FROM 's' WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500')",
+    );
   });
 });

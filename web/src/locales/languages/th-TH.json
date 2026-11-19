@@ -20726,6 +20726,7 @@
       "excludeFromQuery": "Exclude",
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
+      "noDistinctTextTooltip": "Every piece of fixed text in this pattern also appears in another pattern, so a filter would match their logs too.",
       "noStreamSelected": "No stream selected. Please select a stream before creating an alert.",
       "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters."
     },

@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "제외",
       "createAlertAction": "알림 생성",
       "noMatchTerms": "이 패턴에는 필터링할 구별되는 텍스트가 없습니다.",
+      "noDistinctTextTooltip": "이 패턴의 고정 텍스트는 모두 다른 패턴에도 나타나므로 필터가 해당 패턴의 로그와도 일치합니다.",
       "noStreamSelected": "선택된 스트림이 없습니다. 알림을 생성하기 전에 스트림을 선택하세요.",
       "alertBroadMatch": "이 패턴에는 구별되는 상수 텍스트가 없습니다. 알림 쿼리가 광범위하게 일치합니다. 수동 필터를 추가하는 것을 고려하세요."
     },

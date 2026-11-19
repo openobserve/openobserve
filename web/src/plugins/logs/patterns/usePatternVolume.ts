@@ -16,7 +16,7 @@
 import { ref, watch, type Ref } from "vue";
 import searchService from "@/services/search";
 import { extractWhereClause } from "@/utils/query/sqlUtils";
-import { extractConstantsFromPattern, escapeForMatchAll } from "./patternUtils";
+import { resolvePatternMatchTerms, escapeForMatchAll } from "./patternUtils";
 
 /** Context shared by every volume query. */
 export interface PatternVolumeContext {
@@ -39,6 +39,8 @@ export interface PatternVolumeContext {
   queryFn?: string | null;
   regions?: string[];
   clusters?: string[];
+  /** Every extracted template, so a volume query matches only the pattern it labels. */
+  allTemplates?: string[];
 }
 
 /**
@@ -57,8 +59,9 @@ export function buildPatternVolumeContext(args: {
   streamName?: string | null;
   window?: { start: number; end: number } | null;
   lastQuery?: any;
+  allTemplates?: string[];
 }): PatternVolumeContext | null {
-  const { orgId, streamName, window, lastQuery } = args;
+  const { orgId, streamName, window, lastQuery, allTemplates } = args;
   const startUs = lastQuery?.query?.start_time ?? window?.start;
   const endUs = lastQuery?.query?.end_time ?? window?.end;
   if (!streamName || !startUs || !endUs) return null;
@@ -71,6 +74,7 @@ export function buildPatternVolumeContext(args: {
     queryFn: lastQuery?.query?.query_fn ?? null,
     regions: lastQuery?.regions ?? undefined,
     clusters: lastQuery?.clusters ?? undefined,
+    allTemplates,
   };
 }
 
@@ -156,8 +160,8 @@ export async function fetchPatternVolume(
   pattern: any,
   ctx: PatternVolumeContext,
 ): Promise<PatternVolumeResult | null> {
-  const constants = extractConstantsFromPattern(pattern?.template ?? "");
-  if (constants.length === 0) {
+  const constants = resolvePatternMatchTerms(pattern?.template ?? "", ctx.allTemplates);
+  if (!constants) {
     return null;
   }
 

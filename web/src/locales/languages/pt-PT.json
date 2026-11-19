@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "Excluir",
       "createAlertAction": "Criar alerta",
       "noMatchTerms": "Este padrão não possui texto distinto para filtrar.",
+      "noDistinctTextTooltip": "Cada parte de texto fixo deste padrão também aparece noutro padrão, por isso um filtro corresponderia também aos respetivos registos.",
       "noStreamSelected": "Nenhum stream selecionado. Selecione um stream antes de criar um alerta.",
       "alertBroadMatch": "Este padrão não possui texto constante distinto — a consulta do alerta corresponderá amplamente. Considere adicionar filtros manuais."
     },

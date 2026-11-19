@@ -20729,6 +20729,7 @@
       "excludeFromQuery": "Wyklucz",
       "createAlertAction": "Utwórz alert",
       "noMatchTerms": "Ten wzorzec nie ma charakterystycznego tekstu do filtrowania.",
+      "noDistinctTextTooltip": "Każdy stały fragment tekstu w tym wzorcu występuje także w innym wzorcu, więc filtr dopasowałby również ich logi.",
       "noStreamSelected": "Nie wybrano strumienia. Wybierz strumień przed utworzeniem alertu.",
       "alertBroadMatch": "Ten wzorzec nie ma charakterystycznego stałego tekstu — zapytanie alertu będzie pasować szeroko. Rozważ dodanie ręcznych filtrów."
     },
