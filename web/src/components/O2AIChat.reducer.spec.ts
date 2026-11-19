@@ -444,13 +444,44 @@ describe("reduce: toolset gateway frames", () => {
     expect(msg.contentBlocks?.[0]).toMatchObject({ tool: "datadog-prod · search_logs" });
   });
 
-  it.each(["toolset_list", "toolset_list_tools"])("never shows %s", (tool) => {
+  it.each(["toolset_list", "toolset_list_tools", "toolset_read_output"])(
+    "never shows %s",
+    (tool) => {
+      const msg = assistant();
+      const state = makeState({ messages: [msg] });
+      expect(reduce(state, { type: "tool_call", tool, call_id: "c1" }, makeCtx())).toEqual([]);
+      expect(reduce(state, { type: "tool_result", tool, call_id: "c1" }, makeCtx())).toEqual([]);
+      expect(state.activeToolCall).toBeNull();
+      expect(msg.contentBlocks).toEqual([]);
+    },
+  );
+
+  it("shows a toolset_cli_run as toolset · run and its first argument", () => {
     const msg = assistant();
     const state = makeState({ messages: [msg] });
-    expect(reduce(state, { type: "tool_call", tool, call_id: "c1" }, makeCtx())).toEqual([]);
-    expect(reduce(state, { type: "tool_result", tool, call_id: "c1" }, makeCtx())).toEqual([]);
+    const context = { toolset_name: "k8s-prod", command: "  get pods -n checkout" };
+    reduce(
+      state,
+      { type: "tool_call", tool: "toolset_cli_run", call_id: "c1", context },
+      makeCtx(),
+    );
+    expect(state.activeToolCall?.tool).toBe("k8s-prod · run get");
+    reduce(state, { type: "tool_result", tool: "toolset_cli_run", call_id: "c1" }, makeCtx());
+    expect(msg.contentBlocks?.[0]).toMatchObject({ tool: "k8s-prod · run get", success: true });
+
+    reduce(
+      state,
+      { type: "tool_call", tool: "toolset_cli_run", context: { toolset_name: "aws", command: "" } },
+      makeCtx(),
+    );
+    expect(state.activeToolCall?.tool).toBe("aws · run");
+  });
+
+  it("hides a toolset_cli_run that names no toolset", () => {
+    const state = makeState();
+    const frame = { type: "tool_call", tool: "toolset_cli_run", context: { command: "get pods" } };
+    expect(reduce(state, frame, makeCtx())).toEqual([]);
     expect(state.activeToolCall).toBeNull();
-    expect(msg.contentBlocks).toEqual([]);
   });
 
   it("hides a toolset_tool_call that names no toolset or tool", () => {

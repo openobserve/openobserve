@@ -348,6 +348,19 @@ fn bind_confirm_body_to_org(body: &[u8], org_id: &str) -> Option<Vec<u8>> {
     serde_json::to_vec(&value).ok()
 }
 
+/// o2-ai's 409 tells the browser which dialog is stale (`confirmation_not_found`) or that another
+/// replica owns the turn; any other agent failure stays a 500.
+#[cfg(any(feature = "enterprise", test))]
+fn confirm_failure_response(status: StatusCode, body: &str) -> Response {
+    if status == StatusCode::CONFLICT
+        && let Ok(value) = serde_json::from_str::<serde_json::Value>(body)
+        && value.is_object()
+    {
+        return (StatusCode::CONFLICT, Json(value)).into_response();
+    }
+    MetaHttpResponse::internal_error(format!("Confirmation failed: {body}"))
+}
+
 /// Cross-site forms cannot send JSON without a CORS preflight, so every state change requires it.
 fn require_json(headers: &axum::http::HeaderMap) -> Result<(), Response> {
     let is_json = headers
@@ -1616,11 +1629,12 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     request_body(
         content = Object,
         description = "Confirmation payload",
-        example = json!({"approved": true}),
+        example = json!({"approved": true, "confirmation_id": "Zq3V0b2l2m0yZ1Jt5bFzQw"}),
     ),
     responses(
         (status = StatusCode::OK, description = "Confirmation forwarded", body = Object),
         (status = StatusCode::BAD_REQUEST, description = "Invalid session ID, malformed body, or AI agent not configured", body = Object),
+        (status = StatusCode::CONFLICT, description = "The agent's 409, passed through: `confirmation_not_found` when the confirmation_id is no longer pending, or `session_owner_unavailable`", body = Object),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = Object),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "create"})), 
@@ -1700,10 +1714,7 @@ pub async fn confirm_action(
                         status,
                         response_body
                     );
-                    MetaHttpResponse::internal_error(format!(
-                        "Confirmation failed: {}",
-                        response_body
-                    ))
+                    confirm_failure_response(status, &response_body)
                 }
             }
             Err(e) => {
@@ -2220,6 +2231,28 @@ mod tests {
         assert!(bind_confirm_body_to_org(b"", "acme").is_none());
         assert!(bind_confirm_body_to_org(b"not json", "acme").is_none());
         assert!(bind_confirm_body_to_org(b"[true]", "acme").is_none());
+    }
+
+    #[tokio::test]
+    async fn a_stale_confirmation_409_reaches_the_browser_and_other_failures_stay_500() {
+        let not_found = r#"{"code":"confirmation_not_found","message":"no longer pending"}"#;
+        let resp = confirm_failure_response(StatusCode::CONFLICT, not_found);
+        assert_eq!(resp.status(), StatusCode::CONFLICT);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "confirmation_not_found");
+        assert_eq!(body["message"], "no longer pending");
+
+        for (status, raw) in [
+            (StatusCode::CONFLICT, "not json"),
+            (StatusCode::BAD_REQUEST, not_found),
+            (StatusCode::BAD_GATEWAY, "upstream"),
+        ] {
+            let resp = confirm_failure_response(status, raw);
+            assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR, "{status}");
+        }
     }
 
     #[test]

@@ -37,9 +37,9 @@ use utoipa::ToSchema;
 
 use super::{
     projection::{
-        Folded, HIDDEN_TOOLS, SESSION_ARG, TOOLSET_CALL, coerce_tool_output, extract_error_message,
-        extract_mcp_response, is_injected, obj, strip_mcp_prefix, toolset_call_key,
-        toolset_call_label, toolset_call_target, truthy,
+        Folded, HIDDEN_TOOLS, SESSION_ARG, coerce_tool_output, extract_error_message,
+        extract_mcp_response, gateway_call, is_gateway_call, is_injected, obj, strip_mcp_prefix,
+        truthy,
     },
     rca_ledger::{ASK_RESPONDERS, question_of, split_steers},
 };
@@ -92,12 +92,14 @@ impl ThreadPart {
 
 pub(crate) struct ToolPart<'a> {
     part: &'a Map<String, Value>,
-    /// Empty when a `tools_call` or `toolset_tool_call` names no tool; `<toolset>_<tool>` for the
-    /// latter.
+    /// Empty when a `tools_call` or gateway call names no tool; a gateway call's key
+    /// (`<toolset>_<tool>`, `cli_<toolset>`) otherwise.
     pub(crate) tool: Cow<'a, str>,
-    /// `<toolset> · <tool>` for a `toolset_tool_call`, which is always a vendor row.
+    /// What a gateway call shows; set only for one, which is always a vendor row.
     label: Option<String>,
-    /// `tools_call`'s or `toolset_tool_call`'s `args`, else the part's input.
+    /// A gateway CLI run, whose stdout is data and never its exit code or error.
+    gateway_cli: bool,
+    /// `tools_call`'s or a gateway call's arguments, else the part's input.
     input: Option<&'a Map<String, Value>>,
     pub(crate) state: Option<&'a Map<String, Value>>,
     /// `state.status`: `pending`, `running`, `completed` or `error`.
@@ -119,6 +121,7 @@ impl<'a> ToolPart<'a> {
         let name = strip_mcp_prefix(part.get("tool").and_then(Value::as_str).unwrap_or_default());
         let mut tool = Cow::Borrowed(name);
         let mut label = None;
+        let mut gateway_cli = false;
         if name == "tools_call" {
             tool = Cow::Borrowed(strip_mcp_prefix(
                 input
@@ -127,17 +130,19 @@ impl<'a> ToolPart<'a> {
                     .unwrap_or_default(),
             ));
             input = input.and_then(|i| obj(i.get("args")));
-        } else if let Some((toolset, vendor_tool)) = toolset_call_target(name, input) {
-            tool = Cow::Owned(toolset_call_key(toolset, vendor_tool));
-            label = Some(toolset_call_label(toolset, vendor_tool));
-            input = input.and_then(|i| obj(i.get("args")));
-        } else if name == TOOLSET_CALL {
+        } else if let Some(call) = gateway_call(name, input) {
+            tool = Cow::Owned(call.key);
+            label = Some(call.label);
+            gateway_cli = call.cli;
+            input = call.args;
+        } else if is_gateway_call(name) {
             tool = Cow::Borrowed("");
         }
         Some(Self {
             part,
             tool,
             label,
+            gateway_cli,
             input,
             state,
             status,
@@ -155,6 +160,27 @@ impl<'a> ToolPart<'a> {
     /// What a row shows: `tool`, or `<toolset> · <tool>` for a vendor call.
     pub(crate) fn label(&self) -> &str {
         self.label.as_deref().unwrap_or(&self.tool)
+    }
+
+    /// The result the summary and failure rules read: a gateway CLI's stdout stays one string,
+    /// with only the part's `metadata` beside it.
+    pub(crate) fn body(&self) -> Value {
+        let empty = Map::new();
+        let state = self.state.unwrap_or(&empty);
+        if !self.gateway_cli {
+            return tool_body(state);
+        }
+        let output = match state.get("output") {
+            Some(Value::String(text)) => text.clone(),
+            Some(Value::Null) | None => String::new(),
+            Some(other) => other.to_string(),
+        };
+        let mut body = Map::new();
+        body.insert("output".into(), Value::String(output));
+        if let Some(metadata) = state.get("metadata").filter(|m| truthy(m)) {
+            body.insert("metadata".into(), metadata.clone());
+        }
+        Value::Object(body)
     }
 
     /// The tool for matching RCA control tools; empty for a vendor call, whose key can spell one.
@@ -613,7 +639,7 @@ impl Builder {
         let (status, result_summary, error) = match call.status {
             "completed" => (
                 ToolCallStatus::Ok,
-                Some(summarize_result(&call.tool, &tool_body(state)).0),
+                Some(summarize_result(&call.tool, &call.body()).0),
                 None,
             ),
             "error" => (
@@ -1342,6 +1368,16 @@ pub(crate) mod tests {
         );
         s.tool(
             "msg_a1",
+            "prt_t3",
+            "toolset_read_output",
+            "completed",
+            json!({"ref": "toolset_tool_call-call_1", "offset": 16000}),
+            json!({"output": "{\"text\":\"x\",\"next_offset\":null}"}),
+            112,
+            115,
+        );
+        s.tool(
+            "msg_a1",
             "prt_t2",
             "toolset_tool_call",
             "completed",
@@ -1354,7 +1390,11 @@ pub(crate) mod tests {
 
         let thread = project_rca_thread(&s.events, &[], false, false);
         let rows = &thread.steps[0].tool_calls;
-        assert_eq!(rows.len(), 1, "toolset_list_tools is no row");
+        assert_eq!(
+            rows.len(),
+            1,
+            "toolset_list_tools and toolset_read_output are no rows"
+        );
         assert_eq!(rows[0].tool, "datadog-prod · search_logs");
         assert_eq!(
             rows[0].key_arg.as_deref(),
@@ -1411,6 +1451,71 @@ pub(crate) mod tests {
             .collect();
         assert_eq!(rows, ["record · step", "submit · report", "tool · search"]);
         assert!(!thread.report_submitted);
+    }
+
+    #[test]
+    fn a_toolset_cli_run_is_a_cli_row_keyed_cli_toolset() {
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        for (i, (toolset, command)) in [("k8s-prod", "get pods -n checkout"), ("record", "step")]
+            .into_iter()
+            .enumerate()
+        {
+            s.tool(
+                "msg_a1",
+                &format!("prt_c{i}"),
+                "toolset_cli_run",
+                "completed",
+                json!({"toolset_name": toolset, "command": command}),
+                json!({"output": "ok"}),
+                100 + i as i64 * 10,
+                105 + i as i64 * 10,
+            );
+        }
+
+        let thread = project_rca_thread(&s.events, &[], false, false);
+        assert_eq!(
+            thread.steps.len(),
+            1,
+            "a CLI toolset named record opens no step"
+        );
+        let rows: Vec<(&str, Option<&str>)> = thread.steps[0]
+            .tool_calls
+            .iter()
+            .map(|c| (c.tool.as_str(), c.key_arg.as_deref()))
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                ("k8s-prod · run get", Some("get pods -n checkout")),
+                ("record · run step", Some("step")),
+            ]
+        );
+
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        s.tool(
+            "msg_a1",
+            "prt_d1",
+            "toolset_cli_run",
+            "completed",
+            json!({"toolset_name": "k8s-prod", "command": "get cm -o json"}),
+            json!({"output": r#"{"error": null, "return_code": 1}"#}),
+            100,
+            105,
+        );
+        let thread = project_rca_thread(&s.events, &[], false, false);
+        let row = &thread.steps[0].tool_calls[0];
+        assert_eq!(row.status, ToolCallStatus::Ok);
+        assert_eq!(row.result_summary.as_deref(), Some("exit 0 · 1 line"));
+
+        let part = json!({"type": "tool", "tool": "toolset_cli_run", "state": {"status": "completed",
+            "input": {"toolset_name": "bash", "command": "ls"}}});
+        let call = ToolPart::of(part.as_object().unwrap()).unwrap();
+        assert_eq!(call.tool, "cli_bash");
+        assert_eq!(call.label(), "bash · run ls");
+        assert_eq!(call.control_tool(), "");
+        assert_eq!(call.kind(), ThreadPart::Row);
     }
 
     #[test]

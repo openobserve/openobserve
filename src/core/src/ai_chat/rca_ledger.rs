@@ -35,8 +35,7 @@ use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
 use super::{
     projection::{Folded, obj},
     rca_thread::{
-        SUBMIT_REPORT, ThreadPart, ToolPart, error_text, key_arg, ms_to_us, tool_body,
-        updated_part, user_text,
+        SUBMIT_REPORT, ThreadPart, ToolPart, error_text, key_arg, ms_to_us, updated_part, user_text,
     },
 };
 
@@ -352,7 +351,7 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
     let target = evidence_target(&call.tool, &input);
     let empty = Map::new();
     let state = call.state.unwrap_or(&empty);
-    let body = completed.then(|| tool_body(state));
+    let body = completed.then(|| call.body());
     let failure = body
         .as_ref()
         .and_then(|body| completed_call_failure(&call.tool, state, body));
@@ -874,6 +873,16 @@ pub(crate) mod tests {
         s.message("msg_u1", "user", json!({"created": T}));
         s.message("msg_a1", "assistant", json!({"created": T + 100}));
         let vendor = |toolset: &str, tool: &str, args: Value| json!({"toolset_name": toolset, "tool_name": tool, "args": args});
+        s.tool(
+            "msg_a1",
+            "prt_read",
+            "toolset_read_output",
+            "completed",
+            json!({"ref": "toolset_tool_call-call_1", "offset": 16000, "length": 16000}),
+            json!({"output": "{\"text\":\"x\",\"next_offset\":null}"}),
+            990,
+            995,
+        );
         let parts = [
             vendor("record", "step", json!({"stage": "metrics", "title": "t"})),
             vendor(
@@ -902,6 +911,110 @@ pub(crate) mod tests {
         assert!(run.submit.is_none());
         let tools: Vec<&str> = run.tool_log.iter().map(|r| r.tool.as_str()).collect();
         assert_eq!(tools, ["record_step", "record_hypothesis", "submit_report"]);
+    }
+
+    #[test]
+    fn gateway_cli_runs_take_their_outcome_from_the_part_not_from_stdout() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        let error_shaped = r#"{"error": null, "return_code": 1, "stderr": "x"}"#;
+        let runs = [
+            (
+                "get pods -n checkout",
+                "completed",
+                json!({"output": "NAME READY"}),
+            ),
+            (
+                "get cm -o json",
+                "completed",
+                json!({"output": error_shaped}),
+            ),
+            (
+                "get nodes",
+                "completed",
+                json!({"output": "{\"error\":\"forbidden\"}"}),
+            ),
+            (
+                "rollout status x",
+                "completed",
+                json!({"output": "waiting", "metadata": {"exit": 2}}),
+            ),
+            (
+                "get secrets",
+                "error",
+                json!({"error": "the user declined to run this command"}),
+            ),
+        ];
+        for (i, (command, status, result)) in runs.into_iter().enumerate() {
+            s.tool(
+                "msg_a1",
+                &format!("prt_r{i}"),
+                "toolset_cli_run",
+                status,
+                json!({"toolset_name": "k8s-prod", "command": command}),
+                result,
+                1_000 + i as i64 * 10,
+                1_005 + i as i64 * 10,
+            );
+        }
+        let run = decode_run(&s.events);
+
+        let log: Vec<(&str, &str, SignalClass, bool, &str)> = run
+            .tool_log
+            .iter()
+            .map(|r| {
+                let outcome = r.error_type.as_deref().unwrap_or(r.result_summary.as_str());
+                (
+                    r.tool.as_str(),
+                    r.key_arg.as_str(),
+                    r.signal,
+                    r.success,
+                    outcome,
+                )
+            })
+            .collect();
+        assert_eq!(
+            log,
+            [
+                (
+                    "cli_k8s-prod",
+                    "get pods -n checkout",
+                    SignalClass::Infra,
+                    true,
+                    "exit 0 · 1 line"
+                ),
+                (
+                    "cli_k8s-prod",
+                    "get cm -o json",
+                    SignalClass::Infra,
+                    true,
+                    "exit 0 · 1 line"
+                ),
+                (
+                    "cli_k8s-prod",
+                    "get nodes",
+                    SignalClass::Infra,
+                    true,
+                    "exit 0 · 1 line"
+                ),
+                (
+                    "cli_k8s-prod",
+                    "rollout status x",
+                    SignalClass::Infra,
+                    false,
+                    "exit 2"
+                ),
+                (
+                    "cli_k8s-prod",
+                    "get secrets",
+                    SignalClass::Infra,
+                    false,
+                    "the user declined to run this command"
+                ),
+            ]
+        );
+        assert!(run.calls.is_empty() && run.submit.is_none());
     }
 
     /// An org AI Toolset call keeps opencode's `<server>_<tool>` name in the tool log.

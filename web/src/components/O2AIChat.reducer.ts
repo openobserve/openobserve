@@ -27,6 +27,8 @@ export interface PendingConfirmation {
   args: Record<string, any>;
   message: I18nText;
   navAction?: NavigationAction;
+  /** o2-ai's id for this one pending call; the answer must name it. */
+  confirmationId?: string;
 }
 
 export interface ReducerCtx {
@@ -60,7 +62,7 @@ export type StreamEffect =
   | { kind: "save" }
   | { kind: "throttledSave"; force: boolean }
   | { kind: "navigate"; action: NavigationAction }
-  | { kind: "confirmPost"; approved: boolean }
+  | { kind: "confirmPost"; approved: boolean; confirmationId?: string }
   | { kind: "dashboardEvent"; payload: AiDashboardEvent }
   | { kind: "animateTitle"; title: string }
   | { kind: "animateText" }
@@ -155,12 +157,12 @@ function reduceConfirmationRequired(
 
   // Detached streams auto-deny so the agent is not left paused with nobody to answer it.
   if (!ctx.isActive) {
-    effects.push({ kind: "confirmPost", approved: false });
+    effects.push({ kind: "confirmPost", approved: false, confirmationId: data.confirmation_id });
     return effects;
   }
 
   if (data.tool === "navigation_action" && ctx.autoNavigationEnabled) {
-    effects.push({ kind: "confirmPost", approved: true });
+    effects.push({ kind: "confirmPost", approved: true, confirmationId: data.confirmation_id });
     return effects;
   }
 
@@ -174,6 +176,7 @@ function reduceConfirmationRequired(
     pendingConfirmation: true,
     confirmationMessage: data.message,
     confirmationArgs: data.args || {},
+    confirmationId: data.confirmation_id,
   };
   state.activeToolCall = null;
 
@@ -183,21 +186,36 @@ function reduceConfirmationRequired(
     tool: data.tool,
     args: data.args || {},
     message: data.message || ctx.t("aiAssistant.aiChat.confirmToolExecution", { tool: data.tool }),
+    confirmationId: data.confirmation_id,
   };
   effects.push({ kind: "scroll" });
   return effects;
 }
 
-const TOOLSET_LISTING_TOOLS = new Set(["toolset_list", "toolset_list_tools"]);
+const TOOLSET_LISTING_TOOLS = new Set([
+  "toolset_list",
+  "toolset_list_tools",
+  "toolset_read_output",
+]);
+
+/** The label O2 shows for a gateway call, or null when the call misses a name it needs. */
+function gatewayLabel(tool: string, input: any): string | null {
+  if (!input?.toolset_name) return null;
+  if (tool === "toolset_tool_call") {
+    return input.tool_name ? `${input.toolset_name} · ${input.tool_name}` : null;
+  }
+  const first = String(input.command ?? "")
+    .trim()
+    .split(/\s+/)[0];
+  return `${input.toolset_name} · run${first ? ` ${first}` : ""}`;
+}
 
 /** A raw toolset gateway frame as the chat shows it: listings hidden, a call as `toolset · tool`. */
 export function resolveToolsetFrame(data: any, active: ActiveToolCall | null): any | null {
   if (TOOLSET_LISTING_TOOLS.has(data.tool)) return null;
-  if (data.tool !== "toolset_tool_call") return data;
-  const input = data.call_args || data.context || {};
-  if (input.toolset_name && input.tool_name) {
-    return { ...data, tool: `${input.toolset_name} · ${input.tool_name}` };
-  }
+  if (data.tool !== "toolset_tool_call" && data.tool !== "toolset_cli_run") return data;
+  const label = gatewayLabel(data.tool, data.call_args || data.context);
+  if (label) return { ...data, tool: label };
   // A result frame may come without its arguments; it is the active call's result then.
   if (data.type === "tool_result" && active && data.call_id && active.call_id === data.call_id) {
     return { ...data, tool: active.tool };

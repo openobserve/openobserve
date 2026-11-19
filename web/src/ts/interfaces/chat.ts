@@ -45,6 +45,7 @@ export interface ContentBlock {
   pendingConfirmation?: boolean; // true = yellow waiting state with inline confirm/cancel buttons
   confirmationMessage?: string; // message to display in confirmation state
   confirmationArgs?: Record<string, any>; // tool arguments to display for user review
+  confirmationId?: string; // o2-ai's id of the pending call this block asks about
   // Tool result data (from tool_result events):
   success?: boolean; // true = green check, false = red error, undefined = legacy (treated as success)
   resultMessage?: string; // message from tool_result event
