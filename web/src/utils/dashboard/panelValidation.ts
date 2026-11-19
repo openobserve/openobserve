@@ -902,6 +902,15 @@ const validatePanelContentByType = (t: TranslateFn, panel: any, errors: string[]
   }
 };
 
+// Only the editor asks for one query; an imported multi-query treemap still loads and draws its first visible query.
+const validateTreemapQueries = (t: TranslateFn, panel: any, errors: string[]) => {
+  if (panel?.type !== "treemap") return;
+  const queries: { config?: { hide?: boolean } }[] = panel?.queries ?? [];
+  if (queries.filter((query) => !query?.config?.hide).length > 1) {
+    errors.push(t("dashboard.utils.treemapOneQuery"));
+  }
+};
+
 const validateJoinField = (t: TranslateFn, join: any, errors: string[], joinIndex: number) => {
   // validate stream
   if (!join?.stream) {
@@ -1403,6 +1412,7 @@ export const validatePanel = (
 
   // Validate panel content based on type
   validatePanelContentByType(t, panelData?.data, errors);
+  validateTreemapQueries(t, panelData?.data, errors);
   validateHeatmapConfig(t, panelData, errors, isPromQLMode);
   validateCartesianConfig(t, panelData, errors, isPromQLMode);
   validatePanelTypeConfig(t, panelData, errors);

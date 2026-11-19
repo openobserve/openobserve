@@ -281,10 +281,23 @@ export function usePanelDrilldown({
     }
     if (panelSchema.value.type === "bar-gauge") return barGaugeDrilldownSeries(params);
     return {
-      __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
+      // A tile standing in for a missing or empty group carries the blank its drilldown filters on.
+      __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type)
+        ? params?.data?.rawName !== undefined
+          ? (params.data.rawName ?? "")
+          : params?.name
+        : params?.seriesName,
       __value: value,
       // A gauge dial named "(empty)" stands in for a blank label; drilldowns filter on the blank.
       __axisValue: params?.value?.[0] ?? params?.data?.rawName ?? params?.name,
+      // Tiles of the same name sit under different parents, so the path tells them apart; each value is encoded so a "/" in it stays one segment.
+      ...(panelSchema.value.type === "treemap"
+        ? {
+            __path: ((params?.data?.rawPath ?? params?.data?.path ?? []) as (string | null)[])
+              .map((segment) => encodeURIComponent(segment ?? ""))
+              .join("/"),
+          }
+        : {}),
     };
   };
 

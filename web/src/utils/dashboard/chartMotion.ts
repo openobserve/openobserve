@@ -15,12 +15,18 @@
 
 const NO_ENTRANCE = { animationDuration: 0, animationDurationUpdate: 0 };
 
-/** Zeroes the entrance and update durations at the root and on every series, leaving hover state animation alone. */
+/** Zeroes the entrance and update durations at the root and on every series, keeping a treemap's update duration and hover state animation. */
 export const withoutEntrance = (options: Record<string, unknown>): Record<string, unknown> => {
   const { series } = options;
   // A series' own duration overrides the root one, so each series is zeroed too.
-  const still = (entry: unknown) =>
-    entry && typeof entry === "object" ? { ...entry, ...NO_ENTRANCE } : entry;
+  const still = (entry: unknown) => {
+    if (!entry || typeof entry !== "object") return entry;
+    // ECharts draws a treemap's zoom and breadcrumb moves through the update animation, so at 0 the zoomed layout never lands.
+    if ((entry as { type?: unknown }).type === "treemap") {
+      return { ...entry, animationDuration: 0 };
+    }
+    return { ...entry, ...NO_ENTRANCE };
+  };
   return {
     ...options,
     ...NO_ENTRANCE,

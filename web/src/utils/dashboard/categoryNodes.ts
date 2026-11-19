@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
 import { getDataValue } from "./aliasUtils";
 import { getSeriesColor } from "./colorPalette";
 import { echartsPaletteColor } from "./thresholds";
@@ -20,8 +21,12 @@ import { echartsPaletteColor } from "./thresholds";
 /** A category tree node; leaves carry the summed value, parents add up their children. */
 export interface TreemapNode {
   name: string;
+  /** The group's own value when the shown name stands in for a missing (null) or empty one. */
+  rawName?: string | null;
   value: number;
   path: string[];
+  /** The groups' own values from the root, when the shown path stands in for a missing or empty one. */
+  rawPath?: (string | null)[];
   children?: TreemapNode[];
   itemStyle?: { color: string };
   label?: { color?: string; show?: boolean; rotate?: "radial" | "tangential" };
@@ -36,9 +41,21 @@ const toNumber = (value: unknown): number | null => {
 
 const byValue = (a: TreemapNode, b: TreemapNode) => b.value - a.value;
 
-/** Nests rows by the x fields and then the breakdown field, summing the first y field into the leaves. */
-export const buildTreemapNodes = (panelSchema: any, data: any[]): TreemapNode[] => {
-  const root: TreemapNode = { name: "", value: 0, path: [], children: [] };
+// A missing and an empty group are different answers, so each gets its own visible tile.
+const groupName = (key: string | null): string => {
+  if (key === null) return gt("dashboard.utils.categoryNullGroup");
+  return key === "" ? gt("dashboard.utils.categoryEmptyGroup") : key;
+};
+
+const isStandIn = (key: string | null) => key === null || key === "";
+
+/** Nests rows by the x fields and then the breakdown field, summing the first y field into the leaves and counting the rows left out. */
+export const buildTreemapNodes = (
+  panelSchema: any,
+  data: any[],
+): { nodes: TreemapNode[]; skippedRows: number } => {
+  const root: TreemapNode = { name: "", value: 0, path: [], rawPath: [], children: [] };
+  let skippedRows = 0;
   (panelSchema?.queries ?? []).forEach((query: any, index: number) => {
     const rows = data?.[index];
     const value = query?.fields?.y?.[0];
@@ -46,13 +63,29 @@ export const buildTreemapNodes = (panelSchema: any, data: any[]): TreemapNode[] 
     if (!Array.isArray(rows) || !value || !levels.length || query?.config?.hide) return;
     rows.forEach((row: any) => {
       const amount = toNumber(getDataValue(row, value.alias));
-      if (amount === null || amount <= 0) return;
+      // A tile's area is its value, so a row without a positive one cannot be drawn.
+      if (amount === null || amount <= 0) {
+        skippedRows++;
+        return;
+      }
       let node = root;
       levels.forEach((level: any) => {
-        const name = String(getDataValue(row, level.alias) ?? "");
-        let child = node.children!.find((candidate) => candidate.name === name);
+        const raw = getDataValue(row, level.alias);
+        const key = raw === null || raw === undefined ? null : String(raw);
+        // Tiles are told apart by their own value, so a real "(null)" never joins the missing group.
+        let child = node.children!.find(
+          (candidate) => candidate.rawPath![candidate.rawPath!.length - 1] === key,
+        );
         if (!child) {
-          child = { name, value: 0, path: [...node.path, name], children: [] };
+          const name = groupName(key);
+          child = {
+            name,
+            ...(isStandIn(key) ? { rawName: key } : {}),
+            value: 0,
+            path: [...node.path, name],
+            rawPath: [...node.rawPath!, key],
+            children: [],
+          };
           node.children!.push(child);
         }
         child.value += amount;
@@ -61,14 +94,12 @@ export const buildTreemapNodes = (panelSchema: any, data: any[]): TreemapNode[] 
     });
   });
   const tidy = (nodes: TreemapNode[]): TreemapNode[] =>
-    nodes
-      .sort(byValue)
-      .map((node) =>
-        node.children?.length
-          ? { ...node, children: tidy(node.children) }
-          : { name: node.name, value: node.value, path: node.path },
-      );
-  return tidy(root.children!);
+    nodes.sort(byValue).map(({ children, rawPath, ...node }) => ({
+      ...node,
+      ...(rawPath?.some(isStandIn) ? { rawPath } : {}),
+      ...(children?.length ? { children: tidy(children) } : {}),
+    }));
+  return { nodes: tidy(root.children!), skippedRows };
 };
 
 /** Colours each named item from the panel Color palette, shading by value range; a classic palette falls back to the chart colours. */

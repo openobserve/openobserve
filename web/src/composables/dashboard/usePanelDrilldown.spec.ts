@@ -1428,6 +1428,45 @@ describe("usePanelDrilldown", () => {
     openSpy.mockRestore();
   });
 
+  it("hands a treemap tile's full path and the blank behind an empty tile to a URL drilldown", async () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    const deps = makeDeps();
+    deps.panelSchema.value.type = "treemap";
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Link",
+        type: "byUrl",
+        targetBlank: true,
+        data: { url: "https://example.com/?n=${series.__name}&p=${series.__path}" },
+      } as any,
+    ];
+    deps.panelData.value.options.series = [{ type: "treemap" }] as any;
+    const api = usePanelDrilldown(deps as any);
+
+    await api.onChartClick({
+      componentType: "series",
+      seriesIndex: 0,
+      name: "(empty)",
+      value: 4,
+      data: {
+        name: "(empty)",
+        rawName: "",
+        value: 4,
+        path: ["us-east", "a/b", "(empty)"],
+        rawPath: ["us-east", "a/b", ""],
+      },
+      event: { offsetX: 1, offsetY: 1 },
+    });
+    await api.openDrilldown(0);
+
+    expect(openSpy).toHaveBeenCalledWith(
+      "https://example.com/?n=&p=us-east/a%2Fb/",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    openSpy.mockRestore();
+  });
+
   describe("sankey return nodes", () => {
     const sankeyDeps = (drilldown: any) => {
       const deps = makeDeps();

@@ -32,12 +32,19 @@ const LABEL_PADDING = 10;
 const CHILD_LIGHTNESS: [number, number] = [0.35, 0.6];
 const LABEL_FONT_SIZE = 12;
 
+/** Rows the treemap left out because their size is not a positive number. */
+export interface TreemapNotice {
+  skippedRows: number;
+}
+
 let measureContext: OffscreenCanvasRenderingContext2D | null | undefined;
 
-const rootName = (panelSchema: any): string => {
-  const query = panelSchema?.queries?.[0];
+const rootName = (
+  query: { fields?: { y?: unknown[] }; customQuery?: boolean } | undefined,
+  config: unknown,
+): string => {
   const value = query?.fields?.y?.[0];
-  return getFieldLabel(value, panelSchema?.config, query?.customQuery) || value?.alias || "";
+  return getFieldLabel(value, config, query?.customQuery) || value?.alias || "";
 };
 
 const labelContext = (): OffscreenCanvasRenderingContext2D | null => {
@@ -113,15 +120,33 @@ export const contrastLabels = (nodes: TreemapNode[]) => {
 /** Converts SQL rows into a treemap: the x field names the outer tiles, the breakdown splits them. */
 export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
   const config = panelSchema?.config ?? {};
-  const nodes = buildTreemapNodes(panelSchema, Array.isArray(data) ? data : []);
-  if (!nodes.length) return { options: { series: [] }, extras: { panelId: panelSchema?.id } };
+  const rows = Array.isArray(data) ? data : [];
+  // A tile adds up one measure, so a saved panel with more queries draws only its first visible one.
+  const queries: { config?: { hide?: boolean } }[] = panelSchema?.queries ?? [];
+  const drawn = queries.findIndex((query) => !query?.config?.hide);
+  const { nodes, skippedRows } = buildTreemapNodes(
+    { ...panelSchema, queries: drawn < 0 ? [] : [panelSchema.queries[drawn]] },
+    drawn < 0 ? [] : [rows[drawn]],
+  );
+  const treemapNotice: TreemapNotice = { skippedRows };
+  if (!nodes.length) {
+    return { options: { series: [] }, extras: { panelId: panelSchema?.id, treemapNotice } };
+  }
 
   paintByPalette(nodes, config, store?.state?.theme);
   contrastLabels(nodes);
+  const size = panelSchema.queries[drawn]?.fields?.y?.[0];
+  // A count is a whole number, so without a unit its decimals are only trailing zeros.
+  const decimals =
+    size?.functionName === "count" && (!config.unit || config.unit === "default")
+      ? 0
+      : config.decimals;
   const format = (value: unknown) =>
-    formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, config.decimals));
+    formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, decimals));
   const nested = nodes.some((node) => node.children?.length);
   const hasDrilldown = (config.drilldown?.length ?? 0) > 0;
+  // A click opens the drilldown menu instead, and without the breadcrumb a zoom has no way back.
+  const zooms = !hasDrilldown && config.treemap_show_breadcrumb !== false;
   const surface = chartColor("--color-surface-base");
 
   const options = {
@@ -143,17 +168,16 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
       {
         type: "treemap",
         // The breadcrumb's root reads the series name.
-        name: panelSchema?.title || rootName(panelSchema),
+        name: panelSchema?.title || rootName(panelSchema.queries[drawn], config),
         data: nodes,
         top: 8,
         left: 8,
         right: 8,
         bottom: config.treemap_show_breadcrumb === false ? 8 : 32,
         roam: false,
-        // Without a leaf depth the breadcrumb names whatever tile sits under the panel centre; a drilldown blocks zooming, so then every level is drawn.
-        leafDepth: !nested ? 1 : hasDrilldown ? undefined : 2,
-        // A click opens the drilldown menu, so it must not also zoom the tile away under it.
-        nodeClick: hasDrilldown ? false : "zoomToNode",
+        // Without a leaf depth the breadcrumb names whatever tile sits under the panel centre; without zooming, every level is drawn.
+        leafDepth: !nested ? 1 : zooms ? 2 : undefined,
+        nodeClick: zooms ? "zoomToNode" : false,
         breadcrumb: {
           show: config.treemap_show_breadcrumb !== false,
           bottom: 4,
@@ -199,5 +223,5 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
       },
     ],
   };
-  return { options, extras: { panelId: panelSchema?.id } };
+  return { options, extras: { panelId: panelSchema?.id, treemapNotice } };
 };
