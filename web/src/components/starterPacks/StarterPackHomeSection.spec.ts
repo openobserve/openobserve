@@ -105,7 +105,7 @@ const render = async (packs = [KUBERNETES_PACK]) => {
       stubs: {
         StarterPackUndoDialog: true,
         OIcon: true,
-        OTooltip: { template: '<div><slot name="content" /></div>' },
+        OTooltip: { template: '<div><slot /><slot name="content" /></div>' },
       },
     },
   });
@@ -143,7 +143,7 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-card-skeleton")).toBe(true);
     fake.matchers.kubernetes.state.value = "matched";
     await nextTick();
-    expect(has(wrapper, "home-pack-card")).toBe(true);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
     expect(has(wrapper, "home-pack-hero")).toBe(true);
     expect(fake.flows.kubernetes.loadPreview).toHaveBeenCalled();
   });
@@ -153,21 +153,23 @@ describe("StarterPackHomeSection", () => {
     const wrapper = await render([HOSTS_PACK, KUBERNETES_PACK]);
     expect(has(wrapper, "home-pack-card-skeleton")).toBe(true);
     expect(has(wrapper, "home-pack-offer")).toBe(false);
-    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
     fake.matchers.hosts.state.value = "matched";
     await nextTick();
     expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
-    expect(has(wrapper, "home-pack-hosts-card")).toBe(true);
-    expect(has(wrapper, "home-pack-card")).toBe(true);
+    expect(has(wrapper, "home-pack-list-row-hosts")).toBe(true);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
   });
 
-  it("keeps the card while an install is still running", async () => {
+  it("keeps the offer while an install is still running", async () => {
     const wrapper = await render();
     fake.flows.kubernetes.running.value = true;
     fake.flows.kubernetes.record.value = { status: "incomplete" };
     await nextTick();
     const home = homeOf(wrapper);
-    expect(wrapper.get('[data-test="home-pack-card"]').attributes("data-status")).toBe("running");
+    expect(
+      wrapper.get('[data-test="home-pack-list-primary-btn"]').attributes("disabled"),
+    ).toBeDefined();
     expect(has(wrapper, "home-pack-offer")).toBe(true);
     expect(home.setUp.value).toEqual([]);
     fake.flows.kubernetes.record.value = { status: "complete" };
@@ -177,7 +179,7 @@ describe("StarterPackHomeSection", () => {
     expect(home.setUp.value.map((item) => item.pack.id)).toEqual(["kubernetes"]);
   });
 
-  it("shows the hero, counts with a plain bell and the matched stream", async () => {
+  it("shows the hero, then the pack in the same rail and tiles as the header popup", async () => {
     const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
     const hero = wrapper.get('[data-test="home-pack-hero"]').text();
     expect(hero).toContain("Starter packs");
@@ -186,36 +188,35 @@ describe("StarterPackHomeSection", () => {
       "Pick a starter pack below. It creates dashboards, alerts and saved views that fit your streams.",
     );
     expect(has(wrapper, "home-pack-hero-icon")).toBe(true);
-    expect(wrapper.get('[data-test="home-pack-card-row-dashboard"]').text()).toBe("1 dashboard");
-    expect(wrapper.get('[data-test="home-pack-card-row-alert"]').text()).toBe("2 alerts");
+    expect(wrapper.get('[data-test="home-pack-list-hero"]').text()).toContain("Kubernetes");
+    expect(has(wrapper, "home-pack-list-tile-dashboard")).toBe(true);
+    expect(has(wrapper, "home-pack-list-tile-alert")).toBe(true);
+    expect(has(wrapper, "home-pack-list-tile-savedView")).toBe(true);
     expect(wrapper.text()).not.toContain("Silent until you turn them on");
-    expect(wrapper.get('[data-test="home-pack-card-icon-alert"]').attributes("name")).toBe(
-      "notifications",
-    );
-    expect(wrapper.get('[data-test="home-pack-card-row-savedView"]').text()).toBe("1 saved view");
-    expect(wrapper.get('[data-test="home-pack-row-streams"]').text()).toContain("k8s_events");
+    expect(wrapper.get('[data-test="home-pack-list-streams"]').text()).toContain("k8s_events");
   });
 
-  it("shows no count rows until the preview has loaded", async () => {
-    fake.flows.kubernetes = fakeFlow({
-      alertCount: ref(null),
-      dashboardCount: ref(null),
-      viewCount: ref(null),
-    });
-    const wrapper = await render();
-    expect(has(wrapper, "home-pack-card")).toBe(true);
-    expect(has(wrapper, "home-pack-card-row-dashboard")).toBe(false);
-    expect(has(wrapper, "home-pack-card-row-alert")).toBe(false);
-    expect(has(wrapper, "home-pack-card-row-savedView")).toBe(false);
+  it("lists several packs once in a rail and swaps the pane on a rail click", async () => {
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(wrapper.findAll('[data-test="home-pack-offer"]')).toHaveLength(1);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
+    expect(has(wrapper, "home-pack-list-row-hosts")).toBe(true);
+    expect(wrapper.findAll('[data-test="home-pack-list-hero"]')).toHaveLength(1);
+    expect(has(wrapper, "home-pack-list-best-start")).toBe(true);
+    await wrapper.get('[data-test="home-pack-list-row-hosts"]').trigger("click");
+    expect(wrapper.get('[data-test="home-pack-list-hero"]').text()).toContain("Hosts");
+    expect(has(wrapper, "home-pack-list-best-start")).toBe(false);
+    await wrapper.get('[data-test="home-pack-list-primary-btn"]').trigger("click");
+    await flushPromises();
+    expect(useStarterPackPopup("org").packId.value).toBe("hosts");
   });
 
   it("opens the setup popup from Review pack and never installs from the card", async () => {
     const wrapper = await render();
-    const setUp = wrapper.get('[data-test="home-pack-card-setup-btn"]');
+    const setUp = wrapper.get('[data-test="home-pack-list-primary-btn"]');
     expect(setUp.text()).toBe("Review pack");
     expect(setUp.attributes("aria-label")).toBe("Review the Kubernetes pack");
     expect(has(wrapper, "home-pack-card-details-btn")).toBe(false);
-    expect(wrapper.text()).not.toContain("What gets created");
     await setUp.trigger("click");
     await flushPromises();
     const popup = useStarterPackPopup("org");
@@ -277,25 +278,22 @@ describe("StarterPackHomeSection", () => {
     expect(interrupted).toEqual({ packId: "hosts", label: "Hosts", done: 1, total: 3 });
   });
 
-  it("shows two streams and folds the rest into +N streams with a hover list", async () => {
+  it("names the cluster and folds every stream after the first into +N streams", async () => {
     fake.matchers.kubernetes.streams.value = ["a", "b", "c", "d"];
     fake.matchers.kubernetes.clusters.value = ["staging-eu-1"];
     const wrapper = await render();
-    expect(wrapper.get('[data-test="home-pack-card-from"]').text()).toBe("from staging-eu-1");
-    const panel = wrapper.get('[data-test="home-pack-row-streams"]');
-    expect(panel.text()).toContain("a");
-    expect(panel.text()).toContain("b");
-    expect(wrapper.get('[data-test="home-pack-streams-more"]').text()).toContain("+2 streams");
-    const more = wrapper.get('[data-test="home-pack-streams-more-list"]').text();
-    expect(more).toContain("c");
-    expect(more).toContain("d");
+    expect(wrapper.get('[data-test="home-pack-list-from"]').text()).toBe("from staging-eu-1");
+    const streams = wrapper.get('[data-test="home-pack-list-streams"]').text();
+    expect(streams).toContain("a+3 streams");
+    expect(streams).toContain("bcd");
   });
 
-  it("shows no alerts tile and no placeholder for a pack with no alerts", async () => {
+  it("shows an empty alerts tile with no summary for a pack with no alerts", async () => {
     fake.flows.hosts = fakeFlow({ pack: HOSTS_PACK, alertCount: ref(0), viewCount: ref(0) });
+    fake.flows.hosts.preview.value = { items: [], panels: { kept: 0 }, severities: {} };
     const wrapper = await render([HOSTS_PACK]);
-    expect(has(wrapper, "home-pack-hosts-card-row-alert")).toBe(false);
-    expect(has(wrapper, "home-pack-hosts-card-no-alerts")).toBe(false);
+    expect(has(wrapper, "home-pack-list-tile-alert")).toBe(true);
+    expect(has(wrapper, "home-pack-list-tile-summary-alert")).toBe(false);
   });
 
   it("has no Not now button and brings a dismissed pack back with Show again", async () => {
@@ -303,15 +301,15 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-card-dismiss-btn")).toBe(false);
     fake.dismissal.dismiss();
     await nextTick();
-    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
     await wrapper.get('[data-test="home-pack-card-show-again-btn"]').trigger("click");
-    expect(has(wrapper, "home-pack-card")).toBe(true);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
   });
 
   it("has no Hide button on the strip, even for an admin", async () => {
     fake.flows.kubernetes.isAdmin.value = true;
     const wrapper = await render();
-    expect(has(wrapper, "home-pack-card")).toBe(true);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
     expect(has(wrapper, "home-pack-card-hide-all-btn")).toBe(false);
     expect(wrapper.text()).not.toContain("Hide");
   });
@@ -319,7 +317,7 @@ describe("StarterPackHomeSection", () => {
   it("shows nothing for a pack hidden for everyone, and spends nothing on its matcher", async () => {
     fake.org.hidden.value = true;
     const wrapper = await render();
-    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
     expect(has(wrapper, "home-pack-empty")).toBe(false);
     expect(fake.matchers.kubernetes.check).not.toHaveBeenCalled();
   });
@@ -361,7 +359,7 @@ describe("StarterPackHomeSection", () => {
     fake.matchers.hosts.state.value = "matched";
     await nextTick();
     expect(has(wrapper, "home-pack-label")).toBe(true);
-    expect(has(wrapper, "home-pack-hosts-card")).toBe(true);
+    expect(has(wrapper, "home-pack-list-row-hosts")).toBe(true);
   });
 
   it("offers Retry under the label when a match check fails in an empty org", async () => {
@@ -392,7 +390,7 @@ describe("StarterPackHomeSection", () => {
     fake.hasUserData = ref(false);
     const wrapper = await render();
     expect(has(wrapper, "home-pack-label")).toBe(false);
-    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
     expect(has(wrapper, "home-pack-card-skeleton")).toBe(false);
     expect(has(wrapper, "home-pack-empty")).toBe(false);
     expect(has(wrapper, "home-pack-find-other")).toBe(false);
@@ -407,18 +405,18 @@ describe("StarterPackHomeSection", () => {
     fake.matchers.kubernetes.state.value = "matched";
     await nextTick();
     expect(has(wrapper, "home-pack-label")).toBe(false);
-    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
     expect(homeOf(wrapper).offerShown.value).toBe(false);
   });
 
   it("offers the packs once the resources check says the org is empty", async () => {
     fake.noResources = ref(false);
     const wrapper = await render();
-    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
     fake.noResources.value = true;
     await nextTick();
     expect(has(wrapper, "home-pack-label")).toBe(true);
-    expect(has(wrapper, "home-pack-card")).toBe(true);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
     expect(homeOf(wrapper).offerShown.value).toBe(true);
   });
 
@@ -491,22 +489,24 @@ describe("StarterPackHomeSection", () => {
     expect(has(wrapper, "home-pack-offer")).toBe(true);
   });
 
-  it("keeps Ask an admin on a row the user may not create beside one they may", async () => {
+  it("keeps Ask an admin on a pack the user may not create beside one they may", async () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
     expect(has(wrapper, "home-pack-ask-admin")).toBe(false);
-    expect(has(wrapper, "home-pack-card-setup-btn")).toBe(false);
-    expect(wrapper.get('[data-test="home-pack-card-ask-admin"]').text()).toBe(
+    expect(has(wrapper, "home-pack-list-primary-btn")).toBe(false);
+    expect(wrapper.get('[data-test="home-pack-list-ask-admin"]').text()).toBe(
       "Ask an admin to set this up",
     );
-    expect(has(wrapper, "home-pack-hosts-card-setup-btn")).toBe(true);
+    await wrapper.get('[data-test="home-pack-list-row-hosts"]').trigger("click");
+    expect(has(wrapper, "home-pack-list-ask-admin")).toBe(false);
+    expect(has(wrapper, "home-pack-list-primary-btn")).toBe(true);
   });
 
   it("says once to ask an admin when the user may create no offered pack", async () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render();
     expect(has(wrapper, "home-pack-label")).toBe(true);
-    expect(has(wrapper, "home-pack-card")).toBe(false);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(false);
     expect(wrapper.get('[data-test="home-pack-ask-admin"]').text()).toContain(
       "Starter packs fit your data. Ask an admin to add them.",
     );
@@ -536,23 +536,7 @@ describe("StarterPackHomeSection", () => {
     expect(wrapper.findAll('[data-test="home-pack-label"]')).toHaveLength(1);
   });
 
-  it("highlights only the first row, with a filled button there and outline buttons below", async () => {
-    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
-    expect(wrapper.get('[data-test="home-pack-best-start"]').text()).toBe("Best place to start");
-    expect(has(wrapper, "home-pack-hosts-best-start")).toBe(false);
-    const rows = wrapper.get('[data-test="home-pack-offer-rows"]');
-    expect(rows.findAll('[data-test$="row-highlight"]')).toHaveLength(1);
-    const highlight = wrapper.get('[data-test="home-pack-row-highlight"]');
-    expect(highlight.get('[data-test="home-pack-card"]').classes()).toContain("border-accent");
-    expect(wrapper.get('[data-test="home-pack-hosts-card"]').classes()).toContain(
-      "border-border-default",
-    );
-    const buttons = rows.findAll('[data-test$="card-setup-btn"]');
-    expect(buttons.map((btn) => btn.text())).toEqual(["Review pack", "Review pack"]);
-    expect(buttons.map((btn) => btn.attributes("data-o2-variant"))).toEqual(["primary", "outline"]);
-  });
-
-  it("tints each resource card by its kind", async () => {
+  it("tints each tile by its kind", async () => {
     const wrapper = await render();
     const tints = {
       dashboard: "bg-ingest-tint-blue",
@@ -560,99 +544,24 @@ describe("StarterPackHomeSection", () => {
       savedView: "bg-ingest-tint-purple",
     };
     for (const [kind, tint] of Object.entries(tints)) {
-      expect(wrapper.get(`[data-test="home-pack-resource-card-${kind}"]`).classes()).toContain(
-        tint,
-      );
+      expect(wrapper.get(`[data-test="home-pack-list-tile-${kind}"]`).classes()).toContain(tint);
     }
-  });
-
-  it("writes each resource card from the preview, in one column per kind", async () => {
-    fake.matchers.kubernetes.clusters.value = ["staging-eu-1"];
-    fake.flows.kubernetes.preview.value = {
-      items: [
-        { kind: "dashboard", itemId: "overview", status: "new" },
-        { kind: "alert", itemId: "a1", status: "new" },
-        { kind: "alert", itemId: "a2", status: "new" },
-        { kind: "savedView", itemId: "v1", status: "new" },
-      ],
-      panels: { kept: 12, dropped: 0 },
-    };
-    const wrapper = await render();
-    const grid = wrapper.get('[data-test="home-pack-resource-card-dashboard"]').element
-      .parentElement!;
-    expect(grid.className).toContain("grid-cols-3");
-    expect(wrapper.get('[data-test="home-pack-resource-summary-dashboard"]').text()).toBe(
-      "name-overview: 12 panels for staging-eu-1.",
-    );
-    const alerts = wrapper.get('[data-test="home-pack-resource-summary-alert"]');
-    expect(alerts.text()).toBe(
-      "name-a1, name-a2. Fire for every cluster (staging-eu-1). Off until you turn them on.",
-    );
-    expect(alerts.attributes("title")).toBe(alerts.text());
-    expect(alerts.classes()).toContain("line-clamp-4");
-    expect(wrapper.get('[data-test="home-pack-resource-summary-savedView"]').text()).toBe(
-      "Kubernetes events: every event in k8s_events, one click from Logs.",
-    );
-  });
-
-  it("sizes the resource grid to the kinds a pack has", async () => {
-    fake.flows.hosts = fakeFlow({ pack: HOSTS_PACK, viewCount: ref(0) });
-    const wrapper = await render([HOSTS_PACK]);
-    const grid = wrapper.get('[data-test="home-pack-hosts-resource-card-dashboard"]').element
-      .parentElement!;
-    expect(grid.className).toContain("grid-cols-2");
-    expect(wrapper.get('[data-test="home-pack-hosts-resource-summary-dashboard"]').text()).toBe(
-      "Host Metrics: CPU, memory and disk for each host.",
-    );
-    expect(wrapper.get('[data-test="home-pack-hosts-resource-summary-alert"]').text()).toBe(
-      "Fire for every host. Off until you turn them on.",
-    );
-  });
-
-  it("holds resource placeholders in the row until the preview is ready", async () => {
-    fake.flows.kubernetes = fakeFlow({
-      alertCount: ref(null),
-      dashboardCount: ref(null),
-      viewCount: ref(null),
-      previewState: ref("loading"),
-    });
-    const wrapper = await render();
-    expect(has(wrapper, "home-pack-resource-skeleton")).toBe(true);
-    expect(has(wrapper, "home-pack-resource-card-dashboard")).toBe(false);
-  });
-
-  it("says the preview failed in the row instead of leaving the grid blank", async () => {
-    fake.flows.kubernetes = fakeFlow({
-      alertCount: ref(null),
-      dashboardCount: ref(null),
-      viewCount: ref(null),
-      previewState: ref("error"),
-    });
-    const wrapper = await render();
-    expect(has(wrapper, "home-pack-resource-skeleton")).toBe(false);
-    expect(wrapper.get('[data-test="home-pack-resource-error"]').text()).toBe(
-      "Couldn't load what this pack sets up. Review it to try again.",
-    );
   });
 
   it("shows no streams panel for a pack matched without a found stream", async () => {
     fake.matchers.kubernetes.streams.value = [];
     const wrapper = await render();
-    expect(has(wrapper, "home-pack-card")).toBe(true);
-    expect(has(wrapper, "home-pack-row-streams")).toBe(false);
+    expect(has(wrapper, "home-pack-list-row-kubernetes")).toBe(true);
+    expect(has(wrapper, "home-pack-list-streams")).toBe(false);
   });
 
-  it("puts the best-start badge on the first row the user can set up", async () => {
+  it("puts the best-start badge on the first pack the user can set up", async () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
-    expect(has(wrapper, "home-pack-best-start")).toBe(false);
-    expect(has(wrapper, "home-pack-row-highlight")).toBe(false);
-    expect(wrapper.get('[data-test="home-pack-hosts-best-start"]').text()).toBe(
+    expect(has(wrapper, "home-pack-list-best-start")).toBe(false);
+    await wrapper.get('[data-test="home-pack-list-row-hosts"]').trigger("click");
+    expect(wrapper.get('[data-test="home-pack-list-best-start"]').text()).toBe(
       "Best place to start",
     );
-    expect(has(wrapper, "home-pack-hosts-row-highlight")).toBe(true);
-    expect(
-      wrapper.get('[data-test="home-pack-hosts-card-setup-btn"]').attributes("data-o2-variant"),
-    ).toBe("primary");
   });
 });

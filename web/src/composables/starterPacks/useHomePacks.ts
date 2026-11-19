@@ -164,7 +164,7 @@ const matchItems = (item: HomePack): FindMoreItem[] => {
 };
 
 // Same shape as a pack source from groupFindMore, so the header chip reads both alike.
-const matchSource = (item: HomePack): FindMoreSource => ({
+export const matchSource = (item: HomePack): FindMoreSource => ({
   id: item.pack.id,
   packId: item.pack.id,
   label: item.pack.id,

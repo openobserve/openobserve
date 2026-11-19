@@ -15,17 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { StarterPack } from "@/composables/starterPacks/types";
-import { useHomePacks, type HomePacks } from "@/composables/starterPacks/useHomePacks";
+import { matchSource, useHomePacks, type HomePacks } from "@/composables/starterPacks/useHomePacks";
 import { usePackGate } from "@/composables/starterPacks/usePackGate";
+import type { RailPack } from "@/composables/starterPacks/useStarterPackPopup";
 import { useI18nTyped } from "@/types/i18n";
-import StarterPackHomeRow from "./StarterPackHomeRow.vue";
+import StarterPackListPane from "./StarterPackListPane.vue";
 import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
 
 const props = defineProps<{ org: string; packs?: StarterPack[] }>();
@@ -43,8 +44,28 @@ watch(
 );
 onBeforeUnmount(() => emit("ready", null));
 // The badge belongs on a row the user can start, never on an Ask an admin row.
-const firstOffer = computed(() =>
-  home.offered.value.findIndex((item) => item.view.value === "offer"),
+const bestStartId = computed(
+  () => home.offered.value.find((item) => item.view.value === "offer")?.pack.id ?? null,
+);
+const rows = computed<RailPack[]>(() =>
+  home.offered.value.map((item) => ({
+    entry: { pack: item.pack, flow: item.flow, matcher: item.matcher },
+    source: matchSource(item),
+    setUp: false,
+    stopped: false,
+  })),
+);
+const selectedId = ref<string | null>(null);
+const selected = computed(
+  () =>
+    home.offered.value.find((item) => item.pack.id === selectedId.value) ??
+    home.offered.value[0] ??
+    null,
+);
+const busy = computed(
+  () =>
+    !!selected.value &&
+    (selected.value.flow.running.value || selected.value.view.value === "loading"),
 );
 </script>
 
@@ -92,26 +113,22 @@ const firstOffer = computed(() =>
     }}</OText>
     <div
       v-if="home.loading.value"
-      class="border-border-default rounded-surface flex flex-col overflow-hidden border"
+      class="border-border-default rounded-surface grid h-105 grid-cols-[14.5rem_minmax(0,1fr)] overflow-hidden border"
       data-test="home-pack-card-skeleton"
     >
-      <div class="border-border-subtle flex items-center gap-3 border-b px-4 py-3">
-        <OSkeleton class="size-8 shrink-0" />
-        <div class="flex flex-1 flex-col gap-1.5">
-          <OSkeleton class="h-4 w-1/4" />
-          <OSkeleton class="h-3 w-1/6" />
-        </div>
-        <OSkeleton class="h-8 w-36 shrink-0" />
+      <div class="bg-surface-panel border-border-default flex flex-col gap-2 border-e px-2 py-2.5">
+        <OSkeleton v-for="n in 2" :key="n" class="h-12.5 w-full" />
       </div>
-      <div class="flex max-md:flex-col">
-        <div
-          class="border-border-subtle flex w-60 shrink-0 flex-col gap-2 border-e px-4 py-3 max-md:w-full max-md:border-e-0 max-md:border-b"
-        >
-          <OSkeleton class="h-4 w-3/4" />
-          <OSkeleton class="h-4 w-2/3" />
+      <div class="flex flex-col gap-3 p-4">
+        <div class="flex items-center gap-3">
+          <OSkeleton class="size-9 shrink-0" />
+          <div class="flex flex-1 flex-col gap-1.5">
+            <OSkeleton class="h-4 w-1/4" />
+            <OSkeleton class="h-3 w-1/6" />
+          </div>
         </div>
-        <div class="grid flex-1 grid-cols-3 gap-3 p-3 max-sm:grid-cols-1">
-          <OSkeleton v-for="n in 3" :key="n" class="h-16 w-full" />
+        <div class="grid grid-cols-3 gap-2.5">
+          <OSkeleton v-for="n in 3" :key="n" class="h-34 w-full" />
         </div>
       </div>
     </div>
@@ -205,15 +222,45 @@ const firstOffer = computed(() =>
       {{ t("starterPacks.home.askAdminLine") }}
     </OBanner>
 
-    <section v-if="home.showSection.value" class="flex flex-col gap-3" data-test="home-pack-offer">
-      <div class="flex flex-col gap-3" data-test="home-pack-offer-rows">
-        <StarterPackHomeRow
-          v-for="(item, index) in home.offered.value"
-          :key="item.pack.id"
-          :item="item"
-          :first="index === firstOffer"
-        />
-      </div>
+    <section
+      v-if="home.showSection.value"
+      class="bg-surface-base border-border-default rounded-surface flex h-105 flex-col overflow-hidden border"
+      data-test="home-pack-offer"
+    >
+      <StarterPackListPane
+        class="min-h-0 flex-1"
+        :rows="rows"
+        :selected-id="selected?.pack.id"
+        :best-start-id="bestStartId"
+        test-prefix="home-pack-list"
+        @select="selectedId = $event"
+      />
+      <footer
+        v-if="selected"
+        class="border-border-default flex h-14.5 shrink-0 items-center justify-end gap-2 border-t px-4"
+      >
+        <span
+          v-if="selected.view.value === 'forbidden'"
+          class="text-text-secondary flex items-center gap-2 text-xs"
+          data-test="home-pack-list-ask-admin"
+        >
+          <OIcon name="lock" size="sm" class="shrink-0" />
+          {{ t("starterPacks.askAdmin") }}
+        </span>
+        <OButton
+          v-else
+          variant="primary"
+          size="sm-action"
+          class="min-w-35"
+          :disabled="busy"
+          :loading="busy"
+          :aria-label="t('starterPacks.home.reviewSetUpLabel', { title: selected.title })"
+          data-test="home-pack-list-primary-btn"
+          @click="selected.startSetup"
+        >
+          {{ t("starterPacks.home.reviewSetUp") }}
+        </OButton>
+      </footer>
     </section>
 
     <StarterPackUndoDialog
