@@ -23,6 +23,8 @@ import { escapeSingleQuotes } from "@/utils/zincutils";
 export interface ViewTracesPayload {
   serviceName?: string;
   serviceType?: string;
+  /** SQL expression that names the node when it is not `infer_service_name` (GenAI nodes). */
+  identityExpr?: string;
   serviceSystem?: string | null;
   operationName?: string;
   nodeName?: string;
@@ -51,7 +53,9 @@ export function buildViewTracesFilter(data: ViewTracesPayload): string {
   if (!data.serviceName) return "";
 
   const escapedServiceName = escapeSingleQuotes(data.serviceName);
-  const serviceField = data.serviceType ? "infer_service_name" : "service_name";
+  const serviceField = data.serviceType
+    ? data.identityExpr || "infer_service_name"
+    : "service_name";
   let filterQuery = `${serviceField} = '${escapedServiceName}'`;
 
   if (data.serviceType && Object.prototype.hasOwnProperty.call(data, "serviceSystem")) {

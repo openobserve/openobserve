@@ -341,7 +341,8 @@ const useTraces = () => {
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 
-    query["trace_id"] = router.currentRoute.value.query.trace_id;
+    if (router.currentRoute.value.query.trace_id)
+      query["trace_id"] = router.currentRoute.value.query.trace_id;
 
     query["tab"] = searchObj.meta.searchMode;
 

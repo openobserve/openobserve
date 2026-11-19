@@ -27,7 +27,7 @@ import {
   metricsRunError,
 } from "./metrics";
 import { recentSearchRoute } from "./routes";
-import { recentCompletionItems } from "./recentCompletions";
+import { recentCompletionItems, type RecentCompletionItem } from "./recentCompletions";
 
 const entry = (overrides: Partial<QueryHistoryEntry>): QueryHistoryEntry => ({
   id: "e",
@@ -213,6 +213,21 @@ describe("autocomplete clock rows", () => {
     };
   };
 
+  // Applies a row as Monaco does: every edit is a range of the text before the accept.
+  const accept = (text: string, item: RecentCompletionItem) => {
+    const lines = text.split("\n");
+    const offset = (line: number, column: number) =>
+      lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0) + column - 1;
+    return [{ range: item.range, text: item.insertText }, ...item.additionalTextEdits]
+      .map(({ range, text: insert }) => ({
+        start: offset(range.startLineNumber, range.startColumn),
+        end: offset(range.endLineNumber, range.endColumn),
+        insert,
+      }))
+      .sort((a, b) => b.start - a.start || b.end - a.end)
+      .reduce((out, e) => out.slice(0, e.start) + e.insert + out.slice(e.end), text);
+  };
+
   it("replaces the whole editor text with a matching recent query", () => {
     const items = recentCompletionItems(
       ["level = 'error' and ns = 'checkout'"],
@@ -224,28 +239,33 @@ describe("autocomplete clock rows", () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       insertText: "level = 'error' and ns = 'checkout'",
-      filterText: "lev",
       kind: 18,
-      range: { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 4 },
-      additionalTextEdits: [],
     });
-    expect(items[0].sortText < "a").toBe(true);
+    expect(accept("lev", items[0])).toBe("level = 'error' and ns = 'checkout'");
+  });
+
+  it("replaces the text after the caret too", () => {
+    const text = "lev ns";
+    const [item] = recentCompletionItems(
+      ["lev ns = 'a'"],
+      model(text),
+      { lineNumber: 1, column: 4 },
+      18,
+      "x",
+    );
+    expect(accept(text, item)).toBe("lev ns = 'a'");
   });
 
   it("clears the other lines of a multi-line editor", () => {
-    const items = recentCompletionItems(
+    const text = "SELECT *\nFROM a\nWHERE";
+    const [item] = recentCompletionItems(
       ["SELECT * FROM a WHERE b = 1"],
-      model("SELECT *\nFROM a"),
+      model(text),
       { lineNumber: 2, column: 7 },
       18,
       "Recent search",
     );
-    expect(items[0].additionalTextEdits).toEqual([
-      {
-        range: { startLineNumber: 1, startColumn: 1, endLineNumber: 2, endColumn: 1 },
-        text: "",
-      },
-    ]);
+    expect(accept(text, item)).toBe("SELECT * FROM a WHERE b = 1");
   });
 
   it("offers nothing when no recent query matches", () => {

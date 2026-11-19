@@ -325,9 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <LogsNoEventsState
                         class="min-h-0 flex-1"
-                        :sql-mode="searchObj.meta.sqlMode"
-                        :query="searchObj.data.query"
-                        :editor-value="searchObj.data.editorValue"
+                        :sql-mode="shownResultsQuery.sqlMode"
+                        :query="shownResultsQuery.query"
                         :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
                         :date-type="searchObj.data.datetime.type || 'relative'"
                         :ai-enabled="isAiEnabled"
@@ -558,7 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="searchObj.data.queryResults.hits?.length > 0"
               embedded
               :streamName="searchObj.data.stream.selectedStream[0]"
-              streamType="logs"
+              :streamType="searchObj.data.stream.streamType || 'logs'"
               :timeRange="drillDownTimeRange"
               :rateFilter="drillDownRateFilter"
               :baseFilter="drillDownBaseFilter"
@@ -573,9 +572,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <LogsNoEventsState
               v-else-if="searchObj.meta.searchApplied == true"
               data-test="logs-drill-down-no-events-found-text"
-              :sql-mode="searchObj.meta.sqlMode"
-              :query="searchObj.data.query"
-              :editor-value="searchObj.data.editorValue"
+              :sql-mode="shownResultsQuery.sqlMode"
+              :query="shownResultsQuery.query"
               :relative-time-period="searchObj.data.datetime.relativeTimePeriod || ''"
               :date-type="searchObj.data.datetime.type || 'relative'"
               :ai-enabled="isAiEnabled"
@@ -603,6 +601,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="buildQueryPageRef"
               :searchQuery="searchObj.meta.sqlMode ? searchObj.data.query : ''"
               :selectedStream="searchObj.data.stream.selectedStream[0] || ''"
+              :selectedStreamType="searchObj.data.stream.streamType || 'logs'"
               :selectedDateTime="selectedDateTime"
               :isFirstToggle="isFirstBuildToggle"
               :isSqlMode="searchObj.meta.sqlMode"
@@ -672,6 +671,13 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import {
+  cachedSearchMatchesRoute,
+  lastRunSearch,
+  lastRunSurface,
+} from "@/composables/useLogs/logsRouteCache";
+import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { verifyOrganizationStatus, deepCopy, addSpacesToOperators } from "@/utils/zincutils";
@@ -724,7 +730,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
-import { logsReapplyRequest } from "@/utils/queryHistory/logs";
+import { logsReapplyRequest, requestLogsReapply } from "@/utils/queryHistory/logs";
+import { useLogsHistoryRestore } from "@/composables/useLogs/useLogsHistoryRestore";
 import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
@@ -755,7 +762,9 @@ import {
 import {
   endLogsArrival,
   parseSharedPage,
+  replaceNextLogsWrite,
   resetShownSearch,
+  shownEntryFor,
   sharedPage,
   sharedPageNotice,
 } from "@/composables/useLogs/useLogsUrl";
@@ -978,8 +987,13 @@ export default defineComponent({
       patchUrlViewState,
       addTraceId,
     } = logsUtils();
-    const { getHistogramData, buildWebSocketPayload, buildSearch, initializeSearchConnection } =
-      useSearchStream(t);
+    const {
+      getHistogramData,
+      buildWebSocketPayload,
+      buildSearch,
+      initializeSearchConnection,
+      resolveFilterForStreams,
+    } = useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
     const { extractPatterns, patternsState, cancelPatterns, clearPatterns } = usePatterns(t);
@@ -1054,7 +1068,8 @@ export default defineComponent({
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
-    const { showErrorNotification, showAliasErrorForVisualization } = useNotifications();
+    const { showErrorNotification, showAliasErrorForVisualization, showInfoNotification } =
+      useNotifications();
 
     provide("dashboardPanelDataPageKey", "logs");
     const visualizeChartData = ref({});
@@ -1182,7 +1197,14 @@ export default defineComponent({
     };
 
     // Logs is not in MainLayout's keep-alive include list, so onActivated alone would never run.
-    onMounted(registerBeforeAppReload);
+    let stopHistoryRestore: (() => void) | undefined;
+    onMounted(() => {
+      registerBeforeAppReload();
+      stopHistoryRestore = useLogsHistoryRestore(router, () => {
+        replaceNextLogsWrite();
+        requestLogsReapply(true, "url");
+      });
+    });
 
     onActivated(() => {
       registerBeforeAppReload();
@@ -1190,7 +1212,10 @@ export default defineComponent({
     });
 
     onDeactivated(unregisterBeforeAppReload);
-    onBeforeUnmount(unregisterBeforeAppReload);
+    onBeforeUnmount(() => {
+      unregisterBeforeAppReload();
+      stopHistoryRestore?.();
+    });
 
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
@@ -1256,7 +1281,10 @@ export default defineComponent({
           await extractFields();
           refreshData();
           // A newer restore started meanwhile; it carries its own run decision.
-          if (runRequested && logsReapplyRequest.value.seq === seq) runQueryFn();
+          if (runRequested && logsReapplyRequest.value.seq === seq) {
+            const result = await runQueryFn(logsReapplyRequest.value.reason);
+            if (result !== "scheduled" && result !== "dispatched") endLogsArrival();
+          }
         }
       },
     );
@@ -1283,13 +1311,13 @@ export default defineComponent({
       },
     );
 
-    const runQueryFn = async () => {
+    const runQueryFn = async (reason: "run" | "url" = "run") => {
       searchObj.runQuery = false;
       if (!searchObj.data.stream.selectedStream.length) {
         searchObj.loading = false;
-        return;
+        return "skipped";
       }
-      autoRun.engine.requestRun("run");
+      return autoRun.engine.requestRun(reason === "url" ? "url" : "run");
     };
 
     const showRanFilter = (generationId: number, ranQuery: string) => {
@@ -1474,7 +1502,11 @@ export default defineComponent({
     // Main method for handling before mount logic
     async function handleBeforeMount() {
       if (Object.hasOwn(router.currentRoute.value?.query, "logs_visualize_toggle")) {
-        const urlToggle = router.currentRoute.value.query.logs_visualize_toggle;
+        const urlToggle = resolveUrlViewToggle(
+          router.currentRoute.value.query.logs_visualize_toggle,
+          checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)).allowed,
+          router.currentRoute.value.query.stream_type,
+        );
         // Restoring directly onto the Timechart tab: setupLogsTab() will run the
         // visualization once fields are ready, so tell the toggle watcher to skip
         // the page-load fire it is about to receive from the assignment below.
@@ -1522,11 +1554,24 @@ export default defineComponent({
         store.state.logs.logs.data != undefined &&
         Object.hasOwn(store.state.logs.logs.data, "stream") &&
         Object.hasOwn(store.state.logs.logs, "organizationIdentifier") &&
-        (!store.state.logs.logs.data.stream.selectedStream.includes(
-          router.currentRoute.value.query.stream,
-        ) ||
-          router.currentRoute.value.query.org_identifier !==
-            store.state.logs.logs.organizationIdentifier)
+        !cachedSearchMatchesRoute(
+          router.currentRoute.value.query,
+          lastRunSearch(
+            {
+              streams: store.state.logs.logs.data.stream.selectedStream,
+              org: store.state.logs.logs.organizationIdentifier,
+              streamType: store.state.logs.logs.data.stream.streamType,
+              query: store.state.logs.logs.data.query,
+              sqlMode: store.state.logs.logs.meta?.sqlMode,
+              timeType: store.state.logs.logs.data.datetime?.type,
+              period: store.state.logs.logs.data.datetime?.relativeTimePeriod,
+              startTime: store.state.logs.logs.data.datetime?.startTime,
+              endTime: store.state.logs.logs.data.datetime?.endTime,
+              toggle: store.state.logs.logs.meta?.logsVisualizeToggle,
+            },
+            shownEntryFor(lastRunSurface(store.state.logs.logs.meta?.logsVisualizeToggle)),
+          ),
+        )
       ) {
         store.dispatch("logs/setIsInitialized", false);
       }
@@ -1909,16 +1954,30 @@ export default defineComponent({
 
             searchObj.data.query = "";
             const streams = searchObj.data.stream.selectedStream;
+            // Normal mode skips a stream that lacks a filter field and maps a semantic-group field per
+            // stream, so the SQL leaves that arm out and writes the mapped field.
+            const resolved = streams.length > 1 ? resolveFilterForStreams(currentQuery) : null;
+            const usable = resolved?.errors.length === 0 ? resolved : null;
+            const missing = usable?.excluded.map((entry) => entry.stream) ?? [];
+            const skipped = missing.length < streams.length ? missing : [];
+            if (skipped.length) showInfoNotification(searchObj.data.missingStreamMessage);
+            let arms = 0;
 
             streams.forEach((stream: string, index: number) => {
+              if (skipped.includes(stream)) return;
               // BY NAME merges differing columns; ALL keeps events duplicated across streams.
-              if (index > 0) {
+              if (arms++ > 0) {
                 // A -- comment runs to the end of the line, so the next arm must start a new one.
                 searchObj.data.query += hasLineComment(searchObj.data.query)
                   ? "\nUNION ALL BY NAME "
                   : " UNION ALL BY NAME ";
               }
-              const armWhere = textWhere ? `WHERE ${textWhere[index]}` : whereClause;
+              const rewrite = usable?.armRewrites.get(stream);
+              const armWhere = textWhere
+                ? `WHERE ${textWhere[index]}`
+                : rewrite
+                  ? `WHERE ${rewrite}`
+                  : whereClause;
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${armWhere}`;
             });
 
@@ -2098,6 +2157,14 @@ export default defineComponent({
       searchObj.data.datetime.type = "relative";
       autoRun.engine.requestRun("run");
     };
+
+    // The empty state describes the results on screen, so an unrun edit must not change its copy.
+    // A result set no recorded run produced (a search job) has only the live query to go by.
+    const shownResultsQuery = computed(() => {
+      const ran = searchObj.meta.executed?.signature;
+      if (ran) return { sqlMode: ran.sqlMode, query: ran.query };
+      return { sqlMode: !!searchObj.meta.sqlMode, query: String(searchObj.data.query ?? "") };
+    });
 
     // Microsecond bounds of the selected streams' data (union across all selected streams).
     // undefined when no stream is selected or stats are unavailable.
@@ -3326,7 +3393,12 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
+    const isBuildFilterHeld = () =>
+      !!(buildQueryPageRef.value as { freeTextNotice?: boolean } | null)?.freeTextNotice;
+
     const onBuildQueryGenerated = async (query: string) => {
+      // While the notice shows the builder has no SQL for the filter; "" would erase Search.
+      if (isBuildFilterHeld()) return;
       if (searchObj.meta.sqlMode) {
         // SQL mode ON: sync the full generated SQL to the search bar
         searchObj.data.query = query;
@@ -3344,6 +3416,24 @@ export default defineComponent({
       // Disable query editor in build mode when customQuery is false (builder mode)
       // In builder mode, query is auto-generated from fields - user shouldn't edit directly
       searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
+      if (isCustomMode) seedCustomQueryFromHeldFilter();
+    };
+
+    // Builder -> Custom with a filter the builder could not chart: hand the user that filter as SQL.
+    const seedCustomQueryFromHeldFilter = () => {
+      const page = buildQueryPageRef.value as { incompleteFilterNotice?: boolean } | null;
+      const panelQuery = buildDashboardPanelData.data.queries[0];
+      const streams = searchObj.data.stream.selectedStream;
+      if (!page?.incompleteFilterNotice || !panelQuery) return;
+      if (searchObj.meta.sqlMode) {
+        panelQuery.query = searchObj.data.query;
+      } else if (streams.length === 1) {
+        // The WHERE sits on its own line so a trailing `-- comment` cannot swallow GROUP BY.
+        panelQuery.query =
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 ` +
+          `FROM "${streams[0].replace(/"/g, '""')}" WHERE ${searchObj.data.query}\n` +
+          `GROUP BY x_axis_1 ORDER BY x_axis_1`;
+      }
     };
 
     // Handle build mode toggle from SearchBar (updates panel schema's customQuery)
@@ -3354,6 +3444,7 @@ export default defineComponent({
 
         // Builder → Custom: show the generated SQL in the editor for editing
         if (isCustomMode) {
+          if (isBuildFilterHeld()) return;
           const generatedQuery = buildDashboardPanelData.data.queries[0]?.query || "";
           if (searchObj.meta.sqlMode) {
             searchObj.data.query = generatedQuery;
@@ -3486,7 +3577,8 @@ export default defineComponent({
         dashboardPanelData.data.queries[currentQueryIndex].fields.stream = streamName;
         // stream_type should already be set, but ensure it's preserved
         if (!dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type) {
-          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type = "logs";
+          dashboardPanelData.data.queries[currentQueryIndex].fields.stream_type =
+            searchObj.data.stream.streamType || "logs";
         }
       }
 
@@ -4200,6 +4292,7 @@ export default defineComponent({
       onAskAiFixQuery,
       streamDocTimeRange,
       queryWindowUs,
+      shownResultsQuery,
       onJumpToStreamData,
       onFixQuery,
       onConfigureStream,
