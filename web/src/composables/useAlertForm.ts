@@ -1010,6 +1010,7 @@ export function useAlertForm(
     ...alertsListQuery(store.state.selectedOrganization.identifier, activeFolderId.value),
     enabled: !props.isUpdated,
   }));
+  const checkingName = ref(false);
   const nameTakenIn = (name: string): string | null => {
     if (props.isUpdated) return null;
     const hit = (folderAlerts.data.value ?? []).find((a: { name?: string }) => a.name === name);
@@ -2470,6 +2471,11 @@ export function useAlertForm(
   // fire for that.
   // The Save label counts the issues, so a failed save only moves focus to the first one.
   const handleSave = async () => {
+    if (!props.isUpdated) {
+      // The folder list was read when the form opened; someone may have saved this name since.
+      checkingName.value = true;
+      await folderAlerts.refetch().finally(() => (checkingName.value = false));
+    }
     await form.handleSubmit();
     if (!form.state.isValid) focusOnFirstError();
   };
@@ -3738,6 +3744,7 @@ export function useAlertForm(
     applyAlertPrefill,
     applyFieldPatch,
     handleSave,
+    checkingName,
     destinationRequired,
     silentAutoObserveDraft,
     viaIncidentDraft,

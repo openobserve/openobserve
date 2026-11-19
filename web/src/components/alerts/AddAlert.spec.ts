@@ -2026,6 +2026,20 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       expect(wrapper.vm.alertNameSuggestion).toBe("k8s_logs_alert_2");
     });
+
+    it("re-reads the folder on Save, so a name saved since the form opened blocks it", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      wrapper.vm.form.setFieldValue("name", "cpu_high");
+      vi.mocked(alertsService.listByFolderId).mockResolvedValue({
+        data: { list: [{ name: "cpu_high", folder_name: "default" }] },
+      } as any);
+      await wrapper.vm.saveAlert();
+      await flushPromises();
+      expect(wrapper.vm.nameFieldError).toBe(
+        i18n.global.t("alerts.validation.nameTaken", { name: "cpu_high", folder: "default" }),
+      );
+    });
   });
 
   describe("edit header and tucked settings", () => {

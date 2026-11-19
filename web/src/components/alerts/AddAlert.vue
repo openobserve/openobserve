@@ -1194,7 +1194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-alert-submit-btn"
           variant="primary"
           size="sm-action"
-          :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
+          :loading="isSubmitting || checkingName || (isAnomalyMode && anomalySaving)"
           :disabled="silentAutoObserveDraft"
           class="min-w-28"
           @click="saveAlert"
