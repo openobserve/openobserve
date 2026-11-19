@@ -171,10 +171,11 @@ const showEmptyRow = computed(
     !newDraft.value,
 );
 // A vertical caret gets its own line where it stands; resting at the end of an idle filter it sits beside the add buttons.
+// Editing a chip searches inside the picker, so the caret takes no line then.
 const caretLine = computed(
   () =>
     vertical.value &&
-    (open.value ||
+    ((open.value && !editingId.value) ||
       Boolean(newDraft.value) ||
       Boolean(openGroupId.value) ||
       Boolean(caretBeforeId.value) ||

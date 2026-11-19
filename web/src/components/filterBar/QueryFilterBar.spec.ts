@@ -650,6 +650,17 @@ describe("QueryFilterBar", () => {
     expect(wrapper!.find('[data-test^="query-filter-bar-summary-"]').exists()).toBe(false);
   });
 
+  it("gives the vertical caret its own line for a new chip, never while a chip is edited", async () => {
+    mountBar({ modelValue: parseSqlFilter("level = 'error'")!, layout: "vertical" });
+    const draftRow = () => wrapper!.find('[data-test="query-filter-bar-draft-row"]').exists();
+    await editPart("level", "value");
+    expect(draftRow()).toBe(false);
+    await press("Escape");
+    await wrapper!.find('[data-test="query-filter-bar-add-condition"]').trigger("click");
+    await flushPromises();
+    expect(draftRow()).toBe(true);
+  });
+
   it("moves focus to the redrawn fold toggle even when the group id holds a quote", async () => {
     const deep = parseSqlFilter(
       "level = 'a' AND (level = 'b' OR (level = 'c' AND (level = 'd' OR status = 1)))",
