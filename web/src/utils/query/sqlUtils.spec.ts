@@ -760,7 +760,7 @@ describe("sqlUtils", () => {
         streamName: null,
         joins: [],
         limit: 0,
-        hasOrderBy: false,
+        orderedFields: [],
       });
     });
 
@@ -4030,9 +4030,19 @@ describe("applyQueryClauses", () => {
       `SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC LIMIT 2`,
     );
     expect(result.limit).toBe(2);
-    expect(result.hasOrderBy).toBe(true);
+    expect(result.orderedFields).toEqual([result.fields[1]]);
     expect(result.fields[1].sortBy).toBe("DESC");
     expect(result.fields[0].sortBy).toBeUndefined();
+  });
+
+  it("maps every ORDER BY key to its field in key order", async () => {
+    const result = await clausesOf(
+      `SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC, service`,
+    );
+    expect(result.unsupported).toBeUndefined();
+    expect(result.orderedFields).toEqual([result.fields[1], result.fields[0]]);
+    expect(result.fields[1].sortBy).toBe("DESC");
+    expect(result.fields[0].sortBy).toBe("ASC");
   });
 
   it("maps an ORDER BY select-list position to that field", async () => {
@@ -4063,7 +4073,7 @@ describe("applyQueryClauses", () => {
       `SELECT service, count(*) FROM "default" GROUP BY service HAVING count(*) > 1 AND count(*) < 9`,
     ],
     [`SELECT service, count(*) FROM "default" GROUP BY service LIMIT 5 OFFSET 2`],
-    [`SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC, service`],
+    [`SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC, count(*) ASC`],
     [`SELECT service, count(*) FROM "default" GROUP BY service HAVING 2 > 1`],
     [`SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC NULLS LAST`],
   ])("reports a clause the builder cannot express: %s", async (query) => {

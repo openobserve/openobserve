@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { getFieldsFromQuery } from "./sqlUtils";
+import { getFieldsFromQuery, getStreamFromQuery } from "./sqlUtils";
+import { buildSQLChartQuery } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import {
   isQueryParseable,
   parseSQL,
@@ -16,6 +17,7 @@ vi.mock("./sqlUtils", () => ({
     ],
     filters: { filterType: "group", logicalOperator: "AND", conditions: [] },
     streamName: "logs",
+    orderedFields: [],
   }),
   getStreamFromQuery: vi.fn().mockResolvedValue("logs"),
 }));
@@ -253,7 +255,7 @@ describe("sqlQueryParser", () => {
       streamName: "logs",
       joins: [],
       limit: 0,
-      hasOrderBy: false,
+      orderedFields: [],
       unsupported: "Contains ORDER BY on an expression not in SELECT",
     });
 
@@ -267,6 +269,26 @@ describe("sqlQueryParser", () => {
       const result = await parseSQL("SELECT service, count(*) AS c FROM logs GROUP BY service");
       expect(result.customQuery).toBe(true);
       expect(result.parseError).toBe("Contains ORDER BY on an expression not in SELECT");
+    });
+
+    it("opens a HAVING on a group-by field in custom mode", async () => {
+      vi.mocked(getFieldsFromQuery).mockResolvedValueOnce({
+        ...clauseResult([
+          {
+            column: "service",
+            alias: "service",
+            aggregationFunction: null,
+            havingConditions: [{ operator: ">", value: 1 }],
+          },
+          { column: "_timestamp", alias: "c", aggregationFunction: "count" },
+        ]),
+        unsupported: undefined,
+      });
+      const result = await parseSQL(
+        "SELECT service, count(*) AS c FROM logs GROUP BY service HAVING service > 1",
+      );
+      expect(result.customQuery).toBe(true);
+      expect(result.parseError).toBe("Contains HAVING on a non-aggregated field");
     });
 
     it("keeps a raw-row query on the default chart even when its clauses cannot be mapped", async () => {
@@ -599,6 +621,70 @@ describe("sqlQueryParser", () => {
       });
       expect(result.x[0].sortBy).toBeNull();
       expect(result.y[0].sortBy).toBe("DESC");
+    });
+  });
+
+  describe("builder ORDER BY round trip", () => {
+    const parseWithRealParser = async (query: string) => {
+      const actual = await vi.importActual<typeof import("./sqlUtils")>("./sqlUtils");
+      vi.mocked(getStreamFromQuery).mockImplementationOnce(actual.getStreamFromQuery);
+      vi.mocked(getFieldsFromQuery).mockImplementationOnce(actual.getFieldsFromQuery);
+      return parseSQL(query);
+    };
+    const builderSql = (panel: ReturnType<typeof parsedQueryToPanelFields>, chartType: string) => {
+      const queryData = {
+        fields: { ...panel, z: [] },
+        joins: panel.joins,
+        config: { limit: panel.limit },
+      };
+      return buildSQLChartQuery({
+        queryData,
+        chartType,
+        dashboardPanelData: { data: { queries: [queryData] } },
+      });
+    };
+    const sortsOf = (panel: ReturnType<typeof parsedQueryToPanelFields>) =>
+      [...panel.x, ...panel.y, ...panel.breakdown].map((field) => field.sortBy);
+
+    it("reopens a table query with a sort on every x field in builder mode", async () => {
+      const first = parsedQueryToPanelFields(
+        await parseWithRealParser(
+          `SELECT service, level, host, count(*) FROM "default" GROUP BY service, level, host`,
+        ),
+      );
+      const sql = builderSql(first, "table");
+      expect(sql).toContain("ORDER BY x_axis_1 ASC, x_axis_2 ASC, x_axis_3 ASC");
+
+      const reparsed = await parseWithRealParser(sql);
+      expect(reparsed.customQuery).toBe(false);
+      const second = parsedQueryToPanelFields(reparsed);
+      expect(sortsOf(second)).toEqual(sortsOf(first));
+      expect(builderSql(second, "table")).toBe(sql);
+    });
+
+    it("reopens a histogram query sorted on x and y in builder mode", async () => {
+      const first = parsedQueryToPanelFields(
+        await parseWithRealParser(
+          `SELECT histogram(_timestamp) AS t, count(*) AS c FROM "default" GROUP BY t`,
+        ),
+      );
+      first.y[0].sortBy = "DESC";
+      const sql = builderSql(first, "bar");
+      expect(sql).toContain("ORDER BY x_axis_1 ASC, y_axis_1 DESC");
+
+      const reparsed = await parseWithRealParser(sql);
+      expect(reparsed.customQuery).toBe(false);
+      const second = parsedQueryToPanelFields(reparsed);
+      expect(sortsOf(second)).toEqual(["ASC", "DESC"]);
+      expect(builderSql(second, "bar")).toBe(sql);
+    });
+
+    it("opens ORDER BY keys in an order the builder cannot write in custom mode", async () => {
+      const result = await parseWithRealParser(
+        `SELECT histogram(_timestamp) AS t, count(*) AS c FROM "default" GROUP BY t ORDER BY c DESC, t ASC`,
+      );
+      expect(result.customQuery).toBe(true);
+      expect(result.parseError).toBe("Contains ORDER BY in an order the builder cannot write");
     });
   });
 });

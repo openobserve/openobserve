@@ -240,6 +240,41 @@ function classifyField(field: ParsedField): "x" | "y" | "breakdown" {
   return "breakdown";
 }
 
+/** Places GROUP BY fields on the panel axes: more than two go to a table's x-axis, else the first breakdown fills an empty x-axis. */
+function arrangeGroupByFields(
+  xFields: ParsedField[],
+  breakdownFields: ParsedField[],
+): { xFields: ParsedField[]; breakdownFields: ParsedField[]; useTableChart: boolean } {
+  if (xFields.length + breakdownFields.length > 2) {
+    return { xFields: [...xFields, ...breakdownFields], breakdownFields: [], useTableChart: true };
+  }
+  if (xFields.length === 0 && breakdownFields.length > 0) {
+    return {
+      xFields: [breakdownFields[0]],
+      breakdownFields: breakdownFields.slice(1),
+      useTableChart: false,
+    };
+  }
+  return { xFields, breakdownFields, useTableChart: false };
+}
+
+/** True when the builder, which writes ORDER BY keys in x, y, breakdown field order, would write the query's keys in the same order. */
+function matchesBuilderSortOrder(
+  xFields: ParsedField[],
+  yFields: ParsedField[],
+  breakdownFields: ParsedField[],
+  orderedFields: object[],
+): boolean {
+  const axes = arrangeGroupByFields(xFields, breakdownFields);
+  const emitted = [...axes.xFields, ...yFields, ...axes.breakdownFields].filter((field) =>
+    orderedFields.includes(field),
+  );
+  return (
+    emitted.length === orderedFields.length &&
+    emitted.every((field, index) => field === orderedFields[index])
+  );
+}
+
 // ============================================================================
 // Main Parser
 // ============================================================================
@@ -292,7 +327,7 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
     const stream = await getStreamFromQuery(query);
 
     // Extract fields, filters, and joins
-    const { fields, filters, streamName, joins, limit, hasOrderBy, unsupported } =
+    const { fields, filters, streamName, joins, limit, orderedFields, unsupported } =
       await getFieldsFromQuery(query);
 
     // Classify fields into x, y, breakdown
@@ -321,6 +356,15 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
     }
     if ([...xFields, ...breakdownFields].some((field) => field.havingConditions?.length)) {
       return { ...defaultResult, parseError: "Contains HAVING on a non-aggregated field" };
+    }
+    if (
+      !fallsBackToDefaultChart &&
+      !matchesBuilderSortOrder(xFields, yFields, breakdownFields, orderedFields)
+    ) {
+      return {
+        ...defaultResult,
+        parseError: "Contains ORDER BY in an order the builder cannot write",
+      };
     }
 
     // Use default histogram/count when there are no meaningful axis fields:
@@ -366,7 +410,7 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
       customQuery: false,
       rawQuery: query,
       limit,
-      hasOrderBy,
+      hasOrderBy: orderedFields.length > 0,
     };
   } catch (error: any) {
     return {
@@ -445,26 +489,10 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
     return baseField;
   };
 
-  let xFields = parsed.xFields;
-  let breakdownFields = parsed.breakdownFields;
-  let useTableChart = false;
-
-  // Calculate total non-aggregation fields (x-axis + breakdown)
-  // We support single x-axis and single breakdown for most charts
-  // If more than 2 GROUP BY fields, use table chart with all fields on x-axis
-  const totalGroupByFields = xFields.length + breakdownFields.length;
-
-  if (totalGroupByFields > 2) {
-    // Use table chart: move all breakdown fields to x-axis
-    xFields = [...xFields, ...breakdownFields];
-    breakdownFields = [];
-    useTableChart = true;
-  } else if (xFields.length === 0 && breakdownFields.length > 0) {
-    // If no timeseries/histogram field on X-axis but there are breakdown fields,
-    // move the first breakdown field to X-axis
-    xFields = [breakdownFields[0]];
-    breakdownFields = breakdownFields.slice(1);
-  }
+  const { xFields, breakdownFields, useTableChart } = arrangeGroupByFields(
+    parsed.xFields,
+    parsed.breakdownFields,
+  );
 
   return {
     stream: parsed.stream,
