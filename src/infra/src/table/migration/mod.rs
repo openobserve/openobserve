@@ -279,6 +279,7 @@ mod m20261223_000001_create_ai_toolset_health;
 mod m20261224_000001_ai_toolsets_replication;
 mod m20261225_000001_create_ai_memory;
 mod m20261226_000001_add_flags_to_ai_memory_revisions;
+mod m20261227_000001_ai_memory_replication;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -497,6 +498,9 @@ pub(crate) async fn create_ai_memory_tables(db: &sea_orm::DatabaseConnection) ->
         .up(&manager)
         .await?;
     m20261226_000001_add_flags_to_ai_memory_revisions::Migration
+        .up(&manager)
+        .await?;
+    m20261227_000001_ai_memory_replication::Migration
         .up(&manager)
         .await
 }
@@ -936,6 +940,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261224_000001_ai_toolsets_replication::Migration),
             Box::new(m20261225_000001_create_ai_memory::Migration),
             Box::new(m20261226_000001_add_flags_to_ai_memory_revisions::Migration),
+            Box::new(m20261227_000001_ai_memory_replication::Migration),
         ]
     }
 }
@@ -1073,6 +1078,7 @@ mod tests {
         (158, "m20261224_000001_ai_toolsets_replication"),
         (159, "m20261225_000001_create_ai_memory"),
         (160, "m20261226_000001_add_flags_to_ai_memory_revisions"),
+        (161, "m20261227_000001_ai_memory_replication"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

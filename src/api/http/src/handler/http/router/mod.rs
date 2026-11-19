@@ -2060,6 +2060,7 @@ fn service_route_table() -> Router {
             .route("/{org_id}/ai/memory/org/revisions/{id}/accept", post(ai::memory::accept_org_memory_revision))
             .route("/{org_id}/ai/memory/org/revisions/{id}/discard", post(ai::memory::discard_org_memory_revision))
             .route("/{org_id}/ai/memory/org/revert", post(ai::memory::revert_org_memory))
+            .route("/{org_id}/ai/memory/_resync", post(ai::memory::resync_memory))
             .route("/{org_id}/ai/memory/pending", get(ai::memory::list_pending_memory_edits))
             .route("/{org_id}/ai/memory/pending/accept", post(ai::memory::accept_pending_memory_edits))
             .route("/{org_id}/ai/memory/pending/discard", post(ai::memory::discard_pending_memory_edits))

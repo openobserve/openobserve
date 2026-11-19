@@ -18,19 +18,20 @@
 
 use config::meta::ai::memory::{
     AgentMemoryWrites, Author, ContentError, EditError, EditFlag, Evidence, MemoryEdit,
-    MemoryScope, MemorySettings, RevisionState, WriteMode, apply_edits, edit_flags,
-    effective_agent_writes, validate_content, write_mode,
+    MemoryReplica, MemoryScope, MemorySettings, MemoryTombstone, ReplicaRevision, ReplicaSettings,
+    RevisionState, WriteMode, apply_edits, edit_flags, effective_agent_writes, replica_wins,
+    validate_content, write_mode,
 };
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, TransactionTrait,
+    ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, EntityTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
     sea_query::{Expr, Func, OnConflict},
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::entity::{
-    ai_chat_sessions, ai_chat_turns, ai_memory, ai_memory_revisions, org_ai_toolsets, org_users,
-    users,
+    ai_chat_sessions, ai_chat_turns, ai_memory, ai_memory_revisions, ai_memory_tombstones,
+    org_ai_toolsets, org_users, users,
 };
 use crate::{db::get_orm_client_rw, errors};
 
@@ -41,6 +42,8 @@ const AGENT_KEPT: usize = 50;
 const MICROS_PER_DAY: i64 = 24 * 3600 * 1_000_000;
 const PEOPLE_KEPT_MICROS: i64 = 365 * MICROS_PER_DAY;
 const DISCARDED_KEPT_MICROS: i64 = 30 * MICROS_PER_DAY;
+/// How long a delete tombstone is kept; re-syncs drop older ones.
+pub const TOMBSTONE_KEEP_MICROS: i64 = 30 * MICROS_PER_DAY;
 
 /// `scope_key` is `''` for org memory, the toolset's normalized name, or the user's `users.id`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -189,6 +192,23 @@ pub enum AgentOutcome {
     UserScopeRefused,
     WritesOff,
     Written(MemoryKey, Outcome),
+}
+
+/// What another region's message did to this region's memory.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Replicated {
+    /// Nothing new: an older change, or one applied before.
+    Ignored,
+    /// Recorded without replacing this region's head: a new memory, a pending edit or its
+    /// discard, settings, or a losing head kept in history.
+    Recorded,
+    /// `region`'s change replaced this region's head; the caller audits it.
+    Replaced {
+        region: String,
+    },
+    Deleted {
+        region: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -568,7 +588,7 @@ pub async fn set_settings_with<C: ConnectionTrait + TransactionTrait>(
     let txn = conn.begin().await?;
     let outcome = match open_in(&txn, dek, key, toolset_id, now).await? {
         Some(row) => {
-            let row = save_settings(&txn, row, settings).await?;
+            let row = save_settings(&txn, row, settings, now).await?;
             Outcome::SettingsSaved {
                 rev: row.rev,
                 op_id: row.op_id,
@@ -679,7 +699,528 @@ pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
         .filter(ai_memory::Column::Org.eq(org))
         .exec(conn)
         .await?;
+    // A reused org name must not inherit the old org's deletes.
+    ai_memory_tombstones::Entity::delete_many()
+        .filter(ai_memory_tombstones::Column::Org.eq(org))
+        .exec(conn)
+        .await?;
     Ok(())
+}
+
+/// The keys of the org's memories, for a re-sync.
+pub async fn list_keys_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+) -> Result<Vec<MemoryKey>, errors::Error> {
+    ai_memory::Entity::find()
+        .filter(ai_memory::Column::Org.eq(org))
+        .all(conn)
+        .await?
+        .iter()
+        .map(key_of)
+        .collect()
+}
+
+/// `key`'s memory as another region gets it: the head with its revision, every pending
+/// revision, and `also` (a revision just discarded). `local_region` names this region's own
+/// changes, which carry no region.
+pub async fn replica_with<C: ConnectionTrait>(
+    conn: &C,
+    dek: &[u8],
+    key: &MemoryKey,
+    also: Option<&str>,
+    local_region: &str,
+) -> Result<Option<MemoryReplica>, errors::Error> {
+    let Some(row) = find_by_key(conn, key).await? else {
+        return Ok(None);
+    };
+    let mut wanted = Condition::any()
+        .add(ai_memory_revisions::Column::State.eq(RevisionState::Pending.as_str()));
+    if let Some(op_id) = &row.op_id {
+        wanted = wanted.add(ai_memory_revisions::Column::OpId.eq(op_id));
+    }
+    if let Some(id) = also {
+        wanted = wanted.add(ai_memory_revisions::Column::Id.eq(id));
+    }
+    let models = ai_memory_revisions::Entity::find()
+        .filter(ai_memory_revisions::Column::MemoryId.eq(&row.id))
+        .filter(wanted)
+        .order_by_asc(ai_memory_revisions::Column::CreatedAt)
+        .all(conn)
+        .await?;
+    let region = head_region(conn, &row, local_region).await?;
+    let revisions = models
+        .into_iter()
+        .map(|m| to_replica_revision(m, dek, local_region))
+        .collect::<Result<Vec<_>, _>>()?;
+    let settings = ReplicaSettings {
+        agent_memory_writes: row
+            .agent_memory_writes
+            .as_deref()
+            .map(str::parse)
+            .transpose()
+            .map_err(errors::Error::Message)?,
+        max_bytes: row.max_bytes,
+        user_max_bytes: row.user_max_bytes,
+        updated_at: row.settings_at.unwrap_or(0),
+        region: row
+            .settings_region
+            .clone()
+            .unwrap_or_else(|| local_region.to_string()),
+    };
+    Ok(Some(MemoryReplica {
+        org: row.org,
+        scope: key.scope,
+        scope_key: row.scope_key,
+        content: decrypt(dek, &row.content)?,
+        op_id: row.op_id,
+        updated_by: row.updated_by,
+        updated_at: row.updated_at,
+        region,
+        settings,
+        revisions,
+    }))
+}
+
+/// Applies another region's memory: its head replaces this region's only when newer (ties to
+/// the smaller region name), a losing head stays in history with no `rev`, revisions are matched
+/// by op id, and a later delete here keeps it out. Applying the same message twice is a no-op.
+/// [strong]
+pub async fn apply_replica_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    dek: &[u8],
+    replica: &MemoryReplica,
+    local_region: &str,
+    now: i64,
+) -> Result<Replicated, errors::Error> {
+    let txn = conn.begin().await?;
+    let outcome = apply_replica_in(&txn, dek, replica, local_region, now).await?;
+    txn.commit().await?;
+    Ok(outcome)
+}
+
+/// Records another region's delete and removes the memory unless it changed here since.
+/// [strong]
+pub async fn apply_tombstone_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    tombstone: &MemoryTombstone,
+    local_region: &str,
+) -> Result<Replicated, errors::Error> {
+    let txn = conn.begin().await?;
+    put_tombstone_with(&txn, tombstone).await?;
+    let key = MemoryKey::new(&tombstone.org, tombstone.scope, &tombstone.scope_key);
+    let outcome = match find_by_key(&txn, &key).await? {
+        Some(row) => {
+            let row = lock_row(&txn, &row.id).await?;
+            let region = head_region(&txn, &row, local_region).await?;
+            let delete = (tombstone.deleted_at, tombstone.region.as_str());
+            if replica_wins(delete, (row.updated_at, &region)) {
+                delete_in(&txn, &key).await?;
+                Replicated::Deleted {
+                    region: tombstone.region.clone(),
+                }
+            } else {
+                Replicated::Ignored
+            }
+        }
+        None => Replicated::Ignored,
+    };
+    txn.commit().await?;
+    Ok(outcome)
+}
+
+/// Keeps the later of the stored and the given delete of the key, and drops expired ones.
+pub async fn put_tombstone_with<C: ConnectionTrait>(
+    conn: &C,
+    t: &MemoryTombstone,
+) -> Result<(), errors::Error> {
+    ai_memory_tombstones::Entity::delete_many()
+        .filter(ai_memory_tombstones::Column::DeletedAt.lt(t.deleted_at - TOMBSTONE_KEEP_MICROS))
+        .exec(conn)
+        .await?;
+    let key = MemoryKey::new(&t.org, t.scope, &t.scope_key);
+    if let Some(stored) = get_tombstone_with(conn, &key).await?
+        && !replica_wins(
+            (t.deleted_at, &t.region),
+            (stored.deleted_at, &stored.region),
+        )
+    {
+        return Ok(());
+    }
+    let record = ai_memory_tombstones::ActiveModel {
+        org: Set(t.org.clone()),
+        scope: Set(t.scope.as_str().to_string()),
+        scope_key: Set(t.scope_key.clone()),
+        deleted_at: Set(t.deleted_at),
+        region: Set(t.region.clone()),
+    };
+    ai_memory_tombstones::Entity::insert(record)
+        .on_conflict(
+            OnConflict::columns([
+                ai_memory_tombstones::Column::Org,
+                ai_memory_tombstones::Column::Scope,
+                ai_memory_tombstones::Column::ScopeKey,
+            ])
+            .update_columns([
+                ai_memory_tombstones::Column::DeletedAt,
+                ai_memory_tombstones::Column::Region,
+            ])
+            .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await?;
+    Ok(())
+}
+
+/// Drops tombstones older than `before`, then returns the org's remaining ones.
+pub async fn live_tombstones_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    before: i64,
+) -> Result<Vec<MemoryTombstone>, errors::Error> {
+    ai_memory_tombstones::Entity::delete_many()
+        .filter(ai_memory_tombstones::Column::DeletedAt.lt(before))
+        .exec(conn)
+        .await?;
+    ai_memory_tombstones::Entity::find()
+        .filter(ai_memory_tombstones::Column::Org.eq(org))
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(to_tombstone)
+        .collect()
+}
+
+async fn get_tombstone_with<C: ConnectionTrait>(
+    conn: &C,
+    key: &MemoryKey,
+) -> Result<Option<MemoryTombstone>, errors::Error> {
+    ai_memory_tombstones::Entity::find()
+        .filter(ai_memory_tombstones::Column::Org.eq(&key.org))
+        .filter(ai_memory_tombstones::Column::Scope.eq(key.scope.as_str()))
+        .filter(ai_memory_tombstones::Column::ScopeKey.eq(&key.scope_key))
+        .one(conn)
+        .await?
+        .map(to_tombstone)
+        .transpose()
+}
+
+fn to_tombstone(m: ai_memory_tombstones::Model) -> Result<MemoryTombstone, errors::Error> {
+    Ok(MemoryTombstone {
+        scope: m.scope.parse().map_err(errors::Error::Message)?,
+        org: m.org,
+        scope_key: m.scope_key,
+        deleted_at: m.deleted_at,
+        region: m.region,
+    })
+}
+
+async fn apply_replica_in(
+    txn: &DatabaseTransaction,
+    dek: &[u8],
+    r: &MemoryReplica,
+    local_region: &str,
+    now: i64,
+) -> Result<Replicated, errors::Error> {
+    let key = MemoryKey::new(&r.org, r.scope, &r.scope_key);
+    if let Some(t) = get_tombstone_with(txn, &key).await?
+        && !replica_wins((r.updated_at, &r.region), (t.deleted_at, &t.region))
+    {
+        return Ok(Replicated::Ignored);
+    }
+    let created = find_by_key(txn, &key).await?.is_none();
+    let row = ensure_with(txn, dek, &key, now).await?;
+    let mut row = lock_row(txn, &row.id).await?;
+    let mut changed = created;
+    let mut replaced = None;
+    if let Some(op_id) = &r.op_id
+        && row.op_id.as_ref() != Some(op_id)
+    {
+        let known = find_by_op(txn, &row.id, op_id).await?;
+        if known
+            .as_ref()
+            .is_none_or(|m| m.state != RevisionState::Applied.as_str())
+        {
+            let wins = match &row.op_id {
+                None => true,
+                Some(_) => {
+                    let region = head_region(txn, &row, local_region).await?;
+                    replica_wins((r.updated_at, &r.region), (row.updated_at, &region))
+                }
+            };
+            let rev = wins.then_some(row.rev + 1);
+            if wins {
+                if row.op_id.is_some() {
+                    replaced = Some(r.region.clone());
+                }
+                replace_head(txn, dek, &row, r).await?;
+            }
+            let revision = r.revisions.iter().find(|v| &v.op_id == op_id);
+            let applied = AppliedReplica {
+                op_id,
+                content: &r.content,
+                rev,
+                base_rev: row.rev,
+            };
+            record_applied(txn, dek, &row, known, revision, applied, r).await?;
+            if wins {
+                row.rev += 1;
+                row.op_id = Some(op_id.clone());
+            }
+            changed = true;
+        }
+    }
+    changed |= merge_settings(txn, &row, &r.settings, local_region).await?;
+    for v in &r.revisions {
+        if r.op_id.as_ref() == Some(&v.op_id) {
+            continue;
+        }
+        changed |= merge_revision(txn, dek, &row, v).await?;
+    }
+    if changed {
+        trim_history(txn, &row.id, row.op_id.as_deref().unwrap_or_default(), now).await?;
+    }
+    Ok(match (replaced, changed) {
+        (Some(region), _) => Replicated::Replaced { region },
+        (None, true) => Replicated::Recorded,
+        (None, false) => Replicated::Ignored,
+    })
+}
+
+/// The replicated head as this region's, at the time and by the author it carries.
+async fn replace_head(
+    txn: &DatabaseTransaction,
+    dek: &[u8],
+    row: &ai_memory::Model,
+    r: &MemoryReplica,
+) -> Result<(), errors::Error> {
+    ai_memory::Entity::update_many()
+        .col_expr(
+            ai_memory::Column::Content,
+            Expr::value(encrypt(dek, &r.content)?),
+        )
+        .col_expr(ai_memory::Column::Rev, Expr::value(row.rev + 1))
+        .col_expr(ai_memory::Column::OpId, Expr::value(r.op_id.clone()))
+        .col_expr(ai_memory::Column::UpdatedBy, Expr::value(&r.updated_by))
+        .col_expr(ai_memory::Column::UpdatedAt, Expr::value(r.updated_at))
+        .filter(ai_memory::Column::Id.eq(&row.id))
+        .exec(txn)
+        .await?;
+    Ok(())
+}
+
+/// The replicated head's revision, applied here at `rev`, or with no `rev` when it lost.
+struct AppliedReplica<'a> {
+    op_id: &'a str,
+    content: &'a str,
+    rev: Option<i64>,
+    base_rev: i64,
+}
+
+async fn record_applied(
+    txn: &DatabaseTransaction,
+    dek: &[u8],
+    row: &ai_memory::Model,
+    known: Option<ai_memory_revisions::Model>,
+    revision: Option<&ReplicaRevision>,
+    applied: AppliedReplica<'_>,
+    r: &MemoryReplica,
+) -> Result<(), errors::Error> {
+    if let Some(known) = known {
+        ai_memory_revisions::Entity::update_many()
+            .col_expr(
+                ai_memory_revisions::Column::State,
+                Expr::value(RevisionState::Applied.as_str()),
+            )
+            .col_expr(ai_memory_revisions::Column::Rev, Expr::value(applied.rev))
+            .col_expr(
+                ai_memory_revisions::Column::Content,
+                Expr::value(Some(encrypt(dek, applied.content)?)),
+            )
+            .filter(ai_memory_revisions::Column::Id.eq(known.id))
+            .exec(txn)
+            .await?;
+        return Ok(());
+    }
+    // A head whose revision didn't travel (trimmed at the sender) is still recorded.
+    let bare = ReplicaRevision {
+        op_id: applied.op_id.to_string(),
+        state: RevisionState::Applied,
+        edits: None,
+        content: None,
+        updated_by: r.updated_by.clone(),
+        reason: None,
+        evidence: None,
+        origin_region: r.region.clone(),
+        created_at: r.updated_at,
+        flags: vec![],
+    };
+    let v = revision.unwrap_or(&bare);
+    let v = ReplicaRevision {
+        state: RevisionState::Applied,
+        content: Some(applied.content.to_string()),
+        ..v.clone()
+    };
+    insert_replica_revision(txn, dek, row, &v, applied.rev, applied.base_rev).await
+}
+
+/// Takes the replicated settings when they changed after this region's.
+async fn merge_settings(
+    txn: &DatabaseTransaction,
+    row: &ai_memory::Model,
+    s: &ReplicaSettings,
+    local_region: &str,
+) -> Result<bool, errors::Error> {
+    let region = row.settings_region.as_deref().unwrap_or(local_region);
+    let local = (row.settings_at.unwrap_or(0), region);
+    if s.updated_at == 0 || !replica_wins((s.updated_at, &s.region), local) {
+        return Ok(false);
+    }
+    ai_memory::Entity::update_many()
+        .col_expr(
+            ai_memory::Column::AgentMemoryWrites,
+            Expr::value(s.agent_memory_writes.map(|w| w.as_str().to_string())),
+        )
+        .col_expr(ai_memory::Column::MaxBytes, Expr::value(s.max_bytes))
+        .col_expr(
+            ai_memory::Column::UserMaxBytes,
+            Expr::value(s.user_max_bytes),
+        )
+        .col_expr(
+            ai_memory::Column::SettingsAt,
+            Expr::value(Some(s.updated_at)),
+        )
+        .col_expr(
+            ai_memory::Column::SettingsRegion,
+            Expr::value(Some(s.region.clone())),
+        )
+        .filter(ai_memory::Column::Id.eq(&row.id))
+        .exec(txn)
+        .await?;
+    Ok(true)
+}
+
+/// Adds a revision this region lacks, or moves a pending one on to its later state.
+async fn merge_revision(
+    txn: &DatabaseTransaction,
+    dek: &[u8],
+    row: &ai_memory::Model,
+    v: &ReplicaRevision,
+) -> Result<bool, errors::Error> {
+    match find_by_op(txn, &row.id, &v.op_id).await? {
+        None => {
+            insert_replica_revision(txn, dek, row, v, None, row.rev).await?;
+            Ok(true)
+        }
+        Some(m)
+            if m.state == RevisionState::Pending.as_str() && v.state != RevisionState::Pending =>
+        {
+            let content = v.content.as_deref().map(|c| encrypt(dek, c)).transpose()?;
+            let mut update = ai_memory_revisions::Entity::update_many()
+                .col_expr(
+                    ai_memory_revisions::Column::State,
+                    Expr::value(v.state.as_str()),
+                )
+                .filter(ai_memory_revisions::Column::Id.eq(m.id));
+            if v.state == RevisionState::Applied {
+                update =
+                    update.col_expr(ai_memory_revisions::Column::Content, Expr::value(content));
+            }
+            update.exec(txn).await?;
+            Ok(true)
+        }
+        Some(_) => Ok(false),
+    }
+}
+
+async fn insert_replica_revision(
+    txn: &DatabaseTransaction,
+    dek: &[u8],
+    row: &ai_memory::Model,
+    v: &ReplicaRevision,
+    rev: Option<i64>,
+    base_rev: i64,
+) -> Result<(), errors::Error> {
+    let edits = v
+        .edits
+        .as_ref()
+        .map(|e| encrypt(dek, &serde_json::to_string(e)?))
+        .transpose()?;
+    let model = ai_memory_revisions::ActiveModel {
+        id: Set(new_id()),
+        memory_id: Set(row.id.clone()),
+        org: Set(row.org.clone()),
+        rev: Set(rev),
+        state: Set(v.state.as_str().to_string()),
+        base_rev: Set(base_rev),
+        edits: Set(edits),
+        content: Set(v.content.as_deref().map(|c| encrypt(dek, c)).transpose()?),
+        updated_by: Set(v.updated_by.clone()),
+        reason: Set(v.reason.clone()),
+        evidence: Set(v.evidence.as_ref().map(serde_json::to_string).transpose()?),
+        origin_region: Set(v.origin_region.clone()),
+        op_id: Set(v.op_id.clone()),
+        created_at: Set(v.created_at),
+        flags: Set((!v.flags.is_empty())
+            .then(|| serde_json::to_string(&v.flags))
+            .transpose()?),
+    };
+    ai_memory_revisions::Entity::insert(model)
+        .exec_without_returning(txn)
+        .await?;
+    Ok(())
+}
+
+async fn find_by_op<C: ConnectionTrait>(
+    conn: &C,
+    memory_id: &str,
+    op_id: &str,
+) -> Result<Option<ai_memory_revisions::Model>, errors::Error> {
+    Ok(ai_memory_revisions::Entity::find()
+        .filter(ai_memory_revisions::Column::MemoryId.eq(memory_id))
+        .filter(ai_memory_revisions::Column::OpId.eq(op_id))
+        .one(conn)
+        .await?)
+}
+
+/// The region the head's change came from: its revision's, or this region's.
+async fn head_region<C: ConnectionTrait>(
+    conn: &C,
+    row: &ai_memory::Model,
+    local_region: &str,
+) -> Result<String, errors::Error> {
+    let origin = match &row.op_id {
+        Some(op_id) => find_by_op(conn, &row.id, op_id)
+            .await?
+            .map(|m| m.origin_region)
+            .filter(|r| !r.is_empty()),
+        None => None,
+    };
+    Ok(origin.unwrap_or_else(|| local_region.to_string()))
+}
+
+fn to_replica_revision(
+    m: ai_memory_revisions::Model,
+    dek: &[u8],
+    local_region: &str,
+) -> Result<ReplicaRevision, errors::Error> {
+    let origin_region = match m.origin_region.as_str() {
+        "" => local_region.to_string(),
+        region => region.to_string(),
+    };
+    let revision = to_revision(m, dek)?;
+    Ok(ReplicaRevision {
+        op_id: revision.op_id,
+        state: revision.state,
+        edits: revision.edits,
+        content: revision.content,
+        updated_by: revision.updated_by,
+        reason: revision.reason,
+        evidence: revision.evidence,
+        origin_region,
+        created_at: revision.created_at,
+        flags: revision.flags,
+    })
 }
 
 async fn agent_write_in(
@@ -964,11 +1505,21 @@ async fn save_settings(
     txn: &DatabaseTransaction,
     mut row: ai_memory::Model,
     settings: &MemorySettings,
+    now: i64,
 ) -> Result<ai_memory::Model, errors::Error> {
     if settings.is_empty() {
         return Ok(row);
     }
-    let mut update = ai_memory::Entity::update_many().filter(ai_memory::Column::Id.eq(&row.id));
+    // Stamped as this region's change, which replication compares with other regions'.
+    row.settings_at = Some(now);
+    row.settings_region = None;
+    let mut update = ai_memory::Entity::update_many()
+        .filter(ai_memory::Column::Id.eq(&row.id))
+        .col_expr(ai_memory::Column::SettingsAt, Expr::value(Some(now)))
+        .col_expr(
+            ai_memory::Column::SettingsRegion,
+            Expr::value(Option::<String>::None),
+        );
     if settings.clear_agent_memory_writes {
         row.agent_memory_writes = None;
         update = update.col_expr(
@@ -1006,7 +1557,7 @@ async fn apply_in(
     write: &Write,
     meta: &WriteMeta,
 ) -> Result<Outcome, errors::Error> {
-    let row = save_settings(txn, row, &write.settings).await?;
+    let row = save_settings(txn, row, &write.settings, meta.now).await?;
     let (memory_id, base_rev) = (row.id.as_str(), write.base_rev);
     let current = decrypt(dek, &row.content)?;
     if row.rev != base_rev {
@@ -1148,6 +1699,8 @@ async fn ensure_with<C: ConnectionTrait>(
         agent_memory_writes: Set(None),
         max_bytes: Set(None),
         user_max_bytes: Set(None),
+        settings_at: Set(None),
+        settings_region: Set(None),
     };
     // A concurrent first write may insert the same key; either row is the one to use.
     ai_memory::Entity::insert(row)
@@ -2460,5 +3013,353 @@ mod tests {
         let mut doomed = trim_plan(&rows, "op-head", now);
         doomed.sort();
         assert_eq!(doomed, ["a50", "old-discard", "old-person"]);
+    }
+
+    fn from(region: &str, now: i64) -> WriteMeta {
+        WriteMeta {
+            origin_region: region.to_string(),
+            ..person(now)
+        }
+    }
+
+    /// Two regions' databases side by side.
+    async fn regions(label: &str) -> Vec<(DatabaseConnection, DatabaseConnection)> {
+        let a = databases(&format!("{label}_a")).await;
+        let b = databases(&format!("{label}_b")).await;
+        a.into_iter().zip(b).collect()
+    }
+
+    async fn replica(db: &DatabaseConnection, dek: &[u8], key: &MemoryKey) -> MemoryReplica {
+        replica_with(db, dek, key, None, "us-1")
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    async fn history(db: &DatabaseConnection, dek: &[u8], key: &MemoryKey) -> Vec<Revision> {
+        let id = get_with(db, dek, key).await.unwrap().unwrap().id;
+        list_revisions_with(db, dek, &id).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_replica_carries_head_settings_and_pending_and_applies_once() {
+        let dek = random_bytes(64);
+        for (us, eu) in regions("ai_memory_replica_once").await {
+            let key = MemoryKey::user("o1", "u1");
+            apply(
+                &us,
+                &dek,
+                &key,
+                0,
+                &content("## Quirks\n- a\n"),
+                &person(10),
+            )
+            .await
+            .unwrap();
+            let settings = MemorySettings {
+                agent_memory_writes: Some(AgentMemoryWrites::Off),
+                ..Default::default()
+            };
+            set(&us, &dek, &key, &settings, 11).await.unwrap();
+            hold(&us, &dek, &key, 1, &add("b"), &agent(12))
+                .await
+                .unwrap();
+            let msg = replica(&us, &dek, &key).await;
+            assert_eq!(
+                (msg.scope_key.as_str(), msg.region.as_str()),
+                ("u1", "us-1")
+            );
+            assert_eq!(
+                msg.revisions.len(),
+                2,
+                "the head's revision and the pending one"
+            );
+            let other_dek = random_bytes(64);
+            let first = apply_replica_with(&eu, &other_dek, &msg, "eu-1", 20)
+                .await
+                .unwrap();
+            assert_eq!(first, Replicated::Recorded);
+            let again = apply_replica_with(&eu, &other_dek, &msg, "eu-1", 21)
+                .await
+                .unwrap();
+            assert_eq!(
+                again,
+                Replicated::Ignored,
+                "the same message applied twice is a no-op"
+            );
+            let copy = get_with(&eu, &other_dek, &key).await.unwrap().unwrap();
+            assert_eq!((copy.rev, copy.content.as_str()), (1, "## Quirks\n- a\n"));
+            assert_eq!(copy.op_id, msg.op_id);
+            assert_eq!(
+                copy.settings.agent_memory_writes,
+                Some(AgentMemoryWrites::Off)
+            );
+            let revisions = history(&eu, &other_dek, &key).await;
+            let states: Vec<_> = revisions
+                .iter()
+                .map(|r| (r.state, r.origin_region.as_str()))
+                .collect();
+            assert_eq!(states.len(), 2, "{states:?}");
+            assert!(states.contains(&(RevisionState::Pending, "us-1")));
+            assert!(states.contains(&(RevisionState::Applied, "us-1")));
+        }
+    }
+
+    #[tokio::test]
+    async fn the_newest_head_wins_in_either_order_and_the_loser_stays_in_history() {
+        let dek = random_bytes(64);
+        for (us, eu) in regions("ai_memory_replica_newest").await {
+            let key = MemoryKey::org("o1");
+            apply(&us, &dek, &key, 0, &content("older\n"), &from("us-1", 10))
+                .await
+                .unwrap();
+            apply(&eu, &dek, &key, 0, &content("newer\n"), &from("eu-1", 20))
+                .await
+                .unwrap();
+            let (old, new) = (
+                replica(&us, &dek, &key).await,
+                replica(&eu, &dek, &key).await,
+            );
+            // In us the newer eu head replaces the local one; in eu the older us head loses.
+            let in_us = apply_replica_with(&us, &dek, &new, "us-1", 30)
+                .await
+                .unwrap();
+            assert_eq!(
+                in_us,
+                Replicated::Replaced {
+                    region: "eu-1".into()
+                }
+            );
+            let in_eu = apply_replica_with(&eu, &dek, &old, "eu-1", 30)
+                .await
+                .unwrap();
+            assert_eq!(in_eu, Replicated::Recorded);
+            for db in [&us, &eu] {
+                assert_eq!(head(db, &dek, &key).await.1, "newer\n");
+                let kept: Vec<_> = history(db, &dek, &key)
+                    .await
+                    .into_iter()
+                    .map(|r| r.origin_region)
+                    .collect();
+                assert_eq!(kept.len(), 2, "{kept:?}");
+                assert!(kept.contains(&"us-1".to_string()) && kept.contains(&"eu-1".to_string()));
+            }
+            let lost = history(&eu, &dek, &key)
+                .await
+                .into_iter()
+                .find(|r| r.origin_region == "us-1")
+                .unwrap();
+            assert_eq!((lost.state, lost.rev), (RevisionState::Applied, None));
+            // Late copies of either change move nothing.
+            for msg in [&old, &new] {
+                for (db, region) in [(&us, "us-1"), (&eu, "eu-1")] {
+                    let late = apply_replica_with(db, &dek, msg, region, 40).await.unwrap();
+                    assert_eq!(late, Replicated::Ignored);
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn at_the_same_time_the_smaller_region_name_wins() {
+        let dek = random_bytes(64);
+        for (us, eu) in regions("ai_memory_replica_tie").await {
+            let key = MemoryKey::org("o1");
+            apply(&us, &dek, &key, 0, &content("us\n"), &from("us-1", 10))
+                .await
+                .unwrap();
+            apply(&eu, &dek, &key, 0, &content("eu\n"), &from("eu-1", 10))
+                .await
+                .unwrap();
+            let (from_us, from_eu) = (
+                replica(&us, &dek, &key).await,
+                replica(&eu, &dek, &key).await,
+            );
+            apply_replica_with(&us, &dek, &from_eu, "us-1", 20)
+                .await
+                .unwrap();
+            apply_replica_with(&eu, &dek, &from_us, "eu-1", 20)
+                .await
+                .unwrap();
+            assert_eq!(head(&us, &dek, &key).await.1, "eu\n");
+            assert_eq!(head(&eu, &dek, &key).await.1, "eu\n");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_discard_and_an_accept_follow_the_pending_revision_by_op_id() {
+        let dek = random_bytes(64);
+        for (us, eu) in regions("ai_memory_replica_pending").await {
+            let key = MemoryKey::org("o1");
+            apply(
+                &us,
+                &dek,
+                &key,
+                0,
+                &content("## Quirks\n- a\n"),
+                &person(10),
+            )
+            .await
+            .unwrap();
+            let Outcome::Pending { revision_id: first } =
+                hold(&us, &dek, &key, 1, &add("b"), &agent(11))
+                    .await
+                    .unwrap()
+            else {
+                panic!("held");
+            };
+            let Outcome::Pending {
+                revision_id: second,
+            } = hold(&us, &dek, &key, 1, &add("c"), &agent(12))
+                .await
+                .unwrap()
+            else {
+                panic!("held");
+            };
+            apply_replica_with(&eu, &dek, &replica(&us, &dek, &key).await, "eu-1", 13)
+                .await
+                .unwrap();
+            let memory_id = get_with(&us, &dek, &key).await.unwrap().unwrap().id;
+            discard_with(&us, &memory_id, &first).await.unwrap();
+            let discarded = replica_with(&us, &dek, &key, Some(&first), "us-1")
+                .await
+                .unwrap()
+                .unwrap();
+            apply_replica_with(&eu, &dek, &discarded, "eu-1", 14)
+                .await
+                .unwrap();
+            accept_with(&us, &dek, &memory_id, &second, 15)
+                .await
+                .unwrap();
+            let accepted = replica(&us, &dek, &key).await;
+            let outcome = apply_replica_with(&eu, &dek, &accepted, "eu-1", 16)
+                .await
+                .unwrap();
+            assert_eq!(
+                outcome,
+                Replicated::Replaced {
+                    region: "us-1".into()
+                }
+            );
+            let states: Vec<_> = history(&eu, &dek, &key)
+                .await
+                .into_iter()
+                .map(|r| (r.state, r.rev))
+                .collect();
+            assert_eq!(states.len(), 3, "{states:?}");
+            assert!(
+                states.contains(&(RevisionState::Discarded, None)),
+                "{states:?}"
+            );
+            assert!(
+                states.contains(&(RevisionState::Applied, Some(2))),
+                "{states:?}"
+            );
+            assert_eq!(head(&eu, &dek, &key).await, head(&us, &dek, &key).await);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_tombstone_removes_older_memory_and_keeps_its_replicas_out() {
+        let dek = random_bytes(64);
+        for (us, eu) in regions("ai_memory_replica_tombstone").await {
+            let key = MemoryKey::toolset("o1", "datadog-prod");
+            apply(&us, &dek, &key, 0, &content("a\n"), &from("us-1", 10))
+                .await
+                .unwrap();
+            let stale = replica(&us, &dek, &key).await;
+            apply_replica_with(&eu, &dek, &stale, "eu-1", 11)
+                .await
+                .unwrap();
+            let tombstone = MemoryTombstone {
+                org: "o1".into(),
+                scope: MemoryScope::Toolset,
+                scope_key: "datadog-prod".into(),
+                deleted_at: 20,
+                region: "eu-1".into(),
+            };
+            let deleted = apply_tombstone_with(&us, &tombstone, "us-1").await.unwrap();
+            assert_eq!(
+                deleted,
+                Replicated::Deleted {
+                    region: "eu-1".into()
+                }
+            );
+            put_tombstone_with(&eu, &tombstone).await.unwrap();
+            delete_with(&eu, &key).await.unwrap();
+            for (db, region) in [(&us, "us-1"), (&eu, "eu-1")] {
+                let resurrected = apply_replica_with(db, &dek, &stale, region, 30)
+                    .await
+                    .unwrap();
+                assert_eq!(resurrected, Replicated::Ignored);
+                assert!(get_with(db, &dek, &key).await.unwrap().is_none());
+            }
+            assert_eq!(
+                live_tombstones_with(&us, "o1", 0).await.unwrap(),
+                std::slice::from_ref(&tombstone)
+            );
+            assert!(
+                live_tombstones_with(&us, "o1", 21)
+                    .await
+                    .unwrap()
+                    .is_empty(),
+                "expired"
+            );
+            // A write made after the delete brings the memory back.
+            apply(&eu, &dek, &key, 0, &content("b\n"), &from("eu-1", 40))
+                .await
+                .unwrap();
+            put_tombstone_with(&us, &tombstone).await.unwrap();
+            let newer = replica_with(&eu, &dek, &key, None, "eu-1")
+                .await
+                .unwrap()
+                .unwrap();
+            apply_replica_with(&us, &dek, &newer, "us-1", 41)
+                .await
+                .unwrap();
+            assert_eq!(head(&us, &dek, &key).await.1, "b\n");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_later_settings_change_wins() {
+        let dek = random_bytes(64);
+        for (us, eu) in regions("ai_memory_replica_settings").await {
+            let key = MemoryKey::org("o1");
+            let writes = |w| MemorySettings {
+                agent_memory_writes: Some(w),
+                ..Default::default()
+            };
+            set(&us, &dek, &key, &writes(AgentMemoryWrites::Auto), 10)
+                .await
+                .unwrap();
+            set(&eu, &dek, &key, &writes(AgentMemoryWrites::Off), 20)
+                .await
+                .unwrap();
+            let older = replica(&us, &dek, &key).await;
+            let newer = replica_with(&eu, &dek, &key, None, "eu-1")
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                apply_replica_with(&eu, &dek, &older, "eu-1", 30)
+                    .await
+                    .unwrap(),
+                Replicated::Ignored
+            );
+            assert_eq!(
+                apply_replica_with(&us, &dek, &newer, "us-1", 30)
+                    .await
+                    .unwrap(),
+                Replicated::Recorded
+            );
+            for db in [&us, &eu] {
+                let memory = get_with(db, &dek, &key).await.unwrap().unwrap();
+                assert_eq!(
+                    memory.settings.agent_memory_writes,
+                    Some(AgentMemoryWrites::Off)
+                );
+            }
+        }
     }
 }

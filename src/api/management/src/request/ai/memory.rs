@@ -379,6 +379,38 @@ pub async fn discard_org_memory_revision(
     decide(&MemoryKey::org(&org_id), &id, Decision::Discard, admin).await
 }
 
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MemoryResyncResponse {
+    /// Messages sent: one per memory, plus one per delete of the last 30 days.
+    pub published: usize,
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/memory/_resync",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "ResyncAiMemory",
+    summary = "Re-send the org's AI memory to the other regions",
+    description = "Republishes every org, toolset and user memory of the org (applied content, settings and \
+                   pending edits) plus the deletes of the last 30 days, so a region that missed changes \
+                   catches up. Adds and updates only; never deletes a memory another region lacks. Needs \
+                   the memory admin permission. Only available in enterprise deployments with super cluster enabled.",
+    params(("org_id" = String, Path, description = "Organization name")),
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "Messages sent", content_type = "application/json", body = MemoryResyncResponse),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn resync_memory(Path(org_id): Path<String>) -> Response {
+    let now = config::utils::time::now_micros();
+    match ::db::ai_memory_replication::resync(&org_id, now).await {
+        Ok(published) => Json(MemoryResyncResponse { published }).into_response(),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/ai/memory/pending",

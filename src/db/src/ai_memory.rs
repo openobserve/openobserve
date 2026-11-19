@@ -185,7 +185,7 @@ pub async fn accept(key: &MemoryKey, memory_id: &str, revision_id: &str) -> Resu
 pub async fn discard(key: &MemoryKey, memory_id: &str, revision_id: &str) -> Result<Outcome> {
     let outcome = table::discard_with(get_orm_client_rw().await, memory_id, revision_id).await?;
     if outcome == Outcome::Discarded {
-        publish(key).await;
+        publish_with(key, Some(revision_id)).await;
     }
     Ok(outcome)
 }
@@ -232,7 +232,7 @@ pub async fn set_settings(
 /// Deletes one memory with its history. [strong]
 pub async fn delete(key: &MemoryKey) -> Result<()> {
     table::delete_with(get_orm_client_rw().await, key).await?;
-    publish(key).await;
+    publish_delete(key).await;
     Ok(())
 }
 
@@ -246,13 +246,31 @@ pub async fn delete_toolset(
     let deleted =
         table::delete_toolset_with(get_orm_client_rw().await, org, toolset_id, normalize).await?;
     if let ToolsetDelete::Deleted { memory: Some(key) } = &deleted {
-        publish(key).await;
+        publish_delete(key).await;
     }
     Ok(deleted)
 }
 
-// Replication (R2) sends the change for `key` from here, behind the super-cluster guard.
-async fn publish(_key: &MemoryKey) {}
+/// Sends `key`'s memory to the other regions of a super cluster.
+async fn publish(key: &MemoryKey) {
+    publish_with(key, None).await;
+}
+
+#[cfg(feature = "enterprise")]
+async fn publish_with(key: &MemoryKey, discarded: Option<&str>) {
+    crate::ai_memory_replication::publish_put(key, discarded).await;
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn publish_with(_key: &MemoryKey, _discarded: Option<&str>) {}
+
+#[cfg(feature = "enterprise")]
+async fn publish_delete(key: &MemoryKey) {
+    crate::ai_memory_replication::publish_delete(key, now_micros()).await;
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn publish_delete(_key: &MemoryKey) {}
 
 #[cfg(feature = "enterprise")]
 fn origin_region() -> String {

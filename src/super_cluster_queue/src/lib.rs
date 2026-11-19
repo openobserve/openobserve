@@ -15,6 +15,7 @@
 
 #![cfg(feature = "enterprise")]
 
+mod ai_memory;
 mod ai_toolsets;
 mod alert_acks;
 mod alert_states;
@@ -124,6 +125,7 @@ async fn service_identity_msg(msg: Message) -> infra::errors::Result<()> {
 /// polling messages from each queue in a separate thread.
 pub async fn init() -> Result<(), anyhow::Error> {
     let meta_queue = MetaQueue {
+        on_ai_memory_msg: ai_memory::process,
         on_meta_msg: meta::process,
         on_distinct_values_msg: distinct_values::process,
         on_short_url_msg: short_urls::process,

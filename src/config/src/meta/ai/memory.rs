@@ -558,6 +558,102 @@ fn replace_once(content: &str, old: &str, new: &str, index: usize) -> Result<Str
     ))
 }
 
+/// One memory as another region gets it (super-cluster message 103): the applied head, its
+/// settings and the revisions that travel with it, in plaintext. Its `Debug` leaves out the text
+/// and the user id a user memory is keyed by.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoryReplica {
+    pub org: String,
+    pub scope: MemoryScope,
+    /// `''` for org memory, the toolset's normalized name, or the user's stable `users.id`.
+    pub scope_key: String,
+    pub content: String,
+    /// The head's op id; `None` while nothing was applied yet.
+    pub op_id: Option<String>,
+    pub updated_by: String,
+    /// When the head changed, in microseconds; with `region` it decides which head wins.
+    pub updated_at: i64,
+    pub region: String,
+    pub settings: ReplicaSettings,
+    /// The head's revision, every pending one, and any just discarded.
+    pub revisions: Vec<ReplicaRevision>,
+}
+
+impl fmt::Debug for MemoryReplica {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MemoryReplica")
+            .field("org", &self.org)
+            .field("scope", &self.scope)
+            .field("op_id", &self.op_id)
+            .field("updated_at", &self.updated_at)
+            .field("region", &self.region)
+            .field("revisions", &self.revisions.len())
+            .finish_non_exhaustive()
+    }
+}
+
+/// A memory's settings and when they last changed; `updated_at` 0 means never set.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplicaSettings {
+    pub agent_memory_writes: Option<AgentMemoryWrites>,
+    pub max_bytes: Option<i64>,
+    pub user_max_bytes: Option<i64>,
+    pub updated_at: i64,
+    pub region: String,
+}
+
+/// A revision by its op id, the same in every region; `rev` and `base_rev` stay regional.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplicaRevision {
+    pub op_id: String,
+    pub state: RevisionState,
+    pub edits: Option<Vec<MemoryEdit>>,
+    pub content: Option<String>,
+    pub updated_by: String,
+    pub reason: Option<String>,
+    pub evidence: Option<Vec<Evidence>>,
+    pub origin_region: String,
+    pub created_at: i64,
+    #[serde(default)]
+    pub flags: Vec<EditFlag>,
+}
+
+impl fmt::Debug for ReplicaRevision {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ReplicaRevision")
+            .field("op_id", &self.op_id)
+            .field("state", &self.state)
+            .field("origin_region", &self.origin_region)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A memory deleted at `deleted_at` in `region`; kept 30 days so a re-sync can't bring it back.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemoryTombstone {
+    pub org: String,
+    pub scope: MemoryScope,
+    pub scope_key: String,
+    pub deleted_at: i64,
+    pub region: String,
+}
+
+impl fmt::Debug for MemoryTombstone {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MemoryTombstone")
+            .field("org", &self.org)
+            .field("scope", &self.scope)
+            .field("deleted_at", &self.deleted_at)
+            .field("region", &self.region)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Change `a` replaces change `b`: a later time, or at the same time the smaller region name.
+pub fn replica_wins(a: (i64, &str), b: (i64, &str)) -> bool {
+    a.0 > b.0 || (a.0 == b.0 && a.1 < b.1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -816,6 +912,39 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(serde_json::to_value(&skipped).unwrap()["not_loaded"], true);
+    }
+
+    #[test]
+    fn the_newest_change_wins_and_a_tie_goes_to_the_smaller_region() {
+        assert!(replica_wins((2, "us"), (1, "eu")));
+        assert!(!replica_wins((1, "us"), (2, "eu")));
+        assert!(replica_wins((1, "eu"), (1, "us")));
+        assert!(!replica_wins((1, "us"), (1, "eu")));
+        assert!(
+            !replica_wins((1, "eu"), (1, "eu")),
+            "the same change never wins twice"
+        );
+    }
+
+    #[test]
+    fn a_replica_s_debug_shows_neither_its_text_nor_its_user() {
+        let replica = MemoryReplica {
+            org: "o1".into(),
+            scope: MemoryScope::User,
+            scope_key: "user-7f3a".into(),
+            content: "pager rota secret-ish".into(),
+            op_id: Some("op1".into()),
+            updated_by: "user-7f3a".into(),
+            updated_at: 1,
+            region: "us".into(),
+            settings: ReplicaSettings::default(),
+            revisions: vec![],
+        };
+        let shown = format!("{replica:?}");
+        assert!(
+            !shown.contains("user-7f3a") && !shown.contains("pager"),
+            "{shown}"
+        );
     }
 
     #[test]

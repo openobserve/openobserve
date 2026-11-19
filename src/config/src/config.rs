@@ -159,7 +159,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 158: add org_ai_toolsets.region_only/origin_region and ai_toolset_tombstones.
 // 159: create ai_memory and ai_memory_revisions.
 // 160: add ai_memory_revisions.flags, why a pending edit needs a closer look.
-pub const DB_SCHEMA_VERSION: u64 = 160;
+// 161: add ai_memory.settings_at/settings_region and ai_memory_tombstones for replication.
+pub const DB_SCHEMA_VERSION: u64 = 161;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
