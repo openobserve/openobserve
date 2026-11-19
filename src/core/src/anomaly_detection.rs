@@ -20,7 +20,7 @@ mod partitioned_search;
 #[cfg(feature = "enterprise")]
 use std::{
     collections::{HashMap, HashSet},
-    sync::{LazyLock, RwLock},
+    sync::{Arc, LazyLock, RwLock},
     time::{Duration, Instant},
 };
 
@@ -2907,7 +2907,7 @@ fn group_by_stream(
 fn validate_custom_sql_grid(
     sql: &str,
     histogram_interval: &str,
-    stream_fields: Option<&std::collections::HashSet<String>>,
+    stream_fields: Option<&HashSet<String>>,
 ) -> Result<()> {
     use std::ops::ControlFlow;
     let statements =
@@ -4655,7 +4655,7 @@ async fn attach_anomaly_chart(
     ctx.chart_png = if wants_png {
         chart::render_png_waiting(&payload, &actx.anomaly_id)
             .await
-            .map(std::sync::Arc::new)
+            .map(Arc::new)
     } else {
         None
     };
