@@ -139,3 +139,21 @@ export function installedThresholdDiffers(
   const same = suggested.operator === installed.operator && suggested.value === installed.value;
   return same ? null : { installed, suggested };
 }
+
+const PERCENT = /(\d+(?:\.\d+)?)\s?%/g;
+
+/** A card's "> 80%" for a query whose threshold reads 0.8: each percent the threshold stands for is
+ * written as the threshold first, so the copy matches the number the field shows. */
+export function inThresholdUnit(
+  text: string,
+  alert: {
+    query_condition?: LookAlikeCondition | null;
+    trigger_condition?: { operator?: string; threshold?: unknown } | null;
+  },
+): string {
+  const threshold = alertThreshold(alert.query_condition, alert.trigger_condition)?.value;
+  if (threshold === undefined || !(threshold > 0 && threshold <= 1)) return text;
+  return text.replace(PERCENT, (match, n: string) =>
+    Math.abs(Number(n) / 100 - threshold) < 1e-9 ? `${threshold} (${match})` : match,
+  );
+}

@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alert_library.drawer.detects") }}
         </h3>
         <p class="text-text-body text-sm" data-test="alert-library-drawer-description">
-          {{ entry.description || t("alert_library.drawer.noDescription") }}
+          {{ description || t("alert_library.drawer.noDescription") }}
         </p>
         <p
           v-if="streamSwap"
@@ -275,6 +275,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamDataState } from "@/types/alertLibrary";
 import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { inThresholdUnit } from "@/utils/alerts/lookAlike";
 
 import {
   alertTypeOf,
@@ -318,6 +319,17 @@ const { loadAlertFile } = useAlertLibrary();
 const { customizeInEditor } = useLibraryCustomize();
 
 const file = ref<AlertLibraryFile | null>(null);
+// The description quotes its threshold the way the query reads it, so "> 80%" never sits beside a 0.8.
+const description = computed(() =>
+  props.entry?.description && file.value
+    ? raw(
+        inThresholdUnit(
+          props.entry.description,
+          file.value as Parameters<typeof inThresholdUnit>[1],
+        ),
+      )
+    : props.entry?.description,
+);
 const isLoading = ref(false);
 const loadFailed = ref(false);
 /** Bumped per open so the chart remounts instead of showing the last alert's. */

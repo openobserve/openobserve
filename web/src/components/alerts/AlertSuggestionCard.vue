@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       as="p"
       :lines="2"
       class="text-text-secondary m-0 text-xs"
-      >{{ raw(suggestion.sentence) }}</OTruncatedText
+      >{{ raw(inThresholdUnit(suggestion.sentence, suggestion.prefill)) }}</OTruncatedText
     >
     <p
       class="m-0 flex min-w-0 items-center gap-1 text-xs"
@@ -107,6 +107,7 @@ import { severityBadgeValue, severityLabel } from "@/components/alertLibrary/lib
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { joinListMore } from "@/utils/alerts/alertCopy";
 import { cardFit } from "@/composables/alerts/useAlertLibrary";
+import { inThresholdUnit } from "@/utils/alerts/lookAlike";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 
 const props = defineProps<{

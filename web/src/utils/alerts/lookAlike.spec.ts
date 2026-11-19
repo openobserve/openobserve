@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   alertThreshold,
   installedThresholdDiffers,
+  inThresholdUnit,
   lookAlikeAlerts,
   type LookAlikeAlert,
 } from "./lookAlike";
@@ -158,6 +159,24 @@ describe("alertThreshold", () => {
     ],
   ])("reads %s", (_, condition, trigger, expected) => {
     expect(alertThreshold(condition, trigger)).toEqual(expected);
+  });
+});
+
+describe("inThresholdUnit", () => {
+  const promql = (value: unknown) => ({
+    query_condition: { type: "promql", promql_condition: { operator: ">", value } },
+  });
+  it.each([
+    [
+      "a percent the ratio threshold stands for",
+      0.8,
+      "CPU load is > 80%",
+      "CPU load is > 0.8 (80%)",
+    ],
+    ["a percent that is another number", 0.8, "iowait > 10%", "iowait > 10%"],
+    ["a threshold already in percent", 80, "CPU load is > 80%", "CPU load is > 80%"],
+  ])("%s", (_, value, text, want) => {
+    expect(inThresholdUnit(text, promql(value))).toBe(want);
   });
 });
 
