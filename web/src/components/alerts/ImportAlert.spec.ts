@@ -18,6 +18,10 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   });
 });
 
+vi.mock("@/composables/starterPacks/useRewriteChecks", () => ({
+  useRewriteChecks: () => ({ sql: vi.fn().mockResolvedValue(undefined), promql: vi.fn() }),
+}));
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn().mockResolvedValue({ list: [{ name: "test-stream" }] }),
@@ -148,6 +152,35 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
           },
         },
       },
+    });
+  });
+
+  describe("choosing a stream", () => {
+    const sqlAlert = () => ({
+      name: "a",
+      stream_name: "old_logs",
+      stream_type: "logs",
+      query_condition: { type: "sql", sql: 'SELECT * FROM "old_logs" WHERE level = 1' },
+    });
+
+    it("rewrites the query so the imported alert reads the chosen stream", async () => {
+      const importer = wrapper.vm.baseImportRef;
+      importer.jsonArrayOfObj = [sqlAlert()];
+      await wrapper.vm.updateStreamFields("new_logs", 0);
+      const alert = importer.jsonArrayOfObj[0];
+      expect(alert.stream_name).toBe("new_logs");
+      expect(alert.query_condition.sql).toContain('"new_logs"');
+      expect(alert.query_condition.sql).not.toContain("old_logs");
+      expect(JSON.parse(importer.jsonStr)[0].query_condition.sql).toContain('"new_logs"');
+    });
+
+    it("changes nothing when the query cannot be rewritten", async () => {
+      const importer = wrapper.vm.baseImportRef;
+      const broken = sqlAlert();
+      broken.query_condition.sql = "SELECT FROM WHERE old_logs";
+      importer.jsonArrayOfObj = [broken];
+      await wrapper.vm.updateStreamFields("new_logs", 0);
+      expect(importer.jsonArrayOfObj[0].stream_name).toBe("old_logs");
     });
   });
 

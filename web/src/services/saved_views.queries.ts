@@ -25,6 +25,13 @@ export const savedViewsQuery = (org: string) =>
     staleTime: MEDIUM_STALE_TIME,
   });
 
+export const savedViewDetailQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: savedViewKeys.detail(org, id),
+    queryFn: async () => (await savedViews.getViewDetail(org, id)).data,
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 export const createSavedViewMutation = (org: string) =>

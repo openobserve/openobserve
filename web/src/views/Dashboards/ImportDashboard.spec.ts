@@ -20,6 +20,10 @@ vi.mock("@/utils/commons", async () => {
   };
 });
 
+vi.mock("@/composables/starterPacks/useRewriteChecks", () => ({
+  useRewriteChecks: () => ({ sql: vi.fn().mockResolvedValue(undefined), promql: vi.fn() }),
+}));
+
 vi.mock("@/services/dashboards", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -641,6 +645,39 @@ describe("ImportDashboard.vue", () => {
       await flushPromises();
 
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("stream repair", () => {
+    it("rewrites the dashboard to the stream the user chose before create", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      const create = vi.mocked(dashboardService.create).mockResolvedValue({ data: {} } as any);
+      wrapper = mountComponent();
+      const vm = wrapper.vm as any;
+      vm.missingStreams = ["old_logs"];
+      vm.streamChoices.old_logs = "new_logs";
+      const dashboard = {
+        title: "d",
+        tabs: [
+          {
+            panels: [
+              {
+                queryType: "sql",
+                queries: [
+                  {
+                    query: 'SELECT * FROM "old_logs"',
+                    fields: { stream: "old_logs", stream_type: "logs" },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+      await vm.importDashboardFromJSON(dashboard, { value: "default" });
+      const body = create.mock.calls[0][1] as any;
+      expect(body.tabs[0].panels[0].queries[0].fields.stream).toBe("new_logs");
+      expect(body.tabs[0].panels[0].queries[0].query).toContain('"new_logs"');
     });
   });
 });

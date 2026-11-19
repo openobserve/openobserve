@@ -313,6 +313,7 @@ export default function kubernetesCard(
       ];
 
   return {
+    offersStarterPack: true,
     provider: {
       id: "kubernetes",
       name: raw("Kubernetes"),

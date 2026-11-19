@@ -50,6 +50,7 @@ const fake = {
   troubleshoot: vi.fn(),
 };
 const watchArgs = vi.fn();
+vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: false }));
 vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
   useFirstEventWatch: (...args: unknown[]) => {
     watchArgs(...args);
@@ -926,6 +927,27 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     expect(q("first-event-status").attributes("data-display")).toBeUndefined();
     expect(q("first-event-status-troubleshoot-btn").exists()).toBe(true);
     expect(q("first-event-status").text()).not.toContain("Waiting for your first logs");
+  });
+});
+
+describe("FirstEventStatus — starter pack flag off", () => {
+  it("renders today's received banner on a guide that offers a pack", async () => {
+    fake.state.value = "received";
+    fake.result.value = {
+      count: 5,
+      streamName: "default",
+      streamType: "logs",
+      rangeStart: 1,
+      rangeEnd: 2,
+    } as FirstEventResult;
+    mountBar({ offersPack: true, clusterName: "staging-eu-1" });
+    await nextTick();
+    expect(wrapper.html()).not.toContain("first-event-pack-actions");
+    expect(wrapper.html()).not.toContain("first-event-status-pack");
+    const open = wrapper.findComponent('[data-test="first-event-status-open-btn"]');
+    expect(open.html()).toBe(
+      mountBar({}).findComponent('[data-test="first-event-status-open-btn"]').html(),
+    );
   });
 });
 

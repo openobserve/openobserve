@@ -365,7 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -401,6 +401,9 @@ import useStreams from "@/composables/useStreams";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { ensurePackCatalog, packs as allPacks } from "@/composables/starterPacks/usePackCatalog";
+import { ingestTimes, matchAlerts } from "@/composables/starterPacks/packMatchData";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -424,8 +427,11 @@ const CONTRIBUTE_URL = "https://github.com/openobserve/o2-alerts-library";
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const packsEnabled = STARTER_PACKS_ENABLED;
 
 const { manifest, isLoading, error, loadManifest, loadAlertFile, isReady } = useAlertLibrary();
+const packVerdicts = shallowRef<Map<string, boolean> | null>(null);
+let matchRun = 0;
 const anomalyAccess = useAnomalyLibraryAccess();
 const { open: openEditionUpgradeDialog } = useEnterpriseUpgradeDialog();
 const { lockedReason: anomalyLockedReason } = useLicenseLock("anomaly_detection");
@@ -519,8 +525,10 @@ const errorDescription = computed(() => {
 });
 
 // ── readiness ──────────────────────────────────────────────────────────────
-const entryReady = (entry: AlertLibraryEntry): boolean =>
-  readinessKnown.value ? isReady(entry, streamsByType.value) : true;
+const entryReady = (entry: AlertLibraryEntry): boolean => {
+  if (!readinessKnown.value) return true;
+  return packVerdicts.value?.get(entry.id) ?? isReady(entry, streamsByType.value);
+};
 
 const isLocked = (entry: AlertLibraryEntry): boolean =>
   anomalyAccess.value !== "enabled" && alertTypeOf(entry) === "anomaly";
@@ -984,6 +992,25 @@ const goToIngestion = () => {
   });
 };
 
+// Falls back to the stream names, so a failed check never reads as "no data".
+const matchEntries = async (list: Parameters<typeof ingestTimes>[0]) => {
+  const org = store.state.selectedOrganization?.identifier;
+  matchRun += 1;
+  const run = matchRun;
+  let verdicts: Map<string, boolean> | null = null;
+  try {
+    await Promise.all([loadManifest(), ensurePackCatalog(org)]);
+    verdicts = await matchAlerts(org, entries.value, ingestTimes(list), {
+      loadFile: loadAlertFile,
+      packs: allPacks(),
+    });
+  } catch {
+    verdicts = null;
+  }
+  // A slower, older refresh must not overwrite a newer answer.
+  if (run === matchRun) packVerdicts.value = verdicts;
+};
+
 const loadStreams = async () => {
   streamsPending.value = true;
   try {
@@ -994,6 +1021,7 @@ const loadStreams = async () => {
     };
     streamsByType.value = toStreamsByType(payload?.list);
     readinessKnown.value = true;
+    if (packsEnabled) await matchEntries(payload?.list);
   } catch {
     // Keep whatever verdict we already had. Clearing it here meant a failed
     // REFRESH threw away a correct answer: streamsByType still held the good

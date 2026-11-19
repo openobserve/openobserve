@@ -1,0 +1,2749 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "Kubernetes Overview",
+  "description": "",
+  "role": "",
+  "owner": "",
+  "created": "2026-03-06T18:42:28.755Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "Panel_ID7580810",
+          "type": "metric",
+          "title": "Clusters",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [
+              {
+                "name": "clusters",
+                "type": "byDashboard",
+                "targetBlank": false,
+                "findBy": "name",
+                "data": {
+                  "url": "",
+                  "folder": "default",
+                  "dashboard": "Kubernetes Clusters",
+                  "tab": "Clusters",
+                  "passAllVariables": true,
+                  "variables": [
+                    {
+                      "name": "",
+                      "value": ""
+                    }
+                  ],
+                  "logsMode": "auto",
+                  "logsQuery": ""
+                }
+              }
+            ],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(distinct(k8s_cluster)) as \"y_axis_1\" FROM \"kube_node_info\" WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "k8s_pod_phase",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "K8s Cluster",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "k8s_cluster",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 27,
+            "h": 7,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID9017810",
+          "type": "metric",
+          "title": "Namespaces",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [
+              {
+                "name": "nodes",
+                "type": "byDashboard",
+                "targetBlank": false,
+                "findBy": "name",
+                "data": {
+                  "url": "",
+                  "folder": "default",
+                  "dashboard": "Kubernetes Clusters",
+                  "tab": "Namespaces",
+                  "passAllVariables": false,
+                  "variables": [
+                    {
+                      "name": "",
+                      "value": ""
+                    }
+                  ],
+                  "logsMode": "auto",
+                  "logsQuery": ""
+                }
+              }
+            ],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(k8s_cluster, '/', namespace)) AS namespace_count\nFROM kube_namespace_status_phase\nWHERE k8s_cluster IN (${k8s_cluster})\n-- SELECT COUNT(DISTINCT k8s_namespace_name) AS namespace_count\n-- FROM k8s_namespace_phase\n-- WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_namespace_status_phase",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "K8s Cluster",
+                    "alias": "namespace_count",
+                    "column": "namespace_count",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "k8s_namespace_name",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 27,
+            "y": 0,
+            "w": 28,
+            "h": 7,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID3102310",
+          "type": "metric",
+          "title": "Nodes",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [
+              {
+                "name": "nodes",
+                "type": "byDashboard",
+                "targetBlank": false,
+                "findBy": "name",
+                "data": {
+                  "url": "",
+                  "folder": "default",
+                  "dashboard": "Kubernetes Clusters",
+                  "tab": "Nodes",
+                  "passAllVariables": false,
+                  "variables": [
+                    {
+                      "name": "",
+                      "value": ""
+                    }
+                  ],
+                  "logsMode": "auto",
+                  "logsQuery": ""
+                }
+              }
+            ],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(distinct(node)) as \"y_axis_1\" FROM \"kube_node_info\" WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "k8s_pod_phase",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "K8s Cluster",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "k8s_node_name",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 55,
+            "y": 0,
+            "w": 27,
+            "h": 7,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID459710",
+          "type": "metric",
+          "title": "Deployments",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [
+              {
+                "name": "deployments",
+                "type": "byDashboard",
+                "targetBlank": false,
+                "findBy": "name",
+                "data": {
+                  "url": "",
+                  "folder": "default",
+                  "dashboard": "Kubernetes Clusters",
+                  "tab": "Workloads",
+                  "passAllVariables": true,
+                  "variables": [
+                    {
+                      "name": "",
+                      "value": ""
+                    }
+                  ],
+                  "logsMode": "auto",
+                  "logsQuery": ""
+                }
+              }
+            ],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(deployment, '/', namespace, '/', k8s_cluster)) AS deployment_count\nFROM kube_deployment_spec_replicas\nWHERE k8s_cluster IN (${k8s_cluster})\n-- SELECT COUNT(DISTINCT CONCAT(k8s_deployment_name, '/', k8s_namespace_name)) AS deployment_count\n-- FROM k8s_deployment_desired\n-- WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_deployment_spec_replicas",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "K8s Cluster",
+                    "alias": "deployment_count",
+                    "column": "deployment_count",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "k8s_deployment_name",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 109,
+            "y": 0,
+            "w": 29,
+            "h": 7,
+            "i": 5
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID9644010",
+          "type": "metric",
+          "title": "Pods",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(pod, '/', namespace, '/', k8s_cluster)) AS pod_count\nFROM kube_pod_info\nWHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "k8s_pod_phase",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "K8s Cluster",
+                    "alias": "pod_count",
+                    "column": "pod_count",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "k8s_pod_name",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 82,
+            "y": 0,
+            "w": 27,
+            "h": 7,
+            "i": 6
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID1644310",
+          "type": "metric",
+          "title": "Containers",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(container, '/', pod, '/', namespace, '/', k8s_cluster)) AS container_count\nFROM kube_pod_container_info\nWHERE k8s_cluster IN (${k8s_cluster})\n-- SELECT COUNT(DISTINCT CONCAT(k8s_container_name, '/', k8s_pod_name, '/', k8s_namespace_name)) AS container_count\n-- FROM k8s_container_ready\n-- WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_pod_container_status_ready",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "K8s Cluster",
+                    "alias": "container_count",
+                    "column": "container_count",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "k8s_container_name",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 138,
+            "y": 0,
+            "w": 27,
+            "h": 7,
+            "i": 7
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID4093510",
+          "type": "metric",
+          "title": "Replica Sets",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(replicaset, '/', namespace, '/', k8s_cluster)) AS replicaset_count\nFROM kube_replicaset_created\nWHERE k8s_cluster IN (${k8s_cluster})\n-- SELECT COUNT(DISTINCT CONCAT(k8s_replicaset_name, '/', k8s_namespace_name)) AS replicaset_count\n-- FROM k8s_replicaset_desired\n-- WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_replicaset_spec_replicas",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "K8s Cluster",
+                    "alias": "replicaset_count",
+                    "column": "replicaset_count",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "k8s_replicaset_name",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 55,
+            "y": 7,
+            "w": 27,
+            "h": 7,
+            "i": 8
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID6491310",
+          "type": "metric",
+          "title": "Services",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(service, '/', namespace, '/', k8s_cluster)) AS service_count\nFROM kube_service_info\nWHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_service_info",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "K8s Cluster",
+                    "alias": "service_count",
+                    "column": "service_count",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "service_name",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 165,
+            "y": 0,
+            "w": 27,
+            "h": 7,
+            "i": 9
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID3312910",
+          "type": "table",
+          "title": "Events",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 2,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": true,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": [],
+            "sticky_first_column": false,
+            "column_order": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT\n  _timestamp,\n  k8s_cluster                                                    AS cluster,\n  COALESCE(NULLIF(k8s_namespace_name, ''), 'default')            AS namespace,\n  body_object_type                                               AS type,\n  body_object_reason                                             AS reason,\n  body_object_note                                               AS message,\n  body_object_regarding                                          AS regarding,\n  body_object_reportingcontroller                                AS reporter,\n  body_object_deprecatedcount                                    AS count,\n  body_object_deprecatedlasttimestamp                            AS last_seen\nFROM k8s_events\nWHERE k8s_cluster IN (${k8s_cluster}) AND body_object_kind = 'Event'\nORDER BY _timestamp DESC\nLIMIT 100",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "k8s_events",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "_timestamp",
+                    "alias": "_timestamp",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "histogram",
+                    "sortBy": "DESC",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "_timestamp",
+                          "streamAlias": null
+                        }
+                      },
+                      {
+                        "type": "histogramInterval"
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": false,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "namespace",
+                    "alias": "namespace",
+                    "type": "build",
+                    "color": "#5960b2",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "namespace",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  },
+                  {
+                    "label": "cluster",
+                    "alias": "cluster",
+                    "type": "build",
+                    "color": "#c23531",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "cluster",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  },
+                  {
+                    "label": "type",
+                    "alias": "type",
+                    "type": "build",
+                    "color": "#61a0a8",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "type",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  },
+                  {
+                    "label": "reason",
+                    "alias": "reason",
+                    "type": "build",
+                    "color": "#d48265",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "reason",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  },
+                  {
+                    "label": "message",
+                    "alias": "message",
+                    "type": "build",
+                    "color": "#91c7ae",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "message",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  },
+                  {
+                    "label": "reporter",
+                    "alias": "reporter",
+                    "type": "build",
+                    "color": "#749f83",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "reporter",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  },
+                  {
+                    "label": "regarding",
+                    "alias": "regarding",
+                    "type": "build",
+                    "color": "#ca8622",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "regarding",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  },
+                  {
+                    "label": "count",
+                    "alias": "count",
+                    "type": "build",
+                    "color": "#bda29a",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "count",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  },
+                  {
+                    "label": "last_seen",
+                    "alias": "last_seen",
+                    "type": "build",
+                    "color": "#6e7074",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "last_seen",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 28,
+            "w": 192,
+            "h": 30,
+            "i": 16
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID4114710",
+          "type": "metric",
+          "title": "Daemon Sets",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": [],
+            "sticky_first_column": false,
+            "column_order": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(daemonset, '/', namespace, '/', k8s_cluster)) AS daemonset_count\nFROM kube_daemonset_created\nWHERE k8s_cluster IN (${k8s_cluster})\n-- SELECT COUNT(DISTINCT CONCAT(k8s_daemonset_name, '/', k8s_namespace_name)) AS daemonset_count\n-- FROM k8s_daemonset_ready_nodes\n-- WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_daemonset_status_number_ready",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "daemonset_count",
+                    "alias": "daemonset_count",
+                    "type": "build",
+                    "color": "#5960b2",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "daemonset_count",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 27,
+            "h": 7,
+            "i": 17
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID1672310",
+          "type": "metric",
+          "title": "Stateful Sets",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": [],
+            "sticky_first_column": false,
+            "column_order": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(statefulset, '/', namespace, '/', k8s_cluster)) AS statefulset_count\nFROM kube_statefulset_created\nWHERE k8s_cluster IN (${k8s_cluster})\n-- SELECT COUNT(DISTINCT CONCAT(k8s_statefulset_name, '/', k8s_namespace_name)) AS statefulset_count\n-- FROM k8s_statefulset_desired_pods\n-- WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_statefulset_replicas",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "statefulset_count",
+                    "alias": "statefulset_count",
+                    "type": "build",
+                    "color": "#5960b2",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "statefulset_count",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 27,
+            "y": 7,
+            "w": 28,
+            "h": 7,
+            "i": 18
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID2842310",
+          "type": "metric",
+          "title": "HPAs",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": [],
+            "sticky_first_column": false,
+            "column_order": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(horizontalpodautoscaler, '/', namespace, '/', k8s_cluster)) AS hpa_count\nFROM kube_horizontalpodautoscaler_info\nWHERE k8s_cluster IN (${k8s_cluster})\n-- SELECT COUNT(DISTINCT CONCAT(k8s_hpa_name, '/', k8s_namespace_name)) AS hpa_count\n-- FROM k8s_hpa_desired_replicas\n-- WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_horizontalpodautoscaler_info",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "statefulset_count",
+                    "alias": "hpa_count",
+                    "column": "hpa_count",
+                    "type": "build",
+                    "color": "#5960b2",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "statefulset_count",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 165,
+            "y": 7,
+            "w": 27,
+            "h": 7,
+            "i": 19
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID6819310",
+          "type": "metric",
+          "title": "CRDs",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": [],
+            "sticky_first_column": false,
+            "column_order": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT body_metadata_name) AS crd_count\nFROM k8s_events\nWHERE body_kind = 'CustomResourceDefinition' AND k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "k8s_events",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "vpa_count",
+                    "alias": "crd_count",
+                    "column": "crd_count",
+                    "type": "build",
+                    "color": "#5960b2",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "vpa_count",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 82,
+            "y": 7,
+            "w": 27,
+            "h": 7,
+            "i": 20
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID6011910",
+          "type": "metric",
+          "title": "Cron Jobs",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": [],
+            "sticky_first_column": false,
+            "column_order": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(cronjob, '/', namespace, '/', k8s_cluster)) AS cronjob_count\nFROM kube_cronjob_info\nWHERE k8s_cluster IN (${k8s_cluster})\n-- SELECT COUNT(DISTINCT CONCAT(k8s_cronjob_name, '/', k8s_namespace_name)) AS cronjob_count\n-- FROM k8s_cronjob_active_jobs\n-- WHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_cronjob_info",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "cronjob_count",
+                    "alias": "cronjob_count",
+                    "type": "build",
+                    "color": "#5960b2",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "cronjob_count",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 109,
+            "y": 7,
+            "w": 29,
+            "h": 7,
+            "i": 21
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID9404910",
+          "type": "metric",
+          "title": "Jobs",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": [],
+            "sticky_first_column": false,
+            "column_order": []
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT COUNT(DISTINCT CONCAT(job_name, '/', namespace, '/', k8s_cluster)) AS job_count\nFROM kube_job_info\nWHERE k8s_cluster IN (${k8s_cluster})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "kube_job_info",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "statefulset_count",
+                    "alias": "job_count",
+                    "column": "job_count",
+                    "type": "build",
+                    "color": "#5960b2",
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "statefulset_count",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 138,
+            "y": 7,
+            "w": 27,
+            "h": 7,
+            "i": 22
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        },
+        {
+          "id": "Panel_ID4923510",
+          "type": "stacked",
+          "title": "Events Per Cluster",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 2,
+            "line_thickness": 1.5,
+            "step_value": "0",
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "axis_label_rotate": 0,
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "legend_height": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [
+              {
+                "name": "google",
+                "type": "byUrl",
+                "targetBlank": true,
+                "findBy": "name",
+                "data": {
+                  "url": "https://google.com",
+                  "folder": "",
+                  "dashboard": "",
+                  "tab": "",
+                  "passAllVariables": true,
+                  "variables": [
+                    {
+                      "name": "",
+                      "value": ""
+                    }
+                  ],
+                  "logsMode": "auto",
+                  "logsQuery": ""
+                }
+              }
+            ],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last",
+              "colorBySeries": []
+            },
+            "trellis": {
+              "layout": null,
+              "num_of_columns": 1,
+              "group_by_y_axis": false
+            },
+            "show_gridlines": true,
+            "aggregation": "last",
+            "lat_label": "latitude",
+            "lon_label": "longitude",
+            "weight_label": "weight",
+            "name_label": "name",
+            "table_aggregations": [
+              "last"
+            ],
+            "promql_table_mode": "single",
+            "visible_columns": [],
+            "hidden_columns": [],
+            "sticky_columns": [],
+            "sticky_first_column": false,
+            "column_order": [],
+            "table_pagination": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\", k8s_cluster as \"breakdown_1\" FROM \"k8s_events\" WHERE k8s_cluster IN (${k8s_cluster}) AND body_object_kind = 'Event' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "k8s_events",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "x_axis_1",
+                    "column": "x_axis_1",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "_timestamp",
+                          "streamAlias": null
+                        }
+                      },
+                      {
+                        "type": "histogramInterval"
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "type": "build",
+                    "color": null,
+                    "functionName": "count",
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "_timestamp",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": false,
+                    "showFieldAsJson": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [
+                  {
+                    "label": "K8s Cluster Name",
+                    "alias": "breakdown_1",
+                    "column": "breakdown_1",
+                    "type": "build",
+                    "color": null,
+                    "args": [
+                      {
+                        "type": "field",
+                        "value": {
+                          "field": "k8s_cluster",
+                          "streamAlias": null
+                        }
+                      }
+                    ],
+                    "isDerived": false,
+                    "havingConditions": []
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              },
+              "joins": []
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 14,
+            "w": 192,
+            "h": 14,
+            "i": 23
+          },
+          "htmlContent": "",
+          "markdownContent": "",
+          "customChartContent": " // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};\n  "
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [
+      {
+        "type": "query_values",
+        "name": "k8s_cluster",
+        "label": "",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "kube_node_info",
+          "field": "k8s_cluster",
+          "max_record_size": 20,
+          "filter": []
+        },
+        "value": "",
+        "options": [
+          {
+            "label": "",
+            "value": "",
+            "selected": true
+          }
+        ],
+        "multiSelect": true,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": false,
+        "scope": "global",
+        "tabs": [],
+        "panels": []
+      },
+      {
+        "type": "query_values",
+        "name": "namespace",
+        "label": "",
+        "query_data": {
+          "stream_type": "metrics",
+          "stream": "kube_namespace_status_phase",
+          "field": "namespace",
+          "max_record_size": 50,
+          "filter": [
+            {
+              "name": "k8s_cluster",
+              "operator": "=",
+              "value": "$k8s_cluster"
+            }
+          ]
+        },
+        "value": "",
+        "options": [
+          {
+            "label": "",
+            "value": "",
+            "selected": true
+          }
+        ],
+        "multiSelect": true,
+        "hideOnDashboard": false,
+        "selectAllValueForMultiSelect": "first",
+        "customMultiSelectValue": [],
+        "escapeSingleQuotes": false,
+        "scope": "tabs",
+        "tabs": [
+          "42106"
+        ],
+        "panels": []
+      }
+    ],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "15m",
+    "startTime": 1773211783134000,
+    "endTime": 1773212683134000
+  }
+}
