@@ -27,6 +27,7 @@ import TopBar from "@/components/autoobserve/v2/TopBar.vue";
 import TopBarStatus from "@/components/autoobserve/v2/TopBarStatus.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
 import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
+import CoverageBar from "@/components/autoobserve/v2/CoverageBar.vue";
 import HistoryDrawer from "@/components/autoobserve/v2/HistoryDrawer.vue";
 import SettingsDrawer from "@/components/autoobserve/v2/SettingsDrawer.vue";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
@@ -337,7 +338,7 @@ describe("AutoObserve2 coverage page learning line", () => {
     Object.assign(routeQuery, { page: "coverage" });
   });
 
-  it("counts the learning service and its own streams, as the page lists them", async () => {
+  it("counts an unwatched learning service as a gap, and only its own streams as learning", async () => {
     const ready = (Date.now() + 5 * 86_400_000) * 1000;
     vi.mocked(autoobserve.coverage).mockResolvedValue(
       data(
@@ -348,7 +349,7 @@ describe("AutoObserve2 coverage page learning line", () => {
     const wrapper = mountView();
     await flushPromises();
     const sentence = wrapper.find('[data-test="autoobserve2-coverage-sentence"]').text();
-    expect(sentence).toContain("of your 1 service");
+    expect(wrapper.findComponent(CoverageBar).props()).toMatchObject({ gaps: 1, learning: 0 });
     expect(sentence).toMatch(/\b1 stream\b/);
     expect(sentence).not.toMatch(/\b9 streams\b/);
   });
