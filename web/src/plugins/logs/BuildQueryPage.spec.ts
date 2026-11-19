@@ -777,6 +777,30 @@ describe("BuildQueryPage Component", () => {
       expect(mockDashboardPanelData.data.config.table_dynamic_columns).toBe(true);
     });
 
+    it.each(["NOT (level = 'info')", "status BETWEEN 400 AND 450", "lower(level) = 'info'"])(
+      "runs SQL with an unchartable WHERE (%s) as custom SQL and never emits a generated query",
+      async (where) => {
+        const sql = `SELECT * FROM "qb_logs" WHERE ${where}`;
+        wrapper = createWrapper({ isSqlMode: true, searchQuery: sql, selectedStream: "qb_logs" });
+        await flushPromises();
+
+        expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
+        expect(mockDashboardPanelData.data.queries[0].query).toBe(sql);
+        expect(wrapper.emitted("queryGenerated")).toBeFalsy();
+      },
+    );
+
+    it("charts SQL with a WHERE the builder can hold in builder mode", async () => {
+      wrapper = createWrapper({
+        isSqlMode: true,
+        searchQuery: `SELECT * FROM "qb_logs" WHERE level = 'info'`,
+        selectedStream: "qb_logs",
+      });
+      await flushPromises();
+
+      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(false);
+    });
+
     it("should auto-select metric chart type when only Y-axis fields are present", async () => {
       const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
         await import("@/utils/query/sqlQueryParser");
@@ -1006,6 +1030,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
   afterEach(() => wrapper?.unmount());
 
   const notice = () => wrapper.find('[data-test="logs-build-free-text-notice"]');
+  const incompleteNotice = () => wrapper.find('[data-test="logs-build-incomplete-filter-notice"]');
   const initialized = () => vi.waitFor(() => expect(wrapper.emitted("initialized")).toBeTruthy());
 
   it("keeps rendered match_all units as builder conditions and runs", async () => {
@@ -1041,6 +1066,23 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     expect(notice().text()).toContain("search.freeTextBuildNotice");
     expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
     expect(wrapper.emitted("initialized")).toBeTruthy();
+  });
+
+  it("shows the not-chartable notice and never applies a partial filter without free text", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT (level = 'info')",
+      freeTextFilter: false,
+    });
+    await initialized();
+    await flushPromises();
+
+    expect(incompleteNotice().exists()).toBe(true);
+    expect(notice().exists()).toBe(false);
+    expect(incompleteNotice().text()).toContain("search.filterNotChartableNotice");
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+    expect(wrapper.emitted("queryGenerated")).toBeFalsy();
   });
 
   it("refuses Run after the notice: no panel run opens and the editor never queries", async () => {
@@ -1196,7 +1238,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
   });
 
-  it("leaves a SQL filter on today's path", async () => {
+  it("holds back a SQL filter the builder cannot represent", async () => {
     wrapper = createWrapper({
       isSqlMode: false,
       selectedStream: "fts_a",
@@ -1206,7 +1248,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     await initialized();
     await flushPromises();
 
-    expect(notice().exists()).toBe(false);
-    expect(mockMakeAutoSQLQuery).toHaveBeenCalled();
+    expect(incompleteNotice().exists()).toBe(true);
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
   });
 });

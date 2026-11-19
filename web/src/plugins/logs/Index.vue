@@ -3390,7 +3390,12 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
+    const isBuildFilterHeld = () =>
+      !!(buildQueryPageRef.value as { freeTextNotice?: boolean } | null)?.freeTextNotice;
+
     const onBuildQueryGenerated = async (query: string) => {
+      // While the notice shows the builder has no SQL for the filter; "" would erase Search.
+      if (isBuildFilterHeld()) return;
       if (searchObj.meta.sqlMode) {
         // SQL mode ON: sync the full generated SQL to the search bar
         searchObj.data.query = query;
@@ -3408,6 +3413,24 @@ export default defineComponent({
       // Disable query editor in build mode when customQuery is false (builder mode)
       // In builder mode, query is auto-generated from fields - user shouldn't edit directly
       searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
+      if (isCustomMode) seedCustomQueryFromHeldFilter();
+    };
+
+    // Builder -> Custom with a filter the builder could not chart: hand the user that filter as SQL.
+    const seedCustomQueryFromHeldFilter = () => {
+      const page = buildQueryPageRef.value as { incompleteFilterNotice?: boolean } | null;
+      const panelQuery = buildDashboardPanelData.data.queries[0];
+      const streams = searchObj.data.stream.selectedStream;
+      if (!page?.incompleteFilterNotice || !panelQuery) return;
+      if (searchObj.meta.sqlMode) {
+        panelQuery.query = searchObj.data.query;
+      } else if (streams.length === 1) {
+        // The WHERE sits on its own line so a trailing `-- comment` cannot swallow GROUP BY.
+        panelQuery.query =
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 ` +
+          `FROM "${streams[0].replace(/"/g, '""')}" WHERE ${searchObj.data.query}\n` +
+          `GROUP BY x_axis_1 ORDER BY x_axis_1`;
+      }
     };
 
     // Handle build mode toggle from SearchBar (updates panel schema's customQuery)
@@ -3418,6 +3441,7 @@ export default defineComponent({
 
         // Builder → Custom: show the generated SQL in the editor for editing
         if (isCustomMode) {
+          if (isBuildFilterHeld()) return;
           const generatedQuery = buildDashboardPanelData.data.queries[0]?.query || "";
           if (searchObj.meta.sqlMode) {
             searchObj.data.query = generatedQuery;
