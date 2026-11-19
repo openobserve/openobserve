@@ -63,7 +63,8 @@ export interface IntentSlots {
   values?: string[];
   /** The values typed as a pattern such as "5xx"; every other value matches literally. */
   patterns?: string[];
-  group?: string;
+  /** Per: the fields or labels the alert fires for one by one; empty is one alert. */
+  groups?: string[];
   measure?: string;
   factor?: number;
   label?: string;
@@ -548,13 +549,13 @@ export function conditionsFor(slots: IntentSlots, id: () => string) {
 const groupAggregation = (
   fn: string,
   column: string,
-  group: string | undefined,
+  groups: readonly string[] | undefined,
   having: { operator: string; value: unknown },
 ) => ({
   function: fn,
   having: { column, operator: having.operator, value: having.value },
-  group_by: group ? [group] : [],
-  multi_alert: !!group,
+  group_by: [...(groups ?? [])],
+  multi_alert: !!groups?.length,
 });
 
 /** A logs/traces intent as the values it writes; value and per-group count thresholds stay empty for
@@ -580,11 +581,11 @@ export function buildEventFill(
       vrl: false,
       values: {
         ...filters,
-        "query_condition.aggregation": groupAggregation(slots.agg || "p95", measure, slots.group, {
+        "query_condition.aggregation": groupAggregation(slots.agg || "p95", measure, slots.groups, {
           operator: ">",
           value: "",
         }),
-        logGroupBy: slots.group ? [slots.group] : [],
+        logGroupBy: [...(slots.groups ?? [])],
       },
     };
   }
@@ -633,19 +634,19 @@ export function buildEventFill(
       },
     };
   }
-  // countWhere: a count per group needs a measure, so grouping counts the group field.
-  const group = slots.group;
+  // countWhere: a count per group needs a measure, so grouping counts the first group field.
+  const groups = slots.groups ?? [];
   return {
     intent,
     howItChecks: "false",
-    aggregation: !!group,
+    aggregation: groups.length > 0,
     vrl: false,
     values: {
       ...filters,
-      "query_condition.aggregation": group
-        ? groupAggregation("count", group, group, { operator: ">", value: "" })
+      "query_condition.aggregation": groups.length
+        ? groupAggregation("count", groups[0], groups, { operator: ">", value: "" })
         : null,
-      logGroupBy: group ? [group] : [],
+      logGroupBy: [...groups],
     },
   };
 }
@@ -734,21 +735,21 @@ export function compareFactor(vrl: string | null | undefined): number | undefine
 /** A metric as a PromQL query; a counter only ever grows, so it reads as its per-second rate. */
 export function metricPromql(
   metric: string,
-  opts: { counter: boolean; group?: string; windowMinutes: number },
+  opts: { counter: boolean; groups?: readonly string[]; windowMinutes: number },
 ): string {
   const window = `${Math.max(1, Math.round(opts.windowMinutes))}m`;
   const read = opts.counter ? `rate(${metric}[${window}])` : metric;
-  if (!opts.group) return read;
-  return `${opts.counter ? "sum" : "avg"} by (${opts.group}) (${read})`;
+  if (!opts.groups?.length) return read;
+  return `${opts.counter ? "sum" : "avg"} by (${opts.groups.join(", ")}) (${read})`;
 }
 
 /** A percentile over a histogram's bucket series; buckets are cumulative counters, so they are read as a rate. */
 export function percentilePromql(
   metric: string,
-  opts: { group?: string; windowMinutes: number; agg?: string },
+  opts: { groups?: readonly string[]; windowMinutes: number; agg?: string },
 ): string {
   const window = `${Math.max(1, Math.round(opts.windowMinutes))}m`;
-  const by = [BUCKET_LABEL, ...(opts.group ? [opts.group] : [])].join(", ");
+  const by = [BUCKET_LABEL, ...(opts.groups ?? []).filter((g) => g !== BUCKET_LABEL)].join(", ");
   const q = QUANTILE_OF[opts.agg ?? ""] ?? QUANTILE_OF.p95;
   return `histogram_quantile(${q}, sum by (${by}) (rate(${metric}[${window}])))`;
 }
@@ -791,12 +792,12 @@ export function buildMetricFill(
       values: {
         "query_condition.type": "promql",
         "query_condition.promql": percentilePromql(slots.metric, {
-          group: slots.group,
+          groups: slots.groups,
           windowMinutes: ctx.periodMinutes,
           agg: slots.agg,
         }),
         "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
-        "query_condition.promql_multi_alert": !!slots.group,
+        "query_condition.promql_multi_alert": !!slots.groups?.length,
       },
     };
   }
@@ -810,11 +811,11 @@ export function buildMetricFill(
         "query_condition.type": "promql",
         "query_condition.promql": metricPromql(slots.metric, {
           counter: !!slots.counter,
-          group: slots.group,
+          groups: slots.groups,
           windowMinutes: ctx.periodMinutes,
         }),
         "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
-        "query_condition.promql_multi_alert": !!slots.group,
+        "query_condition.promql_multi_alert": !!slots.groups?.length,
       },
     };
   }
@@ -832,12 +833,12 @@ export function buildMetricFill(
             : [{ metric: slots.metric, labels: slots.label ? [slots.label] : [], whole: true }],
           values: slots.values ?? [],
           patterns: slots.patterns,
-          group: slots.group,
+          groups: slots.groups,
           counter: slots.counter ?? true,
           windowMinutes: ctx.periodMinutes,
         }),
         "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
-        "query_condition.promql_multi_alert": !!slots.group,
+        "query_condition.promql_multi_alert": !!slots.groups?.length,
       },
     };
   }
@@ -848,7 +849,7 @@ export function buildMetricFill(
     vrl: false,
     values: {
       "query_condition.type": "custom",
-      "query_condition.aggregation": groupAggregation(slots.agg || "avg", "value", slots.group, {
+      "query_condition.aggregation": groupAggregation(slots.agg || "avg", "value", slots.groups, {
         operator: ">",
         value: "",
       }),
@@ -871,17 +872,19 @@ export function slotsFromForm(
 ): Partial<IntentSlots> {
   const type = read("query_condition.type");
   if (type === "promql") {
-    const agg = promqlQuantileAgg(read("query_condition.promql"), prefer.agg);
-    return intent === "percentile" && agg ? { agg } : {};
+    const promql = String(read("query_condition.promql") ?? "");
+    const groups = promqlByLabels(promql).filter((g) => g !== BUCKET_LABEL);
+    const agg = promqlQuantileAgg(promql, prefer.agg);
+    return intent === "percentile" && agg ? { agg, groups } : { groups };
   }
   if (type !== "custom") return {};
   const aggregation = read("query_condition.aggregation") as FormAggregation | null | undefined;
-  const group = aggregation?.group_by?.find((g): g is string => !!g);
-  if (intent === "countWhere") return { group };
+  const groups = (aggregation?.group_by ?? []).filter((g): g is string => !!g);
+  if (intent === "countWhere") return { groups };
   if (!aggregation) return {};
   if (intent === "percentile")
-    return { agg: aggregation.function, measure: aggregation.having?.column || undefined, group };
-  return intent === "metricAbove" ? { agg: aggregation.function, group } : {};
+    return { agg: aggregation.function, measure: aggregation.having?.column || undefined, groups };
+  return intent === "metricAbove" ? { agg: aggregation.function, groups } : {};
 }
 
 export interface ThresholdPaths {
@@ -1113,9 +1116,9 @@ const statusLike = (p: ReturnType<typeof labelProfile>[number]) =>
  * (its share would be 0 or 100 %); status-like labels lead and version-like ones never fit. */
 export function rankMetricCategory(
   profile: ReturnType<typeof labelProfile>,
-  opts: { group?: string; series?: readonly SeriesLabels[] } = {},
+  opts: { groups?: readonly string[]; series?: readonly SeriesLabels[] } = {},
 ): Ranked {
-  const { group, series = [] } = opts;
+  const { groups = [], series = [] } = opts;
   const fit = profile
     .filter(
       (p) =>
@@ -1124,7 +1127,7 @@ export function rankMetricCategory(
         p.values.length <= CATEGORY_MAX_DISTINCT &&
         seriesTopShare(p) >= MAJORITY_SHARE &&
         !versionLike(p) &&
-        (!group || fixedByGroup(series, p.label, group) < FIXED_BY_GROUP),
+        groups.every((group) => fixedByGroup(series, p.label, group) < FIXED_BY_GROUP),
     )
     .sort(
       (a, b) =>
@@ -1160,7 +1163,7 @@ export function ratioPromql(input: {
   members: MetricFamilyMember[];
   values: string[];
   patterns?: readonly string[];
-  group?: string;
+  groups?: readonly string[];
   counter: boolean;
   windowMinutes: number;
 }): string {
@@ -1178,7 +1181,8 @@ export function ratioPromql(input: {
   };
   const sum = (filtered: boolean) => {
     const inner = input.members.flatMap((m) => reads(m, filtered)).join(" or ");
-    return `sum${input.group ? ` by (${input.group})` : ""} (${inner})`;
+    const by = input.groups?.length ? ` by (${input.groups.join(", ")})` : "";
+    return `sum${by} (${inner})`;
   };
   return `${sum(true)} / ${sum(false)} * 100`;
 }

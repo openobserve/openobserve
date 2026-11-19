@@ -49,6 +49,7 @@ import {
   readFieldShapes,
   shapeQuerySql,
   slotFields,
+  slotsFromForm,
   thresholdPaths,
   withCaseVariants,
   hasCaseVariants,
@@ -214,7 +215,7 @@ describe("alertIntents", () => {
     ];
     const profile = labelProfile(series);
     expect(rankMetricCategory(profile).fit).toContain("lib");
-    expect(rankMetricCategory(profile, { group: "svc", series }).fit).not.toContain("lib");
+    expect(rankMetricCategory(profile, { groups: ["svc"], series }).fit).not.toContain("lib");
     const oneCode = labelProfile([
       { code: "200", node: "a" },
       { code: "200", node: "b" },
@@ -300,7 +301,7 @@ describe("alertIntents", () => {
   it.each([
     [
       "countWhere",
-      { field: "level", values: ["ERROR", "error"], group: "svc" },
+      { field: "level", values: ["ERROR", "error"], groups: ["svc"] },
       {
         howItChecks: "false",
         aggregation: true,
@@ -310,7 +311,7 @@ describe("alertIntents", () => {
     ],
     [
       "percentile",
-      { measure: "took", group: "svc" },
+      { measure: "took", groups: ["svc"] },
       {
         howItChecks: "false",
         aggregation: true,
@@ -445,7 +446,7 @@ describe("alertIntents", () => {
         metric: "http_server_request_duration_count",
         values: ["5.."],
         patterns: ["5.."],
-        group: "service_name",
+        groups: ["service_name"],
         counter: true,
         family: [
           { metric: "http_server_request_duration_count", ...own! },
@@ -470,30 +471,35 @@ describe("alertIntents", () => {
   });
 
   it.each([
-    { intent: "metricAbove", counter: true, group: "host", promql: "sum by (host) (rate(m[10m]))" },
-    { intent: "metricAbove", counter: true, group: undefined, promql: "rate(m[10m])" },
-    { intent: "promql", counter: true, group: undefined, promql: "rate(m[10m])" },
-    { intent: "promql", counter: false, group: undefined, promql: "m" },
+    {
+      intent: "metricAbove",
+      counter: true,
+      groups: ["host", "dc"],
+      promql: "sum by (host, dc) (rate(m[10m]))",
+    },
+    { intent: "metricAbove", counter: true, groups: undefined, promql: "rate(m[10m])" },
+    { intent: "promql", counter: true, groups: undefined, promql: "rate(m[10m])" },
+    { intent: "promql", counter: false, groups: undefined, promql: "m" },
     {
       intent: "percentile",
       counter: true,
-      group: "svc",
+      groups: ["svc"],
       promql: "histogram_quantile(0.95, sum by (le, svc) (rate(m[10m])))",
     },
     {
       intent: "percentile",
       counter: false,
-      group: undefined,
+      groups: undefined,
       promql: "histogram_quantile(0.95, sum by (le) (rate(m[10m])))",
     },
   ] as const)(
-    "$intent on a counter $counter per $group reads $promql",
-    ({ intent, counter, group, promql }) => {
-      const fill = buildMetricFill(intent, { metric: "m", counter, group }, { periodMinutes: 10 });
+    "$intent on a counter $counter per $groups reads $promql",
+    ({ intent, counter, groups, promql }) => {
+      const fill = buildMetricFill(intent, { metric: "m", counter, groups }, { periodMinutes: 10 });
       expect(fill.values).toMatchObject({
         "query_condition.type": "promql",
         "query_condition.promql": promql,
-        "query_condition.promql_multi_alert": !!group,
+        "query_condition.promql_multi_alert": !!groups,
       });
     },
   );
@@ -582,7 +588,7 @@ describe("alertIntents", () => {
   const mt = (intent: string, slots: object) =>
     buildMetricFill(intent as any, { metric: "m", ...slots }, { periodMinutes: 10 });
   it.each([
-    ["count per group", ev("countWhere", { group: "svc" }), HAVING],
+    ["count per group", ev("countWhere", { groups: ["svc"] }), HAVING],
     ["count of all", ev("countWhere", {}), COUNT],
     ["percentile", ev("percentile", { measure: "took" }), HAVING],
     ["gauge above a value", mt("metricAbove", { counter: false }), HAVING],
@@ -604,15 +610,26 @@ describe("alertIntents", () => {
       "query_condition.aggregation.having.value": "50",
     };
     const read = (path: string) => form[path];
-    const grouped = ev("countWhere", { group: "svc" });
-    expect(carriedThreshold(grouped, ev("countWhere", { group: "host" }), read)).toEqual(form);
+    const grouped = ev("countWhere", { groups: ["svc"] });
+    expect(carriedThreshold(grouped, ev("countWhere", { groups: ["host"] }), read)).toEqual(form);
     expect(carriedThreshold(grouped, ev("countWhere", {}), read)).toEqual({
       "trigger_condition.operator": ">=",
       "trigger_condition.threshold": "50",
     });
-    expect(carriedThreshold(grouped, ev("percentile", { group: "svc" }), read)).toEqual({});
+    expect(carriedThreshold(grouped, ev("percentile", { groups: ["svc"] }), read)).toEqual({});
     form["query_condition.aggregation.having.value"] = "";
-    expect(carriedThreshold(grouped, ev("countWhere", { group: "host" }), read)).toEqual({});
+    expect(carriedThreshold(grouped, ev("countWhere", { groups: ["host"] }), read)).toEqual({});
+  });
+
+  it.each([
+    ["a builder's group-by", mt("metricAbove", { groups: ["host", "dc"] }), ["host", "dc"]],
+    ["a count per group", ev("countWhere", { groups: ["svc", "pod"] }), ["svc", "pod"]],
+    ["a histogram's by (…) without le", mt("percentile", { groups: ["a", "b"] }), ["a", "b"]],
+    ["a share's by (…)", mt("ratio", { label: "c", values: ["5"], groups: ["x"] }), ["x"]],
+    ["an ungrouped builder", mt("metricAbove", {}), []],
+  ])("step 1 reads its Per back from %s", (_, fill, groups) => {
+    const read = (path: string) => (fill.values as Record<string, unknown>)[path];
+    expect(slotsFromForm(fill.intent, read).groups).toEqual(groups);
   });
 
   it("ranks metric labels for grouping by how many series carry them", () => {

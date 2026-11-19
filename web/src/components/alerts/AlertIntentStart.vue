@@ -226,16 +226,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('alerts.intent.rows.per')"
         data-test="add-alert-intent-row-per"
       >
-        <OSelect
-          :model-value="slots.group || NO_GROUP"
+        <AlertGroupByPicker
+          :model-value="slots.groups ?? []"
           :options="groupOptions"
           size="sm"
-          searchable
+          :placeholder="t('alerts.intent.noGroup')"
           :class="SLOT_FIELD"
-          :aria-label="t('alerts.intent.slots.group')"
           :dropdown-style="SLOT_MENU"
           data-test="add-alert-intent-slot-group"
-          @update:model-value="setSlot('group', $event)"
+          @update:model-value="setGroups"
         />
       </OSettingRow>
 
@@ -474,6 +473,7 @@ import {
   type ValueCountContext,
 } from "@/composables/alerts/useStreamDiscovery";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
+import AlertGroupByPicker from "@/components/alerts/AlertGroupByPicker.vue";
 import { publishGroupRanking } from "@/composables/alerts/groupRanking";
 import { useIntentState } from "@/composables/alerts/useIntentState";
 import {
@@ -661,11 +661,11 @@ const categoriesFor = (id: IntentId | null): Ranked =>
     : without(
         isMetrics.value
           ? rankMetricCategory(profile.value, {
-              group: slots.group,
+              groups: slots.groups,
               series: series.value[props.streamName],
             })
           : rankCategory(stringFields.value, shapes.value, id === "anyEvent" ? "variety" : "split"),
-        slots.group,
+        ...(slots.groups ?? []),
       );
 const categoryCandidates = computed(() => categoriesFor(props.active));
 const groupCandidates = computed<Ranked>(() =>
@@ -788,7 +788,7 @@ const family = computed<MetricFamilyMember[]>(() => {
   const memberOf = (metric: string): MetricFamilyMember[] => {
     const rows = series.value[metric] ?? [];
     const member = label ? familyMember(label, rows) : undefined;
-    const groupOk = !slots.group || rows.some((one) => one[slots.group!] !== undefined);
+    const groupOk = (slots.groups ?? []).every((g) => rows.some((one) => one[g] !== undefined));
     return member && groupOk ? [{ metric, ...member }] : [];
   };
   const own = memberOf(props.streamName)[0] ?? {
@@ -842,10 +842,7 @@ const fieldOptions = computed<SelectOption[]>(() =>
       ]
     : asOptions(categoryCandidates.value.all),
 );
-const groupOptions = computed<SelectOption[]>(() => [
-  { label: t("alerts.intent.noGroup"), value: NO_GROUP },
-  ...asOptions(groupCandidates.value.all),
-]);
+const groupOptions = computed<SelectOption[]>(() => asOptions(groupCandidates.value.all));
 const measureOptions = computed(() => asOptions(measureCandidates.value.all));
 // Spellings of one label from two naming generations are read together, so they are one choice.
 const labelOptions = computed<SelectOption[]>(() =>
@@ -1060,7 +1057,7 @@ const apply = (id: IntentId) => {
 
 /** Fills empty slots with the first candidate that passes the slot's rule; grouping stays the user's pick. */
 const seedSlots = (id: IntentId) => {
-  if (!wantsGroup(id)) slots.group = undefined;
+  if (!wantsGroup(id)) slots.groups = undefined;
   if (id === "percentile" && !isMetrics.value) slots.measure ??= measureCandidates.value.fit[0];
   if (id === "compareLastWeek") slots.factor ??= DEFAULT_FACTOR;
   if (!wantsValue(id)) return;
@@ -1132,7 +1129,7 @@ watch(
   () => JSON.stringify(formSlots.value, (_, v) => (v === undefined ? null : v)),
   () => {
     for (const [key, value] of Object.entries(formSlots.value) as [keyof IntentSlots, never][])
-      if (slots[key] !== value) slots[key] = value;
+      if (JSON.stringify(slots[key]) !== JSON.stringify(value)) slots[key] = value;
   },
   { immediate: true },
 );
@@ -1140,10 +1137,7 @@ watch(
 const asText = (value: SelectModelValue): string =>
   typeof value === "string" || typeof value === "number" ? String(value) : "";
 
-const setSlot = async (
-  slot: "field" | "group" | "measure" | "label" | "agg",
-  value: SelectModelValue,
-) => {
+const setSlot = async (slot: "field" | "measure" | "label" | "agg", value: SelectModelValue) => {
   const next = asText(value);
   slots[slot] = next && next !== NO_GROUP ? next : undefined;
   if (slot === "field" || slot === "label") {
@@ -1151,6 +1145,12 @@ const setSlot = async (
     slots.patterns = [];
     if (props.active) await seedValues(props.active);
   }
+  if (isMetrics.value) await Promise.all(siblings.value.map(loadSeries));
+  reapply();
+};
+
+const setGroups = async (groups: string[]) => {
+  slots.groups = groups;
   if (isMetrics.value) await Promise.all(siblings.value.map(loadSeries));
   reapply();
 };

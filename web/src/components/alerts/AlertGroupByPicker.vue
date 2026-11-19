@@ -16,17 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { SelectModelValue, SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
-import { useI18nTyped } from "@/types/i18n";
+import type {
+  SelectModelValue,
+  SelectOptionInput,
+  SelectProps,
+} from "@/lib/forms/Select/OSelect.types";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 withDefaults(
   defineProps<{
     modelValue: readonly string[];
     /** The stream's fields or labels, already in ranking order; nothing is ticked for being ranked. */
     options: readonly SelectOptionInput[];
+    /** What an empty pick reads as; step 1 says the alert is not split. */
+    placeholder?: I18nText;
+    size?: SelectProps["size"];
+    dropdownStyle?: SelectProps["dropdownStyle"];
     dataTest?: string;
   }>(),
-  { dataTest: "alert-group-by-picker" },
+  {
+    placeholder: undefined,
+    size: undefined,
+    dropdownStyle: undefined,
+    dataTest: "alert-group-by-picker",
+  },
 );
 
 const emit = defineEmits<{ (e: "update:modelValue", value: string[]): void }>();
@@ -47,7 +60,9 @@ const onPick = (value: SelectModelValue) =>
     searchable
     :max-visible-chips="3"
     :aria-label="t('alerts.groupBy')"
-    :placeholder="t('alerts.placeholders.selectColumn')"
+    :placeholder="placeholder ?? t('alerts.placeholders.selectColumn')"
+    :size="size"
+    :dropdown-style="dropdownStyle"
     class="max-w-full min-w-50"
     :data-test="dataTest"
     @update:model-value="onPick"

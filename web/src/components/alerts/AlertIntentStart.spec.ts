@@ -87,12 +87,12 @@ const mountStep = () => {
     shown.value = true;
     await flushPromises();
   };
-  return { wrapper, select, toggleStep, fills };
+  return { wrapper, select, toggleStep, fills, values };
 };
 
 describe("AlertIntentStart", () => {
   it("opens a starter as one alert, and keeps the user's picks when the step folds away and back", async () => {
-    const { wrapper, select, toggleStep, fills } = mountStep();
+    const { wrapper, select, toggleStep, fills, values } = mountStep();
     await flushPromises();
     await wrapper.find('[data-test="add-alert-intent-metricAbove"]').trigger("click");
     await flushPromises();
@@ -101,11 +101,18 @@ describe("AlertIntentStart", () => {
       multi_alert: false,
     });
     select("agg").vm.$emit("update:modelValue", "p95");
-    select("group").vm.$emit("update:modelValue", "host");
+    select("group").vm.$emit("update:modelValue", ["host"]);
     await flushPromises();
+    expect(fills.at(-1)?.values["query_condition.aggregation"]).toMatchObject({
+      group_by: ["host"],
+      multi_alert: true,
+    });
     await toggleStep();
     expect(select("agg").props("modelValue")).toBe("p95");
-    expect(select("group").props("modelValue")).toBe("host");
+    expect(select("group").props("modelValue")).toEqual(["host"]);
+    set(values, "query_condition.aggregation.group_by", ["host", "dc"]);
+    await flushPromises();
+    expect(select("group").props("modelValue")).toEqual(["host", "dc"]);
     const applied = fills.length;
     await wrapper.find('[data-test="add-alert-intent-metricAbove"]').trigger("click");
     await flushPromises();
