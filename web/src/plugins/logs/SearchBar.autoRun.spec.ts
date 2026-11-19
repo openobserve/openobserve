@@ -15,7 +15,7 @@
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createMemoryHistory } from "vue-router";
@@ -119,10 +119,12 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
   const originalIsCloud = config.isCloud;
   const originalZoConfig = { ...store.state.zoConfig };
 
+  const panelLoading = reactive({ searchRequestTraceIds: {} as Record<string, string[]> });
+
   const mountSearchBar = () =>
     mount(SearchBar, {
       global: {
-        provide: { store },
+        provide: { store, variablesAndPanelsDataLoadingState: panelLoading },
         plugins: [i18n, router],
         stubs: { QueryEditor: true },
       },
@@ -168,6 +170,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
 
   beforeEach(() => {
     resetLogsAutoRunForTests();
+    panelLoading.searchRequestTraceIds = {};
     toastMock.mockClear();
     scheduleSearch.mockReset();
     localStorage.clear();
@@ -674,6 +677,75 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(generation.cancelled).toBe(true);
       expect(searchObj.loading).toBe(false);
     });
+  });
+
+  describe("Visualize and Build Run button after a scope change", () => {
+    const runGroup = () =>
+      wrapper!.find(
+        '[data-test="logs-search-bar-visualize-refresh-btn"], [data-test="logs-search-bar-visualize-cancel-btn"]',
+      ).element.parentElement as HTMLElement;
+    const separatorShown = () => !!runGroup().querySelector('[data-orientation="vertical"]');
+    const loadChartThenMoveTime = async (mode: string) => {
+      const { searchObj } = await setup();
+      searchObj.meta.logsVisualizeToggle = mode;
+      wrapper!.vm.autoRun.panelLoadingChanged(true, false);
+      wrapper!.vm.autoRun.panelLoadingChanged(false, false);
+      await flushPromises();
+      return searchObj;
+    };
+
+    it.each([
+      ["visualize", "true"],
+      ["build", "true"],
+      ["visualize", "false"],
+      ["build", "false"],
+    ])(
+      "%s (enterprise %s): turns Run pending once the time moves past the loaded chart",
+      async (mode, enterprise) => {
+        config.isEnterprise = enterprise;
+        const searchObj = await loadChartThenMoveTime(mode);
+        const run = () => wrapper!.find('[data-test="logs-search-bar-visualize-refresh-btn"]');
+        expect(run().attributes("data-run-pending")).toBeUndefined();
+        expect(run().classes()).not.toContain("bg-button-pending-bg");
+        expect(separatorShown()).toBe(true);
+
+        searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+        await flushPromises();
+        expect(run().attributes("data-run-pending")).toBe("true");
+        expect(run().classes()).toContain("bg-button-pending-bg");
+        expect(separatorShown()).toBe(false);
+
+        wrapper!.vm.autoRun.panelLoadingChanged(true, false);
+        wrapper!.vm.autoRun.panelLoadingChanged(false, false);
+        await flushPromises();
+        expect(run().attributes("data-run-pending")).toBeUndefined();
+        expect(separatorShown()).toBe(true);
+      },
+    );
+
+    it.each(["visualize", "build"])(
+      "%s: shows Cancel, not pending, while the chart's query runs",
+      async (mode) => {
+        config.isEnterprise = "true";
+        panelLoading.searchRequestTraceIds = { panel: ["trace-1"] };
+        const searchObj = await loadChartThenMoveTime(mode);
+        searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+        await flushPromises();
+        expect(wrapper!.vm.showRunQueryPending).toBe(true);
+        expect(wrapper!.vm.visualizeRunPending).toBe(false);
+        expect(wrapper!.find('[data-test="logs-search-bar-visualize-cancel-btn"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper!.find('[data-test="logs-search-bar-visualize-refresh-btn"]').exists()).toBe(
+          false,
+        );
+        const trigger = wrapper!.find(
+          '[data-test="logs-search-bar-refresh-cache-dropdown-trigger"]',
+        );
+        expect(trigger.classes()).not.toContain("bg-button-pending-bg");
+        expect(separatorShown()).toBe(true);
+      },
+    );
   });
 
   describe("saved views and run-state hygiene (TRANSIENT_SEARCH_KEYS)", () => {

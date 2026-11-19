@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { getCurrentInstance, ref } from "vue";
+import { getCurrentInstance, ref, shallowReactive } from "vue";
 import { useStore, type Store } from "vuex";
+import { isEqual } from "lodash-es";
 import config from "@/aws-exports";
 import { gt, type I18nKey, type I18nText } from "@/types/i18n";
 import { searchState, type SearchObject } from "@/composables/useLogs/searchState";
@@ -26,6 +27,7 @@ import {
   sameSignature,
   type AutoRunConfig,
   type AutoRunEngine,
+  type AutoRunMeta,
   type AutoRunStore,
   type LogsSignature,
   type PersistAction,
@@ -320,6 +322,7 @@ function createLogsAutoRun() {
       };
     },
     rearmRefresh: () => rearm?.(),
+    onResetScope: () => clearPanelScopes(),
     getFreeTextFlags: () => freeTextGateFlags(searchObj(), (key) => gt(key as I18nKey)),
     readPanelConfigSignature: (surface) => {
       if (!panelConfigReader) return null;
@@ -534,12 +537,15 @@ function createLogsAutoRun() {
     return decision.ok ? null : decision.reason;
   }
 
+  type PanelScope = { surface: "visualize" | "build"; signature: LogsSignature };
   let panelRun: {
     generationId: number;
     started: boolean;
     failed: boolean;
     dispatched: string | null;
+    scope: PanelScope | null;
   } | null = null;
+  let outsideRunLoad: PanelScope | null = null;
 
   function currentPanelSignature(): string | null {
     if (!panelConfigReader) return null;
@@ -548,14 +554,50 @@ function createLogsAutoRun() {
     return panelConfigSignature(panelConfigReader(surface), readLogsSignature(searchObj()));
   }
 
+  // Charts also reload outside an engine run (tab switch, config re-render), so the scope is noted on every load.
+  const panelScopes = shallowReactive<Partial<Record<"visualize" | "build", LogsSignature>>>({});
+
+  function panelSurface(): "visualize" | "build" | null {
+    const mode = searchModeOf(searchObj().meta.logsVisualizeToggle);
+    return mode === "visualize" || mode === "build" ? mode : null;
+  }
+
+  function isPanelScopeStale(): boolean {
+    const surface = panelSurface();
+    const loaded = surface ? panelScopes[surface] : undefined;
+    return !!loaded && !sameSignature(readLogsSignature(searchObj()), loaded);
+  }
+
+  function currentPanelScope(): PanelScope | null {
+    const surface = panelSurface();
+    return surface ? { surface, signature: readLogsSignature(searchObj()) } : null;
+  }
+
+  // A cancelled or failed load never showed the new scope, so only a load that ends cleanly counts.
+  function commitPanelScope(scope: PanelScope | null): void {
+    if (scope) panelScopes[scope.surface] = scope.signature;
+  }
+
+  function clearPanelScopes(): void {
+    delete panelScopes.visualize;
+    delete panelScopes.build;
+  }
+
+  // Logs results reused by Visualize carry the time window they ran with, not the picker's.
+  function executedTimeMatches(): boolean {
+    const executed = searchObj().meta.executed as AutoRunMeta["executed"];
+    return !executed || isEqual(executed.signature.time, readLogsSignature(searchObj()).time);
+  }
+
   function beginPanelRun(generationId: number, abort?: () => void): void {
     engine.recordPanelDispatch(generationId);
     if (abort) engine.registerAbort(generationId, abort);
-    panelRun = { generationId, started: false, failed: false, dispatched: null };
+    panelRun = { generationId, started: false, failed: false, dispatched: null, scope: null };
   }
 
   function markPanelDispatched(generationId: number): void {
     if (panelRun?.generationId !== generationId || panelRun.dispatched !== null) return;
+    panelRun.scope = currentPanelScope();
     panelRun.dispatched = currentPanelSignature();
   }
 
@@ -580,13 +622,19 @@ function createLogsAutoRun() {
     panelRun = null;
     if (!run) return;
     const signature = run.dispatched;
-    if (ok && signature) engine.recordPanelComplete(run.generationId, signature);
-    else engine.recordPanelFailure(run.generationId);
+    if (ok && signature) {
+      if (engine.recordPanelComplete(run.generationId, signature)) commitPanelScope(run.scope);
+    } else engine.recordPanelFailure(run.generationId);
     engine.settleGeneration(run.generationId);
   }
 
   function panelLoadingChanged(loading: boolean, hasErrors: boolean): void {
-    if (!panelRun) return;
+    if (!panelRun) {
+      if (loading) outsideRunLoad = currentPanelScope();
+      else if (!hasErrors) commitPanelScope(outsideRunLoad);
+      if (!loading) outsideRunLoad = null;
+      return;
+    }
     if (loading) {
       panelRun.started = true;
       markPanelDispatched(panelRun.generationId);
@@ -637,6 +685,8 @@ function createLogsAutoRun() {
     markPanelFailed,
     endPanelRun,
     panelLoadingChanged,
+    isPanelScopeStale,
+    executedTimeMatches,
     hasPanelRun,
     panelSignature: (surface: "visualize" | "build") =>
       panelConfigReader
