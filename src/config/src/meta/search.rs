@@ -30,6 +30,8 @@ use crate::{
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
+/// Consumers (UI notices, alerts) match this text to tell a capped result from a failed one.
+pub const CAPPED_RESULTS_MSG: &str = "Warn: results are capped to meet default limit";
 
 /// To represent the query start and end time based of partition or cache
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1886,6 +1888,15 @@ pub enum StreamResponses {
         code: u16,
         message: String,
         error_detail: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        hint: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        suggestions: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        trace_id: Option<String>,
+        /// The application error code; `code` is the HTTP status.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error_code: Option<u16>,
     },
     PatternExtractionResult {
         patterns: json::Value,
@@ -1915,6 +1926,19 @@ impl Iterator for StreamResponseChunks {
 }
 
 impl StreamResponses {
+    /// An `error` event with no hint, suggestions or trace id.
+    pub fn error(code: u16, message: String, error_detail: Option<String>) -> Self {
+        StreamResponses::Error {
+            code,
+            message,
+            error_detail,
+            hint: None,
+            suggestions: None,
+            trace_id: None,
+            error_code: None,
+        }
+    }
+
     /// Convert a response to an iterator of formatted chunks
     /// For SearchResponse, this will apply the ResponseChunkIterator to break it into multiple
     /// chunks For other response types, this will return an iterator with a single chunk

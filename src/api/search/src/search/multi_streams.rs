@@ -1552,19 +1552,15 @@ pub async fn search_multi_stream(
                                 let error_detail = code.get_error_detail();
                                 let http_response = map_error_to_http_response(&err, None);
 
-                                StreamResponses::Error {
-                                    code: http_response.status().into(),
+                                StreamResponses::error(
+                                    http_response.status().into(),
                                     message,
-                                    error_detail: Some(error_detail),
-                                }
+                                    Some(error_detail),
+                                )
                             }
                         }
                     }
-                    _ => StreamResponses::Error {
-                        code: 500,
-                        message: err.to_string(),
-                        error_detail: None,
-                    },
+                    _ => StreamResponses::error(500, err.to_string(), None),
                 };
                 err_res.to_chunks()
             }

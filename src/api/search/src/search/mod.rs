@@ -26,6 +26,7 @@ use chrono::Utc;
 use config::{
     META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
+        agent_format,
         search::{
             AgentSearchMode, Request, ResultSchemaResponse, SearchEventType,
             SearchHistoryHitResponse, SearchHistoryRequest, SearchPartitionRequest,
@@ -69,7 +70,6 @@ use crate::common::{
     },
 };
 
-pub mod agent_format;
 pub(crate) mod around;
 pub mod error_utils;
 pub mod multi_streams;
