@@ -406,6 +406,8 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       wrapper!.vm.fnSavedView();
       expect(dispatch).toHaveBeenCalledWith("setSavedViewDialog", true);
       dispatch.mockClear();
+      // A run still pending from mount would start and leave Search Around, which is correct behaviour.
+      await vi.waitFor(() => expect(wrapper!.vm.autoRun.engine.hasPendingRequest()).toBe(false));
       markExecuted();
       wrapper!.vm.autoRun.invalidateExecuted("search-around");
       await flushPromises();
