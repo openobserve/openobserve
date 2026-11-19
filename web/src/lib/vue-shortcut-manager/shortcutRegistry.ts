@@ -141,6 +141,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
     titleKey: "shortcuts.modules.alerts",
     pages: [
       "shortcuts.pages.alerts",
+      "createStarter.shortcuts.page",
       "shortcuts.pages.alertEditor",
       "shortcuts.pages.alertDestinations",
       "shortcuts.pages.alertSources",
@@ -598,6 +599,11 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "alerts",
     shortcuts: [
       { id: "alertsCreate", key: "n", descriptionKey: "shortcuts.actions.alertsCreate" },
+      {
+        id: "alertsOpenStarter",
+        key: "shift+n",
+        descriptionKey: "alertStarter.shell.shortcutOpenStarter",
+      },
       { id: "alertsImport", key: "i", descriptionKey: "shortcuts.actions.alertsImport" },
       { id: "alertsRefresh", key: "r", descriptionKey: "shortcuts.actions.alertsRefresh" },
       { id: "alertsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
@@ -613,6 +619,20 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "alertsRowDelete",
         display: "del / ⌫",
         descriptionKey: "shortcuts.actions.tableRowDelete",
+      },
+    ],
+  },
+
+  // ── New-item starter (open popover only) ────────────────────────────────
+  {
+    pageKey: "createStarter.shortcuts.page",
+    scope: "create-starter",
+    shortcuts: [
+      {
+        id: "createStarterSwitchPane",
+        keyForWindows: "ctrl+.",
+        keyForMac: "meta+.",
+        descriptionKey: "createStarter.shortcuts.switchPane",
       },
     ],
   },

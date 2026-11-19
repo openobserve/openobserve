@@ -53,36 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </span>
         </OTooltip>
-        <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
-        <OButton
+        <AlertStarter
           v-else
-          data-test="alert-list-add-alert-btn"
-          variant="primary"
-          size="sm"
+          ref="alertStarterRef"
+          :alert-type="activeTab === 'anomalyDetection' ? 'anomaly_detection' : 'scheduled'"
           :disabled="!templates.length"
-          :aria-label="
-            hasNewDraft ? t('common.editorDraft.newDot', { label: t('alerts.add') }) : undefined
-          "
-          @click="
-            activeTab === 'anomalyDetection'
-              ? router.push({
-                  name: 'addAnomalyDetection',
-                  query: {
-                    org_identifier: store.state.selectedOrganization.identifier,
-                    folder: activeFolderId,
-                    tab: activeTab,
-                  },
-                })
-              : showAddUpdateFn({})
-          "
-          >{{ t(`alerts.add`) }}
-          <EditorDraftDot
-            v-if="hasNewDraft"
-            :saved-at="newDraftSavedAt"
-            corner
-            data-test="alert-list-add-alert-draft-dot"
-          />
-        </OButton>
+          :has-draft="hasNewDraft"
+          :draft-saved-at="newDraftSavedAt"
+          @open-form="openNewAlertForm"
+          @created="refreshAlerts"
+        />
       </template>
 
       <template #actions-overflow>
@@ -103,18 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             side="bottom"
             shortcut-id="alertsImport"
           />
-        </OButton>
-        <OButton
-          v-if="showAlertLibrary"
-          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="outline"
-          size="sm"
-          icon-left="menu-book"
-          data-test="alert-list-alert-library-btn"
-          @click="goToAlertLibrary"
-        >
-          <template v-if="!isCompactToolbar">{{ t("alerts.alertLibrary") }}</template>
-          <OTooltip v-if="isCompactToolbar" :content="t('alerts.alertLibrary')" side="bottom" />
         </OButton>
       </template>
 
@@ -1092,7 +1060,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="lg"
                       icon-left="add"
                       data-test="alert-list-empty-new-alert"
-                      @click="showAddUpdateFn({})"
+                      @click="startNewAlert"
                     >
                       {{ t("emptyState.noAlerts.action") }}
                     </OButton>
@@ -1111,7 +1079,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="lg"
                       icon-left="add"
                       data-test="alert-list-empty-new-alert"
-                      @click="showAddUpdateFn({})"
+                      @click="startNewAlert"
                     >
                       {{ t("emptyState.noAlerts.action") }}
                     </OButton>
@@ -1520,6 +1488,7 @@ import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import AlertStarter from "@/components/alerts/starter/AlertStarter.vue";
 import { matchesAnyKey, readFilterKeys, toggleFilterKey } from "@/utils/filterKeys";
 import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { ALERT_LIST_SAVED_NEW, savedAlertId } from "@/utils/alerts/alertListLanding";
@@ -1581,6 +1550,7 @@ export default defineComponent({
     OPageLayout,
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
     EditorDraftDot,
+    AlertStarter,
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
@@ -4290,6 +4260,26 @@ export default defineComponent({
       });
     };
 
+    const alertStarterRef = ref<InstanceType<typeof AlertStarter> | null>(null);
+    // Push a route, not just swap the view, so Back and discard return to the list.
+    const openNewAlertForm = () => {
+      if (activeTab.value !== "anomalyDetection") {
+        showAddUpdateFn({});
+        return;
+      }
+      router.push({
+        name: "addAnomalyDetection",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
+          tab: activeTab.value,
+        },
+      });
+    };
+    // New alert honours the user's default; with the button locked away, the form opens as before.
+    const startNewAlert = () =>
+      alertStarterRef.value ? alertStarterRef.value.start() : showAddUpdateFn({});
+
     // Raw split (no trim), the same rule AlertSectionTabs hides the Library tab by.
     const showAlertLibrary = computed(
       () => !(store.state.zoConfig?.custom_hide_menus ?? "").split(",").includes("alertLibrary"),
@@ -5057,22 +5047,15 @@ export default defineComponent({
       {
         id: "alertsCreate",
         handler: () => {
-          if (isInputFocused()) return;
-          // Mirror the Add button so the URL updates (action=add / route push),
-          // otherwise "go back"/discard can't return to the list.
-          if (!templates.value.length) return;
-          if (activeTab.value === "anomalyDetection") {
-            router.push({
-              name: "addAnomalyDetection",
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-                folder: activeFolderId.value,
-                tab: activeTab.value,
-              },
-            });
-          } else {
-            showAddUpdateFn({});
-          }
+          if (isInputFocused() || !templates.value.length) return;
+          startNewAlert();
+        },
+      },
+      {
+        id: "alertsOpenStarter",
+        handler: () => {
+          if (isInputFocused() || !templates.value.length) return;
+          alertStarterRef.value?.openStarter();
         },
       },
       {
@@ -5157,6 +5140,9 @@ export default defineComponent({
       addAlert,
       isUpdated,
       showAddUpdateFn,
+      alertStarterRef,
+      openNewAlertForm,
+      startNewAlert,
       editFolderId,
       handleActionQuery,
       showDeleteDialogFn,
