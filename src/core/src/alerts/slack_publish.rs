@@ -23,13 +23,14 @@ use bytes::Bytes;
 use config::meta::{
     alerts::{
         level::AlertLevel,
+        notification_kind::NotificationKind,
         recovery::RecoveryEvent,
         state::{AlertState, ROLLUP_GROUP_KEY},
     },
     destinations::{DestinationType, Module, SlackAppTarget, Template, TemplateKind},
     slack::{
-        ALERT_SLACK_EVENT_VERSION, AlertSlackEvent, AlertSlackEventKind, RenderedWire,
-        SLACK_OUTBOUND_TOPIC, SlackAlertMessageKey,
+        ALERT_SLACK_EVENT_VERSION, ANOMALY_GROUP_KEY, AlertSlackEvent, AlertSlackEventKind,
+        RenderedWire, SLACK_OUTBOUND_TOPIC, SlackAlertMessageKey,
     },
 };
 use dashmap::DashMap;
@@ -37,7 +38,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::alerts::notifications::{
-    apply_custom_template,
+    apply_template_body,
     context::NotificationContext,
     render::{
         DEFAULT_LINK_LABEL,
@@ -188,6 +189,7 @@ pub fn build_event(
             .and_then(|png| chart_b64(t.alert_id, png)),
         level,
         at,
+        anomaly: None,
     }
 }
 
@@ -277,14 +279,38 @@ fn templated_post_event(
     now: i64,
 ) -> anyhow::Result<AlertSlackEvent> {
     let rendered = render_wire(template, ctx)?;
-    let target = post_target(org_id, destination_id, "", now.max(0) as u64);
-    Ok(build_event(
-        &target,
-        level_of(ctx),
-        rendered,
-        chart(ctx),
-        now,
-    ))
+    let thread = anomaly_thread(ctx);
+    let mut target = post_target(org_id, destination_id, "", now.max(0) as u64);
+    if let Some((anomaly_id, hint)) = thread {
+        // The leader finds the thread by detector, and each fire's data time keys its root row.
+        target.alert_id = anomaly_id;
+        target.group_key = ANOMALY_GROUP_KEY;
+        target.firing_started_at = hint.data_us;
+    }
+    let mut event = build_event(&target, level_of(ctx), rendered, chart(ctx), now);
+    event.anomaly = thread.map(|(_, hint)| hint.clone());
+    Ok(event)
+}
+
+/// The detector id and thread hint of an anomaly send; any other kind posts one-off.
+fn anomaly_thread(
+    ctx: &NotificationContext,
+) -> Option<(
+    &str,
+    &crate::alerts::notifications::context::SlackThreadHint,
+)> {
+    let hint = ctx
+        .slack_thread
+        .as_ref()
+        .filter(|_| ctx.kind == NotificationKind::Anomaly)?;
+    let anomaly_id = ctx
+        .context_attributes
+        .iter()
+        .find(|(key, _)| key == "anomaly_id")
+        .map(|(_, id)| id.as_str())
+        .or(ctx.episode_id.as_deref())
+        .filter(|id| !id.is_empty())?;
+    Some((anomaly_id, hint))
 }
 
 /// The short thread reply of a recovery a downtime did not mute; the green edit is the clear's.
@@ -399,7 +425,7 @@ pub async fn send_form_test(
 pub fn render_wire(template: &Template, ctx: &NotificationContext) -> anyhow::Result<RenderedWire> {
     match template.kind {
         TemplateKind::Custom => Ok(wire_from_custom(
-            &apply_custom_template(&template.body, ctx, false),
+            &apply_template_body(template, ctx, false),
             ctx,
         )),
         TemplateKind::Content => {
@@ -510,7 +536,15 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
         .filter(|t| !t.is_empty());
     let has_header = wire.title != ctx.alert_name;
     match text {
-        Some(t) if !has_header => wire.title = t.to_string(),
+        Some(t) if !has_header => {
+            wire.title = t.to_string();
+            // A body that opens with its own bold title line, as the prebuilt Slack body does,
+            // would show the title twice.
+            let bold = format!("*{t}*");
+            if body.first().is_some_and(|b| b.trim() == bold) {
+                body.remove(0);
+            }
+        }
         Some(t) if body.is_empty() && t != wire.title => body.push(t.to_string()),
         _ => {}
     }
@@ -944,7 +978,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::alerts::notifications::resolve::Link;
+    use crate::alerts::notifications::{apply_custom_template, resolve::Link};
 
     const PREBUILT_SLACK: &str = r#"{
   "text": "[{alert_status}] {alert_name}",
@@ -1289,6 +1323,20 @@ mod tests {
             wire.body, wire.title,
             "the text is not repeated as the body"
         );
+        assert!(
+            !wire.body.contains("[firing] checkout-errors"),
+            "the bold title line is not repeated in the body: {wire:?}"
+        );
+        let starred = NotificationContext {
+            alert_name: "cpu_high*".into(),
+            ..ctx.clone()
+        };
+        let wire = render_wire(&built_in, &starred).unwrap();
+        assert_eq!(wire.title, "[firing] cpu_high*");
+        assert!(
+            !wire.body.contains("[firing] cpu_high*"),
+            "a name ending in * is not shown twice: {wire:?}"
+        );
     }
 
     #[test]
@@ -1514,6 +1562,54 @@ mod tests {
             event.rendered.map(|r| r.body).as_deref(),
             Some("checkout-errors opened an incident")
         );
+    }
+
+    #[test]
+    fn an_anomaly_post_is_keyed_by_the_detector_and_its_data_time() {
+        use config::meta::slack::AnomalyThreadInfo;
+        let template = Template {
+            body: "{alert_name}".to_string(),
+            ..Default::default()
+        };
+        let hint = AnomalyThreadInfo {
+            first_anomaly_us: Some(10),
+            data_us: 900,
+            bucket_end_us: 800,
+            gap_us: 3_600_000_000,
+            closes: false,
+            thread_headline: Some("checkout rose 50.0% above expected".into()),
+            model_version: Some(7),
+            recovered_at_us: None,
+        };
+        let anomaly = NotificationContext {
+            kind: NotificationKind::Anomaly,
+            episode_id: Some("2Kanomaly".into()),
+            context_attributes: vec![("anomaly_id".into(), "2Kanomaly".into())],
+            slack_thread: Some(hint.clone()),
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &anomaly, 5).unwrap();
+        assert_eq!(event.kind, AlertSlackEventKind::Post);
+        assert_eq!(event.alert_id, "2Kanomaly");
+        assert_eq!(event.group_key, ANOMALY_GROUP_KEY);
+        assert_eq!(event.firing_started_at, 900);
+        assert_eq!(event.anomaly, Some(hint.clone()));
+
+        let other = NotificationContext {
+            slack_thread: Some(hint),
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &other, 5).unwrap();
+        assert_eq!(event.alert_id, "");
+        assert_eq!(event.group_key, "");
+        assert_eq!(event.firing_started_at, 0);
+        assert_eq!(event.anomaly, None, "other kinds post one-off as before");
+        let plain = NotificationContext {
+            kind: NotificationKind::Anomaly,
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &plain, 5).unwrap();
+        assert_eq!(event.anomaly, None, "an anomaly with no hint posts one-off");
     }
 
     #[tokio::test]

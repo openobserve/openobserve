@@ -195,8 +195,8 @@
             <AlertEvaluationHistory :alert-id="alertId" :is-composite="isCompositeAlert" />
           </OTabPanel>
           <OTabPanel name="configuration" stretch>
-            <OContent class="flex h-full flex-col overflow-y-auto py-4">
-              <AlertConfigSummary v-if="alert" :alert="alert" class="flex-1" />
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" />
             </OContent>
           </OTabPanel>
         </OTabPanels>
@@ -351,7 +351,24 @@
                 :features="['anomaly_detection']"
                 data-test="alerts-alertdetail-anomaly-license-denied"
               />
-              <AnomalyDetectionChart v-else-if="alert" :alert="alert" :anomaly-id="alertId" />
+              <template v-else-if="alert">
+                <!-- The notice text is the server's own message: it carries the dropped row count. -->
+                <OBanner
+                  v-if="duplicateRowsNotice"
+                  variant="warning"
+                  icon="warning"
+                  class="mb-3"
+                  :content="raw(duplicateRowsNotice)"
+                  data-test="alerts-alertdetail-anomaly-duplicate-rows"
+                />
+                <AnomalyDetectionChart
+                  :key="alertId"
+                  :alert="alert"
+                  :anomaly-id="alertId"
+                  @reload="fetchAlert"
+                  @refreshed="noticeQuery.refetch()"
+                />
+              </template>
             </OContent>
           </OTabPanel>
 
@@ -407,8 +424,8 @@
           </OTabPanel>
 
           <OTabPanel name="configuration" stretch>
-            <OContent class="flex h-full flex-col overflow-y-auto py-4">
-              <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" class="flex-1" />
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
               <AlertCalibrationHeadroomCard v-if="alert && !isAnomalyAlert" :alert-id="alertId" />
             </OContent>
           </OTabPanel>
@@ -469,6 +486,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
 import { alertAcksQuery, alertsListQuery } from "@/services/alerts.queries";
+import { anomalyConfigQuery } from "@/services/anomaly_detection.queries";
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
@@ -496,6 +514,7 @@ import type {
 } from "@/ts/interfaces/alert";
 
 const { t } = useI18nTyped();
+
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -765,6 +784,17 @@ const listRow = computed<AlertListRow | null>(
 );
 
 const folderId = computed(() => routeFolderId.value || listRow.value?.folder_id || "");
+// The notice is rewritten by each run, so the summary's scheduled refresh re-reads it here.
+const noticeQuery = useQuery(() =>
+  Object.assign(anomalyConfigQuery(orgId.value, alertId.value), {
+    enabled: !!orgId.value && !!alertId.value && isAnomalyAlert.value && !anomalyLocked.value,
+  }),
+);
+const duplicateRowsNotice = computed<string | null>(() => {
+  const config = noticeQuery.data.value ?? alert.value;
+  return config?.notice_class === "duplicate_rows" ? config.last_error || null : null;
+});
+
 const acksQuery = useQuery(() =>
   Object.assign(alertAcksQuery(orgId.value, alertId.value, folderId.value), {
     enabled: !!orgId.value && !!alertId.value && !!folderId.value,

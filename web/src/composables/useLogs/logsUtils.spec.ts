@@ -739,6 +739,25 @@ describe("logsUtils", () => {
       mockSearchObj.meta.logsVisualizeToggle = "logs";
     });
 
+    it("keeps the anomaly banner parameters, so a search or a refresh does not drop the banner", () => {
+      mockCurrentRoute.value = {
+        query: {
+          from_anomaly: "a1",
+          anomaly_filter_applied: "0",
+          anomaly_actual: "208",
+          type: "search_scheduler",
+        },
+      } as any;
+      try {
+        const query = utils.generateURLQuery();
+        expect(query.from_anomaly).toBe("a1");
+        expect(query.anomaly_filter_applied).toBe("0");
+        expect(query.anomaly_actual).toBe("208");
+      } finally {
+        mockCurrentRoute.value = { query: {} };
+      }
+    });
+
     it("should generate query params with stream info", () => {
       const query = utils.generateURLQuery();
       expect(query.stream_type).toBe("logs");
