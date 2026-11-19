@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ><template #trigger>{{ valuesText }}</template
               ><template #after-options
                 ><p
-                  class="text-text-secondary border-border-default m-0 border-t px-3 py-2 text-xs"
+                  class="text-text-secondary border-border-default m-0 w-0 min-w-full border-t px-3 py-2 text-xs"
                   data-test="add-alert-intent-slot-value-help"
                 >
                   {{ valueHelp }}
@@ -183,6 +183,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-alert-intent-add-group"
         @click="addGroup"
         >{{ t("alerts.intent.addGroup") }}</OButton
+      >
+      <OButton
+        v-if="active === 'unusualVolume' && !scoped && groupCandidates.all.length"
+        variant="link"
+        size="xs"
+        class="ms-1.5"
+        data-test="add-alert-intent-add-filter"
+        @click="addFilter"
+        >{{ t("alerts.intent.addFilter") }}</OButton
+      >
+      <OButton
+        v-if="swapOffer"
+        variant="link"
+        size="xs"
+        class="ms-1.5"
+        data-test="add-alert-intent-use-instead"
+        @click="swapValue"
+        >{{ t("alerts.intent.useInstead", { value: raw(swapOffer) }) }}</OButton
+      >
+      <OButton
+        v-if="otherSpellings.length"
+        variant="link"
+        size="xs"
+        class="ms-1.5"
+        data-test="add-alert-intent-also-match"
+        @click="addSpellings"
+        >{{ t("alerts.intent.alsoMatch", { values: joinListMore(otherSpellings, t) }) }}</OButton
       >
     </div>
     <p
@@ -316,6 +343,7 @@ import {
   joinListOrMore,
 } from "@/utils/alerts/alertCopy";
 import {
+  ANOMALY_BUCKET_MINUTES,
   DEFAULT_FACTOR,
   SHAPE_NUMBER_CAP,
   SHAPE_STRING_CAP,
@@ -337,7 +365,10 @@ import {
   rankMeasure,
   rankMetricCategory,
   rankMetricGroup,
+  orgGroupUse,
   pickedValues,
+  spellingVariants,
+  starterAlternative,
   starterValue,
   readFieldShapes,
   shapeQuerySql,
@@ -392,8 +423,6 @@ const store = useStore();
 const queryClient = useQueryClient();
 const anomalyAccess = useAnomalyLibraryAccess();
 
-// Anomaly histograms bucket by 5 minutes unless changed in section 2.
-const ANOMALY_BUCKET_MINUTES = 5;
 const FAMILY_CAP = 5;
 // The server's own ceiling on library matches per request.
 const ALL_SUGGESTIONS = 50;
@@ -417,9 +446,19 @@ const bucketWords = computed(() => durationWords(ANOMALY_BUCKET_MINUTES, t));
 
 const slots = reactive<IntentSlots>({});
 // The values a starter suggested; the user's first pick replaces them instead of joining them.
-let seeded: string[] = [];
+const seeded = ref<string[]>([]);
+// A value the data cannot tell from the suggested one, offered as a one-click swap while it stands.
+const alternative = ref<string | undefined>();
 // The chip pressed while its slots are still being ranked and seeded.
 const choosing = ref<IntentId | null>(null);
+
+// The org's alerts say which fields it already groups by; the list page caches the same read.
+const orgAlerts = useQuery(() =>
+  Object.assign(firingAlertsQuery(org.value), { enabled: !!org.value }),
+);
+const orgUse = computed(() =>
+  orgGroupUse((orgAlerts.data.value?.list ?? []) as Parameters<typeof orgGroupUse>[0]),
+);
 
 // ── Logs and traces: slot candidates by type, ranked by one shape search ──────
 // Recent events pick the fields worth asking about, then one aggregate measures their shape.
@@ -454,24 +493,27 @@ const shapes = computed(() =>
 );
 // One kind of event wants the field naming the most kinds; a count or a share wants a rare minority.
 const categoriesFor = (id: IntentId | null): Ranked =>
-  without(
-    isMetrics.value
-      ? rankMetricCategory(profile.value, {
-          group: slots.group,
-          series: series.value[props.streamName],
-        })
-      : rankCategory(stringFields.value, shapes.value, id === "anyEvent" ? "variety" : "split"),
-    slots.group,
-  );
+  id === "unusualVolume"
+    ? groupCandidates.value
+    : without(
+        isMetrics.value
+          ? rankMetricCategory(profile.value, {
+              group: slots.group,
+              series: series.value[props.streamName],
+            })
+          : rankCategory(stringFields.value, shapes.value, id === "anyEvent" ? "variety" : "split"),
+        slots.group,
+      );
 const categoryCandidates = computed(() => categoriesFor(props.active));
 const groupCandidates = computed<Ranked>(() =>
   isMetrics.value
-    ? rankMetricGroup(profile.value)
-    : without(rankGroup(stringFields.value, shapes.value), slots.field),
+    ? rankMetricGroup(profile.value, { metric: props.streamName, orgUse: orgUse.value })
+    : without(rankGroup(stringFields.value, shapes.value, orgUse.value), slots.field),
 );
 const measureCandidates = computed(() => rankMeasure(numberFields.value, shapes.value));
 // Defaults come only from a ranking over the data, so a chip waits for its searches to answer.
 const rankingSettled = computed(() => {
+  if (orgAlerts.isPending.value && orgAlerts.fetchStatus.value !== "idle") return false;
   if (isMetrics.value) return !props.streamName || !!series.value[props.streamName];
   const sample = sampleSearch.state.value;
   if (!props.columns.length || sample === "failed") return true;
@@ -557,8 +599,8 @@ const profile = computed(() => labelProfile(series.value[props.streamName] ?? []
 // Step 2's group-by picker lists in this order, so both pickers lead with the same fields.
 const groupOrder = computed(() =>
   isMetrics.value
-    ? rankMetricGroup(profile.value).all
-    : rankGroup(stringFields.value, shapes.value).all,
+    ? rankMetricGroup(profile.value, { metric: props.streamName, orgUse: orgUse.value }).all
+    : rankGroup(stringFields.value, shapes.value, orgUse.value).all,
 );
 watch(
   () =>
@@ -612,7 +654,8 @@ watch(
   async () => {
     choosing.value = null;
     for (const key of Object.keys(slots) as (keyof IntentSlots)[]) delete slots[key];
-    seeded = [];
+    seeded.value = [];
+    alternative.value = undefined;
     if (isMetrics.value && props.streamName) await loadSeries(props.streamName);
   },
   { immediate: true },
@@ -621,7 +664,14 @@ watch(
 // ── Options for the slot pickers ─────────────────────────────────────────────
 const asOptions = (names: string[]): SelectOption[] =>
   names.map((name) => ({ label: raw(name), value: name }));
-const fieldOptions = computed(() => asOptions(categoryCandidates.value.all));
+const fieldOptions = computed<SelectOption[]>(() =>
+  props.active === "unusualVolume"
+    ? [
+        { label: t("alerts.intent.noFilter"), value: NO_GROUP },
+        ...asOptions(categoryCandidates.value.all),
+      ]
+    : asOptions(categoryCandidates.value.all),
+);
 const groupOptions = computed<SelectOption[]>(() => [
   { label: t("alerts.intent.noGroup"), value: NO_GROUP },
   ...asOptions(groupCandidates.value.all),
@@ -683,7 +733,7 @@ const patternOptions = computed<SelectOption[]>(() => {
 const valueHelp = computed(() =>
   isMetrics.value
     ? t("alerts.intent.slots.valueHelpSeries", { example: raw("5xx") })
-    : t("alerts.intent.slots.valueHelpEvents", { noun: noun.value }),
+    : t("alerts.intent.slots.valueHelpEventsAnyCase", { noun: noun.value }),
 );
 
 // The picked values read as words in the sentence, so the picker sizes to them like the other slots.
@@ -697,11 +747,16 @@ const valuesText = computed<I18nText>(() =>
 );
 
 const offersGroup = computed(() => !!props.active && wantsGroup(props.active));
+const scoped = computed(() => props.active === "unusualVolume" && slots.field !== undefined);
+const wantsValueSlot = computed(() => !!props.active && (wantsValue(props.active) || scoped.value));
 const SENTENCES: Record<IntentId, [I18nKey, I18nKey]> = {
   countWhere: ["alerts.intent.countWhere.sentence", "alerts.intent.countWhere.sentenceAll"],
   percentile: ["alerts.intent.percentile.sentencePer", "alerts.intent.percentile.sentenceAll"],
   anyEvent: ["alerts.intent.anyEvent.sentence", "alerts.intent.anyEvent.sentence"],
-  unusualVolume: ["alerts.intent.unusualVolume.sentence", "alerts.intent.unusualVolume.sentence"],
+  unusualVolume: [
+    "alerts.intent.unusualVolume.sentenceWhere",
+    "alerts.intent.unusualVolume.sentence",
+  ],
   compareLastWeek: [
     "alerts.intent.compareLastWeek.sentenceWhere",
     "alerts.intent.compareLastWeek.sentenceWhere",
@@ -728,6 +783,7 @@ const sentenceKey = computed<I18nKey>(() => {
     props.active === "metricAbove" && isCounter.value
       ? RATE_SENTENCES
       : SENTENCES[props.active ?? "countWhere"];
+  if (props.active === "unusualVolume") return scoped.value ? pair[0] : pair[1];
   return slots.group !== undefined ? pair[0] : pair[1];
 });
 const intentLabel = (id: IntentId) =>
@@ -755,6 +811,7 @@ const wantsValue = (id: IntentId) =>
 /** A filter or measure the intent cannot run without is still empty. */
 const missingFor = (id: IntentId) =>
   (wantsValue(id) && (!valueSource.value || !slots.values?.length)) ||
+  (id === "unusualVolume" && !!slots.field && !slots.values?.length) ||
   (id === "percentile" && !slots.measure);
 const needsChoice = computed(() => !!props.active && missingFor(props.active));
 
@@ -780,11 +837,17 @@ const previewWindowUs = () => Math.max(3 * props.periodMinutes, 5) * 60_000_000;
 
 /** The value slot waits for the field's counts, then suggests the largest minority seen recently. */
 const seedValues = async (id: IntentId) => {
+  // Which one entity a volume watches is the user's pick, so only its values load.
+  if (id === "unusualVolume" && slots.field && !isMetrics.value) {
+    void loadValueCounts(valueContext.value, slots.field);
+    return;
+  }
   if (!wantsValue(id) || slots.values?.length) return;
   if (isMetrics.value) {
     const value = starterValue(labelValues.value);
     slots.values = value ? [value] : [];
-    seeded = [...slots.values];
+    seeded.value = [...(slots.values ?? [])];
+    alternative.value = starterAlternative(labelValues.value);
     return;
   }
   const field = slots.field;
@@ -796,7 +859,8 @@ const seedValues = async (id: IntentId) => {
   if (slots.field !== field || slots.values?.length) return;
   const value = starterValue(day.values, recent.values);
   slots.values = value ? withCaseVariants([value], day.values) : [];
-  seeded = [...slots.values];
+  seeded.value = [...(slots.values ?? [])];
+  alternative.value = starterAlternative(day.values, recent.values);
 };
 
 const choose = async (id: IntentId) => {
@@ -847,10 +911,11 @@ const setValues = (value: SelectModelValue) => {
   const previous = slots.values ?? [];
   const added = picked.filter((v) => !previous.includes(v));
   const variants = isMetrics.value ? [] : withCaseVariants(added, fieldValues.value);
-  slots.values = [...new Set([...pickedValues(picked, previous, seeded), ...variants])];
+  const next = pickedValues(picked, previous, seeded.value);
+  slots.values = [...new Set([...next.values, ...variants])];
   const offered = patternOptions.value.map((o) => String(o.value));
   keepPatterns(added.filter((v) => offered.includes(v)));
-  seeded = [];
+  seeded.value = next.seeded;
 };
 
 const addValue = (value: string) => {
@@ -863,9 +928,41 @@ const addValue = (value: string) => {
     : typed;
   if (!text) return;
   const previous = slots.values ?? [];
-  slots.values = [...new Set(pickedValues([...previous, text], previous, seeded))];
+  const next = pickedValues([...new Set([...previous, text])], previous, seeded.value);
+  slots.values = next.values;
   keepPatterns(text === typed ? [] : [text]);
-  seeded = [];
+  seeded.value = next.seeded;
+};
+
+const seenValues = computed(() => (isMetrics.value ? labelValues.value : fieldValues.value));
+// Shown only while the suggested value still stands, so a user's own pick is never second-guessed.
+const swapOffer = computed(() =>
+  alternative.value &&
+  seeded.value.length > 0 &&
+  (slots.values ?? []).every((v) => seeded.value.includes(v))
+    ? alternative.value
+    : undefined,
+);
+const swapValue = () => {
+  const value = swapOffer.value;
+  if (!value) return;
+  const was = seeded.value.find((v) => seenValues.value.some((s) => s.value === v));
+  slots.values = isMetrics.value ? [value] : withCaseVariants([value], seenValues.value);
+  seeded.value = [...(slots.values ?? [])];
+  alternative.value = was;
+  reapply();
+};
+const otherSpellings = computed(() =>
+  wantsValueSlot.value ? spellingVariants(slots.values ?? [], seenValues.value) : [],
+);
+const addSpellings = () => {
+  slots.values = [...(slots.values ?? []), ...otherSpellings.value];
+  seeded.value = [];
+  reapply();
+};
+
+const addFilter = () => {
+  void setSlot("field", groupCandidates.value.fit[0] ?? groupCandidates.value.all[0] ?? "");
 };
 
 // A rate window is written into the query, so the query follows a new window.
@@ -923,11 +1020,7 @@ const area = computed(() => {
   );
 });
 // The org's alerts say whether a card's installed copy alerts at another value than the card does.
-const installed = useQuery(() =>
-  Object.assign(firingAlertsQuery(org.value), {
-    enabled: !!org.value && area.value.cards.some((c) => c.already_set_up.length > 0),
-  }),
-);
+const installed = orgAlerts;
 const comparisonText = (c: AlertThreshold) =>
   raw(`${operatorSymbol(c.operator)} ${formatNumber(c.value)}`);
 const setUpComparison = (card: LibrarySuggestion) => {

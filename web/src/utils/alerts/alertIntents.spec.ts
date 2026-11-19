@@ -34,7 +34,10 @@ import {
   rankMeasure,
   rankMetricCategory,
   rankMetricGroup,
+  orgGroupUse,
   pickedValues,
+  spellingVariants,
+  starterAlternative,
   ratioPromql,
   starterValue,
   readFieldShapes,
@@ -244,14 +247,19 @@ describe("alertIntents", () => {
     ])
       expect(starterValue(none)).toBeUndefined();
     expect(withCaseVariants(["ERROR"], seen)).toEqual(["ERROR", "error"]);
+    expect(starterAlternative(seen)).toBe("WARN");
+    expect(starterAlternative(seen.filter((v) => v.value !== "WARN"))).toBeUndefined();
+    expect(spellingVariants(["WARN"], seen)).toEqual(["Warning"]);
+    expect(spellingVariants(["ERROR", "error"], seen)).toEqual([]);
   });
 
   it.each([
-    ["a first pick replaces the suggestion", ["WARN", "ERROR"], ["WARN"], ["ERROR"]],
-    ["unticking keeps the rest", [], ["WARN"], []],
-    ["a pick after the user's own joins it", ["WARN", "ERROR"], [], ["WARN", "ERROR"]],
-  ])("value picker: %s", (_, picked, seeded, want) => {
-    expect(pickedValues(picked, ["WARN"], seeded)).toEqual(want);
+    ["a first pick replaces the suggestion", ["WARN", "ERROR"], ["WARN"], ["ERROR"], []],
+    ["unticking keeps the rest", [], ["WARN"], [], []],
+    ["a pick after the user's own joins it", ["WARN", "ERROR"], [], ["WARN", "ERROR"], []],
+    ["a re-select keeps the suggestion for the next pick", ["WARN"], ["WARN"], ["WARN"], ["WARN"]],
+  ])("value picker: %s", (_, picked, seeded, values, nextSeeded) => {
+    expect(pickedValues(picked, ["WARN"], seeded)).toEqual({ values, seeded: nextSeeded });
   });
 
   it.each([
@@ -261,7 +269,7 @@ describe("alertIntents", () => {
       {
         howItChecks: "false",
         aggregation: true,
-        agg: { function: "count", having: { column: "svc", operator: ">=", value: 1 } },
+        agg: { function: "count", having: { column: "svc", operator: ">", value: "" } },
         condition: { column: "level", operator: "in", value: ["ERROR", "error"] },
       },
     ],
@@ -295,6 +303,22 @@ describe("alertIntents", () => {
     const conditions = (fill.values["query_condition.conditions"] as any).conditions;
     if (want.condition) expect(conditions[0]).toMatchObject(want.condition);
     else expect(conditions).toEqual([]);
+  });
+
+  it("checks an unusual volume once per bucket over the recommended window, scoped to the picked value", () => {
+    const fill = buildEventFill(
+      "unusualVolume",
+      { field: "svc", values: ["api"] },
+      { stream: "s", id },
+    );
+    expect(fill.anomaly).toMatchObject({
+      filters: [{ field: "svc", operator: "=", value: "api" }],
+      schedule_interval_value: 5,
+      schedule_interval_unit: "m",
+      detection_window_value: 30,
+      detection_window_unit: "m",
+    });
+    expect(buildEventFill("unusualVolume", {}, { stream: "s", id }).anomaly?.filters).toEqual([]);
   });
 
   it("writes the query, the week-ago window and the function for a comparison, so no function is typed", () => {
@@ -434,6 +458,33 @@ describe("alertIntents", () => {
       { __name__: "m", host: "b", cpu: "2" },
     ]);
     expect(rankMetricGroup(profile).all).toEqual(["cpu", "host", "job"]);
+  });
+
+  it("groups a metric by the label naming its entity, then by what the org's alerts group by", () => {
+    const series = Array.from({ length: 300 }, (_, i) => ({
+      k8s_pod_name: `checkout-${String.fromCharCode(97 + (i % 26))}${Math.floor(i / 26)}`,
+      k8s_pod_uid: `${1000 + i}-${2000 + i}`,
+      k8s_namespace_name: `ns-${["a", "b", "c"][i % 3]}`,
+      k8s_cluster_name: `c${i % 2}`,
+      service_name: `svc-${["a", "b", "c", "d"][i % 4]}`,
+    }));
+    const profile = labelProfile(series);
+    expect(rankMetricGroup(profile, { metric: "k8s_pod_memory_usage" }).fit[0]).toBe(
+      "k8s_pod_name",
+    );
+    const orgUse = orgGroupUse([
+      { condition: { aggregation: { group_by: ["service_name"] } } },
+      { condition: { promql: "sum by (service_name) (rate(x[5m]))" } },
+    ]);
+    expect(orgUse.get("service_name")).toBe(2);
+    expect(rankMetricGroup(profile, { metric: "http_server_duration", orgUse }).fit[0]).toBe(
+      "service_name",
+    );
+    const { names, shapes } = shapesOf({
+      deployment: [100, 4, { a: 30, b: 30, c: 40 }],
+      service: [100, 4, { a: 30, b: 30, c: 40 }],
+    });
+    expect(rankGroup(names, shapes, orgUse.set("service", 1)).fit[0]).toBe("service");
   });
 
   it.each([

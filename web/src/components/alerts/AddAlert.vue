@@ -2637,7 +2637,9 @@ export default defineComponent({
         intentPaths.add(path);
         alertForm.setF(path, cloneDeep(value));
       });
-      if (fill.anomaly) Object.assign(alertForm.anomalyConfig.value, fill.anomaly);
+      // A new object, so the anomaly step's own form re-seeds from it instead of writing its old values back.
+      if (fill.anomaly)
+        alertForm.anomalyConfig.value = { ...alertForm.anomalyConfig.value, ...fill.anomaly };
       if (fill.vrl) alertForm.showVrlFunction.value = true;
       alertForm.isAggregationEnabled.value = fill.aggregation;
       await nextTick();

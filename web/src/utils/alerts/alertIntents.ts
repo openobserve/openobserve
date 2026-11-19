@@ -18,6 +18,7 @@
 
 import type { ValueCount } from "@/composables/alerts/useStreamDiscovery";
 import type { SeriesLabels } from "./promqlNoSeries";
+import { promqlByLabels, sqlGroupByLabels } from "./queryGroupLabels";
 
 export type IntentId =
   | "countWhere"
@@ -113,6 +114,8 @@ export const SHAPE_WINDOW_US = 60 * 60 * 1_000_000;
 /** The org alert count from which cards fold to one line (D-PO5). */
 export const CARDS_FOLD_AT = 10;
 export const DEFAULT_FACTOR = 2;
+/** Anomaly histograms bucket by 5 minutes unless changed in section 2. */
+export const ANOMALY_BUCKET_MINUTES = 5;
 
 // Value-shape bounds from the starter design (phase2 §2.5).
 const CATEGORY_MAX_DISTINCT = 20;
@@ -130,6 +133,9 @@ export const SHAPE_TOP_VALUES = 10;
 const MEASURE_MIN_COVERAGE = 0.5;
 const HEAVY_TAIL_RATIO = 5;
 const MIN_WORD_SHARE = 0.8;
+const NEAR_TIE = 0.9;
+// A name word on more than this share of the labels (a namespace like k8s_) names no one entity.
+const ENTITY_TOKEN_MAX_SHARE = 0.25;
 
 /**
  * Intents offered for a stream type; the "unusual" ones only where anomaly detection is usable, and no
@@ -379,8 +385,12 @@ export const rankCategory = (
       );
 
 /** Group fields: several word values, none holding most events; those on (nearly) every event lead,
- * then the most even split. */
-export const rankGroup = (candidates: string[], shapes: readonly FieldShape[]): Ranked =>
+ * then the ones the org's alerts already group by, then the most even split. */
+export const rankGroup = (
+  candidates: string[],
+  shapes: readonly FieldShape[],
+  orgUse: ReadonlyMap<string, number> = new Map(),
+): Ranked =>
   byShape(
     candidates,
     shapes,
@@ -388,6 +398,7 @@ export const rankGroup = (candidates: string[], shapes: readonly FieldShape[]): 
       isCategory(s, GROUP_MIN_COVERAGE, GROUP_MIN_DISTINCT) && (s.topShare ?? 0) < MAJORITY_SHARE,
     (a, b) =>
       Number(b.coverage >= GROUP_FULL_COVERAGE) - Number(a.coverage >= GROUP_FULL_COVERAGE) ||
+      (orgUse.get(b.name) ?? 0) - (orgUse.get(a.name) ?? 0) ||
       byEntropy(a, b),
   );
 
@@ -408,31 +419,59 @@ const spellingOf = (a: string, b: string) => {
   return x.startsWith(y) || y.startsWith(x);
 };
 
-/** The largest minority (the other side of a 60 % majority) that is not a spelling of the majority,
- * preferring values seen in `recent` so the preview has something to show. */
-export function starterValue(
+/** Minority values (the other side of a 60 % majority) that are not a spelling of the majority, largest
+ * first, those seen in `recent` ahead so the preview has something to show. */
+function starterCandidates(
   values: readonly ValueCount[],
-  recent: readonly ValueCount[] = [],
-): string | undefined {
+  recent: readonly ValueCount[],
+): ValueCount[] {
   const seen = values.filter((v) => v.value !== "" && v.count > 0);
   const total = seen.reduce((sum, v) => sum + v.count, 0);
-  if (seen.length < 2 || !total) return undefined;
+  if (seen.length < 2 || !total) return [];
   const [top, ...rest] = [...seen].sort((a, b) => b.count - a.count);
   const minority = rest.filter(
     (v) => v.count / total <= 1 - MAJORITY_SHARE && !spellingOf(v.value, top.value),
   );
-  const present = minority.filter((v) => recent.some((r) => r.value === v.value && r.count > 0));
-  return (present[0] ?? minority[0])?.value;
+  const isRecent = (v: ValueCount) => recent.some((r) => r.value === v.value && r.count > 0);
+  return [...minority.filter(isRecent), ...minority.filter((v) => !isRecent(v))];
 }
 
-/** A picker's new values: a first pick beside a suggestion replaces the suggestion. */
+/** The largest minority that is not a spelling of the majority, preferring values seen in `recent`. */
+export function starterValue(
+  values: readonly ValueCount[],
+  recent: readonly ValueCount[] = [],
+): string | undefined {
+  return starterCandidates(values, recent)[0]?.value;
+}
+
+/** The runner-up when the data cannot tell it from the starter value (within 10 %), offered as a swap. */
+export function starterAlternative(
+  values: readonly ValueCount[],
+  recent: readonly ValueCount[] = [],
+): string | undefined {
+  const [first, second] = starterCandidates(values, recent);
+  return first && second && second.count >= NEAR_TIE * first.count ? second.value : undefined;
+}
+
+/** Other spellings of the picked values in the data (WARN beside Warning), not yet picked. */
+export function spellingVariants(picked: readonly string[], seen: readonly ValueCount[]): string[] {
+  return seen
+    .map((v) => v.value)
+    .filter((v) => v !== "" && !picked.includes(v))
+    .filter((v) => picked.some((p) => Math.min(p.length, v.length) >= 3 && spellingOf(p, v)));
+}
+
+/** A picker's new values and suggestion: a first pick replaces a suggestion; an emit that changes
+ * nothing (a re-select) keeps the suggestion, so the next pick still replaces it. */
 export function pickedValues(
   picked: readonly string[],
   previous: readonly string[],
   seeded: readonly string[],
-): string[] {
+): { values: string[]; seeded: string[] } {
+  const same = picked.length === previous.length && picked.every((v) => previous.includes(v));
+  if (same) return { values: [...previous], seeded: [...seeded] };
   const added = picked.some((v) => !previous.includes(v));
-  return picked.filter((v) => !added || !seeded.includes(v));
+  return { values: picked.filter((v) => !added || !seeded.includes(v)), seeded: [] };
 }
 
 /** The picked values plus every seen value that differs from one only in case. */
@@ -475,7 +514,8 @@ const groupAggregation = (
   multi_alert: !!group,
 });
 
-/** A logs/traces intent as the values it writes; value thresholds stay empty for the user to type. */
+/** A logs/traces intent as the values it writes; value and per-group count thresholds stay empty for
+ * the user to type, so nothing reads as firing at a number nobody chose. */
 export function buildEventFill(
   intent: IntentId,
   slots: IntentSlots,
@@ -525,7 +565,13 @@ export function buildEventFill(
       aggregation: false,
       vrl: false,
       values: {},
-      anomaly: { query_mode: "filters", detection_function: "count", detection_function_field: "" },
+      anomaly: {
+        query_mode: "filters",
+        detection_function: "count",
+        detection_function_field: "",
+        filters: anomalyFilterRows(slots),
+        ...anomalySchedule(),
+      },
     };
   }
   if (intent === "compareLastWeek") {
@@ -554,11 +600,34 @@ export function buildEventFill(
     values: {
       ...filters,
       "query_condition.aggregation": group
-        ? groupAggregation("count", group, group, { operator: ">=", value: 1 })
+        ? groupAggregation("count", group, group, { operator: ">", value: "" })
         : null,
       logGroupBy: group ? [group] : [],
     },
   };
+}
+
+/** Checks once per bucket, so an unusual bucket waits at most one bucket, over the window the anomaly
+ * form recommends for that schedule: twice (check + bucket) plus the 10-minute absence allowance. */
+export function anomalySchedule(bucketMinutes = ANOMALY_BUCKET_MINUTES) {
+  const recommended = 2 * (bucketMinutes + bucketMinutes) + 10;
+  return {
+    histogram_interval_value: bucketMinutes,
+    histogram_interval_unit: "m",
+    schedule_interval_value: bucketMinutes,
+    schedule_interval_unit: "m",
+    detection_window_value: Math.ceil(recommended / bucketMinutes) * bucketMinutes,
+    detection_window_unit: "m",
+  };
+}
+
+/** The anomaly builder's filter rows for "field is value(s)"; none when no field or value is chosen. */
+export function anomalyFilterRows(slots: IntentSlots) {
+  const values = (slots.values ?? []).filter((v) => v !== "");
+  if (!slots.field || !values.length) return [];
+  return values.length === 1
+    ? [{ field: slots.field, operator: "=", value: values[0] }]
+    : [{ field: slots.field, operator: "IN", value: values.map(quoteText).join(", ") }];
 }
 
 const COMPARE_ALIAS = "events";
@@ -643,6 +712,7 @@ export function buildMetricFill(
         query_mode: "filters",
         detection_function: "avg",
         detection_function_field: "value",
+        ...anomalySchedule(),
       },
     };
   }
@@ -782,21 +852,73 @@ export function labelProfile(series: readonly SeriesLabels[]) {
   }));
 }
 
-/** Labels ranked for "per [label]": carried by nearly every series, more values first. */
-export function rankMetricGroup(profile: ReturnType<typeof labelProfile>): Ranked {
+/** How strongly a label names the metric's own entity: the rarer name words it shares with the metric
+ * (pod in k8s_pod_name for k8s_pod_memory_*), never a word most labels carry. */
+const entityScore = (metric: string, label: string, labels: readonly string[]): number => {
+  const own = new Set(nameTokens(metric));
+  const carriers = (token: string) => labels.filter((l) => nameTokens(l).includes(token)).length;
+  return nameTokens(label)
+    .filter((token) => own.has(token))
+    .map((token) => carriers(token))
+    .filter((n) => n > 0 && n <= Math.max(2, ENTITY_TOKEN_MAX_SHARE * labels.length))
+    .reduce((score, n) => score + 1 / n, 0);
+};
+
+const wordValues = (p: ReturnType<typeof labelProfile>[number]) => {
+  const total = p.values.reduce((sum, v) => sum + v.count, 0);
+  const words = p.values.filter((v) => isWord(v.value)).reduce((sum, v) => sum + v.count, 0);
+  return total > 0 && words / total >= MIN_WORD_SHARE;
+};
+
+/** Labels ranked for "per [label]": carried by nearly every series; a word-valued label naming the
+ * metric's entity first (whatever its count), then the org's own group-bys, then more values first. */
+export function rankMetricGroup(
+  profile: ReturnType<typeof labelProfile>,
+  opts: { metric?: string; orgUse?: ReadonlyMap<string, number> } = {},
+): Ranked {
+  const labels = profile.map((p) => p.label);
+  const entity = (p: (typeof profile)[number]) =>
+    opts.metric && wordValues(p) ? entityScore(opts.metric, p.label, labels) : 0;
+  const use = (p: (typeof profile)[number]) => opts.orgUse?.get(p.label) ?? 0;
   const fit = profile
     .filter(
       (p) =>
         p.coverage >= CATEGORY_MIN_COVERAGE &&
         p.values.length >= 2 &&
-        p.values.length <= GROUP_MAX_DISTINCT,
+        (p.values.length <= GROUP_MAX_DISTINCT || entity(p) > 0),
     )
-    .sort((a, b) => b.coverage - a.coverage || b.values.length - a.values.length)
+    .sort(
+      (a, b) =>
+        entity(b) - entity(a) ||
+        use(b) - use(a) ||
+        b.coverage - a.coverage ||
+        b.values.length - a.values.length,
+    )
     .map((p) => p.label);
-  return ranked(
-    fit,
-    profile.map((p) => p.label),
-  );
+  return ranked(fit, labels);
+}
+
+type GroupedAlertRow = {
+  condition?: {
+    sql?: string | null;
+    promql?: string | null;
+    aggregation?: { group_by?: readonly (string | null)[] | null } | null;
+  } | null;
+};
+
+/** How many of the org's alerts group by each field or label, whatever their stream. */
+export function orgGroupUse(rows: readonly GroupedAlertRow[]): Map<string, number> {
+  const use = new Map<string, number>();
+  for (const row of rows) {
+    const c = row.condition;
+    const names = new Set([
+      ...(c?.aggregation?.group_by ?? []).filter((g): g is string => !!g),
+      ...(c?.sql ? sqlGroupByLabels(c.sql) : []),
+      ...(c?.promql ? promqlByLabels(c.promql) : []),
+    ]);
+    names.forEach((name) => use.set(name, (use.get(name) ?? 0) + 1));
+  }
+  return use;
 }
 
 const seriesTopShare = (p: ReturnType<typeof labelProfile>[number]) => {
