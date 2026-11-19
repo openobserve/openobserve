@@ -1,13 +1,9 @@
 /**
  * Logs Patterns Multi-Stream Guard (OSS).
  *
- * The Patterns extraction runs on a dedicated single-stream API. This spec verifies the
- * client-side guard in Index.vue's extractPatternsForCurrentQuery(): when more than one
- * stream is selected in non-SQL mode it cancels the in-flight extraction, clears stale
- * patterns and surfaces an error toast BEFORE any API call. The Patterns toggle button is
- * enterprise-gated, so in OSS we enter patterns mode via the URL query param
- * (logs_visualize_toggle=patterns). No ingestion/FTS/patterns-config setup is required —
- * the guard fires on selectedStream.length alone.
+ * Patterns is enterprise-gated, so on the OSS build a link asking for the Patterns tab
+ * opens Logs instead; the multi-stream guard in Index.vue's extractPatternsForCurrentQuery()
+ * is then unreachable and no toast or extraction request may appear.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -41,12 +37,11 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         testLogger.testEnd(testInfo.title, testInfo.status);
     });
 
-    test("should show an error toast and refuse patterns when multiple streams are selected @P0 @smoke", {
+    test("should open Logs and not call patterns when a multi-stream link asks for Patterns on OSS @P0 @smoke", {
         tag: ['@logs-patterns-multi-stream-guard', '@all', '@smoke', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Test: multi-stream patterns guard fires an error toast');
+        testLogger.info('Test: OSS Patterns link with multiple streams falls back to Logs');
 
-        // The guard fires before any network call, so the streams only need to exist.
         const streamA = makeStreamName('a');
         const streamB = makeStreamName('b');
         await pm.streamsPage.createStream(streamA, 'logs');
@@ -54,23 +49,19 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         await waitForStreamListed(page, streamA, 'logs');
         await waitForStreamListed(page, streamB, 'logs');
 
-        // The guard's whole point is that it returns before the request is built, so record
-        // every extraction call and assert none was made — a toast alone would still pass if
-        // the guard ran after the API had already been hit.
         const extractCalls = [];
         page.on('request', (req) => {
             if (PATTERNS_EXTRACT_URL.test(req.url())) extractCalls.push(req.url());
         });
 
-        // Enter patterns mode via URL (the toggle is enterprise-gated in OSS). restoreUrlQueryParams
-        // splits `stream` on ',' into [a, b], so the guard condition is true on mount and the toast fires.
         const logsUrl = `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}`;
         await pm.logsPage.startToastRecorder();
         await page.goto(`${logsUrl}&stream_type=logs&stream=${streamA},${streamB}&logs_visualize_toggle=patterns`, { waitUntil: 'domcontentloaded' });
 
-        await pm.logsPage.expectMultiStreamPatternsToast();
-        expect(extractCalls, `patterns/extract must not be called for a multi-stream selection, got: ${extractCalls.join(', ')}`).toHaveLength(0);
-        testLogger.info('PASSED: multi-stream guard error toast shown, no extraction request issued');
+        await pm.logsPage.expectPatternsToggleNotVisible();
+        await pm.logsPage.expectNoMultiStreamPatternsToast();
+        expect(extractCalls, `patterns/extract must not be called on OSS, got: ${extractCalls.join(', ')}`).toHaveLength(0);
+        testLogger.info('PASSED: OSS Patterns link opened Logs, no toast, no extraction request');
     });
 
     test("should not show the multi-stream patterns toast for a single stream @P1", {

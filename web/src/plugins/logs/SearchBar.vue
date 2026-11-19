@@ -134,10 +134,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-patterns-toggle"
               value="patterns"
               size="sm"
+              :disabled="patternsUnavailableForStreamType"
               :tooltip="
-                patternsAccess.allowed && toolbarToggleIconOnly
-                  ? t('search.showPatternsLabel')
-                  : undefined
+                patternsUnavailableForStreamType
+                  ? t('search.patternsLogsOnly')
+                  : patternsAccess.allowed && toolbarToggleIconOnly
+                    ? t('search.showPatternsLabel')
+                    : undefined
               "
             >
               <template #icon-left>
@@ -2085,6 +2088,11 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
+    // The patterns API only reads logs streams, so a traces or metrics stream of the same name must not reach it.
+    const patternsUnavailableForStreamType = computed(
+      () => !!searchObj.data.stream.streamType && searchObj.data.stream.streamType !== "logs",
+    );
+
     // Log-pattern mining ("Patterns" toggle) — shown locked (not hidden) in
     // builds that don't unlock it, with the shared nav/settings tooltip.
     const patternsAccess = computed(() =>
@@ -2583,7 +2591,7 @@ export default defineComponent({
               value: "patterns",
               icon: "layers",
               label: t("search.showPatternsLabel"),
-              disabled: false,
+              disabled: patternsUnavailableForStreamType.value,
             },
           ]
         : []),
@@ -3604,7 +3612,7 @@ export default defineComponent({
       clearPermalink();
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
-      searchObj.meta.sqlMode = false;
+      let shortenedToHours = 0;
       const viewOrg = store.state.selectedOrganization.identifier;
       const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
@@ -3669,8 +3677,13 @@ export default defineComponent({
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
-                throw new Error(errMsg);
+                throw Object.assign(new Error(errMsg), { userFacing: true });
               }
+              // Reset only once the view is known to apply, so a failed view keeps the SQL query.
+              searchObj.meta.sqlMode = false;
+              // Let the SQL-mode watcher clear the old query before the view's query is merged.
+              await nextTick();
+              if (leftViewOrg()) return;
               // extractedObj.data.stream.selectedStream = [];
               // extractedObj.data.stream.selectedStream = selectedStreams;
               delete extractedObj.data.stream.streamLists;
@@ -3740,7 +3753,7 @@ export default defineComponent({
               //here we are getting data so we need to check here
               //before we set the time to the dateTimeRef.value we need to check if the startTime and endTime difference is greater than maxQueryRange in hours
               //solution will be we will do endTime - startTime and convert that difference into hours and check with both global and stream level maxQueryRange and if it is less than or equal to that we will keep that as it is
-              //if that exceeds the maxQueryRange we will convert that to relative type (because we cannot assume the start and end date) or we can do that by converting present time - maxQueryRange
+              //if that exceeds the maxQueryRange we keep the end (the saved end for absolute views, now for relative ones) and move the start to end - maxQueryRange
 
               // Validate and adjust time range based on maxQueryRange
               //before we check all this we need to get the current selected stream max query range and also global max query range
@@ -3796,15 +3809,14 @@ export default defineComponent({
 
                 // Check if time difference exceeds effective max query range
                 if (timeDiffInHours > effectiveMaxQueryRange) {
-                  // Adjust to current time - maxQueryRange
-                  const currentTimeMicros = Date.now() * 1000; // Convert milliseconds to microseconds
                   const maxQueryRangeMicros = effectiveMaxQueryRange * 60 * 60 * 1000000;
-
-                  const adjustedStartTime = currentTimeMicros - maxQueryRangeMicros;
-                  const adjustedEndTime = currentTimeMicros;
-
-                  // Get the current datetime type
                   const currentType = searchObj.data.datetime.type || "relative";
+
+                  // Keep the saved end and move only the start, as the backend clamp does.
+                  const adjustedEndTime =
+                    currentType === "absolute" ? endTimeMicros : Date.now() * 1000;
+                  const adjustedStartTime = adjustedEndTime - maxQueryRangeMicros;
+                  shortenedToHours = effectiveMaxQueryRange;
 
                   // Build the complete datetime object with all required fields
                   const updatedDateTime = buildDateTimeObject(
@@ -3850,6 +3862,9 @@ export default defineComponent({
               if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
+              searchObj.meta.sqlMode = false;
+              await nextTick();
+              if (leftViewOrg()) return;
               resetStreamData();
               searchObj.data.stream.streamType = extractedObj.data.stream.streamType;
 
@@ -3918,7 +3933,7 @@ export default defineComponent({
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
-                throw new Error(errMsg);
+                throw Object.assign(new Error(errMsg), { userFacing: true });
               }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -3970,10 +3985,20 @@ export default defineComponent({
 
             updateEditorWidth();
 
-            toast({
-              message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
-              variant: "success",
-            });
+            toast(
+              shortenedToHours > 0
+                ? {
+                    message: t("logs.searchBar.viewAppliedRangeShortened", {
+                      name: item.view_name,
+                      hours: shortenedToHours,
+                    }),
+                    variant: "warning",
+                  }
+                : {
+                    message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
+                    variant: "success",
+                  },
+            );
             markSavedViewApplied(item.view_id);
             setTimeout(async () => {
               if (leftViewOrg()) return;
@@ -4022,7 +4047,7 @@ export default defineComponent({
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
             toast({
-              message: err.message || t("search.errorWhileApplyingSavedView"),
+              message: res.data?.message || t("search.errorWhileApplyingSavedView"),
               variant: "error",
             });
           }
@@ -4032,7 +4057,10 @@ export default defineComponent({
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
-            message: t("logs.searchBar.errorApplyingSavedView"),
+            message:
+              (err?.userFacing && err.message) ||
+              err?.response?.data?.message ||
+              t("logs.searchBar.errorApplyingSavedView"),
             variant: "error",
           });
           console.log("Error while applying saved view", err);
@@ -4644,10 +4672,17 @@ export default defineComponent({
       return !sameSignature(autoRun.readSignature(), baseline);
     };
 
+    watch(patternsUnavailableForStreamType, (unavailable) => {
+      if (unavailable && searchObj.meta.logsVisualizeToggle === "patterns") {
+        onLogsVisualizeToggleUpdate("logs");
+      }
+    });
+
     const onLogsVisualizeToggleUpdate = async (value: any) => {
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // here is what keeps the locked Patterns view from becoming active —
       // clicking it opens the upgrade dialog instead of switching.
+      if (value === "patterns" && patternsUnavailableForStreamType.value) return;
       if (value === "patterns" && !patternsAccess.value.allowed) {
         openUpgradeDialog();
         return;
@@ -5253,6 +5288,7 @@ export default defineComponent({
       loadSavedView,
       config,
       patternsAccess,
+      patternsUnavailableForStreamType,
       scheduledSearchAccess,
       openUpgradeDialog,
       handleRegionsSelection,

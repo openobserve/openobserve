@@ -1421,6 +1421,10 @@ export function createAutoRun(deps: AutoRunDeps) {
     setOutcome("logs", "invalidated");
   }
 
+  function clearSearchAroundInvalidation(): void {
+    if (invalidation === "search-around") invalidation = null;
+  }
+
   function resetScope(cause: "saved-view" | "url" | "reapply" | "job" | "org"): void {
     meta.lastRunAttempt = null;
     cancelGeneration(null, { cause: cause === "org" ? "org" : "reset" });
@@ -1527,6 +1531,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     recordPanelComplete,
     recordPanelFailure,
     invalidateExecuted,
+    clearSearchAroundInvalidation,
     resetScope,
     registerRefreshPause,
     onRefreshTick,

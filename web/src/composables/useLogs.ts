@@ -20,6 +20,8 @@ import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { applyTimezone } from "@/utils/storage";
 
 import useNotifications from "@/composables/useNotifications";
@@ -544,7 +546,11 @@ const useLogs = (t: TranslateFn) => {
       Object.prototype.hasOwnProperty.call(queryParams, "logs_visualize_toggle") &&
       queryParams.logs_visualize_toggle != ""
     ) {
-      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
+      searchObj.meta.logsVisualizeToggle = resolveUrlViewToggle(
+        queryParams.logs_visualize_toggle,
+        checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)).allowed,
+        queryParams.stream_type,
+      );
     }
 
     //here we restore the fn editor state from the url query params
