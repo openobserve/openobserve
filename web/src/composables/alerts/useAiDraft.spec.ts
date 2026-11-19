@@ -153,7 +153,7 @@ describe("useAiDraft", () => {
   });
 
   it("keeps the prose across tool calls, a paragraph per step, and marks a paused tail unfinished", async () => {
-    // Trimmed from a live run: the agent's steps arrive joined, and the pause holds back the last words.
+    // The agent separates its steps with a blank line; the pause holds back the last words.
     chat.fetchAiChat.mockResolvedValueOnce(
       stream(
         sse(
@@ -161,10 +161,13 @@ describe("useAiDraft", () => {
           { type: "tool_call", tool: "StreamList", message: "Listing streams" },
           { type: "tool_result", tool: "StreamList", success: true },
           { type: "usage", usage: { llm_calls: 1 } },
-          { type: "message_delta", content: "creating the alert.`k8s_events` has `object.Type` " },
-          { type: "message_delta", content: "and `k8s_cluster`. Now compare windows:Query " },
+          {
+            type: "message_delta",
+            content: "creating the alert.\n\n`k8s_events` has `object.Type`",
+          },
+          { type: "message_delta", content: " and `k8s_cluster`.\n\n" },
           { type: "tool_call", tool: "SearchSQL", message: "Querying logs" },
-          { type: "message_delta", content: "syntax valid; the recent window " },
+          { type: "message_delta", content: "Query syntax valid; the recent window " },
           {
             type: "confirmation_required",
             tool: "CreateAlert",
@@ -179,7 +182,27 @@ describe("useAiDraft", () => {
     await flushPromises();
     expect([ai.phase.value, ai.text.value]).toEqual([
       "ready",
-      "I need to see the streams before creating the alert.\n\n`k8s_events` has `object.Type` and `k8s_cluster`. Now compare windows:\n\nQuery syntax valid; the recent window…",
+      "I need to see the streams before creating the alert.\n\n`k8s_events` has `object.Type` and `k8s_cluster`.\n\nQuery syntax valid; the recent window…",
+    ]);
+  });
+
+  it("an agent that creates without asking leaves the saved-itself state, never a proposal", async () => {
+    chat.fetchAiChat.mockResolvedValueOnce(
+      stream(
+        sse(
+          { type: "message_delta", content: "Created the alert." },
+          { type: "tool_result", tool: "CreateAlert", success: true },
+          { type: "navigation_action", ...VIEW, target: { alert_id: "a1", name: "nginx_5xx" } },
+          { type: "complete" },
+        ),
+      ),
+    );
+    const ai = run();
+    await ai.start("nginx 5xx above 5%");
+    expect([ai.phase.value, ai.result.value, ai.createdRoute.value?.query.alert_id]).toEqual([
+      "saved",
+      null,
+      "a1",
     ]);
   });
 

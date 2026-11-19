@@ -39,8 +39,6 @@ export type AiDraftEvent =
 
 const IGNORED = new Set(["title", "logs", "usage", "sync", "sync_state", "cancelled"]);
 
-// The agent's steps reach the stream joined ("first.Warning"); code spans are matched first so "os.Getenv" stays whole.
-const GLUED_STEP = /(`[^`\n]*`)|(?<=[\p{Ll}\d)\]*'"`])([.!?:])(?=\p{Lu}\p{Ll}|`)/gu;
 const ENDS_SENTENCE = /[.!?…]["')*`\]]*$/;
 const DANGLING = /[\s,;:–—-]+$/;
 
@@ -98,11 +96,9 @@ export function readDraftEvent(data: any): AiDraftEvent {
   return typeof text === "string" ? { kind: "text", text } : { kind: "ignored" };
 }
 
-/** The assistant's words as paragraphs, one per step; `unfinished` ends a cut sentence with "…" while the turn runs. */
+/** The assistant's words; `unfinished` ends a cut sentence with "…" while the turn runs. */
 export function draftProse(text: string, unfinished = false): string {
-  const prose = text
-    .replace(GLUED_STEP, (match, code: string | undefined) => (code ? match : `${match}\n\n`))
-    .trim();
+  const prose = text.trim();
   if (!unfinished || !prose || ENDS_SENTENCE.test(prose)) return prose;
   return `${prose.replace(DANGLING, "")}…`;
 }

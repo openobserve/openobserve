@@ -291,6 +291,11 @@ export function useAiDraft<T>(host: AiDraftHost<T>): AiDraft<T> {
           t,
         );
         turn.created = { route: action ? buildNavigationRoute(action, org()) : null };
+        // An agent that ignores confirm_before_create has already saved it; no proposal will follow.
+        if (!approved) {
+          createdRoute.value = turn.created.route;
+          phase.value = "saved";
+        }
       }
     }
   };

@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="phase === 'saved'"
         variant="warning"
         :text="t('aiDraft.savedByAssistant')"
-        :action-label="draft.createdRoute.value ? t('aiDraft.openSaved') : undefined"
+        :action-label="t('aiDraft.openSaved')"
         data-test="ai-draft-saved"
         action-data-test="ai-draft-open-saved"
         @action="emit('open-saved')"

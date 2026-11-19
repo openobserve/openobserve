@@ -20,6 +20,7 @@ import { useAiDraft, type AiDraft } from "@/composables/alerts/useAiDraft";
 import { createAlertTestRun, type AlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import type { AiDraftIssue } from "@/components/ai-draft/aiDraftEvents";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { alertKeys } from "@/services/alerts.querykeys";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { getIntlLocale } from "@/locales";
 import type { AiConfirmAnswer } from "@/composables/useAiChat";
@@ -177,6 +178,11 @@ export function useAlertAiDraft(folder: () => string = () => "default"): AlertAi
   const queryReadBack = computed(() =>
     readBackAlert.value ? describeQueryAlert(readBackAlert.value, t) : null,
   );
+
+  // A create the agent ran itself bypassed the approve mutation, so the lists are refreshed here.
+  watch(ai.phase, (phase) => {
+    if (phase === "saved") void queryClient.invalidateQueries({ queryKey: alertKeys.all(org()) });
+  });
 
   // The check already sent back any name the org lacks, so the seed holds only real destinations.
   const destinations = ref<string[]>([]);

@@ -211,9 +211,12 @@ const editPrompt = async () => {
   focusPrompt();
 };
 
+// Without the agent's link to the alert, Open lands on the folder's alert list.
 const openSaved = () => {
-  const route = props.controller.ai.createdRoute.value;
-  if (!route) return;
+  const route = props.controller.ai.createdRoute.value ?? {
+    path: "/alerts",
+    query: { org_identifier: org.value, folder: props.controller.folderId() },
+  };
   void router.push(route);
   emit("opened");
 };
