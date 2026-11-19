@@ -40,7 +40,7 @@ export interface TreemapNotice {
 let measureContext: OffscreenCanvasRenderingContext2D | null | undefined;
 
 const rootName = (
-  query: { fields?: { y?: unknown[] }; customQuery?: boolean } | undefined,
+  query: { fields?: { y?: { alias?: string }[] }; customQuery?: boolean } | undefined,
   config: unknown,
 ): string => {
   const value = query?.fields?.y?.[0];
