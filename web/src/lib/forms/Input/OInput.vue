@@ -426,6 +426,11 @@ const wrapperClasses = computed(() => [
         :class="[
           'min-w-0 rounded-[inherit] bg-transparent outline-none',
           fitContent ? 'field-sizing-content flex-auto' : 'flex-1',
+          // A content-sized field has no room for spin buttons: they cover its text and catch a
+          // triple-click, which then steps the value instead of selecting it.
+          fitContent &&
+            type === 'number' &&
+            '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
           'text-input-text placeholder:text-input-placeholder',
           'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'h-full',

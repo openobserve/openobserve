@@ -268,7 +268,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :debounce="300"
               :error="!(periodMinutes > 0)"
               :aria-label="t('alerts.form.names.lookBack')"
-              :class="NO_SPIN"
               data-test="add-alert-intent-slot-window"
               @update:model-value="
                 setWindow($event === '' || $event === null ? '' : Number($event))
@@ -297,7 +296,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               fit-content
               :min="1"
               :aria-label="t('alerts.intent.slots.factor')"
-              :class="NO_SPIN"
               data-test="add-alert-intent-slot-factor"
               @update:model-value="setFactor($event)"
             />
@@ -330,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               size="sm"
               fit-content
-              :class="['min-w-28!', NO_SPIN]"
+              class="min-w-28!"
               :placeholder="t('alerts.placeholders.value')"
               :aria-label="t('alerts.alertIfNoOfEvents')"
               data-test="add-alert-intent-slot-threshold-input"
@@ -597,10 +595,6 @@ const SLOT_MENU = { minWidth: "min(18rem, calc(100vw - 2rem))" };
 const LABEL_MENU = { minWidth: "min(28rem, calc(100vw - 2rem))" };
 // A slot hugs its value, never cut below the row's width, and keeps a field's width when nearly empty.
 const SLOT_FIELD = "w-fit! max-w-full min-w-28";
-// A narrow number field puts its spin arrows under the cursor: a triple-click there steps the value
-// instead of selecting it, so the next key appends ("10" became "75").
-const NO_SPIN =
-  "[&_input]:[appearance:textfield] [&_input::-webkit-inner-spin-button]:appearance-none [&_input::-webkit-outer-spin-button]:appearance-none";
 const STATE_TAG = {
   variant: "default-soft",
   size: "xs",
