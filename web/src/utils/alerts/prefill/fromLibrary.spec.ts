@@ -89,6 +89,21 @@ describe("buildPrefillFromLibrary", () => {
     expect(prefill.sql).toBeUndefined();
   });
 
+  it.each([
+    ['1 - (avg without (cpu) (rate(x{mode="idle"}[5m])))', 1, true],
+    ["sum by (host) (rate(x[5m])) > 3", 1, true],
+    ["sum(rate(x[5m])) by (host)", 1, true],
+    ["rate(x[5m])", 1, true],
+    ["avg without (cpu) (x)", 3, undefined],
+    ["sum(rate(x[5m])) / sum(rate(y[5m]))", 1, undefined],
+    ["histogram_quantile(0.95, sum by (le) (rate(x_bucket[5m])))", 1, undefined],
+  ])("%s at %s series: opens one per series %s", (promql, threshold, perSeries) => {
+    const file = promqlFile();
+    (file.query_condition as any).promql = promql;
+    file.trigger_condition = { ...file.trigger_condition, threshold };
+    expect(buildPrefillFromLibrary({ entry: entry(), file }).promqlMultiAlert).toBe(perSeries);
+  });
+
   it("carries the SQL query and leaves promqlCondition unset", () => {
     const prefill = buildPrefillFromLibrary({
       entry: entry({ query_type: "sql", stream_type: "logs" }),

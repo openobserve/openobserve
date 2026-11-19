@@ -23,7 +23,8 @@
  * carries an existing query across as written, with one exception: a grouped SQL
  * query that fires on any row and ends in `HAVING … <op> N` opens as one alert per
  * group, its threshold moved from the HAVING into the per-group condition so the
- * form's number is the one that fires. The same groups fire either way.
+ * form's number is the one that fires. The same groups fire either way. A PromQL query
+ * that can return several series and fires on any one opens one per series likewise.
  */
 
 import {
@@ -35,6 +36,7 @@ import {
 } from "@/ts/interfaces/alertPrefill";
 import { MAX_PERIOD_MINUTES, clampPeriodMinutes, warn } from "../alertPrefill";
 import { sqlHavingToCondition } from "../alertSqlUtils";
+import { promqlKeepsLabels } from "../queryGroupLabels";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import type { LibrarySuggestion } from "../librarySuggest.types";
 
@@ -105,6 +107,11 @@ export const buildPrefillFromLibrary = (input: LibraryPrefillInput): AlertPrefil
     firesOnAnyRow(trigger.operator, trigger.threshold)
       ? sqlHavingToCondition(sql ?? "")
       : null;
+  const promql = asText(queryCondition.promql);
+  const perSeries =
+    isPromql &&
+    firesOnAnyRow(trigger.operator, trigger.threshold) &&
+    promqlKeepsLabels(promql ?? "");
 
   return {
     version: ALERT_PREFILL_VERSION,
@@ -115,8 +122,9 @@ export const buildPrefillFromLibrary = (input: LibraryPrefillInput): AlertPrefil
     streamType: asText(file.stream_type) ?? entry.stream_type ?? "",
     streamName: asText(file.stream_name) ?? entry.stream ?? "",
     queryType: isPromql ? "promql" : "sql",
-    ...(isPromql ? { promql: asText(queryCondition.promql) } : { sql: perGroup?.sql ?? sql }),
+    ...(isPromql ? { promql } : { sql: perGroup?.sql ?? sql }),
     promqlCondition: condition,
+    ...(perSeries ? { promqlMultiAlert: true } : {}),
     ...(perGroup
       ? {
           aggregation: {
