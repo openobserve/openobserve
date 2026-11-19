@@ -640,7 +640,7 @@ const useLogs = (t: TranslateFn) => {
 
   const getFilterExpressionByFieldType = (
     field: string | number,
-    field_value: string | number | boolean,
+    field_value: string | number | boolean | null | undefined,
     action: string,
   ) => {
     let operator = action == "include" ? "=" : "!=";
@@ -666,19 +666,17 @@ const useLogs = (t: TranslateFn) => {
         fieldType = fieldTypeList[field];
       }
 
-      if (field_value === "null" || field_value === "" || field_value === null) {
-        operator = action == "include" ? "is" : "is not";
-        field_value = "null";
-      }
       const quotedField =
         searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
-      let expression =
-        field_value == "null"
-          ? `${quotedField} ${operator} ${field_value}`
-          : `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
-
       const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
       const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
+      const isTyped = isNumericType(fieldType) || isBooleanType(fieldType);
+
+      // "" and the text "null" are values a string holds; a number or boolean shown as "" is missing.
+      if (field_value === null || field_value === undefined || (isTyped && field_value === "")) {
+        return `${quotedField} ${action == "include" ? "is" : "is not"} null`;
+      }
+      let expression = `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
 
       if (isNumericType(fieldType)) {
         expression = `${quotedField} ${operator} ${field_value}`;

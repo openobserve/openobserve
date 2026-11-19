@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch } from "vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useI18nTyped } from "@/types/i18n";
 import { emptyFilterGroup, filterTreeToSql, type FilterGroup } from "@/utils/query/filterBar";
 import { parseSqlFilter } from "@/utils/query/filterBarParser";
@@ -40,6 +41,7 @@ const props = withDefaults(defineProps<SqlFilterBuilderProps>(), {
 const emit = defineEmits<SqlFilterBuilderEmits>();
 
 const { t } = useI18nTyped();
+const { confirm } = useConfirmDialog();
 
 const tree = ref<FilterGroup>(emptyFilterGroup());
 const barRef = ref<QueryFilterBarExpose | null>(null);
@@ -70,7 +72,15 @@ function onTreeChange(next: FilterGroup) {
   emit("update:query", sql);
 }
 
-function clearAndBuild() {
+async function clearAndBuild() {
+  const cleared = await confirm({
+    title: t("filterBar.clearQueryTitle"),
+    message: t("filterBar.clearQueryMessage"),
+    confirmLabel: t("filterBar.clearAndBuild"),
+    confirmVariant: "destructive",
+    focusCancel: true,
+  });
+  if (!cleared) return;
   unparsable.value = false;
   onTreeChange(emptyFilterGroup());
 }

@@ -37,6 +37,7 @@ import {
   stamp,
   toConnector,
   valueStrings,
+  withAndRunGroups,
   type CodecContext,
   type FilterCodec,
 } from "./types";
@@ -225,7 +226,7 @@ function parseGroup(group: Record<string, unknown>, id?: string): FilterGroup {
     if (isPlainObject(item)) return parseLeaf(item);
     return stamp(makeRawNode(JSON.stringify(item)), item);
   });
-  return stamp(makeGroup(items, toConnector(group.logicalOperator), id), group);
+  return stamp(makeGroup(withAndRunGroups(items), toConnector(group.logicalOperator), id), group);
 }
 
 function columnOf(

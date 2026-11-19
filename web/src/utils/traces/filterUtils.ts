@@ -1,4 +1,4 @@
-import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
+import { removeConditions } from "@/utils/query/sqlFilterBuilder";
 
 /**
  * Shared filter utilities for the Traces feature.
@@ -74,21 +74,12 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
   // never matched and stayed in the query after the value was unchecked.
   const op = `(?:[=!<>]|is\\b)`;
   const fieldPattern = new RegExp(`^"?${esc}"?\\s*${op}`, "i");
-  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*${op}`, "i");
-
-  const removeFromClause = (clause: string): string => {
-    const remaining = splitOnAnd(clause.trim()).filter((cond) => {
-      const trimmed = cond.trim();
-      return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
-    });
-    return remaining.join(" AND ");
-  };
 
   // The whole string is the where clause. Do not split on "|": the legacy
   // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
   // inside a term such as match_all('text | error') would hide the conditions
   // before the pipe from removal and corrupt the term on rejoin.
-  return removeFromClause(queryStr);
+  return removeConditions(queryStr.trim(), (condition) => fieldPattern.test(condition));
 };
 
 /**
@@ -159,6 +150,78 @@ export const mergePendingFilters = (pending: string, baseQuery: string): string 
       ? [wrapInParens(conditions)]
       : splitTopLevel(conditions, "and");
   return terms.reduce((query, term) => mergeFilterTerm(term, query), baseQuery);
+};
+
+const isEqualityOn = (term: string, field: string, value: string): boolean => {
+  const condition = parseSimpleCondition(term);
+  return (
+    condition?.field === field.toLowerCase() &&
+    condition.operator === "=" &&
+    condition.value === value
+  );
+};
+
+/** True when every row the filter returns meets `field = value`: the condition is ANDed at the top, not under an OR. */
+export const isRequiredCondition = (query: string, field: string, value: string): boolean => {
+  const where = query.trim();
+  if (splitTopLevel(where, "or").length > 1) return false;
+  return splitTopLevel(where, "and").some((term) => {
+    const group = /^\(([\s\S]*)\)$/.exec(term);
+    if (group) return isRequiredCondition(group[1], field, value);
+    return isEqualityOn(term, field, value);
+  });
+};
+
+/** Cuts out the `field = value` conditions isRequiredCondition finds, keeping any under an OR and the rest of the text as written. */
+export const removeRequiredCondition = (query: string, field: string, value: string): string => {
+  if (splitTopLevel(query, "or").length > 1) return query;
+  let result = query;
+  let from = 0;
+  const terms = splitTopLevel(query, "and").map((text) => {
+    const start = query.indexOf(text, from);
+    from = start + text.length;
+    return { text, start };
+  });
+  // Last to first, so each cut leaves the earlier offsets valid.
+  for (const { text, start } of terms.reverse()) {
+    const group = /^\(([\s\S]*)\)$/.exec(text);
+    const inner = group ? removeRequiredCondition(group[1], field, value) : null;
+    let replacement: string | null = null;
+    if (group && inner !== group[1]) replacement = inner!.trim() ? `(${inner})` : "";
+    else if (!group && isEqualityOn(text, field, value)) replacement = "";
+    if (replacement === null) continue;
+    result = result.slice(0, start) + replacement + result.slice(start + text.length);
+  }
+  if (result === query) return query;
+  const tidy = dropDanglingConnectors(result);
+  // Errors-only bracketed an OR filter to AND onto it; once that is gone, so are the brackets.
+  const lone = /^\(([\s\S]*)\)$/.exec(tidy);
+  return lone && splitTopLevel(tidy, "and").length === 1 && splitTopLevel(lone[1], "or").length > 1
+    ? lone[1]
+    : tidy;
+};
+
+// String literals, quoted names and comments, which may hold a lone `and`, `or` or bracket.
+const OPAQUE_SQL = /'(?:[^']|'')*'|"(?:[^"]|"")*"|--[^\n]*|\/\*[\s\S]*?\*\//g;
+
+/** Removes the `and`/`or` connectors and empty brackets that cutting a condition out of a filter leaves behind. */
+export const dropDanglingConnectors = (query: string): string => {
+  const opaque: string[] = [];
+  let text = query.replace(OPAQUE_SQL, (part) => `\uE000${opaque.push(part) - 1}\uE000`);
+  let before: string;
+  do {
+    before = text;
+    text = text
+      // A name before the brackets, even across a space, makes them a call: `now ()`.
+      .replace(/(^|[^\w\s\uE000]|\b(?:and|or))(\s*)\(\s*\)/gi, "$1$2")
+      .replace(/\(\s*(?:and|or)\b\s*/gi, "(")
+      .replace(/\s*\b(?:and|or)\s*\)/gi, ")")
+      // The cut condition was ANDed to one side, so where an AND meets an OR the OR is the one that stays.
+      .replace(/\b(and|or)\s+(and|or)\b/gi, (_m, a: string, b: string) => (/^or$/i.test(b) ? b : a))
+      .replace(/^\s*(?:and|or)\b\s*/i, "")
+      .replace(/\s*\b(?:and|or)\s*$/i, "");
+  } while (text !== before);
+  return text.trim().replace(/\uE000(\d+)\uE000/g, (_m, index: string) => opaque[Number(index)]);
 };
 
 /**

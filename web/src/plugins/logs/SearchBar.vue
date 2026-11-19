@@ -1330,6 +1330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :fields="filterBuilderFields"
                   :load-values="loadFilterBuilderValues"
                   :fields-loading="searchObj.loadingStream"
+                  :free-text="streamsSearchFullText"
                   :extra-suggestions="recentFilterSection"
                   :max-rows="isFocused ? 0 : 3"
                   data-test="logs-search-bar-filter-builder"
@@ -1381,6 +1382,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
                 :recent-queries="recentQueries"
+                :full-text-search="streamsSearchFullText"
+                :values-time-range="valuesWindow"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -1864,7 +1867,9 @@ import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import { useFilterBuilderPreference } from "@/components/filterBar/useFilterBuilderPreference";
 import { useFilterBarGrowth } from "@/components/filterBar/useFilterBarGrowth";
 import { toFilterFields } from "@/utils/query/filterBar";
+import { getConsumableRelativeTime } from "@/utils/date";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
@@ -1938,7 +1943,11 @@ import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
-import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
+import {
+  hasFieldCondition,
+  qualifyFieldConditions,
+  removeFieldCondition,
+} from "@/plugins/logs/filterUtils";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -2377,8 +2386,23 @@ export default defineComponent({
     const openAiFromBuilder = () =>
       (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
     const filterBuilderFields = computed(() =>
-      toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
+      toFilterFields(
+        searchObj.data.stream.selectedStreamFields ?? [],
+        (searchObj.data.streamResults?.list ?? [])
+          .filter((stream: { name: string }) =>
+            searchObj.data.stream.selectedStream.includes(stream.name),
+          )
+          .map((stream: { schema?: { name: string; type: string }[] }) => stream.schema ?? []),
+      ),
     );
+    // match_all fails on any selected stream that has no full-text search field.
+    const streamsSearchFullText = computed(() => {
+      const selected: string[] = searchObj.data.stream.selectedStream ?? [];
+      const { targets } = buildFilterContext(searchObj, store.state.zoConfig, {
+        ignoreFailures: true,
+      });
+      return selected.length > 0 && selected.every((name) => targets[name]?.mode === "fts");
+    });
     const loadFilterBuilderValues = (field: string, search: string) =>
       resolveFieldValues(field, { prefix: search });
     const onFilterBuilderQuery = (sql: string) => {
@@ -2548,7 +2572,19 @@ export default defineComponent({
       updateFunctionKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
+
+    const currentValuesWindow = () =>
+      pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
+    setValuesTimeRange(currentValuesWindow);
+    // A lookup keeps the function it began with, so a new one tells a lookup in flight the range changed.
+    watch(
+      () => pageValuesSetting(searchObj.data.datetime ?? {}),
+      () => setValuesTimeRange(() => currentValuesWindow()),
+    );
+    // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
+    const valuesWindow = computed(currentValuesWindow);
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
@@ -5365,6 +5401,8 @@ export default defineComponent({
       pickRecentFilterRow,
       onFilterBuilderFocus,
       recentQueries,
+      streamsSearchFullText,
+      valuesWindow,
       recentExamples,
       onRecentEditorKeydown,
       noteEditorPointer,
@@ -5628,7 +5666,7 @@ export default defineComponent({
               const parsedSQL = this.fnParsedSQL();
               const streamPrefix: string =
                 parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
-              filter = `"${streamPrefix}".${filter}`;
+              filter = qualifyFieldConditions(filter, streamPrefix);
             }
 
             // if query contains order by clause or limit clause then add where clause before that
