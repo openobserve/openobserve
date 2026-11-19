@@ -657,6 +657,70 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(functionRuns()).toBe(1);
     });
 
+    const returnToLogs = async (
+      from: string,
+      change: "time" | "query" | null,
+      { to = "logs", liveMode = true } = {},
+    ) => {
+      const { searchObj, logs } = await setup({ liveMode });
+      searchObj.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+      markExecuted();
+      searchObj.meta.logsVisualizeToggle = from;
+      searchObj.meta.logsVisualizeDirtyFlag = false;
+      if (change === "time")
+        searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+      if (change === "query") searchObj.data.query = 'SELECT count(*) FROM "app"';
+      await flushPromises();
+      logs.mockClear();
+
+      vi.useFakeTimers();
+      await wrapper!.vm.onLogsVisualizeToggleUpdate(to);
+      await vi.advanceTimersByTimeAsync(3000);
+      return logs;
+    };
+
+    it.each(["visualize", "build", "patterns"])(
+      "re-runs Search on return from %s when the time changed there",
+      async (from) => {
+        const logs = await returnToLogs(from, "time");
+        expect(logs).toHaveBeenCalledTimes(1);
+        expect(logs.mock.calls[0][0]).toMatchObject({ reason: "tab", op: "full" });
+      },
+    );
+
+    it("re-runs Drill down on return from Visualize when the time changed there", async () => {
+      const logs = await returnToLogs("visualize", "time", { to: "drilldown" });
+      expect(logs).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(["visualize", "build", "patterns"])(
+      "keeps Search's rows on return from %s when nothing changed there",
+      async (from) => {
+        const logs = await returnToLogs(from, null);
+        expect(logs).not.toHaveBeenCalled();
+      },
+    );
+
+    it("re-runs Search on return from Patterns when a filter changed there", async () => {
+      const logs = await returnToLogs("patterns", "query");
+      expect(logs).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps Search's rows when Build only rewrote the query", async () => {
+      const logs = await returnToLogs("build", "query");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("keeps Search's rows after a time change elsewhere while Auto Run is off", async () => {
+      const logs = await returnToLogs("visualize", "time", { liveMode: false });
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("leaves stale rows alone when moving between Search and Drill down", async () => {
+      const logs = await returnToLogs("logs", "time", { to: "drilldown" });
+      expect(logs).not.toHaveBeenCalled();
+    });
+
     it("cancels the in-flight generation from the Cancel button in OSS too", async () => {
       (config as any).isEnterprise = "false";
       const { searchObj } = await setup();
