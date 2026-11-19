@@ -1003,7 +1003,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="add-alert-preview-range-slot"
                   />
                 </div>
-                <div class="h-60 min-h-0">
+                <div :class="previewTestOpen ? 'flex min-h-60 flex-col' : 'h-60 min-h-0'">
                   <AnomalyDataPreview v-if="isAnomalyMode" :config="anomalyConfig" />
                   <template v-else>
                     <div
@@ -1030,7 +1030,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <PreviewAlert
                         v-show="!pendingIntent"
                         ref="previewAlertRef"
-                        class="h-full w-full"
+                        class="h-full w-full flex-1"
                         :formData="formData"
                         :query="previewQuery"
                         :selectedTab="formData.query_condition.type || 'custom'"
@@ -1042,6 +1042,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         labelled-limit
                         @schema-updated="handleSqlSchemaUpdated"
                         @value-range="previewValueRange = $event"
+                        @test-open="previewTestOpen = $event"
                       />
                     </template>
                   </template>
@@ -1632,6 +1633,7 @@ export default defineComponent({
     // fetch. QueryConfig's own watcher on this prop does the actual
     // clear-if-missing comparison; this handler only forwards the list.
     const previewValueRange = ref<ValueRange | null>(null);
+    const previewTestOpen = ref(false);
     const handleSqlSchemaUpdated = (payload: { projections: string[]; hasHaving: boolean }) => {
       alertForm.sqlAggColumnOptions.value = payload.projections;
       alertForm.sqlQueryHasHaving.value = payload.hasHaving;
@@ -2894,6 +2896,7 @@ export default defineComponent({
       onCompositeValidation,
       handleSqlSchemaUpdated,
       previewValueRange,
+      previewTestOpen,
     };
   },
 });

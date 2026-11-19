@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCountChartQuery,
   cleanAggregationQuery,
+  groupColumns,
   withCompositeGroupLabel,
   withHistogramMinutes,
   withoutTimeBucket,
@@ -488,5 +489,30 @@ describe("withCompositeGroupLabel — rewrite safety", () => {
     expect(quotesBalanced(out)).toBe(true);
     expect(out).toContain("'alerts having errors'");
     expect(out).toContain("zo_group_label");
+  });
+});
+
+describe("groupColumns", () => {
+  it.each([
+    [
+      "joined into one alias",
+      `SELECT histogram(_timestamp) AS zo_sql_key, avg(value) as zo_sql_val , concat(host,' : ',pod) as x_axis_2 FROM "m" GROUP BY zo_sql_key , x_axis_2`,
+      ["host", "pod"],
+      ["x_axis_2"],
+    ],
+    [
+      "kept under their own names",
+      `SELECT histogram(_timestamp) AS zo_sql_key, avg(value) AS zo_sql_val, host FROM "m" GROUP BY zo_sql_key, host`,
+      ["host"],
+      ["host"],
+    ],
+    [
+      "named in a literal only",
+      `SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_val, host FROM "m" WHERE msg = 'x AS x_axis_2' GROUP BY zo_sql_key, host`,
+      ["host"],
+      ["host"],
+    ],
+  ])("reads the groups of a query %s", (_case, sql, groupBy, columns) => {
+    expect(groupColumns(sql, groupBy)).toEqual(columns);
   });
 });

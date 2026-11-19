@@ -258,6 +258,14 @@ export const withoutTimeBucket = (query: string): string | null => {
   return /\bzo_sql_key\b/i.test(maskStringLiterals(out)) ? null : out.trim();
 };
 
+/** The result columns a grouped query names its groups by: its x_axis aliases when it renames them. */
+export const groupColumns = (query: string, groupBy: string[]): string[] => {
+  const aliases = [...maskStringLiterals(query).matchAll(/\bAS\s+(x_axis_\d+)\b/gi)].map(
+    (match) => match[1],
+  );
+  return groupBy.length && aliases.length ? aliases : groupBy;
+};
+
 export default cleanAggregationQuery;
 
 /**

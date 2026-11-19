@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { describe, expect, it } from "vitest";
-import { promqlValueUnit } from "./alertValueUnit";
+import { chartUnit, gaugeValueUnit, promqlValueUnit } from "./alertValueUnit";
 
 const MEM = { name: "container_memory_working_set_bytes", type: "gauge", unit: "By" };
 const REQ = { name: "http_server_duration_count", type: "counter", unit: "" };
@@ -53,5 +53,24 @@ describe("promqlValueUnit", () => {
     ["a query on another metric", "avg(node_memory_free_bytes)", MEM, null],
   ])("%s", (_name, query, meta, unit) => {
     expect(promqlValueUnit(query, meta)).toBe(unit);
+  });
+});
+
+describe("gaugeValueUnit", () => {
+  it.each([
+    ["a gauge's declared unit", MEM, "bytes"],
+    [
+      "a count annotation, as its name",
+      { name: "k8s_node_cpu_usage", type: "gauge", unit: "{cpu}" },
+      "cpu",
+    ],
+    ["a counter, whose raw values are totals", REQ, null],
+  ])("reads %s", (_name, meta, unit) => {
+    expect(gaugeValueUnit(meta)).toBe(unit);
+  });
+
+  it("charts a unit no table knows as written", () => {
+    expect(chartUnit("cpu")).toEqual({ unit: "custom", unitCustom: "cpu" });
+    expect(chartUnit(null).unit).toBe("numbers");
   });
 });

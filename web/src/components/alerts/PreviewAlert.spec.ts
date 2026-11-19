@@ -950,6 +950,19 @@ describe("PreviewAlert - PromQL verdict", () => {
     w.unmount();
   });
 
+  it("writes the verdict once, from the settled part of a streamed result", async () => {
+    const w = await mountPromql();
+    const renderer = w.findComponent({ name: "PanelSchemaRenderer" });
+    renderer.vm.$emit("loading-state-change", true);
+    await emitSeries(w, seriesPayload(series("node-a", ["90"]), series("node-b", ["95"])));
+    await emitSeries(w, threeNodes());
+    expect(w.vm.evaluationStatus).toBeNull();
+    renderer.vm.$emit("loading-state-change", false);
+    await nextTick();
+    expectVerdict(w, { matched: 1, gate: "1 >= 1", trigger: true });
+    w.unmount();
+  });
+
   it("renders WOULD NOT TRIGGER when no series meets the condition", async () => {
     const w = await mountPromql({ condition: { column: "value", operator: ">=", value: 90 } });
 
@@ -3473,6 +3486,25 @@ describe("PreviewAlert - a chart with many series", () => {
     w.unmount();
   });
 
+  it("falls back to the sample's floor when the full count fails", async () => {
+    vi.mocked(searchService.metrics_query).mockRejectedValue(new Error("boom"));
+    const formData: any = {
+      stream_name: "mem",
+      stream_type: "metrics",
+      trigger_condition: { period: 10, threshold: 1, operator: ">=" },
+      query_condition: { promql_condition: { column: "value", operator: ">", value: 0.85 } },
+    };
+    const w = await mountComp({ query: "mem", selectedTab: "promql", formData });
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: { series: [{ name: "a", data: [[1, "0.9"]] }] },
+      extras: { seriesLimit: { shown: 1, total: 574 } },
+    });
+    await flushPromises();
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 1, atLeast: true });
+    vi.mocked(searchService.metrics_query).mockReset();
+    w.unmount();
+  });
+
   it("counts every series past the threshold on the server when the chart draws only some", async () => {
     vi.mocked(searchService.metrics_query).mockImplementation(async ({ query }: any) => ({
       data: {
@@ -3502,7 +3534,8 @@ describe("PreviewAlert - a chart with many series", () => {
       extras: { seriesLimit: { shown: 2, total: 574 } },
     });
     await nextTick();
-    expect(w.vm.evaluationStatus).toMatchObject({ count: 1, atLeast: true });
+    // The sample's floor is not shown on the way to the full count, so the verdict changes once.
+    expect(w.vm.evaluationStatus).toBeNull();
     await flushPromises();
     expect(w.vm.evaluationStatus).toMatchObject({ count: 85, wouldTrigger: true });
     expect(w.vm.evaluationStatus.atLeast).toBeFalsy();

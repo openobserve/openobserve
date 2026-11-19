@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { CARD_KIND, getMetricDefaults } from "@/utils/metrics/metricDefaults";
+import {
+  CARD_KIND,
+  getMetricDefaults,
+  toO2Unit,
+  type O2Unit,
+} from "@/utils/metrics/metricDefaults";
 
 /** Functions that keep the unit of the values they read. */
 const KEEPS_UNIT = new Set([
@@ -102,7 +107,27 @@ export function promqlValueUnit(query: string, meta: MetricMeta): string | null 
     if (rest.every((fn) => RATES.has(fn)) && defaults.cardKind === CARD_KIND.COUNTER_RATE)
       unit = defaults.unit;
   } else if (!rest.length && defaults.cardKind === CARD_KIND.GAUGE) {
-    unit = defaults.unit;
+    unit = annotatedUnit(meta) ?? defaults.unit;
   }
   return unit && !NO_UNIT.has(unit) ? unit : null;
+}
+
+// A UCUM annotation such as {cpu} counts things of that name, which no unit table lists.
+const annotatedUnit = (meta: MetricMeta): string | null =>
+  /^\{([^{}]+)\}$/.exec(meta.unit?.trim() ?? "")?.[1] ?? null;
+
+/** The unit of a gauge's own values, which min, max, avg, sum and percentiles keep. */
+export function gaugeValueUnit(meta: MetricMeta): string | null {
+  const defaults = getMetricDefaults(meta.name, meta.type, meta.unit);
+  if (defaults.cardKind !== CARD_KIND.GAUGE) return null;
+  const unit = annotatedUnit(meta) ?? defaults.unit;
+  return NO_UNIT.has(unit) ? null : unit;
+}
+
+/** A chart's unit setting; a unit no table knows is shown as written. */
+export function chartUnit(unit: string | null): O2Unit {
+  const known = toO2Unit(unit ?? "none");
+  return unit && known.unit === "numbers" && !NO_UNIT.has(unit)
+    ? { unit: "custom", unitCustom: unit }
+    : known;
 }

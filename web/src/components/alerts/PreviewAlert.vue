@@ -43,16 +43,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </Teleport>
     <OTruncatedText
-      v-if="showChartKey && chartCaption"
+      v-if="showChartKey && chartCaption && !testOpen"
       class="text-text-secondary shrink-0 px-4 pt-1 text-xs"
       data-test="alert-preview-caption"
       >{{ chartCaption }}</OTruncatedText
     >
-    <!-- Its own stacking context keeps the chart's loading line under the Test it panel. -->
+    <!-- Under Test it the chart stays mounted, out of the flow: a PromQL preview runs only from its watchers. -->
     <div
       data-test="alert-preview-chart"
-      class="preview-alert-chart relative isolate min-h-0 flex-1 px-4"
-      :class="showChartKey ? 'pb-1' : 'pb-4'"
+      class="preview-alert-chart isolate min-h-0 flex-1 px-4"
+      :class="[
+        showChartKey ? 'pb-1' : 'pb-4',
+        testOpen ? 'invisible absolute inset-0' : 'relative',
+      ]"
+      :aria-hidden="testOpen || undefined"
     >
       <!-- Empty query placeholder -->
       <div v-if="awaitsQuery" class="flex h-full flex-col items-center justify-center gap-2">
@@ -70,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :searchType="searchTypeForPanel"
         :is_ui_histogram="shouldUseHistogram"
         @result-metadata-update="handleChartDataUpdate"
-        @series-data-update="handleSeriesDataUpdate"
+        @series-data-update="onSeriesData"
         @error="onPreviewError"
         @loading-state-change="onPreviewLoading"
       />
@@ -96,12 +100,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </QueryErrorState>
     </div>
     <div
-      v-if="showChartKey"
+      v-if="showChartKey && !testOpen"
       class="text-text-secondary flex min-h-5 shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 px-4 pb-1 text-xs"
       data-test="alert-preview-key"
     >
       <span
-        v-for="limit in testOpen ? [] : limitKeys"
+        v-for="limit in limitKeys"
         :key="limit.level"
         class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap"
         :data-test="
@@ -119,21 +123,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <span class="ms-auto flex min-w-0 items-center gap-3">
         <OTruncatedText
-          v-if="seriesCountText && !testOpen"
+          v-if="seriesCountText"
           class="min-w-0"
           data-test="alert-preview-series-count"
         >
           {{ seriesCountText }}
         </OTruncatedText>
         <span
-          v-if="testable && !testOpen && testGapText"
+          v-if="testable && testGapText"
           :id="testGapId"
           class="shrink-0"
           data-test="alert-preview-test-it-reason"
           >{{ testGapText }}</span
         >
         <OButton
-          v-if="testable && !testOpen"
+          v-if="testable"
           ref="testItButton"
           variant="link"
           size="xs"
@@ -194,9 +198,13 @@ import { FILTER_PROFILES } from "@/components/filterBar/filterProfiles";
 import { evaluateAlertBody, testRunKey, testValueText } from "@/utils/alerts/alertTestRun";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import AlertTestRun from "./AlertTestRun.vue";
-import { promqlValueUnit, type MetricMeta } from "@/utils/alerts/alertValueUnit";
+import {
+  chartUnit,
+  gaugeValueUnit,
+  promqlValueUnit,
+  type MetricMeta,
+} from "@/utils/alerts/alertValueUnit";
 import { noSeriesReason, noSeriesSentence, selectorsOf } from "@/utils/alerts/promqlNoSeries";
-import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { promqlDaySeriesQuery, promqlParseTreeQuery } from "@/services/alert_preview.queries";
 import useStreams from "@/composables/useStreams";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -205,6 +213,7 @@ import {
   buildCountChartQuery,
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
+  groupColumns,
   withHistogramMinutes,
   withoutTimeBucket,
 } from "@/utils/alerts/aggregationPreviewQuery";
@@ -273,6 +282,7 @@ const props = defineProps({
 const emit = defineEmits<{
   (e: "schema-updated", payload: { projections: string[]; hasHaving: boolean }): void;
   (e: "value-range", range: ValueRange | null): void;
+  (e: "test-open", open: boolean): void;
 }>();
 
 // Strip axis labels from field config so ECharts doesn't render axis titles
@@ -346,7 +356,7 @@ const applyThresholds = (): void => {
     warning: t("alerts.plain.warnLine"),
   }).map((line) => ({ ...line, show_label: false }));
   const bounds = thresholdAxisBounds(markLines);
-  const unit = toO2Unit(valueUnit.value ?? "none");
+  const unit = chartUnit(valueUnit.value);
   dashboardPanelData.data.config.unit = unit.unit;
   dashboardPanelData.data.config.unit_custom = unit.unitCustom;
   // Counted events are whole numbers; an axis of "180.00" reads as a measurement.
@@ -424,10 +434,25 @@ const onPreviewError = (error: { message?: string; code?: string | number } | nu
   previewError.value = error;
   if (error?.message || !previewLoading) settledPreviewError.value = error;
 };
+// A streamed result arrives in parts; its counts and verdict are written once, from the settled part.
+let unsettledSeries: unknown = null;
+const onSeriesData = (seriesData: unknown) => {
+  if (previewLoading) {
+    unsettledSeries = seriesData;
+    return;
+  }
+  unsettledSeries = null;
+  handleSeriesDataUpdate(seriesData);
+};
 // Set once a builder run settles on the renderer's own "No Data", so the chart can say why.
 const filterDrewNothing = ref(false);
 const onPreviewLoading = (loading: boolean) => {
   previewLoading = loading;
+  if (!loading && unsettledSeries) {
+    const settled = unsettledSeries;
+    unsettledSeries = null;
+    handleSeriesDataUpdate(settled);
+  }
   if (!loading) settledPreviewError.value = previewError.value;
   filterDrewNothing.value =
     !loading &&
@@ -476,6 +501,15 @@ const valueUnit = computed((): string | null => {
     )
   )
     return "microseconds";
+  const agg = qc?.aggregation;
+  if (
+    props.selectedTab === "custom" &&
+    props.isAggregationEnabled &&
+    metricMeta.value &&
+    agg?.having?.column === "value" &&
+    !["count", "total_events"].includes(agg.function)
+  )
+    return gaugeValueUnit(metricMeta.value);
   if (props.selectedTab !== "promql" || !metricMeta.value || qc?.promql_rule_mode) return null;
   if (props.formData._ui?.forecast) return null;
   return promqlValueUnit(props.query, metricMeta.value);
@@ -528,6 +562,8 @@ onBeforeUnmount(() => {
   testRun.currentKey.value = null;
 });
 const testOpen = ref(false);
+// Test it's answer takes the chart's place and can be taller, so the host lets the box grow.
+watch(testOpen, (open) => emit("test-open", open));
 const testItButton = ref<{ $el: HTMLElement } | null>(null);
 // The panel covers Test it, so closing it hands focus back to the button that opened it.
 const closeTest = async () => {
@@ -906,7 +942,7 @@ const fetchQuerySchema = async () => {
         props.formData.query_condition?.aggregation?.group_by || []
       ).filter((f: string) => f && f.trim() !== "");
 
-      const breakdown = groupByFields.map((field: string) => ({
+      const breakdown = groupColumns(queryForPreview, groupByFields).map((field: string) => ({
         alias: field,
         column: field,
         color: null,
@@ -1218,8 +1254,9 @@ const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) =>
           if (allHits.length > 0 && groupByFields.length > 0) {
             // Group hits by the user's group_by field combination (strip time bucket dimension)
             const groupMap = new Map<string, number[]>();
+            const columns = groupColumns(props.query, groupByFields);
             for (const hit of allHits) {
-              const key = groupByFields.map((f: string) => String(hit[f] ?? "")).join("\x00");
+              const key = columns.map((f: string) => String(hit[f] ?? "")).join("\x00");
               if (!groupMap.has(key)) groupMap.set(key, []);
               groupMap.get(key)!.push(Number(hit.zo_sql_num ?? hit.alert_agg_value ?? 0));
             }
@@ -1852,9 +1889,12 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
 
   const drawn = drawnSeries.value;
   const sampled = !!drawn && drawn.total > drawn.shown;
-  writePromqlVerdict(criticalCount, firingCount, sampled);
   seriesCountGeneration++;
-  if (sampled && !props.formData._ui?.forecast) void countAllSeries(critical, warning, operator);
+  // The sample's lower bound is written only if the full count fails, so the verdict changes once.
+  const fromSample = () => writePromqlVerdict(criticalCount, firingCount, sampled);
+  if (sampled && !props.formData._ui?.forecast)
+    void countAllSeries(critical, warning, operator, fromSample);
+  else fromSample();
 };
 
 /** The verdict from the series past each band; `atLeast` when they were counted from a sample. */
@@ -1923,10 +1963,15 @@ const PROMQL_OPERATORS: Record<string, string> = {
 let promqlEndSeconds = 0;
 let seriesCountGeneration = 0;
 // The chart draws only some series, so the server counts all of them past each band at the chart's end.
-const countAllSeries = async (critical: number, warning: number | null, operator?: string) => {
+const countAllSeries = async (
+  critical: number,
+  warning: number | null,
+  operator: string | undefined,
+  fromSample: () => void,
+) => {
   const generation = ++seriesCountGeneration;
   const op = PROMQL_OPERATORS[operator ?? ""];
-  if (!op) return;
+  if (!op) return fromSample();
   const query = props.query;
   const org = store.state.selectedOrganization.identifier;
   const period = Number(props.formData.trigger_condition?.period) || 0;
@@ -1945,7 +1990,7 @@ const countAllSeries = async (critical: number, warning: number | null, operator
     if (generation !== seriesCountGeneration || query !== props.query) return;
     writePromqlVerdict(criticalCount, firingCount ?? criticalCount, false);
   } catch {
-    // The sampled lower bound stays.
+    if (generation === seriesCountGeneration && query === props.query) fromSample();
   }
 };
 
