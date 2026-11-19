@@ -16,6 +16,10 @@ pub struct Model {
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Never sent to, nor overwritten from, another region.
+    pub region_only: bool,
+    /// The region whose write this row holds; `None` for this region's own.
+    pub origin_region: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -39,6 +43,8 @@ mod tests {
             created_by: "admin@example.com".to_string(),
             created_at: 1000,
             updated_at: 2000,
+            region_only: false,
+            origin_region: None,
         };
         assert_eq!(m.id, "ts-1");
         assert_eq!(m.org, "myorg");

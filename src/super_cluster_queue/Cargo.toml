@@ -10,6 +10,7 @@ default = []
 enterprise = [
     "dep:anyhow",
     "dep:arrow",
+    "dep:audit",
     "dep:async-recursion",
     "dep:bytes",
     "dep:common",
@@ -23,6 +24,7 @@ enterprise = [
     "dep:serde_json",
     "dep:svix-ksuid",
     "dep:tokio",
+    "audit/enterprise",
     "compaction/enterprise",
     "enrichment-data/enterprise",
     "openobserve-core/enterprise",
@@ -37,6 +39,7 @@ vectorscan = [
 [dependencies]
 anyhow = { workspace = true, optional = true }
 arrow = { workspace = true, optional = true }
+audit = { workspace = true, optional = true }
 async-recursion = { workspace = true, optional = true }
 bytes = { workspace = true, optional = true }
 common = { workspace = true, optional = true }

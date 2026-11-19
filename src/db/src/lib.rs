@@ -22,6 +22,8 @@ use {
 };
 
 pub mod agent_signals;
+#[cfg(feature = "enterprise")]
+pub mod ai_toolsets;
 pub mod alerts;
 pub mod authz;
 pub mod backfill;

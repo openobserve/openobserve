@@ -23,11 +23,14 @@ export interface ToolsetCreateRequest {
   kind: ToolsetKind;
   description?: string;
   data?: Record<string, any>;
+  /** Kept out of super-cluster replication. */
+  region_only?: boolean;
 }
 
 export interface ToolsetUpdateRequest {
   description?: string;
   data?: Record<string, any>;
+  region_only?: boolean;
 }
 
 export interface ToolsetMcpConfig {
@@ -63,6 +66,10 @@ const aiToolsets = {
   },
   discover: (org_identifier: string, body: ToolsetDiscoverRequest) => {
     return http().post(`/api/${org_identifier}/ai/toolsets/_discover`, body);
+  },
+  /** Re-sends the org's replicated toolsets and recent deletes to the other regions. */
+  resync: (org_identifier: string) => {
+    return http().post<{ published: number }>(`/api/${org_identifier}/ai/toolsets/_resync`);
   },
   delete: (org_identifier: string, id: string) => {
     return http().delete(`/api/${org_identifier}/ai/toolsets/${id}`);

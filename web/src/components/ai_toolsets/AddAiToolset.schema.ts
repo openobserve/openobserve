@@ -56,6 +56,7 @@ export const makeAddAiToolsetSchema = (
       name: z.string().min(1, t("aiToolset.nameRequired")),
       kind: z.string().min(1, t("aiToolset.kindRequired")),
       description: z.string().optional(),
+      region_only: z.boolean().optional(),
 
       // ── MCP fields (validated only when kind === "mcp" — see superRefine) ─
       // Number inputs emit strings → z.coerce.number(); consumers coerce at use.
@@ -171,6 +172,7 @@ export const addAiToolsetDefaults = (): AddAiToolsetForm => ({
   name: "",
   kind: "mcp",
   description: "",
+  region_only: false,
   // A new custom MCP starts with every tool off; the picker turns tools on.
   mcp: {
     url: "",

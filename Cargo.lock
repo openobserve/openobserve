@@ -12402,6 +12402,7 @@ dependencies = [
  "anyhow",
  "arrow",
  "async-recursion",
+ "audit",
  "bytes",
  "common",
  "compaction",
