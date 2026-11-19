@@ -432,7 +432,7 @@ export function buildSQLContext(
             labelFont,
           );
           const rotatedHeight =
-            Math.min(labelWidth, measured) * Math.sin(rotationInRadians) +
+            Math.min(labelWidth, measured, 120) * Math.sin(rotationInRadians) +
             labelFontSize * Math.cos(rotationInRadians);
           return Math.max(0, Math.ceil(rotatedHeight - labelFontSize));
         })()
