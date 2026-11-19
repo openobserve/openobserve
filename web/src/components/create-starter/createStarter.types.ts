@@ -23,7 +23,7 @@ export type ChoiceAvailability = "on" | "locked" | "hidden";
 export interface StarterPane {
   id: "ai" | "library";
   label: I18nText;
-  /** "44 match your data"; null = no count (loading, 0 or failed). */
+  /** "44 match your data"; 0 = none match (no count shown); null = loading or failed. */
   count: number | null;
   availability: ChoiceAvailability;
 }

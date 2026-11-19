@@ -2597,7 +2597,7 @@ describe("AddAlert (OForm owner)", () => {
       ["create", {}, true],
       ["edit", { isUpdated: true, modelValue: savedAlert() }, false],
     ])(
-      "folder is chosen in step 3 on %s, on the name's row, and read-only in the header",
+      "folder is chosen in step 3 on %s, on the name's row, and read-only in the header; Start another way is for create only",
       async (_, props, pick) => {
         wrapper = withHeader(props);
         await flushPromises();
@@ -2618,6 +2618,7 @@ describe("AddAlert (OForm owner)", () => {
           pick ? 1 : 0,
         );
         expect(wrapper.find('[data-test="add-alert-header-title-trigger"]').exists()).toBe(pick);
+        expect(wrapper.find('[data-test="alert-starter-another-way"]').exists()).toBe(pick);
       },
     );
   });

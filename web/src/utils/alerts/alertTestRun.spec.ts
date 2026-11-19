@@ -23,6 +23,8 @@ import errorsTruncated from "@/test/fixtures/alerts/evaluate-errors-truncated.js
 import {
   checkTimeText,
   conditionsRoot,
+  dayVerdict,
+  dayVerdictLine,
   evaluateAlertBody,
   requestFailureReason,
   testRunDay,
@@ -403,6 +405,29 @@ describe("testRunDay", () => {
     const paused = testRunDay(pausedAfterNotify(true) as EvaluateAlertResponse);
     expect([paused.fired, paused.refires]).toEqual([1, 0]);
     expect(testRunDay(errorsTruncated as EvaluateAlertResponse).untestedHours).toBe(23);
+  });
+});
+
+describe("dayVerdict", () => {
+  const allFailed = {
+    ...errorsTruncated,
+    checks: errorsTruncated.checks.map((c) => ({
+      ...c,
+      error: c.error ?? { code: 500, message: "" },
+    })),
+    summary: { ...errorsTruncated.summary, errors: errorsTruncated.checks.length },
+  };
+  const singleGroup = { ...grouped, summary: { ...grouped.summary, groups_fired_total: 1 } };
+  it.each([
+    ["two groups fired", grouped, "fired", "secondary", "Would have fired for 2 groups in 24 h"],
+    ["one group fired", singleGroup, "fired", "secondary", "Would have fired 3 times in 24 h"],
+    ["some checks failed, none fired", errorsTruncated, "quiet", "secondary", "Quiet in 24 h"],
+    ["no matching data", noSeries, "noData", "warning", "No data in 24 h"],
+    ["every check failed", allFailed, "failed", "error", "Couldn't test: Search timed out"],
+  ])("%s", (_name, r, state, tone, text) => {
+    const verdict = dayVerdict(r as EvaluateAlertResponse);
+    const line = dayVerdictLine(verdict, t);
+    expect([verdict.state, line.tone, String(line.text)]).toEqual([state, tone, text]);
   });
 });
 

@@ -92,6 +92,20 @@ export interface TestRunDay {
   singleCheckSpikes: number;
 }
 
+export type DayVerdict =
+  | { state: "fired"; count: number; groups: number }
+  | { state: "quiet" }
+  | { state: "noData" }
+  | { state: "failed"; reason: I18nText | null };
+
+/** Text colour per tone for a dry-run line in a list row. */
+export const DAY_VERDICT_TONE_CLASS: Record<TestRunTone, string> = {
+  body: "text-text-body",
+  secondary: "text-text-secondary",
+  warning: "text-status-warning-text",
+  error: "text-status-error-text",
+};
+
 /** The alert as the save path sends it, minus the record stamps, for the dry run. */
 export function evaluateAlertBody(
   formData: PayloadFormData,
@@ -709,6 +723,43 @@ export function valueSplitText(
       t("alerts.testRun.valueCount", { value: raw(value), count: formatNumber(n) }),
     );
   return t("alerts.testRun.byValue", { list: listWithMore(items, sorted.length, t) });
+}
+
+/** A whole tested day, read as one result for a row in a list. */
+export function dayVerdict(r: EvaluateAlertResponse): DayVerdict {
+  const { checks, errors } = r.summary;
+  if (checks > 0 && errors >= checks) {
+    const message = r.checks.find((c) => c.error?.message?.trim())?.error?.message.trim();
+    return { state: "failed", reason: message ? raw(message) : null };
+  }
+  const day = testRunDay(r);
+  if (!checks || day.events === 0) return { state: "noData" };
+  if (day.fired === 0) return { state: "quiet" };
+  return { state: "fired", count: day.fired, groups: r.summary.groups_fired_total ?? 0 };
+}
+
+/** The one wording and tone every list uses for a row's 24-hour dry run. */
+export function dayVerdictLine(
+  v: DayVerdict,
+  t: TranslateFn,
+): { text: I18nText; tone: TestRunTone } {
+  if (v.state === "failed") {
+    return {
+      tone: "error",
+      text: v.reason
+        ? t("alertStarter.dayTest.failedReason", { reason: v.reason })
+        : t("alertStarter.dayTest.failed"),
+    };
+  }
+  if (v.state === "noData") return { tone: "warning", text: t("alertStarter.dayTest.noData") };
+  if (v.state === "quiet") return { tone: "secondary", text: t("alertStarter.dayTest.quiet") };
+  return {
+    tone: "secondary",
+    text:
+      v.groups > 1
+        ? t("alertStarter.dayTest.firedGroups", { count: formatNumber(v.groups) }, v.groups)
+        : t("alertStarter.dayTest.firedTimes", { count: formatNumber(v.count) }, v.count),
+  };
 }
 
 /** What failed, from the server's own message when it gave one. */

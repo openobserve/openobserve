@@ -367,6 +367,15 @@ describe("alerts service", () => {
         silentForbidden: true,
       });
     });
+
+    it.each([
+      ["a user-pressed test", undefined, 1],
+      ["a dry run the UI starts itself", { track: false }, 0],
+    ])("tracks %s", async (_name, options, calls) => {
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+      await alerts.evaluate("org", { alert: {} } as any, undefined, undefined, options);
+      expect(analytics.track).toHaveBeenCalledTimes(calls);
+    });
   });
 
   describe("create_by_alert_id", () => {

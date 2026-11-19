@@ -208,6 +208,7 @@ import type { AlertLibraryEntry, AlertLibraryFile, StreamsByType } from "@/types
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { formatNumber } from "@/utils/alerts/alertCopy";
 import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
+import type { DayVerdict } from "@/utils/alerts/alertTestRun";
 import type { AlreadySetUp } from "@/utils/alerts/librarySuggest.types";
 import { buildPrefillFromLibrary } from "@/utils/alerts/prefill/fromLibrary";
 import { entryInScope, scopePrefill, type ScopeSkipReason } from "@/utils/alerts/starterScope";
@@ -221,7 +222,6 @@ import {
   useStarterScopeOptions,
   orderRows,
   selectAllNext,
-  type DryRunVerdict,
 } from "./libraryPaneData";
 
 const props = defineProps<{
@@ -311,8 +311,9 @@ const ready = computed(() =>
 );
 const notReadyCount = computed(() => entries.value.length - ready.value.length);
 
+// null while loading or failed; a real 0 lets New skip a starter with nothing to offer.
 watch(
-  () => (busy.value || failed.value || ready.value.length === 0 ? null : ready.value.length),
+  () => (busy.value || failed.value ? null : ready.value.length),
   (count) => emit("count", count),
   { immediate: true },
 );
@@ -376,7 +377,7 @@ const totalText = computed<I18nText>(() => {
   if (pack.value !== "all") {
     return t("alertStarter.library.matchOfPack", { count, total, pack: packLabel(pack.value) });
   }
-  return t("alertStarter.library.matchYourData", { count: total }, total);
+  return t("createStarter.matchCount", { count: total }, total);
 });
 
 // ── order: what you already have sinks, but never under a pointer already at work ──
@@ -519,7 +520,7 @@ watch(seenEntries, (list) => {
     }
   }
 });
-const verdictFor = (entry: AlertLibraryEntry): DryRunVerdict | "pending" | null =>
+const verdictFor = (entry: AlertLibraryEntry): DayVerdict | "pending" | null =>
   canDryRun(entry) ? (dryRun.verdicts.value[dryRunKey(entry)] ?? "pending") : null;
 
 // ── selection ──

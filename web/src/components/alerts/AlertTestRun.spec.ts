@@ -82,7 +82,9 @@ describe("AlertTestRun", () => {
     expect(text(wrapper, "running")).toContain("Testing 144 checks over the last 24 hours");
     await flushPromises();
 
-    expect(evaluate).toHaveBeenCalledWith("default", { alert: BODY }, "f1", expect.anything());
+    expect(evaluate).toHaveBeenCalledWith("default", { alert: BODY }, "f1", expect.anything(), {
+      track: true,
+    });
     expect(text(wrapper, "summary")).toContain("sent notifications in 2 of them");
     expect(text(wrapper, "groups")).toContain("checkout");
     expect(text(wrapper, "groups")).toContain("2 checks");

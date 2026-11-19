@@ -86,7 +86,7 @@ describe("AlertLibraryPane", () => {
 
   it.each([
     { name: "the ready total once readiness is known", cached: manifest, list: ["app"], count: 2 },
-    { name: "no count when nothing matches", cached: manifest, list: ["other"], count: null },
+    { name: "0 when nothing matches", cached: manifest, list: ["other"], count: 0 },
     { name: "no count when the catalogue is down", cached: null, list: ["app"], count: null },
     { name: "no count while the streams load", cached: manifest, list: null, count: null },
   ])("emits $name", async ({ cached, list, count }) => {

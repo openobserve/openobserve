@@ -247,7 +247,8 @@ export const ALERT_FIND_ENTRIES: readonly AlertFindEntry[] = [
     section: "notify",
     tier: "shown",
     groupKey: "alerts.find.groups.destinations",
-    targets: ["alert-destinations-select"],
+    // A new alert keeps the picker inside Who to tell's Pick popover, so the row is the target.
+    targets: ["alert-settings-who-to-tell-row", "alert-destinations-select"],
   },
   {
     id: "createsIncident",

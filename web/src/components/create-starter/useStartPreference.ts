@@ -72,7 +72,7 @@ export function resolveStart(
   const can = (c: StartChoice) => c === "form" || panes.some((p) => p.id === c && p.openable);
   if (def !== "last" && can(def)) return def;
   if (last && can(last)) return last;
-  // count is null while loading, failed or 0, so only an explicit 0 rules a pane out.
+  // count is null while loading or failed, so only a known 0 rules a pane out.
   return panes.find((p) => p.openable && p.count !== 0)?.id ?? "form";
 }
 

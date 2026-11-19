@@ -30,7 +30,7 @@ import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import type { AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
 import { limitText } from "@/utils/alerts/alertReadBack";
-import { testRunDay } from "@/utils/alerts/alertTestRun";
+import { dayVerdict, type DayVerdict } from "@/utils/alerts/alertTestRun";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import {
   buildScopeOptions,
@@ -46,11 +46,8 @@ export const SCOPE_STREAM_TYPES: readonly ScopeStreamType[] = ["logs", "metrics"
 const DRY_RUN_CONCURRENCY = 3;
 const DRY_RUN_TTL_MS = 10 * 60_000;
 
-export type DryRunVerdict =
-  { state: "fired"; count: number; groups: number } | { state: "quiet" } | { state: "none" };
-
 /** Kept across pane opens, so reopening the starter repeats no dry run. */
-const verdictCache = new Map<string, { verdict: DryRunVerdict; at: number }>();
+const verdictCache = new Map<string, { verdict: DayVerdict; at: number }>();
 
 /** The org's scope choices, from the same cached reads Discovered services and correlation use. */
 export function useStarterScopeOptions() {
@@ -154,26 +151,14 @@ export function prefillSummary(prefill: AlertPrefill): { per: string[]; conditio
   return { per, condition };
 }
 
-const verdictOf = (response: Parameters<typeof testRunDay>[0]): DryRunVerdict => {
-  const summary = response.summary;
-  if (!summary.checks || summary.errors >= summary.checks) return { state: "none" };
-  const day = testRunDay(response);
-  // A day with no matching event says nothing about the alert, so it states nothing.
-  if (day.events === 0) return { state: "none" };
-  if (day.alerts > 0) {
-    return { state: "fired", count: day.alerts, groups: summary.groups_fired_total ?? 0 };
-  }
-  return { state: "quiet" };
-};
-
 /** Server dry runs for the rows in view: three at a time, cached per entry and stream, cancelled on unmount. */
 export function useLibraryDryRun(org: ComputedRef<string>) {
-  const verdicts = shallowRef<Record<string, DryRunVerdict>>({});
+  const verdicts = shallowRef<Record<string, DayVerdict>>({});
   const queue: Array<{ key: string; body: () => Promise<EvaluateAlertBody | null> }> = [];
   const running = new Map<string, AbortController>();
   const asked = new Set<string>();
 
-  const settle = (key: string, verdict: DryRunVerdict, cache: boolean) => {
+  const settle = (key: string, verdict: DayVerdict, cache: boolean) => {
     if (cache) verdictCache.set(`${org.value}|${key}`, { verdict, at: Date.now() });
     verdicts.value = { ...verdicts.value, [key]: verdict };
   };
@@ -187,17 +172,18 @@ export function useLibraryDryRun(org: ComputedRef<string>) {
         try {
           const body = await job.body();
           if (controller.signal.aborted) return;
-          if (!body) return settle(job.key, { state: "none" }, true);
+          if (!body) return settle(job.key, { state: "failed", reason: null }, true);
           const response = await alertsService.evaluate(
             org.value,
             { alert: body },
             undefined,
             controller.signal,
+            { track: false },
           );
-          settle(job.key, verdictOf(response.data), true);
+          settle(job.key, dayVerdict(response.data), true);
         } catch {
-          // A cancel is not an answer; a refusal or failure shows nothing and is asked again next open.
-          if (!controller.signal.aborted) settle(job.key, { state: "none" }, false);
+          // A cancel is not an answer; a refusal or failure is asked again next open.
+          if (!controller.signal.aborted) settle(job.key, { state: "failed", reason: null }, false);
         } finally {
           running.delete(job.key);
           pump();

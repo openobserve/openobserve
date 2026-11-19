@@ -104,9 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('alertStarter.library.loading')"
         />
         <span
-          v-else-if="verdictText"
+          v-else-if="verdictLine"
+          :class="DAY_VERDICT_TONE_CLASS[verdictLine.tone]"
           :data-test="`alert-starter-library-row-verdict-${entry.id}`"
-          >{{ verdictText }}</span
+          >{{ verdictLine.text }}</span
         >
       </div>
     </div>
@@ -131,8 +132,11 @@ import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { joinList } from "@/utils/alerts/alertCopy";
 import type { AlreadySetUp } from "@/utils/alerts/librarySuggest.types";
-
-import type { DryRunVerdict } from "./libraryPaneData";
+import {
+  DAY_VERDICT_TONE_CLASS,
+  dayVerdictLine,
+  type DayVerdict,
+} from "@/utils/alerts/alertTestRun";
 
 const props = defineProps<{
   entry: AlertLibraryEntry;
@@ -142,7 +146,7 @@ const props = defineProps<{
   summary: { per: string[]; condition: string } | null;
   summaryPending: boolean;
   /** `null`: no dry run for this row, so nothing is said. */
-  verdict: DryRunVerdict | "pending" | null;
+  verdict: DayVerdict | "pending" | null;
   own: AlreadySetUp[];
 }>();
 
@@ -181,13 +185,11 @@ const perText = computed(() =>
   t("alertStarter.library.per", { labels: joinList(props.summary?.per ?? []) }),
 );
 
-const verdictText = computed(() => {
+// A row whose day had no data or couldn't run says nothing; the review before adding says why.
+const verdictLine = computed(() => {
   const verdict = props.verdict;
-  if (!verdict || verdict === "pending" || verdict.state === "none") return null;
-  if (verdict.state === "quiet") return t("alertStarter.library.quiet");
-  if (verdict.groups > 1) {
-    return t("alertStarter.library.firedGroups", { count: verdict.groups }, verdict.groups);
-  }
-  return t("alertStarter.library.firedTimes", { count: verdict.count }, verdict.count);
+  if (!verdict || verdict === "pending") return null;
+  if (verdict.state !== "fired" && verdict.state !== "quiet") return null;
+  return dayVerdictLine(verdict, t);
 });
 </script>

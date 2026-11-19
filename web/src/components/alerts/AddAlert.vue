@@ -179,6 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </AlertEditActions>
           </template>
+          <template v-else-if="!isEditing" #actions>
+            <AlertStarter
+              trigger="another-way"
+              :alert-type="isAnomalyMode ? 'anomaly_detection' : 'scheduled'"
+            />
+          </template>
         </OPageHeader>
       </template>
 
@@ -1315,6 +1321,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import AlertStarter from "./starter/AlertStarter.vue";
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -1531,6 +1538,7 @@ export default defineComponent({
   components: {
     OIcon,
     OInlineNotice,
+    AlertStarter,
     OPageLayout,
     OBanner,
     JsonEditor,

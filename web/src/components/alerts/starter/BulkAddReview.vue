@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="shrink-0"
             :data-test="`alerts-bulk-add-review-duplicate-${row.entry.id}`"
           >
-            {{ t("alertStarter.bulk.duplicate", { count: row.duplicates }, row.duplicates) }}
+            {{ t("alertStarter.library.youHave", { count: row.duplicates }, row.duplicates) }}
           </OTag>
         </div>
 
@@ -130,9 +130,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="sr-only">{{ t("alertStarter.bulk.testing") }}</span>
             <OSkeleton type="text" animation="none" class="h-3 w-32" />
           </template>
-          <OTruncatedText v-else-if="row.test.text" as="span" :class="toneClass(row.test.tone)">{{
-            row.test.text
-          }}</OTruncatedText>
+          <OTruncatedText
+            v-else-if="row.test.text"
+            as="span"
+            :class="DAY_VERDICT_TONE_CLASS[row.test.tone]"
+            >{{ row.test.text }}</OTruncatedText
+          >
         </div>
 
         <OButton
@@ -198,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alerts-bulk-add-review-add"
           @click="run(rows.map((row) => row.entry.id))"
         >
-          {{ t("alertStarter.bulk.add", { count: rows.length }, rows.length) }}
+          {{ t("alertStarter.shell.addSelected", { count: rows.length }, rows.length) }}
         </OButton>
       </template>
     </footer>
@@ -231,8 +234,15 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { librarySuggestionsQuery } from "@/services/alert_library.queries";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { EvaluateAlertBody, EvaluateAlertResponse } from "@/utils/alerts/alertEvaluate.types";
-import { testRunDay, testRunKey } from "@/utils/alerts/alertTestRun";
+import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
+import {
+  DAY_VERDICT_TONE_CLASS,
+  dayVerdict,
+  dayVerdictLine,
+  testRunKey,
+  type DayVerdict,
+  type TestRunTone,
+} from "@/utils/alerts/alertTestRun";
 import type { LibrarySuggestQuery } from "@/utils/alerts/librarySuggest.types";
 import { getFoldersListByType } from "@/utils/commons";
 
@@ -252,10 +262,8 @@ const INTERVALS = [1, 5, 10, 15, 30, 60];
 const OWN_INTERVAL = 0;
 const STREAM_TYPES = ["logs", "metrics", "traces"] as const;
 
-type Tone = "loading" | "body" | "warning" | "error";
-
 interface RowTest {
-  tone: Tone;
+  tone: TestRunTone | "loading";
   text: I18nText | null;
   key: string | null;
 }
@@ -370,10 +378,11 @@ const intervalOptions = computed(() => [
 const summaryText = computed<I18nText>(() => {
   const failed = installer.failedIds.value.length;
   const added = installer.results.value.length - failed;
-  return t("alertStarter.bulk.summaryFailed", {
-    added: t("alertStarter.bulk.summaryAdded", { count: added }, added),
-    count: failed,
-  });
+  return t(
+    "alertStarter.bulk.summaryFailed",
+    { added: t("alertStarter.bulk.summaryAdded", { count: added }, added), count: failed },
+    failed,
+  );
 });
 
 const statusIcon = (status: InstallStatus) => {
@@ -394,12 +403,6 @@ const statusText = (status: InstallStatus): I18nText => {
   return t("alertStarter.bulk.waiting");
 };
 
-const toneClass = (tone: Tone) => {
-  if (tone === "warning") return "text-status-warning";
-  if (tone === "error") return "text-status-negative";
-  return "text-text-secondary";
-};
-
 // ── 24 h test ──────────────────────────────────────────────────────────────
 const runners = new Map<string, AlertTestRun>();
 let testGeneration = 0;
@@ -408,53 +411,35 @@ const setTest = (id: string, test: RowTest) => {
   tests.value = { ...tests.value, [id]: test };
 };
 
-const verdict = (r: EvaluateAlertResponse): Pick<RowTest, "tone" | "text"> => {
-  const failedCheck = r.checks.find((check) => check.error);
-  if (r.summary.checks > 0 && r.summary.errors === r.summary.checks && failedCheck?.error) {
-    return {
-      tone: "error",
-      text: t("alertStarter.bulk.testFailed", { reason: raw(failedCheck.error.message) }),
-    };
-  }
-  const day = testRunDay(r);
-  if (day.events === 0) return { tone: "warning", text: t("alertStarter.bulk.noData") };
-  if (day.fired === 0) return { tone: "body", text: t("alertStarter.bulk.quiet") };
-  const groups = r.summary.groups_fired_total;
-  return groups > 0
-    ? { tone: "body", text: t("alertStarter.bulk.firedGroups", { count: groups }, groups) }
-    : { tone: "body", text: t("alertStarter.bulk.firedTimes", { count: day.fired }, day.fired) };
-};
+const rowTest = (verdict: DayVerdict, key: string | null): RowTest => ({
+  ...dayVerdictLine(verdict, t),
+  key,
+});
 
 const testOne = async (entry: AlertLibraryEntry, settings: InstallBatch, generation: number) => {
   if (alertTypeOf(entry) === "anomaly") {
-    setTest(entry.id, { tone: "body", text: t("alertStarter.bulk.learnsFirst"), key: null });
+    setTest(entry.id, { tone: "secondary", text: t("alertStarter.bulk.learnsFirst"), key: null });
     return;
   }
   let body: EvaluateAlertBody;
   try {
     body = (await installer.prepare(entry, settings)).payload as EvaluateAlertBody;
   } catch (error) {
-    const reason = installer.errorText(error);
-    setTest(entry.id, {
-      tone: "error",
-      text: t("alertStarter.bulk.testFailed", { reason }),
-      key: null,
-    });
+    setTest(entry.id, rowTest({ state: "failed", reason: installer.errorText(error) }, null));
     return;
   }
   const key = testRunKey(body);
   if (generation !== testGeneration || tests.value[entry.id]?.key === key) return;
 
   setTest(entry.id, { tone: "loading", text: null, key: null });
-  const runner = runners.get(entry.id) ?? createAlertTestRun();
+  const runner = runners.get(entry.id) ?? createAlertTestRun({ track: false });
   runners.set(entry.id, runner);
   await runner.run(org(), body, t, settings.folderId);
   if (generation !== testGeneration) return;
   if (runner.state.value === "ready" && runner.result.value) {
-    setTest(entry.id, { ...verdict(runner.result.value), key });
+    setTest(entry.id, rowTest(dayVerdict(runner.result.value), key));
   } else if (runner.state.value === "failed") {
-    const reason = runner.failure.value ?? raw("");
-    setTest(entry.id, { tone: "error", text: t("alertStarter.bulk.testFailed", { reason }), key });
+    setTest(entry.id, rowTest({ state: "failed", reason: runner.failure.value }, key));
   }
 };
 

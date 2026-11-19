@@ -167,7 +167,7 @@ const reportedCounts = ref<Record<string, number | null>>({});
 const props = withDefaults(
   defineProps<{
     alertType?: "scheduled" | "anomaly_detection";
-    /** "new" is the list's New alert button; "another-way" is step 1's Start another way. */
+    /** "new" is the list's New alert button; "another-way" is the new-alert form header's Start another way. */
     trigger?: "new" | "another-way";
     disabled?: boolean;
     /** An unsaved new alert waits in this browser. */

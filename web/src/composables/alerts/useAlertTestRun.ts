@@ -57,7 +57,8 @@ export interface RealtimeEventDay {
 
 export const ALERT_TEST_RUN_KEY: InjectionKey<AlertTestRun> = Symbol("alertTestRun");
 
-export function createAlertTestRun(): AlertTestRun {
+/** `track: false` when the caller runs it without the user asking, so analytics skip it. */
+export function createAlertTestRun({ track = true }: { track?: boolean } = {}): AlertTestRun {
   const state = ref<AlertTestRunState>("idle");
   const result = shallowRef<EvaluateAlertResponse | null>(null);
   const failure = ref<I18nText | null>(null);
@@ -85,6 +86,7 @@ export function createAlertTestRun(): AlertTestRun {
         { alert: body },
         folder,
         controller.signal,
+        { track },
       );
       if (mine !== generation) return;
       result.value = response.data;

@@ -375,7 +375,14 @@ const alerts = {
   },
   // Dry run of an unsaved alert: the server searches as the caller, writes and sends nothing.
   // The Test it panel says what a 403 refused, so the access boundary stays out of it.
-  evaluate: (org: string, body: EvaluateAlertRequest, folder?: string, signal?: AbortSignal) =>
+  // `track: false` for dry runs the UI starts by itself, so the event counts only user-pressed tests.
+  evaluate: (
+    org: string,
+    body: EvaluateAlertRequest,
+    folder?: string,
+    signal?: AbortSignal,
+    { track = true }: { track?: boolean } = {},
+  ) =>
     http()
       .post<EvaluateAlertResponse>(`/api/v2/${encodeURIComponent(org)}/alerts/evaluate`, body, {
         ...inFolder(folder),
@@ -383,7 +390,7 @@ const alerts = {
         silentForbidden: true,
       })
       .then((res) => {
-        analytics.track("alert_test_run_completed");
+        if (track) analytics.track("alert_test_run_completed");
         return res;
       }),
   generate_sql: (org_identifier: string, data: any) => {
