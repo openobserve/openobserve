@@ -431,7 +431,7 @@ describe("AddAlert drafts", () => {
     );
     await wrapper!
       .findComponent(AddAlert)
-      .get('[data-test="alert-settings-period-input-field"]')
+      .get('[data-test="alert-settings-silence-duration-input-field"]')
       .setValue("15");
     await flushPromises();
     window.dispatchEvent(new Event("pointerdown"));
@@ -452,10 +452,9 @@ describe("AddAlert drafts", () => {
       true,
       { AlertSettings: false },
     );
-    await fillField("alert-settings-period-input-field", "25");
-    // The period field commits after its 300 ms debounce.
+    await fillField("alert-settings-silence-duration-input-field", "25");
     await vi.waitFor(() =>
-      expect(String((vm().formData.trigger_condition as { period: unknown }).period)).toBe("25"),
+      expect(String((vm().formData.trigger_condition as { silence: unknown }).silence)).toBe("25"),
     );
     window.dispatchEvent(new Event("pagehide"));
 
@@ -570,7 +569,7 @@ describe("AddAlert drafts", () => {
     );
     await wrapper!
       .findComponent(AddAlert)
-      .get('[data-test="alert-settings-period-input-field"]')
+      .get('[data-test="alert-settings-silence-duration-input-field"]')
       .trigger("keydown", { key: "s", metaKey: true });
     await flushPromises();
     window.dispatchEvent(new Event("pointerdown"));

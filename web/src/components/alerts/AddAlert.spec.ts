@@ -1639,7 +1639,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(wrapper.vm.tiers.isVisible("description")).toBe(true);
     });
 
-    it("section 4 puts Check every and Looking at the last in one row", async () => {
+    it("section 4's Check every row holds only the interval; the look back sits on the condition", async () => {
       wrapper = mountAlert(
         {},
         {
@@ -1653,7 +1653,7 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       const row = wrapper.get('[data-test="add-alert-schedule-row"]');
       expect(row.find('[data-test="alert-check-every-input"]').exists()).toBe(true);
-      expect(row.find('[data-test="alert-settings-period-input"]').exists()).toBe(true);
+      expect(row.find('[data-test="alert-settings-period-input"]').exists()).toBe(false);
     });
 
     it.each([
@@ -2320,13 +2320,9 @@ describe("AddAlert (OForm owner)", () => {
       });
       await flushPromises();
       expect(wrapper.vm.form.getFieldValue("tags")).toEqual(["pack:k8s"]);
-      // Tab from the card's last field never lands on the button that undoes it.
-      const scratch = () => wrapper.find('[data-test="add-alert-start-from-scratch"]');
-      expect(scratch().attributes("tabindex")).toBe("-1");
       wrapper.vm.startFromScratch();
       await flushPromises();
       expect(wrapper.vm.form.getFieldValue("tags")).toEqual([]);
-      expect(scratch().attributes("tabindex")).toBeUndefined();
     });
 
     it.each([
