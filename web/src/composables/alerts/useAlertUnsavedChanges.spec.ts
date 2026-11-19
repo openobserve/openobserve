@@ -59,7 +59,7 @@ describe("useAlertUnsavedChanges", () => {
       "trigger_condition.threshold",
       "trigger_condition.period",
     ]);
-    expect([...api.sections.value].sort()).toEqual(["condition", "schedule"]);
+    expect([...api.sections.value]).toEqual(["condition"]);
   });
 
   it("drops to zero when the values go back to the baseline (Discard)", async () => {

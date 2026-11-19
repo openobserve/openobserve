@@ -67,7 +67,7 @@ describe("useAlertSettingTiers", () => {
     const tiers = useAlertSettingTiers({ available: () => true, isSet: () => false, showAll });
     expect(tiers.isVisible("priority")).toBe(false);
     showAll.value = true;
-    expect(tiers.view("details").expanded).toBe(true);
+    expect(tiers.view("notify").expanded).toBe(true);
     expect(tiers.view("condition").more).toEqual([]);
     expect(tiers.isVisible("priority")).toBe(true);
     expect(tiers.isVisible("description")).toBe(true);
@@ -83,7 +83,7 @@ describe("useAlertSettingTiers", () => {
     expect(tiers.isVisible("description")).toBe(true);
     tiers.conceal("description");
     expect(tiers.isVisible("description")).toBe(false);
-    expect(tiers.view("details").addLinks.map((d) => d.id)).toContain("description");
+    expect(tiers.view("notify").addLinks.map((d) => d.id)).toContain("description");
   });
 
   it("still hides an unset setting that was never shown", async () => {
@@ -107,11 +107,11 @@ describe("useAlertSettingTiers", () => {
         tiers.placedBelow,
       );
     expect(below()).toEqual([]);
-    tiers.toggle("details");
-    expect(below()).toEqual(["tags"]);
+    tiers.toggle("notify");
+    expect(below()).toEqual(["keepFiring", "tags"]);
     set.tags = true;
     await nextTick();
-    tiers.toggle("details");
+    tiers.toggle("notify");
     tiers.bring("description");
     expect(below()).toEqual(["tags", "description"]);
     showAll.value = true;
@@ -120,6 +120,6 @@ describe("useAlertSettingTiers", () => {
     set.tags = false;
     tiers.conceal("tags");
     expect(below()).toEqual(["description"]);
-    expect(tiers.view("details").more.map((d) => d.id)).toContain("tags");
+    expect(tiers.view("notify").more.map((d) => d.id)).toContain("tags");
   });
 });

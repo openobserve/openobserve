@@ -140,7 +140,8 @@ describe("diff helpers", () => {
       { path: "trigger_condition.threshold", before: 1, after: 2 },
       { path: "trigger_condition.period", before: 1, after: 2 },
       { path: "destinations", before: [], after: ["x"] },
+      { path: "stream_name", before: "a", after: "b" },
     ]);
-    expect([...sections].sort()).toEqual(["condition", "notify", "schedule"]);
+    expect([...sections].sort()).toEqual(["condition", "notify", "watch"]);
   });
 });

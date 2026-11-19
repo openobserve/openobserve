@@ -117,7 +117,7 @@ describe("useAlertSettingFind", () => {
   it("falls back to the section when the control is not on screen", async () => {
     const { find, goToSection, reveal } = setup();
     await find.select("timezone");
-    expect(goToSection).toHaveBeenCalledWith("schedule");
+    expect(goToSection).toHaveBeenCalledWith("condition");
     expect(reveal).not.toHaveBeenCalled();
   });
 
