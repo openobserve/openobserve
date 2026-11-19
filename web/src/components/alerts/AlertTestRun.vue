@@ -36,6 +36,8 @@ const props = defineProps<{
   destinations: string[];
   /** The alert's own message template; otherwise a sample message is sent. */
   template?: string | null;
+  /** Why the form can't be tested again yet, said where the stale note goes. */
+  blockedReason?: I18nText | null;
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -225,7 +227,7 @@ const send = async () => {
               class="text-text-secondary m-0 text-xs"
               data-test="alert-test-run-stale"
             >
-              {{ t("alerts.testRun.staleRunAgain") }}
+              {{ blockedReason || t("alerts.testRun.staleRunAgain") }}
             </p>
           </template>
         </div>

@@ -119,12 +119,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ seriesCountText }}
         </OTruncatedText>
+        <span
+          v-if="testable && !testOpen && testGapText"
+          :id="testGapId"
+          class="shrink-0"
+          data-test="alert-preview-test-it-reason"
+          >{{ testGapText }}</span
+        >
         <OButton
           v-if="testable && !testOpen"
           ref="testItButton"
           variant="link"
           size="xs"
           class="shrink-0"
+          :disabled="!!testGap"
+          :focusable-unavailable="!!testGap"
+          :description-id="testGapId"
           :loading="testRun.state.value === 'running'"
           data-test="alert-preview-test-it"
           @click="testOpen = true"
@@ -136,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AlertTestRun
       v-if="testOpen && testable"
       :body="testBody"
+      :blocked-reason="testGapText"
       :folder="testFolder"
       :destinations="formData.destinations ?? []"
       :template="formData.template || null"
@@ -155,6 +166,7 @@ import {
   reactive,
   onBeforeMount,
   onBeforeUnmount,
+  useId,
   type PropType,
 } from "vue";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
@@ -162,6 +174,8 @@ import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thr
 import { seriesValueRange, type ValueRange } from "@/utils/alerts/ratioThreshold";
 import { keyToMs } from "@/utils/alerts/alertBacktest";
 import {
+  CONDITION_GAP_KEYS,
+  conditionGap,
   isCountLimit,
   isSpanDurationMeasure,
   previewCountText,
@@ -466,8 +480,16 @@ const testable = computed(
     props.formData.is_real_time !== "composite" &&
     !["anomaly_detection", "composite"].includes(props.formData.alert_type),
 );
+// Test it judges a rule, so an unfinished condition holds it with the step's own reason.
+const testGap = computed(() =>
+  props.formData.is_real_time === "true"
+    ? null
+    : conditionGap(props.formData as any, { aggregationEnabled: props.isAggregationEnabled }),
+);
+const testGapText = computed(() => (testGap.value ? t(CONDITION_GAP_KEYS[testGap.value]) : null));
+const testGapId = `${useId()}-test-reason`;
 const testBody = computed(() => {
-  if (!testable.value) return null;
+  if (!testable.value || testGap.value) return null;
   try {
     return evaluateAlertBody(props.formData as any, {
       store,

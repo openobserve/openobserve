@@ -3726,6 +3726,22 @@ describe("PreviewAlert - value alerts without a value, span durations and Test i
     w.unmount();
   });
 
+  it.each([
+    ["", true],
+    [90, false],
+  ])("holds Test it with its reason while the value threshold is %j: %s", async (value, held) => {
+    const w = await mountComp({
+      query: "SELECT 1",
+      isAggregationEnabled: true,
+      formData: valueAlert({ value }),
+    });
+    await flushPromises();
+    const button = w.find('[data-test="alert-preview-test-it"]');
+    expect(button.attributes("aria-disabled") === "true").toBe(held);
+    expect(w.find('[data-test="alert-preview-test-it-reason"]').exists()).toBe(held);
+    w.unmount();
+  });
+
   it("covers Test it with its panel and hands focus back to it on close", async () => {
     vi.spyOn(alertsService, "evaluate").mockReturnValue(new Promise(() => {}));
     const w = mount(PreviewAlert, {
