@@ -14194,7 +14194,6 @@
     "tagsTooltip": "Filtreleme ve uyarıları gruplama için etiketler, örn. prod veya service:checkout. Otomatik olarak küçük harfe çevrilir; bir harfle başlamalıdır.",
     "criticalIf": "Kritik ise",
     "warningIf": "Uyarı ise",
-    "addWarning": "Uyarı ekle",
     "removeWarning": "Uyarıyı kaldır",
     "optional": "isteğe bağlı",
     "promqlExamples": "Örnekler:",

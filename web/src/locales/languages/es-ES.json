@@ -14194,7 +14194,6 @@
     "tagsTooltip": "Etiquetas para filtrar y agrupar alertas, p. ej. prod o service:checkout. Se convierten a minúsculas automáticamente; deben comenzar con una letra.",
     "criticalIf": "Crítico si",
     "warningIf": "Advertencia si",
-    "addWarning": "Agregar advertencia",
     "removeWarning": "Eliminar advertencia",
     "optional": "opcional",
     "promqlExamples": "Ejemplos:",

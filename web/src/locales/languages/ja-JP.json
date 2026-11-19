@@ -14194,7 +14194,6 @@
     "tagsTooltip": "アラートのフィルタリングとグループ化のためのラベル。例: prod や service:checkout。自動的に小文字化されます。文字で始まる必要があります。",
     "criticalIf": "重大（クリティカル）条件",
     "warningIf": "警告条件",
-    "addWarning": "警告を追加",
     "removeWarning": "警告を削除",
     "optional": "任意",
     "promqlExamples": "例:",

@@ -14194,7 +14194,6 @@
     "tagsTooltip": "알림을 필터링하고 그룹화하기 위한 레이블입니다. 예: prod 또는 service:checkout. 자동으로 소문자로 변환되며, 문자로 시작해야 합니다.",
     "criticalIf": "심각 조건",
     "warningIf": "경고 조건",
-    "addWarning": "경고 추가",
     "removeWarning": "경고 제거",
     "optional": "선택 사항",
     "promqlExamples": "예:",

@@ -14194,7 +14194,6 @@
     "tagsTooltip": "تسميات لتنبيهات التصفية والتجميع، مثل prod أو service:checkout. مكتوبة بحرف صغير تلقائيا؛ يجب أن تبدأ بحرف.",
     "criticalIf": "حرج إذا",
     "warningIf": "تحذير إذا",
-    "addWarning": "إضافة تحذير",
     "removeWarning": "إزالة التحذير",
     "optional": "اختياري",
     "promqlExamples": "أمثلة:",

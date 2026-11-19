@@ -14194,7 +14194,6 @@
     "tagsTooltip": "Labels voor het filteren en groeperen van alarmen, bijv. prod of service:checkout. Wordt automatisch in kleine letters gezet; moet met een letter beginnen.",
     "criticalIf": "Kritiek als",
     "warningIf": "Waarschuwing als",
-    "addWarning": "Waarschuwing toevoegen",
     "removeWarning": "Waarschuwing verwijderen",
     "optional": "optioneel",
     "promqlExamples": "Voorbeelden:",

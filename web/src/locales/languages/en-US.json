@@ -14459,7 +14459,6 @@
     "tagsTooltip": "Tags for filtering and grouping alerts, e.g. prod or service:checkout. Lowercased automatically; must start with a letter.",
     "criticalIf": "Critical if",
     "warningIf": "Warning threshold",
-    "addWarning": "Warning",
     "removeWarning": "Remove warning",
     "optional": "optional",
     "promqlExamples": "Try:",
@@ -15652,8 +15651,7 @@
     "form": {
       "warning": {
         "label": "Warning",
-        "placeholder": "No warning",
-        "help": "Sends a warning-level alert before the threshold is reached."
+        "placeholder": "No warning"
       },
       "showAll": "Show all settings",
       "change": "Change",
@@ -15764,7 +15762,6 @@
         "defaultTag": "(default)"
       },
       "schedule": {
-        "lookingAt": "looking at the last",
         "lookingAtRow": "Look back",
         "cronRow": "Cron",
         "cronHint": "Second, minute, hour, day of month, month, day of week",
@@ -15883,14 +15880,6 @@
         "lookBack": "Look back",
         "savesAs": "Saves as {name}: names can't have spaces or symbols",
         "rewritten": "Spaces and symbols became underscores"
-      },
-      "link": {
-        "unlink": "Unlink",
-        "alsoSet": "Also set {fields} to {duration}.",
-        "undo": "Undo",
-        "linked": "Linked: editing one sets the other",
-        "separate": "Set separately",
-        "link": "Link them"
       },
       "promqlStream": {
         "fromQuery": "Reads {metric}, from the query",

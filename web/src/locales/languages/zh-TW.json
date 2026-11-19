@@ -14194,7 +14194,6 @@
     "tagsTooltip": "用於篩選和分組警示的標籤，例如 prod 或 service:checkout。會自動轉為小寫；且必須以字母開頭。",
     "criticalIf": "嚴重條件",
     "warningIf": "警告條件",
-    "addWarning": "新增警告",
     "removeWarning": "移除警告",
     "optional": "選用",
     "promqlExamples": "範例：",

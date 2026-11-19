@@ -14194,7 +14194,6 @@
     "tagsTooltip": "Etichette per filtrare e raggruppare gli avvisi, es. prod o service:checkout. Convertite automaticamente in minuscolo; devono iniziare con una lettera.",
     "criticalIf": "Critico se",
     "warningIf": "Avviso se",
-    "addWarning": "Aggiungi avviso",
     "removeWarning": "Rimuovi avviso",
     "optional": "facoltativo",
     "promqlExamples": "Esempi:",

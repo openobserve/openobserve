@@ -14194,7 +14194,6 @@
     "tagsTooltip": "Etykiety do filtrowania i grupowania alertów, np. prod lub service:checkout. Automatycznie zamieniane na małe litery; muszą zaczynać się od litery.",
     "criticalIf": "Krytyczne, jeśli",
     "warningIf": "Ostrzeżenie, jeśli",
-    "addWarning": "Dodaj ostrzeżenie",
     "removeWarning": "Usuń ostrzeżenie",
     "optional": "opcjonalne",
     "promqlExamples": "Przykłady:",

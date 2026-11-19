@@ -14194,7 +14194,6 @@
     "tagsTooltip": "Bezeichnungen zum Filtern und Gruppieren von Alarmen, z. B. prod oder service:checkout. Werden automatisch in Kleinbuchstaben umgewandelt; müssen mit einem Buchstaben beginnen.",
     "criticalIf": "Kritisch wenn",
     "warningIf": "Warnung wenn",
-    "addWarning": "Warnung hinzufügen",
     "removeWarning": "Warnung entfernen",
     "optional": "optional",
     "promqlExamples": "Beispiele:",

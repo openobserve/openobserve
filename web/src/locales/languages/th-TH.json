@@ -14192,7 +14192,6 @@
     "tagsTooltip": "Labels for filtering and grouping alerts, e.g. prod or service:checkout. Lowercased automatically; must start with a letter.",
     "criticalIf": "Critical if",
     "warningIf": "Warning if",
-    "addWarning": "Add warning",
     "removeWarning": "Remove warning",
     "optional": "optional",
     "promqlExamples": "Examples:",

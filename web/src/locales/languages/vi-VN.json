@@ -14194,7 +14194,6 @@
     "tagsTooltip": "Nhãn để lọc và nhóm các cảnh báo, ví dụ: prod hoặc service:checkout. Tự động chuyển thành chữ thường; phải bắt đầu bằng một chữ cái.",
     "criticalIf": "Nghiêm trọng nếu",
     "warningIf": "Cảnh báo nếu",
-    "addWarning": "Thêm cảnh báo",
     "removeWarning": "Xóa cảnh báo",
     "optional": "tùy chọn",
     "promqlExamples": "Ví dụ:",
