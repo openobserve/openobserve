@@ -78,12 +78,33 @@ describe("noSeriesReason", () => {
       ],
       expected: {
         kind: "valueNotSeen",
-        matcher: 'http_status_code=~"5.."',
-        label: "http_status_code",
+        matchers: ['http_status_code=~"5.."'],
+        labels: ["http_status_code"],
         seen: [
           ["200", 2],
           ["404", 1],
           [null, 1],
+        ],
+      },
+    },
+    {
+      name: "a value no spelling of the label carries: every spelling named, its values merged",
+      selectors: [
+        { name: "http_server_duration_count", matchers: [{ ...fiveXx, value: "3.." }] },
+        {
+          name: "http_server_duration_count",
+          matchers: [{ ...fiveXx, label: "http_response_status_code", value: "3.." }],
+        },
+        { name: "http_server_duration_count", matchers: [] },
+      ],
+      expected: {
+        kind: "valueNotSeen",
+        matchers: ['http_status_code=~"3.."', 'http_response_status_code=~"3.."'],
+        labels: ["http_status_code", "http_response_status_code"],
+        seen: [
+          ["200", 2],
+          ["404", 1],
+          ["500", 1],
         ],
       },
     },

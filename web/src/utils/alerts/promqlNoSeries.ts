@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
-import { formatNumber, joinListMore } from "@/utils/alerts/alertCopy";
+import { formatNumber, joinListMore, joinListOrMore } from "@/utils/alerts/alertCopy";
 
 export interface PromqlMatcher {
   label: string;
@@ -32,7 +32,12 @@ export type SeriesLabels = Record<string, string>;
 export type NoSeriesReason =
   | { kind: "noData"; metric: string }
   | { kind: "labelMissing"; metric: string; label: string; labels: string[] }
-  | { kind: "valueNotSeen"; matcher: string; label: string; seen: [string | null, number][] }
+  | {
+      kind: "valueNotSeen";
+      matchers: string[];
+      labels: string[];
+      seen: [string | null, number][];
+    }
   | { kind: "expression"; metric: string; series: number };
 
 /** Every vector selector in a parse_tree AST, in query order, each distinct one once. */
@@ -82,11 +87,39 @@ const matches = (matcher: PromqlMatcher, series: SeriesLabels): boolean => {
 const labelNames = (series: SeriesLabels[]) =>
   [...new Set(series.flatMap((s) => Object.keys(s)))].filter((l) => !l.startsWith("__")).sort();
 
-// null counts the series without the label: often the filter names the wrong one of two look-alikes.
-const valueCounts = (series: SeriesLabels[], label: string): [string | null, number][] => {
+// null counts the series carrying none of the labels: often the filter names the wrong look-alike.
+const valueCounts = (series: SeriesLabels[], labels: string[]): [string | null, number][] => {
   const counts = new Map<string | null, number>();
-  for (const s of series) counts.set(s[label] ?? null, (counts.get(s[label] ?? null) ?? 0) + 1);
+  for (const s of series) {
+    const value = labels.map((l) => s[l]).find((v) => v !== undefined) ?? null;
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
   return [...counts].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+};
+
+const culpritOf = (selector: PromqlSelector, series: SeriesLabels[]) =>
+  series.some((s) => selector.matchers.every((m) => matches(m, s)))
+    ? undefined
+    : selector.matchers.find((m) => !series.some((s) => matches(m, s)));
+
+/** One value missing under every spelling of its label (an `or` across naming generations) is one reason. */
+const valueNotSeen = (
+  culprit: PromqlMatcher,
+  selectors: PromqlSelector[],
+  seriesOf: (metric: string) => SeriesLabels[],
+): NoSeriesReason => {
+  const same = selectors.flatMap((sel) => {
+    const m = culpritOf(sel, seriesOf(sel.name));
+    return m && m.op === culprit.op && m.value === culprit.value ? [{ sel, m }] : [];
+  });
+  const labels = [...new Set(same.map(({ m }) => m.label))];
+  const metrics = [...new Set(same.map(({ sel }) => sel.name))];
+  return {
+    kind: "valueNotSeen",
+    matchers: [...new Set(same.map(({ m }) => `${m.label}${m.op}"${m.value}"`))],
+    labels,
+    seen: valueCounts(metrics.flatMap(seriesOf), labels),
+  };
 };
 
 /** Why a PromQL query that drew nothing matched no series: the first selector that explains it. */
@@ -105,13 +138,7 @@ export function noSeriesReason(
     if (series.some((s) => matchers.every((m) => matches(m, s)))) continue;
     // Each matcher alone may match; then it is the combination, which the expression line covers.
     const culprit = matchers.find((m) => !series.some((s) => matches(m, s)));
-    if (culprit)
-      return {
-        kind: "valueNotSeen",
-        matcher: `${culprit.label}${culprit.op}"${culprit.value}"`,
-        label: culprit.label,
-        seen: valueCounts(series, culprit.label),
-      };
+    if (culprit) return valueNotSeen(culprit, selectors, seriesOf);
   }
   const first = selectors[0];
   if (!first) return null;
@@ -137,12 +164,12 @@ export function noSeriesSentence(reason: NoSeriesReason, t: TranslateFn): I18nTe
           });
     case "valueNotSeen":
       return t("alerts.guard.valueNotSeen", {
-        value: raw(reason.matcher),
+        value: joinListOrMore(reason.matchers, t),
         seen: joinListMore(
           reason.seen.map(([value, count]) =>
             value === null
               ? t("alerts.guard.seenWithout", {
-                  label: raw(reason.label),
+                  label: joinListOrMore(reason.labels, t),
                   count: formatNumber(count),
                 })
               : t("alerts.discovery.valueCount", { value: raw(value), count: formatNumber(count) }),
