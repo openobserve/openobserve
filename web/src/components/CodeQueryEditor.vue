@@ -328,6 +328,7 @@ import {
   groupEntries,
   isValueFunction,
   parseLogicalLeadContext,
+  aggregatesAllowed,
   logicalLeadNames,
   buildLogicalLead,
   CHAINING_KEYWORDS,
@@ -1849,8 +1850,12 @@ export default defineComponent({
         // Inside avg( or approx_percentile_cont(, numeric columns lead; on a metrics stream every label would sort above `value`.
         const numericFirst = wantsNumericColumn(parseCallContext(textUntilPosition));
         const rank = (list: any[]) => (numericFirst ? rankNumericFieldsFirst(list) : list);
-        const entries = [...rank(config.keywords()), ...rank(config.suggestions())];
         const textBeforeWord = textUntilPosition.slice(0, textUntilPosition.length - word.length);
+        const allowAggregates =
+          language !== "sql" || aggregatesAllowed(textBeforeWord, config.filterMode());
+        const entries = [...rank(config.keywords()), ...rank(config.suggestions())].filter(
+          (raw) => allowAggregates || !objectEntry(raw)?.aggregate,
+        );
         const canChain = chainsHere(config, model, position);
         const lead =
           language === "sql" ? parseLogicalLeadContext(textBeforeWord, config.filterMode()) : null;
@@ -1859,6 +1864,7 @@ export default defineComponent({
               entries,
               logicalLeadNames(lead, config.filterMode()),
               canChain ? acceptCommand("operator", true) : undefined,
+              word,
             )
           : entries;
         if (!canChain) return ranked;
