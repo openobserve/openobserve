@@ -64,4 +64,13 @@ describe("buildSavedViewPayload", () => {
     expect(full.data.visualizationData).toEqual({ v: 1 });
     expect(full.data.buildData).toEqual({ b: 1 });
   });
+
+  it("leaves out a stream and meta the search does not carry, so restore uses page defaults", () => {
+    const payload = buildSavedViewPayload({ data: { query: "q" } }, { timezone: "UTC" });
+
+    expect(payload.data.query).toBe("q");
+    expect(payload.data.timezone).toBe("UTC");
+    expect(payload.data).not.toHaveProperty("stream");
+    expect(payload).not.toHaveProperty("meta");
+  });
 });

@@ -16,20 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, watch } from "vue";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import {
   loadPackCatalog,
   packById,
   packCatalogState,
 } from "@/composables/starterPacks/usePackCatalog";
-import { useI18nTyped } from "@/types/i18n";
 
-const props = withDefaults(
-  defineProps<{ org?: string; notice?: boolean; requires?: string | string[] }>(),
-  { org: "", notice: false, requires: undefined },
-);
-
-const { t } = useI18nTyped();
+const props = withDefaults(defineProps<{ org?: string; requires?: string | string[] }>(), {
+  org: "",
+  requires: undefined,
+});
 
 const load = () => {
   if (props.org) void loadPackCatalog(props.org);
@@ -47,15 +43,4 @@ watch(() => props.org, load, { immediate: true });
 
 <template>
   <slot v-if="ready" />
-  <OEmptyState
-    v-else-if="notice && packCatalogState === 'error'"
-    size="block"
-    variant="error"
-    illustration="broken-panel"
-    :title="t('starterPacks.unavailable')"
-    :action-label="t('alert_library.retry')"
-    action-icon="refresh"
-    data-test="starter-packs-unavailable"
-    @action="load"
-  />
 </template>

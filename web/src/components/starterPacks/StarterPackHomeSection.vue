@@ -27,15 +27,14 @@ import { usePackGate } from "@/composables/starterPacks/usePackGate";
 import { useStarterPackPopup, type RailPack } from "@/composables/starterPacks/useStarterPackPopup";
 import { useI18nTyped } from "@/types/i18n";
 import StarterPackListPane from "./StarterPackListPane.vue";
-import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
 
 const props = defineProps<{ org: string; packs?: StarterPack[] }>();
 // Hands the pack state to Home, which hides Overview while the offer shows.
 const emit = defineEmits<{ ready: [packs: HomePacks | null] }>();
 
 const { t } = useI18nTyped();
-const home = useHomePacks(props.org, props.packs);
 const gate = usePackGate(props.org);
+const home = useHomePacks(props.org, props.packs, () => gate.visible.value);
 // An org past onboarding shows no packs, so Home keeps its Overview.
 watch(
   () => gate.visible.value,
@@ -136,45 +135,7 @@ const busy = computed(
 
     <template v-for="item in home.notices.value" :key="item.pack.id">
       <OBanner
-        v-if="item.view.value === 'hiddenAdmin'"
-        variant="default"
-        dense
-        inline-actions
-        :data-test="item.testId('home-pack-hidden-all')"
-      >
-        {{ t("starterPacks.home.hiddenForEveryone", { title: item.title }) }}
-        <template #actions>
-          <OButton
-            variant="ghost"
-            size="sm-action"
-            :data-test="item.testId('home-pack-card-show-all-btn')"
-            @click="item.setHidden(item.orgHide.show)"
-          >
-            {{ t("starterPacks.home.showForEveryone") }}
-          </OButton>
-        </template>
-      </OBanner>
-      <OBanner
-        v-else-if="item.view.value === 'dismissed'"
-        variant="default"
-        dense
-        inline-actions
-        :data-test="item.testId('home-pack-dismissed')"
-      >
-        {{ t("starterPacks.home.hidden", { title: item.title }) }}
-        <template #actions>
-          <OButton
-            variant="ghost"
-            size="sm-action"
-            :data-test="item.testId('home-pack-card-show-again-btn')"
-            @click="item.dismissal.restore"
-          >
-            {{ t("starterPacks.home.showAgain") }}
-          </OButton>
-        </template>
-      </OBanner>
-      <OBanner
-        v-else-if="item.view.value === 'interrupted'"
+        v-if="item.view.value === 'interrupted'"
         variant="warning"
         dense
         inline-actions
@@ -263,14 +224,6 @@ const busy = computed(
         </OButton>
       </footer>
     </section>
-
-    <StarterPackUndoDialog
-      v-for="item in home.items"
-      :key="`undo-${item.pack.id}`"
-      v-model:open="item.undoOpen.value"
-      :flow="item.flow"
-      mode="undo"
-    />
   </div>
 </template>
 

@@ -22,10 +22,10 @@ import type { PackInstallRecord } from "./types";
 
 const keyPrefix = (packId: string) => `starter_pack.${packId}.`;
 
-export const recordKey = (packId: string, installId: string) => `${keyPrefix(packId)}${installId}`;
+const recordKey = (packId: string, installId: string) => `${keyPrefix(packId)}${installId}`;
 
 // FNV-1a: a change detector for item bodies, and `crypto.subtle` is absent on plain http.
-export const fnv1a = (text: string): string => {
+const fnv1a = (text: string): string => {
   let hash = 0x811c9dc5;
   for (let index = 0; index < text.length; index += 1) {
     hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193);
@@ -49,8 +49,6 @@ export const contentHash = (value: unknown): string => {
   const text = JSON.stringify(sortKeys(value));
   return `${text.length.toString(16)}-${fnv1a(text)}`;
 };
-
-export const panelHash = (panel: Record<string, any>) => contentHash(panel);
 
 // The KV store is shared and user-writable, so a stored value is not trusted to be a record.
 const parseRecord = (value: string): PackInstallRecord | null => {

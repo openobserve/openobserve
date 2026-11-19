@@ -35,7 +35,7 @@ export interface BrowserInterrupted {
 export interface BrowserMatchCopy {
   /** Milliseconds since epoch of the last check that ran in this browser. */
   checkedAt: number;
-  /** Built-in packs not yet set up, same shape as Find more; Library groups stay on the Starter Packs page. */
+  /** Built-in packs not yet set up; a copy from an older check may hold Library groups, which load drops. */
   sources: FindMoreSource[];
   /** Built-in pack ids known to be installed at the last check. */
   installedPackIds: string[];

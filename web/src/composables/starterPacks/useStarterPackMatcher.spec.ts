@@ -7,12 +7,10 @@ import { EVENTS_STREAM } from "@/views/Infrastructure/kubernetes2/kubernetesQuer
 import type { StarterPack } from "./types";
 import { packById } from "./usePackCatalog";
 import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
-import {
-  MATCH_PARTIAL_AFTER_MS,
-  MATCH_POLL_MS,
-  fitStreams,
-  useStarterPackMatcher,
-} from "./useStarterPackMatcher";
+import { fitStreams, useStarterPackMatcher } from "./useStarterPackMatcher";
+
+const POLL_MS = 5_000;
+const PARTIAL_AFTER_MS = 3 * 60_000;
 
 loadCatalogFixture();
 
@@ -171,13 +169,13 @@ describe("useStarterPackMatcher", () => {
     const { api } = setup(true);
     await api.check();
     expect(api.waitedLong.value).toBe(false);
-    await vi.advanceTimersByTimeAsync(MATCH_PARTIAL_AFTER_MS + MATCH_POLL_MS);
+    await vi.advanceTimersByTimeAsync(PARTIAL_AFTER_MS + POLL_MS);
     expect(api.state.value).toBe("waiting");
     expect(api.waitedLong.value).toBe(true);
 
     fake.metrics = ["k8s_pod_cpu_usage"];
     fake.columns = { k8s_pod_cpu_usage: ["value"] };
-    await vi.advanceTimersByTimeAsync(MATCH_POLL_MS);
+    await vi.advanceTimersByTimeAsync(POLL_MS);
     expect(api.state.value).toBe("matched");
     expect(api.waitedLong.value).toBe(false);
     expect(vi.getTimerCount()).toBe(0);

@@ -21,28 +21,6 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
-/** The one alert scope line every pack surface shows (D16). */
-export const packNote = (
-  t: Translate,
-  {
-    licensed,
-    alerts,
-    views,
-    title,
-    native,
-  }: { licensed: boolean; alerts: number; views: number; title: I18nText; native: boolean },
-) => {
-  const counts = {
-    alerts: t("starterPacks.countAlerts", { count: alerts }, alerts),
-    views: t("starterPacks.countViews", { count: views }, views),
-  };
-  // A pack with no built-in view has no plan variant, and no views clause when it ships none.
-  if (!native && !views) return t("starterPacks.bannerNotePlain", { alerts: counts.alerts, title });
-  return licensed && native
-    ? t("starterPacks.bannerNote", counts)
-    : t("starterPacks.bannerNoteUnlicensed", { ...counts, title });
-};
-
 export const packScopeValue = (t: Translate, clusters: string[]) =>
   clusters.length
     ? t("starterPacks.scopeSeen", { count: clusters.length, clusters: raw(clusters.join(", ")) })

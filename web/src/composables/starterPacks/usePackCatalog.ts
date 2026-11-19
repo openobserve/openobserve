@@ -78,7 +78,7 @@ interface LoadedCatalog {
   packs: StarterPack[];
 }
 
-export type PackCatalogState = "idle" | "loading" | "ready" | "error";
+type PackCatalogState = "idle" | "loading" | "ready" | "error";
 
 const GALLERY_TIMEOUT_MS = 10_000;
 
@@ -120,7 +120,10 @@ const DETECTORS: Record<string, NonNullable<StarterPack["detector"]>> = {
 
 const loaded = shallowRef<LoadedCatalog | null>(null);
 const state = ref<PackCatalogState>("idle");
-let pending: Promise<boolean> | null = null;
+// The endpoint answers per org, so a loaded catalog serves only its org; one set directly
+// (a test fixture) has no org and serves any.
+let loadedFor: string | null = null;
+let pending: { org: string; done: Promise<boolean> } | null = null;
 
 const known = <T>(map: Record<string, T>, key: string, what: string): T => {
   if (!Object.prototype.hasOwnProperty.call(map, key)) {
@@ -216,7 +219,6 @@ export const toStarterPack = (raw: RawPack): StarterPack => {
     detectStreams: raw.detect?.streams,
     detector,
     logo: raw.logo,
-    pausedImpactKey: raw.paused_impact ? textKey(raw.id, "pausedImpact") : undefined,
     alertSummaries: raw.alert_summaries,
     tileSummaries: raw.tile_summaries
       ? {
@@ -231,7 +233,6 @@ export const toStarterPack = (raw: RawPack): StarterPack => {
     version: raw.version,
     title: raw.title,
     titleKey: textKey(raw.id, "title"),
-    descriptionKey: textKey(raw.id, "description"),
     folder: raw.folder,
     dashboards: raw.dashboards.map(toDashboard),
     alerts: [...raw.alerts.core, ...raw.alerts.more],
@@ -252,25 +253,33 @@ export const setPackCatalog = (raw: RawCatalog) => {
   state.value = "ready";
 };
 
-/** Loads the catalog once per page; concurrent callers share one request and a failure can be retried. */
+/** Loads the catalog once per org; concurrent callers share one request and a failure can be retried. */
 export const loadPackCatalog = (org: string): Promise<boolean> => {
-  if (loaded.value) return Promise.resolve(true);
-  if (pending) return pending;
+  if (loaded.value && (loadedFor === null || loadedFor === org)) return Promise.resolve(true);
+  if (pending?.org === org) return pending.done;
+  loaded.value = null;
+  loadedFor = null;
   state.value = "loading";
-  pending = starterPacksService
-    .catalog(org)
-    .then((response) => {
-      setPackCatalog(response.data);
-      return true;
-    })
-    .catch(() => {
-      state.value = "error";
-      return false;
-    })
-    .finally(() => {
-      pending = null;
-    });
-  return pending;
+  const run: { org: string; done: Promise<boolean> } = {
+    org,
+    done: starterPacksService
+      .catalog(org)
+      .then((response) => {
+        if (pending !== run) return false;
+        setPackCatalog(response.data);
+        loadedFor = org;
+        return true;
+      })
+      .catch(() => {
+        if (pending === run) state.value = "error";
+        return false;
+      })
+      .finally(() => {
+        if (pending === run) pending = null;
+      }),
+  };
+  pending = run;
+  return run.done;
 };
 
 /** For background checks: an unloaded catalog would make every pack read as absent. */

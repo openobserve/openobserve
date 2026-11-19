@@ -29,6 +29,7 @@ import { useStreamFit } from "@/composables/starterPacks/streamFit";
 import type { RailPack } from "@/composables/starterPacks/useStarterPackPopup";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
+import { KIND_CHIPS } from "./packKindChips";
 
 const props = withDefaults(
   defineProps<{
@@ -70,17 +71,17 @@ const SEVERITY_BADGE: Record<LibrarySeverity, SeverityBadge["variant"]> = {
 const TILE_LOOKS: Record<Kind, { tile: string; chip: string; icon: IconName }> = {
   dashboard: {
     tile: "border-ingest-accent-blue/25",
-    chip: "bg-ingest-accent-blue text-white dark:bg-icon-chip-info-bg dark:text-icon-chip-info-text",
+    chip: KIND_CHIPS.dashboard,
     icon: "dashboard",
   },
   alert: {
     tile: "border-ingest-accent-orange/25",
-    chip: "bg-ingest-accent-orange text-white dark:bg-icon-chip-orange-bg dark:text-icon-chip-orange-text",
+    chip: KIND_CHIPS.alert,
     icon: "notifications",
   },
   savedView: {
     tile: "border-ingest-accent-purple/25",
-    chip: "bg-ingest-accent-purple text-white dark:bg-icon-chip-purple-bg dark:text-icon-chip-purple-text",
+    chip: KIND_CHIPS.savedView,
     icon: "bookmark",
   },
 };

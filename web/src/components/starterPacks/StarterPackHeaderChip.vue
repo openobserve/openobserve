@@ -98,7 +98,8 @@ const primaryLabel = computed(() => {
   return t("starterPacks.popup.reviewSetUp");
 });
 
-// The list reads each pack's record once, and the selected pack's clusters and plan, only once shown.
+// The list reads each pack's record once, and the selected pack's clusters and plan, only once shown;
+// an org past onboarding reads none.
 const asked = new Set<string>();
 const loadOnce = ({ pack, flow }: PackEntry) => {
   if (flow.loaded.value || asked.has(pack.id)) return;
@@ -115,7 +116,9 @@ const prepare = (row: RailPack) => {
 // A string key, so a rail recompute with the same rows and selection does not re-run it.
 watch(
   () => {
-    if (!popupOpen.value || screen.value !== "list" || !selected.value) return "";
+    if (!popupOpen.value || !gate.visible.value || screen.value !== "list" || !selected.value) {
+      return "";
+    }
     const rows = rail.value.map(({ entry }) => entry.pack.id).join(",");
     return `${selected.value.entry.pack.id}:${selected.value.setUp}:${rows}`;
   },

@@ -27,8 +27,7 @@ const source = (id: string, packId?: string): FindMoreSource => ({
   packId,
   label: id,
   streams: [`${id}_logs`],
-  items: [{ kind: "alert", id: `${id}/a`, name: "A", queries: 1 }],
-  queriesPerDay: 1,
+  items: [{ kind: "alert", id: `${id}/a`, name: "A" }],
 });
 
 const HOSTS = source("hosts", "hosts");

@@ -42,8 +42,8 @@ import type { StarterPack } from "./types";
 
 export type PackMatchState = "checking" | "matched" | "waiting" | "none" | "error";
 
-export const MATCH_POLL_MS = 5_000;
-export const MATCH_PARTIAL_AFTER_MS = 3 * 60_000;
+const MATCH_POLL_MS = 5_000;
+const MATCH_PARTIAL_AFTER_MS = 3 * 60_000;
 
 const CLUSTER_WINDOW_US = 24 * 60 * 60 * 1_000_000;
 const CLUSTER_COLUMNS = ["k8s_cluster", "k8s_cluster_name"];

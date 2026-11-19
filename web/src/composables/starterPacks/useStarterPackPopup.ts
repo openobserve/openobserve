@@ -29,7 +29,7 @@ import type { StarterPack } from "./types";
 import { useStarterPackFlow, type StarterPackFlow } from "./useStarterPackFlow";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
 
-export type PopupScreen = "list" | "pack";
+type PopupScreen = "list" | "pack";
 
 /** One pack's install state and data match, shared by every surface of an org. */
 export interface PackEntry {
