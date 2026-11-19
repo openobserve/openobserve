@@ -29830,7 +29830,7 @@
         "during": "{stream}, pendant l'interruption",
         "after": "{stream}, après la fin de l'incident",
         "legendHealthy": "Sain : niveau habituel, avant le début ou après la fin",
-        "legendAffected": "Affecté : pendant l'indisponibilité",
+        "legendAffected": "Affecté : pendant la panne",
         "noBefore": "Aucune ligne n'a été stockée pour {streams} avant le début de cet incident ; il n'a donc pas de barre « avant ». | Aucune ligne n'a été stockée pour {streams} avant le début de cet incident ; ils n'ont donc pas de barre « avant ».",
         "usual": "{stream}, niveau habituel",
         "partialFailed": "Impossible de charger {streams}, il n'a donc aucune barre. | Impossible de charger {streams}, ils n'ont donc aucune barre.",
