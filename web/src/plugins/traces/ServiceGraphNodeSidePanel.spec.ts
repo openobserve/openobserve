@@ -676,6 +676,106 @@ describe("ServiceGraphNodeSidePanel", () => {
         serviceSystem: "mysql",
       });
     });
+
+    it("sends the identity expression for agent and tool nodes", async () => {
+      for (const [st, col] of Object.entries({
+        agent: "gen_ai_agent_name",
+        tool: "gen_ai_tool_name",
+      })) {
+        wrapper = mountPanel({ selectedNode: { ...baseNode, name: "n", service_type: st } });
+        await wrapper.vm.viewRelatedTraces();
+        expect(wrapper.emitted("view-traces")?.[0]?.[0]).toMatchObject({
+          serviceType: st,
+          identityExpr: col,
+        });
+        wrapper.unmount();
+      }
+    });
+
+    it("sends the schema-resolved model expression for a model node", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [
+          { name: "gen_ai_request_model", type: "keyword" },
+          { name: "gen_ai_response_model", type: "keyword" },
+        ],
+      });
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, name: "gpt-4o", service_type: "model" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+      await wrapper.vm.viewRelatedTraces();
+      expect(wrapper.emitted("view-traces")?.[0]?.[0]).toMatchObject({
+        identityExpr: "COALESCE(gen_ai_request_model, gen_ai_response_model)",
+      });
+    });
+
+    it("sends no identity expression for instrumented and inferred dependency nodes", async () => {
+      for (const st of [undefined, "database", "queue", "rpc", "external"]) {
+        wrapper = mountPanel({ selectedNode: { ...baseNode, service_type: st } });
+        await wrapper.vm.viewRelatedTraces();
+        expect(wrapper.emitted("view-traces")?.[0]?.[0]).not.toHaveProperty("identityExpr");
+        wrapper.unmount();
+      }
+    });
+
+    it("sends the row caller only when it is a real service_name", async () => {
+      const row = { operation: "op", caller: "caller-a" };
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [{ operation_name: "op", caller_service: "caller-a", request_count: 1 }] },
+      } as any);
+      for (const [st, callerService] of [
+        ["tool", undefined],
+        ["model", undefined],
+        ["agent", "caller-a"],
+        ["database", "caller-a"],
+        [undefined, undefined],
+      ] as const) {
+        wrapper = mountPanel({ selectedNode: { ...baseNode, service_type: st } });
+        await flushPromises();
+        wrapper
+          .find('[data-test="service-graph-side-panel-operations-table"]')
+          .findComponent('[data-test="stub-table"]')
+          .vm.$emit("rowClick", row);
+        const payload = wrapper.emitted("view-traces")?.[0]?.[0] as Record<string, any>;
+        expect(payload.operationName).toBe("op");
+        expect(payload.callerService).toBe(callerService);
+        expect((wrapper.vm as any).operationRowCaller(row)).toBe(callerService);
+        wrapper.unmount();
+      }
+      vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as any);
+    });
+
+    it("sends no caller from an operation row's cell button on a tool node", async () => {
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [{ operation_name: "op", caller_service: "caller-a", request_count: 1 }] },
+      } as any);
+      wrapper = mountPanel({ selectedNode: { ...baseNode, name: "n", service_type: "tool" } });
+      await flushPromises();
+      vi.mocked(searchService.search).mockResolvedValue({ data: { hits: [] } } as any);
+      // The table is stubbed, so its cell slot is rendered here to reach the button's handler.
+      const cell = wrapper
+        .find('[data-test="service-graph-side-panel-operations-table"]')
+        .findComponent('[data-test="stub-table"]')
+        .vm.$slots["cell-hover-actions"]({
+          row: { operation: "op", caller: "caller-a" },
+          column: { id: "errors" },
+          active: true,
+        });
+      const button = cell.find(
+        (vnode: any) => vnode.props?.["data-test"] === "service-graph-side-panel-view-traces-btn",
+      );
+      button.props.onClick(new MouseEvent("click"));
+
+      const payload = wrapper.emitted("view-traces")?.[0]?.[0] as Record<string, any>;
+      expect(payload).toMatchObject({
+        operationName: "op",
+        errorsOnly: true,
+        identityExpr: "gen_ai_tool_name",
+      });
+      expect(payload.callerService).toBeUndefined();
+    });
   });
 
   // -------------------------------------------------------------------------
