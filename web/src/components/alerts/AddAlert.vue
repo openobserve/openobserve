@@ -1066,12 +1066,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
         data-test="add-alert-footer"
       >
-        <div class="me-auto flex min-w-0 items-center gap-4">
+        <div class="me-auto flex min-w-0 flex-1 items-center gap-4">
           <AlertUnsavedChanges
             v-if="isEditingAlert"
             :changes="unsavedChanges"
             :disabled="isSubmitting"
             @discard="discardChanges"
+          />
+          <AlertLookAlike
+            v-else-if="!isAnomalyMode && !silentAutoObserveDraft && !viaIncidentDraft"
+            :stream-type="formData.stream_type"
+            :stream-name="formData.stream_name"
+            :query-condition="formData.query_condition"
+            @open="openExistingAlert"
           />
           <p
             v-if="silentAutoObserveDraft"
@@ -1320,6 +1327,7 @@ import type { ChoiceCardOption } from "@/lib/forms/ChoiceCards/OChoiceCards.type
 import AlertSampleEvents from "./AlertSampleEvents.vue";
 import AlertStreamOption from "./AlertStreamOption.vue";
 import AlertIntentStart from "./AlertIntentStart.vue";
+import AlertLookAlike from "./AlertLookAlike.vue";
 import type { IntentFill, IntentId } from "@/utils/alerts/alertIntents";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 import type { ValueRange } from "@/utils/alerts/ratioThreshold";
@@ -1331,6 +1339,7 @@ import {
   recentActivity,
   recentStreams,
   streamOptions,
+  useStreamDays,
 } from "@/composables/alerts/useStreamDiscovery";
 import AlertCheckTimeline from "./AlertCheckTimeline.vue";
 import AlertBacktest from "./AlertBacktest.vue";
@@ -1499,6 +1508,7 @@ export default defineComponent({
     AlertSampleEvents,
     AlertStreamOption,
     AlertIntentStart,
+    AlertLookAlike,
     AlertMetricLabels,
     AlertCheckTimeline,
     AlertBacktest,
@@ -2088,6 +2098,11 @@ export default defineComponent({
       formData: alertForm.formData,
       destinationObjects: computed(() => props.destinations as AlertDestinationObjects),
       anomalyConfig: alertForm.anomalyConfig,
+      anomalyStreamDays: useStreamDays(
+        () => store.state.selectedOrganization?.identifier ?? "",
+        () => (alertForm.isAnomalyMode.value ? String(alertForm.formData.value.stream_type) : ""),
+        () => String(alertForm.formData.value.stream_name ?? ""),
+      ),
       isAnomalyMode: alertForm.isAnomalyMode,
       isAggregationEnabled: alertForm.isAggregationEnabled,
       isEditing: computed(() => alertForm.beingUpdated.value || alertForm.anomalyEditMode.value),
