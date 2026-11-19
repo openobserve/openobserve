@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { promqlMetricNames, promqlScaledToPercent } from "./promqlMetrics";
+import { promqlMetricNames, promqlScaledToPercent, promqlWithMetric } from "./promqlMetrics";
 
 describe("promqlMetricNames", () => {
   it.each([
@@ -47,5 +47,21 @@ describe("promqlMetricNames", () => {
     ["a * 1000", false],
   ])("%s reads in percent: %s", (query, percent) => {
     expect(promqlScaledToPercent(query)).toBe(percent);
+  });
+});
+
+describe("promqlWithMetric", () => {
+  it.each([
+    ["rate(a_count[10m])", "rate(b_count[10m])"],
+    [
+      'sum by (svc) (rate(a_count{code=~"5.."}[5m])) / sum by (svc) (rate(a_count[5m]))',
+      'sum by (svc) (rate(b_count{code=~"5.."}[5m])) / sum by (svc) (rate(b_count[5m]))',
+    ],
+    ['{__name__="a_count", job="a_count"}', '{__name__="b_count", job="a_count"}'],
+    ["rate(a_count[5m]) / rate(c[5m])", undefined],
+    ["rate(a_count_total[5m])", undefined],
+    ["", undefined],
+  ])("%s on b_count reads %s", (query, moved) => {
+    expect(promqlWithMetric(query, "a_count", "b_count")).toBe(moved);
   });
 });

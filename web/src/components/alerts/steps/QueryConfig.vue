@@ -1906,7 +1906,7 @@ import { metricPromql } from "@/utils/alerts/alertIntents";
 import { isSpanDurationMeasure, UNIT_KEEPING_FUNCTIONS } from "@/utils/alerts/alertReadBack";
 import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
-import { promqlScaledToPercent } from "@/utils/alerts/promqlMetrics";
+import { promqlScaledToPercent, promqlWithMetric } from "@/utils/alerts/promqlMetrics";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
 import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
@@ -2361,24 +2361,46 @@ export default defineComponent({
     );
     // A counter only grows, so a new alert's first measure is its rate, never an average of the raw count.
     let rateDefaultedFor = "";
+    let rateDefault = "";
     watch(promqlMetricType, (type) => {
       const stream = props.streamName;
-      if (!type || type.toLowerCase() === "gauge" || rateDefaultedFor === stream) return;
-      rateDefaultedFor = stream;
+      if (!type || rateDefaultedFor === stream) return;
+      const ownDefault =
+        localTab.value === "promql" && !!rateDefault && props.promqlQuery === rateDefault;
       const untouched =
-        localTab.value === "custom" &&
-        selectedFunction.value === "avg" &&
-        [undefined, null, ""].includes(fv("query_condition.aggregation.having.value"));
-      if (props.beingUpdated || props.isSeeding || !untouched) return;
+        ownDefault ||
+        (localTab.value === "custom" &&
+          selectedFunction.value === "avg" &&
+          [undefined, null, ""].includes(fv("query_condition.aggregation.having.value")));
+      if (type.toLowerCase() === "gauge") {
+        if (!ownDefault || props.beingUpdated || props.isSeeding) return;
+        rateDefault = "";
+        emit("update:promqlQuery", "");
+        updateTab("custom");
+        return;
+      }
+      rateDefaultedFor = stream;
+      if (props.beingUpdated || props.isSeeding || !untouched || ownDefault) return;
+      rateDefault = metricPromql(stream, {
+        counter: true,
+        windowMinutes: Number(props.triggerCondition?.period) || 10,
+      });
       updateTab("promql");
-      emit(
-        "update:promqlQuery",
-        metricPromql(stream, {
-          counter: true,
-          windowMinutes: Number(props.triggerCondition?.period) || 10,
-        }),
-      );
+      emit("update:promqlQuery", rateDefault);
     });
+    // A query that reads only the metric picked before reads the newly picked one.
+    watch(
+      () => props.streamName,
+      (stream, before) => {
+        if (props.streamType !== "metrics" || !stream || !before || localTab.value !== "promql")
+          return;
+        if (props.beingUpdated || props.isSeeding) return;
+        const moved = promqlWithMetric(props.promqlQuery ?? "", before, stream);
+        if (moved === undefined) return;
+        if (props.promqlQuery === rateDefault) rateDefault = moved;
+        emit("update:promqlQuery", moved);
+      },
+    );
     const promqlSamples = computed(() =>
       props.streamType === "metrics" && props.streamName
         ? alertPromqlSamples({

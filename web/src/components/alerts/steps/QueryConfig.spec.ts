@@ -480,6 +480,29 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.emitted("update:promqlQuery")?.at(-1)?.[0]).toBe(promql);
       expect(wrapper.emitted("update:tab")?.at(-1)?.[0]).toBe(promql ? "promql" : undefined);
     });
+
+    it.each([
+      ["counter", "", "rate(b_count[10m])", "promql"],
+      ["gauge", "", "", "custom"],
+      ["counter", 'sum(rate(a_count{code="5"}[5m]))', 'sum(rate(b_count{code="5"}[5m]))', "promql"],
+    ])("a switch to a %s turns %j into %j", async (type, written, promql, tab) => {
+      streamFixtures.a_count = {
+        schema: [{ name: "value" }],
+        metrics_meta: { metric_type: "counter" },
+      };
+      streamFixtures.b_count = { schema: [{ name: "value" }], metrics_meta: { metric_type: type } };
+      await setQCProps({
+        "onUpdate:promqlQuery": (v: string) => (qcProps.promqlQuery = v),
+        "onUpdate:tab": (v: string) => (qcProps.tab = v),
+        streamType: "metrics",
+        streamName: "a_count",
+      });
+      await flushPromises();
+      if (written) await setQCProps({ promqlQuery: written });
+      await setQCProps({ streamName: "b_count" });
+      await flushPromises();
+      expect([qcProps.promqlQuery, qcProps.tab]).toEqual([promql, tab]);
+    });
   });
 
   describe("Tab Options Computation", () => {

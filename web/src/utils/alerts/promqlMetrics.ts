@@ -60,3 +60,19 @@ export function promqlScaledToPercent(query: string): boolean {
     .trim();
   return /^100\s*\*/.test(bare) || /\*\s*100$/.test(bare);
 }
+
+/** The query reading `to` where it read `from`; undefined unless `from` is the only metric it reads. */
+export function promqlWithMetric(query: string, from: string, to: string): string | undefined {
+  const names = promqlMetricNames(query);
+  if (names.length !== 1 || names[0] !== from) return undefined;
+  const name = from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const bare = new RegExp(`(?<![\\w:.])${name}(?![\\w:])`, "g");
+  const nameMatcher = new RegExp(`(__name__\\s*=\\s*)"${name}"`, "g");
+  let moved = "";
+  let at = 0;
+  for (const literal of query.matchAll(STRINGS)) {
+    moved += query.slice(at, literal.index).replace(bare, to) + literal[0];
+    at = (literal.index ?? 0) + literal[0].length;
+  }
+  return (moved + query.slice(at).replace(bare, to)).replace(nameMatcher, `$1"${to}"`);
+}
