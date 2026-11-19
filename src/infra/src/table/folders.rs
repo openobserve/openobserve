@@ -227,25 +227,26 @@ pub async fn delete(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), errors::Error> {
-    delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await?;
-    publish_delete(org_id, folder_type, folder_id).await;
+    if delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await? {
+        publish_delete(org_id, folder_type, folder_id).await;
+    }
     Ok(())
 }
 
-/// [`delete`] on a given connection; the caller publishes the change once it commits.
+/// [`delete`] on a given connection; returns whether a row went, and the caller publishes it.
 pub async fn delete_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     folder_id: &str,
     folder_type: FolderType,
-) -> Result<(), errors::Error> {
-    Entity::delete_many()
+) -> Result<bool, errors::Error> {
+    let deleted = Entity::delete_many()
         .filter(Column::Org.eq(org_id))
         .filter(Column::FolderId.eq(folder_id))
         .filter(Column::Type.eq(folder_type_into_i16(folder_type)))
         .exec(conn)
         .await?;
-    Ok(())
+    Ok(deleted.rows_affected > 0)
 }
 
 /// Returns the primary-key `id` of the folder identified by its name and type.

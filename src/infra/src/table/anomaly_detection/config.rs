@@ -316,19 +316,15 @@ pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str
 }
 
 pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<()> {
-    let ids = anomaly_detection_config::Entity::find()
-        .select_only()
-        .column(anomaly_detection_config::Column::AnomalyId)
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .into_tuple::<String>()
-        .all(conn)
-        .await
-        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
-    anomaly_detection_config::Entity::delete_many()
-        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
-        .exec(conn)
-        .await
-        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    let delete = anomaly_detection_config::Entity::delete_many()
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id));
+    let ids: Vec<String> = crate::table::delete_returning(
+        conn,
+        delete,
+        &[anomaly_detection_config::Column::AnomalyId],
+    )
+    .await
+    .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
     for id in &ids {
         publish_delete(org_id, id).await;
     }

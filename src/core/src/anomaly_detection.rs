@@ -1464,7 +1464,9 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     active.training_started_at = Set(None);
     active.last_error = Set(Some("Training cancelled by user.".to_string()));
     active.updated_at = Set(Utc::now().timestamp_micros());
-    active.update(db).await?;
+    anomaly_config_table::save_changes(db, active)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     log::info!("[anomaly_detection {anomaly_id}] training cancelled by user");
     Ok(())
