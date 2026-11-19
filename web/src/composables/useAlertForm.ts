@@ -72,6 +72,7 @@ import {
   saveAlertJson as saveAlertJsonUtil,
   type ValidationContext,
   type JsonValidationContext,
+  type SqlCheckPurpose,
   type SqlCheckResult,
 } from "@/utils/alerts/alertValidation";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
@@ -1644,7 +1645,8 @@ export function useAlertForm(
     return validateInputsUtil(input, validationContext, notify);
   };
 
-  const validateSqlQuery = async (): Promise<SqlCheckResult> => {
+  // The form's own checks stream; only Save runs the one-shot check that also validates fields.
+  const validateSqlQuery = async (purpose: SqlCheckPurpose = "edit"): Promise<SqlCheckResult> => {
     const validationContext: ValidationContext = {
       store,
       t,
@@ -1654,7 +1656,7 @@ export function useAlertForm(
       buildQueryPayload,
       getParser,
     };
-    return validateSqlQueryUtil(formData.value, validationContext);
+    return validateSqlQueryUtil(formData.value, validationContext, purpose);
   };
 
   const validateConditionsAgainstUDS = () => {
@@ -2684,7 +2686,7 @@ export function useAlertForm(
     if (!getParser(qc.sql)) return blockOnQuery(t("alerts.messages.selectAllColumnsNotAllowed"));
     // An edit that kept the stored query must not be blocked by a check that cannot change it.
     if (sqlUnchangedSinceLoad()) return "passed";
-    const verdict = await validateSqlQuery();
+    const verdict = await validateSqlQuery("save");
     if (verdict === "sql_error") {
       focusSqlError();
       return blockOnQuery(t("alerts.messages.fixSqlErrorBeforeSaving"));

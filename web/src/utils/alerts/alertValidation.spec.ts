@@ -16,6 +16,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+const streamed = vi.hoisted(() => vi.fn());
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({ fetchQueryDataWithHttpStream: streamed }),
+}));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/utils/query/sqlDiagnostics", () => ({
   rangesFromServerError: vi.fn().mockResolvedValue([]),
@@ -100,6 +104,26 @@ describe("validateSqlQuery verdicts", () => {
 
     expect(await older).toBe("sql_error");
     expect(context.sqlQueryErrorMsg.value).toBe("");
+  });
+
+  it.each([
+    ["a passing query", (h: any) => h.complete(), "valid", ""],
+    [
+      "a 400 mid-stream",
+      (h: any) => h.error({}, { content: { code: 400, message: "bad sql" } }),
+      "sql_error",
+      "bad sql",
+    ],
+  ])("checks %s while editing over the streaming search", async (_case, answer, verdict, shown) => {
+    vi.useFakeTimers();
+    streamed.mockImplementation((_req: unknown, handlers: any) => answer(handlers));
+    const context = makeContext();
+    const done = validateSqlQuery(formData, context, "edit");
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(await done).toBe(verdict);
+    expect(context.sqlQueryErrorMsg.value).toBe(shown);
+    expect(searchService.search).not.toHaveBeenCalled();
   });
 
   it("reports a passing query as valid", async () => {
