@@ -2991,6 +2991,31 @@ pub static RCA_LIVE_STREAMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+// AutoObserve's own health, set by the enterprise engine: the path that works when Slack does not.
+pub static AUTOOBSERVE_FEED_FAILING: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "autoobserve_feed_failing",
+            "1 while the org's AutoObserve Slack feed fails to post, else 0",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+pub static AUTOOBSERVE_HEARTBEAT_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "autoobserve_heartbeat_age_seconds",
+            "Seconds since the region's AutoObserve engine last finished a good pass",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["region"],
+    )
+    .expect("Metric created")
+});
 // Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
 pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -3830,6 +3855,8 @@ pub(crate) fn register(registry: &Registry) {
         Box::new(RCA_ANSWER_WAIT_SECONDS.clone()),
         Box::new(RCA_RESUME_TOTAL.clone()),
         Box::new(RCA_LIVE_STREAMS.clone()),
+        Box::new(AUTOOBSERVE_FEED_FAILING.clone()),
+        Box::new(AUTOOBSERVE_HEARTBEAT_AGE_SECONDS.clone()),
         Box::new(PUBLIC_DASHBOARD_READS_TOTAL.clone()),
         Box::new(PUBLIC_DASHBOARD_BUILDS_TOTAL.clone()),
         Box::new(PUBLIC_DASHBOARD_BUILD_SECONDS.clone()),

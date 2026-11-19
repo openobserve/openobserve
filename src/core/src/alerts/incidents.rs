@@ -536,6 +536,25 @@ enum MuteChange<'a> {
     Retarget { from: &'a str, to: &'a str },
 }
 
+/// What an automatic start did; `NotStarted(None)` has nothing new to record.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, PartialEq)]
+pub(crate) enum AutoStart {
+    Started,
+    NotStarted(Option<&'static str>),
+}
+
+#[cfg(feature = "enterprise")]
+impl AutoStart {
+    /// Why no run started, `None` when one did or runs.
+    pub(crate) fn off_reason(&self) -> Option<&'static str> {
+        match self {
+            Self::Started => None,
+            Self::NotStarted(reason) => *reason,
+        }
+    }
+}
+
 /// Extract semantic dimensions using configured distinguish_by groups only
 /// This replaces the current fallback that uses ALL labels
 #[cfg(feature = "enterprise")]
@@ -2064,6 +2083,9 @@ pub async fn correlate_external_event(
             org_id,
             incident_id,
             config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+            config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+                config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+            ),
         )
         .await;
     }
@@ -3638,7 +3660,7 @@ impl FiringResolve {
     /// Whether this call resolved the incident, and what its follow-up steps did, failures kept.
     fn outcome(self) -> (bool, Option<Repairs>) {
         let (resolved, mut repairs) = match self.incident {
-            IncidentAfter::Kept => (false, None),
+            IncidentAfter::Kept | IncidentAfter::Owned => (false, None),
             IncidentAfter::Resolved(r) => (true, Some(r)),
             IncidentAfter::AlreadyResolved(r) => (false, r),
         };
@@ -3652,9 +3674,11 @@ impl FiringResolve {
 /// The incident after one of its firings recovered.
 #[derive(Debug, Default)]
 enum IncidentAfter {
-    /// Missing, or kept open for another firing or a human.
+    /// Missing, or kept open for another firing or a case.
     #[default]
     Kept,
+    /// Every firing recovered; a person who acknowledged or was assigned it owns the close.
+    Owned,
     /// Resolved before this call; with what its follow-up steps did when the caller repairs.
     AlreadyResolved(Option<Repairs>),
     /// Resolved by this call.
@@ -3853,8 +3877,15 @@ async fn settle_resolution(
     use infra::table::alert_incidents::AutomaticResolution;
 
     Ok(
-        match infra::table::alert_incidents::resolve_if_recovered(org_id, incident_id).await? {
+        match infra::table::alert_incidents::resolve_if_recovered(
+            org_id,
+            incident_id,
+            quiet_enabled(),
+        )
+        .await?
+        {
             AutomaticResolution::Kept => IncidentAfter::Kept,
+            AutomaticResolution::Owned => IncidentAfter::Owned,
             AutomaticResolution::AlreadyResolved(_) if !repair => {
                 IncidentAfter::AlreadyResolved(None)
             }
@@ -3898,7 +3929,34 @@ async fn recover_finding_firing(
     let (id, at) = (&incident.id, recovered_at);
     let onset = Some(triggered_at);
     let done = resolve_firing(org_id, id, subject_id, at, false, onset, turns).await?;
+    if matches!(done.incident, IncidentAfter::Owned) && quiet_enabled() {
+        note_kept_open(org_id, id, recovered_at, turns).await;
+    }
     Ok(done.outcome())
+}
+
+/// Z3's note, under the incident's turn so recoveries landing together write it once; only logged.
+#[cfg(feature = "enterprise")]
+async fn note_kept_open(org_id: &str, id: &str, back: i64, turns: &dyn IncidentTurns) {
+    let noted = async {
+        let turn = turns.take(org_id, id).await?;
+        let noted = crate::autoobserve::incidents::note_kept_open(org_id, id, back).await;
+        turn.end().await;
+        noted
+    };
+    if let Err(e) = noted.await {
+        log::warn!("[incidents] {org_id}/{id}: the kept-open note was not written: {e}");
+    }
+}
+
+/// The quiet switch over the kept-open note (Z3); tests set it per thread.
+#[cfg(feature = "enterprise")]
+fn quiet_enabled() -> bool {
+    #[cfg(test)]
+    if let Some(on) = tests::findings::QUIET_ON.with(std::cell::Cell::get) {
+        return on;
+    }
+    o2_enterprise::enterprise::autoobserve::holds::enabled()
 }
 
 /// Ok only when nothing is left for a retry, so the engine tells a recovery once it is whole.
@@ -4733,6 +4791,9 @@ async fn join_ops_incident(
                 org_id,
                 &existing.id,
                 config::meta::alerts::rca_runs::RunTrigger::AutoNewAlertType,
+                config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+                    config::meta::alerts::rca_runs::RunTrigger::AutoNewAlertType,
+                ),
             )
             .await;
         }
@@ -5103,13 +5164,19 @@ async fn membership_on_join(
     muted_by: Option<&str>,
     remembered: bool,
 ) {
-    use config::meta::alerts::rca_runs::RunTrigger;
+    use config::meta::alerts::rca_runs::{AutoRunOpts, RunTrigger};
 
     let unmuted = muted_by.is_none();
     if !remembered {
         spawn_membership_check(org_id, incident_id, alert_id, unmuted, muted_by);
     } else if unmuted {
-        start_automatic_rca(org_id, incident_id, RunTrigger::AutoNewAlertType).await;
+        start_automatic_rca(
+            org_id,
+            incident_id,
+            RunTrigger::AutoNewAlertType,
+            AutoRunOpts::for_trigger(RunTrigger::AutoNewAlertType),
+        )
+        .await;
     }
 }
 
@@ -5121,7 +5188,7 @@ fn spawn_membership_check(
     then_rca: bool,
     muted_by: Option<&str>,
 ) {
-    use config::meta::alerts::rca_runs::RunTrigger;
+    use config::meta::alerts::rca_runs::{AutoRunOpts, RunTrigger};
     use o2_enterprise::enterprise::alerts::incident_membership as membership;
 
     let (org, incident, alert) = (
@@ -5136,7 +5203,13 @@ fn spawn_membership_check(
                 after_member_removed(&org, &incident, &removal, muted_by.as_deref()).await;
             }
             _ if then_rca => {
-                start_automatic_rca(&org, &incident, RunTrigger::AutoNewAlertType).await;
+                start_automatic_rca(
+                    &org,
+                    &incident,
+                    RunTrigger::AutoNewAlertType,
+                    AutoRunOpts::for_trigger(RunTrigger::AutoNewAlertType),
+                )
+                .await;
             }
             _ => {}
         }
@@ -5713,20 +5786,20 @@ pub fn rca_off_reason_for(analysis_on: bool, agent_available: bool) -> Option<&'
 #[cfg(feature = "enterprise")]
 pub(crate) const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
 
-/// The one start path of automatic runs; returns why none started, `None` when one did or runs.
+/// The one start path of automatic runs.
 #[cfg(feature = "enterprise")]
-async fn start_automatic_rca(
+pub(crate) async fn start_automatic_rca(
     org_id: &str,
     incident_id: &str,
     trigger: config::meta::alerts::rca_runs::RunTrigger,
-) -> Option<&'static str> {
-    use config::meta::alerts::rca_runs::{RunMode, RunTrigger};
+    opts: config::meta::alerts::rca_runs::AutoRunOpts,
+) -> AutoStart {
     use o2_enterprise::enterprise::alerts::rca_service;
 
     use super::rca_runs::{RunSubject, StartOutcome, StartRun};
 
     if !rca_will_run(org_id, incident_id).await {
-        return rca_not_run_reason();
+        return AutoStart::NotStarted(rca_not_run_reason());
     }
     match infra::table::alert_incidents::get(org_id, incident_id).await {
         Ok(Some(incident)) if incident.rca_off_reason.is_some() => {
@@ -5736,19 +5809,19 @@ async fn start_automatic_rca(
             );
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
             // Already recorded, so there is nothing new to say.
-            return None;
+            return AutoStart::NotStarted(None);
         }
         Ok(_) => {}
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return Some(RCA_OFF_START_FAILED);
+            return AutoStart::NotStarted(Some(RCA_OFF_START_FAILED));
         }
     }
 
     // A refusal starts nothing and charges nothing; the meter runs after the start.
     #[cfg(feature = "cloud")]
-    let usage_feature = if trigger == RunTrigger::AutoNewIncident {
+    let usage_feature = if trigger == config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident {
         crate::trial_quota::TrialQuotaFeature::NewIncident
     } else {
         crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis
@@ -5763,17 +5836,17 @@ async fn start_automatic_rca(
         );
         // No verdict is coming, so nothing may go on holding a page for one.
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-        return Some(RCA_OFF_QUOTA);
+        return AutoStart::NotStarted(Some(RCA_OFF_QUOTA));
     }
 
     let outcome = super::rca_runs::start_run(StartRun {
         org_id: org_id.to_string(),
         subject: RunSubject::Incident(incident_id.to_string()),
         trigger,
-        mode: RunMode::Fresh,
+        mode: opts.mode,
         started_by: "system".to_string(),
         guidance: None,
-        skip_cooldown: trigger == RunTrigger::AutoNewIncident,
+        skip_cooldown: opts.skip_cooldown,
         oncall_subjects: None,
         context_used: None,
     })
@@ -5785,7 +5858,7 @@ async fn start_automatic_rca(
                 "[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping {} trigger",
                 trigger.as_str()
             );
-            return None;
+            return AutoStart::NotStarted(None);
         }
         Ok(StartOutcome::CoolingDown) => {
             log::debug!(
@@ -5793,12 +5866,12 @@ async fn start_automatic_rca(
                 trigger.as_str()
             );
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return Some(RCA_OFF_COOLING_DOWN);
+            return AutoStart::NotStarted(Some(RCA_OFF_COOLING_DOWN));
         }
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not start a run for {org_id}/{incident_id}: {e}");
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return Some(RCA_OFF_START_FAILED);
+            return AutoStart::NotStarted(Some(RCA_OFF_START_FAILED));
         }
     };
 
@@ -5814,8 +5887,7 @@ async fn start_automatic_rca(
             RcaLaunch {
                 trigger,
                 user_email: SYSTEM_USER_EMAIL.to_string(),
-                // Automatic runs stand on their own.
-                build_on_previous: false,
+                build_on_previous: opts.builds_on_previous(),
                 // Metered inside, right before the turn starts.
                 usage_permit: None,
                 // Automatic runs carry no guidance.
@@ -5833,7 +5905,7 @@ async fn start_automatic_rca(
             );
         }
     });
-    None
+    AutoStart::Started
 }
 
 /// Pages a new incident's on-call record and blast radius; the record decides L0.
@@ -5926,8 +5998,12 @@ async fn start_new_incident_rca(
         org_id,
         incident_id,
         config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+        config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+            config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+        ),
     )
-    .await)
+    .await
+    .off_reason())
 }
 
 /// An un-muted incident's analysis.
@@ -5955,6 +6031,9 @@ async fn start_unmuted_incident_rca(
             org_id,
             incident_id,
             config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+            config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+                config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
+            ),
         )
         .await;
     }
@@ -6187,8 +6266,15 @@ pub async fn trigger_rca_for_incident(
     } else {
         None
     };
+    // A resume continues a session that already read the bundle.
+    let evidence = if resume.is_none() {
+        crate::autoobserve::next_step::evidence_for_incident(&org_id, &incident_id, &run_id).await
+    } else {
+        None
+    };
     let context =
-        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
+        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis, evidence)
+            .await;
     let context = rca_service::rca_context_json(&context);
 
     #[cfg(feature = "cloud")]
@@ -6493,17 +6579,28 @@ pub async fn record_ack_change(
     status: config::meta::alerts::incidents::IncidentStatus,
     event: IncidentEvent,
 ) {
-    let muted = match infra::table::alert_incidents::get(org_id, incident_id).await {
-        Ok(m) => m.is_some_and(|m| m.muted_by_downtime_id.is_some()),
+    let row = match infra::table::alert_incidents::get(org_id, incident_id).await {
+        Ok(m) => m,
         Err(e) => {
             log::error!("[incidents] could not read {org_id}/{incident_id} after an ack: {e}");
-            false
+            None
         }
     };
+    let muted = row
+        .as_ref()
+        .is_some_and(|m| m.muted_by_downtime_id.is_some());
     if let Err(e) = append_event_unless_muted(org_id, incident_id, event, muted).await {
         log::error!("[incidents] could not record the ack of {org_id}/{incident_id}: {e}");
     }
     publish_status(org_id, incident_id, &status.to_string()).await;
+    #[cfg(feature = "enterprise")]
+    if let Some(by) = row.and_then(|m| m.acknowledged_by.zip(m.acknowledged_at))
+        && status == config::meta::alerts::incidents::IncidentStatus::Acknowledged
+    {
+        use crate::autoobserve::incidents::{RespondedAs, respond_to_incident};
+        let (org, id) = (org_id.to_string(), incident_id.to_string());
+        respond_to_incident(org, id, RespondedAs::Acknowledged { by: by.0, at: by.1 });
+    }
 }
 
 /// Update incident status
@@ -6759,6 +6856,9 @@ async fn reopen_follow_ups(
             org_id,
             incident_id,
             config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
+            config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
+                config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
+            ),
         )
         .await;
     }
@@ -7298,7 +7398,7 @@ pub async fn notify_severity_change(
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "enterprise")]
-    mod findings {
+    pub(super) mod findings {
         use std::{
             collections::HashMap,
             sync::{
@@ -7311,6 +7411,11 @@ mod tests {
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
 
         use super::super::*;
+
+        thread_local! {
+            pub(in crate::alerts::incidents) static QUIET_ON: std::cell::Cell<Option<bool>> =
+                const { std::cell::Cell::new(None) };
+        }
 
         const TITLE: &str = "checkout (logs) stopped sending data";
         const ONSET: i64 = 1_793_784_600_000_000;
@@ -7689,7 +7794,7 @@ mod tests {
                 ids.push(open(&own, &pager).await.unwrap());
             }
             let paged = SubjectRef::new(SubjectType::Incident, ids[0].clone(), 1);
-            infra::table::oncall_responses::open(
+            let record = infra::table::oncall_responses::open(
                 &org,
                 &paged,
                 Some(&team.id),
@@ -7737,6 +7842,25 @@ mod tests {
                 serde_json::to_value(&pages[&ids[3]]).unwrap(),
                 serde_json::json!({"outcome": "failed", "team_id": null, "team_name": null})
             );
+            let threads = issue_incidents_of(&org).await;
+            let (thread, firings) = &threads[&ids[0]];
+            let own = ("stream_silence-s0".to_string(), ONSET);
+            assert_eq!(
+                *firings,
+                std::collections::BTreeSet::from([own]),
+                "its link's onset"
+            );
+            assert_eq!(
+                (thread.paged, thread.page_failed, thread.acked_by.as_deref()),
+                (true, false, None)
+            );
+            assert_eq!(thread.response_id.as_deref(), Some(record.id.as_str()));
+            assert_eq!(thread.team_name.as_deref(), Some("shop"));
+            let url = format!("/web/oncall/responses/{}?org_identifier={org}", record.id);
+            assert!(thread.page_url.as_deref().unwrap().ends_with(&url));
+            let (failed, _) = &threads[&ids[3]];
+            assert_eq!((failed.paged, failed.page_failed), (false, true));
+            assert_eq!((&failed.response_id, &failed.page_url), (&None, &None));
         }
 
         #[tokio::test]
@@ -7888,6 +8012,33 @@ mod tests {
             assert_eq!(page.team_name.as_deref(), Some("shop"));
         }
 
+        /// Each incident's thread view and the firings an issue finds it by.
+        async fn issue_incidents_of(
+            org: &str,
+        ) -> HashMap<
+            String,
+            (
+                o2_enterprise::enterprise::autoobserve::context::IssueIncident,
+                std::collections::BTreeSet<(String, i64)>,
+            ),
+        > {
+            let page = o2_enterprise::enterprise::autoobserve::api::Page {
+                limit: 50,
+                offset: 0,
+            };
+            let now = config::utils::time::now_micros();
+            crate::autoobserve::incidents::list_with(org, page, None, true, now)
+                .await
+                .unwrap()
+                .items
+                .into_iter()
+                .map(|i| {
+                    let thread = i.issue_incident.expect("every item reads its page");
+                    (i.incident.id, (thread, i.firings))
+                })
+                .collect()
+        }
+
         async fn pages_of(
             org: &str,
             oncall_on: bool,
@@ -7897,7 +8048,7 @@ mod tests {
                 offset: 0,
             };
             let now = config::utils::time::now_micros();
-            crate::autoobserve::incidents::list_with(org, page, oncall_on, now)
+            crate::autoobserve::incidents::list_with(org, page, None, oncall_on, now)
                 .await
                 .unwrap()
                 .items
@@ -8811,6 +8962,21 @@ mod tests {
                 })
         }
 
+        async fn kept_open_notes(org_id: &str, id: &str) -> usize {
+            use config::meta::alerts::incidents::IncidentEventType;
+
+            let line = crate::autoobserve::incidents::kept_open_line(BACK);
+            infra::table::incident_events::get(org_id, id)
+                .await
+                .unwrap()
+                .iter()
+                .filter(|e| {
+                    matches!(&e.event_type, IncidentEventType::Comment { user_id, comment }
+                        if user_id == "system" && *comment == line)
+                })
+                .count()
+        }
+
         #[tokio::test]
         async fn a_recovered_finding_resolves_its_unacknowledged_incident_unmuted() {
             let _db = store().await;
@@ -9225,10 +9391,12 @@ mod tests {
         #[tokio::test]
         async fn an_acknowledged_or_assigned_incident_gets_its_link_resolved_and_stays_open() {
             let _db = store().await;
-            for column in [
-                incident_rows::Column::AcknowledgedBy,
-                incident_rows::Column::AssignedTo,
+            for (column, quiet) in [
+                (incident_rows::Column::AcknowledgedBy, true),
+                (incident_rows::Column::AssignedTo, true),
+                (incident_rows::Column::AcknowledgedBy, false),
             ] {
+                QUIET_ON.with(|on| on.set(Some(quiet)));
                 let (org, pager) = (new_org(), Pager::default());
                 let f = finding(&org, ONSET);
                 let id = open(&f, &pager).await.unwrap();
@@ -9243,7 +9411,12 @@ mod tests {
                 assert_ne!(status(&org, &id).await, "resolved", "{column:?}");
                 assert_eq!(links_resolved_at(&id).await, [Some(BACK)], "{column:?}");
                 assert!(!resolved_by_system(&org, &id).await, "{column:?}");
+                let again = resolve_finding_firing(&org, &f.subject_id, ONSET, BACK).await;
+                assert!(!again.unwrap(), "{column:?}");
+                let notes = kept_open_notes(&org, &id).await;
+                assert_eq!(notes, usize::from(quiet), "{column:?} quiet {quiet}: once");
             }
+            QUIET_ON.with(|on| on.set(None));
         }
 
         #[tokio::test]
