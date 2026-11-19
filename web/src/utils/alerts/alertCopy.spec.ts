@@ -10,6 +10,7 @@ import {
   everyDuration,
   joinListMore,
   measureWords,
+  notifyHelp,
   valueWithUnit,
 } from "./alertCopy";
 
@@ -84,5 +85,68 @@ describe("measureWords", () => {
   ])("%s of %s grouped by %j reads %s", (fn, column, groups, expected) => {
     const aggregation = { function: fn, having: { column } };
     expect(measureWords(aggregation, groups, "logs", t)).toBe(expected);
+  });
+});
+
+describe("notifyHelp", () => {
+  const promql = (multi: boolean, query = "avg by (k8s_node_name) (cpu)") => ({
+    type: "promql",
+    promql: query,
+    promql_multi_alert: multi,
+  });
+  const builder = (multi: boolean, group_by: string[]) => ({
+    type: "custom",
+    aggregation: { multi_alert: multi, group_by },
+  });
+  it.each([
+    ["one alert", promql(false), "whileFiring", "suppressRepeatsHelp", {}],
+    [
+      "one per PromQL by-label",
+      promql(true),
+      "whileFiringEach",
+      "suppressRepeatsHelpEach",
+      { labels: "k8s_node_name" },
+    ],
+    [
+      "one per series with no by-label",
+      promql(true, "1 - avg without (cpu) (x)"),
+      "whileFiringEachSeries",
+      "suppressRepeatsHelpEachSeries",
+      {},
+    ],
+    [
+      "one per builder group",
+      builder(true, ["service_name", ""]),
+      "whileFiringEach",
+      "suppressRepeatsHelpEach",
+      { labels: "service_name" },
+    ],
+    [
+      "a builder group with one alert",
+      builder(false, ["service_name"]),
+      "whileFiring",
+      "suppressRepeatsHelp",
+      {},
+    ],
+    [
+      "one per SQL group",
+      {
+        type: "sql",
+        sql: "SELECT pod, count(*) FROM t GROUP BY pod",
+        aggregation: { multi_alert: true },
+      },
+      "whileFiringEach",
+      "suppressRepeatsHelpEach",
+      { labels: "pod" },
+    ],
+  ])("%s says who each wait covers", (_case, qc, remind, suppress, params) => {
+    expect(notifyHelp(qc, false, t)).toEqual({
+      remind: t(`alerts.form.remind.${remind}` as any, params),
+      suppress: t(`alerts.alertSettings.${suppress}` as any, params),
+    });
+  });
+
+  it("with Suppress repeats on, the wait only spaces out a new firing", () => {
+    expect(notifyHelp(promql(true), true, t).remind).toBe(t("alerts.form.remind.noReminders"));
   });
 });

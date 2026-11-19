@@ -221,9 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="silenceFieldRef"
             :label="t('alerts.form.remind.label')"
             :description="
-              isRealTime === 'true'
-                ? t('alerts.form.remind.realtimeHelp')
-                : t('alerts.form.remind.help')
+              isRealTime === 'true' ? t('alerts.form.remind.realtimeHelp') : notifyLines.remind
             "
             fill
           >
@@ -496,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSettingRow
                 v-if="repeatSuppressionAvailable && tierShows('suppressRepeats')"
                 :label="t('alerts.alertSettings.suppressRepeats')"
-                :info="t('alerts.alertSettings.suppressRepeatsTooltip')"
+                :description="notifyLines.suppress"
                 fill
               >
                 <OFormSwitch
@@ -541,7 +539,7 @@ import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
 import { describeDestinations } from "@/utils/alerts/destinationDescription";
-import { durationWords, everyWords } from "@/utils/alerts/alertCopy";
+import { durationWords, everyWords, notifyHelp } from "@/utils/alerts/alertCopy";
 import { finerCheckMinutes, missedBreachMinutes } from "@/utils/alerts/checkCadence";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
@@ -903,6 +901,9 @@ export default defineComponent({
             run: lookBack.relink,
           };
     });
+    const notifyLines = computed(() =>
+      notifyHelp(fv("query_condition"), !!fv("suppress_repeats"), t),
+    );
     // A wait shorter than the checks never holds a notification back, so it says so instead of moving it.
     const silenceHint = computed<LinkNote | null>(() => {
       const checkMinutes = frequencyMinutes();
@@ -1195,6 +1196,7 @@ export default defineComponent({
       handlePeriodChange,
       scheduleNote,
       silenceHint,
+      notifyLines,
       destinationDetails,
       // Field refs for the parent focus manager
       periodFieldRef,

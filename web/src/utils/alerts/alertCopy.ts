@@ -15,6 +15,7 @@
 
 import { getIntlLocale } from "@/locales";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import { promqlByLabels, sqlGroupByLabels } from "./queryGroupLabels";
 
 const NOUN_BY_STREAM: Record<string, I18nKey> = {
   logs: "alerts.verdict.events",
@@ -201,3 +202,42 @@ export function compactDuration(seconds: number, t: TranslateFn): I18nText {
 /** A count for tight spots, as the reader's locale shortens it: "22K", "1.3M". */
 export const compactNumber = (value: number): I18nText =>
   raw(new Intl.NumberFormat(getIntlLocale(), { notation: "compact" }).format(value));
+
+interface NotifyQueryCondition {
+  type?: string;
+  promql?: string;
+  promql_multi_alert?: boolean;
+  sql?: string;
+  aggregation?: { multi_alert?: boolean; group_by?: readonly (string | null)[] } | null;
+}
+
+// Mirrors the scheduler's multi_alert_enabled(): each group keeps its own wait and last level.
+const groupLabelsOf = (qc: NotifyQueryCondition | null | undefined): string[] | null => {
+  if (!qc) return null;
+  if (qc.type === "promql") return qc.promql_multi_alert ? promqlByLabels(qc.promql ?? "") : null;
+  if (!qc.aggregation?.multi_alert) return null;
+  if (qc.type === "sql") return sqlGroupByLabels(qc.sql ?? "");
+  return (qc.aggregation.group_by ?? []).filter((f): f is string => !!f?.trim());
+};
+
+/** The help lines of Notify at most every and Suppress repeats, naming what each wait covers. */
+export function notifyHelp(
+  qc: NotifyQueryCondition | null | undefined,
+  suppressRepeats: boolean,
+  t: TranslateFn,
+): { remind: I18nText; suppress: I18nText } {
+  const labels = groupLabelsOf(qc);
+  const params = labels?.length ? { labels: joinListMore(labels, t) } : {};
+  const [remind, suppress]: [I18nKey, I18nKey] = !labels
+    ? ["alerts.form.remind.whileFiring", "alerts.alertSettings.suppressRepeatsHelp"]
+    : labels.length
+      ? ["alerts.form.remind.whileFiringEach", "alerts.alertSettings.suppressRepeatsHelpEach"]
+      : [
+          "alerts.form.remind.whileFiringEachSeries",
+          "alerts.alertSettings.suppressRepeatsHelpEachSeries",
+        ];
+  return {
+    remind: suppressRepeats ? t("alerts.form.remind.noReminders") : t(remind, params),
+    suppress: t(suppress, params),
+  };
+}
