@@ -50,13 +50,17 @@ impl TryFrom<Model> for Template {
         };
         let id = svix_ksuid::Ksuid::from_str(&value.id)
             .map_err(|e| TemplateError::ConvertingId(e.to_string()))?;
+        // A row saved from the old one-line prebuilt fallback reads as the shipped body, on every
+        // path: cache seed, watch reload, a lagging replica, an old node's late write.
+        let mut body = value.body;
+        config::prebuilt_loader::upgrade_legacy_body(&value.name, &mut body);
         Ok(Self {
             id: Some(id),
             org_id: value.org,
             name: value.name,
             is_default: value.is_default,
             template_type,
-            body: value.body,
+            body,
             kind: TemplateKind::from(value.kind.as_str()),
             applies_to: applies_to_from_column(&value.applies_to),
         })
@@ -983,6 +987,32 @@ mod tests {
         assert!(
             matches!(tmpl.template_type, TemplateType::Email { title } if title == "Alert Subject")
         );
+    }
+
+    #[test]
+    fn a_row_with_the_old_one_line_body_reads_as_the_shipped_body() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id, None, "http");
+        model.name = "prebuilt_slack".to_string();
+        model.body = r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string();
+        let tmpl = Template::try_from(model.clone()).unwrap();
+        assert_eq!(
+            tmpl.body,
+            config::prebuilt_loader::get_prebuilt_template("slack")
+                .unwrap()
+                .body
+        );
+        assert_eq!(tmpl.name, "prebuilt_slack");
+        assert_eq!(tmpl.id.unwrap().to_string(), id);
+
+        model.body = r#"{"text": "edited {alert_name}"}"#.to_string();
+        let edited = Template::try_from(model.clone()).unwrap();
+        assert_eq!(edited.body, r#"{"text": "edited {alert_name}"}"#);
+
+        model.name = "my_slack".to_string();
+        model.body = r#"{"text": "[{alert_status}] {alert_name}"}"#.to_string();
+        let other = Template::try_from(model).unwrap();
+        assert_eq!(other.body, r#"{"text": "[{alert_status}] {alert_name}"}"#);
     }
 
     #[test]
