@@ -333,9 +333,6 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udf(super::udf::fulltext::match_all::MATCH_ALL_UDF.clone());
     ctx.register_udf(super::udf::fulltext::match_all::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
-        super::udaf::percentile_cont::PercentileCont::new(),
-    ));
-    ctx.register_udaf(AggregateUDF::from(
         super::udaf::summary_percentile::SummaryPercentile::new(),
     ));
     ctx.register_udaf(AggregateUDF::from(
