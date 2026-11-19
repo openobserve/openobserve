@@ -2149,27 +2149,7 @@
       "view": "ビュー",
       "frustration": "フラストレーション",
       "failedRequest": "失敗したリクエスト",
-      "noResponse": "応答なし",
-      "noResponseStatus": "0 — レスポンスなし",
-      "failedRequestDetails": "失敗したリクエストの詳細",
-      "browserStatus": "ブラウザのステータス",
-      "serverStatus": "サーバーのステータス",
-      "noServerSpanFound": "サーバースパンが見つかりません",
-      "noServerSpanHint": "スパンが見つからない場合は、サンプリング、取り込みの遅延、計装されていないルート、または保持期間が原因の可能性もあります。",
-      "unknownNoTrace": "不明（トレースなし）",
-      "unknown": "不明",
-      "abortedByApp": "アプリによって中止",
-      "method": "メソッド",
-      "url": "URL",
-      "duration": "所要時間",
-      "timing": "タイミング",
-      "timingDns": "DNS",
-      "timingConnect": "接続",
-      "timingSsl": "SSL",
-      "timingFirstByte": "最初のバイト",
-      "timingDownload": "ダウンロード",
-      "size": "サイズ",
-      "initiatedBy": "開始元"
+      "noResponse": "応答なし"
     },
     "replayCanvasNotRecorded": "Canvas の内容は記録されていません",
     "actionOnTarget": "{action}（\"{target}\" に対して）",
@@ -2213,6 +2193,7 @@
       "pageLabel": "ページ",
       "noDeviceData": "このページでは、このデバイスタイプでクリックが記録されていません。",
       "noReplay": "このページのセッションリプレイは記録されていないため、描画するスクリーンショットがありません。アプリでセッションリプレイを有効にしてください。",
+      "noReplayLegacySdk": "ページスナップショットにはより新しい RUM SDK が必要です。ここで記録されたセッションリプレイは古い SDK によるものなので、描画に使えるスクリーンショットがありません。",
       "loadFailed": "クリックデータを読み込めませんでした。",
       "snapshotFailed": "ページスナップショットを読み込めませんでした。",
       "noPosition": "この期間、このページにはクリックがありません。",
@@ -2278,8 +2259,7 @@
       "showElements": "要素を表示",
       "markerLabel": "順位 {rank}、{name}、{count}クリック | 順位 {rank}、{name}、{count}クリック",
       "markerLabelFrustrated": "順位 {rank}、{name}、{count}クリック、{frustrated}件のフラストレーション | 順位 {rank}、{name}、{count}クリック、{frustrated}件のフラストレーション",
-      "markerClicks": "{count}クリック | {count}クリック",
-      "noReplayLegacySdk": "ページスナップショットにはより新しい RUM SDK が必要です。ここで記録されたセッションリプレイは古い SDK によるものなので、描画に使えるスクリーンショットがありません。"
+      "markerClicks": "{count}クリック | {count}クリック"
     },
     "analytics": {
       "title": "プロダクト分析",
@@ -3361,7 +3341,6 @@
     "licenseAndUsage": "ライセンスと利用",
     "copyLicenseId": "ライセンスIDをコピー",
     "editionLbl": "エディション",
-    "limitPrefix": "· 制限",
     "gbPerDay": "GB / 日",
     "ofDailyLimitUsedToday": "本日の日次制限の使用量",
     "gbToday": "本日のGB",
@@ -3385,6 +3364,7 @@
     "usage_limits": "使用量の上限",
     "feature_comparison_lbl": "機能比較",
     "feature_comparision_ent_msg": "OpenObserveエンタープライズエディションを使用しており、以下にリストされているすべての高度な機能にアクセスできます。",
+    "feature_comparision_ent_partial_msg": "OpenObserve Enterprise Edition をご利用中です。ライセンスに含まれない機能があります。上記のリストをご確認ください。",
     "feature_comparision_plan_detail": "ご利用のプラン:エンタープライズエディションでは、1 日あたり最大 50 GB (最大 1.5 TB/月) のデータを無料で取り込むことができます。",
     "feature_comparision_os_msg": "現在 OpenObserve オープンソースエディションを使用しています。Enterprise Edition にアップグレードすると、下の比較表に記載されている高度な機能を活用できます。",
     "feature_comparision_good_news": "朗報です。OpenObserveエンタープライズエディションは完全に無料で、1日あたり最大50 GB（最大1.5 TB/月）のデータインジェストが可能です。",
@@ -3465,6 +3445,7 @@
     "features_no_match": "検索に一致する機能はありません",
     "features_none": "このグループに機能はありません",
     "features_free_heading": "無料、すべてのライセンスに含まれます",
+    "features_free_not_included": "無料、ライセンスに含まれません",
     "features_new": "ライセンス発行後に追加された機能",
     "features_filter_new": "新規",
     "request_new_license": "新しいライセンスをリクエスト",
@@ -3527,6 +3508,13 @@
     "license_already_active_msg": "ライセンスはまだ有効です。新しいライセンスキーで更新しますか?",
     "yes_update_license": "はい、ライセンスを更新してください",
     "no_keep_current": "いいえ、最新の状態に保つ",
+    "license_downgrade_title": "このライセンスキーを適用しますか？",
+    "license_downgrade_intro": "このキーは現在のライセンスを置き換えます。",
+    "license_downgrade_expired": "このキーは {date} に期限切れになりました。無料枠の 50 GB/日が適用されます。",
+    "license_downgrade_lose": "以下が失われます: {names}",
+    "license_downgrade_limit": "1日の上限が {old} から {new} に変わります",
+    "license_downgrade_expiry": "有効期限が {old} から {new} に変わります",
+    "license_limit_per_day": "{gb} GB/日",
     "header_button": {
       "cloud_features": "{product} の機能",
       "enterprise_edition": "エディション:エンタープライズ",
@@ -4890,6 +4878,8 @@
       "reasonExpired": "未実行 · 1 時間以上キューで待機",
       "reasonWorkerLost": "ワーカー消失 · 再実行なし",
       "reasonWorkflowDisabled": "ワークフローが無効化されていました",
+      "reasonEndpointDisabled": "未実行 · HTTP エンドポイントが無効でした",
+      "reasonCredentialRevoked": "未実行 · 認証情報が取り消されました",
       "reasonRunTimeout": "15 分後にタイムアウト",
       "allTriggers": "すべてのトリガー",
       "triggerFilter": "トリガー",
@@ -5638,8 +5628,8 @@
     "periodInfoLine1": "クエリを実行する期間。",
     "periodInfoLine2": "例: 10分とは、クエリが実行されるたびに過去10分間のデータを使用することを意味します。クエリが午後4:00に実行される場合、午後3:50から午後4:00までのデータを使用します。",
     "periodShouldMatchFrequency": "注: 期間は頻度と同じである必要があります。",
-    "delayInfoLine1": "パイプラインの実行がスケジュールされる遅延。",
-    "delayInfoLine2": "例: 10分の遅延は、パイプラインがスケジュールされた時刻の10分後に実行されることを意味します。",
+    "delayInfoLine1": "スケジュール時刻の後に待機する時間です。遅れて到着するデータを取り込めるようにします。",
+    "delayInfoLine2": "例: 10 分の遅延を設定すると、1 時間ごとのパイプラインは 10:10 に実行され、9:00 から 10:00 までのデータを読み取ります。",
     "closeDrawer": "ドロワーを閉じる",
     "conditionValueGuidelines": "条件値のガイドライン:",
     "customColumnGuideline": "カスタム列を追加するには、列名を入力して",
@@ -6254,14 +6244,7 @@
       "askAiRejected": "{path} で {status} {reason} によりリクエストが拒否されています。",
       "askAiNoRequests": "何も到着しておらず、リクエストも拒否されていません。",
       "askAiUnavailable": "拒否されたリクエストを読み取れなかったため、原因は不明です。",
-      "thisGuide": "データソース",
-      "hintWaitingAfter": "最初のレコードが到着すると、これは自動的に緑になります。{elapsed}以内に何も届かない場合は、何が問題だったかを表示します。トラブルシュートを実行すると、すぐに確認できます。",
-      "idleInPrompt": "{stream} はすでにデータを受信しています。プロンプトをコピーするとチェックが開始されます。",
-      "idleMatchesPrompt": "一致するストリームはすでにデータを受信しています。プロンプトをコピーするとチェックが開始されます。",
-      "idleNewPrompt": "プロンプトをコピーするとチェックが開始されます。",
-      "fixInvalidCredentialsPrompt": ".env 内のトークンが組織トークン {token} と一致しません。.env を再度ダウンロードし、コーディングエージェントにリクエストの再実行を依頼してください。",
-      "fixInvalidCredentialsPromptUnnamed": ".env 内のトークンがこの組織の現在のトークンと一致しません。.env を再度ダウンロードし、コーディングエージェントにリクエストの再実行を依頼してください。",
-      "copyPrompt": "プロンプトをコピー"
+      "thisGuide": "データソース"
     },
     "firstDataNotice": {
       "pill": "最初のデータが届きました",
@@ -6414,17 +6397,7 @@
         "promptTitle": "{client1}、{client2}、{client3} に貼り付けてください",
         "promptLabel": "プロンプト",
         "promptCopied": "プロンプトをコピーしました",
-        "health": {
-          "title": "AI データヘルス",
-          "scopeAgent": "チェック開始以降に {stream} 内のエージェント {agent} から届いたスパン",
-          "scopeStream": "チェック開始以降の {stream} 内のスパン",
-          "checking": "AI データヘルスを確認しています…",
-          "checkAgain": "再度確認",
-          "checkAgainHint": "コーディングエージェントがコードを変更し、別のリクエストを実行したら、再度確認してください。",
-          "unsupported": "このバージョンの OpenObserve は AI データヘルスを確認しません。最初のスパンは到着しているため、トレーシングは機能しています。",
-          "error": "AI データヘルスのチェックを実行できませんでした。最初のスパンは到着しているため、トレーシングは機能しています。",
-          "noGenAiSpans": "スパンは到着しましたが、そのいずれも LLM 呼び出しではないため、LLM クライアントは計装されていません。コーディングエージェントに LLM クライアントの計装を依頼し、リクエストを実行してから、再度確認してください。"
-        }
+        "health": {}
       }
     },
     "header": "データソース",
@@ -10344,7 +10317,10 @@
     "contractManagedMessage": "請求は契約に基づいて処理されます — 変更についてはアカウントマネージャーにお問い合わせください",
     "upgradeToPlanMessage": "OpenObserveのサービスを引き続きご利用いただくには、プランをアップグレードしてください。",
     "creditsUsedLabel": "使用済みクレジット",
-    "licenseExpiryContactAdmin": "管理者に連絡してライセンスを更新してください。",
+    "licenseExpiredOn": "ライセンスは {date} に期限切れになりました。機能は引き続き利用できます。",
+    "licenseExpiredLimit": "無料枠の {limit} GB/日が適用されます。1 か月間に {allowed} 日を超えて上限を超過すると、更新するまで検索が停止します。",
+    "licenseAskAdminToRenew": "ライセンス管理者に更新を依頼してください。",
+    "renewLicense": "ライセンスを更新",
     "subscribed": "購読済み",
     "invoiceHistory": "請求書履歴",
     "amount": "金額",
@@ -10488,7 +10464,6 @@
     "failedToLinkAwsSubscription": "AWS サブスクリプションをリンクできませんでした",
     "failedToLinkAzureSubscription": "Azure サブスクリプションをリンクできませんでした",
     "last15Minutes": "過去15分",
-    "licenseHasExpired": "ライセンスが期限切れです",
     "numberOfPipelines": "パイプライン数",
     "oneDayUntilLicenseExpires": "ライセンスの有効期限まで残り1日",
     "pleaseWaitProcessingRequest": "リクエストを処理しています。しばらくお待ちください...",
@@ -12213,6 +12188,8 @@
       "noDestinationNote": "任意です。アラートは引き続き実行され履歴も記録されますが、宛先への通知は行われません。",
       "sendsToStatus": "アラートが発火するたびに {targets} に送信します。",
       "oncallTeamTarget": "オンコールチーム",
+      "lockedWorkflowFallback": "ロックされたワークフロー",
+      "lockedTargetBadge": "ロック済み",
       "createsIncident": "インシデントを作成",
       "createsIncidentTooltip": "アラートがインシデントを作成できる場合、専用の通知は送信されません。代わりに、新しいインシデントが作成されたとき、または新しいアラートタイプが既存のインシデントに加わったときに、インシデントの通知が送信されます。",
       "helpTemplateTitle": "テンプレートオーバーライド",
@@ -12303,13 +12280,7 @@
       "suppressRepeats": "繰り返し通知を抑制",
       "suppressRepeatsTooltip": "アラートが発火し始めたときやレベルが変わったときに1回だけ通知し、評価ごとには通知しません。オフのままにすると、サイレンス期間の経過ごとにリマインダーを受け取り続けます。",
       "keepFiringForInvalid": "0 以上の秒数を入力してください",
-      "keepFiringForTooLong": "最大 86400 秒（24 時間）を入力してください",
-      "helpApplyToObject": "このテンプレートを使用",
-      "helpTemplateExplainObject": "テンプレートは送信されるメッセージです。テキストと変数で構成されます。ここで選択すると、この設定に限り、各宛先の独自テンプレートが置き換えられます。",
-      "helpTemplateWhenDescObject": "空のままにすると、各宛先はこの種類に該当する場合は独自テンプレートを使用し、その後、組み込みメッセージを使用します。オーバーライドを設定すると、該当するすべての宛先に同じメッセージを送信します。",
-      "helpCurrentHeadingObject": "現在送信される内容",
-      "helpCurrentOverrideSome": "該当する宛先はこのテンプレートを使用します:",
-      "helpCurrentResolved": "オーバーライドは設定されていません。各宛先が使用するもの:"
+      "keepFiringForTooLong": "最大 86400 秒（24 時間）を入力してください"
     },
     "advanced": {
       "addVariable": "変数を追加",
@@ -12449,6 +12420,9 @@
       "lastTrained": "最終トレーニング",
       "level": "レベル",
       "lookBackWindow": "ルックバックウィンドウ",
+      "scheduleIntervalFloor": "チェック間隔は {min} 以上である必要があります。",
+      "lookBackWindowCap": "この検出解像度では、ルックバックウィンドウは最大 {max} です。それより長いウィンドウは 100,000 を超えるバケットを保持します。ウィンドウを短くするか、より長い検出解像度を使用してください。",
+      "retrainOnEditNote": "クエリ、関数、または検出解像度を変更すると、この検出器が再トレーニングされます。トレーニングが終了するまで検出は一時停止します。",
       "lookBackWindowFloor": "ルックバックウィンドウは少なくとも{min}（チェック間隔 + 検出解像度1つ分）である必要があります。これより短いウィンドウでは、最初の実行が発火した時点で完全なバケットを保持できないため、その実行はバケットをスキップします。",
       "lookBackWindowLegacy": "この保存済みウィンドウは{min}の最小値（チェック間隔 + 検出解像度1つ分）を下回っています。変更されずに保存されますが、ウィンドウを引き上げるまで最初の実行でバケットがスキップされる可能性があります。",
       "lookBackWindowMinimum": "最低 {min}。この設定では {recommended} 以上を推奨します。",
@@ -12542,6 +12516,7 @@
       "summaryTrainingDays": "{days}日",
       "summaryWindowShare": "✓ ウィンドウ内の割合: {rule}",
       "timestampAliasBanned": "{column}は列エイリアスとして使用できません。代わりに{timeBucket}を使用してください。",
+      "valueColumnMissing": "このアラートは列 {column} から値を読み取ります。SQL クエリでその列名を維持してください。",
       "tooltipAnomalyAbove": "異常: 予想範囲を上回っています",
       "tooltipAnomalyBelow": "異常: 予想範囲を下回っています",
       "trainingSpan": "学習期間",
@@ -12737,6 +12712,7 @@
     "oncallTeamPlaceholder": "所有権ルールからルーティング",
     "oncallTeamTooltip": "このアラートが呼び出すチーム。通常は未設定のままにして、アラートのアイデンティティディメンションからチームを判定します。ディメンションで所有者を表すことができない場合のみ設定してください。",
     "oncallTeamNoTeams": "まだオンコールチームがありません。オンコールチームのページから作成してください。",
+    "lockedTeamFallback": "ロックされたチーム",
     "oncallTeamAtFireTime": "所有権から",
     "oncallTeamFromRules": "このアラートにはチームが設定されていないため、担当者は発火する行の識別ディメンションから導出されます。それらは発火するまで不明です。",
     "tags": "タグ",
@@ -13049,6 +13025,10 @@
         "onceFor": "1 回、{duration}"
       },
       "validation": {
+        "groupLimitLost": "このアラートを削除すると、グループ制限も削除されます。確定するには「すべてのグループをミュート」を使用してください。",
+        "endInPast": "終了時刻が過去です。現在より後の終了時刻を選択してください。",
+        "pastSloOnly": "このウィンドウは過去です。SLO データのみを修正します。",
+        "neverProducesWindow": "このスケジュールではウィンドウが生成されません。",
         "conditionRequired": "条件を追加するか、条件ブロックを削除してください。",
         "pairKey": "すべての行でディメンションを選択してください。",
         "pairOperator": "ダウンタイム条件では = または != を使用してください。",
@@ -13122,7 +13102,9 @@
       "confirmEndNow": {
         "title": "このダウンタイムを今すぐ終了しますか？",
         "message": "通知はすぐに再開されます。ダウンタイムは早期終了としてリストに残ります。",
+        "recurringMessage": "このダウンタイムは繰り返しです。今すぐ終了すると、将来のすべてのウィンドウとその延長も停止します。同じ項目を対象とする他のダウンタイムは引き続きミュートします。将来のウィンドウを再びミュートするには、複製してください。",
         "ok": "今すぐ終了",
+        "recurringOk": "今すぐ終了して将来のウィンドウを停止",
         "keep": "継続する"
       },
       "extend": {
@@ -13155,6 +13137,8 @@
       "confirmCancel": {
         "title": "ダウンタイムをキャンセル",
         "message": "通知はすぐに再開されます。ダウンタイムは履歴として一覧に残ります。",
+        "recurringMessage": "このダウンタイムは繰り返しです。キャンセルすると将来のすべてのウィンドウが停止します。",
+        "bulkRecurringNote": "選択したダウンタイムの少なくとも 1 つが繰り返しです。キャンセルすると将来のすべてのウィンドウが停止します。",
         "bulkMessage": "{count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。 | {count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。",
         "confirm": "ダウンタイムをキャンセル | ダウンタイムをキャンセル",
         "keep": "ダウンタイムを維持 | ダウンタイムを維持"
@@ -13192,6 +13176,11 @@
         "cardCaption": "まずフォルダで絞り込み、その後に任意のブロックでさらに絞り込みます。上記のディメンション条件はこのモジュールにも適用されます。",
         "noConditionForChecks": "上記のディメンション条件はチェックには適用されません。",
         "appliesTo": "適用対象",
+        "groupScope": "{alert} の {count} グループのみをミュートします: {labels}。 | {alert} の {count} グループのみをミュートします: {labels}。",
+        "groupScopeNoLabels": "{alert} の {count} グループのみをミュートします。 | {alert} の {count} グループのみをミュートします。",
+        "groupScopeEndsOnGroupClear": "このグループが発火を停止したときに終了します。",
+        "groupScopeEndsOnAlertClear": "このアラートが発火を停止したときに終了します。",
+        "groupScopeClear": "スケジュールされた終了まですべてのグループをミュート",
         "tabTargets": "ターゲット",
         "tabSchedule": "スケジュール",
         "tabAdvanced": "詳細設定",
@@ -13354,6 +13343,12 @@
         "bannerOn": "アクティブな間、組織に表示されます",
         "bannerOff": "バナーなし",
         "occurrences": "発生回数",
+        "plannedSchedule": "予定スケジュール",
+        "endedEarlyAt": "早期終了日時",
+        "cancelledAt": "キャンセル日時",
+        "endedEarlyAtTime": "{time} に早期終了",
+        "cancelledAtTime": "{time} にキャンセル",
+        "stoppedTime": "{time} ({zone})",
         "nextWindow": "次のウィンドウ: {window}。あなたのタイムゾーン: {local}。",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "一致条件",
@@ -13508,8 +13503,7 @@
             "ended": "終了",
             "cancelled": "キャンセル",
             "extended": "延長"
-          },
-          "template": "テンプレート"
+          }
         },
         "test": {
           "send": "テスト送信",
@@ -13580,42 +13574,8 @@
       "incident": "インシデント"
     },
     "priorityUnsetPagesAs": "未設定（P2 として呼び出し）",
-    "notificationKinds": {
-      "alert": "アラート",
-      "incident": "インシデント",
-      "anomaly": "異常",
-      "synthetics": "合成モニタリング",
-      "downtime": "ダウンタイム",
-      "on_call": "オンコール"
-    },
-    "templateOverride": {
-      "label": "テンプレートオーバーライド",
-      "placeholder": "宛先のテンプレートを使用",
-      "help": "{kind} メッセージの宛先テンプレートを上書きします。プリビルドテンプレートは選択できないため、先にコピーしてください。",
-      "empty": "{kind} に適用できるテンプレートはまだありません。",
-      "create": "テンプレートを作成",
-      "loadFailed": "テンプレートを読み込めませんでした",
-      "forbidden": "テンプレートを一覧表示するには、テンプレートの読み取り権限が必要です",
-      "mismatch": "あなたの宛先のうち {count} 件（{names}）には適合しません。これらの宛先はそれぞれのテンプレートにフォールバックします。",
-      "groupContent": "コンテンツ",
-      "groupCustom": "カスタム",
-      "webhookOnly": "（Webhook のみ）",
-      "emailOnly": "（メールのみ）",
-      "snsOnly": "（SNS のみ）",
-      "stale": "テンプレート {name} は存在しなくなりました。別のものを選択するか、フィールドをクリアしてください。",
-      "willUse": "使用予定: {template}",
-      "willUsePerDestination": "宛先ごとの使用予定:",
-      "willUseRow": "{destination}: {template}",
-      "templateWithSource": "{name} ({source})",
-      "builtIn": "組み込みの {kind} メッセージ",
-      "sourceExplicit": "このオーバーライド",
-      "sourceDestination": "宛先テンプレート",
-      "sourceOrgDefault": "組織のデフォルト",
-      "sourceCompiled": "組み込み",
-      "sourcePlatformResolve": "プラットフォームによる解決",
-      "sourceLegacy": "レガシーペイロード",
-      "sourceLegacyPayload": "種類固有の JSON ペイロード（汎用 Webhook）"
-    }
+    "notificationKinds": {},
+    "templateOverride": {}
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -13935,26 +13895,7 @@
     "testSendConfirm": "これにより、選択したチャネルに [TEST] とマークされた実際のメッセージが投稿されます。",
     "testSendSuccess": "テストメッセージを送信しました",
     "testSendRateLimited": "テスト送信が多すぎます。しばらく待ってから再試行してください",
-    "testSendNoDestination": "最初に宛先を選択してください",
-    "playgroundLabel": "プレイグラウンド",
-    "playgroundHelp": "ここでは何も送信されません。",
-    "emptyVariables": "「{kind}」では次の変数が空です: {names}",
-    "appliesTo": "適用対象",
-    "appliesToAll": "すべての種類",
-    "appliesToAny": "任意の種類",
-    "allKindsNotice": "すべての種類に適用されるテンプレート: {count} 件。これらのテンプレートは、宛先で異常検知、合成モニタリング、オンコール、ダウンタイム、インシデントのメッセージにも使用されます。確認してください。",
-    "allKindsNoticeReview": "確認",
-    "appliesToInferred": "本文内の変数から推定",
-    "appliesToManual": "ユーザーが選択",
-    "appliesToReset": "推定にリセット",
-    "previewKind": "種類",
-    "previewForbidden": "テンプレートをプレビューする権限がありません",
-    "previewFailed": "プレビューに失敗しました: {message}",
-    "severityFailed": "失敗",
-    "severityDegraded": "劣化",
-    "severityFlaky": "不安定",
-    "severityRecovered": "復旧",
-    "variableGroupCommon": "共通"
+    "testSendNoDestination": "最初に宛先を選択してください"
   },
   "alert_sources": {
     "header": "外部アラートソース",
@@ -14210,12 +14151,7 @@
     "severityErrorDescription": "標準エラーインシデント",
     "severityWarningDescription": "警告レベルのインシデント",
     "severityInfoDescription": "情報インシデント",
-    "urlRecipientsChannel": "URL / 受信者 / チャンネル",
-    "payloadFormat": "ペイロード形式",
-    "payloadFormatAuto": "自動",
-    "payloadFormatLegacy": "レガシー JSON",
-    "payloadFormatRendered": "レンダリング済みテンプレート",
-    "payloadFormatHelp": "自動では、テンプレートが関連付けられるまで、異常検知、合成モニタリング、オンコールのメッセージに従来の JSON 本文を送信します。メタデータキー payload_format として保存されます。"
+    "urlRecipientsChannel": "URL / 受信者 / チャンネル"
   },
   "pipeline_destinations": {
     "header": "パイプライン宛先",
@@ -14733,6 +14669,7 @@
     "generalDesc": "テーマ、クエリのデフォルト、基本設定",
     "orgDesc": "組織のパラメータと識別子",
     "cipherKeysDesc": "機密フィールドの暗号化キー",
+    "aiToolsetsDesc": "AI アシスタントが使用できる MCP サーバーと CLI ツール",
     "regexPatternsDesc": "墨消し用の再利用可能なregexパターン",
     "domainManagementDesc": "サインインを許可されたSSOドメインに制限",
     "passwordPolicy": "パスワードポリシー",
@@ -15068,9 +15005,7 @@
     },
     "licensePage": {
       "unexpectedError": "予期しないエラー",
-      "daysRemaining": "ライセンスの期限まであと{days}日",
-      "oneDayRemaining": "ライセンスの期限まであと1日",
-      "licenseExpired": "ライセンスの有効期限が切れました"
+      "daysRemaining": "ライセンスの期限まであと{days}日"
     },
     "nodesPage": {
       "subtitle": "クラスターノードとそのヘルス状態",
@@ -23421,19 +23356,6 @@
     "exportSucceeded": "{count}個のSLOをエクスポートしました | {count}個のSLOをエクスポートしました",
     "moved": "{count} 個のSLOを {folder} に移動しました",
     "moveFailed": "移動に失敗しました",
-    "import": {
-      "title": "SLOs をインポート",
-      "results": "インポート結果",
-      "noResults": "インポートすると、各 SLO の結果がここに表示されます。",
-      "jsonEmpty": "インポートする前に、ファイル、URL、またはエディターから SLO JSON を追加してください。",
-      "invalidJson": "SLO JSON を解析できませんでした。",
-      "notAnObject": "SLO #{index} は JSON オブジェクトではないため、スキップされました。",
-      "nameRequired": "SLO #{index} には名前がないため、スキップされました。",
-      "created": "SLO #{index}「{name}」をインポートしました。",
-      "failed": "SLO #{index}「{name}」はインポートされませんでした: {reason}",
-      "unknownError": "不明なエラー",
-      "succeeded": "SLO を {count} 件インポートしました | SLO を {count} 件インポートしました"
-    },
     "preview": {
       "goodEvents": "良好なイベント",
       "badEvents": "不良イベント",
@@ -27476,9 +27398,7 @@
     "claimSignalsFailedPaths": "{paths} を引き受けられませんでした",
     "claimSignalsMorePaths": "{paths}、ほか {count} 件",
     "toastSignalsClaimedPartly": "{count} 件中 {claimed} 件のシグナルは今後 {team} に送信されます。{paths} を引き受けられませんでした | {count} 件中 {claimed} 件のシグナルは今後 {team} に送信されます。{paths} を引き受けられませんでした",
-    "scopeNotSeenYet": "まだデータで確認されていません",
-    "deliveryTemplate": "テンプレート: {templates}",
-    "policyMailBanner": "メールおよび SNS の宛先は、このバージョンから呼び出しを受け取ります: {names}。"
+    "scopeNotSeenYet": "まだデータで確認されていません"
   },
   "paidUsage": {
     "consentTitle": "有料のAI使用を有効にしますか？",

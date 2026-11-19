@@ -2149,27 +2149,7 @@
       "view": "منظر",
       "frustration": "الإحباط",
       "failedRequest": "الطلبات الفاشلة",
-      "noResponse": "لا استجابة",
-      "noResponseStatus": "0 — لا استجابة",
-      "failedRequestDetails": "تفاصيل الطلب الفاشل",
-      "browserStatus": "حالة المتصفح",
-      "serverStatus": "حالة الخادم",
-      "noServerSpanFound": "لم يُعثر على امتداد خادم",
-      "noServerSpanHint": "قد يعني غياب الامتداد أيضًا أخذ العينات أو تأخر الاستيعاب أو مسارًا غير مُجهّز بالتتبع أو الاحتفاظ بالبيانات.",
-      "unknownNoTrace": "غير معروف (لا يوجد تتبع)",
-      "unknown": "غير معروف",
-      "abortedByApp": "أُلغي بواسطة التطبيق",
-      "method": "الطريقة",
-      "url": "URL",
-      "duration": "المدة",
-      "timing": "التوقيت",
-      "timingDns": "DNS",
-      "timingConnect": "الاتصال",
-      "timingSsl": "SSL",
-      "timingFirstByte": "أول بايت",
-      "timingDownload": "التنزيل",
-      "size": "الحجم",
-      "initiatedBy": "المُبادر"
+      "noResponse": "لا استجابة"
     },
     "replayCanvasNotRecorded": "لم يتم تسجيل محتوى Canvas",
     "actionOnTarget": "{action} في \"{target}\"",
@@ -2213,6 +2193,7 @@
       "pageLabel": "الصفحة",
       "noDeviceData": "لم تُسجّل أي نقرات على نوع الجهاز هذا لهذه الصفحة.",
       "noReplay": "لم يتم تسجيل إعادة تشغيل جلسة لهذه الصفحة، لذلك لا توجد لقطة شاشة للرسم عليها. فعّل إعادة تشغيل الجلسة للتطبيق.",
+      "noReplayLegacySdk": "تحتاج لقطات الصفحة إلى إصدار أحدث من RUM SDK. إعادة تشغيل الجلسة المسجلة هنا تأتي من SDK أقدم، لذا لا توجد لقطة شاشة للرسم عليها.",
       "loadFailed": "تعذّر تحميل بيانات النقرات.",
       "snapshotFailed": "تعذّر تحميل لقطة الصفحة.",
       "noPosition": "لا توجد نقرات في هذه الفترة لهذه الصفحة.",
@@ -2278,8 +2259,7 @@
       "showElements": "إظهار العناصر",
       "markerLabel": "الرتبة {rank}، {name}، {count} نقرة | الرتبة {rank}، {name}، {count} نقرات",
       "markerLabelFrustrated": "الرتبة {rank}، {name}، {count} نقرة، {frustrated} محبَط | الرتبة {rank}، {name}، {count} نقرات، {frustrated} محبَط",
-      "markerClicks": "{count} نقرة | {count} نقرات",
-      "noReplayLegacySdk": "تحتاج لقطات الصفحة إلى إصدار أحدث من RUM SDK. إعادة تشغيل الجلسة المسجلة هنا تأتي من SDK أقدم، لذا لا توجد لقطة شاشة للرسم عليها."
+      "markerClicks": "{count} نقرة | {count} نقرات"
     },
     "analytics": {
       "title": "تحليلات المنتج",
@@ -3361,7 +3341,6 @@
     "licenseAndUsage": "الترخيص والاستخدام",
     "copyLicenseId": "نسخة معرف الرخصة",
     "editionLbl": "الطبعة",
-    "limitPrefix": "· الحد",
     "gbPerDay": "GB / يوم",
     "ofDailyLimitUsedToday": "الحد اليومي المستخدم اليوم",
     "gbToday": "بريطانيا العظمى اليوم",
@@ -3385,6 +3364,7 @@
     "usage_limits": "حدود الاستخدام",
     "feature_comparison_lbl": "مقارنة الميزات",
     "feature_comparision_ent_msg": "أنت تستخدم OpenObserve إصدار المؤسسات مع إمكانية الوصول إلى جميع الميزات المتقدمة المذكورة أدناه.",
+    "feature_comparision_ent_partial_msg": "أنت تستخدم OpenObserve Enterprise Edition. بعض الميزات غير مشمولة في ترخيصك؛ راجع القائمة أعلاه.",
     "feature_comparision_plan_detail": "خطتك: إصدار المؤسسات مجاني لما يصل إلى 50 جيجابايت/يوم (~1.5 تيرابايت/شهر) من استيعاب البيانات.",
     "feature_comparision_os_msg": "أنت تستخدم حاليا OpenObserve الإصدار مفتوح المصدر. قم بالترقية إلى إصدار المؤسسات لفتح الميزات المتقدمة المدرجة في جدول المقارنة أدناه.",
     "feature_comparision_good_news": "خبر جيد: إصدار OpenObserve Enterprise Edition مجاني تماما لما يصل إلى 50 جيجابايت/يوم (~1.5 تيرابايت/شهر) من استيعاب البيانات.",
@@ -3465,6 +3445,7 @@
     "features_no_match": "لا توجد ميزات تطابق بحثك",
     "features_none": "لا توجد ميزات في هذه المجموعة",
     "features_free_heading": "مجانية، ومتضمنة مع كل ترخيص",
+    "features_free_not_included": "مجانية، غير مشمولة في ترخيصك",
     "features_new": "جديد بعد ترخيصك",
     "features_filter_new": "جديد",
     "request_new_license": "طلب رخصة جديدة",
@@ -3527,6 +3508,13 @@
     "license_already_active_msg": "رخصتك لا تزال نشطة. هل تريد تحديثها بمفتاح الرخصة الجديد؟",
     "yes_update_license": "نعم، تحديث الترخيص",
     "no_keep_current": "لا، ابق على اطلاع",
+    "license_downgrade_title": "هل تريد تطبيق مفتاح الترخيص هذا؟",
+    "license_downgrade_intro": "يستبدل هذا المفتاح ترخيصك الحالي.",
+    "license_downgrade_expired": "انتهت صلاحية هذا المفتاح في {date}. سيسري الحد المجاني البالغ 50 غيغابايت/يوم.",
+    "license_downgrade_lose": "ستفقد: {names}",
+    "license_downgrade_limit": "ينتقل الحد اليومي من {old} إلى {new}",
+    "license_downgrade_expiry": "ينتقل تاريخ الانتهاء من {old} إلى {new}",
+    "license_limit_per_day": "{gb} غيغابايت/يوم",
     "header_button": {
       "cloud_features": "{product} الميزات",
       "enterprise_edition": "الطبعة: إنتربرايز",
@@ -4890,6 +4878,8 @@
       "reasonExpired": "لم يُشغَّل قط · في الانتظار لأكثر من ساعة",
       "reasonWorkerLost": "فُقد العامل · لم يُعَد تشغيله",
       "reasonWorkflowDisabled": "تم تعطيل سير العمل",
+      "reasonEndpointDisabled": "لم يُشغَّل قط · تم إيقاف نقطة نهاية HTTP",
+      "reasonCredentialRevoked": "لم يُشغَّل قط · أُبطلت بيانات اعتماده",
       "reasonRunTimeout": "انتهت المهلة بعد 15 دقيقة",
       "allTriggers": "كل المُشغِّلات",
       "triggerFilter": "المُشغِّل",
@@ -5638,8 +5628,8 @@
     "periodInfoLine1": "الفترة التي يجب أن يتم فيها تشغيل الاستعلام.",
     "periodInfoLine2": "على سبيل المثال، 10 دقائق تعني أنه عندما يتم تشغيل الاستعلام، سيستخدم آخر 10 دقائق من البيانات. إذا تم تشغيل الاستعلام الساعة 4:00 م، فسيستخدم البيانات من 3:50 م إلى 4:00 م.",
     "periodShouldMatchFrequency": "ملاحظة: يجب أن تكون الفترة نفسها مع التردد.",
-    "delayInfoLine1": "التأخير الذي من المقرر تشغيل مسار المعالجة من أجله.",
-    "delayInfoLine2": "على سبيل المثال، تأخير 10 دقائق يعني أن مسار المعالجة سيعمل بعد 10 دقائق من الوقت المحدد.",
+    "delayInfoLine1": "مدة الانتظار بعد الوقت المجدول كي تتمكن البيانات المتأخرة من الوصول.",
+    "delayInfoLine2": "مثال: مع تأخير 10 دقائق، يعمل مسار المعالجة كل ساعة عند 10:10 ويقرأ البيانات من 9:00 إلى 10:00.",
     "closeDrawer": "أغلق الدرج",
     "conditionValueGuidelines": "إرشادات قيمة الشرط:",
     "customColumnGuideline": "لإضافة عمود مخصص، اكتب اسم العمود واضغط",
@@ -6254,14 +6244,7 @@
       "askAiRejected": "تُرفض الطلبات بسبب {status} {reason} على {path}.",
       "askAiNoRequests": "لم يصل أي شيء ولم يُرفض أي طلب.",
       "askAiUnavailable": "تعذّرت قراءة الطلبات المرفوضة، لذا السبب غير معروف.",
-      "thisGuide": "مصدر بيانات",
-      "hintWaitingAfter": "يتحول هذا إلى اللون الأخضر من تلقاء نفسه عند وصول أول سجل. إذا لم يصل شيء خلال {elapsed} فسيعرض سبب المشكلة؛ تتحقق أداة استكشاف الأخطاء الآن.",
-      "idleInPrompt": "{stream} يتلقى البيانات بالفعل. تبدأ الفحوصات عند نسخ النص التوجيهي.",
-      "idleMatchesPrompt": "التدفقات المطابقة تتلقى البيانات بالفعل. تبدأ الفحوصات عند نسخ النص التوجيهي.",
-      "idleNewPrompt": "تبدأ الفحوصات عند نسخ النص التوجيهي.",
-      "fixInvalidCredentialsPrompt": "الرمز في ملف .env لا يطابق رمز المؤسسة {token}. نزّل ملف .env مرة أخرى واطلب من وكيل البرمجة إعادة تنفيذ الطلب.",
-      "fixInvalidCredentialsPromptUnnamed": "الرمز في ملف .env لا يطابق رمز هذه المؤسسة الحالي. نزّل ملف .env مرة أخرى واطلب من وكيل البرمجة إعادة تنفيذ الطلب.",
-      "copyPrompt": "نسخ النص التوجيهي"
+      "thisGuide": "مصدر بيانات"
     },
     "firstDataNotice": {
       "pill": "وصلت بياناتك الأولى",
@@ -6414,17 +6397,7 @@
         "promptTitle": "الصق هذا في {client1} أو {client2} أو {client3}",
         "promptLabel": "المطالبة",
         "promptCopied": "تم نسخ المطالبة",
-        "health": {
-          "title": "سلامة بيانات الذكاء الاصطناعي",
-          "scopeAgent": "الامتدادات من الوكيل {agent} في {stream} منذ بدء الفحص",
-          "scopeStream": "الامتدادات في {stream} منذ بدء الفحص",
-          "checking": "جارٍ التحقق من سلامة بيانات الذكاء الاصطناعي…",
-          "checkAgain": "تحقق مرة أخرى",
-          "checkAgainHint": "بعد أن يغيّر وكيل البرمجة الشيفرة ويشغّل طلبًا آخر، تحقق مرة أخرى.",
-          "unsupported": "لا يتحقق إصدار OpenObserve هذا من سلامة بيانات الذكاء الاصطناعي. وصل أول امتداد لديك، لذا يعمل التتبع.",
-          "error": "تعذّر تشغيل فحوصات سلامة بيانات الذكاء الاصطناعي. وصل أول امتداد لديك، لذا يعمل التتبع.",
-          "noGenAiSpans": "وصلت الامتدادات، لكن لا شيء منها استدعاء LLM، لذا عميل LLM غير مُجهّز بالتتبع. اطلب من وكيل البرمجة تجهيز عميل LLM بالتتبع، ثم شغّل طلبًا وتحقق مرة أخرى."
-        }
+        "health": {}
       }
     },
     "header": "مصادر البيانات",
@@ -10344,7 +10317,10 @@
     "contractManagedMessage": "يتم التعامل مع الفوترة من خلال عقدك — تواصل مع مدير حسابك للتغييرات",
     "upgradeToPlanMessage": "ترقية إلى خطة للاستمرار في الاستمتاع بالخدمات بحلول OpenObserve.",
     "creditsUsedLabel": "الاعتمادات المستخدمة",
-    "licenseExpiryContactAdmin": "يرجى تحديث رخصتك بالتواصل مع المسؤول الخاص بك.",
+    "licenseExpiredOn": "انتهت صلاحية ترخيصك في {date}. تظل ميزاتك مفعّلة.",
+    "licenseExpiredLimit": "سيُطبَّق الآن الحد المجاني البالغ {limit} غيغابايت/يوم: إذا تجاوزت الحد لأكثر من {allowed} يومًا في الشهر، يتوقف البحث حتى تجدد الترخيص.",
+    "licenseAskAdminToRenew": "اطلب من مسؤول الترخيص لديك تجديده.",
+    "renewLicense": "جدّد الترخيص",
     "subscribed": "مشترك",
     "invoiceHistory": "تاريخ الفواتير",
     "amount": "المبلغ",
@@ -10488,7 +10464,6 @@
     "failedToLinkAwsSubscription": "فشل ربط اشتراك AWS",
     "failedToLinkAzureSubscription": "فشل ربط اشتراك Azure",
     "last15Minutes": "آخر 15 دقيقة",
-    "licenseHasExpired": "انتهت صلاحية الترخيص الخاص بك",
     "numberOfPipelines": "عدد مسارات المعالجة",
     "oneDayUntilLicenseExpires": "يوم واحد متبقي لانتهاء صلاحية الترخيص",
     "pleaseWaitProcessingRequest": "يرجى الانتظار بينما نقوم بمعالجة طلبك...",
@@ -12213,6 +12188,8 @@
       "noDestinationNote": "اختياري. سيظل التنبيه يعمل ويسجل سجله، ولكن لن يتم إخطار أي وجهة.",
       "sendsToStatus": "يُرسل إلى {targets} في كل مرة يتم فيها إطلاق التنبيه.",
       "oncallTeamTarget": "فريق مناوبة",
+      "lockedWorkflowFallback": "سير عمل مقفل",
+      "lockedTargetBadge": "مقفل",
       "createsIncident": "يُنشئ حادثًا",
       "createsIncidentTooltip": "إذا كان بإمكان تنبيه إنشاء حادث، فإنه لا يرسل إشعارا مخصصا. بدلا من ذلك، يتم إرسال إشعار بالحادث عند إنشاء حادث جديد أو انضمام نوع تنبيه جديد إلى حادث قائم.",
       "helpTemplateTitle": "تجاوز القالب",
@@ -12303,13 +12280,7 @@
       "suppressRepeats": "كتم التكرارات",
       "suppressRepeatsTooltip": "إشعار مرة واحدة عندما يبدأ التنبيه في الإطلاق أو يتغير مستواه، وليس عند كل تقييم. اتركه معطّلًا لمواصلة تلقّي التذكيرات بعد كل فترة كتم.",
       "keepFiringForInvalid": "أدخل 0 ثانية أو أكثر",
-      "keepFiringForTooLong": "أدخل 86400 ثانية (24 ساعة) كحد أقصى",
-      "helpApplyToObject": "استخدام هذا القالب",
-      "helpTemplateExplainObject": "القالب هو الرسالة التي تُرسَل: النص بالإضافة إلى المتغيرات. اختيار قالب هنا يستبدل قالب كل وجهة، لهذا الإعداد فقط.",
-      "helpTemplateWhenDescObject": "إذا تُرك هذا فارغًا، تستخدم كل وجهة قالبها الخاص إن كان ينطبق على هذا النوع، ثم الرسالة المدمجة. عيّن تجاوزًا لإرسال رسالة واحدة إلى كل وجهة مطابقة.",
-      "helpCurrentHeadingObject": "ما يُرسَل الآن",
-      "helpCurrentOverrideSome": "تستخدم الوجهات المطابقة هذا القالب:",
-      "helpCurrentResolved": "لم يتم تعيين أي تجاوز. تستخدم كل وجهة:"
+      "keepFiringForTooLong": "أدخل 86400 ثانية (24 ساعة) كحد أقصى"
     },
     "advanced": {
       "addVariable": "إضافة متغير",
@@ -12449,6 +12420,9 @@
       "lastTrained": "آخر تدريب",
       "level": "المستوى",
       "lookBackWindow": "نافذة الرجوع",
+      "scheduleIntervalFloor": "يجب ألا تقل فترة الفحص عن {min}.",
+      "lookBackWindowCap": "يمكن أن تصل نافذة البحث الرجعي إلى {max} كحد أقصى عند دقة الكشف هذه: النافذة الأطول تضم أكثر من 100,000 حاوية زمنية. قصّر النافذة أو استخدم دقة كشف أطول.",
+      "retrainOnEditNote": "يؤدي تغيير الاستعلام أو الدالة أو دقة الكشف إلى إعادة تدريب هذا الكاشف. يتوقف الكشف حتى ينتهي التدريب.",
       "lookBackWindowFloor": "يجب ألا تقل نافذة الرجوع عن {min} — الفحص كل زائد دقة كشف واحدة. النافذة الأقصر لا تتسع لحزمة كاملة عند تشغيل التشغيل الأول، لذا سيتخطى ذلك التشغيل حزمًا.",
       "lookBackWindowLegacy": "هذه النافذة المحفوظة أقل من الحد الأدنى {min} (الفحص كل زائد دقة كشف واحدة). ستُحفظ دون تغيير، لكن التشغيل الأول قد يتخطى حزمًا حتى تُرفع النافذة.",
       "lookBackWindowMinimum": "{min} على الأقل؛ ويُوصى بـ {recommended} أو أكثر لهذه الإعدادات.",
@@ -12542,6 +12516,7 @@
       "summaryTrainingDays": "{days} ي",
       "summaryWindowShare": "✓ نسبة النافذة: {rule}",
       "timestampAliasBanned": "لا يمكن استخدام {column} كاسم مستعار للعمود. استخدم {timeBucket} بدلا من ذلك.",
+      "valueColumnMissing": "يقرأ هذا التنبيه قيمته من العمود {column}. احتفظ باسم هذا العمود في استعلام SQL.",
       "tooltipAnomalyAbove": "شذوذ: أعلى من النطاق المتوقع",
       "tooltipAnomalyBelow": "شذوذ: أدنى من النطاق المتوقع",
       "trainingSpan": "مدة التدريب",
@@ -12737,6 +12712,7 @@
     "oncallTeamPlaceholder": "التوجيه وفقًا لقواعد الملكية",
     "oncallTeamTooltip": "أي فريق يستدعيه هذا التنبيه. اتركه غير محدد لاستنتاج الفريق من أبعاد هوية التنبيه، وهو الوضع الطبيعي — لا تحدده إلا عندما لا يمكن لهذه الأبعاد التعبير عن المالك.",
     "oncallTeamNoTeams": "لا توجد فرق مناوبة بعد. أنشئ فريقًا من قسم فرق المناوبة.",
+    "lockedTeamFallback": "فريق مقفل",
     "oncallTeamAtFireTime": "من الملكية",
     "oncallTeamFromRules": "لا يوجد فريق محدد على هذا التنبيه، لذلك يُستنتج المالك من أبعاد هوية الصف الذي يُطلق التنبيه. ولا تُعرف هذه الأبعاد حتى يُطلق التنبيه.",
     "tags": "الوسوم",
@@ -13049,6 +13025,10 @@
         "onceFor": "مرة واحدة، {duration}"
       },
       "validation": {
+        "groupLimitLost": "تؤدي إزالة هذا التنبيه أيضًا إلى إزالة حد المجموعة. استخدم كتم كل المجموعات للتأكيد.",
+        "endInPast": "وقت الانتهاء يقع في الماضي. اختر وقت انتهاء لاحقًا.",
+        "pastSloOnly": "هذه النافذة في الماضي. إنها تصحح بيانات SLO فقط.",
+        "neverProducesWindow": "لا يُنتج هذا الجدول الزمني أي نافذة على الإطلاق.",
         "conditionRequired": "أضف شرطًا، أو أزل كتلة الشرط.",
         "pairKey": "اختر بُعدًا لكل صف.",
         "pairOperator": "استخدم = أو != في شرط فترة الصيانة.",
@@ -13122,7 +13102,9 @@
       "confirmEndNow": {
         "title": "هل تريد إنهاء فترة الصيانة هذه الآن؟",
         "message": "تُستأنف الإشعارات فورًا. تبقى فترة الصيانة في القائمة على أنها انتهت مبكرًا.",
+        "recurringMessage": "تتكرر فترة الصيانة هذه. إنهاؤها الآن يوقف أيضًا كل نافذة مستقبلية وامتداداتها. تواصل فترات الصيانة الأخرى التي تغطي العناصر نفسها الكتم. لكتم النوافذ المستقبلية مرة أخرى، أنشئ نسخة منها.",
         "ok": "الإنهاء الآن",
+        "recurringOk": "أنهِ الآن وأوقف النوافذ المستقبلية",
         "keep": "الإبقاء قيد التشغيل"
       },
       "extend": {
@@ -13155,6 +13137,8 @@
       "confirmCancel": {
         "title": "إلغاء فترة الصيانة",
         "message": "تستأنف الإشعارات فورًا. تبقى فترة الصيانة في القائمة للسجل.",
+        "recurringMessage": "تتكرر فترة الصيانة هذه. يؤدي إلغاؤها إلى إيقاف كل نافذة مستقبلية.",
+        "bulkRecurringNote": "تتكرر فترة صيانة واحدة على الأقل من الفترات المحددة. يؤدي إلغاؤها إلى إيقاف كل نافذة مستقبلية.",
         "bulkMessage": "إلغاء {count} فترة صيانة؟ تُستأنف الإشعارات فورًا. | إلغاء {count} من فترات الصيانة؟ تُستأنف الإشعارات فورًا.",
         "confirm": "إلغاء فترة الصيانة | إلغاء فترات الصيانة",
         "keep": "الإبقاء على فترة الصيانة | الإبقاء على فترات الصيانة"
@@ -13192,6 +13176,11 @@
         "cardCaption": "المجلدات أولاً، ثم تضيّق الكتل الاختيارية النطاق أكثر. ينطبق شرط البُعد أعلاه على هذه الوحدة أيضًا.",
         "noConditionForChecks": "لا ينطبق شرط البُعد أعلاه على الفحوصات.",
         "appliesTo": "ينطبق على",
+        "groupScope": "تكتم فقط {count} مجموعة من {alert}: {labels}. | تكتم فقط {count} مجموعات من {alert}: {labels}.",
+        "groupScopeNoLabels": "تكتم فقط {count} مجموعة من {alert}. | تكتم فقط {count} مجموعات من {alert}.",
+        "groupScopeEndsOnGroupClear": "تنتهي عندما تتوقف هذه المجموعة عن الإطلاق.",
+        "groupScopeEndsOnAlertClear": "تنتهي عندما يتوقف هذا التنبيه عن الإطلاق.",
+        "groupScopeClear": "كتم كل المجموعات حتى الانتهاء المجدول",
         "tabTargets": "الأهداف",
         "tabSchedule": "الجدولة",
         "tabAdvanced": "متقدم",
@@ -13354,6 +13343,12 @@
         "bannerOn": "تظهر للمؤسسة أثناء التنشيط",
         "bannerOff": "بلا لافتة",
         "occurrences": "التكرارات",
+        "plannedSchedule": "الجدول الزمني المخطط",
+        "endedEarlyAt": "انتهت مبكرًا عند",
+        "cancelledAt": "أُلغيت عند",
+        "endedEarlyAtTime": "انتهت مبكرًا عند {time}",
+        "cancelledAtTime": "أُلغيت عند {time}",
+        "stoppedTime": "{time} ({zone})",
         "nextWindow": "النافذة التالية: {window}. توقيتك: {local}.",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "مطابقة بواسطة",
@@ -13508,8 +13503,7 @@
             "ended": "انتهت",
             "cancelled": "أُلغيت",
             "extended": "مُددت"
-          },
-          "template": "القالب"
+          }
         },
         "test": {
           "send": "إرسال اختبار",
@@ -13580,42 +13574,8 @@
       "incident": "الحادث"
     },
     "priorityUnsetPagesAs": "غير محددة (تنبيه بمستوى P2)",
-    "notificationKinds": {
-      "alert": "التنبيه",
-      "incident": "الحادث",
-      "anomaly": "الشذوذ",
-      "synthetics": "المراقبة الاصطناعية",
-      "downtime": "فترة الصيانة",
-      "on_call": "المناوبة"
-    },
-    "templateOverride": {
-      "label": "تجاوز القالب",
-      "placeholder": "استخدام قالب الوجهة",
-      "help": "يتجاوز قالب الوجهة لرسائل {kind}. لا يمكن اختيار القوالب المُعدّة مسبقًا؛ انسخ أحدها أولًا.",
-      "empty": "لا توجد قوالب تنطبق على {kind} بعد.",
-      "create": "أنشئ قالبًا",
-      "loadFailed": "تعذّر تحميل القوالب",
-      "forbidden": "يتطلب سرد القوالب إذن قراءة القوالب",
-      "mismatch": "لا يناسب {count} من وجهاتك ({names})؛ وستعود تلك الوجهات إلى قالبها الخاص.",
-      "groupContent": "المحتوى",
-      "groupCustom": "مخصص",
-      "webhookOnly": "(Webhook فقط)",
-      "emailOnly": "(البريد الإلكتروني فقط)",
-      "snsOnly": "(SNS فقط)",
-      "stale": "لم يعد القالب {name} موجودًا. اختر قالبًا آخر أو امسح الحقل.",
-      "willUse": "سيُستخدم: {template}",
-      "willUsePerDestination": "سيُستخدم لكل وجهة:",
-      "willUseRow": "{destination}: {template}",
-      "templateWithSource": "{name} ({source})",
-      "builtIn": "رسالة {kind} المضمنة",
-      "sourceExplicit": "هذا التجاوز",
-      "sourceDestination": "قالب الوجهة",
-      "sourceOrgDefault": "افتراضي المؤسسة",
-      "sourceCompiled": "مضمن",
-      "sourcePlatformResolve": "تحديد المنصة",
-      "sourceLegacy": "الحمولة القديمة",
-      "sourceLegacyPayload": "حمولة JSON الخاصة بالنوع (Webhook عام)"
-    }
+    "notificationKinds": {},
+    "templateOverride": {}
   },
   "alert_dependencies": {
     "actionOpen": "فتح",
@@ -13935,26 +13895,7 @@
     "testSendConfirm": "هذا سيرسل رسالة حقيقية إلى القناة المختارة، مع علامة [اختبار].",
     "testSendSuccess": "تم إرسال رسالة الاختبار",
     "testSendRateLimited": "الكثير من الاختبارات — يرجى الانتظار لحظة والمحاولة مرة أخرى",
-    "testSendNoDestination": "اختر وجهة أولا",
-    "playgroundLabel": "ساحة التجربة",
-    "playgroundHelp": "لا يتم إرسال أي شيء من هنا.",
-    "emptyVariables": "فارغة لـ {kind}: {names}",
-    "appliesTo": "ينطبق على",
-    "appliesToAll": "جميع الأنواع",
-    "appliesToAny": "أي نوع",
-    "allKindsNotice": "القوالب التي تنطبق على جميع الأنواع: {count}. تستخدمها وجهاتها أيضًا لرسائل الشذوذ والمراقبة الاصطناعية والمناوبة وفترة الصيانة والحوادث. راجعها.",
-    "allKindsNoticeReview": "راجع",
-    "appliesToInferred": "مستنتج من المتغيرات في النص",
-    "appliesToManual": "اختيارك",
-    "appliesToReset": "أعد التعيين إلى المستنتج",
-    "previewKind": "النوع",
-    "previewForbidden": "ليس لديك إذن لمعاينة القوالب",
-    "previewFailed": "فشلت المعاينة: {message}",
-    "severityFailed": "فشل",
-    "severityDegraded": "متدهور",
-    "severityFlaky": "متقلب",
-    "severityRecovered": "متعافى",
-    "variableGroupCommon": "عامة"
+    "testSendNoDestination": "اختر وجهة أولا"
   },
   "alert_sources": {
     "header": "مصادر تنبيه خارجية",
@@ -14210,12 +14151,7 @@
     "severityErrorDescription": "حوادث الأخطاء القياسية",
     "severityWarningDescription": "حوادث مستوى التحذير",
     "severityInfoDescription": "الحوادث الإعلامية",
-    "urlRecipientsChannel": "URL / المستلمون / القناة",
-    "payloadFormat": "تنسيق الحمولة",
-    "payloadFormatAuto": "تلقائي",
-    "payloadFormatLegacy": "JSON قديم",
-    "payloadFormatRendered": "قالب مُصيَّر",
-    "payloadFormatHelp": "يرسل الوضع التلقائي متن JSON القديم لرسائل الشذوذ والمراقبة الاصطناعية والمناوبة حتى يتم إرفاق قالب. يُخزَّن كمفتاح البيانات الوصفية payload_format."
+    "urlRecipientsChannel": "URL / المستلمون / القناة"
   },
   "pipeline_destinations": {
     "header": "وجهات مسارات المعالجة",
@@ -14733,6 +14669,7 @@
     "generalDesc": "الموضوع، الإعدادات الافتراضية للاستعلام، والتفضيلات الأساسية",
     "orgDesc": "معايير المؤسسة والمعرفات",
     "cipherKeysDesc": "مفاتيح التشفير للحقول الحساسة",
+    "aiToolsetsDesc": "خوادم MCP وأدوات CLI التي يمكن لمساعد الذكاء الاصطناعي استخدامها",
     "regexPatternsDesc": "أنماط regex القابلة لإعادة الاستخدام للحذف",
     "domainManagementDesc": "قيد تسجيل الدخول على نطاقات SSO المسموح بها",
     "passwordPolicy": "سياسة كلمة المرور",
@@ -15068,9 +15005,7 @@
     },
     "licensePage": {
       "unexpectedError": "خطأ غير متوقع",
-      "daysRemaining": "الأيام المتبقية حتى تنتهي صلاحية رخصتك: {days}",
-      "oneDayRemaining": "يوم واحد متبقي لانتهاء صلاحية الترخيص",
-      "licenseExpired": "انتهت صلاحية الترخيص الخاص بك"
+      "daysRemaining": "الأيام المتبقية حتى تنتهي صلاحية رخصتك: {days}"
     },
     "nodesPage": {
       "subtitle": "عقد العنقود وصحتها",
@@ -23421,19 +23356,6 @@
     "exportSucceeded": "تم تصديرها {count} SLO | تم تصديرها {count} SLOs",
     "moved": "تم نقل {count} من أهداف SLO إلى {folder}",
     "moveFailed": "فشل النقل",
-    "import": {
-      "title": "استيراد SLOs",
-      "results": "نتائج الاستيراد",
-      "noResults": "تظهر نتيجة كل SLO هنا بعد الاستيراد.",
-      "jsonEmpty": "أضف JSON الخاص بـ SLO من ملف أو عنوان URL أو المحرر قبل الاستيراد.",
-      "invalidJson": "تعذّر تحليل JSON الخاص بـ SLO.",
-      "notAnObject": "SLO #{index} ليس كائن JSON وتم تخطيه.",
-      "nameRequired": "SLO #{index} ليس له اسم وتم تخطيه.",
-      "created": "تم استيراد SLO #{index} \"{name}\".",
-      "failed": "لم يتم استيراد SLO #{index} \"{name}\": {reason}",
-      "unknownError": "خطأ غير معروف",
-      "succeeded": "تم استيراد {count} SLO | تم استيراد {count} SLOs"
-    },
     "preview": {
       "goodEvents": "الأحداث الجيدة",
       "badEvents": "الأحداث السيئة",
@@ -27476,9 +27398,7 @@
     "claimSignalsFailedPaths": "تعذّرت المطالبة بـ {paths}",
     "claimSignalsMorePaths": "{paths} و{count} أخرى",
     "toastSignalsClaimedPartly": "{claimed} من {count} إشارة تذهب الآن إلى {team}؛ تعذّرت المطالبة بـ {paths} | {claimed} من {count} إشارات تذهب الآن إلى {team}؛ تعذّرت المطالبة بـ {paths}",
-    "scopeNotSeenYet": "لم يُرَ في بياناتك بعد",
-    "deliveryTemplate": "القالب: {templates}",
-    "policyMailBanner": "تتلقى وجهات البريد الإلكتروني وSNS نداءات المناوبة من هذا الإصدار: {names}."
+    "scopeNotSeenYet": "لم يُرَ في بياناتك بعد"
   },
   "paidUsage": {
     "consentTitle": "هل تريد تشغيل استخدام الذكاء الاصطناعي المدفوع؟",

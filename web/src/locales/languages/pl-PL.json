@@ -2149,27 +2149,7 @@
       "view": "Widok",
       "frustration": "Frustracja",
       "failedRequest": "Nieudane żądania",
-      "noResponse": "Brak odpowiedzi",
-      "noResponseStatus": "0 — Brak odpowiedzi",
-      "failedRequestDetails": "Szczegóły nieudanego żądania",
-      "browserStatus": "Status przeglądarki",
-      "serverStatus": "Status serwera",
-      "noServerSpanFound": "Nie znaleziono spanu serwera",
-      "noServerSpanHint": "Brakujący span może też oznaczać próbkowanie, opóźnienie pozyskiwania danych, nieinstrumentowaną trasę lub retencję.",
-      "unknownNoTrace": "Nieznane (brak trace)",
-      "unknown": "Nieznane",
-      "abortedByApp": "przerwane przez aplikację",
-      "method": "Metoda",
-      "url": "URL",
-      "duration": "Czas trwania",
-      "timing": "Czasy",
-      "timingDns": "DNS",
-      "timingConnect": "Połączenie",
-      "timingSsl": "SSL",
-      "timingFirstByte": "Pierwszy bajt",
-      "timingDownload": "Pobieranie",
-      "size": "Rozmiar",
-      "initiatedBy": "Zainicjowane przez"
+      "noResponse": "Brak odpowiedzi"
     },
     "replayCanvasNotRecorded": "Zawartość canvas nie została nagrana",
     "actionOnTarget": "{action} na \"{target}\"",
@@ -2213,6 +2193,7 @@
       "pageLabel": "Strona",
       "noDeviceData": "Nie zarejestrowano kliknięć na tym typie urządzenia dla tej strony.",
       "noReplay": "Dla tej strony nie zarejestrowano żadnego odtwarzania sesji, więc nie ma zrzutu ekranu do naniesienia danych. Włącz odtwarzanie sesji dla aplikacji.",
+      "noReplayLegacySdk": "Migawki stron wymagają nowszego RUM SDK. Zarejestrowane tutaj odtwarzanie sesji pochodzi ze starszego SDK, więc nie ma zrzutu ekranu, na którym można rysować.",
       "loadFailed": "Nie udało się wczytać danych o kliknięciach.",
       "snapshotFailed": "Nie udało się wczytać zrzutu strony.",
       "noPosition": "Brak kliknięć w tym okresie dla tej strony.",
@@ -2278,8 +2259,7 @@
       "showElements": "Pokaż elementy",
       "markerLabel": "Pozycja {rank}, {name}, {count} kliknięcie | Pozycja {rank}, {name}, {count} kliknięcia",
       "markerLabelFrustrated": "Pozycja {rank}, {name}, {count} kliknięcie, {frustrated} sfrustrowanych | Pozycja {rank}, {name}, {count} kliknięcia, {frustrated} sfrustrowanych",
-      "markerClicks": "{count} kliknięcie | {count} kliknięcia",
-      "noReplayLegacySdk": "Migawki stron wymagają nowszego RUM SDK. Zarejestrowane tutaj odtwarzanie sesji pochodzi ze starszego SDK, więc nie ma zrzutu ekranu, na którym można rysować."
+      "markerClicks": "{count} kliknięcie | {count} kliknięcia"
     },
     "analytics": {
       "title": "Analityka produktu",
@@ -3361,7 +3341,6 @@
     "licenseAndUsage": "Licencja i wykorzystanie",
     "copyLicenseId": "Skopiuj ID licencji",
     "editionLbl": "Edycja",
-    "limitPrefix": "· limit",
     "gbPerDay": "GB / dzień",
     "ofDailyLimitUsedToday": "z dziennego limitu wykorzystanego dzisiaj",
     "gbToday": "GB dzisiaj",
@@ -3385,6 +3364,7 @@
     "usage_limits": "Limity użycia",
     "feature_comparison_lbl": "Porównanie funkcji",
     "feature_comparision_ent_msg": "Korzystasz z OpenObserve Enterprise Edition z dostępem do wszystkich zaawansowanych funkcji wymienionych poniżej.",
+    "feature_comparision_ent_partial_msg": "Używasz edycji OpenObserve Enterprise. Niektóre funkcje nie są objęte Twoją licencją; zobacz listę powyżej.",
     "feature_comparision_plan_detail": "Twój plan: Enterprise Edition jest bezpłatne do 50 GB/dzień (~1,5 TB/miesiąc) wprowadzania danych.",
     "feature_comparision_os_msg": "Obecnie korzystasz z OpenObserve Open Source Edition. Zaktualizuj do Enterprise Edition, aby odblokować zaawansowane funkcje wymienione w poniższej tabeli porównawczej.",
     "feature_comparision_good_news": "Dobra wiadomość: OpenObserve Enterprise Edition jest całkowicie bezpłatne do 50 GB/dzień (~1,5 TB/miesiąc) wprowadzania danych.",
@@ -3465,6 +3445,7 @@
     "features_no_match": "Brak funkcji pasujących do wyszukiwania",
     "features_none": "Brak funkcji w tej grupie",
     "features_free_heading": "Bezpłatne, wliczone w każdą licencję",
+    "features_free_not_included": "Bezpłatne, niedostępne w Twojej licencji",
     "features_new": "Nowe po Twojej licencji",
     "features_filter_new": "Nowe",
     "request_new_license": "Poproś o nową licencję",
@@ -3527,6 +3508,13 @@
     "license_already_active_msg": "Twoja licencja jest nadal aktywna. Czy chcesz ją zaktualizować nowym kluczem licencyjnym?",
     "yes_update_license": "Tak, aktualizuj licencję",
     "no_keep_current": "Nie, zachowaj obecną",
+    "license_downgrade_title": "Zastosować ten klucz licencji?",
+    "license_downgrade_intro": "Ten klucz zastąpi Twoją obecną licencję.",
+    "license_downgrade_expired": "Ten klucz wygasł {date}. Obowiązywać będzie bezpłatny limit 50 GB/dzień.",
+    "license_downgrade_lose": "Utracisz: {names}",
+    "license_downgrade_limit": "Limit dzienny zmieni się z {old} na {new}",
+    "license_downgrade_expiry": "Data wygaśnięcia zmieni się z {old} na {new}",
+    "license_limit_per_day": "{gb} GB/dzień",
     "header_button": {
       "cloud_features": "Funkcje {product}",
       "enterprise_edition": "Wersja: Enterprise",
@@ -4890,6 +4878,8 @@
       "reasonExpired": "nigdy nie uruchomiono · w kolejce ponad 1 h",
       "reasonWorkerLost": "utracono workera · nie uruchomiono ponownie",
       "reasonWorkflowDisabled": "przepływ pracy był wyłączony",
+      "reasonEndpointDisabled": "nigdy nie uruchomiono · punkt końcowy HTTP był wyłączony",
+      "reasonCredentialRevoked": "nigdy nie uruchomiono · jego poświadczenie zostało unieważnione",
       "reasonRunTimeout": "przekroczono limit czasu po 15 min",
       "allTriggers": "Wszystkie wyzwalacze",
       "triggerFilter": "Wyzwalacz",
@@ -5638,8 +5628,8 @@
     "periodInfoLine1": "Okres, dla którego zapytanie powinno działać.",
     "periodInfoLine2": "np. 10 minut oznacza, że za każdym razem, gdy zapytanie zostanie uruchomione, użyje ostatnich 10 minut danych. Jeśli zapytanie uruchomi się o 16:00, użyje danych od 15:50 do 16:00.",
     "periodShouldMatchFrequency": "Uwaga: Okres powinien być taki sam jak częstotliwość.",
-    "delayInfoLine1": "Opóźnienie, z jakim potok ma zostać uruchomiony.",
-    "delayInfoLine2": "np. 10 minut opóźnienia oznacza, że potok uruchomi się 10 minut po zaplanowanym czasie.",
+    "delayInfoLine1": "Czas oczekiwania po zaplanowanym czasie, aby spóźnione dane mogły dotrzeć.",
+    "delayInfoLine2": "np. przy 10-minutowym opóźnieniu potok godzinny uruchamia się o 10:10 i odczytuje dane od 9:00 do 10:00.",
     "closeDrawer": "Zamknij panel",
     "conditionValueGuidelines": "Wytyczne dotyczące wartości warunku:",
     "customColumnGuideline": "Aby dodać kolumnę niestandardową, wpisz nazwę kolumny i naciśnij",
@@ -6254,14 +6244,7 @@
       "askAiRejected": "żądania są odrzucane z {status} {reason} na {path}.",
       "askAiNoRequests": "nic nie dotarło i żadne żądanie nie zostało odrzucone.",
       "askAiUnavailable": "nie udało się odczytać odrzuconych żądań, więc przyczyna nie jest znana.",
-      "thisGuide": "źródło danych",
-      "hintWaitingAfter": "To zmieni kolor na zielony samoczynnie, gdy dotrze pierwszy rekord. Jeśli nic nie dotrze w ciągu {elapsed}, wskaże, co poszło nie tak; opcja Rozwiązywanie problemów sprawdzi teraz.",
-      "idleInPrompt": "{stream} już odbiera dane. Sprawdzanie rozpocznie się po skopiowaniu promptu.",
-      "idleMatchesPrompt": "Pasujące strumienie już odbierają dane. Sprawdzanie rozpocznie się po skopiowaniu promptu.",
-      "idleNewPrompt": "Sprawdzanie rozpocznie się po skopiowaniu promptu.",
-      "fixInvalidCredentialsPrompt": "Token w Twoim pliku .env nie pasuje do tokenu organizacji {token}. Pobierz plik .env ponownie i poproś swojego agenta programistycznego o ponowne wykonanie żądania.",
-      "fixInvalidCredentialsPromptUnnamed": "Token w Twoim pliku .env nie pasuje do bieżącego tokenu tej organizacji. Pobierz plik .env ponownie i poproś swojego agenta programistycznego o ponowne wykonanie żądania.",
-      "copyPrompt": "Kopiuj prompt"
+      "thisGuide": "źródło danych"
     },
     "firstDataNotice": {
       "pill": "Twoje pierwsze dane dotarły",
@@ -6414,17 +6397,7 @@
         "promptTitle": "Wklej to do {client1}, {client2} lub {client3}",
         "promptLabel": "Prompt",
         "promptCopied": "Prompt skopiowany",
-        "health": {
-          "title": "Kondycja danych AI",
-          "scopeAgent": "Spany od agenta {agent} w strumieniu {stream} od rozpoczęcia sprawdzania",
-          "scopeStream": "Spany w strumieniu {stream} od rozpoczęcia sprawdzania",
-          "checking": "Sprawdzanie kondycji danych AI…",
-          "checkAgain": "Sprawdź ponownie",
-          "checkAgainHint": "Gdy Twój agent programistyczny zmieni kod i wykona kolejne żądanie, sprawdź ponownie.",
-          "unsupported": "Ta wersja OpenObserve nie sprawdza kondycji danych AI. Pierwszy span dotarł, więc śledzenie działa.",
-          "error": "Nie udało się uruchomić sprawdzania kondycji danych AI. Pierwszy span dotarł, więc śledzenie działa.",
-          "noGenAiSpans": "Spany dotarły, ale żaden z nich nie jest wywołaniem LLM, więc klient LLM nie jest instrumentowany. Poproś swojego agenta programistycznego o instrumentację klienta LLM, wykonanie żądania i ponowne sprawdzenie."
-        }
+        "health": {}
       }
     },
     "header": "Źródła danych",
@@ -10344,7 +10317,10 @@
     "contractManagedMessage": "Rozliczenia są obsługiwane przez Twoją umowę — skontaktuj się z opiekunem konta w celu wprowadzenia zmian.",
     "upgradeToPlanMessage": "Przejdź na wyższy plan, aby nadal korzystać z usług OpenObserve.",
     "creditsUsedLabel": "wykorzystane kredyty",
-    "licenseExpiryContactAdmin": "Zaktualizuj licencję, kontaktując się z administratorem.",
+    "licenseExpiredOn": "Twoja licencja wygasła {date}. Twoje funkcje pozostają włączone.",
+    "licenseExpiredLimit": "Obowiązuje teraz bezpłatny limit {limit} GB/dzień: przekroczenie go przez więcej niż {allowed} dni w miesiącu wstrzymuje wyszukiwanie do czasu odnowienia.",
+    "licenseAskAdminToRenew": "Poproś administratora licencji o odnowienie.",
+    "renewLicense": "Odnów licencję",
     "subscribed": "Subskrybowany",
     "invoiceHistory": "Historia faktur",
     "amount": "Kwota",
@@ -10488,7 +10464,6 @@
     "failedToLinkAwsSubscription": "Nie udało się połączyć subskrypcji AWS",
     "failedToLinkAzureSubscription": "Nie udało się połączyć subskrypcji Azure",
     "last15Minutes": "Ostatnie 15 minut",
-    "licenseHasExpired": "Twoja licencja wygasła",
     "numberOfPipelines": "Liczba potoków",
     "oneDayUntilLicenseExpires": "Pozostał 1 dzień do wygaśnięcia Twojej licencji.",
     "pleaseWaitProcessingRequest": "Proszę czekać, trwa przetwarzanie żądania...",
@@ -12213,6 +12188,8 @@
       "noDestinationNote": "Opcjonalne. Alert nadal działa i zapisuje swoją historię, ale żadne miejsce docelowe nie otrzymuje powiadomienia.",
       "sendsToStatus": "Wysyła do {targets} przy każdym wyzwoleniu alertu.",
       "oncallTeamTarget": "zespół dyżurny",
+      "lockedWorkflowFallback": "Zablokowany przepływ pracy",
+      "lockedTargetBadge": "Zablokowane",
       "createsIncident": "Tworzy incydent",
       "createsIncidentTooltip": "Jeśli alert może utworzyć incydent, nie wysyła dedykowanego powiadomienia. Zamiast tego powiadomienie o incydencie jest wysyłane, gdy nowy incydent zostanie utworzony lub nowy typ alertu dołączy do istniejącego incydentu.",
       "helpTemplateTitle": "Zastąpienie szablonem",
@@ -12303,13 +12280,7 @@
       "suppressRepeats": "Pomijaj powtórzenia",
       "suppressRepeatsTooltip": "Powiadamiaj raz, gdy alert zacznie być wyzwolony lub zmieni poziom, a nie przy każdej ocenie. Pozostaw wyłączone, aby nadal otrzymywać przypomnienia po każdym okresie wyciszenia.",
       "keepFiringForInvalid": "Wprowadź 0 lub więcej sekund",
-      "keepFiringForTooLong": "Wprowadź maksymalnie 86400 sekund (24 godziny)",
-      "helpApplyToObject": "Użyj tego szablonu",
-      "helpTemplateExplainObject": "Szablon to wysyłana wiadomość: tekst wraz ze zmiennymi. Wybranie go tutaj zastępuje własny szablon każdego miejsca docelowego, tylko w tej konfiguracji.",
-      "helpTemplateWhenDescObject": "Pozostaw to pole puste, a każde miejsce docelowe użyje własnego szablonu, jeśli ma on zastosowanie do tego rodzaju, w przeciwnym razie wbudowanej wiadomości. Ustaw nadpisanie, aby wysłać jedną wiadomość do każdego pasującego miejsca docelowego.",
-      "helpCurrentHeadingObject": "Co jest teraz wysyłane",
-      "helpCurrentOverrideSome": "Pasujące miejsca docelowe używają tego szablonu:",
-      "helpCurrentResolved": "Nie ustawiono nadpisania. Każde miejsce docelowe używa:"
+      "keepFiringForTooLong": "Wprowadź maksymalnie 86400 sekund (24 godziny)"
     },
     "advanced": {
       "addVariable": "Dodaj zmienną",
@@ -12449,6 +12420,9 @@
       "lastTrained": "Ostatnio trenowany",
       "level": "Poziom",
       "lookBackWindow": "Okno wsteczne",
+      "scheduleIntervalFloor": "Pole Sprawdzaj co musi wynosić co najmniej {min}.",
+      "lookBackWindowCap": "Okno wsteczne może wynosić najwyżej {max} przy tej rozdzielczości wykrywania: dłuższe okno obejmuje ponad 100 000 przedziałów. Skróć okno lub użyj dłuższej rozdzielczości wykrywania.",
+      "retrainOnEditNote": "Zmiana zapytania, funkcji lub rozdzielczości wykrywania powoduje ponowne wytrenowanie tego detektora. Wykrywanie jest wstrzymane do zakończenia trenowania.",
       "lookBackWindowFloor": "Okno wsteczne musi wynosić co najmniej {min} — interwał sprawdzania plus jedna rozdzielczość detekcji. Krótsze okno nie obejmuje pełnego zasobnika, gdy uruchamia się pierwsze wykonanie, więc to wykonanie pominęłoby zasobniki.",
       "lookBackWindowLegacy": "To zapisane okno jest poniżej minimum {min} (interwał sprawdzania plus jedna rozdzielczość detekcji). Zostanie zapisane bez zmian, ale pierwsze wykonanie może pomijać zasobniki, dopóki okno nie zostanie zwiększone.",
       "lookBackWindowMinimum": "Co najmniej {min}; przy tych ustawieniach zalecane jest {recommended} lub więcej.",
@@ -12542,6 +12516,7 @@
       "summaryTrainingDays": "{days} d.",
       "summaryWindowShare": "✓ Udział w oknie: {rule}",
       "timestampAliasBanned": "{column} nie może być użyty jako alias kolumny. Użyj {timeBucket} zamiast tego.",
+      "valueColumnMissing": "Ten alert odczytuje swoją wartość z kolumny {column}. Zachowaj tę nazwę kolumny w zapytaniu SQL.",
       "tooltipAnomalyAbove": "Anomalia: powyżej oczekiwanego zakresu",
       "tooltipAnomalyBelow": "Anomalia: poniżej oczekiwanego zakresu",
       "trainingSpan": "Okres treningu",
@@ -12737,6 +12712,7 @@
     "oncallTeamPlaceholder": "Kieruj na podstawie reguł własności",
     "oncallTeamTooltip": "Który zespół wzywa ten alert. Pozostaw nieustawione, aby ustalić zespół na podstawie wymiarów tożsamości alertu, co jest typowym przypadkiem — ustaw ręcznie tylko wtedy, gdy te wymiary nie mogą wyrazić właściciela.",
     "oncallTeamNoTeams": "Brak zespołów dyżurnych. Utwórz go w sekcji Zespoły dyżurne.",
+    "lockedTeamFallback": "Zablokowany zespół",
     "oncallTeamAtFireTime": "Z reguł własności",
     "oncallTeamFromRules": "Dla tego alertu nie ustawiono zespołu, więc właściciel jest wyznaczany na podstawie wymiarów tożsamości wiersza, który zostaje wyzwolony. Nie są one znane, dopóki to nie nastąpi.",
     "tags": "Tagi",
@@ -13049,6 +13025,10 @@
         "onceFor": "Jednorazowo, {duration}"
       },
       "validation": {
+        "groupLimitLost": "Usunięcie tego alertu usuwa również limit grup. Użyj opcji Wycisz wszystkie grupy, aby potwierdzić.",
+        "endInPast": "Czas zakończenia przypada w przeszłości. Wybierz czas zakończenia późniejszy niż teraz.",
+        "pastSloOnly": "To okno przypada w przeszłości. Koryguje ono tylko dane SLO.",
+        "neverProducesWindow": "Ten harmonogram nigdy nie tworzy okna.",
         "conditionRequired": "Dodaj warunek lub usuń blok warunku.",
         "pairKey": "Wybierz wymiar dla każdego wiersza.",
         "pairOperator": "W warunku okna serwisowego użyj = lub !=.",
@@ -13122,7 +13102,9 @@
       "confirmEndNow": {
         "title": "Zakończyć to okno serwisowe teraz?",
         "message": "Powiadomienia zostaną od razu wznowione. Okno serwisowe pozostanie na liście jako zakończone wcześniej.",
+        "recurringMessage": "To okno serwisowe się powtarza. Zakończenie go teraz zatrzymuje również wszystkie przyszłe okna i ich przedłużenia. Inne okna serwisowe obejmujące te same elementy nadal wyciszają. Aby ponownie wyciszyć przyszłe okna, zduplikuj je.",
         "ok": "Zakończ teraz",
+        "recurringOk": "Zakończ teraz i zatrzymaj przyszłe okna",
         "keep": "Pozostaw aktywną"
       },
       "extend": {
@@ -13155,6 +13137,8 @@
       "confirmCancel": {
         "title": "Anuluj okno serwisowe",
         "message": "Powiadomienia zostaną wznowione natychmiast. Okno serwisowe pozostaje na liście w celach historycznych.",
+        "recurringMessage": "To okno serwisowe się powtarza. Anulowanie go zatrzymuje wszystkie przyszłe okna.",
+        "bulkRecurringNote": "Co najmniej jedno wybrane okno serwisowe się powtarza. Anulowanie go zatrzymuje wszystkie przyszłe okna.",
         "bulkMessage": "Anulować {count} okno serwisowe? Powiadomienia zostaną wznowione natychmiast. | Anulować okna serwisowe ({count})? Powiadomienia zostaną wznowione natychmiast.",
         "confirm": "Anuluj okno serwisowe | Anuluj okna serwisowe",
         "keep": "Zachowaj okno serwisowe | Zachowaj okna serwisowe"
@@ -13192,6 +13176,11 @@
         "cardCaption": "Najpierw foldery, a opcjonalne bloki zawężają wybór dalej. Warunek wymiaru powyżej dotyczy również tego modułu.",
         "noConditionForChecks": "Warunek wymiaru powyżej nie dotyczy kontroli.",
         "appliesTo": "Dotyczy",
+        "groupScope": "Wycisza tylko {count} grupę alertu {alert}: {labels}. | Wycisza tylko {count} grup alertu {alert}: {labels}.",
+        "groupScopeNoLabels": "Wycisza tylko {count} grupę alertu {alert}. | Wycisza tylko {count} grup alertu {alert}.",
+        "groupScopeEndsOnGroupClear": "Kończy się, gdy ta grupa przestaje być wyzwolona.",
+        "groupScopeEndsOnAlertClear": "Kończy się, gdy ten alert przestaje być wyzwolony.",
+        "groupScopeClear": "Wycisz wszystkie grupy do zaplanowanego zakończenia",
         "tabTargets": "Cele",
         "tabSchedule": "Harmonogram",
         "tabAdvanced": "Zaawansowane",
@@ -13354,6 +13343,12 @@
         "bannerOn": "Wyświetlany organizacji, gdy aktywny",
         "bannerOff": "Brak banera",
         "occurrences": "Wystąpienia",
+        "plannedSchedule": "Zaplanowany harmonogram",
+        "endedEarlyAt": "Zakończono wcześniej o",
+        "cancelledAt": "Anulowano o",
+        "endedEarlyAtTime": "Zakończono wcześniej o {time}",
+        "cancelledAtTime": "Anulowano o {time}",
+        "stoppedTime": "{time} ({zone})",
         "nextWindow": "Następne okno: {window}. Twój czas: {local}.",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "Dopasowane przez",
@@ -13508,8 +13503,7 @@
             "ended": "Zakończony",
             "cancelled": "Anulowany",
             "extended": "Przedłużony"
-          },
-          "template": "Szablon"
+          }
         },
         "test": {
           "send": "Wyślij test",
@@ -13580,42 +13574,8 @@
       "incident": "Incydent"
     },
     "priorityUnsetPagesAs": "Nie ustawiono (powiadamia jako P2)",
-    "notificationKinds": {
-      "alert": "Alert",
-      "incident": "Incydent",
-      "anomaly": "Anomalia",
-      "synthetics": "Syntetyki",
-      "downtime": "Okno serwisowe",
-      "on_call": "Dyżury"
-    },
-    "templateOverride": {
-      "label": "Nadpisanie szablonu",
-      "placeholder": "Użyj szablonu miejsca docelowego",
-      "help": "Nadpisuje szablon miejsca docelowego dla wiadomości typu {kind}. Nie można wybierać gotowych szablonów; najpierw skopiuj jeden.",
-      "empty": "Żadne szablony nie mają jeszcze zastosowania do typu {kind}.",
-      "create": "Utwórz szablon",
-      "loadFailed": "Nie udało się wczytać szablonów",
-      "forbidden": "Wyświetlanie listy szablonów wymaga uprawnienia do odczytu szablonów",
-      "mismatch": "Nie pasuje do {count} z Twoich miejsc docelowych ({names}); te miejsca użyją własnego szablonu.",
-      "groupContent": "Treść",
-      "groupCustom": "Niestandardowe",
-      "webhookOnly": "(tylko webhook)",
-      "emailOnly": "(tylko e-mail)",
-      "snsOnly": "(tylko SNS)",
-      "stale": "Szablon {name} już nie istnieje. Wybierz inny lub wyczyść pole.",
-      "willUse": "Zostanie użyty: {template}",
-      "willUsePerDestination": "Zostanie użyty dla poszczególnych miejsc docelowych:",
-      "willUseRow": "{destination}: {template}",
-      "templateWithSource": "{name} ({source})",
-      "builtIn": "Wbudowana wiadomość typu {kind}",
-      "sourceExplicit": "to nadpisanie",
-      "sourceDestination": "szablon miejsca docelowego",
-      "sourceOrgDefault": "domyślny w organizacji",
-      "sourceCompiled": "wbudowany",
-      "sourcePlatformResolve": "rozstrzygane przez platformę",
-      "sourceLegacy": "starszy ładunek",
-      "sourceLegacyPayload": "własny ładunek JSON danego typu (ogólny webhook)"
-    }
+    "notificationKinds": {},
+    "templateOverride": {}
   },
   "alert_dependencies": {
     "actionOpen": "Otwórz",
@@ -13935,26 +13895,7 @@
     "testSendConfirm": "To wyśle prawdziwą wiadomość do wybranego kanału, oznaczoną jako [TEST].",
     "testSendSuccess": "Wiadomość testowa wysłana",
     "testSendRateLimited": "Zbyt wiele wysłanych testów — poczekaj chwilę i spróbuj ponownie",
-    "testSendNoDestination": "Najpierw wybierz miejsce docelowe",
-    "playgroundLabel": "Obszar testowy",
-    "playgroundHelp": "Nic tutaj nie jest wysyłane.",
-    "emptyVariables": "Brak wartości dla typu {kind}: {names}",
-    "appliesTo": "Dotyczy",
-    "appliesToAll": "Wszystkie typy",
-    "appliesToAny": "Dowolny typ",
-    "allKindsNotice": "Szablony stosowane do każdego typu: {count}. Miejsca docelowe tych szablonów używają ich również do wiadomości o anomaliach, syntetykach, dyżurach, oknach serwisowych i incydentach. Przejrzyj je.",
-    "allKindsNoticeReview": "Przejrzyj",
-    "appliesToInferred": "Wywnioskowane na podstawie zmiennych w treści",
-    "appliesToManual": "Wybrane przez Ciebie",
-    "appliesToReset": "Przywróć wywnioskowane",
-    "previewKind": "Typ",
-    "previewForbidden": "Nie masz uprawnień do podglądu szablonów",
-    "previewFailed": "Podgląd nie powiódł się: {message}",
-    "severityFailed": "Niepowodzenie",
-    "severityDegraded": "Pogorszenie",
-    "severityFlaky": "Niestabilny",
-    "severityRecovered": "Przywrócono",
-    "variableGroupCommon": "Wspólne"
+    "testSendNoDestination": "Najpierw wybierz miejsce docelowe"
   },
   "alert_sources": {
     "header": "Zewnętrzne źródła alertów",
@@ -14210,12 +14151,7 @@
     "severityErrorDescription": "Incydenty standardowych błędów",
     "severityWarningDescription": "Incydenty poziomu ostrzeżeń",
     "severityInfoDescription": "Incydenty informacyjne",
-    "urlRecipientsChannel": "URL / odbiorcy / kanał",
-    "payloadFormat": "Format ładunku",
-    "payloadFormatAuto": "Automatyczny",
-    "payloadFormatLegacy": "Starszy JSON",
-    "payloadFormatRendered": "Wyrenderowany szablon",
-    "payloadFormatHelp": "W trybie automatycznym wysyłany jest stary ładunek JSON dla wiadomości o anomaliach, syntetykach i dyżurach, dopóki nie zostanie dołączony szablon. Zapisywane jako klucz metadanych payload_format."
+    "urlRecipientsChannel": "URL / odbiorcy / kanał"
   },
   "pipeline_destinations": {
     "header": "Miejsca docelowe potoków",
@@ -14733,6 +14669,7 @@
     "generalDesc": "Motyw, domyślne zapytania i podstawowe preferencje",
     "orgDesc": "Parametry organizacji i identyfikatory",
     "cipherKeysDesc": "Klucze szyfrowania dla poufnych pól",
+    "aiToolsetsDesc": "Serwery MCP i narzędzia CLI, których może używać Asystent AI",
     "regexPatternsDesc": "Wielokrotnego użytku wzorce regex do maskowania",
     "domainManagementDesc": "Ogranicz logowanie do dozwolonych domen SSO",
     "passwordPolicy": "Zasady haseł",
@@ -15068,9 +15005,7 @@
     },
     "licensePage": {
       "unexpectedError": "nieoczekiwany błąd",
-      "daysRemaining": "Dni pozostałe do wygaśnięcia licencji: {days}",
-      "oneDayRemaining": "1 dzień pozostał do wygaśnięcia licencji",
-      "licenseExpired": "Twoja licencja wygasła"
+      "daysRemaining": "Dni pozostałe do wygaśnięcia licencji: {days}"
     },
     "nodesPage": {
       "subtitle": "Węzły klastra i ich stan",
@@ -23421,19 +23356,6 @@
     "exportSucceeded": "Wyeksportowano {count} SLO | Wyeksportowano {count} SLO",
     "moved": "Przeniesiono {count} SLO do {folder}",
     "moveFailed": "Przenoszenie nie powiodło się",
-    "import": {
-      "title": "Importuj SLO",
-      "results": "Wyniki importu",
-      "noResults": "Wynik każdego SLO pojawi się tutaj po zaimportowaniu.",
-      "jsonEmpty": "Przed importem dodaj JSON SLO z pliku, z adresu URL lub z edytora.",
-      "invalidJson": "Nie można przeanalizować JSON SLO.",
-      "notAnObject": "SLO #{index} nie jest obiektem JSON i zostało pominięte.",
-      "nameRequired": "SLO #{index} nie ma nazwy i zostało pominięte.",
-      "created": "Zaimportowano SLO #{index} „{name}”.",
-      "failed": "Nie zaimportowano SLO #{index} „{name}”: {reason}",
-      "unknownError": "Nieznany błąd",
-      "succeeded": "Zaimportowano {count} SLO | Zaimportowano {count} SLO"
-    },
     "preview": {
       "goodEvents": "Dobre zdarzenia",
       "badEvents": "Złe zdarzenia",
@@ -27476,9 +27398,7 @@
     "claimSignalsFailedPaths": "Nie udało się przejąć: {paths}",
     "claimSignalsMorePaths": "{paths} i jeszcze {count}",
     "toastSignalsClaimedPartly": "{claimed} z {count} sygnałów trafia teraz do {team}; nie udało się przejąć: {paths} | {claimed} z {count} sygnałów trafia teraz do {team}; nie udało się przejąć: {paths}",
-    "scopeNotSeenYet": "Jeszcze niewidoczny w Twoich danych",
-    "deliveryTemplate": "Szablon: {templates}",
-    "policyMailBanner": "Miejsca docelowe e-mail i SNS otrzymują wezwania z tej wersji: {names}."
+    "scopeNotSeenYet": "Jeszcze niewidoczny w Twoich danych"
   },
   "paidUsage": {
     "consentTitle": "Włączyć płatne korzystanie z AI?",

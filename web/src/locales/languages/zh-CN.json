@@ -2149,27 +2149,7 @@
       "view": "视图",
       "frustration": "挫败",
       "failedRequest": "失败请求",
-      "noResponse": "无响应",
-      "noResponseStatus": "0 — 无响应",
-      "failedRequestDetails": "失败请求详情",
-      "browserStatus": "浏览器状态",
-      "serverStatus": "服务器状态",
-      "noServerSpanFound": "未找到服务端 Span",
-      "noServerSpanHint": "缺少 Span 也可能意味着采样、摄取延迟、未埋点的路由或保留策略。",
-      "unknownNoTrace": "未知（无追踪）",
-      "unknown": "未知",
-      "abortedByApp": "被应用中止",
-      "method": "方法",
-      "url": "URL",
-      "duration": "持续时间",
-      "timing": "耗时",
-      "timingDns": "DNS",
-      "timingConnect": "连接",
-      "timingSsl": "SSL",
-      "timingFirstByte": "首字节",
-      "timingDownload": "下载",
-      "size": "大小",
-      "initiatedBy": "发起方"
+      "noResponse": "无响应"
     },
     "replayCanvasNotRecorded": "未录制 Canvas 内容",
     "actionOnTarget": "在 \"{target}\" 上 {action}",
@@ -2213,6 +2193,7 @@
       "pageLabel": "页面",
       "noDeviceData": "该页面在此设备类型上未记录到点击。",
       "noReplay": "该页面未记录到会话回放，因此没有可绘制的截图。请为应用开启会话回放。",
+      "noReplayLegacySdk": "页面快照需要较新版本的 RUM SDK。此处记录的会话回放来自较旧版本的 SDK，因此没有可用于绘制的截图。",
       "loadFailed": "无法加载点击数据。",
       "snapshotFailed": "无法加载页面快照。",
       "noPosition": "该页面在该时间段内没有点击。",
@@ -2278,8 +2259,7 @@
       "showElements": "显示元素",
       "markerLabel": "排名 {rank}，{name}，{count} 次点击 | 排名 {rank}，{name}，{count} 次点击",
       "markerLabelFrustrated": "排名 {rank}，{name}，{count} 次点击，{frustrated} 次受挫 | 排名 {rank}，{name}，{count} 次点击，{frustrated} 次受挫",
-      "markerClicks": "{count} 次点击 | {count} 次点击",
-      "noReplayLegacySdk": "页面快照需要较新版本的 RUM SDK。此处记录的会话回放来自较旧版本的 SDK，因此没有可用于绘制的截图。"
+      "markerClicks": "{count} 次点击 | {count} 次点击"
     },
     "analytics": {
       "title": "产品分析",
@@ -3361,7 +3341,6 @@
     "licenseAndUsage": "许可证与使用",
     "copyLicenseId": "复制许可证 ID",
     "editionLbl": "版本",
-    "limitPrefix": "· 限制",
     "gbPerDay": "GB / 天",
     "ofDailyLimitUsedToday": "今日已使用的每日限额",
     "gbToday": "今日 GB",
@@ -3385,6 +3364,7 @@
     "usage_limits": "使用限制",
     "feature_comparison_lbl": "功能对比",
     "feature_comparision_ent_msg": "你正在使用 OpenObserve 企业版，可以访问下面列出的所有高级功能。",
+    "feature_comparision_ent_partial_msg": "您正在使用 OpenObserve 企业版。部分功能不在您的许可证范围内；请查看上方列表。",
     "feature_comparision_plan_detail": "您的套餐：企业版可免费写入高达 50 GB /天（约 1.5 TB/月）的数据。",
     "feature_comparision_os_msg": "你目前正在使用 OpenObserve 开源版。升级到企业版可解锁下表中列出的高级功能。",
     "feature_comparision_good_news": "好消息：OpenObserve 企业版完全免费，每天写入高达 50 GB（约 1.5 TB/月）的数据。",
@@ -3465,6 +3445,7 @@
     "features_no_match": "没有功能与您的搜索匹配",
     "features_none": "此组中没有功能",
     "features_free_heading": "免费，所有许可证均包含",
+    "features_free_not_included": "免费，不在您的许可证范围内",
     "features_new": "许可证之后新增",
     "features_filter_new": "新增",
     "request_new_license": "申请新许可证",
@@ -3527,6 +3508,13 @@
     "license_already_active_msg": "您的许可证仍然有效。你想用新的许可证密钥对其进行更新吗？",
     "yes_update_license": "是的，更新许可证",
     "no_keep_current": "不，保持最新状态",
+    "license_downgrade_title": "要应用此许可证密钥吗？",
+    "license_downgrade_intro": "此密钥将替换您当前的许可证。",
+    "license_downgrade_expired": "此密钥已于 {date} 过期。将适用每天 50 GB 的免费额度。",
+    "license_downgrade_lose": "您将失去：{names}",
+    "license_downgrade_limit": "每日限额将从 {old} 变为 {new}",
+    "license_downgrade_expiry": "到期时间将从 {old} 变为 {new}",
+    "license_limit_per_day": "{gb} GB/天",
     "header_button": {
       "cloud_features": "{product} 功能",
       "enterprise_edition": "版本：企业版",
@@ -4890,6 +4878,8 @@
       "reasonExpired": "从未运行 · 排队超过 1 小时",
       "reasonWorkerLost": "worker 丢失 · 未重新运行",
       "reasonWorkflowDisabled": "工作流已停用",
+      "reasonEndpointDisabled": "从未运行 · HTTP 端点已关闭",
+      "reasonCredentialRevoked": "从未运行 · 其凭证已被吊销",
       "reasonRunTimeout": "15 分钟后超时",
       "allTriggers": "所有触发器",
       "triggerFilter": "触发器",
@@ -5638,8 +5628,8 @@
     "periodInfoLine1": "查询应运行的时间段。",
     "periodInfoLine2": "例如，10 分钟表示每当查询运行时，它将使用最近 10 分钟的数据。如果查询在下午 4:00 运行，则将使用下午 3:50 到 4:00 的数据。",
     "periodShouldMatchFrequency": "注意：时间段应与频率相同。",
-    "delayInfoLine1": "流水线计划运行的延迟时间。",
-    "delayInfoLine2": "例如，延迟 10 分钟意味着流水线将在计划时间后 10 分钟运行。",
+    "delayInfoLine1": "在计划时间之后等待的时间，以便迟到数据能够到达。",
+    "delayInfoLine2": "例如，延迟 10 分钟时，每小时运行的流水线会在 10:10 运行，并读取 9:00 到 10:00 的数据。",
     "closeDrawer": "关闭抽屉",
     "conditionValueGuidelines": "条件值指南：",
     "customColumnGuideline": "要添加自定义列，请键入列名并按",
@@ -6254,14 +6244,7 @@
       "askAiRejected": "请求在 {path} 上被拒绝，状态为 {status} {reason}。",
       "askAiNoRequests": "尚未收到任何数据，也没有请求被拒绝。",
       "askAiUnavailable": "无法读取被拒绝的请求，因此原因未知。",
-      "thisGuide": "某个数据源",
-      "hintWaitingAfter": "第一条记录到达后，此处会自动变绿。如果 {elapsed} 内没有任何数据到达，它会显示哪里出了问题；「排查」会立即检查。",
-      "idleInPrompt": "{stream} 已在接收数据。复制提示词后即开始检查。",
-      "idleMatchesPrompt": "匹配的数据流已在接收数据。复制提示词后即开始检查。",
-      "idleNewPrompt": "复制提示词后即开始检查。",
-      "fixInvalidCredentialsPrompt": "你 .env 中的令牌与组织令牌 {token} 不匹配。请重新下载 .env，并让你的编码智能体重新运行该请求。",
-      "fixInvalidCredentialsPromptUnnamed": "你 .env 中的令牌与该组织当前的令牌不匹配。请重新下载 .env，并让你的编码智能体重新运行该请求。",
-      "copyPrompt": "复制提示词"
+      "thisGuide": "某个数据源"
     },
     "firstDataNotice": {
       "pill": "你的首批数据已到达",
@@ -6414,17 +6397,7 @@
         "promptTitle": "将此内容粘贴到 {client1}、{client2} 或 {client3}",
         "promptLabel": "提示词",
         "promptCopied": "提示词已复制",
-        "health": {
-          "title": "AI 数据健康",
-          "scopeAgent": "自检查开始以来 {stream} 中来自智能体 {agent} 的 Span",
-          "scopeStream": "自检查开始以来 {stream} 中的 Span",
-          "checking": "正在检查 AI 数据健康…",
-          "checkAgain": "重新检查",
-          "checkAgainHint": "在你的编码智能体修改代码并再次运行请求后，请重新检查。",
-          "unsupported": "此 OpenObserve 版本不检查 AI 数据健康。你的首个 Span 已到达，说明追踪工作正常。",
-          "error": "无法运行 AI 数据健康检查。你的首个 Span 已到达，说明追踪工作正常。",
-          "noGenAiSpans": "Span 已到达，但其中没有 LLM 调用，说明 LLM 客户端未埋点。请让你的编码智能体为 LLM 客户端埋点，运行一次请求，然后重新检查。"
-        }
+        "health": {}
       }
     },
     "header": "数据源",
@@ -10344,7 +10317,10 @@
     "contractManagedMessage": "计费通过您的合同处理 — 如需更改请联系您的客户经理",
     "upgradeToPlanMessage": "升级套餐以继续享受 OpenObserve 服务。",
     "creditsUsedLabel": "已用积分",
-    "licenseExpiryContactAdmin": "请通过联系您的管理员来更新许可证。",
+    "licenseExpiredOn": "您的许可证已于 {date} 过期。您的功能仍保持启用。",
+    "licenseExpiredLimit": "现在适用 {limit} GB/天的免费额度：一个月内超出该额度的天数超过 {allowed} 天时，搜索将暂停，直到您续订。",
+    "licenseAskAdminToRenew": "请联系许可证管理员续订。",
+    "renewLicense": "续订许可证",
     "subscribed": "已订阅",
     "invoiceHistory": "发票历史记录",
     "amount": "金额",
@@ -10488,7 +10464,6 @@
     "failedToLinkAwsSubscription": "关联 AWS 订阅失败",
     "failedToLinkAzureSubscription": "关联 Azure 订阅失败",
     "last15Minutes": "最近 15 分钟",
-    "licenseHasExpired": "您的许可证已过期",
     "numberOfPipelines": "流水线数量",
     "oneDayUntilLicenseExpires": "您的许可证还有 1 天到期",
     "pleaseWaitProcessingRequest": "请稍候，我们正在处理您的请求...",
@@ -12213,6 +12188,8 @@
       "noDestinationNote": "可选。告警仍会运行并记录其历史，但不会通知任何目标。",
       "sendsToStatus": "每次告警触发时发送到 {targets}。",
       "oncallTeamTarget": "一个值班团队",
+      "lockedWorkflowFallback": "已锁定的工作流",
+      "lockedTargetBadge": "已锁定",
       "createsIncident": "创建事件",
       "createsIncidentTooltip": "如果告警可以创建事件，则不会发送专门的通知。相反，当创建新事件或新告警类型加入现有事件时，会发送有关该事件的通知。",
       "helpTemplateTitle": "模板覆盖",
@@ -12303,13 +12280,7 @@
       "suppressRepeats": "抑制重复通知",
       "suppressRepeatsTooltip": "告警开始触发或级别发生变化时通知一次，而不是每次评估都通知。保持关闭可在每个静默期后继续收到提醒。",
       "keepFiringForInvalid": "请输入 0 或更大的秒数",
-      "keepFiringForTooLong": "最多输入 86400 秒（24 小时）",
-      "helpApplyToObject": "使用此模板",
-      "helpTemplateExplainObject": "模板就是要发送的消息：文本加上变量。在此选择一个模板会替换各目标自身的模板，且仅对本配置生效。",
-      "helpTemplateWhenDescObject": "留空时，每个目标会使用其自身适用于此类通知的模板，否则使用内置消息。设置覆盖项可向所有适配的目标发送同一条消息。",
-      "helpCurrentHeadingObject": "当前发送内容",
-      "helpCurrentOverrideSome": "适配的目标使用此模板：",
-      "helpCurrentResolved": "未设置覆盖项。每个目标使用："
+      "keepFiringForTooLong": "最多输入 86400 秒（24 小时）"
     },
     "advanced": {
       "addVariable": "添加变量",
@@ -12449,6 +12420,9 @@
       "lastTrained": "上次训练",
       "level": "级别",
       "lookBackWindow": "向后看窗口",
+      "scheduleIntervalFloor": "检查间隔必须至少为 {min}。",
+      "lookBackWindowCap": "在此检测分辨率下，回溯窗口最多只能为 {max}：更长的窗口会包含超过 100,000 个桶。请缩短窗口或使用更长的检测分辨率。",
+      "retrainOnEditNote": "更改查询、函数或检测分辨率都会重新训练此检测器。检测将暂停，直到训练结束。",
       "lookBackWindowFloor": "回溯窗口必须至少为 {min} — 即检查间隔加上一个检测分辨率。窗口更短时，首次运行触发时无法容纳一个完整的桶，因此该次运行会跳过桶。",
       "lookBackWindowLegacy": "此已保存的窗口低于 {min} 的最小值（检查间隔加上一个检测分辨率）。它将按原样保存，但在窗口提高之前，首次运行可能会跳过桶。",
       "lookBackWindowMinimum": "至少 {min}；按当前设置建议 {recommended} 或更长。",
@@ -12542,6 +12516,7 @@
       "summaryTrainingDays": "{days} 天",
       "summaryWindowShare": "✓ 窗口占比：{rule}",
       "timestampAliasBanned": "{column} 不能用作列别名。请改用 {timeBucket}。",
+      "valueColumnMissing": "此告警从列 {column} 读取其值。请在该 SQL 查询中保留该列名。",
       "tooltipAnomalyAbove": "异常：高于预期范围",
       "tooltipAnomalyBelow": "异常：低于预期范围",
       "trainingSpan": "训练时间范围",
@@ -12737,6 +12712,7 @@
     "oncallTeamPlaceholder": "按归属规则路由",
     "oncallTeamTooltip": "此告警要呼叫哪个团队。通常留空，根据告警的身份维度自动识别团队；仅当这些维度无法表达负责人时才需要设置。",
     "oncallTeamNoTeams": "暂无值班团队。请在“值班团队”中创建一个。",
+    "lockedTeamFallback": "已锁定的团队",
     "oncallTeamAtFireTime": "根据归属规则",
     "oncallTeamFromRules": "由于此告警未设置团队，因此负责人会根据触发行的标识维度来推算，这些维度在触发前无法获知。",
     "tags": "标签",
@@ -13049,6 +13025,10 @@
         "onceFor": "一次，{duration}"
       },
       "validation": {
+        "groupLimitLost": "移除此告警也会移除分组限制。请使用“静音所有分组”进行确认。",
+        "endInPast": "结束时间已过去。请选择晚于当前时间的结束时间。",
+        "pastSloOnly": "此窗口已过去。它仅会修正 SLO 数据。",
+        "neverProducesWindow": "此计划永远不会生成窗口。",
         "conditionRequired": "请添加条件，或移除条件块。",
         "pairKey": "请为每一行选择维度。",
         "pairOperator": "在静默期条件中请使用 = 或 !=。",
@@ -13122,7 +13102,9 @@
       "confirmEndNow": {
         "title": "立即结束此停机？",
         "message": "通知会立即恢复。该停机将以提前结束状态保留在列表中。",
+        "recurringMessage": "此静默期会重复。立即结束它也会停止所有未来窗口及其延长。覆盖相同项目的其他静默期会继续静音。要再次静音未来窗口，请复制此静默期。",
         "ok": "立即结束",
+        "recurringOk": "立即结束并停止未来窗口",
         "keep": "继续运行"
       },
       "extend": {
@@ -13155,6 +13137,8 @@
       "confirmCancel": {
         "title": "取消静默时段",
         "message": "通知将立即恢复。该静默时段会保留在列表中作为历史记录。",
+        "recurringMessage": "此静默期会重复。取消它将停止所有未来窗口。",
+        "bulkRecurringNote": "至少有一个选中的静默期会重复。取消它将停止所有未来窗口。",
         "bulkMessage": "取消 {count} 个静默时段？通知将立即恢复。 | 取消 {count} 个静默时段？通知将立即恢复。",
         "confirm": "取消静默时段",
         "keep": "保留静默时段"
@@ -13192,6 +13176,11 @@
         "cardCaption": "先按文件夹筛选，再由可选区块进一步缩小范围。上方的维度条件同样适用于此模块。",
         "noConditionForChecks": "上方的维度条件不适用于检查。",
         "appliesTo": "适用于",
+        "groupScope": "仅静音 {alert} 的 {count} 个分组：{labels}。 | 仅静音 {alert} 的 {count} 个分组：{labels}。",
+        "groupScopeNoLabels": "仅静音 {alert} 的 {count} 个分组。 | 仅静音 {alert} 的 {count} 个分组。",
+        "groupScopeEndsOnGroupClear": "当此分组停止触发时结束。",
+        "groupScopeEndsOnAlertClear": "当此告警停止触发时结束。",
+        "groupScopeClear": "静音所有分组，直到计划结束时间",
         "tabTargets": "目标",
         "tabSchedule": "计划",
         "tabAdvanced": "高级",
@@ -13354,6 +13343,12 @@
         "bannerOn": "激活期间向组织显示",
         "bannerOff": "无横幅",
         "occurrences": "发生次数",
+        "plannedSchedule": "计划时间表",
+        "endedEarlyAt": "提前结束于",
+        "cancelledAt": "取消于",
+        "endedEarlyAtTime": "提前结束于 {time}",
+        "cancelledAtTime": "取消于 {time}",
+        "stoppedTime": "{time}（{zone}）",
         "nextWindow": "下一个窗口：{window}。您的时间：{local}。",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "匹配依据",
@@ -13508,8 +13503,7 @@
             "ended": "已结束",
             "cancelled": "已取消",
             "extended": "已延长"
-          },
-          "template": "模板"
+          }
         },
         "test": {
           "send": "发送测试",
@@ -13580,42 +13574,8 @@
       "incident": "事件"
     },
     "priorityUnsetPagesAs": "未设置（按 P2 呼叫）",
-    "notificationKinds": {
-      "alert": "告警",
-      "incident": "事件",
-      "anomaly": "异常",
-      "synthetics": "合成监控",
-      "downtime": "静默期",
-      "on_call": "值班"
-    },
-    "templateOverride": {
-      "label": "模板覆盖",
-      "placeholder": "使用目标的模板",
-      "help": "覆盖 {kind} 消息的目标模板。无法选择预置模板；请先复制一个。",
-      "empty": "暂无适用于 {kind} 的模板。",
-      "create": "创建模板",
-      "loadFailed": "无法加载模板",
-      "forbidden": "列出模板需要模板读取权限",
-      "mismatch": "不适用于您的 {count} 个目标（{names}）；这些目标将回退到其自身的模板。",
-      "groupContent": "内容",
-      "groupCustom": "自定义",
-      "webhookOnly": "（仅 Webhook）",
-      "emailOnly": "（仅邮件）",
-      "snsOnly": "（仅 SNS）",
-      "stale": "模板 {name} 已不存在。请选择其他模板或清空该字段。",
-      "willUse": "将使用：{template}",
-      "willUsePerDestination": "按目标分别使用：",
-      "willUseRow": "{destination}：{template}",
-      "templateWithSource": "{name}（{source}）",
-      "builtIn": "内置 {kind} 消息",
-      "sourceExplicit": "此覆盖",
-      "sourceDestination": "目标模板",
-      "sourceOrgDefault": "组织默认",
-      "sourceCompiled": "内置",
-      "sourcePlatformResolve": "平台解析",
-      "sourceLegacy": "旧版载荷",
-      "sourceLegacyPayload": "该类型自身的 JSON 载荷（通用 Webhook）"
-    }
+    "notificationKinds": {},
+    "templateOverride": {}
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -13935,26 +13895,7 @@
     "testSendConfirm": "这将向所选频道发布一条真实消息，并标记为 [TEST]。",
     "testSendSuccess": "测试消息已发送",
     "testSendRateLimited": "测试发送过于频繁——请稍等片刻后重试",
-    "testSendNoDestination": "请先选择目标",
-    "playgroundLabel": "演练场",
-    "playgroundHelp": "此处不会发送任何内容。",
-    "emptyVariables": "{kind} 为空：{names}",
-    "appliesTo": "适用于",
-    "appliesToAll": "所有类型",
-    "appliesToAny": "任意类型",
-    "allKindsNotice": "适用于所有类型的模板：{count} 个。它们的目标也会将其用于异常、合成监控、值班、静默期和事件消息。请检查。",
-    "allKindsNoticeReview": "检查",
-    "appliesToInferred": "根据正文中的变量推断",
-    "appliesToManual": "由您选择",
-    "appliesToReset": "重置为推断值",
-    "previewKind": "类型",
-    "previewForbidden": "您没有预览模板的权限",
-    "previewFailed": "预览失败：{message}",
-    "severityFailed": "失败",
-    "severityDegraded": "降级",
-    "severityFlaky": "不稳定",
-    "severityRecovered": "已恢复",
-    "variableGroupCommon": "通用"
+    "testSendNoDestination": "请先选择目标"
   },
   "alert_sources": {
     "header": "外部告警源",
@@ -14210,12 +14151,7 @@
     "severityErrorDescription": "标准错误事件",
     "severityWarningDescription": "警告级事件",
     "severityInfoDescription": "信息级事件",
-    "urlRecipientsChannel": "URL / 收件人 / 频道",
-    "payloadFormat": "载荷格式",
-    "payloadFormatAuto": "自动",
-    "payloadFormatLegacy": "旧版 JSON",
-    "payloadFormatRendered": "渲染后的模板",
-    "payloadFormatHelp": "在附加模板之前，自动模式会为异常、合成监控和值班消息发送旧的 JSON 正文。存储为元数据键 payload_format。"
+    "urlRecipientsChannel": "URL / 收件人 / 频道"
   },
   "pipeline_destinations": {
     "header": "流水线目标",
@@ -14733,6 +14669,7 @@
     "generalDesc": "主题、查询默认值和核心首选项",
     "orgDesc": "组织参数和标识符",
     "cipherKeysDesc": "用于敏感字段的加密密钥",
+    "aiToolsetsDesc": "人工智能助手可以使用的 MCP 服务器和 CLI 工具",
     "regexPatternsDesc": "用于脱敏的可重用 regex 模式",
     "domainManagementDesc": "限制仅允许的 SSO 域登录",
     "passwordPolicy": "密码策略",
@@ -15068,9 +15005,7 @@
     },
     "licensePage": {
       "unexpectedError": "意外错误",
-      "daysRemaining": "距离许可证过期还有 {days} 天",
-      "oneDayRemaining": "距离许可证过期还有 1 天",
-      "licenseExpired": "您的许可证已过期"
+      "daysRemaining": "距离许可证过期还有 {days} 天"
     },
     "nodesPage": {
       "subtitle": "集群节点及其健康状态",
@@ -23421,19 +23356,6 @@
     "exportSucceeded": "已导出 {count} 个 SLO | 已导出 {count} 个 SLO",
     "moved": "已将 {count} 个 SLO 移动到 {folder}",
     "moveFailed": "移动失败",
-    "import": {
-      "title": "导入 SLO",
-      "results": "导入结果",
-      "noResults": "导入后，每个 SLO 的结果会显示在这里。",
-      "jsonEmpty": "导入前，请通过文件、URL 或编辑器添加 SLO JSON。",
-      "invalidJson": "无法解析 SLO JSON。",
-      "notAnObject": "SLO #{index} 不是 JSON 对象，已跳过。",
-      "nameRequired": "SLO #{index} 没有名称，已跳过。",
-      "created": "SLO #{index} \"{name}\" 已导入。",
-      "failed": "SLO #{index} \"{name}\" 未导入：{reason}",
-      "unknownError": "未知错误",
-      "succeeded": "已导入 {count} 个 SLO | 已导入 {count} 个 SLO"
-    },
     "preview": {
       "goodEvents": "良好事件",
       "badEvents": "不良事件",
@@ -27476,9 +27398,7 @@
     "claimSignalsFailedPaths": "无法认领 {paths}",
     "claimSignalsMorePaths": "{paths} 以及另外 {count} 个",
     "toastSignalsClaimedPartly": "{count} 个信号中有 {claimed} 个现在发送给 {team}；无法认领 {paths} | {count} 个信号中有 {claimed} 个现在发送给 {team}；无法认领 {paths}",
-    "scopeNotSeenYet": "尚未在你的数据中出现",
-    "deliveryTemplate": "模板：{templates}",
-    "policyMailBanner": "此版本会向以下邮箱和 SNS 目标发送值班通知：{names}。"
+    "scopeNotSeenYet": "尚未在你的数据中出现"
   },
   "paidUsage": {
     "consentTitle": "开启付费 AI 使用？",

@@ -2149,27 +2149,7 @@
       "view": "보기",
       "frustration": "불만",
       "failedRequest": "실패한 요청",
-      "noResponse": "응답 없음",
-      "noResponseStatus": "0 — 응답 없음",
-      "failedRequestDetails": "실패한 요청 세부 정보",
-      "browserStatus": "브라우저 상태",
-      "serverStatus": "서버 상태",
-      "noServerSpanFound": "서버 스팬을 찾을 수 없음",
-      "noServerSpanHint": "스팬이 없는 것은 샘플링, 수집 지연, 계측되지 않은 라우트 또는 보존 기간 때문일 수도 있습니다.",
-      "unknownNoTrace": "알 수 없음 (트레이스 없음)",
-      "unknown": "알 수 없음",
-      "abortedByApp": "앱에서 중단됨",
-      "method": "메서드",
-      "url": "URL",
-      "duration": "소요 시간",
-      "timing": "타이밍",
-      "timingDns": "DNS",
-      "timingConnect": "연결",
-      "timingSsl": "SSL",
-      "timingFirstByte": "첫 바이트",
-      "timingDownload": "다운로드",
-      "size": "크기",
-      "initiatedBy": "시작 주체"
+      "noResponse": "응답 없음"
     },
     "replayCanvasNotRecorded": "캔버스 콘텐츠가 기록되지 않았습니다",
     "actionOnTarget": "{action}: \"{target}\"",
@@ -2213,6 +2193,7 @@
       "pageLabel": "페이지",
       "noDeviceData": "이 페이지에서는 이 기기 유형에 기록된 클릭이 없습니다.",
       "noReplay": "이 페이지에는 세션 재생이 기록되지 않아 히트맵을 그릴 스크린샷이 없습니다. 앱에서 세션 재생을 켜세요.",
+      "noReplayLegacySdk": "페이지 스냅샷에는 최신 RUM SDK가 필요합니다. 여기에 기록된 세션 재생은 이전 SDK에서 생성되어 스크린샷을 표시할 수 없습니다.",
       "loadFailed": "클릭 데이터를 불러오지 못했습니다.",
       "snapshotFailed": "페이지 스냅샷을 불러오지 못했습니다.",
       "noPosition": "이 기간 동안 이 페이지에 클릭이 없습니다.",
@@ -2278,8 +2259,7 @@
       "showElements": "요소 표시",
       "markerLabel": "순위 {rank}, {name}, {count}회 클릭 | 순위 {rank}, {name}, {count}회 클릭",
       "markerLabelFrustrated": "순위 {rank}, {name}, {count}회 클릭, 불만 {frustrated}건 | 순위 {rank}, {name}, {count}회 클릭, 불만 {frustrated}건",
-      "markerClicks": "{count}회 클릭 | {count}회 클릭",
-      "noReplayLegacySdk": "페이지 스냅샷에는 최신 RUM SDK가 필요합니다. 여기에 기록된 세션 재생은 이전 SDK에서 생성되어 스크린샷을 표시할 수 없습니다."
+      "markerClicks": "{count}회 클릭 | {count}회 클릭"
     },
     "analytics": {
       "title": "제품 분석",
@@ -3361,7 +3341,6 @@
     "licenseAndUsage": "라이선스 및 사용",
     "copyLicenseId": "라이선스 ID 복사",
     "editionLbl": "에디션",
-    "limitPrefix": "· 제한",
     "gbPerDay": "GB / 일",
     "ofDailyLimitUsedToday": "오늘 사용한 일일 제한",
     "gbToday": "오늘 GB",
@@ -3385,6 +3364,7 @@
     "usage_limits": "사용 제한",
     "feature_comparison_lbl": "기능 비교",
     "feature_comparision_ent_msg": "아래 나열된 모든 고급 기능에 액세스할 수 있는 OpenObserve 엔터프라이즈 에디션을 사용하고 있습니다.",
+    "feature_comparision_ent_partial_msg": "OpenObserve Enterprise Edition을 사용 중입니다. 일부 기능은 라이선스에 포함되어 있지 않습니다. 위 목록을 참고하세요.",
     "feature_comparision_plan_detail": "요금제: 엔터프라이즈 에디션은 하루 최대 50GB (~1.5TB/월) 의 데이터 통합에 대해 무료입니다.",
     "feature_comparision_os_msg": "현재 OpenObserve 오픈 소스 에디션을 사용하고 있습니다.엔터프라이즈 에디션으로 업그레이드하여 아래 비교표에 나열된 고급 기능을 잠금 해제하세요.",
     "feature_comparision_good_news": "좋은 소식: OpenObserve 엔터프라이즈 에디션은 하루 최대 50GB (~1.5TB/월) 의 데이터 수집을 완전히 무료로 제공합니다.",
@@ -3465,6 +3445,7 @@
     "features_no_match": "검색과 일치하는 기능이 없습니다",
     "features_none": "이 그룹에 기능이 없습니다",
     "features_free_heading": "무료, 모든 라이선스에 포함",
+    "features_free_not_included": "무료, 라이선스에 포함되지 않음",
     "features_new": "라이선스 이후 새로 추가된 기능",
     "features_filter_new": "신규",
     "request_new_license": "새 라이선스 요청",
@@ -3527,6 +3508,13 @@
     "license_already_active_msg": "라이선스가 아직 활성 상태입니다.새 라이선스 키로 업데이트하시겠습니까?",
     "yes_update_license": "예, 라이선스 업데이트",
     "no_keep_current": "아니요, 최신 상태로 유지",
+    "license_downgrade_title": "이 라이선스 키를 적용할까요?",
+    "license_downgrade_intro": "이 키는 현재 라이선스를 대체합니다.",
+    "license_downgrade_expired": "이 키는 {date}에 만료되었습니다. 무료 한도인 50GB/일이 적용됩니다.",
+    "license_downgrade_lose": "다음을 잃게 됩니다: {names}",
+    "license_downgrade_limit": "일일 한도가 {old}에서 {new}로 변경됩니다",
+    "license_downgrade_expiry": "만료일이 {old}에서 {new}로 변경됩니다",
+    "license_limit_per_day": "{gb} GB/일",
     "header_button": {
       "cloud_features": "{product} 기능",
       "enterprise_edition": "에디션: 엔터프라이즈",
@@ -4890,6 +4878,8 @@
       "reasonExpired": "실행되지 않음 · 1시간 이상 대기",
       "reasonWorkerLost": "워커 유실 · 재실행되지 않음",
       "reasonWorkflowDisabled": "워크플로우가 비활성화됨",
+      "reasonEndpointDisabled": "실행된 적 없음 · HTTP 엔드포인트가 꺼져 있음",
+      "reasonCredentialRevoked": "실행된 적 없음 · 자격 증명이 취소됨",
       "reasonRunTimeout": "15분 후 시간 초과",
       "allTriggers": "모든 트리거",
       "triggerFilter": "트리거",
@@ -5638,8 +5628,8 @@
     "periodInfoLine1": "쿼리가 실행될 기간입니다.",
     "periodInfoLine2": "예: 10분은 쿼리가 실행될 때마다 마지막 10분의 데이터를 사용함을 의미합니다. 쿼리가 오후 4:00에 실행되면 오후 3:50부터 오후 4:00까지의 데이터를 사용합니다.",
     "periodShouldMatchFrequency": "참고: 기간은 빈도와 동일해야 합니다.",
-    "delayInfoLine1": "파이프라인이 실행되도록 예약된 지연 시간입니다.",
-    "delayInfoLine2": "예: 10분 지연은 파이프라인이 예약된 시간보다 10분 후에 실행됨을 의미합니다.",
+    "delayInfoLine1": "지연 도착 데이터를 받을 수 있도록 예정된 시간 이후 대기하는 시간입니다.",
+    "delayInfoLine2": "예: 지연 시간이 10분이면 매시간 실행되는 파이프라인이 10:10에 실행되어 9:00부터 10:00까지의 데이터를 읽습니다.",
     "closeDrawer": "패널 닫기",
     "conditionValueGuidelines": "조건 값 지침:",
     "customColumnGuideline": "사용자 지정 열을 추가하려면 열 이름을 입력하고 누르세요.",
@@ -6254,14 +6244,7 @@
       "askAiRejected": "요청이 {status} {reason}(으)로 {path}에서 거부되었습니다.",
       "askAiNoRequests": "아무것도 도착하지 않았고 거부된 요청도 없습니다.",
       "askAiUnavailable": "거부된 요청을 읽을 수 없어 원인을 알 수 없습니다.",
-      "thisGuide": "데이터 소스",
-      "hintWaitingAfter": "첫 레코드가 도착하면 자동으로 초록색으로 바뀝니다. {elapsed} 안에 아무것도 도착하지 않으면 무엇이 잘못되었는지 표시되며, 문제 해결을 누르면 지금 확인합니다.",
-      "idleInPrompt": "{stream}은(는) 이미 데이터를 수신하고 있습니다. 프롬프트를 복사하면 확인이 시작됩니다.",
-      "idleMatchesPrompt": "일치하는 스트림이 이미 데이터를 수신하고 있습니다. 프롬프트를 복사하면 확인이 시작됩니다.",
-      "idleNewPrompt": "프롬프트를 복사하면 확인이 시작됩니다.",
-      "fixInvalidCredentialsPrompt": ".env의 토큰이 조직 토큰 {token}과 일치하지 않습니다. .env를 다시 다운로드한 뒤 코딩 에이전트에게 요청을 다시 실행하도록 하세요.",
-      "fixInvalidCredentialsPromptUnnamed": ".env의 토큰이 이 조직의 현재 토큰과 일치하지 않습니다. .env를 다시 다운로드한 뒤 코딩 에이전트에게 요청을 다시 실행하도록 하세요.",
-      "copyPrompt": "프롬프트 복사"
+      "thisGuide": "데이터 소스"
     },
     "firstDataNotice": {
       "pill": "첫 데이터가 도착했습니다",
@@ -6414,17 +6397,7 @@
         "promptTitle": "{client1}, {client2} 또는 {client3}에 붙여넣으세요",
         "promptLabel": "프롬프트",
         "promptCopied": "프롬프트가 복사되었습니다",
-        "health": {
-          "title": "AI 데이터 상태",
-          "scopeAgent": "확인 시작 이후 {stream}의 에이전트 {agent}에서 발생한 스팬",
-          "scopeStream": "확인 시작 이후 {stream}의 스팬",
-          "checking": "AI 데이터 상태 확인 중…",
-          "checkAgain": "다시 확인",
-          "checkAgainHint": "코딩 에이전트가 코드를 변경하고 다른 요청을 실행한 후 다시 확인하세요.",
-          "unsupported": "이 OpenObserve 버전은 AI 데이터 상태를 확인하지 않습니다. 첫 번째 스팬이 도착했으므로 트레이스가 동작합니다.",
-          "error": "AI 데이터 상태 확인을 실행할 수 없습니다. 첫 번째 스팬이 도착했으므로 트레이스가 동작합니다.",
-          "noGenAiSpans": "스팬은 도착했지만 그중 LLM 호출이 없으므로 LLM 클라이언트가 계측되지 않았습니다. 코딩 에이전트에게 LLM 클라이언트를 계측하고 요청을 실행한 뒤 다시 확인하도록 하세요."
-        }
+        "health": {}
       }
     },
     "header": "데이터 소스",
@@ -10344,7 +10317,10 @@
     "contractManagedMessage": "청구는 계약을 통해 처리됩니다 — 변경 사항은 계정 관리자에게 문의하세요.",
     "upgradeToPlanMessage": "OpenObserve 서비스를 계속 이용하려면 요금제를 업그레이드하세요.",
     "creditsUsedLabel": "사용된 크레딧",
-    "licenseExpiryContactAdmin": "관리자에게 문의하여 라이선스를 업데이트하세요.",
+    "licenseExpiredOn": "라이선스가 {date}에 만료되었습니다. 기능은 계속 사용할 수 있습니다.",
+    "licenseExpiredLimit": "이제 무료 한도인 {limit} GB/일이 적용됩니다. 한 달 동안 {allowed}일 넘게 한도를 초과하면 갱신할 때까지 검색이 일시 중지됩니다.",
+    "licenseAskAdminToRenew": "라이선스 관리자에게 갱신을 요청하세요.",
+    "renewLicense": "라이선스 갱신",
     "subscribed": "구독됨",
     "invoiceHistory": "인보이스 내역",
     "amount": "금액",
@@ -10488,7 +10464,6 @@
     "failedToLinkAwsSubscription": "AWS 구독을 연결하지 못했습니다.",
     "failedToLinkAzureSubscription": "Azure 구독을 연결하지 못했습니다.",
     "last15Minutes": "지난 15분",
-    "licenseHasExpired": "라이선스가 만료되었습니다.",
     "numberOfPipelines": "파이프라인 수",
     "oneDayUntilLicenseExpires": "라이선스가 만료되기까지 1일 남았습니다.",
     "pleaseWaitProcessingRequest": "요청을 처리하는 동안 잠시 기다려 주세요...",
@@ -12213,6 +12188,8 @@
       "noDestinationNote": "선택 사항입니다. 알림은 계속 실행되고 기록을 남기지만, 어떤 대상에도 알림이 전송되지 않습니다.",
       "sendsToStatus": "알림이 발생할 때마다 {targets}(으)로 전송합니다.",
       "oncallTeamTarget": "온콜 팀",
+      "lockedWorkflowFallback": "잠긴 워크플로우",
+      "lockedTargetBadge": "잠김",
       "createsIncident": "인시던트 생성",
       "createsIncidentTooltip": "알림이 인시던트를 생성할 수 있는 경우, 전용 알림을 보내지 않습니다. 대신 새 인시던트가 생성되거나 새 알림 유형이 기존 인시던트에 추가될 때 인시던트에 대한 알림이 전송됩니다.",
       "helpTemplateTitle": "템플릿 오버라이드",
@@ -12303,13 +12280,7 @@
       "suppressRepeats": "반복 억제",
       "suppressRepeatsTooltip": "알림이 발생하기 시작하거나 레벨이 변경될 때 한 번만 알림을 보내고, 매 평가마다 보내지 않습니다. 각 무음 기간 이후에도 계속 알림을 받으려면 꺼 두세요.",
       "keepFiringForInvalid": "0초 이상 입력하세요",
-      "keepFiringForTooLong": "최대 86400초(24시간)까지 입력하세요",
-      "helpApplyToObject": "이 템플릿 사용",
-      "helpTemplateExplainObject": "템플릿은 전송되는 메시지로, 텍스트와 변수로 구성됩니다. 여기서 템플릿을 선택하면 이 구성에 한해 각 대상의 자체 템플릿을 대체합니다.",
-      "helpTemplateWhenDescObject": "비워 두면 각 대상은 이 종류에 적용되는 자체 템플릿을 사용하고, 없으면 기본 제공 메시지를 사용합니다. 재정의를 설정하면 해당하는 모든 대상에 하나의 메시지를 전송합니다.",
-      "helpCurrentHeadingObject": "현재 전송되는 내용",
-      "helpCurrentOverrideSome": "해당하는 대상은 이 템플릿을 사용합니다:",
-      "helpCurrentResolved": "재정의가 설정되지 않았습니다. 각 대상은 다음을 사용합니다:"
+      "keepFiringForTooLong": "최대 86400초(24시간)까지 입력하세요"
     },
     "advanced": {
       "addVariable": "변수 추가",
@@ -12449,6 +12420,9 @@
       "lastTrained": "마지막 학습",
       "level": "레벨",
       "lookBackWindow": "룩 백 윈도우",
+      "scheduleIntervalFloor": "확인 주기는 최소 {min} 이상이어야 합니다.",
+      "lookBackWindowCap": "이 감지 해상도에서 룩백 윈도우는 최대 {max}까지 가능합니다. 더 긴 윈도우는 버킷이 100,000개를 넘습니다. 윈도우를 줄이거나 더 긴 감지 해상도를 사용하세요.",
+      "retrainOnEditNote": "쿼리, 함수 또는 감지 해상도를 변경하면 이 탐지기가 재훈련됩니다. 훈련이 끝날 때까지 탐지가 일시 중지됩니다.",
       "lookBackWindowFloor": "룩백 윈도우는 최소 {min} 이상이어야 합니다 — 확인 주기에 감지 해상도 1개를 더한 값입니다. 더 짧은 윈도우는 첫 실행이 트리거될 때 완전한 버킷을 담을 수 없으므로, 해당 실행은 버킷을 건너뛰게 됩니다.",
       "lookBackWindowLegacy": "저장된 이 윈도우는 최소값 {min}(확인 주기 + 감지 해상도 1개)보다 작습니다. 변경 없이 저장되지만, 윈도우를 늘리기 전까지 첫 실행에서 버킷을 건너뛸 수 있습니다.",
       "lookBackWindowMinimum": "최소 {min}, 이 설정에서는 {recommended} 이상을 권장합니다.",
@@ -12542,6 +12516,7 @@
       "summaryTrainingDays": "{days}일",
       "summaryWindowShare": "✓ 윈도우 비율: {rule}",
       "timestampAliasBanned": "{column}은(는) 열 별칭으로 사용할 수 없습니다. 대신 {timeBucket}을(를) 사용하세요.",
+      "valueColumnMissing": "이 알림은 {column} 컬럼에서 값을 읽습니다. SQL 쿼리에서 해당 컬럼 이름을 유지하세요.",
       "tooltipAnomalyAbove": "이상: 예상 범위보다 높음",
       "tooltipAnomalyBelow": "이상: 예상 범위보다 낮음",
       "trainingSpan": "학습 기간",
@@ -12737,6 +12712,7 @@
     "oncallTeamPlaceholder": "소유권 규칙에 따라 라우팅",
     "oncallTeamTooltip": "이 알림이 호출할 팀입니다. 일반적으로는 설정하지 않으면 알림의 식별 차원에서 팀이 결정됩니다. 해당 차원으로 소유자를 표현할 수 없는 경우에만 설정하세요.",
     "oncallTeamNoTeams": "아직 온콜 팀이 없습니다. 온콜 팀에서 하나를 만드세요.",
+    "lockedTeamFallback": "잠긴 팀",
     "oncallTeamAtFireTime": "소유권 기준",
     "oncallTeamFromRules": "이 알림에는 설정된 팀이 없으므로 소유자는 트리거되는 행의 식별 차원에서 결정됩니다. 해당 차원은 트리거되기 전까지는 알 수 없습니다.",
     "tags": "태그",
@@ -13049,6 +13025,10 @@
         "onceFor": "1회, {duration}"
       },
       "validation": {
+        "groupLimitLost": "이 알림을 제거하면 그룹 제한도 제거됩니다. 확인하려면 모든 그룹 음소거를 사용하세요.",
+        "endInPast": "종료 시간이 과거입니다. 현재 이후의 종료 시간을 선택하세요.",
+        "pastSloOnly": "이 윈도우는 과거에 있습니다. SLO 데이터만 보정합니다.",
+        "neverProducesWindow": "이 일정은 윈도우를 생성하지 않습니다.",
         "conditionRequired": "조건을 추가하거나 조건 블록을 제거하세요.",
         "pairKey": "모든 행에 대해 차원을 선택하세요.",
         "pairOperator": "다운타임 조건에는 = 또는 != 를 사용하세요.",
@@ -13122,7 +13102,9 @@
       "confirmEndNow": {
         "title": "이 다운타임을 지금 종료할까요?",
         "message": "알림이 즉시 다시 시작됩니다. 다운타임은 조기 종료로 목록에 남습니다.",
+        "recurringMessage": "이 다운타임은 반복됩니다. 지금 종료하면 이후의 모든 윈도우와 해당 확장도 중지됩니다. 동일한 항목을 대상으로 하는 다른 다운타임은 계속 음소거합니다. 이후 윈도우를 다시 음소거하려면 복제하세요.",
         "ok": "지금 종료",
+        "recurringOk": "지금 종료하고 향후 윈도우 중지",
         "keep": "계속 실행"
       },
       "extend": {
@@ -13155,6 +13137,8 @@
       "confirmCancel": {
         "title": "다운타임 취소",
         "message": "알림이 즉시 재개됩니다. 다운타임은 이력용으로 목록에 남습니다.",
+        "recurringMessage": "이 다운타임은 반복됩니다. 취소하면 이후의 모든 윈도우가 중지됩니다.",
+        "bulkRecurringNote": "선택한 다운타임 중 하나 이상이 반복됩니다. 취소하면 이후의 모든 윈도우가 중지됩니다.",
         "bulkMessage": "{count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다. | {count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다.",
         "confirm": "다운타임 취소 | 다운타임 취소",
         "keep": "다운타임 유지 | 다운타임 유지"
@@ -13192,6 +13176,11 @@
         "cardCaption": "폴더가 먼저 적용되고, 선택적 블록이 범위를 더 좁힙니다. 위의 차원 조건은 이 모듈에도 적용됩니다.",
         "noConditionForChecks": "위의 차원 조건은 검사에 적용되지 않습니다.",
         "appliesTo": "적용 대상",
+        "groupScope": "{alert}의 그룹 {count}개만 음소거합니다: {labels}. | {alert}의 그룹 {count}개만 음소거합니다: {labels}.",
+        "groupScopeNoLabels": "{alert}의 그룹 {count}개만 음소거합니다. | {alert}의 그룹 {count}개만 음소거합니다.",
+        "groupScopeEndsOnGroupClear": "이 그룹의 발생이 중지되면 종료됩니다.",
+        "groupScopeEndsOnAlertClear": "이 알림의 발생이 중지되면 종료됩니다.",
+        "groupScopeClear": "예정된 종료까지 모든 그룹 음소거",
         "tabTargets": "대상",
         "tabSchedule": "일정",
         "tabAdvanced": "고급",
@@ -13354,6 +13343,12 @@
         "bannerOn": "활성 상태 동안 조직에 표시됨",
         "bannerOff": "배너 없음",
         "occurrences": "발생 횟수",
+        "plannedSchedule": "계획된 일정",
+        "endedEarlyAt": "조기 종료 시각",
+        "cancelledAt": "취소 시각",
+        "endedEarlyAtTime": "{time}에 조기 종료됨",
+        "cancelledAtTime": "{time}에 취소됨",
+        "stoppedTime": "{time} ({zone})",
         "nextWindow": "다음 기간: {window}. 현지 시간: {local}.",
         "sectionCount": "{name} · {count}",
         "matchedByHeader": "일치 기준",
@@ -13508,8 +13503,7 @@
             "ended": "종료됨",
             "cancelled": "취소됨",
             "extended": "연장됨"
-          },
-          "template": "템플릿"
+          }
         },
         "test": {
           "send": "테스트 보내기",
@@ -13580,42 +13574,8 @@
       "incident": "인시던트"
     },
     "priorityUnsetPagesAs": "설정 안 됨(P2로 호출)",
-    "notificationKinds": {
-      "alert": "알림",
-      "incident": "인시던트",
-      "anomaly": "이상",
-      "synthetics": "Synthetics",
-      "downtime": "다운타임",
-      "on_call": "온콜"
-    },
-    "templateOverride": {
-      "label": "템플릿 재정의",
-      "placeholder": "대상의 템플릿 사용",
-      "help": "{kind} 메시지에 대한 대상 템플릿을 재정의합니다. 미리 제공된 템플릿은 선택할 수 없습니다. 먼저 복사하세요.",
-      "empty": "아직 {kind}에 적용되는 템플릿이 없습니다.",
-      "create": "템플릿 생성",
-      "loadFailed": "템플릿을 불러오지 못했습니다",
-      "forbidden": "템플릿을 나열하려면 템플릿 읽기 권한이 필요합니다",
-      "mismatch": "대상 {count}개에 적합하지 않습니다({names}). 해당 대상은 자체 템플릿으로 대체됩니다.",
-      "groupContent": "콘텐츠",
-      "groupCustom": "사용자 지정",
-      "webhookOnly": "(웹훅 전용)",
-      "emailOnly": "(이메일 전용)",
-      "snsOnly": "(SNS 전용)",
-      "stale": "템플릿 {name}이(가) 더 이상 존재하지 않습니다. 다른 템플릿을 선택하거나 필드를 비우세요.",
-      "willUse": "사용 예정: {template}",
-      "willUsePerDestination": "대상별 사용 예정:",
-      "willUseRow": "{destination}: {template}",
-      "templateWithSource": "{name} ({source})",
-      "builtIn": "기본 제공 {kind} 메시지",
-      "sourceExplicit": "이 재정의",
-      "sourceDestination": "대상 템플릿",
-      "sourceOrgDefault": "조직 기본값",
-      "sourceCompiled": "기본 제공",
-      "sourcePlatformResolve": "플랫폼 결정",
-      "sourceLegacy": "레거시 페이로드",
-      "sourceLegacyPayload": "해당 종류의 자체 JSON 페이로드(일반 웹훅)"
-    }
+    "notificationKinds": {},
+    "templateOverride": {}
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -13935,26 +13895,7 @@
     "testSendConfirm": "선택한 채널에 [TEST]로 표시된 실제 메시지를 게시합니다.",
     "testSendSuccess": "테스트 메시지 전송됨",
     "testSendRateLimited": "테스트 전송이 너무 많습니다 — 잠시 후 다시 시도하세요.",
-    "testSendNoDestination": "먼저 대상을 선택하세요.",
-    "playgroundLabel": "플레이그라운드",
-    "playgroundHelp": "여기에서는 아무것도 전송되지 않습니다.",
-    "emptyVariables": "{kind}에 대해 비어 있음: {names}",
-    "appliesTo": "적용 대상",
-    "appliesToAll": "모든 종류",
-    "appliesToAny": "종류 무관",
-    "allKindsNotice": "모든 종류에 적용되는 템플릿: {count}개. 이 템플릿의 대상은 이상 탐지, Synthetics, 온콜, 다운타임 및 인시던트 메시지에도 이 템플릿을 사용합니다. 검토하세요.",
-    "allKindsNoticeReview": "검토",
-    "appliesToInferred": "본문의 변수에서 추론됨",
-    "appliesToManual": "직접 선택함",
-    "appliesToReset": "추론값으로 재설정",
-    "previewKind": "종류",
-    "previewForbidden": "템플릿을 미리 볼 권한이 없습니다",
-    "previewFailed": "미리보기 실패: {message}",
-    "severityFailed": "실패",
-    "severityDegraded": "저하됨",
-    "severityFlaky": "불안정",
-    "severityRecovered": "복구됨",
-    "variableGroupCommon": "공통"
+    "testSendNoDestination": "먼저 대상을 선택하세요."
   },
   "alert_sources": {
     "header": "외부 알림 소스",
@@ -14210,12 +14151,7 @@
     "severityErrorDescription": "표준 오류 인시던트",
     "severityWarningDescription": "경고 수준 인시던트",
     "severityInfoDescription": "정보 인시던트",
-    "urlRecipientsChannel": "URL / 수신자 / 채널",
-    "payloadFormat": "페이로드 형식",
-    "payloadFormatAuto": "자동",
-    "payloadFormatLegacy": "레거시 JSON",
-    "payloadFormatRendered": "렌더링된 템플릿",
-    "payloadFormatHelp": "자동은 템플릿이 연결될 때까지 이상 탐지, Synthetics 및 온콜 메시지에 기존 JSON 본문을 전송합니다. 메타데이터 키 payload_format으로 저장됩니다."
+    "urlRecipientsChannel": "URL / 수신자 / 채널"
   },
   "pipeline_destinations": {
     "header": "파이프라인 대상",
@@ -14733,6 +14669,7 @@
     "generalDesc": "테마, 쿼리 기본값 및 핵심 환경설정",
     "orgDesc": "조직 매개변수 및 식별자",
     "cipherKeysDesc": "민감한 필드를 위한 암호화 키",
+    "aiToolsetsDesc": "AI 어시스턴트가 사용할 수 있는 MCP 서버 및 CLI 도구",
     "regexPatternsDesc": "수정에 재사용 가능한 regex 패턴",
     "domainManagementDesc": "허용된 SSO 도메인으로 로그인 제한",
     "passwordPolicy": "비밀번호 정책",
@@ -15068,9 +15005,7 @@
     },
     "licensePage": {
       "unexpectedError": "예상치 못한 오류",
-      "daysRemaining": "라이선스 만료까지 {days}일 남았습니다.",
-      "oneDayRemaining": "라이선스 만료까지 1일 남았습니다.",
-      "licenseExpired": "라이선스가 만료되었습니다."
+      "daysRemaining": "라이선스 만료까지 {days}일 남았습니다."
     },
     "nodesPage": {
       "subtitle": "클러스터 노드 및 상태",
@@ -23421,19 +23356,6 @@
     "exportSucceeded": "SLO {count}개 내보냈습니다 | SLO {count}개 내보냈습니다",
     "moved": "{count}개의 SLO를 {folder}(으)로 이동했습니다",
     "moveFailed": "이동 실패",
-    "import": {
-      "title": "SLO 가져오기",
-      "results": "가져오기 결과",
-      "noResults": "가져온 후 각 SLO의 결과가 여기에 표시됩니다.",
-      "jsonEmpty": "가져오기 전에 파일, URL 또는 편집기에서 SLO JSON을 추가하세요.",
-      "invalidJson": "SLO JSON을 구문 분석할 수 없습니다.",
-      "notAnObject": "SLO #{index}은(는) JSON 객체가 아니어서 건너뛰었습니다.",
-      "nameRequired": "SLO #{index}에는 이름이 없어 건너뛰었습니다.",
-      "created": "SLO #{index} \"{name}\"을(를) 가져왔습니다.",
-      "failed": "SLO #{index} \"{name}\"을(를) 가져오지 못했습니다: {reason}",
-      "unknownError": "알 수 없는 오류",
-      "succeeded": "SLO {count}개를 가져왔습니다 | SLO {count}개를 가져왔습니다"
-    },
     "preview": {
       "goodEvents": "정상 이벤트",
       "badEvents": "오류 이벤트",
@@ -27476,9 +27398,7 @@
     "claimSignalsFailedPaths": "{paths}의 소유권을 가져오지 못했습니다",
     "claimSignalsMorePaths": "{paths} 외 {count}개",
     "toastSignalsClaimedPartly": "신호 {count}개 중 {claimed}개가 이제 {team} 팀으로 전달됩니다. {paths}의 소유권은 가져오지 못했습니다 | 신호 {count}개 중 {claimed}개가 이제 {team} 팀으로 전달됩니다. {paths}의 소유권은 가져오지 못했습니다",
-    "scopeNotSeenYet": "아직 데이터에서 확인되지 않음",
-    "deliveryTemplate": "템플릿: {templates}",
-    "policyMailBanner": "이 버전에서는 이메일 및 SNS 대상이 호출을 수신합니다: {names}."
+    "scopeNotSeenYet": "아직 데이터에서 확인되지 않음"
   },
   "paidUsage": {
     "consentTitle": "유료 AI 사용을 켜시겠습니까?",
