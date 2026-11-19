@@ -1795,7 +1795,6 @@ import {
   b64DecodeUnicode,
   getImageURL,
   useLocalInterestingFields,
-  queryIndexSplit,
   timestampToTimezoneDate,
   b64EncodeUnicode,
   buildDateTimeObject,
@@ -1864,9 +1863,11 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import {
+  appendSqlFilter,
   hasFieldCondition,
   qualifyFieldConditions,
   removeFieldCondition,
+  replaceInOuterWhere,
 } from "@/plugins/logs/filterUtils";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
@@ -5496,62 +5497,18 @@ export default defineComponent({
               filter = qualifyFieldConditions(filter, streamPrefix);
             }
 
-            // if query contains order by clause or limit clause then add where clause before that
-            // if query contains where clause then add filter after that with and operator and keep order by or limit after that
-            // if query does not contain where clause then add where clause before filter
-            if (query.toLowerCase().includes("where")) {
-              // Replace an existing condition for this field, or append if none.
-              // In append mode (SearchResult include/exclude), skip the
-              // field-level replace so multiple values for the same field
-              // coexist with AND.
-              const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
-              const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
-              if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
-                query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
-              } else {
-                // Find the earliest clause that ends the WHERE conditions.
-                // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
-                // We must insert the new filter before whichever comes first so it
-                // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
-                const terminatingClauses = ["group by", "having", "order by", "limit"];
-                const lowerQuery = query.toLowerCase();
-                let firstClause: string | null = null;
-                let firstIndex = Infinity;
-                for (const clause of terminatingClauses) {
-                  const idx = lowerQuery.indexOf(clause);
-                  if (idx !== -1 && idx < firstIndex) {
-                    firstIndex = idx;
-                    firstClause = clause;
-                  }
-                }
-                if (firstClause) {
-                  const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
-                  query = beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
-                } else {
-                  query = query + " AND " + filter;
-                }
-              }
-            } else {
-              // Find the earliest clause to insert WHERE before.
-              // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
-              const terminatingClauses = ["group by", "having", "order by", "limit"];
-              const lowerQuery = query.toLowerCase();
-              let firstClause: string | null = null;
-              let firstIndex = Infinity;
-              for (const clause of terminatingClauses) {
-                const idx = lowerQuery.indexOf(clause);
-                if (idx !== -1 && idx < firstIndex) {
-                  firstIndex = idx;
-                  firstClause = clause;
-                }
-              }
-              if (firstClause) {
-                const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
-                query = beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
-              } else {
-                query = query + " where " + filter;
-              }
-            }
+            // Replace an existing condition for this field, or append if none.
+            // Append mode (SearchResult include/exclude) skips the replace so values AND together.
+            const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
+            const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
+            const replaced = fieldNameSQL
+              ? replaceInOuterWhere(query, (piece) =>
+                  hasFieldCondition(piece, fieldNameSQL)
+                    ? replaceExistingFieldCondition(piece, fieldNameSQL, filter)
+                    : null,
+                )
+              : null;
+            query = replaced ?? appendSqlFilter(query, filter);
             currentQuery[0] = query;
           } else {
             const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";

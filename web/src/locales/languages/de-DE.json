@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "Die ausgewählten Streams haben keine Volltextfelder",
     "freeTextNoTextFields": "Dieser Stream hat keine Textfelder zum Durchsuchen.",
     "freeTextNoTextFieldsNamed": "Nicht durchsucht: {streams} (keine Textfelder).",
-    "freeTextBuildNotice": "Dieser Filter enthält eine Textsuche; bearbeiten Sie ihn in SQL."
+    "freeTextBuildNotice": "Dieser Filter enthält eine Textsuche; bearbeiten Sie ihn in SQL.",
+    "filterNotChartableNotice": "Dieser Filter kann im Builder nicht als Diagramm dargestellt werden. Ihr Suchfilter bleibt unverändert; wechseln Sie zu {custom}, um ihn darzustellen."
   },
   "menu": {
     "alertCalibration": "Alarmkalibrierung",
@@ -12949,6 +12950,7 @@
         "emptyQuery": "Es gibt keine Abfrage, aus der ein Alarm erstellt werden kann.",
         "noQueries": "Dieses Panel hat keine Abfrage, aus der ein Alarm erstellt werden kann.",
         "noConstants": "Die ausgewählten Muster haben keinen markanten Text, mit dem abgeglichen werden kann.",
+        "patternsShared": "{count} der ausgewählten Muster teilen ihren gesamten Text mit anderen Mustern und fehlen deshalb im Alert-Filter.",
         "sqlModeFilterDropped": "Ihre SQL-Abfrage wurde nicht übernommen — der Alarm stimmt nur mit den ausgewählten Mustern überein.",
         "patternsUnusable": "Keines der Muster auf dieser Seite hat markanten Text, mit dem abgeglichen werden kann, daher verwendet der Alarm nur Ihre Suche.",
         "dbmRollupLag": "Datenbankkennzahlen werden alle {minutes} Minuten aggregiert, daher kann dieser Alarm nur so oft auslösen — er ist keine Echtzeit-Alarmierung.",
@@ -20192,6 +20194,7 @@
       "excludeFromQuery": "Ausschließen",
       "createAlertAction": "Alarm erstellen",
       "noMatchTerms": "Dieses Muster hat keinen unterscheidbaren Text zum Filtern.",
+      "noDistinctTextTooltip": "Jeder feste Text in diesem Muster kommt auch in einem anderen Muster vor, daher würde ein Filter auch deren Logs treffen.",
       "noStreamSelected": "Kein Stream ausgewählt. Bitte wählen Sie einen Stream aus, bevor Sie einen Alarm erstellen.",
       "alertBroadMatch": "Dieses Muster hat keinen unterscheidbaren konstanten Text – die Alarmabfrage wird weitgehend übereinstimmen. Erwägen Sie das Hinzufügen manueller Filter."
     },

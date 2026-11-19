@@ -1,9 +1,9 @@
 /**
- * Logs Patterns Multi-Stream Guard (OSS).
+ * Logs Patterns Multi-Stream Guard.
  *
- * Patterns is enterprise-gated, so on the OSS build a link asking for the Patterns tab
- * opens Logs instead; the multi-stream guard in Index.vue's extractPatternsForCurrentQuery()
- * is then unreachable and no toast or extraction request may appear.
+ * Patterns is enterprise-gated. Where it is allowed, a multi-stream link hits the guard in
+ * Index.vue's extractPatternsForCurrentQuery() and shows an error toast; on OSS the link opens
+ * Logs instead. Either way no patterns extraction request may be made.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -37,10 +37,10 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         testLogger.testEnd(testInfo.title, testInfo.status);
     });
 
-    test("should open Logs and not call patterns when a multi-stream link asks for Patterns on OSS @P0 @smoke", {
+    test("should refuse patterns for a multi-stream link: toast on enterprise, Logs fallback on OSS @P0 @smoke", {
         tag: ['@logs-patterns-multi-stream-guard', '@all', '@smoke', '@logs']
     }, async ({ page }) => {
-        testLogger.info('Test: OSS Patterns link with multiple streams falls back to Logs');
+        testLogger.info('Test: multi-stream Patterns link is refused without an extraction request');
 
         const streamA = makeStreamName('a');
         const streamB = makeStreamName('b');
@@ -58,10 +58,19 @@ test.describe("Logs Patterns Multi-Stream Guard testcases", () => {
         await pm.logsPage.startToastRecorder();
         await page.goto(`${logsUrl}&stream_type=logs&stream=${streamA},${streamB}&logs_visualize_toggle=patterns`, { waitUntil: 'domcontentloaded' });
 
-        await pm.logsPage.expectPatternsToggleNotVisible();
-        await pm.logsPage.expectNoMultiStreamPatternsToast();
-        expect(extractCalls, `patterns/extract must not be called on OSS, got: ${extractCalls.join(', ')}`).toHaveLength(0);
-        testLogger.info('PASSED: OSS Patterns link opened Logs, no toast, no extraction request');
+        // The Patterns toggle is always rendered (locked on OSS), so the build is told apart by
+        // whether the link opened the Patterns tab: a locked build falls back to Logs.
+        const patternsToggle = page.locator('[data-test="logs-patterns-toggle"]');
+        await expect(patternsToggle).toBeVisible({ timeout: 30000 });
+        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        const patternsAllowed = (await patternsToggle.getAttribute('data-state')) === 'on';
+        if (patternsAllowed) {
+            await pm.logsPage.expectMultiStreamPatternsToast();
+        } else {
+            await pm.logsPage.expectNoMultiStreamPatternsToast();
+        }
+        expect(extractCalls, `patterns/extract must not be called for a multi-stream selection, got: ${extractCalls.join(', ')}`).toHaveLength(0);
+        testLogger.info(`PASSED: multi-stream Patterns link refused (patternsAllowed=${patternsAllowed}), no extraction request`);
     });
 
     test("should not show the multi-stream patterns toast for a single stream @P1", {
