@@ -159,8 +159,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      service_streams rows named by the metric-name label that list no trace stream.
 // 159: delete org_ai_toolsets rows of the removed cli kind.
 // 160: create ai_toolset_health.
-// 161: add org_ai_toolsets replication columns and the toolset tombstones table.
-pub const DB_SCHEMA_VERSION: u64 = 161;
+// 161: add org_ai_toolsets.region_only/origin_region and ai_toolset_tombstones.
+// 162: create ai_memory and ai_memory_revisions.
+pub const DB_SCHEMA_VERSION: u64 = 162;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

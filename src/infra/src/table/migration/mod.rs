@@ -280,6 +280,7 @@ mod m20261223_000001_create_alert_leases;
 mod m20261224_000001_delete_cli_ai_toolsets;
 mod m20261223_000001_create_ai_toolset_health;
 mod m20261224_000001_ai_toolsets_replication;
+mod m20261225_000001_create_ai_memory;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -484,6 +485,18 @@ pub(crate) async fn create_service_identity_tables_for_test(
 ) -> Result<(), DbErr> {
     m20261220_000001_create_service_identity_tables::Migration
         .up(&SchemaManager::new(db))
+        .await
+}
+
+/// `create_user_tables` needs these too: removing a user or membership deletes its AI memory.
+/// Created in migration order from toolset health on, as on a migrated database.
+pub(crate) async fn create_ai_memory_tables(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    m20261223_000001_create_ai_toolset_health::Migration
+        .up(&manager)
+        .await?;
+    m20261225_000001_create_ai_memory::Migration
+        .up(&manager)
         .await
 }
 
@@ -928,6 +941,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261224_000001_delete_cli_ai_toolsets::Migration),
             Box::new(m20261223_000001_create_ai_toolset_health::Migration),
             Box::new(m20261224_000001_ai_toolsets_replication::Migration),
+            Box::new(m20261225_000001_create_ai_memory::Migration),
         ]
     }
 }
@@ -1069,6 +1083,7 @@ mod tests {
         (159, "m20261224_000001_delete_cli_ai_toolsets"),
         (160, "m20261223_000001_create_ai_toolset_health"),
         (161, "m20261224_000001_ai_toolsets_replication"),
+        (162, "m20261225_000001_create_ai_memory"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
