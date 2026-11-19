@@ -719,6 +719,7 @@ import {
 import { buildColumnIdentifierAst, quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { replaceSelectFieldList } from "@/utils/query/quickModeFieldList";
 import { hasLineComment } from "@/utils/query/sqlComments";
+import { quoteIdent } from "@/utils/security/sql";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -3446,11 +3447,14 @@ export default defineComponent({
         if (isCustomMode) {
           if (isBuildFilterHeld()) {
             const page = buildQueryPageRef.value as { incompleteFilterNotice?: boolean } | null;
-            if (page?.incompleteFilterNotice && !searchObj.meta.sqlMode) {
-              const stream = searchObj.data.stream.selectedStream[0];
+            const streams = searchObj.data.stream.selectedStream;
+            // The seed names one stream, so several selected streams get no seed.
+            if (page?.incompleteFilterNotice && searchObj.meta.sqlMode) {
+              buildDashboardPanelData.data.queries[0].query = searchObj.data.query;
+            } else if (page?.incompleteFilterNotice && streams.length === 1) {
               buildDashboardPanelData.data.queries[0].query =
                 `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 ` +
-                `FROM "${stream}" WHERE ${searchObj.data.query} GROUP BY x_axis_1 ORDER BY x_axis_1`;
+                `FROM ${quoteIdent(streams[0])} WHERE ${searchObj.data.query} GROUP BY x_axis_1 ORDER BY x_axis_1`;
             }
             return;
           }

@@ -177,6 +177,49 @@ describe(
         );
       });
 
+      const histogramFrom = (from: string) =>
+        `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM ${from} WHERE ${where} GROUP BY x_axis_1 ORDER BY x_axis_1`;
+
+      it("quotes a stream name that contains a double quote in the seed", async () => {
+        await openIncomplete();
+        wrapper.vm.searchObj.data.stream.selectedStream = ['we"ird'];
+        await wrapper.vm.onBuildModeToggle(true);
+        await flushPromises();
+
+        expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe(
+          histogramFrom('"we""ird"'),
+        );
+        expect(wrapper.vm.searchObj.data.query).toBe(where);
+      });
+
+      it("seeds nothing and keeps Search when several streams are selected", async () => {
+        await openIncomplete();
+        wrapper.vm.searchObj.data.stream.selectedStream = ["fts_a", "fts_b"];
+        wrapper.vm.buildDashboardPanelData.data.queries[0].query = "";
+        await wrapper.vm.onBuildModeToggle(true);
+        await flushPromises();
+
+        expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe("");
+        expect(wrapper.vm.searchObj.data.query).toBe(where);
+        expect(wrapper.vm.searchObj.data.editorValue).toBe(where);
+      });
+
+      it("seeds the custom query with the Search SQL in SQL mode and keeps Search", async () => {
+        await openIncomplete();
+        const sql = `SELECT * FROM "fts_a" WHERE ${where}`;
+        const { searchObj } = wrapper.vm;
+        searchObj.meta.sqlMode = true;
+        searchObj.data.query = sql;
+        searchObj.data.editorValue = sql;
+        await flushPromises();
+        await wrapper.vm.onBuildModeToggle(true);
+        await flushPromises();
+
+        expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe(sql);
+        expect(searchObj.data.query).toBe(sql);
+        expect(searchObj.data.editorValue).toBe(sql);
+      });
+
       it("keeps the Search query when SQL mode is toggled", async () => {
         await openIncomplete();
         wrapper.vm.searchObj.meta.sqlMode = true;

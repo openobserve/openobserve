@@ -92,8 +92,8 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
   const mode: AlertPatternMode = input.mode ?? "exclude";
   const requested = input.templates ?? [];
 
-  // A pattern with no invariant constants has nothing that identifies it — its
-  // wildcards are per-log samples, not something to match on.
+  // Patterns with no long constant, or whose constants all appear in another
+  // pattern, have no filter that selects only them; wildcards are per-log samples.
   const allTemplates = input.allTemplates;
   const templates = usable(requested, allTemplates);
   if (requested.length && templates.length < requested.length) {

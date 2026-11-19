@@ -149,7 +149,7 @@ mod tests {
     use datafusion::{
         arrow::{
             array::{Array, Float64Array, ListArray, RecordBatch},
-            datatypes::{Field, Float64Type, Schema},
+            datatypes::{Field, Float32Type, Float64Type, Schema},
         },
         common::tree_node::{Transformed, TreeNode, TreeNodeRecursion},
         datasource::MemTable,
@@ -178,8 +178,12 @@ mod tests {
     }
 
     fn new_acc(udaf: &AggregateUDF) -> Box<dyn Accumulator> {
-        let schema = Schema::new(vec![Field::new("a", DataType::Float64, false)]);
-        let field: FieldRef = Arc::new(Field::new("a", DataType::Float64, false));
+        new_acc_typed(udaf, DataType::Float64)
+    }
+
+    fn new_acc_typed(udaf: &AggregateUDF, dt: DataType) -> Box<dyn Accumulator> {
+        let schema = Schema::new(vec![Field::new("a", dt.clone(), false)]);
+        let field: FieldRef = Arc::new(Field::new("a", dt, false));
         let exprs = [col("a", &schema).unwrap(), lit(0.5f64)];
         let expr_fields = [
             field.clone(),
@@ -215,6 +219,27 @@ mod tests {
             merge_two_multi_row_batches(&wrapped),
             ScalarValue::Float64(Some(4.5))
         );
+    }
+
+    #[test]
+    fn test_wrapper_merges_every_f32_state_row() {
+        let wrapped = AggregateUDF::from(PercentileCont::new());
+        let mut acc = new_acc_typed(&wrapped, DataType::Float32);
+        let lists = [vec![Some(1.0f32), Some(2.0)], vec![Some(3.0), Some(4.0)]]
+            .into_iter()
+            .map(Some);
+        let states: ArrayRef = Arc::new(ListArray::from_iter_primitive::<Float32Type, _, _>(lists));
+        acc.merge_batch(&[states]).unwrap();
+        assert_eq!(acc.evaluate().unwrap(), ScalarValue::Float32(Some(2.5)));
+    }
+
+    #[test]
+    fn test_wrapper_empty_state_batch_is_noop() {
+        let wrapped = AggregateUDF::from(PercentileCont::new());
+        let mut acc = new_acc(&wrapped);
+        acc.merge_batch(&[state_batch(&[])]).unwrap();
+        acc.merge_batch(&[state_batch(&[&[1.0, 3.0]])]).unwrap();
+        assert_eq!(acc.evaluate().unwrap(), ScalarValue::Float64(Some(2.0)));
     }
 
     #[test]

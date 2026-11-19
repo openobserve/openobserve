@@ -2051,6 +2051,45 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_vrl_to_response_result_array_runtime_error_fails_every_row() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"a": 1}), json::json!({"a": 2})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("#ResultArray#SkipVRL#\n. = parse_json!(\"not json\")".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"a": 1}), json::json!({"a": 2})]);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(
+            response.function_error[0].starts_with("Query function failed on 2 of 2 rows: "),
+            "{:?}",
+            response.function_error
+        );
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_result_array_success_has_no_function_error() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"a": 1}), json::json!({"a": 2})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("#ResultArray#SkipVRL#\n. = [{\"x\": 1}]".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"x": 1})]);
+        assert!(response.function_error.is_empty());
+    }
+
+    #[test]
     fn test_apply_vrl_to_response_filters_null_array_items() {
         let mut response = config::meta::search::Response {
             hits: vec![json::json!({"input": true})],

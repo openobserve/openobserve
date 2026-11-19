@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { maskedSpanEnd } from "@/utils/query/sqlComments";
 import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
 
 /**
@@ -101,22 +102,15 @@ export const replaceExistingFieldCondition = (
 
 const TOP_LEVEL_KEYWORD = /(where|group\s+by|having|order\s+by|limit|offset|or)\b/iy;
 
-// Keyword offsets outside quotes, comments and brackets; `or` is only reported when asked for.
+// Keyword offsets outside quotes, comments and brackets.
 const topLevelKeywords = (sql: string): { kw: string; index: number }[] => {
   const found: { kw: string; index: number }[] = [];
-  let quote = "";
   let depth = 0;
   for (let i = 0; i < sql.length; i++) {
-    const ch = sql[i];
-    if (quote) {
-      if (ch === quote) quote = "";
-    } else if (ch === "'" || ch === '"') quote = ch;
-    else if (sql.startsWith("--", i)) {
-      const eol = sql.indexOf("\n", i);
-      if (eol === -1) break;
-      i = eol;
-    } else if (ch === "(") depth++;
-    else if (ch === ")") depth--;
+    const span = maskedSpanEnd(sql, i);
+    if (span !== null) i = span - 1;
+    else if (sql[i] === "(") depth++;
+    else if (sql[i] === ")") depth--;
     else if (depth === 0 && !/\w/.test(sql[i - 1] ?? " ")) {
       TOP_LEVEL_KEYWORD.lastIndex = i;
       const m = TOP_LEVEL_KEYWORD.exec(sql);

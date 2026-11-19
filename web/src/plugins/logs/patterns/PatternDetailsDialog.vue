@@ -89,6 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :disabled="canFilter" :content="filterBlockedTooltip">
               <span
                 class="inline-flex"
+                :role="canFilter ? undefined : 'group'"
+                :aria-label="canFilter ? undefined : t('logs.patternList.includeInQuery')"
                 :tabindex="canFilter ? undefined : 0"
                 :aria-describedby="canFilter ? undefined : 'pattern-detail-filter-blocked-reason'"
                 data-test="pattern-detail-include-wrap"
@@ -108,6 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :disabled="canFilter" :content="filterBlockedTooltip">
               <span
                 class="inline-flex"
+                :role="canFilter ? undefined : 'group'"
+                :aria-label="canFilter ? undefined : t('logs.patternList.excludeFromQuery')"
                 :tabindex="canFilter ? undefined : 0"
                 :aria-describedby="canFilter ? undefined : 'pattern-detail-filter-blocked-reason'"
                 data-test="pattern-detail-exclude-wrap"
@@ -124,24 +128,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </span>
             </OTooltip>
-            <OTooltip :disabled="!alertBlockedReason" :content="alertBlockedReason">
+            <OTooltip v-if="alertsLocked" :content="alertsLockedReason">
               <span
                 class="inline-flex"
-                :tabindex="alertBlockedReason ? 0 : undefined"
-                :aria-describedby="
-                  alertBlockedReason ? 'pattern-detail-alert-blocked-reason' : undefined
-                "
+                role="group"
+                tabindex="0"
+                :aria-label="t('logs.patternList.createAlertAction')"
+                aria-describedby="pattern-detail-alert-locked-reason"
                 data-test="pattern-detail-create-alert-wrap"
               >
                 <OButton
                   variant="warning"
                   size="xs"
-                  :icon-left="alertsLocked ? undefined : 'notifications'"
-                  :disabled="!!alertBlockedReason"
+                  disabled
                   data-test="pattern-detail-create-alert-btn"
-                  @click="onCreateAlert"
                 >
-                  <template v-if="alertsLocked" #icon-left>
+                  <template #icon-left>
                     <OIcon
                       name="lock"
                       class="lock-chip"
@@ -153,6 +155,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </span>
             </OTooltip>
+            <OButton
+              v-else
+              variant="warning"
+              size="xs"
+              icon-left="notifications"
+              data-test="pattern-detail-create-alert-btn"
+              @click="onCreateAlert"
+            >
+              {{ t("logs.patternList.createAlertAction") }}
+            </OButton>
             <span
               v-if="!canFilter"
               id="pattern-detail-filter-blocked-reason"
@@ -162,12 +174,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ filterBlockedTooltip }}
             </span>
             <span
-              v-if="alertBlockedReason"
-              id="pattern-detail-alert-blocked-reason"
+              v-if="alertsLocked"
+              id="pattern-detail-alert-locked-reason"
               class="sr-only"
-              data-test="pattern-detail-alert-blocked-reason"
+              data-test="pattern-detail-alert-locked-reason"
             >
-              {{ alertBlockedReason }}
+              {{ alertsLockedReason }}
             </span>
           </div>
 
@@ -457,14 +469,6 @@ const filterBlockedTooltip = computed(() =>
   ),
 );
 
-const alertBlockedReason = computed(() =>
-  alertsLocked.value
-    ? raw(alertsLockedReason.value)
-    : props.filterBlockedReason
-      ? filterBlockedTooltip.value
-      : raw(""),
-);
-
 const emit = defineEmits<{
   (e: "update:modelValue", value: boolean): void;
   (e: "navigate", next: boolean, prev: boolean): void;
@@ -516,7 +520,7 @@ const onExclude = () => {
   emit("update:modelValue", false);
 };
 const onCreateAlert = () => {
-  if (!props.selectedPattern || alertBlockedReason.value) return;
+  if (!props.selectedPattern || alertsLocked.value) return;
   analytics.track("log_patterns_alert_started");
   emit("create-alert", props.selectedPattern.pattern);
   emit("update:modelValue", false);

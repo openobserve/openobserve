@@ -520,6 +520,27 @@ describe("appendSqlFilter", () => {
     );
   });
 
+  it("ignores keywords inside comments, escaped quotes and quoted identifiers", () => {
+    expect(appendSqlFilter(`${base} WHERE a = 1 /* order by x */`, f)).toBe(
+      `${base} WHERE a = 1 /* order by x */ AND ${f}`,
+    );
+    expect(appendSqlFilter(`${base} WHERE a = 1 /* ( */ ORDER BY a`, f)).toBe(
+      `${base} WHERE a = 1 /* ( */ AND ${f} ORDER BY a`,
+    );
+    expect(appendSqlFilter(`${base} WHERE msg = 'it''s limit 5 or x'`, f)).toBe(
+      `${base} WHERE msg = 'it''s limit 5 or x' AND ${f}`,
+    );
+    expect(appendSqlFilter(`${base} WHERE "limit" = 1 AND order_by_col = 2`, f)).toBe(
+      `${base} WHERE "limit" = 1 AND order_by_col = 2 AND ${f}`,
+    );
+  });
+
+  it("matches keywords case-insensitively across newlines", () => {
+    expect(appendSqlFilter(`${base}\nwhere a = 1\nor b = 2\norder\nby a`, f)).toBe(
+      `${base}\nwhere (a = 1\nor b = 2) AND ${f} order\nby a`,
+    );
+  });
+
   it("works for Exclude filters", () => {
     expect(appendSqlFilter(`${base} WHERE ${or}`, "svc_name != 'alpha'")).toBe(
       `${base} WHERE (${or}) AND svc_name != 'alpha'`,

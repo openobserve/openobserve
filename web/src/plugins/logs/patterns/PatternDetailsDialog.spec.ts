@@ -242,7 +242,7 @@ describe("PatternDetailsDialog", () => {
       it("makes the blocked buttons focusable and described by the reason", () => {
         const w = mountWith("shared");
         const reason = enUS.logs.patternList.noDistinctTextTooltip;
-        for (const id of ["include", "exclude", "create-alert"]) {
+        for (const id of ["include", "exclude"]) {
           const wrap = w.find(`[data-test="pattern-detail-${id}-wrap"]`);
           expect(wrap.attributes("tabindex")).toBe("0");
           const describedBy = wrap.attributes("aria-describedby")!;
@@ -253,7 +253,7 @@ describe("PatternDetailsDialog", () => {
 
       it("leaves the wrappers out of the tab order when nothing is blocked", () => {
         const w = mountWith();
-        for (const id of ["include", "exclude", "create-alert"]) {
+        for (const id of ["include", "exclude"]) {
           const wrap = w.find(`[data-test="pattern-detail-${id}-wrap"]`);
           expect(wrap.attributes("tabindex")).toBeUndefined();
           expect(wrap.attributes("aria-describedby")).toBeUndefined();
@@ -262,29 +262,29 @@ describe("PatternDetailsDialog", () => {
         w.unmount();
       });
 
-      it("disables Create alert with the same reason when the filter is not unique", async () => {
-        const w = mountWith("none");
-        const btn = w
-          .findAllComponents(OButtonStub)
-          .find((c: any) => c.attributes("data-test") === "pattern-detail-create-alert-btn");
-        expect(btn?.props("disabled")).toBe(true);
-        expect(
-          w
-            .find('[data-test="pattern-detail-create-alert-wrap"]')
-            .element.closest('[data-test-stub="o-tooltip"]')
-            ?.getAttribute("data-content"),
-        ).toBe(enUS.logs.patternList.noMatchTerms);
-        await w.find('[data-test="pattern-detail-create-alert-btn"]').trigger("click");
-        expect(w.emitted("create-alert")).toBeUndefined();
-        w.unmount();
+      it("keeps Create alert enabled and clickable when Include/Exclude is blocked", async () => {
+        for (const reason of ["none", "shared"] as const) {
+          const w = mountWith(reason);
+          const btn = w
+            .findAllComponents(OButtonStub)
+            .find((c: any) => c.attributes("data-test") === "pattern-detail-create-alert-btn");
+          expect(!!btn?.props("disabled")).toBe(false);
+          await w.find('[data-test="pattern-detail-create-alert-btn"]').trigger("click");
+          expect(w.emitted("create-alert")).toHaveLength(1);
+          w.unmount();
+        }
       });
 
-      it("keeps Create alert enabled when the filter is unique", () => {
-        const w = mountWith(null);
-        const btn = w
-          .findAllComponents(OButtonStub)
-          .find((c: any) => c.attributes("data-test") === "pattern-detail-create-alert-btn");
-        expect(btn?.props("disabled")).toBe(false);
+      it("names each blocked wrapper after its button", () => {
+        const w = mountWith("shared");
+        const labels = ["include", "exclude"].map((id) => {
+          const wrap = w.find(`[data-test="pattern-detail-${id}-wrap"]`);
+          return [wrap.attributes("role"), wrap.attributes("aria-label")];
+        });
+        expect(labels).toEqual([
+          ["group", enUS.logs.patternList.includeInQuery],
+          ["group", enUS.logs.patternList.excludeFromQuery],
+        ]);
         w.unmount();
       });
 
@@ -327,6 +327,11 @@ describe("PatternDetailsDialog", () => {
           .find((c: any) => c.attributes("data-test") === "pattern-detail-create-alert-btn");
         expect(btnComponent?.props("disabled")).toBeDefined();
         expect(locked.find('[data-test="pattern-detail-create-alert-lock"]').exists()).toBe(true);
+        const wrap = locked.find('[data-test="pattern-detail-create-alert-wrap"]');
+        expect([wrap.attributes("role"), wrap.attributes("aria-label")]).toEqual([
+          "group",
+          enUS.logs.patternList.createAlertAction,
+        ]);
         await btn.trigger("click");
         expect(locked.emitted("create-alert")).toBeUndefined();
         locked.unmount();

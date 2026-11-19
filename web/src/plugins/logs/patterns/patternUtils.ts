@@ -58,15 +58,16 @@ const sharedWith = (terms: string[], other: string): boolean => {
 
 /**
  * `match_all()` terms selecting only this pattern: long constants, else every
- * constant. Null when no term set separates it from the other templates.
+ * constant when long ones exist but are shared. Null when nothing separates it.
  */
 export const resolvePatternMatchTerms = (
   template: string,
   allTemplates?: string[],
 ): string[] | null => {
   const long = extractConstantsFromPattern(template);
-  // Without the other templates nothing can vouch for short words, so only long constants are trusted.
-  if (!allTemplates) return long.length ? long : null;
+  // Short words alone never identify a pattern, and without the other templates nothing vouches for them.
+  if (!long.length) return null;
+  if (!allTemplates) return long;
   const others = allTemplates.filter((t) => t !== template);
   const unique = (terms: string[]) => terms.length > 0 && !others.some((o) => sharedWith(terms, o));
 
@@ -77,12 +78,12 @@ export const resolvePatternMatchTerms = (
 
 export type PatternFilterBlock = "none" | "shared";
 
-/** Why a pattern cannot be filtered on: it has no constant text, or every piece is shared. */
+/** Why a pattern cannot be filtered on: no long constant text, or every piece is shared. */
 export const patternFilterBlockedReason = (
   template: string,
   allTemplates?: string[],
 ): PatternFilterBlock | null => {
-  if (splitConstants(template).length === 0) return "none";
+  if (extractConstantsFromPattern(template).length === 0) return "none";
   return resolvePatternMatchTerms(template, allTemplates) === null ? "shared" : null;
 };
 

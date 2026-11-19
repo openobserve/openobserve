@@ -28,6 +28,7 @@ describe("parseWhereClauseToFilterChecked with the real SQL parser", () => {
     ["level = 'info' AND status > 5", true],
     ["level = lower('A')", false],
     ["a = b", false],
+    ['level = "info"', false],
     ["level = 'x' AND a = b", false],
     ["1=1", true],
     ["status > 5", true],

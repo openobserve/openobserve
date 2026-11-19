@@ -443,6 +443,12 @@ describe("resolvePatternMatchTerms", () => {
     expect(resolvePatternMatchTerms(x, [x, y])).toBeNull();
   });
 
+  it("returns null for a short-only template, alone or among others", () => {
+    expect(resolvePatternMatchTerms("GET <*>")).toBeNull();
+    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>"])).toBeNull();
+    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>", A])).toBeNull();
+  });
+
   it("returns null for an all-wildcard template", () => {
     expect(resolvePatternMatchTerms("<*> <*>", ["<*> <*>", A])).toBeNull();
   });
@@ -462,6 +468,10 @@ describe("patternFilterBlockedReason", () => {
 
   it("is 'none' for a template with no constant text", () => {
     expect(patternFilterBlockedReason("<*> <:NUM>", ["<*> <:NUM>", A])).toBe("none");
+  });
+
+  it("is 'none' for a short-only template even when it is the only pattern", () => {
+    expect(patternFilterBlockedReason("GET <*>", ["GET <*>"])).toBe("none");
   });
 
   it("is 'shared' when every constant also sits in another template", () => {
