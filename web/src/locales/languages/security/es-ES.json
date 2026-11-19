@@ -920,7 +920,7 @@
       "correlationWindow": "Lo define el intervalo de tiempo de la correlación",
       "createForbidden": "Crear una detección requiere el permiso de Seguridad",
       "preview": {
-        "run": "Previsualizar en el historial",
+        "run": "Vista previa sobre el historial",
         "hint": "Ejecuta la regla sobre el rango elegido igual que lo hace el programador e indica qué se habría disparado",
         "failed": "La consulta falló: {reason}",
         "time": "Hora",

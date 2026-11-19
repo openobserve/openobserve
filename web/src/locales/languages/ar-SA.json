@@ -3788,7 +3788,7 @@
     "enter_license_key": "أدخل مفتاح الترخيص",
     "paste_license_placeholder": "الصق مفتاح رخصتك هنا...",
     "license_auto_filled": "تم ملء مفتاح الترخيص تلقائيًا من URL. انقر على \"تحديث الترخيص\" للتطبيق.",
-    "update_license": "حدّث الترخيص",
+    "update_license": "تحديث الترخيص",
     "license_id": "معرف الرخصة",
     "company": "الشركة",
     "license_key": "مفتاح الترخيص",
@@ -3813,7 +3813,7 @@
     "features_new": "جديدة بعد ترخيصك",
     "features_filter_new": "جديدة",
     "request_new_license": "طلب ترخيص جديد",
-    "add_new_license_key": "أضف مفتاح ترخيص جديد",
+    "add_new_license_key": "إضافة مفتاح ترخيص جديد",
     "online_error_unreachable": "تعذّر الوصول إلى خادم الترخيص.{limits}",
     "online_error_timeout": "تعذّر الوصول إلى خادم الترخيص.{limits}",
     "online_error_blocked": "تم حظر هذا التثبيت بواسطة OpenObserve. تواصل مع الدعم.",
@@ -3891,7 +3891,7 @@
     "expiry_online": "ينتهي ترخيصك في {date}. انقر على تحديث الآن للتحقق من وجود ترخيص مجدد.",
     "expiry_viewer": "ينتهي ترخيصك في {date}. اطلب من مسؤول تحديث الترخيص.",
     "expiry_airgapped": "ينتهي ترخيصك في {date}. تواصل مع OpenObserve للحصول على مفتاح مجدد.",
-    "refresh_license_limits": "حدّث حدود الترخيص",
+    "refresh_license_limits": "تحديث حدود الترخيص",
     "banner_paused_usage": "البحث متوقف مؤقتًا. تجاوز الاستيعاب الحد اليومي في {exceeded} يوم من هذا الشهر ({allowed} مسموح). لا يزال الاستيعاب جاريًا. تواصل مع OpenObserve باستخدام معرّف الترخيص {licenseId}. | البحث متوقف مؤقتًا. تجاوز الاستيعاب الحد اليومي في {exceeded} أيام من هذا الشهر ({allowed} مسموح). لا يزال الاستيعاب جاريًا. تواصل مع OpenObserve باستخدام معرّف الترخيص {licenseId}.",
     "banner_paused_other": "تم إيقاف البحث مؤقتًا بسبب فحص الترخيص. لا تزال البيانات تُستوعب. تواصل مع OpenObserve باستخدام معرّف الترخيص {licenseId}.",
     "banner_paused_no_id": "تم إيقاف البحث مؤقتًا بسبب فحص الترخيص. لا تزال البيانات تُستوعب.",
@@ -3967,10 +3967,10 @@
     "waiver_breach_ended": "انتهت مخصصات {month} عند {end} UTC.",
     "waiver_window_until": "حتى {end}",
     "waiver_window_days": "أيام الاستخدام من {start} إلى {end}",
-    "update_license_key": "حدّث مفتاح الترخيص",
+    "update_license_key": "تحديث مفتاح الترخيص",
     "paste_new_license_placeholder": "الصق مفتاح الرخصة الجديد هنا...",
     "your_complete_license_key": "مفتاح رخصتك الكامل:",
-    "copy_key": "انسخ المفتاح",
+    "copy_key": "نسخ المفتاح",
     "usage_information": "معلومات الاستخدام",
     "usage_chart_title": "الاستيعاب اليومي لهذا الشهر",
     "no_license_ingestion_limit": "بدون ترخيص، يقتصر الاستيعاب على <strong>{limit} GB</strong> يوميًا.",
@@ -5111,7 +5111,7 @@
       "variantOption": "{name} — {help}",
       "variantHelp": {
         "info": "إشعارات عامة وأخبار الإصدارات",
-        "warning": "تدهور الخدمة أو صيانة مرتقبة",
+        "warning": "تدهور الخدمة أو صيانة قادمة",
         "critical": "انقطاعات؛ تُعرض أولًا وتُخفي العروض الترويجية",
         "promo": "أحداث وعروض؛ تُعرض أخيرًا وتُخفى أثناء الانقطاعات"
       },
@@ -13260,7 +13260,7 @@
           "refuted": "مدحوض"
         },
         "openEvidence": "افتح الدليل {number}",
-        "notVerifiedId": "غير مُتحقق منه",
+        "notVerifiedId": "غير موثّق",
         "hypotheses": "الفرضيات",
         "noHypotheses": "لم تُسجَّل أي فرضيات بعد.",
         "noEvidenceYet": "لا يوجد دليل بعد",
@@ -15471,7 +15471,7 @@
     "destinationsLoadError": "وجهات تحميل أخطاء"
   },
   "alert_destinations": {
-    "chooseTypeTitle": "اختيار النوع",
+    "chooseTypeTitle": "اختر النوع",
     "selectDestinationType": "نوع الوجهة",
     "connectionStepTitle": "الاتصال",
     "connectionDetailsTitle": "تفاصيل الاتصال",
@@ -15701,7 +15701,7 @@
     "featureOwnDataDesc": "خزّن البيانات المستوعبة مباشرة في حاوية التخزين الخاصة بك وابقَ متحكمًا بالكامل في من يمكنه الوصول إليها.",
     "featureSecureTitle": "آمن ومتوافق",
     "featureSecureDesc": "مفاتيح الوصول الدقيقة، بياناتك الحساسة تبقى في بنية تحتك.",
-    "newStorageConfiguration": "تكوين جديد لحاوية التخزين",
+    "newStorageConfiguration": "تكوين حاوية تخزين جديدة",
     "selectProviderDesc": "اختر مزود تخزين سحابي لتخزين بيانات هذه المؤسسة.",
     "bucketNameRequired": "اسم حاوية التخزين مطلوب",
     "accessKeyRequired": "مفتاح الوصول مطلوب",
@@ -17180,7 +17180,7 @@
     "cancelQuery": "إلغاء الاستعلام",
     "queryRange": "نطاق الاستعلام",
     "userSummary": "ملخص المستخدم",
-    "allQueries": "كل الاستعلامات",
+    "allQueries": "جميع الاستعلامات",
     "allFields": "جميع الحقول",
     "queryType": "نوع الاستعلام",
     "numOfQueries": "عدد الاستعلامات",
@@ -21454,7 +21454,7 @@
     "tabLabel": "مزودو LLM",
     "title": "مزودو LLM",
     "subtitle": "مزودو LLM للتقييمات المباشرة",
-    "newButton": "موفّر جديد",
+    "newButton": "مزود جديد",
     "searchPlaceholder": "البحث في المزوّدين",
     "defaultBadge": "الافتراضي",
     "loadError": "فشل تحميل مزودي LLM",
@@ -21465,7 +21465,7 @@
       "defaultModel": "النموذج الافتراضي"
     },
     "empty": {
-      "title": "لا توجد موفّرات LLM بعد",
+      "title": "لا يوجد مزودو LLM بعد",
       "description": "يخزّن مزوّدو LLM تفاصيل الاتصال (عنوان URL الأساسي + بيانات الاعتماد) لنماذج اللغة التي تستدعيها أدوات تقييم LLM Judge لديك. أضف واحدًا لبدء تشغيل التقييمات القائمة على الحكم."
     }
   },

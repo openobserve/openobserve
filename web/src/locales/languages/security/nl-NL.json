@@ -302,7 +302,7 @@
       "source": "Bron",
       "matchedRules": "{n} detectie kwam overeen | {n} detecties kwamen overeen",
       "openCase": "Casus openen",
-      "openCaseHint": "Open een zaak voor deze gebeurtenis, met de titel, prioriteit en entiteiten al ingevuld",
+      "openCaseHint": "Open een case voor deze gebeurtenis, met titel, prioriteit en entiteiten al ingevuld",
       "addToCase": "Toevoegen aan casus",
       "pickCase": "Toevoegen aan een open casus",
       "caseOpened": "Casus geopend: {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Bepaald door de tijdspanne van de correlatie",
       "createForbidden": "Voor het maken van een detectie is de Security-machtiging nodig",
       "preview": {
-        "run": "Voorbeeld op historie",
-        "hint": "Voert de regel uit over het gekozen bereik zoals de scheduler dat doet en meldt wat er zou zijn afgegaan",
+        "run": "Voorvertoning op historie",
+        "hint": "Voert de regel uit over het gekozen bereik zoals de planner dat doet en toont wat zou zijn afgegaan",
         "failed": "De query is mislukt: {reason}",
         "time": "Tijd",
         "range": {
@@ -1093,7 +1093,7 @@
       "stat": {
         "ready": "Klaar om te installeren",
         "installed": "Geïnstalleerd",
-        "applies": "Van toepassing op je bronnen",
+        "applies": "Passen bij je bronnen",
         "readyHint": "Regels die op ten minste één van je streams draaien en nog niet zijn geïnstalleerd",
         "appliesHint": "Regels voor een logbron die je hebt, geïnstalleerd of niet; omvat elke regel die klaar is om te installeren",
         "allRules": "Alle regels",
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Wijzigingsoverzicht",
-      "hint": "Wie detecties, bronnen, zaken en toekenningen van Security-rollen heeft gewijzigd, zolang het auditspoor wordt bewaard",
+      "hint": "Wie detecties, bronnen, cases en Security-roltoekenningen heeft gewijzigd, zolang het auditlog wordt bewaard",
       "includeReads": "Leesacties meenemen",
       "when": "Wanneer",
       "who": "Gewijzigd door",

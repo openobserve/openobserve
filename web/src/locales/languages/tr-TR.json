@@ -16691,7 +16691,7 @@
       "secretKeyLabel": "Gizli anahtar",
       "storageAccountNameLabel": "Depolama hesabı adı",
       "roleArnLabel": "Rol ARN'si",
-      "externalIdLabel": "Harici kimlik",
+      "externalIdLabel": "Harici Kimlik",
       "pleaseWaitMessage": "Lütfen bekleyin...",
       "credentialsUpdatedSuccess": "Kimlik bilgileri başarıyla güncellendi",
       "storageConfigCreatedSuccess": "Depolama yapılandırması başarıyla oluşturuldu",
