@@ -1654,3 +1654,64 @@ describe("validatePanel on logs", () => {
     expect(errors.filter((error) => /unsupported|not supported/i.test(error))).toEqual([]);
   });
 });
+
+describe("validatePanel on a treemap with more than one query", () => {
+  const field = (alias: string) => ({
+    alias,
+    column: alias,
+    label: alias,
+    type: "raw",
+    rawQuery: alias,
+  });
+  const query = (hide = false) => ({
+    customQuery: false,
+    query: "SELECT 1",
+    fields: { x: [field("region")], y: [field("count")], breakdown: [], z: [] },
+    config: { hide },
+  });
+  const run = (queries: ReturnType<typeof query>[]) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      { data: { type: "treemap", queryType: "sql", config: {}, queries }, layout: {} },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const oneQuery = gt("dashboard.utils.treemapOneQuery");
+
+  it("rejects two visible queries and accepts one visible beside a hidden one", () => {
+    expect(run([query(), query()])).toContain(oneQuery);
+    expect(run([query(), query(true)])).toEqual([]);
+    expect(run([query()])).toEqual([]);
+  });
+
+  it("still imports a saved multi-query treemap, which draws its first visible query", () => {
+    const errors = validateDashboardJson(gt, {
+      dashboardId: "d",
+      title: "t",
+      version: "v3",
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default",
+          panels: [
+            {
+              type: "treemap",
+              id: "p-tree",
+              title: "t",
+              layout: { x: 0, y: 0, w: 1, h: 1, i: "tree" },
+              queries: [query(), query()],
+            },
+          ],
+        },
+      ],
+    });
+    expect(errors.some((error) => error.includes(oneQuery))).toBe(false);
+  });
+});

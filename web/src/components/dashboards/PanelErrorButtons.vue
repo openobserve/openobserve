@@ -261,6 +261,7 @@ import PanelNoticeContent from "@/components/dashboards/PanelNoticeContent.vue";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
+import type { TreemapNotice } from "@/utils/dashboard/convertTreemapData";
 import {
   buildPanelNotices,
   seriesTotalBoundOf,
@@ -312,6 +313,10 @@ export default defineComponent({
     },
     sankeyNotice: {
       type: Object as PropType<SankeyNotice | null>,
+      default: null,
+    },
+    treemapNotice: {
+      type: Object as PropType<TreemapNotice | null>,
       default: null,
     },
     serverPartial: {
@@ -397,6 +402,7 @@ export default defineComponent({
             serverPartial: props.serverPartial,
           }),
           sankeyNotice: props.sankeyNotice,
+          treemapNotice: props.treemapNotice,
           serverPartial: props.serverPartial,
           partialReasons: props.serverPartialReasons,
           interrupted: props.isPartialData && !props.isPanelLoading,
