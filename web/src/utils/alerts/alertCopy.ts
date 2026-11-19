@@ -49,6 +49,16 @@ const UNIT_WORD_KEYS: Record<string, I18nKey> = {
   bytes: "alerts.units.words.bytes",
 };
 
+const COUNT_KEYS: Record<string, I18nKey> = {
+  ">=": "alerts.summary.plainEnglish.conditionAtLeast",
+  ">": "alerts.summary.plainEnglish.conditionMoreThan",
+  "<=": "alerts.summary.plainEnglish.conditionOrFewer",
+  "<": "alerts.summary.plainEnglish.conditionFewer",
+  "=": "alerts.summary.plainEnglish.conditionExactly",
+  "==": "alerts.summary.plainEnglish.conditionExactly",
+  "!=": "alerts.summary.plainEnglish.conditionNot",
+};
+
 const UNITLESS = new Set(["", "none", "short"]);
 
 const SECONDS_PER = { day: 86400, hour: 3600, minute: 60 } as const;
@@ -86,6 +96,25 @@ export function measureWords(
   return !field || groups.includes(field)
     ? t("alerts.verdict.eventCount", { noun })
     : t("alerts.verdict.eventCountWith", { noun, field });
+}
+
+/** A count test in words: "3+ events", "fewer than 3 events", "no events"; "1+" stays plural. */
+export function countText(
+  operator: string | undefined,
+  threshold: unknown,
+  noun: (count: number) => I18nText,
+  t: TranslateFn,
+): I18nText {
+  const op = operator ?? "";
+  const n = Number(threshold);
+  // A count is a whole number, so "fewer than 1" can only mean none.
+  if (op === "<" && n <= 1)
+    return t("alerts.summary.plainEnglish.conditionNone", { noun: noun(2) });
+  const one = n === 1 && op !== ">=";
+  const params = { threshold, noun: noun(one ? 1 : 2) };
+  return COUNT_KEYS[op]
+    ? t(COUNT_KEYS[op], params)
+    : t("alerts.summary.plainEnglish.conditionOther", { ...params, operator: op });
 }
 
 /** The side of the threshold an operator alerts on; "=" and "!=" have none. */

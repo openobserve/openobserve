@@ -308,17 +308,19 @@ describe("useAlertFormSections", () => {
     expect(byId(items.value, "condition").state).toBe("none");
   });
 
-  it("phrases each event-count operator in words", () => {
-    const summary = (operator: string) =>
-      byId(
-        setup(scheduled({ trigger_condition: { operator, threshold: 3 } })).items.value,
-        "condition",
-      ).summary;
-    expect(summary(">")).toBe("more than 3 events");
-    expect(summary("<=")).toBe("at most 3 events");
-    expect(summary("<")).toBe("less than 3 events");
-    expect(summary("=")).toBe("exactly 3 events");
-    expect(summary("!=")).toBe("not exactly 3 events");
+  it.each([
+    [">", 3, "more than 3 events"],
+    ["<=", 3, "at most 3 events"],
+    ["<", 3, "fewer than 3 events"],
+    ["=", 3, "exactly 3 events"],
+    ["!=", 3, "not exactly 3 events"],
+    [">=", 1, "1+ events"],
+    [">", 1, "more than 1 event"],
+    ["<=", 1, "at most 1 event"],
+    ["<", 1, "no events"],
+  ])("phrases the event count %s %s as %j", (operator, threshold, phrase) => {
+    const { items } = setup(scheduled({ trigger_condition: { operator, threshold } }));
+    expect(byId(items.value, "condition").summary).toBe(phrase);
   });
 
   it("counts invalid fields per section from the form's field meta; the schedule counts against its step", () => {

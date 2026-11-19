@@ -16,6 +16,7 @@
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { hasDeliveryTarget } from "./deliveryTarget";
 import {
+  countText,
   dataNoun,
   formatNumber,
   joinList,
@@ -122,14 +123,6 @@ export const CONDITION_GAP_KEYS: Record<ConditionGap, I18nKey> = {
   fixQuery: "alerts.sections.condition.fixQuery",
   noThreshold: "alerts.sections.condition.noThreshold",
   fixLimit: "alerts.sections.condition.fixLimit",
-};
-
-const CONDITION_KEYS: Record<string, I18nKey> = {
-  ">=": "alerts.summary.plainEnglish.conditionAtLeast",
-  ">": "alerts.summary.plainEnglish.conditionMoreThan",
-  "<=": "alerts.summary.plainEnglish.conditionOrFewer",
-  "<": "alerts.summary.plainEnglish.conditionFewerThan",
-  "!=": "alerts.summary.plainEnglish.conditionNot",
 };
 
 const PROMQL_QUIET_KEYS: Record<"above" | "below" | "none", I18nKey> = {
@@ -266,23 +259,18 @@ function whoText(
   return t("alerts.readBack.targets", { targets });
 }
 
-/** A count test in words: "3+ events", "less than 3 spans"; the noun follows the stream type. */
+/** A count test in words; the noun follows the stream type. */
 export function eventCountText(
   tc: ReadBackAlert["trigger_condition"] | undefined,
   t: TranslateFn,
   streamType?: string,
 ): I18nText {
-  const threshold = tc?.threshold ?? "";
-  const operator = tc?.operator ?? "";
-  // "1+ events" stays plural; only "exactly 1 event" reads as one.
-  const one = ["=", "==", "!="].includes(operator) && num(threshold) === 1;
-  const noun = dataNoun(streamType, "custom", one ? 1 : 2, t);
-  if (operator === "=" || operator === "==") {
-    return t("alerts.summary.plainEnglish.conditionExactly", { threshold, noun });
-  }
-  return CONDITION_KEYS[operator]
-    ? t(CONDITION_KEYS[operator], { threshold, noun })
-    : t("alerts.summary.plainEnglish.conditionOther", { threshold, operator, noun });
+  return countText(
+    tc?.operator,
+    tc?.threshold ?? "",
+    (n) => dataNoun(streamType, "custom", n, t),
+    t,
+  );
 }
 
 const groupsOf = (alert: ReadBackAlert): string[] => [
