@@ -20,7 +20,7 @@ import { useQuery } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { firingAlertsQuery } from "@/services/alerts.queries";
 import { joinListMore } from "@/utils/alerts/alertCopy";
@@ -58,6 +58,7 @@ const matches = computed(() =>
   ),
 );
 
+// Names follow a lead, never open the line: a name starting a sentence reads as if we capitalised it.
 const text = computed(() =>
   t(
     "alerts.lookAlike.line",
@@ -67,7 +68,6 @@ const text = computed(() =>
         t,
         1,
       ),
-      stream: raw(props.streamName ?? ""),
     },
     matches.value.length,
   ),
