@@ -42,6 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </div>
     </Teleport>
+    <OTruncatedText
+      v-if="showChartKey && chartCaption"
+      class="text-text-secondary shrink-0 px-4 pt-1 text-xs"
+      data-test="alert-preview-caption"
+      >{{ chartCaption }}</OTruncatedText
+    >
     <!-- Its own stacking context keeps the chart's loading line under the Test it panel. -->
     <div
       data-test="alert-preview-chart"
@@ -147,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="testOpen && testable"
       :body="testBody"
       :blocked-reason="testGapText"
+      :baseline-empty="baselineEmptyText"
       :folder="testFolder"
       :destinations="formData.destinations ?? []"
       :template="formData.template || null"
@@ -173,6 +180,7 @@ import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import { seriesValueRange, type ValueRange } from "@/utils/alerts/ratioThreshold";
 import { keyToMs } from "@/utils/alerts/alertBacktest";
+import { previewCaption } from "@/utils/alerts/previewCaption";
 import {
   CONDITION_GAP_KEYS,
   conditionGap,
@@ -284,6 +292,12 @@ const isPreviewCountLimit = (v: unknown): boolean =>
   isCountLimit(v) ||
   ((typeof v === "number" || typeof v === "string") && String(v).trim() !== "" && Number(v) === 0);
 
+// "One per <column>" on SQL: each row is a group, judged on one of its columns, not on the row count.
+const sqlPerGroup = (): boolean =>
+  props.selectedTab === "sql" &&
+  !!props.formData.query_condition?.aggregation?.multi_alert &&
+  hasLimitValue(props.formData.query_condition?.aggregation?.having?.column);
+
 /** The limits the current mode draws; a count limit that needs fixing draws none. */
 // Warning comes from the critical's family (aggregate value or count), or it lands on the wrong scale.
 const currentLimits = (): [unknown, unknown] => {
@@ -301,6 +315,7 @@ const currentLimits = (): [unknown, unknown] => {
       ? [aggregation.having.value, aggregation.warning_value]
       : [undefined, undefined];
   }
+  if (sqlPerGroup()) return [aggregation.having.value, aggregation.warning_value];
   return [isPreviewCountLimit(tc?.threshold) ? tc.threshold : undefined, tc?.warning_threshold];
 };
 
@@ -548,10 +563,19 @@ watch(previewRange, (range) => {
 const orgPreviewMinutes = (): number =>
   Number(store.state.zoConfig?.alert_preview_timerange_minutes) || 0;
 const alertWindowMinutes = (): number => Number(props.formData.trigger_condition?.period) || 0;
+// Over a whole range a per-group query is one row per group, filtered by its HAVING, so the chart
+// draws each group's value per look-back window instead, with nothing filtered out.
+const sqlGroupChartQuery = computed((): string | null => {
+  if (!sqlPerGroup() || !props.query) return null;
+  if (comparisonWindows(props.formData.query_condition?.multi_time_range).length) return null;
+  if (props.formData.query_condition?.vrl_function || alertWindowMinutes() <= 0) return null;
+  if (/\bhistogram\(/i.test(props.query)) return null;
+  return withHistogramMinutes(cleanAggregationQuery(props.query), alertWindowMinutes());
+});
 // A SQL verdict counts the rows the query returns, which only one window can give; a builder
 // chart draws one point per window, so it shows a dozen of them, never more than a day.
 const previewChecks = computed(() => {
-  if (props.selectedTab === "sql") return 1;
+  if (props.selectedTab === "sql" && !sqlGroupChartQuery.value) return 1;
   if (props.selectedTab !== "custom" || props.formData.is_real_time === "true") return 3;
   return Math.min(12, Math.max(3, Math.floor(1440 / Math.max(alertWindowMinutes(), 1))));
 });
@@ -943,6 +967,7 @@ const fetchQuerySchema = async () => {
     }
     // ── Non-aggregation SQL path (result_schema) ──────────────────────────────
 
+    const groupChart = sqlGroupChartQuery.value;
     const schemaRes = await searchService.result_schema(
       {
         org_identifier: store.state.selectedOrganization.identifier,
@@ -984,15 +1009,26 @@ const fetchQuerySchema = async () => {
       hasHaving: !!extractedFields.having,
     });
 
-    const chartType = determineChartType(extractedFields);
+    // A per-group chart draws the one column the alert judges per window, on the threshold's scale.
+    const judged = String(props.formData.query_condition?.aggregation?.having?.column ?? "");
+    const chartType = groupChart ? "line" : determineChartType(extractedFields);
     dashboardPanelData.data.type = chartType;
 
     // Convert schema to fields
-    const fields = convertSchemaToFields(extractedFields, chartType);
+    const fields = groupChart
+      ? convertSchemaToFields(
+          {
+            ...extractedFields,
+            projections: ["zo_sql_key", ...extractedFields.group_by, judged],
+            timeseries_field: "zo_sql_key",
+          },
+          chartType,
+        )
+      : convertSchemaToFields(extractedFields, chartType);
 
     // Set up the query
     dashboardPanelData.data.queries[0].customQuery = true;
-    dashboardPanelData.data.queries[0].query = props.query;
+    dashboardPanelData.data.queries[0].query = groupChart ?? props.query;
     dashboardPanelData.data.queries[0].vrlFunctionQuery = getDecodedVrlFunction();
     // Enable dynamic columns when VRL function is present
     dashboardPanelData.data.config.table_dynamic_columns = props.formData.query_condition
@@ -1261,7 +1297,22 @@ const evaluateResultMetadata = (resultMetaData: any, windowFilter: (hit: any) =>
         // The backend meanwhile evaluates the alert with a single non-streaming
         // search (`streaming_output: false`, src/core/src/alerts/mod.rs:584) and
         // counts `records.len()` once (:831).
-        else if (props.selectedTab === "sql") {
+        else if (sqlPerGroup()) {
+          // Each row is a group; the ones past the judged column's threshold would fire.
+          const having = props.formData.query_condition.aggregation.having;
+          const limit = Number(having.value);
+          const rows = firstQueryMetadata.flatMap((p: any) =>
+            Array.isArray(p?.hits) ? p.hits.filter(inWindow) : [],
+          );
+          resultCount = Number.isFinite(limit)
+            ? rows.filter((row: any) =>
+                promqlSampleMatches(Number(row?.[having.column]), having.operator, limit),
+              ).length
+            : 0;
+          atLeast = firstQueryMetadata.some(
+            (p: any) => Array.isArray(p?.hits) && stoppedAtRowCap(p.hits.length),
+          );
+        } else if (props.selectedTab === "sql") {
           // `total: 0` is a SETTLED ANSWER, not a missing field: a shrinking HAVING
           // (`< N`, `!= N`) legitimately ends at zero rows. Testing truthiness here
           // instead of `!== undefined` silently resurrects the previous frame's count.
@@ -1663,9 +1714,10 @@ const setEvaluationStatus = (verdict: {
     label: args.label,
     ...(verdict.value === undefined ? {} : { value: verdict.value }),
     grouped:
-      props.selectedTab === "custom" &&
-      props.isAggregationEnabled &&
-      groupBy.some((f) => !!f && f.trim() !== ""),
+      sqlPerGroup() ||
+      (props.selectedTab === "custom" &&
+        props.isAggregationEnabled &&
+        groupBy.some((f) => !!f && f.trim() !== "")),
     reason: verdict.level
       ? t("alerts.previewEvaluation.reasonLevel", {
           reason: sentence,
@@ -1682,6 +1734,16 @@ const setEvaluationStatus = (verdict: {
 // (rows, groups, data points). PromQL goes through evaluatePromqlSeries instead.
 const evaluateAndSetStatus = (resultCount: number, atLeast = false, value?: number) => {
   if (writeRealTimeStatus(resultCount)) return;
+  // Any one group past its threshold fires; the saved row-count gate is always "at least 1".
+  if (sqlPerGroup()) {
+    setEvaluationStatus({
+      count: resultCount,
+      atLeast,
+      wouldTrigger: resultCount > 0,
+      comparison: "",
+    });
+    return;
+  }
 
   // A lower bound decides only when every count from it up gets the same answer.
   const threshold = Number(props.formData.trigger_condition?.threshold || 0);
@@ -2385,6 +2447,22 @@ const compareStatus = computed((): NonNullable<typeof evaluationStatus.value> | 
         note: "warn",
       };
 });
+const chartCaption = computed(() =>
+  previewCaption(
+    {
+      tab: props.selectedTab,
+      streamType: props.formData.stream_type,
+      query: props.query,
+      measured: !!props.isAggregationEnabled,
+      aggregation: props.formData.query_condition?.aggregation,
+      sqlColumn: sqlPerGroup() ? props.formData.query_condition.aggregation.having.column : null,
+    },
+    t,
+  ),
+);
+const baselineEmptyText = computed(() =>
+  baselines.value?.empty ? raw(baselines.value.empty) : null,
+);
 let compareGeneration = 0;
 let compareTraceIds: string[] = [];
 const cancelBaselineSearches = () => {
