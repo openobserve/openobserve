@@ -85,8 +85,7 @@ const dismiss = async () => {
 
 const open = () => {
   const first = matches.value[0];
-  if (first?.alert_id)
-    emit("open", { alert_id: first.alert_id, name: first.name ?? "", matched_by: "query" });
+  if (first?.alert_id) emit("open", { alert_id: first.alert_id, name: first.name ?? "" });
 };
 </script>
 

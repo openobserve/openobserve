@@ -132,8 +132,6 @@ const setUpText = computed<I18nText>(() => {
     t,
     1,
   );
-  if (setUp.value?.matched_by === "pack_tag")
-    return t("alerts.librarySuggest.alreadySetUpEdited", { name });
   if (props.setUpComparison)
     return t("alerts.librarySuggest.alreadySetUpAt", { ...props.setUpComparison, name });
   return t("alerts.librarySuggest.alreadySetUp", { name });

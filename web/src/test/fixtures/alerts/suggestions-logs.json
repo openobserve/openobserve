@@ -118,8 +118,7 @@
       "already_set_up": [
         {
           "alert_id": "2xQk9fWm0Lr7aP3bN1cD5eZtYu8",
-          "name": "pod_crash_looping",
-          "matched_by": "query"
+          "name": "pod_crash_looping"
         }
       ],
       "enterprise": false,
