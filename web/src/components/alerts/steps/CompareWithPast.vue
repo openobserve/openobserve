@@ -93,6 +93,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-alert-compare-needs-baseline"
         @update:model-value="setNeedsBaseline"
       />
+      <!-- Both answers lose something (a rise from zero, or a quiet start), so each states its cost. -->
+      <p
+        v-if="index === 0 && factor"
+        class="text-text-secondary m-0 ms-6 text-xs"
+        data-test="add-alert-compare-needs-baseline-help"
+      >
+        {{
+          needsBaseline
+            ? t("alerts.form.compare.needsBaselineOn")
+            : t("alerts.form.compare.needsBaselineOff")
+        }}
+      </p>
       <p
         v-if="index === 0 && !hasFunction"
         class="text-status-warning-text m-0 mt-1 text-xs"
