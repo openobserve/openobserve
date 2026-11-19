@@ -302,7 +302,7 @@
       "source": "Origine",
       "matchedRules": "{n} rilevamento corrispondente | {n} rilevamenti corrispondenti",
       "openCase": "Apri caso",
-      "openCaseHint": "Apri un caso su questo evento, con titolo, priorità ed entità già compilati",
+      "openCaseHint": "Apri un caso su questo evento, con titolo, priorità ed entità compilati",
       "addToCase": "Aggiungi al caso",
       "pickCase": "Aggiungi a un caso aperto",
       "caseOpened": "Caso aperto: {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Definito dall'intervallo di tempo della correlazione",
       "createForbidden": "Creare un rilevamento richiede il permesso Sicurezza",
       "preview": {
-        "run": "Anteprima sulla cronologia",
-        "hint": "Esegue la regola sull'intervallo scelto come fa lo scheduler e indica cosa si sarebbe attivato",
+        "run": "Anteprima sullo storico",
+        "hint": "Esegue la regola sull'intervallo scelto come farebbe lo scheduler e indica cosa sarebbe stato attivato",
         "failed": "La query non è riuscita: {reason}",
         "time": "Ora",
         "range": {
@@ -1093,7 +1093,7 @@
       "stat": {
         "ready": "Pronto per l'installazione",
         "installed": "Installato",
-        "applies": "Corrispondono alle tue fonti",
+        "applies": "Corrispondenze con le tue origini",
         "readyHint": "Regole che vengono eseguite su almeno uno dei tuoi stream e non sono ancora installate",
         "appliesHint": "Regole per una fonte di log che hai, installate o no; include ogni regola pronta da installare",
         "allRules": "Tutte le regole",
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Registro modifiche",
-      "hint": "Chi ha modificato rilevamenti, origini, casi e assegnazioni di ruoli di Sicurezza, finché viene conservato l'audit trail",
+      "hint": "Chi ha modificato rilevamenti, origini, casi e concessioni di ruoli di sicurezza, per tutto il periodo in cui viene conservata la traccia di audit",
       "includeReads": "Includi letture",
       "when": "Quando",
       "who": "Modificato da",

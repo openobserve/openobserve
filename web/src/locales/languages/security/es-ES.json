@@ -302,7 +302,7 @@
       "source": "Fuente",
       "matchedRules": "{n} detección coincidente | {n} detecciones coincidentes",
       "openCase": "Abrir caso",
-      "openCaseHint": "Abrir un caso sobre este evento, con el título, la prioridad y las entidades ya rellenados",
+      "openCaseHint": "Abre un caso sobre este evento, con su título, prioridad y entidades ya rellenados",
       "addToCase": "Añadir al caso",
       "pickCase": "Añadir a un caso abierto",
       "caseOpened": "Caso abierto: {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Lo define el intervalo de tiempo de la correlación",
       "createForbidden": "Crear una detección requiere el permiso de Seguridad",
       "preview": {
-        "run": "Vista previa sobre el historial",
-        "hint": "Ejecuta la regla sobre el rango elegido como lo hace el programador e indica qué se habría disparado",
+        "run": "Previsualizar sobre el historial",
+        "hint": "Ejecuta la regla sobre el rango elegido igual que lo hace el programador e indica qué se habría disparado",
         "failed": "La consulta falló: {reason}",
         "time": "Hora",
         "range": {
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Registro de cambios",
-      "hint": "Quién cambió detecciones, fuentes, casos y concesiones de roles de Seguridad, mientras se conserve el registro de auditoría",
+      "hint": "Quién modificó las detecciones, las fuentes, los casos y las asignaciones de roles de Seguridad, mientras se conserve el registro de auditoría",
       "includeReads": "Incluir lecturas",
       "when": "Cuándo",
       "who": "Cambiado por",
