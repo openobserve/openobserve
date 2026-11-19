@@ -825,10 +825,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ groupEachLabel }}
                           </OToggleGroupItem>
                         </OToggleGroup>
-                        <!-- Kept, hidden, while "One per" is picked: nothing moves and a value typed there lands. -->
+                        <!-- Kept mounted at zero size while "One per" is picked: a value typed there lands, and no blank line is held. -->
                         <div
                           class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
-                          :class="groupAnswer === 'one' ? '' : 'invisible'"
+                          :class="groupAnswer === 'one' ? '' : 'invisible h-0 w-0 overflow-hidden'"
                           :inert="groupAnswer !== 'one' || undefined"
                           data-test="add-alert-group-limit"
                         >
@@ -880,6 +880,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                       <AlertMessageLine
+                        v-show="groupAnswer === 'one' || thresholdError"
                         :error="thresholdError"
                         :error-data-test="countErrorTest"
                         data-test="alert-group-limit-message"
@@ -1441,11 +1442,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ groupEachLabel }}
                               </OToggleGroupItem>
                             </OToggleGroup>
-                            <!-- Kept, hidden, while "One per" is picked: nothing moves and a value typed there lands. -->
+                            <!-- Kept mounted at zero size while "One per" is picked: a value typed there lands, and no blank line is held. -->
                             <div
                               v-if="limitBesideOne"
                               class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
-                              :class="groupAnswer === 'one' ? '' : 'invisible'"
+                              :class="
+                                groupAnswer === 'one' ? '' : 'invisible h-0 w-0 overflow-hidden'
+                              "
                               :inert="groupAnswer !== 'one' || undefined"
                               data-test="add-alert-group-limit"
                             >
@@ -1498,6 +1501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                           <AlertMessageLine
                             v-if="limitBesideOne"
+                            v-show="groupAnswer === 'one' || thresholdError"
                             :error="thresholdError"
                             :error-data-test="countErrorTest"
                             data-test="alert-group-limit-message"
