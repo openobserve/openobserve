@@ -14272,6 +14272,7 @@
     "testSendGroupLabel": "发送真实测试消息",
     "testSend": "发送测试",
     "testSendDestinationLabel": "目标",
+    "testSendFixedSample": "测试发送使用固定示例。",
     "testSendConfirmTitle": "发送真实测试消息？",
     "testSendConfirm": "这将向所选频道发布一条真实消息，并标记为 [TEST]。",
     "testSendSuccess": "测试消息已发送",

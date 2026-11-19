@@ -14272,6 +14272,7 @@
     "testSendGroupLabel": "Eine echte Testnachricht senden",
     "testSend": "Test senden",
     "testSendDestinationLabel": "Ziel",
+    "testSendFixedSample": "Testnachrichten verwenden ein festes Beispiel.",
     "testSendConfirmTitle": "Eine echte Testnachricht senden?",
     "testSendConfirm": "Dadurch wird eine echte Nachricht an den ausgewählten Kanal gesendet, gekennzeichnet mit [TEST].",
     "testSendSuccess": "Testnachricht gesendet",

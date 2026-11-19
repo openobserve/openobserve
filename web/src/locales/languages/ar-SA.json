@@ -14272,6 +14272,7 @@
     "testSendGroupLabel": "إرسال رسالة اختبار حقيقية",
     "testSend": "إرسال اختبار",
     "testSendDestinationLabel": "الوجهة",
+    "testSendFixedSample": "تستخدم رسائل الاختبار عينة ثابتة.",
     "testSendConfirmTitle": "إرسال رسالة اختبار حقيقية؟",
     "testSendConfirm": "هذا سيرسل رسالة حقيقية إلى القناة المختارة، مع علامة [اختبار].",
     "testSendSuccess": "تم إرسال رسالة الاختبار",

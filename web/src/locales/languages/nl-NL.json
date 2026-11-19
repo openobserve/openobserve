@@ -14272,6 +14272,7 @@
     "testSendGroupLabel": "Verstuur een echt testbericht",
     "testSend": "Verstuur test",
     "testSendDestinationLabel": "Bestemming",
+    "testSendFixedSample": "Testberichten gebruiken een vast voorbeeld.",
     "testSendConfirmTitle": "Een echt testbericht verzenden?",
     "testSendConfirm": "Hiermee wordt een echt bericht naar het geselecteerde kanaal verzonden, gemarkeerd met [TEST].",
     "testSendSuccess": "Testbericht verzonden",

@@ -107,6 +107,8 @@ string_enum! {
         Resume => "resume",
         /// A report kept from before analysis runs existed ([ReportFormat::V1]).
         Legacy => "legacy",
+        /// AutoObserve's settled evidence changed the picture after the first run.
+        EvidenceSettled => "evidence_settled",
     }
 }
 
@@ -115,7 +117,9 @@ impl RunTrigger {
     pub fn analysis_trigger_type(&self) -> AnalysisTriggerType {
         match self {
             Self::AutoNewIncident => AnalysisTriggerType::AutomaticNewIncident,
-            Self::AutoNewAlertType => AnalysisTriggerType::AutomaticReanalysis,
+            Self::AutoNewAlertType | Self::EvidenceSettled => {
+                AnalysisTriggerType::AutomaticReanalysis
+            }
             Self::AutoReopen => AnalysisTriggerType::AutomaticReopened,
             Self::Manual | Self::Reanalyze | Self::OncallPage | Self::Resume | Self::Legacy => {
                 AnalysisTriggerType::Manual
@@ -133,6 +137,35 @@ string_enum! {
     RunMode {
         Fresh => "fresh",
         BuildOnPrevious => "build_on_previous",
+    }
+}
+
+/// How an automatic run starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AutoRunOpts {
+    pub mode: RunMode,
+    pub skip_cooldown: bool,
+}
+
+impl AutoRunOpts {
+    /// Only a new incident skips the cooldown: nothing analysed it yet.
+    pub fn for_trigger(trigger: RunTrigger) -> Self {
+        Self {
+            mode: RunMode::Fresh,
+            skip_cooldown: trigger == RunTrigger::AutoNewIncident,
+        }
+    }
+
+    /// The first run just finished, so the cooldown would refuse the run that extends it.
+    pub fn evidence_settled() -> Self {
+        Self {
+            mode: RunMode::BuildOnPrevious,
+            skip_cooldown: true,
+        }
+    }
+
+    pub fn builds_on_previous(&self) -> bool {
+        self.mode == RunMode::BuildOnPrevious
     }
 }
 
@@ -708,6 +741,14 @@ mod tests {
             RunTrigger::Reanalyze.analysis_trigger_type(),
             AnalysisTriggerType::Manual
         ));
+        assert!(matches!(
+            RunTrigger::EvidenceSettled.analysis_trigger_type(),
+            AnalysisTriggerType::AutomaticReanalysis
+        ));
+        assert_eq!(
+            "evidence_settled".parse::<RunTrigger>().unwrap(),
+            RunTrigger::EvidenceSettled
+        );
         let user_started: Vec<RunTrigger> = [
             RunTrigger::AutoNewIncident,
             RunTrigger::AutoNewAlertType,
@@ -717,6 +758,7 @@ mod tests {
             RunTrigger::OncallPage,
             RunTrigger::Resume,
             RunTrigger::Legacy,
+            RunTrigger::EvidenceSettled,
         ]
         .into_iter()
         .filter(RunTrigger::is_user_started)
@@ -729,6 +771,28 @@ mod tests {
                 RunTrigger::Resume
             ]
         );
+    }
+
+    /// The automatic triggers keep a fresh run and the cooldown only a new incident skips.
+    #[test]
+    fn automatic_run_options_per_trigger() {
+        use RunMode::{BuildOnPrevious, Fresh};
+        let cases = [
+            (RunTrigger::AutoNewIncident, Fresh, true),
+            (RunTrigger::AutoNewAlertType, Fresh, false),
+            (RunTrigger::AutoReopen, Fresh, false),
+        ];
+        for (trigger, mode, skip_cooldown) in cases {
+            let opts = AutoRunOpts::for_trigger(trigger);
+            assert_eq!((opts.mode, opts.skip_cooldown), (mode, skip_cooldown));
+            assert!(!opts.builds_on_previous(), "{trigger}");
+        }
+        let settled = AutoRunOpts::evidence_settled();
+        assert_eq!(
+            (settled.mode, settled.skip_cooldown),
+            (BuildOnPrevious, true)
+        );
+        assert!(settled.builds_on_previous());
     }
 
     #[test]

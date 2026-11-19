@@ -81,14 +81,17 @@ const covered = (): Cell => ({
 
 describe("Signals watched gap line (flagged surface 2)", () => {
   it("drafts the errors, latency and no-data alerts in one review list, and Ask AI (F1)", () => {
-    const parts = gapInsight(gt, "en-US", row([LOGS, TRACES]));
+    const busy = row([LOGS, TRACES]);
+    busy.identity!.trafficPerHour = 1_500_000;
+    const parts = gapInsight(gt, "en-US", busy);
     expect(parts?.cta?.label).toBe("Review and add alerts");
     const target = parts?.cta?.target;
     if (target?.type !== "bulk") throw new Error("expected bulk");
-    expect(target.request.rows.map((r) => [r.kind, r.scope.stream.name])).toEqual([
-      ["errors", "ingest_c"],
-      ["latency", "default"],
-      ["no_data", "ingest_c"],
+    // Only the no-data row's usual level is the service's traffic; errors and latency measure theirs.
+    expect(target.request.rows.map((r) => [r.kind, r.scope.stream.name, r.usually])).toEqual([
+      ["errors", "ingest_c", null],
+      ["latency", "default", null],
+      ["no_data", "ingest_c", 1_500_000],
     ]);
     expect(parts?.ai?.subject).toBe("svc-ingest-c");
   });

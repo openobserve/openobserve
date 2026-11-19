@@ -41,7 +41,64 @@ describe("inferAppliesTo", () => {
 
   it("picks anomaly for an anomaly variable", () => {
     expect(inferAppliesTo("{anomaly_count} anomalies")).toEqual(["anomaly"]);
-    expect(inferAppliesTo("worst {worst_actual_value} vs {threshold}")).toEqual(["anomaly"]);
+    expect(inferAppliesTo("worst {worst_actual_value} vs {worst_expected}")).toEqual(["anomaly"]);
+    expect(inferAppliesTo("{max_deviation_percent}% {deviation_kind}")).toEqual(["anomaly"]);
+  });
+
+  it("treats common field names as all kinds, not anomaly", () => {
+    // B4: an alert on a stream with these fields must still apply to alerts.
+    expect(inferAppliesTo("CPU on {host} is {cpu_pct}% (limit {threshold})")).toEqual([]);
+    expect(inferAppliesTo("{score} {window_start} {window_end}")).toEqual([]);
+  });
+
+  it("matches only the exact names the server sends, not a shared prefix", () => {
+    expect(inferAppliesTo("{worst_host} {deviation_pct}")).toEqual([]);
+    expect(inferAppliesTo("{check_interval} {check_owner}")).toEqual([]);
+    expect(inferAppliesTo("{check_status_label} {check_consecutive_failures}")).toEqual([
+      "synthetics",
+    ]);
+  });
+
+  it("knows every anomaly and synthetics variable the server sends", () => {
+    // Mirrors ANOMALY_VARIABLES and SYNTHETICS_VARIABLES in
+    // src/core/src/alerts/notifications/examples.rs, minus the bare common names.
+    const anomaly = [
+      "anomaly_id",
+      "anomaly_name",
+      "anomaly_kind",
+      "anomaly_count",
+      "max_deviation_percent",
+      "deviation_kind",
+      "worst_actual_value",
+      "worst_expected",
+      "anomaly_score",
+      "anomaly_explore_url",
+      "anomaly_explore_label",
+      "anomaly_url",
+    ];
+    const synthetics = [
+      "check_id",
+      "check_name",
+      "check_type",
+      "check_target",
+      "check_status",
+      "check_status_label",
+      "check_status_reason",
+      "check_locations_line",
+      "check_location_count",
+      "check_consecutive_failures",
+      "check_flaky",
+      "check_degraded",
+      "check_run_id",
+      "check_url",
+      "check_error",
+      "check_environments",
+      "check_checked_at",
+      "check_title",
+    ];
+    for (const name of anomaly) expect(inferAppliesTo(`{${name}}`), name).toEqual(["anomaly"]);
+    for (const name of synthetics)
+      expect(inferAppliesTo(`{${name}}`), name).toEqual(["synthetics"]);
   });
 
   it("adds synthetics when a check variable appears, in chip order", () => {

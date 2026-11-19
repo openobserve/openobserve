@@ -916,6 +916,7 @@ async fn incident_rca_context(
             org_id,
             incident_id,
             None,
+            None,
         )
         .await,
     )
@@ -5473,6 +5474,7 @@ mod tests {
             alert_name: None,
             stream: None,
             dimensions: None,
+            evidence: None,
         }
     }
 

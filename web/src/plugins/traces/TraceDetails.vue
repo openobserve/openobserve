@@ -804,7 +804,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
-                  @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
                   @update:activeTab="onSidebarTabChange($event as string)"
@@ -873,7 +872,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
-                  @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
                   @update:activeTab="onSidebarTabChange($event as string)"
@@ -903,7 +901,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select-span="updateSelectedSpan"
                 @add-filter="addFilterFromSidebar"
                 @apply-filter-immediately="applyFilterImmediately"
-                @open-trace="openTraceLink"
               />
             </div>
 
@@ -958,7 +955,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @evaluate="openSpanEvaluation"
                   @add-to-dataset="openSpanDataset"
                   @close="closeSidebar"
-                  @open-trace="openTraceLink"
                   @add-filter="addFilterFromSidebar"
                   @apply-filter-immediately="applyFilterImmediately"
                   @update:activeTab="onSidebarTabChange($event as string)"
@@ -2316,6 +2312,18 @@ export default defineComponent({
         } else {
           searchObj.meta.redirectedFromLogs = false;
         }
+      },
+    );
+
+    // A span link, Back and Forward change the URL's trace without remounting this page.
+    watch(
+      () => router.currentRoute.value.query.trace_id,
+      (newTraceId) => {
+        const route = router.currentRoute.value;
+        if (props.mode !== "standalone" || route.name !== "traceDetails" || !newTraceId) return;
+        resetTraceDetails();
+        setupTraceDetails();
+        if (route.query.span_id) updateSelectedSpan(route.query.span_id as string);
       },
     );
 
@@ -3693,11 +3701,6 @@ export default defineComponent({
       backToTracesList();
     };
 
-    const openTraceLink = async () => {
-      resetTraceDetails();
-      await setupTraceDetails();
-    };
-
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
     const spanNavAnnouncement = ref("");
     const announceSpanNav = (message: string) => announceInto(spanNavAnnouncement, message);
@@ -3841,7 +3844,6 @@ export default defineComponent({
       focusedEventIndex,
       routeToTracesList,
       handleExpandToFullView,
-      openTraceLink,
       convertTimeFromNsToMs,
       searchQuery,
       handleSearchQueryChange,

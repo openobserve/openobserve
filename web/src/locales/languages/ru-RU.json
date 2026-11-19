@@ -14272,6 +14272,7 @@
     "testSendGroupLabel": "Отправить реальное тестовое сообщение",
     "testSend": "Отправить тест",
     "testSendDestinationLabel": "Получатель",
+    "testSendFixedSample": "Тестовые отправки используют фиксированный образец.",
     "testSendConfirmTitle": "Отправить реальное тестовое сообщение?",
     "testSendConfirm": "Это отправит реальное сообщение в выбранный канал с пометкой [TEST].",
     "testSendSuccess": "Тестовое сообщение отправлено",

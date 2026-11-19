@@ -199,6 +199,8 @@ pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
+/// Enterprise usage calculations need data at most this old, so publishing never waits longer.
+const ENTERPRISE_USAGE_PUBLISH_CAP_SECS: i64 = 10 * 60;
 
 #[inline]
 pub fn get_batch_size() -> usize {
@@ -5443,6 +5445,12 @@ fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.health_check.failed_times = 3;
     }
     Ok(())
+}
+
+/// `ZO_USAGE_PUBLISH_INTERVAL` as an enterprise build applies it.
+#[inline]
+pub fn enterprise_usage_publish_interval(cfg: &Config) -> i64 {
+    ENTERPRISE_USAGE_PUBLISH_CAP_SECS.min(cfg.common.usage_publish_interval)
 }
 
 #[inline]

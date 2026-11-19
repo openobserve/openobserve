@@ -12509,6 +12509,27 @@ export class LogsPage {
         await monacoHelper.triggerSuggestions();
     }
 
+    /** Re-opens suggestions until a label matches expectedLabels (case-insensitive) or the timeout passes; returns the last labels. */
+    async setQueryEditorContentAndWaitForSuggestions(content, expectedLabels, timeout = 10000) {
+        const monacoHelper = this.getMonacoEditorHelper();
+        await monacoHelper.setContent(this.getQueryEditorContainer(), content);
+        const expected = expectedLabels.map(l => l.toLowerCase());
+        const deadline = Date.now() + timeout;
+        let interval = 600;
+        for (let attempt = 1; ; attempt++) {
+            // Stale context keywords clear only after the editor debounce + keywords prop round trip; the menu is the sole signal.
+            await this.page.waitForTimeout(interval);
+            await this.dismissSuggestions();
+            await monacoHelper.triggerSuggestions();
+            const labels = await this.waitAndGetSuggestionLabels(2000).catch(() => []);
+            if (labels.some(l => expected.includes(l.toLowerCase())) || Date.now() >= deadline) {
+                return labels;
+            }
+            testLogger.info(`Suggestions not settled (attempt ${attempt}): ${labels.slice(0, 5).join(', ')} — re-opening`);
+            interval = 1000;
+        }
+    }
+
     /**
      * Clear the logs query editor and type literal text (preserves auto-pair
      * behaviour for quotes — used by the FROM "partial test).

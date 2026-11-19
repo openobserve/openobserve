@@ -102,6 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("alert_templates.testSend") }}</OButton
           >
         </div>
+        <div class="text-text-tertiary text-xs" data-test="template-preview-panel-test-send-note">
+          {{ t("alert_templates.testSendFixedSample") }}
+        </div>
       </div>
     </div>
 

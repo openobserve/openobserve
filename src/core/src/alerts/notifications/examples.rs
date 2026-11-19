@@ -237,28 +237,12 @@ pub fn example_context_at(
     };
     let priority = sample_priority(level);
     let mut ctx = sample(kind, level == Some(AlertLevel::Ok), priority, check);
-    // The level a live send of this kind carries, so the dot and show_when match it.
-    match kind {
-        NotificationKind::Incident if level != Some(AlertLevel::Ok) => {
-            ctx.level = Some(match priority {
-                "P1" | "P2" => AlertLevel::Critical,
-                _ => AlertLevel::Warning,
-            });
-        }
-        NotificationKind::OnCall if level != Some(AlertLevel::Ok) => {
-            ctx.level = match priority {
-                "P1" => Some(AlertLevel::Critical),
-                "P2" => Some(AlertLevel::Warning),
-                _ => None,
-            };
-        }
-        NotificationKind::Anomaly => {
-            if let Some(level) = level {
-                ctx.level = Some(level);
-                ctx.alert_level = level.as_str().into();
-            }
-        }
-        _ => {}
+    // An incident and an on-call sample read their level from the priority in `sample`.
+    if kind == NotificationKind::Anomaly
+        && let Some(level) = level
+    {
+        ctx.level = Some(level);
+        ctx.alert_level = level.as_str().into();
     }
     ctx
 }
@@ -509,6 +493,14 @@ fn on_call_example(resolved: bool, priority: &str) -> NotificationContext {
         AlertLevel::Critical
     };
     let mut ctx = base(NotificationKind::OnCall, resolved, level);
+    if !resolved {
+        // The level `on_call_context` gives a live page of this priority.
+        ctx.level = match priority {
+            "P1" => Some(AlertLevel::Critical),
+            "P2" => Some(AlertLevel::Warning),
+            _ => None,
+        };
+    }
     let (stage, reason, ack) = if resolved {
         ("resolved", "the incident was resolved", "")
     } else {
@@ -612,6 +604,14 @@ fn incident_example(resolved: bool, priority: &str) -> NotificationContext {
         AlertLevel::Critical
     };
     let mut ctx = base(NotificationKind::Incident, resolved, level);
+    if !resolved {
+        // The level a live incident of this severity gets; P4 is informational, so none.
+        ctx.level = match priority {
+            "P1" | "P2" => Some(AlertLevel::Critical),
+            "P3" => Some(AlertLevel::Warning),
+            _ => None,
+        };
+    }
     ctx.alert_name = "High error rate".into();
     // A live incident reads its severity as its level.
     ctx.alert_level = priority.into();
@@ -776,6 +776,66 @@ mod tests {
         assert_eq!(example(NotificationKind::Synthetics), want);
         let title = &want["slack_firing"]["blocks"][0]["text"]["text"];
         assert!(title.as_str().unwrap().contains("🔴 checkout API failing"));
+    }
+
+    #[test]
+    fn an_on_call_sample_reads_its_level_from_its_priority() {
+        for (priority, level) in [
+            ("P1", Some(AlertLevel::Critical)),
+            ("P2", Some(AlertLevel::Warning)),
+            ("P3", None),
+        ] {
+            let ctx = sample(
+                NotificationKind::OnCall,
+                false,
+                priority,
+                CheckSample::Failing,
+            );
+            assert_eq!(ctx.level, level, "{priority}");
+        }
+        assert_eq!(
+            example_context(NotificationKind::OnCall, false).level,
+            Some(AlertLevel::Warning)
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn an_on_call_sample_reads_its_level_from_its_priority_as_a_live_page_does() {
+        use o2_enterprise::enterprise::oncall::sender::OnCallNotification;
+
+        use crate::alerts::notifications::oncall::on_call_context;
+        for priority in ["P1", "P2", "P3"] {
+            let live = on_call_context(&OnCallNotification {
+                priority: priority.into(),
+                ..Default::default()
+            });
+            let sample = sample(
+                NotificationKind::OnCall,
+                false,
+                priority,
+                CheckSample::Failing,
+            );
+            assert_eq!(sample.level, live.level, "{priority}");
+        }
+    }
+
+    #[test]
+    fn an_incident_sample_reads_its_level_from_its_priority() {
+        for (priority, level) in [
+            ("P1", Some(AlertLevel::Critical)),
+            ("P2", Some(AlertLevel::Critical)),
+            ("P3", Some(AlertLevel::Warning)),
+            ("P4", None),
+        ] {
+            let ctx = sample(
+                NotificationKind::Incident,
+                false,
+                priority,
+                CheckSample::Failing,
+            );
+            assert_eq!(ctx.level, level, "{priority}");
+        }
     }
 
     #[test]

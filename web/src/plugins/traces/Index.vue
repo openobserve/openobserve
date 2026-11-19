@@ -1065,11 +1065,24 @@ async function getQueryData(
     // avoiding the costly full re-sort that `ORDER BY start_time` forces.
     const orderByCol =
       validSortCol === "start_time" ? store.state.zoConfig.timestamp_column : validSortCol;
+    // Pages are separate queries, so equal sort values need a stable order;
+    // the time sort stays single-key to keep the backend's time-ordered scan.
+    const tieBreaks =
+      orderByCol === store.state.zoConfig.timestamp_column
+        ? ""
+        : ["trace_id", "span_id"]
+            .filter(
+              (col) =>
+                col !== orderByCol &&
+                (schemaFieldNames.length === 0 || schemaFieldNames.includes(col)),
+            )
+            .map((col) => `, ${col} ASC`)
+            .join("");
 
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}${tieBreaks}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),

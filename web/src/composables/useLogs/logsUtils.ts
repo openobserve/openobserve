@@ -29,6 +29,9 @@ import {
 import { searchState } from "@/composables/useLogs/searchState";
 import { encodeFtScan } from "@/utils/logs/freeTextScan";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
+import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
+import type { ServerQueryFunction } from "@/services/query_functions";
 import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -55,7 +58,8 @@ import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 interface SQLColumn {
   expr?: {
     type: string;
-    name?: string;
+    // aggr_func nodes name the function directly; function nodes hold its dotted path
+    name?: string | { name?: { value?: string }[] };
   };
   as?: string;
 }
@@ -97,6 +101,17 @@ export const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any 
   }
 
   return whereNode;
+};
+
+const aggregateNamesByCatalog = new WeakMap<ServerQueryFunction[], Set<string>>();
+
+// The parser types only a few aggregates as aggr_func; the rest are plain function nodes.
+const isAggregateColumn = (column: SQLColumn, aggregates: Set<string>): boolean => {
+  const expr = column?.expr;
+  if (expr?.type === "aggr_func") return true;
+  if (expr?.type !== "function" || typeof expr.name !== "object") return false;
+  const name = expr.name.name?.at(-1)?.value;
+  return typeof name === "string" && aggregates.has(name.toLowerCase());
 };
 
 // node-sql-parser CTE entry: a named WITH clause whose statement is another AST node
@@ -252,13 +267,29 @@ export const logsUtils = () => {
    * @param columns - Array of parsed SQL column objects from the query AST
    * @returns true if aggregation is detected, false otherwise
    */
+  // Aggregate names from the server's function catalog, which the logs search loads before it runs.
+  const catalogAggregates = (): Set<string> => {
+    const org = store.state.selectedOrganization?.identifier;
+    const catalog = org
+      ? queryClient.getQueryData<ServerQueryFunction[]>(queryFunctionsQuery(org).queryKey)
+      : undefined;
+    if (!Array.isArray(catalog)) return new Set();
+    let names = aggregateNamesByCatalog.get(catalog);
+    if (!names) {
+      names = new Set(
+        catalog.filter((f) => f?.kind === "aggregate").map((f) => String(f.name).toLowerCase()),
+      );
+      aggregateNamesByCatalog.set(catalog, names);
+    }
+    return names;
+  };
+
   const hasAggregation = (columns: SQLColumn[]): boolean => {
     // Check for aggregation functions in column expressions
     if (columns && Array.isArray(columns)) {
-      for (const column of columns) {
-        if (column?.expr?.type === "aggr_func") {
-          return true;
-        }
+      const aggregates = catalogAggregates();
+      if (columns.some((column) => isAggregateColumn(column, aggregates))) {
+        return true;
       }
     }
 
@@ -271,19 +302,22 @@ export const logsUtils = () => {
     return false;
   };
 
+  // The parser attaches a set operation's trailing LIMIT to its last branch.
+  const getOuterLimit = (parsedSQL: ExtendedParsedSQLResult | null = null) => {
+    let node = parsedSQL;
+    while (node?._next) node = node._next;
+    return node?.limit ?? null;
+  };
+
   /**
    * Determines if a parsed SQL query contains a LIMIT clause.
    *
    * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
    * @returns true if a LIMIT clause with values is present, false otherwise
    */
-  const isLimitQuery = (parsedSQL: ParsedSQLResult | null = null): boolean => {
-    return Boolean(
-      parsedSQL?.limit &&
-      parsedSQL.limit.value &&
-      Array.isArray(parsedSQL.limit.value) &&
-      parsedSQL.limit.value.length > 0,
-    );
+  const isLimitQuery = (parsedSQL: ExtendedParsedSQLResult | null = null): boolean => {
+    const limit = getOuterLimit(parsedSQL);
+    return Boolean(limit?.value && Array.isArray(limit.value) && limit.value.length > 0);
   };
 
   /**
@@ -699,6 +733,7 @@ export const logsUtils = () => {
     extractTimestamps,
     hasAggregation,
     isLimitQuery,
+    getOuterLimit,
     isDistinctQuery,
     isWithQuery,
     addTraceId,

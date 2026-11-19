@@ -249,6 +249,10 @@ struct ConfigResponse<'a> {
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
+    /// O2_AUTOOBSERVE_CONTEXT_ENABLED, only while O2_AUTOOBSERVE_ENABLED is on.
+    autoobserve_context_enabled: bool,
+    /// O2_AUTOOBSERVE_AI_EVIDENCE_ENABLED; off, the drawers hide the engine step too.
+    autoobserve_next_step_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     /// Hides the publish button and the Public links view when the feature is off.
@@ -606,6 +610,14 @@ pub async fn zo_config(
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
+    let autoobserve_context_enabled = enterprise_value!(
+        false,
+        o2_enterprise::enterprise::autoobserve::context::enabled()
+    );
+    let autoobserve_next_step_enabled = enterprise_value!(
+        false,
+        o2_enterprise::enterprise::autoobserve::next_step::enabled()
+    );
     let composite_alerts_available = config::get_config().alert_composite.writes_enabled;
     let online_evals_enabled = enterprise_value!(
         false,
@@ -640,10 +652,9 @@ pub async fn zo_config(
 
     let usage_enabled = enterprise_value!(false, true);
 
-    // Usage calculations need data at most 10 minutes old.
     let usage_publish_interval = enterprise_value!(
         cfg.common.usage_publish_interval,
-        (10 * 60).min(cfg.common.usage_publish_interval)
+        config::enterprise_usage_publish_interval(&cfg)
     );
 
     #[cfg(feature = "cloud")]
@@ -799,6 +810,8 @@ pub async fn zo_config(
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
         anomaly_detection_enabled,
+        autoobserve_context_enabled,
+        autoobserve_next_step_enabled,
         composite_alerts_available,
         synthetics_enabled,
         public_dashboards_enabled: cfg.public_dashboards.enabled,
