@@ -68,4 +68,18 @@ describe("SearchBar — the query pane grows with the filter builder", () => {
     await flushPromises();
     expect(wrapper.emitted("filterBuilderGrowth")?.at(-1)).toEqual([null]);
   });
+
+  it("keeps the SQL editor while it has focus after an edit leaves SQL mode, then shows the chip bar", async () => {
+    wrapper = mountSearchBar();
+    await flushPromises();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    await flushPromises();
+    wrapper.vm.onQueryEditorFocus();
+    wrapper.vm.searchObj.meta.sqlMode = false;
+    await flushPromises();
+    expect(wrapper.vm.showFilterBuilder).toBe(false);
+    await wrapper.vm.handleQueryEditorBlur();
+    await flushPromises();
+    expect(wrapper.vm.showFilterBuilder).toBe(true);
+  });
 });

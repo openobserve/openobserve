@@ -2327,12 +2327,15 @@ export default defineComponent({
     watch(filterBuilderGrowth, (growth) => emit("filterBuilderGrowth", growth), {
       immediate: true,
     });
+    // An edit that leaves SQL mode, such as clearing the editor, must not swap the input under the caret.
+    const queryEditorFocused = ref(false);
     // Filter mode is always the chip bar; SQL mode and the visualize/build views keep the editor.
     const showFilterBuilder = computed(
       () =>
         !searchObj.meta.sqlMode &&
         !searchObj.meta.nlpMode &&
-        searchObj.meta.logsVisualizeToggle === "logs",
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        !queryEditorFocused.value,
     );
     const aiAccess = computed(() =>
       checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
@@ -2387,6 +2390,7 @@ export default defineComponent({
     onBeforeUnmount(releaseFieldTypes);
 
     const onQueryEditorFocus = () => {
+      queryEditorFocused.value = true;
       searchObj.meta.queryEditorPlaceholderFlag = false;
       _sqlOnFocus();
       openRecentOnFocus();
@@ -2407,6 +2411,7 @@ export default defineComponent({
     };
 
     const handleQueryEditorBlur = async () => {
+      queryEditorFocused.value = false;
       searchObj.meta.queryEditorPlaceholderFlag = true;
       await _sqlOnBlur();
     };
