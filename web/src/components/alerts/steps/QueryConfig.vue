@@ -1950,7 +1950,11 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import AlertWarningRow from "@/components/alerts/AlertWarningRow.vue";
 import AlertWindowPhrase from "@/components/alerts/AlertWindowPhrase.vue";
 import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
-import { ALERT_FORM_CONTEXT_KEY, type AlertLineNote } from "@/components/alerts/alertFormContext";
+import {
+  ALERT_FORM_CONTEXT_KEY,
+  type AlertLineNote,
+  type ThresholdGuide,
+} from "@/components/alerts/alertFormContext";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -3054,6 +3058,9 @@ export default defineComponent({
         ? ""
         : queryRequiredError.value,
     );
+    // A UCUM annotation such as {cpu} names what is counted, so it reads as that word.
+    const annotationUnit = (metric: string | undefined) =>
+      /^\{([^{}]+)\}$/.exec((metric && metricInfo.value[metric]?.unit) || "")?.[1].trim() ?? "";
     const unitSuffix = (metric: string | undefined) => {
       const unit = normalizeDeclaredUnit(metric ? metricInfo.value[metric]?.unit : undefined);
       const suffixes: Record<string, I18nText> = {
@@ -3064,7 +3071,7 @@ export default defineComponent({
         nanoseconds: t("alerts.units.options.ns"),
         bytes: raw("B"),
       };
-      return (unit && suffixes[unit]) || "";
+      return (unit && suffixes[unit]) || raw(annotationUnit(metric));
     };
     // The builder's value and a bare PromQL selector read in the metric's own unit.
     const unitMetric = computed((): string | undefined => {
@@ -3092,7 +3099,8 @@ export default defineComponent({
     );
     // A percent typed against 0-1 values never fires (90 vs 0.9), so the field offers the ratio.
     const ratioHint = computed<AlertLineNote | null>(() => {
-      if (props.streamType !== "metrics" || thresholdUnit.value || promqlPercent.value) return null;
+      const realUnit = thresholdUnit.value && !annotationUnit(unitMetric.value);
+      if (props.streamType !== "metrics" || realUnit || promqlPercent.value) return null;
       const field =
         localTab.value === "promql"
           ? "query_condition.promql_condition.value"
@@ -3139,6 +3147,31 @@ export default defineComponent({
             max: formatNumber(range.max),
           })
         : t("alerts.guard.valueRangePending");
+    });
+    const thresholdHandlers: Record<string, (value: any) => void> = {
+      "trigger_condition.operator": (v) => onTriggerOperatorChange(v),
+      "trigger_condition.threshold": (v) => onTriggerThresholdChange(v),
+      "query_condition.aggregation.having.operator": (v) => onConditionOperatorChange(v),
+      "query_condition.aggregation.having.value": (v) => onConditionValueChange(v),
+      "query_condition.promql_condition.operator": (v) => onPromqlOperatorChange(v),
+      "query_condition.promql_condition.value": (v) => onPromqlValueChange(v),
+      "_ui.durationValue": (v) => onDurationValueChange(v),
+    };
+    const thresholdGuide: ThresholdGuide = {
+      unit: thresholdUnit,
+      note: conditionNote,
+      help: conditionHelp,
+      operators: plainOperators,
+      spanDuration: isSpanDuration,
+      durationUnit,
+      durationUnits: durationUnitOptions,
+      setDurationUnit: (unit) => onDurationUnitChange(unit),
+      change: (path, value) => thresholdHandlers[path]?.(value),
+    };
+    if (formContext?.thresholdGuide) formContext.thresholdGuide.value = thresholdGuide;
+    onBeforeUnmount(() => {
+      if (formContext?.thresholdGuide?.value === thresholdGuide)
+        formContext.thresholdGuide.value = null;
     });
 
     // A loaded query longer than the fold reads as its first lines; typing or focusing opens it.
