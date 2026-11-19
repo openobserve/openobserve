@@ -82,7 +82,7 @@ provide(SETTING_ROW_GRID_KEY, true);
     >
       <header
         data-snap-sticky
-        class="bg-surface-subtle border-border-default rounded-t-surface sticky top-0 z-30 flex min-h-9 flex-wrap items-center gap-x-2 border-b px-4 py-1 max-lg:static max-lg:z-auto"
+        class="bg-surface-subtle border-border-default rounded-t-surface sticky top-0 z-30 flex min-h-9 flex-wrap items-center gap-x-2 border-b px-4 py-0.5 max-lg:static max-lg:z-auto"
       >
         <h2
           class="text-text-heading m-0 text-sm font-semibold focus:outline-none"
@@ -102,7 +102,7 @@ provide(SETTING_ROW_GRID_KEY, true);
           <template #trigger>
             <OButton
               variant="ghost"
-              size="icon-xs"
+              size="icon-xs-sq"
               icon-left="info-outline"
               :aria-label="t('alerts.sections.aboutStep')"
               :data-test="`add-alert-section-${id}-about`"

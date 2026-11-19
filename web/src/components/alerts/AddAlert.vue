@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex min-h-0 min-w-0 shrink grow basis-5xl flex-col max-lg:flex-none lg:max-w-5xl"
         >
           <div
-            class="border-border-default flex shrink-0 items-center justify-end gap-4 border-b px-4 py-1"
+            class="border-border-default flex shrink-0 items-center justify-end gap-4 border-b px-4 py-0.5"
             data-test="add-alert-show-all-bar"
           >
             <div v-if="compactRail" ref="findSlotRef" class="me-auto w-60 min-w-0" />
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </p>
               <div class="[container-type:inline-size] [container-name:stream-config]">
                 <div
-                  class="border-border-default flex items-center gap-0 border-b py-2.5"
+                  class="border-border-default flex items-center gap-0 border-b py-1.5"
                   data-test="add-alert-how-it-checks-row"
                 >
                   <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
