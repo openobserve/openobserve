@@ -1294,7 +1294,6 @@ describe("AlertSettings — notify and timing in their sections", () => {
   it.each([
     ["true", {}, "alerts.form.remind.realtimeHelp"],
     ["false", {}, "alerts.form.remind.whileFiring"],
-    ["false", { suppress_repeats: true }, "alerts.form.remind.noReminders"],
   ])("Notify at most every explains itself for is_real_time %s %j", (kind, values, key) => {
     const { targets } = mountSectioned(kind, values);
     expect(targets.settingsNotify.textContent).toContain(t(key));

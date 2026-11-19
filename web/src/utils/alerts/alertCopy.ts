@@ -223,7 +223,6 @@ const groupLabelsOf = (qc: NotifyQueryCondition | null | undefined): string[] | 
 /** The help lines of Notify at most every and Suppress repeats, naming what each wait covers. */
 export function notifyHelp(
   qc: NotifyQueryCondition | null | undefined,
-  suppressRepeats: boolean,
   t: TranslateFn,
 ): { remind: I18nText; suppress: I18nText } {
   const labels = groupLabelsOf(qc);
@@ -236,8 +235,5 @@ export function notifyHelp(
           "alerts.form.remind.whileFiringEachSeries",
           "alerts.alertSettings.suppressRepeatsHelpEachSeries",
         ];
-  return {
-    remind: suppressRepeats ? t("alerts.form.remind.noReminders") : t(remind, params),
-    suppress: t(suppress, params),
-  };
+  return { remind: t(remind, params), suppress: t(suppress, params) };
 }

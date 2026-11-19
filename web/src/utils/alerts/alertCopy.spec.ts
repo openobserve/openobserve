@@ -89,64 +89,39 @@ describe("measureWords", () => {
 });
 
 describe("notifyHelp", () => {
-  const promql = (multi: boolean, query = "avg by (k8s_node_name) (cpu)") => ({
-    type: "promql",
-    promql: query,
-    promql_multi_alert: multi,
-  });
-  const builder = (multi: boolean, group_by: string[]) => ({
-    type: "custom",
-    aggregation: { multi_alert: multi, group_by },
-  });
+  const sql = "SELECT pod, count(*) FROM t GROUP BY pod";
   it.each([
-    ["one alert", promql(false), "whileFiring", "suppressRepeatsHelp", {}],
+    ["one alert", { type: "promql", promql: "avg by (node) (x)" }, "", ""],
     [
-      "one per PromQL by-label",
-      promql(true),
-      "whileFiringEach",
-      "suppressRepeatsHelpEach",
-      { labels: "k8s_node_name" },
+      "a PromQL by-label",
+      { type: "promql", promql: "avg by (node) (x)", promql_multi_alert: true },
+      "Each",
+      "node",
     ],
     [
-      "one per series with no by-label",
-      promql(true, "1 - avg without (cpu) (x)"),
-      "whileFiringEachSeries",
-      "suppressRepeatsHelpEachSeries",
-      {},
+      "no by-label",
+      { type: "promql", promql: "avg without (cpu) (x)", promql_multi_alert: true },
+      "EachSeries",
+      "",
     ],
     [
-      "one per builder group",
-      builder(true, ["service_name", ""]),
-      "whileFiringEach",
-      "suppressRepeatsHelpEach",
-      { labels: "service_name" },
+      "a builder group",
+      { aggregation: { multi_alert: true, group_by: ["svc", ""] } },
+      "Each",
+      "svc",
     ],
     [
-      "a builder group with one alert",
-      builder(false, ["service_name"]),
-      "whileFiring",
-      "suppressRepeatsHelp",
-      {},
+      "a builder group, one alert",
+      { aggregation: { multi_alert: false, group_by: ["svc"] } },
+      "",
+      "",
     ],
-    [
-      "one per SQL group",
-      {
-        type: "sql",
-        sql: "SELECT pod, count(*) FROM t GROUP BY pod",
-        aggregation: { multi_alert: true },
-      },
-      "whileFiringEach",
-      "suppressRepeatsHelpEach",
-      { labels: "pod" },
-    ],
-  ])("%s says who each wait covers", (_case, qc, remind, suppress, params) => {
-    expect(notifyHelp(qc, false, t)).toEqual({
-      remind: t(`alerts.form.remind.${remind}` as any, params),
-      suppress: t(`alerts.alertSettings.${suppress}` as any, params),
+    ["a SQL group", { type: "sql", sql, aggregation: { multi_alert: true } }, "Each", "pod"],
+  ])("%s says what each wait covers", (_case, qc, scope, labels) => {
+    const params = labels ? { labels } : {};
+    expect(notifyHelp(qc, t)).toEqual({
+      remind: t(`alerts.form.remind.whileFiring${scope}` as any, params),
+      suppress: t(`alerts.alertSettings.suppressRepeatsHelp${scope}` as any, params),
     });
-  });
-
-  it("with Suppress repeats on, the wait only spaces out a new firing", () => {
-    expect(notifyHelp(promql(true), true, t).remind).toBe(t("alerts.form.remind.noReminders"));
   });
 });

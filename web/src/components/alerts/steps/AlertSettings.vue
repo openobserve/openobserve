@@ -939,9 +939,7 @@ export default defineComponent({
             run: lookBack.relink,
           };
     });
-    const notifyLines = computed(() =>
-      notifyHelp(fv("query_condition"), !!fv("suppress_repeats"), t),
-    );
+    const notifyLines = computed(() => notifyHelp(fv("query_condition"), t));
     // A wait shorter than the checks never holds a notification back, so it says so instead of moving it.
     const silenceHint = computed<LinkNote | null>(() => {
       const checkMinutes = frequencyMinutes();
