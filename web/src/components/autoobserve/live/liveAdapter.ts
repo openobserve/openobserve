@@ -51,7 +51,6 @@ import {
   type LiveFailure,
   type LiveStale,
 } from "./liveCopy";
-import { serviceLearning, type LearningStream } from "./LiveCoverageLearning";
 import { alertFindingBody, alertFindingHeadline, analysedText } from "./alertFindingCopy";
 import {
   gapGroupInsight,
@@ -352,7 +351,6 @@ const toRow = (
   service: string,
   minutes: number | null,
   locale: string,
-  nowMs: number,
 ): CoverageRow => {
   const cells = Object.fromEntries(
     SIGNALS.map((signal) => {
@@ -364,10 +362,7 @@ const toRow = (
     }),
   ) as Record<Signal, CoverageCell>;
   const covered = GAP_CLASSES.filter((cls) => row.cells[cls]?.state === "covered").length;
-  const state = serviceStateOf(
-    covered,
-    serviceLearning((row.streams ?? []) as LearningStream[], nowMs),
-  );
+  const state = serviceStateOf(covered);
   const checks = Object.fromEntries(
     GAP_CLASSES.map((cls) => [cls, toCell(t, row.cells[cls], t(CLASS_LABEL[cls]), locale)]),
   ) as Record<LiveCheck, CoverageCell>;
@@ -399,11 +394,10 @@ const toRow = (
   };
 };
 
-// Watched needs every check; a service still learning its baseline is not yet a gap.
-const serviceStateOf = (covered: number, learning: boolean): LiveCoverageState => {
+const serviceStateOf = (covered: number): LiveCoverageState => {
   if (covered >= GAP_CLASSES.length) return "watched";
   if (covered > 0) return "partial";
-  return learning ? "learning" : "gap";
+  return "gap";
 };
 
 // Closest engine match for the design's "can't watch": a monitor exists but can't see or reach the service.
@@ -443,7 +437,7 @@ export const toCoverageSource = (
     };
   const names = placeLabels(t, data.rows.map(placeOf));
   const minutes = minutesSince(data.pass_at, now);
-  const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale, now));
+  const rows = data.rows.map((row, i) => toRow(t, row, names[i], minutes, locale));
   const planned = new Set(data.rows.flatMap((row, i) => (cannotWatch(row) ? [names[i]] : [])));
   return {
     ...base,
