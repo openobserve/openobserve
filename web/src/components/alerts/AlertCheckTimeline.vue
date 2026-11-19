@@ -28,6 +28,14 @@ const props = defineProps<{
   period: number;
   /** A forecast fits a trend over this window, whatever the look back, so gaps do not apply. */
   forecastWindow?: I18nText;
+  /** PromQL reads a series' latest value or any crossing, so the window means something else there. */
+  queryCondition?: {
+    type?: string;
+    promql_multi_alert?: boolean;
+    promql_rule_mode?: boolean;
+  } | null;
+  /** Checks run on the clock grid, so equal windows are fixed blocks a burst can straddle. */
+  aligned?: boolean;
 }>();
 
 const WIDTH = 600;
@@ -61,12 +69,23 @@ const bandStart = computed(() =>
   Math.max(0, NOW_X - (props.period / Math.max(props.frequency, 1)) * STEP),
 );
 const overlap = computed(() => scheduleOverlap(props.period, props.frequency));
-const caption = computed(() =>
-  t(CAPTION[overlap.value.kind], {
-    period: durationWords(props.period, t),
+const caption = computed(() => {
+  const period = durationWords(props.period, t);
+  const query = props.queryCondition;
+  if (query?.type === "promql" && !query.promql_rule_mode && query.promql_multi_alert) {
+    return t("alerts.form.schedule.promqlLatest", { period });
+  }
+  const words = t(CAPTION[overlap.value.kind], {
+    period,
     minutes: durationWords(overlap.value.minutes, t),
-  }),
-);
+  });
+  if (query?.type === "promql" && !query.promql_rule_mode) {
+    return t("alerts.form.schedule.promqlAny", { period, overlap: words });
+  }
+  return props.aligned && overlap.value.kind === "equal"
+    ? t("alerts.form.schedule.alignedBlocks", { period })
+    : words;
+});
 </script>
 
 <template>

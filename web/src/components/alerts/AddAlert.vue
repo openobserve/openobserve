@@ -735,6 +735,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :frequency="Number(formData.trigger_condition.frequency)"
                   :period="Number(formData.trigger_condition.period)"
                   :forecast-window="checkTimelineForecastWindow"
+                  :query-condition="formData.query_condition"
+                  :aligned="formData.trigger_condition.align_time !== false"
                 />
               </div>
             </AlertFormSection>
@@ -2318,6 +2320,7 @@ export default defineComponent({
       reveal: (el: HTMLElement) => snapScrollRef.value?.revealElement(el),
       openSetting: (id: string) => settingFind.select(id),
       conditionNote: ref(null),
+      previewStatus: activeEvaluationStatus,
     });
 
     const checkTimelineForecastWindow = computed(() => {

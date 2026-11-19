@@ -37,6 +37,13 @@ export interface AlertFormContext {
   openSetting?(id: string): Promise<void>;
   /** What the schedule says about the condition, shown in the condition row's message line. */
   conditionNote?: Ref<AlertLineNote | null>;
+  /** The preview's verdict at the latest window: how many groups would fire now. */
+  previewStatus?: ComputedRef<{
+    wouldTrigger: boolean;
+    count?: number;
+    atLeast?: boolean;
+    grouped?: boolean;
+  } | null>;
 }
 
 export const ALERT_FORM_CONTEXT_KEY: InjectionKey<AlertFormContext> = Symbol("alertFormContext");

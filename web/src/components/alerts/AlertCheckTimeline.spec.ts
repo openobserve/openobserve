@@ -5,9 +5,9 @@ import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import AlertCheckTimeline from "./AlertCheckTimeline.vue";
 
-const mountTimeline = (frequency: number, period: number) =>
+const mountTimeline = (frequency: number, period: number, extra: Record<string, unknown> = {}) =>
   mount(AlertCheckTimeline, {
-    props: { frequency, period },
+    props: { frequency, period, ...extra },
     global: { plugins: [i18n] },
   });
 
@@ -30,6 +30,21 @@ describe("AlertCheckTimeline", () => {
     const wrapper = mountTimeline(frequency, period);
     expect(wrapper.get('[data-test="add-alert-check-timeline-caption"]').text()).toBe(caption);
     expect(wrapper.text()).toContain(i18n.global.t("alerts.sections.timeline.now"));
+  });
+
+  const t = i18n.global.t;
+  const equal = t("alerts.form.schedule.equalWords", { period: "5 minutes" });
+  it.each([
+    [{ aligned: true }, "alerts.form.schedule.alignedBlocks", {}],
+    [
+      { queryCondition: { type: "promql", promql_multi_alert: true } },
+      "alerts.form.schedule.promqlLatest",
+      {},
+    ],
+    [{ queryCondition: { type: "promql" } }, "alerts.form.schedule.promqlAny", { overlap: equal }],
+  ])("says what a window means for %j", (extra, key, params) => {
+    const text = mountTimeline(5, 5, extra).get('[data-test="add-alert-check-timeline-caption"]');
+    expect(text.text()).toBe(t(key, { period: "5 minutes", ...params }));
   });
 
   it("draws the read window back from now, stopping at the edge of the line", () => {
