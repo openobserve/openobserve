@@ -1380,11 +1380,7 @@ export default defineComponent({
      * Common method to extract patterns
      * Handles validation, loading states, and error handling
      */
-    const extractPatternsForCurrentQuery = async (
-      clear_cache = false,
-      generationId?: number,
-      ranQuery?: string,
-    ) => {
+    const extractPatternsForCurrentQuery = async (generationId?: number, ranQuery?: string) => {
       const engine = autoRun.engine;
       const settle = () => {
         if (generationId !== null && generationId !== undefined)
@@ -1463,18 +1459,6 @@ export default defineComponent({
         if (generationId !== null && generationId !== undefined)
           engine.recordPatternsComplete(generationId);
 
-        // Only update histogram for patterns mode, don't fetch logs data
-        // Patterns have their own separate state and don't need logs data
-        searchObj.meta.clearCache = clear_cache;
-        searchObj.meta.refreshHistogram = true;
-
-        // Fetch histogram data only (not logs) for patterns mode. It needs the
-        // same request the extraction ran on: called with no arguments it threw
-        // on `queryReq.query`, and because the throw happens inside the
-        // manager's own promise it escaped this try/catch as an unhandled
-        // rejection rather than surfacing as a search error.
-        await getHistogramData(queryReq, { clear_cache });
-        refreshHistogramChart();
         settle();
       } catch (error) {
         console.error("[Index] Error extracting patterns:", error);
@@ -1488,11 +1472,9 @@ export default defineComponent({
 
     const executePatternsRun = async (ctx: RunContext) => {
       autoRun.engine.registerAbort(ctx.generation.id, () => cancelPatterns());
-      await extractPatternsForCurrentQuery(
-        !!searchObj.meta.clearCache,
-        ctx.generation.id,
-        ctx.signature.query,
-      );
+      // Extraction has no cache to bypass; a leftover one-shot flag would skip the next Search run's cache.
+      searchObj.meta.clearCache = false;
+      await extractPatternsForCurrentQuery(ctx.generation.id, ctx.signature.query);
     };
 
     // // Watch for patterns mode switch - completely separate from logs flow
