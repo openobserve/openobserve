@@ -835,9 +835,20 @@ describe("useAlertFormSections", () => {
     );
   });
 
-  it("names the stream and its type in the watch summary", () => {
+  it("names the stream, or every metric a PromQL query reads, and its type in the watch summary", () => {
     const { items } = setup(scheduled({ stream_name: "default", stream_type: "logs" }));
     expect(byId(items.value, "watch").summary).toBe("default · Logs");
+    const promql = "rate(http_a_count[5m]) / rate(http_b_count[5m])";
+    const ratio = setup(
+      scheduled({
+        stream_name: "http_a_count",
+        stream_type: "metrics",
+        query_condition: { type: "promql", promql },
+      }),
+    );
+    expect(byId(ratio.items.value, "watch").summary).toBe(
+      "http_a_count and http_b_count · Metrics",
+    );
   });
 
   it("shows a muted tick while editing a saved alert", () => {

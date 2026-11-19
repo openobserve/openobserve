@@ -260,6 +260,13 @@ export function checkEveryLabel(formData: AlertSectionsFormData, t: TranslateFn)
   return t("alerts.sections.everyMinutes", { count: minutes }, minutes);
 }
 
+/** The stream an alert watches, or every metric its PromQL query reads. */
+export function watchedStreamText(formData: AlertSectionsFormData, t: TranslateFn): I18nText {
+  const qc = formData?.query_condition ?? {};
+  const metrics = qc.type === "promql" ? promqlMetricNames(qc.promql ?? "") : [];
+  return metrics.length > 1 ? joinListMore(metrics, t) : raw(formData?.stream_name ?? "");
+}
+
 /** A read-back line as plain text, the way its slots render it. */
 export function reviewLineText(line: AlertReviewLine, t: TranslateFn): I18nText {
   const sentence = (one: Omit<AlertReviewLine, "id" | "more">) =>
@@ -669,7 +676,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
         if (!hasValue(fd.stream_name)) {
           return { missing: true, summary: t("alerts.sections.watch.pickStream") };
         }
-        const stream = raw(fd.stream_name);
+        const stream = watchedStreamText(fd, t);
         if (!hasValue(fd.stream_type)) return { missing: false, summary: stream };
         const typeKey = STREAM_TYPE_LABELS[fd.stream_type!];
         const type = typeKey ? t(typeKey) : raw(fd.stream_type);
@@ -759,11 +766,9 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       return { keypath: "alerts.sections.review.watchNoStream", parts: {} };
     }
     const typeKey = STREAM_TYPE_LABELS[fd.stream_type ?? ""];
-    const qc = fd.query_condition ?? {};
-    const metrics = qc.type === "promql" ? promqlMetricNames(qc.promql ?? "") : [];
     const parts: ReviewSentence["parts"] = {
       type: strong(typeKey ? t(typeKey) : raw(fd.stream_type)),
-      stream: strong(metrics.length > 1 ? joinListMore(metrics, t) : raw(fd.stream_name)),
+      stream: strong(watchedStreamText(fd, t)),
     };
     const filter = filterOf(fd) ?? sqlFilterOf(fd);
     if (!filter) {

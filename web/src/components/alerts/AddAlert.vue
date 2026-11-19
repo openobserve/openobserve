@@ -1420,6 +1420,7 @@ import {
 } from "./alertFormSections";
 import {
   useAlertFormSections,
+  watchedStreamText,
   type AlertDestinationObjects,
 } from "@/composables/alerts/useAlertFormSections";
 import { shownFieldError } from "@/composables/alerts/shownFieldError";
@@ -2007,7 +2008,7 @@ export default defineComponent({
       const type = streamTypeOptions.value.find((o) => o.value === fd.stream_type)?.label;
       return alertForm.t("alerts.form.watch.summary", {
         type: type ?? raw(fd.stream_type),
-        stream: raw(fd.stream_name),
+        stream: watchedStreamText(fd, alertForm.t),
         how,
       });
     });
