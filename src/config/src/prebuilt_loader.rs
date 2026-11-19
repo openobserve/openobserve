@@ -201,9 +201,9 @@ const EMBEDDED_CONFIG: &str = include_str!(concat!(
     "/../../config/prebuilt-destinations.json"
 ));
 
-/// Bodies the old hand-written fallback shipped as `(template name, body)`.
-/// Org copies saved from these bodies are system output, never user edits, so
-/// the startup reseed may replace them with the shipped body.
+/// Bodies the old hand-written fallback shipped for the chat and email templates, as
+/// `(template name, body)`. These templates only change how a message looks, so a row that still
+/// holds one of these bodies is sent with the shipped body.
 pub const LEGACY_BUILTIN_BODIES: &[(&str, &str)] = &[
     (
         "prebuilt_slack",
@@ -220,12 +220,19 @@ pub const LEGACY_BUILTIN_BODIES: &[(&str, &str)] = &[
         r#"{"@type": "MessageCard", "text": "[{alert_status}] {alert_name}"}"#,
     ),
     (
-        "prebuilt_pagerduty",
-        r#"{"payload": {"summary": "OpenObserve [{alert_status}]: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#,
-    ),
-    (
         "prebuilt_discord",
         r#"{"content": "[{alert_status}] {alert_name}"}"#,
+    ),
+];
+
+/// Bodies the old hand-written fallback shipped for templates that open tickets or feed other
+/// systems. The shipped bodies add fields (urgency, impact, caller, links) that change what the
+/// receiving system creates, so a row that holds one of these bodies keeps it: it is not upgraded
+/// on read and the startup reseed does not overwrite it.
+pub const KEPT_LEGACY_BODIES: &[(&str, &str)] = &[
+    (
+        "prebuilt_pagerduty",
+        r#"{"payload": {"summary": "OpenObserve [{alert_status}]: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#,
     ),
     (
         "prebuilt_webhook",
@@ -241,16 +248,40 @@ pub const LEGACY_BUILTIN_BODIES: &[(&str, &str)] = &[
     ),
 ];
 
-/// True when `body` is what the old fallback shipped for template `name`.
+/// Chat and email bodies that earlier versions of `config/prebuilt-destinations.json` shipped,
+/// keyed by template name. Deployments that had the file on disk saved rows with these bodies.
+const PREVIOUS_SHIPPED_BODIES: &str = include_str!("prebuilt_previous_bodies.json");
+
+fn previous_shipped_bodies() -> &'static HashMap<String, Vec<String>> {
+    static BODIES: std::sync::OnceLock<HashMap<String, Vec<String>>> = std::sync::OnceLock::new();
+    BODIES.get_or_init(|| {
+        serde_json::from_str(PREVIOUS_SHIPPED_BODIES)
+            .expect("prebuilt_previous_bodies.json is valid; a test parses it")
+    })
+}
+
+/// True when `body` is a body that the system once shipped for the chat or email template `name`
+/// and that the read path replaces with the shipped body.
 pub fn is_legacy_builtin_body(name: &str, body: &str) -> bool {
     LEGACY_BUILTIN_BODIES
         .iter()
         .any(|(n, b)| *n == name && *b == body)
+        || previous_shipped_bodies()
+            .get(name)
+            .is_some_and(|bodies| bodies.iter().any(|b| b == body))
 }
 
-/// Replaces `body` with the shipped body when it is the old fallback's one-line body for template
-/// `name`. Every stored row goes through this on read, so a row an old node or a lagging replica
-/// still holds is sent with the shipped body. Returns true when it changed `body`.
+/// True when `body` is the old fallback body of a ticketing or webhook template `name`, which the
+/// startup reseed must leave in place.
+pub fn is_kept_legacy_body(name: &str, body: &str) -> bool {
+    KEPT_LEGACY_BODIES
+        .iter()
+        .any(|(n, b)| *n == name && *b == body)
+}
+
+/// Replaces `body` with the shipped body when it is an earlier system body of the chat or email
+/// template `name`. Every stored row goes through this on read, so a row an old node or a lagging
+/// replica still holds is sent with the shipped body. Returns true when it changed `body`.
 pub fn upgrade_legacy_body(name: &str, body: &mut String) -> bool {
     if !is_legacy_builtin_body(name, body) {
         return false;
@@ -734,6 +765,47 @@ mod tests {
 
         let mut shipped = get_prebuilt_template("slack").unwrap().body;
         assert!(!upgrade_legacy_body("prebuilt_slack", &mut shipped));
+    }
+
+    #[test]
+    fn ticketing_and_webhook_legacy_bodies_are_kept() {
+        for (name, body) in KEPT_LEGACY_BODIES {
+            let mut stored = body.to_string();
+            assert!(!upgrade_legacy_body(name, &mut stored), "{name}");
+            assert_eq!(stored, *body);
+            assert!(is_kept_legacy_body(name, body), "{name}");
+            assert!(!is_legacy_builtin_body(name, body), "{name}");
+        }
+        let servicenow = get_prebuilt_template("servicenow").unwrap().body;
+        assert!(!is_kept_legacy_body("prebuilt_servicenow", &servicenow));
+    }
+
+    #[test]
+    fn earlier_shipped_chat_bodies_upgrade_to_the_shipped_body() {
+        let previous = previous_shipped_bodies();
+        let old_slack = &previous["prebuilt_slack"];
+        assert!(
+            old_slack.iter().any(|b| b.contains("\"header\"")),
+            "the rich Slack body with a header block is listed"
+        );
+        let shipped = get_prebuilt_template("slack").unwrap().body;
+        for body in old_slack {
+            let mut stored = body.clone();
+            assert!(upgrade_legacy_body("prebuilt_slack", &mut stored));
+            assert_eq!(stored, shipped);
+        }
+        for (name, bodies) in previous {
+            let prebuilt_type = name.strip_prefix(PREBUILT_TEMPLATE_PREFIX).unwrap();
+            assert!(
+                matches!(
+                    prebuilt_type,
+                    "slack" | "msteams" | "teams" | "discord" | "email"
+                ),
+                "only chat and email bodies upgrade, found {name}"
+            );
+            let shipped = get_prebuilt_template(prebuilt_type).unwrap().body;
+            assert!(!bodies.contains(&shipped), "{name} lists its shipped body");
+        }
     }
 
     #[test]
