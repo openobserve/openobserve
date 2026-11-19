@@ -2003,7 +2003,7 @@ import {
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
-import { dataNoun, formatNumber, joinListMore } from "@/utils/alerts/alertCopy";
+import { dataNoun, formatNumber, joinListMore, valueRangeText } from "@/utils/alerts/alertCopy";
 import { metricPromql } from "@/utils/alerts/alertIntents";
 import {
   isSpanDurationMeasure,
@@ -3150,17 +3150,9 @@ export default defineComponent({
       const range = props.previewValueRange;
       const fix = ratioThresholdFix({ value: typed, declaredRatio, range });
       if (fix === null) return null;
-      const value = formatNumber(typed);
       const shownFix = formatNumber(fix);
       return {
-        text: range
-          ? t("alerts.guard.ratioRange", {
-              min: formatNumber(range.min),
-              max: formatNumber(range.max),
-              value,
-              fix: shownFix,
-            })
-          : t("alerts.guard.ratioDeclared", { value, fix: shownFix }),
+        text: valueRangeText(range, t, { typed, fix }),
         action: t("alerts.guard.ratioUse", { fix: shownFix }),
         warning: true,
         run: () => {
@@ -3173,15 +3165,7 @@ export default defineComponent({
     });
     const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
     const conditionNote = computed(() => ratioHint.value ?? formContext?.conditionNote?.value);
-    const conditionHelp = computed(() => {
-      const range = props.previewValueRange;
-      return range
-        ? t("alerts.guard.valueRange", {
-            min: formatNumber(range.min),
-            max: formatNumber(range.max),
-          })
-        : t("alerts.guard.valueRangePending");
-    });
+    const conditionHelp = computed(() => valueRangeText(props.previewValueRange, t));
     const thresholdHandlers: Record<string, (value: any) => void> = {
       "trigger_condition.operator": (v) => onTriggerOperatorChange(v),
       "trigger_condition.threshold": (v) => onTriggerThresholdChange(v),

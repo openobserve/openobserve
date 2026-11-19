@@ -134,6 +134,28 @@ export const formatNumber = (value: unknown): I18nText => {
   return raw(new Intl.NumberFormat(getIntlLocale(), { maximumFractionDigits: 2 }).format(n));
 };
 
+/** Recent values in words, "stay at" when flat; a ratio threshold adds the typed percent and its fix. */
+export function valueRangeText(
+  range: { min: number; max: number } | null | undefined,
+  t: TranslateFn,
+  ratio?: { typed: unknown; fix: unknown },
+): I18nText {
+  const value = ratio ? formatNumber(ratio.typed) : undefined;
+  const fix = ratio ? formatNumber(ratio.fix) : undefined;
+  if (!range)
+    return ratio
+      ? t("alerts.guard.ratioDeclared", { value, fix })
+      : t("alerts.guard.valueRangePending");
+  const [min, max] = [formatNumber(range.min), formatNumber(range.max)];
+  if (min === max)
+    return ratio
+      ? t("alerts.guard.ratioSteady", { value: min, typed: value, fix })
+      : t("alerts.guard.valueSteady", { value: min });
+  return ratio
+    ? t("alerts.guard.ratioRange", { min, max, value, fix })
+    : t("alerts.guard.valueRange", { min, max });
+}
+
 /** A duration in sentences: "10 minutes", "2 hours". */
 export const durationWords = (minutes: number, t: TranslateFn): I18nText =>
   minutes >= 60 && minutes % 60 === 0

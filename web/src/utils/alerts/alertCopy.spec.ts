@@ -11,6 +11,7 @@ import {
   joinListMore,
   measureWords,
   notifyHelp,
+  valueRangeText,
   valueWithUnit,
 } from "./alertCopy";
 
@@ -29,6 +30,20 @@ describe("joinListMore", () => {
 
   it("takes a smaller cap", () => {
     expect(joinListMore(["a", "b", "c"], t, 1)).toBe("a and 2 more");
+  });
+});
+
+describe("valueRangeText", () => {
+  it.each([
+    [{ min: 2, max: 2 }, undefined, t("alerts.guard.valueSteady", { value: "2" })],
+    [{ min: 1, max: 3 }, undefined, t("alerts.guard.valueRange", { min: "1", max: "3" })],
+    [
+      { min: 0.5, max: 0.5 },
+      { typed: 50, fix: 0.5 },
+      t("alerts.guard.ratioSteady", { value: "0.5", typed: "50", fix: "0.5" }),
+    ],
+  ])("%j with %j reads the steady or ranged copy", (range, ratio, expected) => {
+    expect(valueRangeText(range, t, ratio)).toBe(expected);
   });
 });
 

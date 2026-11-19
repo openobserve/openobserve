@@ -44,11 +44,13 @@ export function sqlGroupByLabels(sql: string): string[] {
 /** Every label a PromQL query aggregates `by`, across all its `by (...)` clauses. */
 export function promqlByLabels(query: string): string[] {
   const labels = new Set<string>();
+  // histogram_quantile consumes the bucket bound, so its result is never split by it.
+  const quantile = /\bhistogram_quantile\s*\(/i.test(query);
   for (const match of query.matchAll(/\bby\s*\(([^)]*)\)/gi)) {
     match[1]
       .split(",")
       .map((label) => label.trim())
-      .filter(Boolean)
+      .filter((label) => label && !(quantile && label === "le"))
       .forEach((label) => labels.add(label));
   }
   return [...labels];
