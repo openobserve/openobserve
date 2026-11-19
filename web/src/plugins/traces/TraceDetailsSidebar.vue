@@ -1301,7 +1301,6 @@ export default defineComponent({
     "close",
     "view-logs",
     "select-span",
-    "open-trace",
     "show-correlation",
     "add-filter",
     "apply-filter-immediately",
@@ -2371,8 +2370,6 @@ export default defineComponent({
           name: "traceDetails",
           query,
         });
-
-        emit("open-trace");
       }
     };
 

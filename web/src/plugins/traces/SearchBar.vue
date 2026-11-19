@@ -424,6 +424,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="icon-toolbar"
             shortcut-id="tracesCopyUrl"
+            :disabled="!!shareReason"
+            :tooltip="shareReason || undefined"
           />
           <ODropdown side="bottom" align="end">
             <template #trigger>
@@ -607,6 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :suggestions="effectiveSuggestions"
           :field-value-resolver="resolveFieldValues"
           :recent-queries="recentQueries"
+          :values-time-range="valuesWindow"
           :debounce-time="100"
           :filter-mode="!searchObj.meta.sqlMode"
           :hide-nl-toggle="!isAiEnabled"
@@ -726,14 +729,12 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
 import useStreams from "@/composables/useStreams";
-import {
-  applyFilterTerm,
-  replaceExistingFieldCondition,
-  removeFieldCondition,
-} from "@/utils/traces/filterUtils";
+import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import {
   isDatetimeChanged,
+  tracesQueryNotRun,
   tracesRunIsStaged,
   tracesToolbarLayout,
   TRACES_TOOLBAR_WIDTHS,
@@ -742,6 +743,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { downloadFile } from "@/utils/dom";
 import { toCsv } from "@/utils/csv";
 import { useMutation, useQuery } from "@tanstack/vue-query";
+import { getConsumableRelativeTime } from "@/utils/date";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import savedViewsService from "@/services/saved_views";
@@ -874,6 +876,10 @@ export default defineComponent({
       if (typeof applied !== "string") return false;
       return String(searchObj.data.editorValue ?? "").trim() !== applied.trim();
     });
+    // The URL already carries the staged edit, so a link before Run would share a query nobody ran.
+    const shareReason = computed(() =>
+      tracesQueryNotRun(searchObj) ? t("search.autoRunPersistNeedsRun") : null,
+    );
     const recentListActive = ref(false);
     const { enabled: recentSearchesEnabled } = useRecentSearches();
     const recentList = useRecentSearchesList("traces", recentListActive);
@@ -950,7 +956,19 @@ export default defineComponent({
       updateFieldKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
+
+    const currentValuesWindow = () =>
+      pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
+    setValuesTimeRange(currentValuesWindow);
+    // A lookup keeps the function it began with, so a new one tells a lookup in flight the range changed.
+    watch(
+      () => pageValuesSetting(searchObj.data.datetime ?? {}),
+      () => setValuesTimeRange(() => currentValuesWindow()),
+    );
+    // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
+    const valuesWindow = computed(currentValuesWindow);
 
     onActivated(async () => {
       await nextTick();
@@ -1184,24 +1202,6 @@ export default defineComponent({
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(current);
       // Only trigger search if not explicitly skipped
       if (!skipSearch && store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
-        emit("searchdata");
-      }
-    };
-
-    // Remove all conditions for a given field from the editor value.
-    // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
-    const removeFilterByField = (fieldName: string) => {
-      // The whole editor value is the where clause — never split it on "|", the
-      // split is quote-unaware and would corrupt match_all('text | error').
-      const value = searchObj.data.editorValue as string;
-      const newValue = replaceExistingFieldCondition(value, fieldName, "")
-        .replace(/\s*\band\b\s*$/i, "")
-        .replace(/^\s*\band\b\s*/i, "")
-        .replace(/\s+and\s+and\s+/gi, " and ")
-        .trim();
-      searchObj.data.editorValue = newValue;
-      if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
       }
     };
@@ -1613,6 +1613,7 @@ export default defineComponent({
       recentFocusOpen,
       showRunQueryPending,
       recentQueries,
+      valuesWindow,
       recentExamples,
       onRecentEditorEdit,
       dismissRecentFocus,
@@ -1644,9 +1645,9 @@ export default defineComponent({
       onErrorOnlyToggle,
       updateNewDateTime,
       tracesShareURL,
+      shareReason,
       config,
       applyFilters,
-      removeFilterByField,
       serviceGraphVisualizationTabs,
       serviceGraphLayoutOptions,
       onServiceGraphVisualizationChange,

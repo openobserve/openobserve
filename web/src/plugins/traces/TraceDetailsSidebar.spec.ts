@@ -1310,11 +1310,22 @@ describe("TraceDetailsSidebar", async () => {
         expect(noLinksMsg.exists()).toBe(false);
       });
 
-      it("should emit open-trace when a different trace link is clicked", async () => {
-        const linkRow = wrapper.find('[data-test="trace-event-detail-link-0"]');
-        await linkRow.trigger("click");
+      it("should navigate without emitting when a different trace link is clicked", async () => {
+        const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
 
-        expect(wrapper.emitted("open-trace")).toBeTruthy();
+        await wrapper.find('[data-test="trace-event-detail-link-0"]').trigger("click");
+
+        expect(pushSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "traceDetails",
+            query: expect.objectContaining({
+              trace_id: JSON.parse(mockLinks)[0].context.traceId,
+              span_id: JSON.parse(mockLinks)[0].context.spanId,
+            }),
+          }),
+        );
+        expect(wrapper.emitted("open-trace")).toBeFalsy();
+        pushSpy.mockRestore();
       });
 
       it("should emit select-span when a same trace link is clicked", async () => {

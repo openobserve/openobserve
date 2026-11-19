@@ -1315,6 +1315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :suggestions="effectiveSuggestions"
                 :field-value-resolver="resolveFieldValues"
                 :recent-queries="recentQueries"
+                :values-time-range="valuesWindow"
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
@@ -1784,7 +1785,9 @@ const RECENT_SEARCHES_LAYERS =
 const EDITOR_POINTER_FOCUS_MS = 1000;
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import { getConsumableRelativeTime } from "@/utils/date";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
 import { json2csv } from "json-2-csv";
 import QueryPlanDialog from "@/components/QueryPlanDialog.vue";
 import {
@@ -1860,7 +1863,11 @@ import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
-import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
+import {
+  hasFieldCondition,
+  qualifyFieldConditions,
+  removeFieldCondition,
+} from "@/plugins/logs/filterUtils";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -2410,7 +2417,19 @@ export default defineComponent({
       updateFunctionKeywords,
       updateStreamKeywords,
       resolveFieldValues,
+      setValuesTimeRange,
     } = useSqlSuggestions();
+
+    const currentValuesWindow = () =>
+      pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
+    setValuesTimeRange(currentValuesWindow);
+    // A lookup keeps the function it began with, so a new one tells a lookup in flight the range changed.
+    watch(
+      () => pageValuesSetting(searchObj.data.datetime ?? {}),
+      () => setValuesTimeRange(() => currentValuesWindow()),
+    );
+    // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
+    const valuesWindow = computed(currentValuesWindow);
 
     const refreshTimeChange = (item) => {
       searchObj.meta.refreshInterval = Number(item.value);
@@ -5223,6 +5242,7 @@ export default defineComponent({
       recentDrawerRef,
       recentFocusOpen,
       recentQueries,
+      valuesWindow,
       recentExamples,
       onRecentEditorKeydown,
       noteEditorPointer,
@@ -5473,7 +5493,7 @@ export default defineComponent({
               const parsedSQL = this.fnParsedSQL();
               const streamPrefix: string =
                 parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
-              filter = `"${streamPrefix}".${filter}`;
+              filter = qualifyFieldConditions(filter, streamPrefix);
             }
 
             // if query contains order by clause or limit clause then add where clause before that
