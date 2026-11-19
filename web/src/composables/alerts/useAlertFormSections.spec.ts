@@ -53,7 +53,7 @@ const setup = (
   editing = false,
   incidentsEnabled = true,
   queryFailed = false,
-  extra: { anomaly?: Record<string, unknown>; aggregation?: boolean } = {},
+  extra: { anomaly?: Record<string, unknown>; aggregation?: boolean; streamDays?: number } = {},
 ) =>
   useAlertFormSections({
     fieldMeta: ref(meta),
@@ -61,6 +61,7 @@ const setup = (
     destinationObjects: ref(DESTINATIONS),
     anomalyConfig: ref(extra.anomaly ?? {}),
     isAnomalyMode: ref(formData.is_real_time === "anomaly"),
+    anomalyStreamDays: ref(extra.streamDays),
     isAggregationEnabled: ref(extra.aggregation ?? false),
     isEditing: ref(editing),
     incidentsEnabled: ref(incidentsEnabled),
@@ -501,11 +502,13 @@ describe("useAlertFormSections", () => {
         detection_window_value: 3,
         detection_window_unit: "h",
         alert_direction: "both",
+        training_window_days: 28,
       },
+      streamDays: 15,
     });
     expect(anomaly.review.value.map((l) => reviewLineText(l, t))).toEqual([
       "Watches Logs in default for unusual values.",
-      "Fires when count per 5 minutes is unusual (spikes or drops).",
+      "Fires when count per 5 minutes is unusual (spikes or drops). Learns what is normal from the 15 days this stream has.",
       "Tells no one yet.",
       "Checks every hour, looking at the last 3 hours.",
     ]);
@@ -685,10 +688,11 @@ describe("useAlertFormSections", () => {
         alert_direction: "both",
         alert_enabled: true,
         alert_destination_ids: ["O2K8SAlerts"],
+        training_window_days: 28,
       },
       card: [
         "Watches Logs in nginx where upstream is router-5080, for unusual values.",
-        "Fires when count per 5 minutes is unusual (spikes or drops).",
+        "Fires when count per 5 minutes is unusual (spikes or drops). Learns what is normal from the last 28 days.",
         "Tells O2K8SAlerts (Slack webhook).",
         "Checks every 10 minutes, looking at the last 3 hours.",
       ],

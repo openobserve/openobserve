@@ -56,6 +56,10 @@ import {
 } from "@/utils/alerts/alertReadBack";
 import { describeDestinations } from "@/utils/alerts/destinationDescription";
 import {
+  anomalyIntervalSeconds,
+  anomalyTrainingFact,
+} from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
+import {
   promqlByLabels,
   promqlTrailingComparison,
   sqlGroupByLabels,
@@ -102,6 +106,7 @@ export interface AlertSectionsAnomalyConfig {
   detection_window_value?: number | string;
   detection_window_unit?: string;
   alert_direction?: string | null;
+  training_window_days?: number | string;
 }
 
 /** The bits of the alert form the section list reads; `formData` is the form's read-view. */
@@ -112,6 +117,8 @@ export interface AlertFormSectionsInput {
   /** The org's destinations, so a picked one can be named with its kind. */
   destinationObjects?: Readonly<Ref<AlertDestinationObjects | undefined>>;
   anomalyConfig: Ref<AlertSectionsAnomalyConfig>;
+  /** Whole days of data the anomaly's stream holds; undefined while unknown. */
+  anomalyStreamDays?: Readonly<Ref<number | undefined>>;
   isAnomalyMode: Ref<boolean>;
   /** Builder/SQL threshold on an aggregate rather than on the event count. */
   isAggregationEnabled: Ref<boolean>;
@@ -888,7 +895,41 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   };
 
   // Must last, Keep firing for, the warning and Compare with, each as its own sentence.
+  const anomalyLearns = (): ReviewSentence => {
+    const anomaly = input.anomalyConfig.value ?? {};
+    const fact = anomalyTrainingFact(
+      Number(anomaly.training_window_days),
+      input.anomalyStreamDays?.value,
+      anomalyIntervalSeconds(
+        Number(anomaly.histogram_interval_value ?? 5),
+        String(anomaly.histogram_interval_unit ?? "m"),
+      ),
+    );
+    if (fact.kind === "waits")
+      return {
+        keypath: "alerts.sections.review.anomalyLearnsWaits",
+        parts: {
+          measures: strong(formatNumber(fact.measures)),
+          duration: plain(durationText(fact.minutes * 60, t)),
+        },
+      };
+    if (fact.kind === "reads")
+      return {
+        keypath: "alerts.sections.review.anomalyLearns",
+        parts: { days: strong(formatNumber(fact.days)) },
+      };
+    return {
+      keypath:
+        fact.kind === "has"
+          ? "alerts.sections.review.anomalyLearnsHas"
+          : "alerts.sections.review.anomalyLearnsFlat",
+      parts: { count: strong(formatNumber(fact.days)) },
+      plural: fact.days,
+    };
+  };
+
   const conditionExtras = (fd: AlertSectionsFormData): ReviewSentence[] => {
+    if (mode.value === "anomaly") return [anomalyLearns()];
     if (mode.value !== "false" && mode.value !== "composite") return [];
     const extras: ReviewSentence[] = [];
     const hold = Number(fd.pending_period_sec ?? 0);

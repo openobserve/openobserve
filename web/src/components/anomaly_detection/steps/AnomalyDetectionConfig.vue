@@ -74,7 +74,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="filterRows"
             :fields="filterFields"
             :fields-loading="loadingFields"
-            :load-values="loadFilterValues"
+            :load-values="filterDiscovery.loadValues"
+            :value-label="filterDiscovery.valueLabel"
+            :value-hint="filterDiscovery.valueHint"
+            :field-detail="filterDiscovery.fieldDetail"
+            :value-empty-text="filterDiscovery.valueEmptyText"
+            :value-note="
+              t('alerts.intent.slots.valueHelpEvents', {
+                noun: dataNoun(config.stream_type, 'custom', 2, t),
+              })
+            "
             :placeholder="
               config.stream_name
                 ? t('alerts.form.filter.placeholder')
@@ -379,22 +388,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               class="mt-1 text-xs"
-              :class="
-                streamDays !== undefined && streamDays < minTrainingDays
-                  ? 'text-status-warning-text'
-                  : 'text-text-secondary'
-              "
+              :class="trainingNote.warn ? 'text-status-warning-text' : 'text-text-secondary'"
               data-test="anomaly-training-window-floor-hint"
             >
-              {{
-                streamDays === undefined
-                  ? t("alerts.form.anomaly.trainingFloor", { days: minTrainingDays })
-                  : t(
-                      "alerts.form.anomaly.trainingHave",
-                      { days: minTrainingDays, count: streamDays },
-                      streamDays,
-                    )
-              }}
+              {{ trainingNote.text }}
             </div>
             <div v-if="!tierShows('anomalyRetrain')">
               <OButton
@@ -632,7 +629,11 @@ import { useStore } from "vuex";
 import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
-import { dataSpanDays, isIngestArtifact } from "@/composables/alerts/useStreamDiscovery";
+import {
+  dataSpanDays,
+  isIngestArtifact,
+  useFilterDiscovery,
+} from "@/composables/alerts/useStreamDiscovery";
 import { dataNoun, durationText, everyDuration, everyWords } from "@/utils/alerts/alertCopy";
 import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
@@ -659,7 +660,8 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
   ANOMALY_BALANCED_BAND_WIDTH,
-  ANOMALY_MIN_TRAINING_DAYS,
+  ANOMALY_HOURLY_PATTERN_DAYS,
+  anomalyTrainingFact,
   createAnomalyDetectionConfigSchema,
   anomalyDetectionConfigDefaults,
   anomalyIntervalSeconds,
@@ -1301,6 +1303,41 @@ export default defineComponent({
       filterBuilderRef.value?.activate();
     };
 
+    const trainingNote = computed(() => {
+      const fact = anomalyTrainingFact(
+        Number(trainingWindowDays.value),
+        streamDays.value,
+        anomalyIntervalSeconds(
+          Number(histogramIntervalValue.value),
+          String(histogramIntervalUnit.value),
+        ),
+      );
+      if (fact.kind === "reads")
+        return { warn: false, text: t("alerts.form.anomaly.trainingReads", { days: fact.days }) };
+      if (fact.kind === "has")
+        return {
+          warn: false,
+          text: t("alerts.form.anomaly.trainingHas", { count: fact.days }, fact.days),
+        };
+      if (fact.kind === "flat")
+        return {
+          warn: true,
+          text: t(
+            "alerts.form.anomaly.trainingFlat",
+            { count: fact.days, pattern: ANOMALY_HOURLY_PATTERN_DAYS },
+            fact.days,
+          ),
+        };
+      return {
+        warn: true,
+        text: t("alerts.form.anomaly.trainingWaits", {
+          measures: fact.measures,
+          duration: durationText(fact.minutes * 60, t),
+          pattern: ANOMALY_HOURLY_PATTERN_DAYS,
+        }),
+      };
+    });
+
     const intervalText = (value: unknown, unit: unknown) => {
       const secs = anomalyIntervalSeconds(Number(value), String(unit));
       return secs === null ? raw("—") : secondsInWords(secs);
@@ -1331,8 +1368,13 @@ export default defineComponent({
     );
 
     // No stream context means no value lookup; the picker then takes typed values only.
-    const loadFilterValues = (field: string, search: string) =>
-      resolveFieldValues(field, { prefix: search }).catch(() => [] as string[]);
+    const filterDiscovery = useFilterDiscovery(() => {
+      const org = store.state.selectedOrganization?.identifier;
+      const { stream_name: streamName, stream_type: streamType } = props.config;
+      return org && streamName && streamType
+        ? { org, streamType: String(streamType), streamName: String(streamName) }
+        : null;
+    }, t);
 
     // The parent (AddAlert wizard via useAlertForm) still calls
     // anomalyStep2Ref.validate() to gate Next/Save — drive it through
@@ -1363,7 +1405,7 @@ export default defineComponent({
       onDetectionFunctionChange,
       filterFields,
       onFiltersChange,
-      loadFilterValues,
+      filterDiscovery,
       validate,
       hasTimestampAlias,
       missingValueColumn,
@@ -1375,6 +1417,7 @@ export default defineComponent({
       detectionFunctionField,
       detectionWindowValue,
       trainingWindowDays,
+      trainingNote,
       showSqlErrors,
       histogramIntervalError,
       scheduleIntervalError,
@@ -1396,7 +1439,6 @@ export default defineComponent({
       onBudgetTier,
       sensitivityError,
       sensitivityTooltip,
-      minTrainingDays: ANOMALY_MIN_TRAINING_DAYS,
       streamDays,
       onCustomSqlChange,
       tierShows,

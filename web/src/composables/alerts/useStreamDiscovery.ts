@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive } from "vue";
+import { computed, reactive, type ComputedRef } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { streamSchemaQuery } from "@/services/stream.queries";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
@@ -113,6 +115,20 @@ export function dataSpanDays(
 ): number | undefined {
   const first = Number(stats?.doc_time_min ?? 0);
   return first > 0 ? Math.max(0, Math.floor((nowUs - first) / DAY_US)) : undefined;
+}
+
+/** `dataSpanDays` of a stream, read from the cached schema the anomaly step reads too. */
+export function useStreamDays(
+  org: () => string,
+  streamType: () => string,
+  streamName: () => string,
+): ComputedRef<number | undefined> {
+  const schema = useQuery(() =>
+    Object.assign(streamSchemaQuery(org(), streamName(), streamType()), {
+      enabled: !!org() && !!streamType() && !!streamName(),
+    }),
+  );
+  return computed(() => dataSpanDays(schema.data.value?.stats, Date.now() * 1000));
 }
 
 /** When a stream last received data and how much, from the stats its list row already carries. */

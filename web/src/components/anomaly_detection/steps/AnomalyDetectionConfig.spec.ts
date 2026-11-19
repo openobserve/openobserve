@@ -71,6 +71,7 @@ import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
 import {
   anomalyDetectionConfigDefaults,
   anomalyBandGrouping,
+  anomalyTrainingFact,
   anomalyBandWidthPrefill,
   anomalyExpectedGroupingKey,
   anomalyNoticeBadgeKeys,
@@ -1019,11 +1020,14 @@ describe("AnomalyDetectionConfig", () => {
   describe("training window — days suffix and one hint line", () => {
     const floorHint = (w: VueWrapper) => w.find('[data-test="anomaly-training-window-floor-hint"]');
 
-    it.each([7, 28])("%s days states the 21-day training floor", async (days) => {
+    it.each([
+      [7, 21],
+      [28, 28],
+    ])("%s days says training reads the last %s days", async (days, reads) => {
       wrapper = mountConfig({ training_window_days: days });
       await flushPromises();
       expect(floorHint(wrapper).text()).toBe(
-        i18n.global.t("alerts.form.anomaly.trainingFloor", { days: 21 }),
+        i18n.global.t("alerts.form.anomaly.trainingReads", { days: reads }),
       );
     });
 
@@ -1804,6 +1808,21 @@ describe("anomalyWindowShareErrors", () => {
     );
     // A blank fire share is 100, so recover may go up to it.
     expect(errors({ alert_window_recover_pct: 100 }).recover).toBeNull();
+  });
+});
+
+// Mirrors trainer.rs: it reads max(window, 21) days, trains on what the stream has, and needs 100 measures.
+describe("anomalyTrainingFact", () => {
+  it.each([
+    [7, undefined, 300, { kind: "reads", days: 21 }],
+    [28, 40, 300, { kind: "reads", days: 28 }],
+    [15, 15, 300, { kind: "has", days: 15 }],
+    [28, 2, 300, { kind: "flat", days: 2 }],
+    [28, 2, 7200, { kind: "has", days: 2 }],
+    [28, 0, 300, { kind: "waits", measures: 100, minutes: 540 }],
+    [28, 0, 30, { kind: "waits", measures: 100, minutes: 50 }],
+  ])("window %s, stream %s days, %ss measures", (window, days, measure, fact) => {
+    expect(anomalyTrainingFact(window, days, measure)).toEqual(fact);
   });
 });
 

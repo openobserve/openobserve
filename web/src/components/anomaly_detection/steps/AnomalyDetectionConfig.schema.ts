@@ -159,6 +159,38 @@ export const ANOMALY_BAND_GROUPING_KEYS: Record<string, string> = {
 /** The trainer fetches at least this many days of history, whatever the configured window. */
 export const ANOMALY_MIN_TRAINING_DAYS = 21;
 
+/** Closed measures training needs before it fits (`O2_ANOMALY_MIN_TRAINING_DATA_POINTS` default). */
+export const ANOMALY_MIN_TRAINING_MEASURES = 100;
+
+/** Days of data before the normal level follows the hour of day. */
+export const ANOMALY_HOURLY_PATTERN_DAYS = 3;
+
+/** What training will learn from, given the stream's whole days of data (undefined while unknown). */
+export type AnomalyTrainingFact =
+  | { kind: "reads"; days: number }
+  | { kind: "has"; days: number }
+  | { kind: "flat"; days: number }
+  | { kind: "waits"; measures: number; minutes: number };
+
+export function anomalyTrainingFact(
+  windowDays: number,
+  streamDays: number | undefined,
+  measureSeconds: number | null,
+): AnomalyTrainingFact {
+  const reads = Math.max(Number(windowDays) || 1, ANOMALY_MIN_TRAINING_DAYS);
+  if (streamDays === undefined || streamDays >= reads) return { kind: "reads", days: reads };
+  const hourly = anomalyBandGrouping(measureSeconds) === "weekend_hour";
+  if (streamDays >= ANOMALY_HOURLY_PATTERN_DAYS || (streamDays >= 1 && !hourly))
+    return { kind: "has", days: streamDays };
+  if (streamDays >= 1) return { kind: "flat", days: streamDays };
+  const minutes = (ANOMALY_MIN_TRAINING_MEASURES * (measureSeconds || 300)) / 60;
+  return {
+    kind: "waits",
+    measures: ANOMALY_MIN_TRAINING_MEASURES,
+    minutes: minutes > 60 ? Math.ceil(minutes / 60) * 60 : Math.ceil(minutes),
+  };
+}
+
 /** The grouping the trainer picks (absence.rs `slot_resolution_for`): weekday/weekend × hour, unless a bucket is coarser than 1h. */
 export const anomalyBandGrouping = (intervalSeconds: number | null): AnomalyBandGrouping =>
   intervalSeconds !== null && intervalSeconds > 3600 ? "global" : "weekend_hour";
