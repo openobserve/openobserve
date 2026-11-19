@@ -92,18 +92,25 @@ describe("groupByChoices", () => {
     label: value,
     value,
   }));
-  const choose = (streamType: string, selected: string[] = []) =>
+  const choose = (streamType: string, selected: string[] = [], ranked: string[] = []) =>
     groupByChoices(cols, {
       streamType,
       selected,
       seriesLabel: raw("Series"),
       timestamp: "_timestamp",
+      ranked,
     }).map((c) => `${c.value}:${c.label}`);
   it.each([
-    ["metrics", [], ["__hash__:Series", "pod:pod"]],
-    ["logs", [], ["__name__:__name__", "pod:pod", "__hash__:__hash__"]],
-    ["metrics", ["__name__"], ["__hash__:Series", "__name__:__name__", "pod:pod"]],
-  ])("offers a %s stream (saved %j) %j", (streamType, selected, shown) => {
-    expect(choose(streamType, selected)).toEqual(shown);
+    ["metrics", [], [], ["__hash__:Series", "pod:pod"]],
+    ["logs", [], [], ["__name__:__name__", "pod:pod", "__hash__:__hash__"]],
+    ["metrics", ["__name__"], [], ["__hash__:Series", "__name__:__name__", "pod:pod"]],
+    [
+      "logs",
+      [],
+      ["__hash__", "gone", "pod"],
+      ["__hash__:__hash__", "pod:pod", "__name__:__name__"],
+    ],
+  ])("offers a %s stream (saved %j, ranked %j) %j", (streamType, selected, ranked, shown) => {
+    expect(choose(streamType, selected, ranked)).toEqual(shown);
   });
 });

@@ -294,6 +294,7 @@ import {
   type ValueCountContext,
 } from "@/composables/alerts/useStreamDiscovery";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
+import { publishGroupRanking } from "@/composables/alerts/groupRanking";
 import {
   dataNoun,
   durationWords,
@@ -538,6 +539,23 @@ const loadSeries = async (metric: string) => {
   }
 };
 const profile = computed(() => labelProfile(series.value[props.streamName] ?? []));
+// Step 2's group-by picker lists in this order, so both pickers lead with the same fields.
+const groupOrder = computed(() =>
+  isMetrics.value
+    ? rankMetricGroup(profile.value).all
+    : rankGroup(stringFields.value, shapes.value).all,
+);
+watch(
+  () =>
+    rankingSettled.value && props.streamName
+      ? [props.streamType, props.streamName, ...groupOrder.value].join("\n")
+      : "",
+  (order) => {
+    if (!order) return;
+    const key = { org: org.value, streamType: props.streamType, streamName: props.streamName };
+    publishGroupRanking(key, groupOrder.value);
+  },
+);
 const pickedMetric = computed(() => props.metricStreams.find((s) => s.name === props.streamName));
 const siblings = computed(() =>
   pickedMetric.value

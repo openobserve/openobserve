@@ -1910,6 +1910,7 @@ import { isSpanDurationMeasure, UNIT_KEEPING_FUNCTIONS } from "@/utils/alerts/al
 import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
 import { promqlScaledToPercent, promqlWithMetric } from "@/utils/alerts/promqlMetrics";
+import { groupRanking } from "@/composables/alerts/groupRanking";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
 import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
@@ -3178,6 +3179,11 @@ export default defineComponent({
         selected: [...(logGroupByStore.value ?? []), ...(metricGroupByStore.value ?? [])],
         seriesLabel: t("alerts.form.group.seriesOption"),
         timestamp: store.state.zoConfig?.timestamp_column || "_timestamp",
+        ranked: groupRanking({
+          org: store.state.selectedOrganization?.identifier ?? "",
+          streamType: props.streamType,
+          streamName: props.streamName,
+        }),
       }),
     );
     const groupByLabels = computed(() =>

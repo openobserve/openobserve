@@ -153,10 +153,8 @@ export const generateSqlQuery = (
   return query;
 };
 
-/**
- * Group-by choices: the time column never groups, and a metrics stream offers its series id first,
- * named in words, instead of `__name__`. A saved choice stays listed so the select can show it.
- */
+/** Group-by choices: never the time column; a metrics stream's series id first, named in words, not
+ * `__name__`; a saved choice stays listed; `ranked` names (step 1's group ranking) lead in their order. */
 export const groupByChoices = <T extends { label?: unknown; value: string }>(
   columns: readonly T[],
   opts: {
@@ -164,10 +162,16 @@ export const groupByChoices = <T extends { label?: unknown; value: string }>(
     selected: readonly string[];
     seriesLabel: I18nText;
     timestamp: string;
+    ranked?: readonly string[];
   },
 ): T[] => {
   const dropped = new Set([opts.timestamp, ...(opts.streamType === "metrics" ? ["__name__"] : [])]);
-  const kept = columns.filter((c) => !dropped.has(c.value) || opts.selected.includes(c.value));
+  const rank = new Map((opts.ranked ?? []).map((name, i) => [name, i]));
+  const kept = columns
+    .filter((c) => !dropped.has(c.value) || opts.selected.includes(c.value))
+    .map((c, i) => ({ c, at: rank.get(c.value) ?? rank.size + i }))
+    .sort((a, b) => a.at - b.at)
+    .map(({ c }) => c);
   if (opts.streamType !== "metrics") return kept;
   const series = kept
     .filter((c) => c.value === "__hash__")

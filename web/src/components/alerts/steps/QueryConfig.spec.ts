@@ -36,6 +36,7 @@ import {
   useAlertSettingTiers,
 } from "@/composables/alerts/useAlertSettingTiers";
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
+import { publishGroupRanking } from "@/composables/alerts/groupRanking";
 
 // The composed orchestrator schema — messages resolve through the real locale.
 const t = (key: string, named?: Record<string, unknown>): string =>
@@ -464,6 +465,17 @@ describe("QueryConfig.vue", () => {
         { name: "test_func", function: "// test function" },
       ]);
     });
+  });
+
+  it("lists group-by fields in the order step 1 ranked them", async () => {
+    publishGroupRanking({ org: "test-org", streamType: "logs", streamName: "test-stream" }, [
+      "field2",
+    ]);
+    await flushPromises();
+    expect(wrapper.vm.groupByOptions.map((o: { value: string }) => o.value)).toEqual([
+      "field2",
+      "field1",
+    ]);
   });
 
   describe("a new alert on a counter metric", () => {
