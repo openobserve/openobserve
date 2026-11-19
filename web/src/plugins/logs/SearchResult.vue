@@ -925,7 +925,7 @@ import { formatLargeNumber } from "@/utils/formatters";
 import { CUSTOM_THEME_NAME, THEME_STORAGE_KEYS } from "@/constants/themes";
 import useLogs from "../../composables/useLogs";
 import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
-import { getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
+import { emptyValueFieldType, getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
@@ -1735,9 +1735,14 @@ export default defineComponent({
       if (rawValue === BREAKDOWN_EMPTY_VALUE) {
         const quote = (f: string) =>
           searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(f) : f;
-        const fieldType = searchObj.data.stream.selectedStreamFields.find(
-          (f: { name: string; dataType?: string }) => f.name === field,
-        )?.dataType;
+        const fieldType = emptyValueFieldType(
+          field,
+          searchObj.data.stream.selectedStreamFields.find(
+            (f: { name: string; dataType?: string }) => f.name === field,
+          )?.dataType,
+          searchObj.data.streamResults?.list ?? [],
+          searchObj.data.stream.selectedStream,
+        );
         searchObj.data.stream.addToFilterMode = "append";
         searchObj.data.stream.addToFilter = getEmptyBreakdownFilter(
           field,

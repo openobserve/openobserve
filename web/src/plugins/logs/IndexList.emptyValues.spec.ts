@@ -83,6 +83,24 @@ describe("Logs field list: the blank and null rows", () => {
     expect(searchObj.data.stream.addToFilter).toBe(expression);
   });
 
+  it.each([
+    ["include", "k is null"],
+    ["exclude", "k is not null"],
+  ])(
+    "checks only null (%s) when another selected stream types the field as a number",
+    (action, expression) => {
+      searchObj.data.streamResults = {
+        list: [
+          { name: "app", schema, settings: {} },
+          { name: "other", schema: [{ name: "k", type: "Int64" }], settings: {} },
+        ],
+      } as any;
+      searchObj.data.stream.selectedStream = ["app", "other"];
+      wrapper.vm.addMultipleSearchTerms("k", [""], action);
+      expect(searchObj.data.stream.addToFilter).toBe(expression);
+    },
+  );
+
   it("reads the blank-row filter back as the blank row", async () => {
     searchObj.data.query = "(k is null OR k = '' OR k = 'x')";
     await flushPromises();
