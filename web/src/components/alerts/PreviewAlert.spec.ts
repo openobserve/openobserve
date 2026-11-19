@@ -3426,6 +3426,68 @@ describe("PreviewAlert - a chart with many series", () => {
     w.unmount();
   });
 
+  it("counts every series past the threshold on the server when the chart draws only some", async () => {
+    vi.mocked(searchService.metrics_query).mockImplementation(async ({ query }: any) => ({
+      data: {
+        status: "success",
+        data: {
+          resultType: "vector",
+          result: Array.from({ length: decodeURIComponent(query).includes("> 0.85") ? 85 : 0 }),
+        },
+      },
+    }));
+    const formData: any = {
+      stream_name: "mem",
+      stream_type: "metrics",
+      trigger_condition: { period: 10, threshold: 1, operator: ">=" },
+      query_condition: { promql_condition: { column: "value", operator: ">", value: 0.85 } },
+    };
+    const w = await mountComp({ query: "mem", selectedTab: "promql", formData });
+    w.vm.refreshData();
+    await flushPromises();
+    w.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("series-data-update", {
+      options: {
+        series: [
+          { name: "a", data: [[1, "0.9"]] },
+          { name: "b", data: [[1, "0.1"]] },
+        ],
+      },
+      extras: { seriesLimit: { shown: 2, total: 574 } },
+    });
+    await nextTick();
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 1, atLeast: true });
+    await flushPromises();
+    expect(w.vm.evaluationStatus).toMatchObject({ count: 85, wouldTrigger: true });
+    expect(w.vm.evaluationStatus.atLeast).toBeFalsy();
+    vi.mocked(searchService.metrics_query).mockReset();
+    w.unmount();
+  });
+
+  it.each([
+    ["a day checked every minute", "24h", 1, "60s"],
+    ["a day checked every 10 minutes", "24h", 10, "0"],
+    ["the default range", "checks", 1, "0"],
+  ])(
+    "samples a PromQL chart of %s once per check only when it would skip checks",
+    async (_, range, frequency, step) => {
+      const formData: any = {
+        stream_name: "cpu",
+        stream_type: "metrics",
+        trigger_condition: { period: 5, threshold: 1, operator: ">=", frequency },
+        query_condition: { promql_condition: { column: "value", operator: ">", value: 90 } },
+      };
+      const w = await mountComp({ query: "cpu", selectedTab: "promql", formData });
+      w.vm.previewRange = range;
+      w.vm.refreshData();
+      await flushPromises();
+      const panel = w.findComponent({ name: "PanelSchemaRenderer" });
+      expect(panel.props("panelSchema").config.step_value ?? "0").toBe(step);
+      if (step !== "0")
+        expect(panel.props("selectedTimeObj").end_time.getTime() % (60 * 1_000_000)).toBe(0);
+      w.unmount();
+    },
+  );
+
   it("names the limit under the chart instead of on its line", async () => {
     const w = await mountComp({ query: "SELECT * FROM logs", labelledLimit: true });
     w.vm.refreshData();

@@ -1709,7 +1709,18 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
     }
   }
 
-  const hasWarningBand = warning !== null;
+  const drawn = drawnSeries.value;
+  const sampled = !!drawn && drawn.total > drawn.shown;
+  writePromqlVerdict(criticalCount, firingCount, sampled);
+  seriesCountGeneration++;
+  if (sampled && !props.formData._ui?.forecast) void countAllSeries(critical, warning, operator);
+};
+
+/** The verdict from the series past each band; `atLeast` when they were counted from a sample. */
+const writePromqlVerdict = (criticalCount: number, firingCount: number, atLeast: boolean) => {
+  const critical = finiteThreshold(props.formData.query_condition?.promql_condition?.value);
+  const hasWarningBand =
+    finiteThreshold(props.formData.query_condition?.promql_warning_value) !== null;
 
   const criticalGate = evaluateCountGate(criticalCount);
   const forecast = props.formData._ui?.forecast;
@@ -1732,6 +1743,7 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   if (criticalGate.passes) {
     setEvaluationStatus({
       count: criticalCount,
+      atLeast,
       wouldTrigger: true,
       comparison: criticalGate.comparison,
       level: hasWarningBand ? "critical" : null,
@@ -1744,12 +1756,52 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   // never consults the second gate at all — hence `hasWarningBand &&`.
   const firingGate = evaluateCountGate(firingCount);
   const firesWarning = hasWarningBand && firingGate.passes;
+  // A quiet count from a sample says nothing about the series not drawn.
+  if (atLeast && !firesWarning) {
+    evaluationStatus.value = null;
+    return;
+  }
   setEvaluationStatus({
     count: firingCount,
+    atLeast,
     wouldTrigger: firesWarning,
     comparison: firingGate.comparison,
     level: firesWarning ? "warning" : null,
   });
+};
+
+const PROMQL_OPERATORS: Record<string, string> = {
+  ">": ">",
+  ">=": ">=",
+  "<": "<",
+  "<=": "<=",
+  "=": "==",
+  "==": "==",
+  "!=": "!=",
+};
+let promqlEndSeconds = 0;
+let seriesCountGeneration = 0;
+// The chart draws only some series, so the server counts all of them past each band at the chart's end.
+const countAllSeries = async (critical: number, warning: number | null, operator?: string) => {
+  const generation = ++seriesCountGeneration;
+  const op = PROMQL_OPERATORS[operator ?? ""];
+  if (!op) return;
+  const query = props.query;
+  const org = store.state.selectedOrganization.identifier;
+  const past = (limit: number) =>
+    queryClient.fetchQuery(
+      promRulePreviewQuery(org, `(${query}) ${op} ${limit}`, promqlEndSeconds),
+    );
+  try {
+    const [criticalCount, firingCount] = await Promise.all([
+      past(critical),
+      warning === null ? null : past(warning),
+    ]);
+    if (generation !== seriesCountGeneration || query !== props.query) return;
+    writePromqlVerdict(criticalCount, firingCount ?? criticalCount, false);
+  } catch {
+    // The sampled lower bound stays.
+  }
 };
 
 const chartDataSeries = (seriesData: any): any[] =>
@@ -1873,6 +1925,14 @@ const refreshRulePreview = async (at: number) => {
   }
 };
 
+// The server's own step gives about 300 points, which on a wide range skips most checks.
+const promqlCheckStepSeconds = (rangeMinutes: number): number => {
+  const tc = props.formData.trigger_condition ?? {};
+  const minutes = Number(tc.frequency) || 0;
+  if (tc.frequency_type === "cron" || minutes <= 0) return 0;
+  return rangeMinutes / 300 > minutes && rangeMinutes / minutes <= 1440 ? minutes * 60 : 0;
+};
+
 let lastRunKey = "";
 // The chart may cover several checks, but the verdict judges the latest window only.
 let verdictWindowStartMs = 0;
@@ -1931,7 +1991,14 @@ const refreshData = () => {
   if (runKey === lastRunKey) return;
   lastRunKey = runKey;
 
-  const endTime = new Date().getTime() * 1000;
+  // A sample per check keeps the peaks a check sees; aligned, the samples fall on the check times.
+  const stepSeconds =
+    props.selectedTab === "promql" ? promqlCheckStepSeconds(new_relative_time) : 0;
+  const stepMicros = stepSeconds * 1_000_000;
+  const now = new Date().getTime() * 1000;
+  const endTime = stepMicros ? Math.floor(now / stepMicros) * stepMicros : now;
+  promqlEndSeconds = endTime / 1_000_000;
+  dashboardPanelData.data.config.step_value = stepSeconds ? `${stepSeconds}s` : "0";
   runVerdictSearch(endTime);
   void checkBaselines(endTime);
   if (props.selectedTab === "promql" && props.formData.query_condition?.promql_rule_mode)
