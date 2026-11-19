@@ -369,6 +369,20 @@ export function describeAlertInPlainWords(
   });
 }
 
+/** The same sentence without who hears, for a read-back that shows its own Who to tell line. */
+export function describeConditionInPlainWords(alert: ReadBackAlert, t: TranslateFn): I18nText {
+  if (!alert?.stream_name) return raw("");
+  const gap =
+    alert.is_real_time === "true" ? null : conditionGap(alert, { aggregationEnabled: true });
+  if (gap) return t(CONDITION_GAP_KEYS[gap]);
+  return t("alerts.readBack.condition", {
+    what: whatText(alert, t, true),
+    hold: holdText(alert, t),
+    schedule: scheduleText(alert, t),
+    cooldown: cooldownText(alert.trigger_condition?.silence, t),
+  });
+}
+
 /** The composite counterpart: who hears and which combination of its alerts. Empty until there is an expression. */
 export function describeCompositeInPlainWords(
   alert: ReadBackCompositeAlert,

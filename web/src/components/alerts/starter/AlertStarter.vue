@@ -87,22 +87,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #pane-ai>
-      <AlertAiPane v-model:prompt="aiPrompt" />
+      <AlertAiPane v-model:prompt="aiPrompt" :controller="aiDraft" @opened="open = false" />
     </template>
 
     <template #footer-end="{ pane }">
-      <OTooltip v-if="pane === 'ai'" :content="t('alertStarter.ai.draftUnavailable')">
-        <span class="inline-flex">
-          <OButton
-            variant="primary"
-            size="sm"
-            icon-left="auto-awesome"
-            disabled
-            data-test="alert-starter-ai-draft"
-            >{{ t("alertStarter.ai.draft") }}</OButton
-          >
-        </span>
-      </OTooltip>
+      <AlertAiActions
+        v-if="pane === 'ai'"
+        :controller="aiDraft"
+        :prompt="aiPrompt"
+        @created="onAiCreated"
+        @opened="open = false"
+      />
       <OButton
         v-else-if="selected.length && !reviewing"
         variant="primary"
@@ -119,9 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import CreateStarter from "@/components/create-starter/CreateStarter.vue";
 import type {
@@ -129,10 +124,12 @@ import type {
   StarterPane,
   StarterScope,
 } from "@/components/create-starter/createStarter.types";
+import AlertAiActions from "@/components/alerts/starter/AlertAiActions.vue";
 import AlertAiPane from "@/components/alerts/starter/AlertAiPane.vue";
 import AlertLibraryPane from "@/components/alerts/starter/AlertLibraryPane.vue";
 import BulkAddReview from "@/components/alerts/starter/BulkAddReview.vue";
 import { useLibraryReadiness } from "@/components/alerts/starter/libraryPaneData";
+import { useAlertAiDraft } from "@/components/alerts/starter/useAlertAiDraft";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { menuState } from "@/utils/featureGate";
 import { useFeatureNames } from "@/composables/useFeatureLock";
@@ -177,6 +174,10 @@ const scope = ref<StarterScope>({ kind: "all" });
 const reviewing = ref(false);
 const reviewEntries = ref<AlertLibraryEntry[]>([]);
 const aiPrompt = ref("");
+
+const router = useRouter();
+// The alert lands in the folder on screen, as the form's own Save does.
+const aiDraft = useAlertAiDraft(() => String(router?.currentRoute.value.query.folder ?? "default"));
 
 // Read before the starter opens, so the Library count is there from its first frame.
 const library = useLibraryReadiness(() => props.alertType);
@@ -246,6 +247,7 @@ watch(open, (now) => {
   }
   reviewing.value = false;
   aiPrompt.value = "";
+  aiDraft.ai.reset();
 });
 
 const review = () => {
@@ -257,6 +259,11 @@ const onBulkDone = (created: number) => {
   selected.value = [];
   open.value = false;
   emit("created", created);
+};
+
+const onAiCreated = () => {
+  open.value = false;
+  emit("created", 1);
 };
 
 const resume = () => {

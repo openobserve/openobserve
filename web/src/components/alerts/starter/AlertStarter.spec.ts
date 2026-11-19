@@ -30,6 +30,12 @@ vi.mock("@/components/alerts/starter/AlertLibraryPane.vue", () => ({
 vi.mock("@/components/alerts/starter/AlertAiPane.vue", () => ({
   default: { name: "AlertAiPane", template: "<div data-test='ai-pane-stub' />" },
 }));
+vi.mock("@/components/alerts/starter/AlertAiActions.vue", () => ({
+  default: { name: "AlertAiActions", template: "<div />" },
+}));
+vi.mock("./useAlertAiDraft", () => ({
+  useAlertAiDraft: () => ({ ai: { reset: vi.fn() } }),
+}));
 vi.mock("@/components/alerts/starter/BulkAddReview.vue", () => ({
   default: { name: "BulkAddReview", template: "<div />" },
 }));

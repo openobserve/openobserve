@@ -234,6 +234,22 @@ const useAiChat = () => {
     });
   };
 
+  /** Answers a paused tool call of a running turn; resolves to whether the server took the answer. */
+  const confirmAiTool = async (org_id: string, sessionId: string, approved: boolean) => {
+    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/confirm/${encodeURIComponent(sessionId)}`;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approved }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
   const chatsUrl = (org_id: string, sessionId?: string) =>
     `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats` +
     (sessionId ? `/${encodeURIComponent(sessionId)}` : "");
@@ -311,6 +327,7 @@ const useAiChat = () => {
   return {
     fetchAiChat,
     cancelAiChat,
+    confirmAiTool,
     chatHistoryServer,
     listServerChats,
     getServerChat,

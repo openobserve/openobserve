@@ -231,6 +231,13 @@ export const saveAlertMutation = (org: string, isUpdate: () => boolean) =>
     meta: { invalidates: [alertKeys.all(org)], silentError: true },
   });
 
+/** The assistant creates the alert once its proposal is approved; `approve` resolves when it reports back. */
+export const approveProposedAlertMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (approve: () => Promise<void>) => approve(),
+    meta: { invalidates: [alertKeys.all(org)], silentError: true },
+  });
+
 /** An anomaly clone also lands in the anomaly configs Overview reads from its own scope. */
 export const cloneAnomalyAlertMutation = (org: string) =>
   mutationOptions({

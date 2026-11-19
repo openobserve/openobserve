@@ -14685,6 +14685,10 @@
           "label": "Add alert",
           "toast": "{sourceLabel}. Nothing is saved until you save.",
           "sourceLabel": "Suggested by AutoObserve for {service}"
+        },
+        "assistant": {
+          "label": "Create with AI",
+          "toast": "Drafted by AI from “{sourceLabel}”. Nothing is saved until you save."
         }
       },
       "warnings": {
@@ -15514,7 +15518,8 @@
       "asItHappens": "checked as events arrive",
       "cooldown": ", at most once every {duration}",
       "composite": "{who} when its alerts match {expression}{hold}{cooldown}.",
-      "measureIs": "{measure} is {op} {value} over {window}"
+      "measureIs": "{measure} is {op} {value} over {window}",
+      "condition": "Fires when {what}{hold}, {schedule}{cooldown}."
     },
     "editMode": {
       "muteFor": "Mute for",
@@ -35823,7 +35828,6 @@
       "describe": "Describe the alert",
       "try": "Try",
       "draft": "Draft",
-      "draftUnavailable": "Drafting from a description isn't available yet",
       "example": {
         "logsJump": "Log volume in {stream} jumps well above usual",
         "logsSilent": "No logs from {stream} for 15 minutes",
@@ -35831,7 +35835,13 @@
         "metricsSilent": "{stream} stops reporting for 15 minutes",
         "tracesSlower": "Requests in {stream} get much slower than usual",
         "tracesSilent": "No spans from {stream} for 15 minutes"
-      }
+      },
+      "stop": "Stop",
+      "continueInChat": "Continue in chat",
+      "editInForm": "Edit in form",
+      "create": "Create alert",
+      "created": "Alert {name} created",
+      "unknownDestination": "There is no destination named {name}"
     },
     "library": {
       "searchPlaceholder": "Search the library",
@@ -35902,6 +35912,28 @@
       "more": "and {count} more | and {count} more",
       "nobodyTold": "Nobody will be told: firings only show in Alert history"
     }
+  },
+  "aiDraft": {
+    "drafting": "Drafting…",
+    "checking": "Testing it on the last 24 hours…",
+    "earlierSteps": "{count} earlier step | {count} earlier steps",
+    "editPrompt": "Edit prompt",
+    "savedByAssistant": "The assistant saved this alert itself instead of drafting it",
+    "openSaved": "Open",
+    "failure": {
+      "unavailable": "The assistant isn't available right now",
+      "unavailableReason": "The assistant isn't available: {reason}",
+      "quota": "The assistant's usage limit is reached",
+      "stream": "The draft stopped before it finished",
+      "streamReason": "The draft stopped before it finished: {reason}",
+      "invalid": "The draft failed its checks twice: {reason} | The draft failed its checks twice: {reason}, and {count} more problem | The draft failed its checks twice: {reason}, and {count} more problems",
+      "noProposal": "The assistant ended without proposing an alert",
+      "expired": "The assistant stopped waiting for your answer, so this can no longer be created from here",
+      "notCreated": "The assistant couldn't create the alert",
+      "notCreatedReason": "The assistant couldn't create the alert: {reason}"
+    },
+    "replyLabel": "Reply to the assistant",
+    "replySend": "Send"
   },
   "createStarter": {
     "switchHint": "Switch between ways to start",
