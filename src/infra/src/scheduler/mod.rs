@@ -19,7 +19,10 @@ use async_trait::async_trait;
 use config::{
     meta::{
         meta_store::MetaStore,
-        triggers::{OncallSlackSyncData, SlackSyncFinish, Trigger, TriggerModule, TriggerStatus},
+        triggers::{
+            OncallSlackSyncData, SlackSyncFinish, Trigger, TriggerModule, TriggerRunStamp,
+            TriggerStatus,
+        },
     },
     utils::json,
 };
@@ -116,6 +119,12 @@ pub trait Scheduler: Sync + Send + 'static {
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
+}
+
+/// What a run stamp needs from the job row it lands on.
+struct StampedJob {
+    start_time: Option<i64>,
+    data: String,
 }
 
 /// Initializes the scheduler - creates table and index
@@ -351,6 +360,25 @@ pub async fn delete_with<C: ConnectionTrait>(
     Ok(())
 }
 
+/// Applies a replicated run stamp to its alert's job row; false when the row is missing or
+/// already holds this run's claim or a later one.
+pub async fn apply_run_stamp(stamp: &TriggerRunStamp) -> Result<bool> {
+    let client = crate::db::get_orm_client_rw().await;
+    Ok(apply_run_stamp_with(client, stamp).await?)
+}
+
+/// [`apply_run_stamp`] against a caller-supplied connection; a row written between its read and
+/// its write is an error, so the queue redelivers the stamp. [strong]
+pub async fn apply_run_stamp_with<C: ConnectionTrait>(
+    conn: &C,
+    stamp: &TriggerRunStamp,
+) -> std::result::Result<bool, sea_orm::DbErr> {
+    match read_stamped_job(conn, stamp).await? {
+        Some(job) => write_run_stamp(conn, stamp, &job).await,
+        None => Ok(false),
+    }
+}
+
 /// Scheduler pulls only those triggers that match the conditions-
 /// - trigger.next_run_at <= now
 /// - !(trigger.is_realtime && !trigger.is_silenced)
@@ -508,10 +536,20 @@ async fn claim_statement<C: ConnectionTrait, const N: usize>(
     values: [sea_orm::Value; N],
 ) -> std::result::Result<bool, sea_orm::DbErr> {
     let backend = conn.get_database_backend();
-    let sql = match backend {
+    let sql = numbered(backend, sql)?;
+    let result = conn
+        .execute(Statement::from_sql_and_values(backend, sql, values))
+        .await?;
+    Ok(result.rows_affected() == 1)
+}
+
+/// A statement written with `?`, numbered for PostgreSQL.
+fn numbered(backend: DatabaseBackend, sql: &str) -> std::result::Result<String, sea_orm::DbErr> {
+    match backend {
         DatabaseBackend::Postgres => {
             let mut n = 0;
-            sql.chars()
+            Ok(sql
+                .chars()
                 .map(|c| {
                     if c == '?' {
                         n += 1;
@@ -520,19 +558,79 @@ async fn claim_statement<C: ConnectionTrait, const N: usize>(
                         c.to_string()
                     }
                 })
-                .collect()
+                .collect())
         }
-        DatabaseBackend::Sqlite => sql.to_string(),
-        _ => {
-            return Err(sea_orm::DbErr::Custom(
-                "unsupported metadata store for scheduler claim fencing".to_string(),
-            ));
-        }
+        DatabaseBackend::Sqlite => Ok(sql.to_string()),
+        _ => Err(sea_orm::DbErr::Custom(
+            "unsupported metadata store for scheduler claim fencing".to_string(),
+        )),
+    }
+}
+
+async fn read_stamped_job<C: ConnectionTrait>(
+    conn: &C,
+    stamp: &TriggerRunStamp,
+) -> std::result::Result<Option<StampedJob>, sea_orm::DbErr> {
+    let backend = conn.get_database_backend();
+    let sql = numbered(
+        backend,
+        "SELECT start_time, data FROM scheduled_jobs WHERE org = ? AND module = ? AND module_key = ?",
+    )?;
+    let values = [
+        stamp.org.clone().into(),
+        (TriggerModule::Alert as i32).into(),
+        stamp.module_key.clone().into(),
+    ];
+    let Some(row) = conn
+        .query_one(Statement::from_sql_and_values(backend, sql, values))
+        .await?
+    else {
+        return Ok(None);
     };
-    let result = conn
-        .execute(Statement::from_sql_and_values(backend, sql, values))
-        .await?;
-    Ok(result.rows_affected() == 1)
+    Ok(Some(StampedJob {
+        start_time: row.try_get("", "start_time")?,
+        data: row.try_get("", "data")?,
+    }))
+}
+
+/// Stamps the job as it was read; false unless it was claimed earlier, an error if it changed
+/// since.
+async fn write_run_stamp<C: ConnectionTrait>(
+    conn: &C,
+    stamp: &TriggerRunStamp,
+    job: &StampedJob,
+) -> std::result::Result<bool, sea_orm::DbErr> {
+    // Equal is refused too: a save keeps the claim time, and its row must outlive a late stamp.
+    if job
+        .start_time
+        .is_some_and(|claimed| claimed >= stamp.start_time)
+    {
+        return Ok(false);
+    }
+    // `data = ?` is the compare-and-swap: a full-row apply on another topic may run between.
+    let sql = "UPDATE scheduled_jobs SET status = ?, retries = ?, start_time = ?, end_time = ?, \
+               next_run_at = ?, data = ? WHERE org = ? AND module = ? AND module_key = ? \
+               AND data = ? AND (start_time IS NULL OR start_time < ?)";
+    let values = [
+        (stamp.status.clone() as i32).into(),
+        stamp.retries.into(),
+        stamp.start_time.into(),
+        stamp.end_time.into(),
+        stamp.next_run_at.into(),
+        stamp.patch_data(&job.data).into(),
+        stamp.org.clone().into(),
+        (TriggerModule::Alert as i32).into(),
+        stamp.module_key.clone().into(),
+        job.data.clone().into(),
+        stamp.start_time.into(),
+    ];
+    if claim_statement(conn, sql, values).await? {
+        return Ok(true);
+    }
+    Err(sea_orm::DbErr::Custom(format!(
+        "alert job {}/{} changed while a run stamp was applied",
+        stamp.org, stamp.module_key
+    )))
 }
 
 /// A failed event cannot undo the committed release, so it is logged and the release reported.
@@ -568,6 +666,27 @@ mod tests {
     use sea_orm::{ConnectionTrait, Database, TransactionTrait};
 
     use super::*;
+
+    const JOB_DATA: &str = r#"{"tolerance":3,"last_satisfied_at":1000,"last_notified_level":2}"#;
+
+    /// The job table a stamp test runs against; a PostgreSQL one drops its schema when done.
+    struct JobsDb {
+        conn: sea_orm::DatabaseConnection,
+        pg: Option<(sea_orm::DatabaseConnection, String)>,
+    }
+
+    impl JobsDb {
+        async fn done(self) {
+            let Some((admin, schema)) = self.pg else {
+                return;
+            };
+            self.conn.close().await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"DROP SCHEMA "{schema}" CASCADE"#))
+                .await
+                .unwrap();
+        }
+    }
 
     fn assert_bool_result_future<F>(_: F)
     where
@@ -884,6 +1003,225 @@ mod tests {
         ];
         for (case, at, read, want) in cases {
             assert_eq!(slack_sync_arm_time(at, read).ok(), want, "{case}");
+        }
+    }
+
+    /// PostgreSQL first (when `ZO_META_POSTGRES_DSN` is set) so a failure names it, then SQLite.
+    async fn job_dbs() -> Vec<JobsDb> {
+        let mut out = Vec::new();
+        let dsn = std::env::var("ZO_META_POSTGRES_DSN").unwrap_or_default();
+        if !dsn.trim().is_empty() {
+            let schema = format!(
+                "job_stamp_test_{}",
+                config::ider::generate().to_ascii_lowercase()
+            );
+            let admin = Database::connect(&dsn).await.unwrap();
+            admin
+                .execute_unprepared(&format!(r#"CREATE SCHEMA "{schema}""#))
+                .await
+                .unwrap();
+            let mut options = sea_orm::ConnectOptions::new(dsn);
+            options
+                .max_connections(1)
+                .set_schema_search_path(schema.clone());
+            let conn = Database::connect(options).await.unwrap();
+            create_jobs_table(&conn, "BIGSERIAL PRIMARY KEY").await;
+            out.push(JobsDb {
+                conn,
+                pg: Some((admin, schema)),
+            });
+        }
+        let conn = Database::connect("sqlite::memory:").await.unwrap();
+        create_jobs_table(&conn, "INTEGER PRIMARY KEY AUTOINCREMENT").await;
+        out.push(JobsDb { conn, pg: None });
+        out
+    }
+
+    async fn create_jobs_table(conn: &sea_orm::DatabaseConnection, id_column: &str) {
+        conn.execute_unprepared(&format!(
+            "CREATE TABLE scheduled_jobs (id {id_column}, org TEXT NOT NULL, \
+             module INT NOT NULL, module_key TEXT NOT NULL, is_realtime BOOLEAN DEFAULT false \
+             NOT NULL, is_silenced BOOLEAN DEFAULT false NOT NULL, status INT NOT NULL, \
+             start_time BIGINT, end_time BIGINT, retries INT NOT NULL, next_run_at BIGINT NOT \
+             NULL, data TEXT NOT NULL, claim_epoch BIGINT DEFAULT 0 NOT NULL, \
+             UNIQUE (org, module, module_key))"
+        ))
+        .await
+        .unwrap();
+    }
+
+    /// An alert job the replica holds: silenced, mid-retry, claimed at `start_time`.
+    async fn insert_alert_job(db: &sea_orm::DatabaseConnection, start_time: &str, data: &str) {
+        db.execute_unprepared(&format!(
+            "INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, \
+             status, start_time, end_time, retries, next_run_at, data) VALUES ('o', {}, \
+             'alert-1', true, true, 1, {start_time}, 1100, 2, 900, '{data}')",
+            TriggerModule::Alert as i32
+        ))
+        .await
+        .unwrap();
+    }
+
+    /// `(status, retries, start_time, end_time, next_run_at, is_silenced, data, is_realtime)` of
+    /// the alert job.
+    async fn alert_job(
+        db: &sea_orm::DatabaseConnection,
+    ) -> (i32, i32, Option<i64>, Option<i64>, i64, bool, String, bool) {
+        let row = db
+            .query_one(Statement::from_string(
+                db.get_database_backend(),
+                "SELECT status, retries, start_time, end_time, next_run_at, is_silenced, data, \
+                 is_realtime FROM scheduled_jobs WHERE module_key = 'alert-1'"
+                    .to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        (
+            row.try_get("", "status").unwrap(),
+            row.try_get("", "retries").unwrap(),
+            row.try_get("", "start_time").unwrap(),
+            row.try_get("", "end_time").unwrap(),
+            row.try_get("", "next_run_at").unwrap(),
+            row.try_get("", "is_silenced").unwrap(),
+            row.try_get("", "data").unwrap(),
+            row.try_get("", "is_realtime").unwrap(),
+        )
+    }
+
+    fn run_stamp(start_time: i64) -> TriggerRunStamp {
+        TriggerRunStamp {
+            org: "o".to_string(),
+            module_key: "alert-1".to_string(),
+            status: TriggerStatus::Waiting,
+            retries: 0,
+            start_time,
+            end_time: Some(2_500),
+            next_run_at: 3_000,
+            period_end_time: Some(1_900),
+            tolerance: 7,
+            last_satisfied_at: Some(2_000),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_run_stamp_moves_the_per_run_fields_and_keeps_the_rest_of_the_job_row() {
+        for db in job_dbs().await {
+            insert_alert_job(&db.conn, "1000", JOB_DATA).await;
+            let stamp = run_stamp(2_000);
+
+            assert!(apply_run_stamp_with(&db.conn, &stamp).await.unwrap());
+
+            assert_eq!(
+                alert_job(&db.conn).await,
+                (
+                    TriggerStatus::Waiting as i32,
+                    0,
+                    Some(2_000),
+                    Some(2_500),
+                    3_000,
+                    true,
+                    stamp.patch_data(JOB_DATA),
+                    true,
+                )
+            );
+            db.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_run_stamp_for_a_job_this_region_does_not_have_writes_nothing() {
+        for db in job_dbs().await {
+            assert!(
+                !apply_run_stamp_with(&db.conn, &run_stamp(2_000))
+                    .await
+                    .unwrap()
+            );
+
+            let jobs = db
+                .conn
+                .query_all(Statement::from_string(
+                    db.conn.get_database_backend(),
+                    "SELECT id FROM scheduled_jobs".to_string(),
+                ))
+                .await
+                .unwrap();
+            assert!(jobs.is_empty());
+            db.done().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn a_run_stamp_older_than_the_jobs_claim_is_refused() {
+        for db in job_dbs().await {
+            insert_alert_job(&db.conn, "5000", JOB_DATA).await;
+            let before = alert_job(&db.conn).await;
+
+            assert!(
+                !apply_run_stamp_with(&db.conn, &run_stamp(2_000))
+                    .await
+                    .unwrap()
+            );
+
+            assert_eq!(alert_job(&db.conn).await, before);
+            db.done().await;
+        }
+    }
+
+    /// A save keeps the job's claim time, so a stamp of that same claim arriving after the save
+    /// (or redelivered) must not put the run's values back.
+    #[tokio::test]
+    async fn a_run_stamp_for_the_claim_the_job_already_holds_is_refused() {
+        for db in job_dbs().await {
+            insert_alert_job(&db.conn, "2000", JOB_DATA).await;
+            let before = alert_job(&db.conn).await;
+
+            assert!(
+                !apply_run_stamp_with(&db.conn, &run_stamp(2_000))
+                    .await
+                    .unwrap()
+            );
+
+            assert_eq!(alert_job(&db.conn).await, before);
+            db.done().await;
+        }
+    }
+
+    /// A job that has never been claimed has nothing newer to protect.
+    #[tokio::test]
+    async fn a_run_stamp_lands_on_a_job_that_was_never_claimed() {
+        for db in job_dbs().await {
+            insert_alert_job(&db.conn, "NULL", JOB_DATA).await;
+
+            assert!(
+                apply_run_stamp_with(&db.conn, &run_stamp(2_000))
+                    .await
+                    .unwrap()
+            );
+
+            assert_eq!(alert_job(&db.conn).await.2, Some(2_000));
+            db.done().await;
+        }
+    }
+
+    /// The row is rewritten after the read, as a concurrent full-row apply would.
+    #[tokio::test]
+    async fn a_run_stamp_never_overwrites_job_data_written_after_it_was_read() {
+        for db in job_dbs().await {
+            insert_alert_job(&db.conn, "1000", JOB_DATA).await;
+            let stamp = run_stamp(2_000);
+            let read = read_stamped_job(&db.conn, &stamp).await.unwrap().unwrap();
+            db.conn
+                .execute_unprepared("UPDATE scheduled_jobs SET data = '{\"tolerance\":99}'")
+                .await
+                .unwrap();
+
+            write_run_stamp(&db.conn, &stamp, &read).await.unwrap_err();
+
+            let after = alert_job(&db.conn).await;
+            assert_eq!(after.6, r#"{"tolerance":99}"#);
+            assert_eq!(after.2, Some(1_000));
+            db.done().await;
         }
     }
 }

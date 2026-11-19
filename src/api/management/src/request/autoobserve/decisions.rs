@@ -91,10 +91,11 @@ impl Access for LiveAccess<'_> {
     }
 
     /// Calibration's org-wide rule; the service adds DEC-3's folder rule through `may_edit_alert`.
+    /// An issue's verdict quiets its subject, so it needs what a mark on that subject needs.
     async fn may_decide(&self, family: Family, subject: &EntityRef) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
-            Family::Suggestion => {
+            Family::Suggestion | Family::Issue => {
                 let id = subject
                     .key_dims
                     .get(dims::ENTITY_ID)
@@ -107,7 +108,7 @@ impl Access for LiveAccess<'_> {
     async fn reads_notes(&self, family: Family) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
-            Family::Suggestion => {
+            Family::Suggestion | Family::Issue => {
                 !rbac_enforced().await
                     || org_wide_allows(self.org_id, self.user_id, "alerts", "PUT").await
             }
@@ -757,6 +758,7 @@ mod tests {
             request_id: Some("3f2c9a1e-dialog".into()),
             applied_via: None,
             offer_fingerprint: None,
+            step_id: None,
         };
         let report = DecisionRequest {
             family: Family::AlertFinding,
@@ -1134,7 +1136,7 @@ mod tests {
                     }
                 }
                 self.writes.fetch_add(1, SeqCst);
-                Patched::Written
+                Patched::Written { updated_at: None }
             }
         }
 
