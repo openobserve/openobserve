@@ -51,6 +51,11 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
     description = "Creates a new AI toolset (MCP server, CLI tool, skill, or generic config). \
                    The name must match `^[a-z0-9]+(-[a-z0-9]+)*$` and be at most 64 characters. \
                    The `data` field is encrypted at rest using per-org envelope encryption. \
+                   An MCP toolset's `data` may limit what the agent calls: `allowed_tools`, \
+                   `blocked_tools` and `write_tools` (tool name globs, `*` = any characters), \
+                   `max_calls_per_turn` (1-500), `rate_limit` (`{calls, per_seconds}`) and \
+                   `max_result_bytes` (1 KiB-16 MiB); an omitted key keeps the agent's default, \
+                   so an omitted `allowed_tools` means `[\"*\"]`; `blocked_tools` always wins. \
                    Only available in enterprise deployments.",
     request_body(
         content = inline(ToolsetCreateRequest),
@@ -246,7 +251,12 @@ pub async fn list(
                    `data` is merged over the stored config, keeping top-level keys it omits, \
                    unless it carries `\"schema\": 2`, which replaces the config wholesale. \
                    A secret value of `***` keeps the stored value; when the MCP URL's origin \
-                   changes every secret must be sent again. \
+                   changes every secret must be sent again. A merge update that omits the MCP \
+                   limits (`allowed_tools`, `blocked_tools`, `write_tools`, `max_calls_per_turn`, \
+                   `rate_limit`, `max_result_bytes`) keeps the stored ones; send `null` to clear \
+                   one. A `\"schema\": 2` replacement drops every limit it omits, so it must \
+                   resend any it wants to keep. A dropped `allowed_tools` means `[\"*\"]`, and \
+                   `blocked_tools` still wins over it. \
                    Only available in enterprise deployments.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -557,6 +567,55 @@ mod tests {
                 "allowed_tools": ["search_logs"]
             })
         );
+    }
+
+    #[test]
+    fn update_keeps_stored_mcp_limits_it_does_not_send_and_validates_new_ones() {
+        let stored = json!({
+            "url": "https://mcp.datadoghq.com/api/mcp",
+            "headers": {"DD-API-KEY": "api-secret"},
+            "allowed_tools": ["search_*"],
+            "blocked_tools": ["delete_*"],
+            "write_tools": [],
+            "max_calls_per_turn": 20,
+            "rate_limit": {"calls": 50, "per_seconds": 10},
+            "max_result_bytes": 65536
+        })
+        .to_string();
+        let data = updated_data(
+            "mcp",
+            Some(&stored),
+            Some(json!({
+                "url": "https://mcp.datadoghq.com/api/mcp",
+                "headers": {"DD-API-KEY": "***"},
+                "timeout_seconds": 60,
+                "max_calls_per_turn": null
+            })),
+        )
+        .unwrap();
+        let merged = parsed(data);
+        assert_eq!(merged["allowed_tools"], json!(["search_*"]));
+        assert_eq!(merged["blocked_tools"], json!(["delete_*"]));
+        assert_eq!(merged["write_tools"], json!([]));
+        assert_eq!(
+            merged["rate_limit"],
+            json!({"calls": 50, "per_seconds": 10})
+        );
+        assert_eq!(merged["max_result_bytes"], 65536);
+        assert_eq!(
+            merged["max_calls_per_turn"],
+            json!(null),
+            "null clears the limit"
+        );
+        assert_eq!(merged["timeout_seconds"], 60);
+
+        let err = updated_data(
+            "mcp",
+            Some(&stored),
+            Some(json!({"rate_limit": {"calls": 0, "per_seconds": 10}})),
+        )
+        .unwrap_err();
+        assert!(err.contains("rate_limit.calls"), "{err}");
     }
 
     #[test]
