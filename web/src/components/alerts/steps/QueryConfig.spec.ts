@@ -2894,15 +2894,18 @@ describe("QueryConfig.vue", () => {
     it.each([
       ["a bare selector shows the metric's unit", "node_cpu_seconds_total", "s"],
       ["a rate changes the unit, so none shows", "rate(node_cpu_seconds_total[5m])", ""],
-    ])("%s", async (_name, query, unit) => {
+      ["a query scaled by 100 reads in percent", "rate(node_cpu_seconds_total[5m]) * 100", "%"],
+    ])("%s, on the threshold and the warning alike", async (_name, query, unit) => {
       streamFixtures.node_cpu_seconds_total = {
         schema: [{ name: "value" }],
         metrics_meta: { unit: "seconds" },
       };
-      remount(promqlProps(query), metricPromqlForm(query));
+      const form = metricPromqlForm(query);
+      form.query_condition.promql_warning_value = 0.5;
+      remount(promqlProps(query), form);
       await flushPromises();
-      const shown = host.find('[data-test="alert-threshold-unit"]');
-      expect(shown.exists() ? shown.text() : "").toBe(unit);
+      const shown = host.findAll('[data-test="alert-threshold-unit"]').map((el) => el.text());
+      expect(shown).toEqual(unit ? [unit, unit] : []);
     });
 
     it("Rule mode moves a typed threshold into the query, and back when turned off", async () => {

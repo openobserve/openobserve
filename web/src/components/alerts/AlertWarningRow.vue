@@ -27,6 +27,8 @@ defineProps<{
   operator: I18nText;
   /** A field error as the form reports it. */
   error?: string;
+  /** The threshold's unit, so both levels read in the same one. */
+  unit?: I18nText;
   inputDataTest: string;
   errorDataTest: string;
 }>();
@@ -57,6 +59,9 @@ const { t } = useI18nTyped();
     >
       <template #error />
     </OFormInput>
+    <span v-if="unit" class="text-text-secondary text-compact" data-test="alert-threshold-unit">{{
+      unit
+    }}</span>
     <template #actions>
       <OButton
         variant="ghost-primary"
