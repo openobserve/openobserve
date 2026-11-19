@@ -540,6 +540,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("alerts.form.schedule.realtime")
                   }}</span>
                 </OSettingRow>
+                <div ref="compareLeadRef" class="empty:hidden" />
                 <div
                   v-show="!isAnomalyMode && !isCompositeMode"
                   :ref="(el) => setSectionTarget('queryCondition', el)"
@@ -598,24 +599,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="empty:hidden"
                   data-snap-stop
                 />
-                <AlertTierPlace id="compareWithPast">
-                  <div
-                    v-if="formData.is_real_time === 'false' && tiers.isVisible('compareWithPast')"
-                    data-snap-stop
-                  >
-                    <CompareWithPast
-                      ref="step3Ref"
-                      :multiTimeRange="formData.query_condition.multi_time_range"
-                      :period="formData.trigger_condition.period"
-                      :frequency="formData.trigger_condition.frequency"
-                      :frequencyType="formData.trigger_condition.frequency_type"
-                      :cron="formData.trigger_condition.cron"
-                      :selectedTab="formData.query_condition.type || 'custom'"
-                      :has-function="!!formData.query_condition.vrl_function?.trim()"
-                      @update:multiTimeRange="updateMultiTimeRange"
-                    />
-                  </div>
-                </AlertTierPlace>
+                <Teleport :to="compareLeadRef" :disabled="!compareLeads || !compareLeadRef">
+                  <AlertTierPlace id="compareWithPast">
+                    <div
+                      v-if="formData.is_real_time === 'false' && tiers.isVisible('compareWithPast')"
+                      data-snap-stop
+                    >
+                      <CompareWithPast
+                        ref="step3Ref"
+                        :multiTimeRange="formData.query_condition.multi_time_range"
+                        :period="formData.trigger_condition.period"
+                        :frequency="formData.trigger_condition.frequency"
+                        :frequencyType="formData.trigger_condition.frequency_type"
+                        :cron="formData.trigger_condition.cron"
+                        :selectedTab="formData.query_condition.type || 'custom'"
+                        :has-function="!!formData.query_condition.vrl_function?.trim()"
+                        @update:multiTimeRange="updateMultiTimeRange"
+                      />
+                    </div>
+                  </AlertTierPlace>
+                </Teleport>
                 <AlertSuggestionLine section="condition" anchor="end" />
                 <div
                   :ref="(el) => setSectionTarget('narrowPreview', el)"
@@ -1344,6 +1347,7 @@ import AlertIntentStart from "./AlertIntentStart.vue";
 import AlertLookAlike from "./AlertLookAlike.vue";
 import AlertMessageLine from "./AlertMessageLine.vue";
 import type { IntentFill, IntentId } from "@/utils/alerts/alertIntents";
+import { compareFactor } from "@/utils/alerts/alertIntents";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 import type { ValueRange } from "@/utils/alerts/ratioThreshold";
 import { buildPrefillFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
@@ -2368,6 +2372,19 @@ export default defineComponent({
 
     const railInCondition = computed(() => !lgUp.value && !!sectionTargets.narrowPreview);
     const compactRail = computed(() => lgUp.value && !xlUp.value);
+    // A generated comparison is the alert's condition, so it leads step 2; it stays there while windows exist.
+    const compareLeadRef = ref<HTMLElement | null>(null);
+    const compareLeads = ref(false);
+    watch(
+      () => {
+        const qc = alertForm.formData.value.query_condition;
+        return [qc?.multi_time_range?.length ?? 0, compareFactor(qc?.vrl_function)] as const;
+      },
+      ([windows, factor]) => {
+        compareLeads.value = windows > 0 && (compareLeads.value || factor !== undefined);
+      },
+      { immediate: true },
+    );
     const findSlotRef = ref<HTMLElement | null>(null);
     const findInBar = computed(() => compactRail.value && !!findSlotRef.value);
 
@@ -2806,6 +2823,8 @@ export default defineComponent({
       compactRail,
       findSlotRef,
       findInBar,
+      compareLeadRef,
+      compareLeads,
       snapScrollRef,
       activeSection,
       goToSection,
