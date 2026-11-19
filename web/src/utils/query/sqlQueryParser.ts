@@ -38,6 +38,8 @@ export interface ParsedField {
   type?: "build" | "raw";
   /** Raw SQL expression for type: "raw" fields (e.g., CASE WHEN ... END) */
   rawQuery?: string;
+  havingConditions?: { operator: string; value: number }[];
+  sortBy?: "ASC" | "DESC";
 }
 
 export interface ParsedFilter {
@@ -84,6 +86,10 @@ export interface ParsedQuery {
   rawQuery: string;
   /** Parse error message if any */
   parseError?: string;
+  /** Row limit from LIMIT; 0 when absent */
+  limit: number;
+  /** True when the query sets its own ORDER BY, so no default sort is added */
+  hasOrderBy: boolean;
 }
 
 // ============================================================================
@@ -260,6 +266,8 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
     joins: [],
     customQuery: true,
     rawQuery: query,
+    limit: 0,
+    hasOrderBy: false,
   };
 
   // Check if query is empty
@@ -284,7 +292,8 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
     const stream = await getStreamFromQuery(query);
 
     // Extract fields, filters, and joins
-    const { fields, filters, streamName, joins } = await getFieldsFromQuery(query);
+    const { fields, filters, streamName, joins, limit, hasOrderBy, unsupported } =
+      await getFieldsFromQuery(query);
 
     // Classify fields into x, y, breakdown
     const xFields: ParsedField[] = [];
@@ -306,11 +315,19 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
       }
     }
 
+    const fallsBackToDefaultChart = xFields.length === 0 && yFields.length === 0;
+    if (unsupported && !fallsBackToDefaultChart) {
+      return { ...defaultResult, parseError: unsupported };
+    }
+    if ([...xFields, ...breakdownFields].some((field) => field.havingConditions?.length)) {
+      return { ...defaultResult, parseError: "Contains HAVING on a non-aggregated field" };
+    }
+
     // Use default histogram/count when there are no meaningful axis fields:
     // - SELECT * (no fields extracted)
     // - Bare-field-select (e.g., SELECT method, status FROM logs) where all
     //   fields are plain columns with no aggregation or time functions
-    if (xFields.length === 0 && yFields.length === 0) {
+    if (fallsBackToDefaultChart) {
       return {
         stream: stream || streamName || "",
         streamType,
@@ -333,6 +350,8 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
         joins: joins || [],
         customQuery: false,
         rawQuery: query,
+        limit: 0,
+        hasOrderBy: false,
       };
     }
 
@@ -346,6 +365,8 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
       joins: joins || [],
       customQuery: false,
       rawQuery: query,
+      limit,
+      hasOrderBy,
     };
   } catch (error: any) {
     return {
@@ -368,9 +389,17 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
   breakdown: any[];
   filter: any;
   joins: any[];
+  limit: number;
   /** True if table chart should be used (e.g., more than 2 GROUP BY fields) */
   useTableChart: boolean;
 } {
+  const sortFor = (field: ParsedField, axis: string) =>
+    parsed.hasOrderBy
+      ? (field.sortBy ?? null)
+      : axis === "x" && field.type !== "raw"
+        ? "ASC"
+        : null;
+
   const mapFieldToPanel = (field: ParsedField, index: number, axis: string) => {
     // Always use sequential alias (e.g., x_axis_1, y_axis_1, z_axis_1)
     // '_timestamp' is not allowed as an alias
@@ -385,9 +414,9 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
         color: null,
         type: "raw",
         rawQuery: field.rawQuery,
-        sortBy: null,
+        sortBy: sortFor(field, axis),
         isDerived: false,
-        havingConditions: [],
+        havingConditions: field.havingConditions ?? [],
       };
     }
 
@@ -409,9 +438,9 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
           },
         },
       ],
-      sortBy: axis === "x" ? "ASC" : null,
+      sortBy: sortFor(field, axis),
       isDerived: false,
-      havingConditions: [],
+      havingConditions: field.havingConditions ?? [],
     };
     return baseField;
   };
@@ -445,6 +474,7 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
     breakdown: breakdownFields.map((f, i) => mapFieldToPanel(f, i, "z")),
     filter: parsed.filters,
     joins: parsed.joins || [],
+    limit: parsed.limit,
     useTableChart,
   };
 }

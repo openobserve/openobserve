@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { getFieldsFromQuery } from "./sqlUtils";
 import {
   isQueryParseable,
   parseSQL,
@@ -244,6 +245,36 @@ describe("sqlQueryParser", () => {
     it("should default to logs streamType", async () => {
       const result = await parseSQL("SELECT * FROM logs");
       expect(result.streamType).toBe("logs");
+    });
+
+    const clauseResult = (fields: object[]) => ({
+      fields,
+      filters: { filterType: "group", logicalOperator: "AND", conditions: [] },
+      streamName: "logs",
+      joins: [],
+      limit: 0,
+      hasOrderBy: false,
+      unsupported: "Contains ORDER BY on an expression not in SELECT",
+    });
+
+    it("opens a chart query with a clause the builder cannot express in custom mode", async () => {
+      vi.mocked(getFieldsFromQuery).mockResolvedValueOnce(
+        clauseResult([
+          { column: "service", alias: "service", aggregationFunction: null },
+          { column: "_timestamp", alias: "c", aggregationFunction: "count" },
+        ]),
+      );
+      const result = await parseSQL("SELECT service, count(*) AS c FROM logs GROUP BY service");
+      expect(result.customQuery).toBe(true);
+      expect(result.parseError).toBe("Contains ORDER BY on an expression not in SELECT");
+    });
+
+    it("keeps a raw-row query on the default chart even when its clauses cannot be mapped", async () => {
+      vi.mocked(getFieldsFromQuery).mockResolvedValueOnce(clauseResult([]));
+      const result = await parseSQL("SELECT * FROM logs ORDER BY _timestamp DESC LIMIT 100");
+      expect(result.customQuery).toBe(false);
+      expect(result.yFields[0].aggregationFunction).toBe("count");
+      expect(result.limit).toBe(0);
     });
   });
 
@@ -528,6 +559,46 @@ describe("sqlQueryParser", () => {
       expect(result.y[0].type).toBe("raw");
       expect(result.y[0].rawQuery).toBe("CASE WHEN status = 'success' THEN 1 ELSE 0 END");
       expect(result.y[0].alias).toBe("y_axis_1");
+    });
+  });
+
+  describe("parsedQueryToPanelFields clauses", () => {
+    const base = {
+      stream: "logs",
+      streamType: "logs",
+      xFields: [{ column: "service", alias: "service", aggregationFunction: null }],
+      yFields: [
+        {
+          column: "_timestamp",
+          alias: "c",
+          aggregationFunction: "count",
+          havingConditions: [{ operator: ">", value: 120 }],
+        },
+      ],
+      breakdownFields: [],
+      filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+      joins: [],
+      customQuery: false,
+      rawQuery: "",
+      limit: 2,
+      hasOrderBy: false,
+    };
+
+    it("carries HAVING and LIMIT and keeps the default x sort without ORDER BY", () => {
+      const result = parsedQueryToPanelFields(base);
+      expect(result.y[0].havingConditions).toEqual([{ operator: ">", value: 120 }]);
+      expect(result.limit).toBe(2);
+      expect(result.x[0].sortBy).toBe("ASC");
+    });
+
+    it("uses only the query's ORDER BY when it has one", () => {
+      const result = parsedQueryToPanelFields({
+        ...base,
+        hasOrderBy: true,
+        yFields: [{ ...base.yFields[0], sortBy: "DESC" as const }],
+      });
+      expect(result.x[0].sortBy).toBeNull();
+      expect(result.y[0].sortBy).toBe("DESC");
     });
   });
 });

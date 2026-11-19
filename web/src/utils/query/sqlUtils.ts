@@ -385,7 +385,7 @@ export function extractFields(parsedAst: any, timeField: string, sqlParser?: any
       field.streamAlias = column?.expr?.table || null;
     } else if (column.expr.type === "aggr_func") {
       field.column = column?.expr?.args?.expr?.column?.expr?.value ?? timeField;
-      field.aggregationFunction = column?.expr?.name?.toLowerCase() ?? "count";
+      field.aggregationFunction = aggregationName(column.expr);
       // Extract table/streamAlias from aggregation function argument
       field.streamAlias = column?.expr?.args?.expr?.table || null;
     } else if (column.expr.type === "function") {
@@ -419,6 +419,152 @@ export function extractFields(parsedAst: any, timeField: string, sqlParser?: any
   }
 
   return fields;
+}
+
+const HAVING_OPERATORS: Record<string, string> = {
+  "=": "=",
+  "<>": "<>",
+  "!=": "<>",
+  ">=": ">=",
+  "<=": "<=",
+  ">": ">",
+  "<": "<",
+};
+
+interface AstExpr {
+  type?: string;
+  value?: unknown;
+  table?: string | null;
+  column?: string | { expr?: { value?: string } };
+  name?: string | { name?: { value?: string }[] };
+  operator?: string;
+  left?: AstExpr;
+  right?: AstExpr;
+  args?: { distinct?: string | null; expr?: AstExpr; value?: AstExpr[] };
+}
+
+interface AstColumn {
+  expr: AstExpr;
+  as?: string | null;
+}
+
+interface AstSelect {
+  columns?: AstColumn[];
+  having?: AstExpr | null;
+  orderby?: { expr: AstExpr; type?: string; nulls?: string | null }[] | null;
+  limit?: { value?: AstExpr[] } | null;
+}
+
+interface ClauseField {
+  column?: string;
+  type?: string;
+  havingConditions?: { operator: string; value: number }[];
+  sortBy?: "ASC" | "DESC";
+}
+
+function nestedColumnName(expr?: AstExpr): string | undefined {
+  return typeof expr?.column === "object" ? expr.column?.expr?.value : undefined;
+}
+
+function columnRefName(expr: AstExpr): string | undefined {
+  return nestedColumnName(expr) ?? (typeof expr.column === "string" ? expr.column : undefined);
+}
+
+function aggregationName(expr: AstExpr): string {
+  const name = typeof expr.name === "string" ? expr.name.toLowerCase() : "count";
+  return expr.args?.distinct ? `${name}-distinct` : name;
+}
+
+function exprSignature(expr: AstExpr | undefined, timeField: string): string | null {
+  if (expr?.type === "column_ref") {
+    return `${expr.table ?? ""}.${columnRefName(expr)}`;
+  }
+  if (expr?.type === "aggr_func") {
+    return `${aggregationName(expr)}(${nestedColumnName(expr.args?.expr) ?? timeField})`;
+  }
+  if (expr?.type === "function") {
+    const name =
+      typeof expr.name === "object" ? expr.name?.name?.[0]?.value?.toLowerCase() : undefined;
+    return `${name}(${nestedColumnName(expr.args?.value?.[0]) ?? timeField})`;
+  }
+  return null;
+}
+
+/** Index into ast.columns that a HAVING/ORDER BY expression refers to: by position (ORDER BY only), alias or same expression. */
+function resolveSelectIndex(
+  expr: AstExpr | undefined,
+  columns: AstColumn[],
+  timeField: string,
+  allowPosition: boolean,
+): number {
+  if (allowPosition && expr?.type === "number") return Number(expr.value) - 1;
+  if (expr?.type === "column_ref" && !expr.table) {
+    const name = columnRefName(expr);
+    const aliased = name === undefined ? -1 : columns.findIndex((column) => column.as === name);
+    if (aliased !== -1) return aliased;
+  }
+  const signature = exprSignature(expr, timeField);
+  if (!signature) return -1;
+  return columns.findIndex((column) => exprSignature(column.expr, timeField) === signature);
+}
+
+function flattenAnd(expr: AstExpr): AstExpr[] {
+  if (
+    expr.type === "binary_expr" &&
+    expr.operator?.toUpperCase() === "AND" &&
+    expr.left &&
+    expr.right
+  ) {
+    return [...flattenAnd(expr.left), ...flattenAnd(expr.right)];
+  }
+  return [expr];
+}
+
+/** Copies HAVING, ORDER BY and LIMIT onto the select-aligned fields, or names the clause the builder cannot express. */
+export function applyQueryClauses(
+  ast: AstSelect,
+  fields: ClauseField[],
+  timeField: string,
+): { limit: number; hasOrderBy: boolean; unsupported?: string } {
+  const columns = ast.columns ?? [];
+  const fieldFor = (expr: AstExpr | undefined, allowPosition: boolean) => {
+    const field = fields[resolveSelectIndex(expr, columns, timeField, allowPosition)];
+    return field && (field.column || field.type === "raw") ? field : null;
+  };
+  const result = { limit: 0, hasOrderBy: false };
+
+  for (const condition of ast.having ? flattenAnd(ast.having) : []) {
+    const operator = condition.operator ? HAVING_OPERATORS[condition.operator] : undefined;
+    const field = operator ? fieldFor(condition.left, false) : null;
+    const value = condition.right?.type === "number" ? Number(condition.right.value) : NaN;
+    if (!operator || !field || !Number.isFinite(value) || field.havingConditions?.length) {
+      return { ...result, unsupported: "Contains a HAVING condition the builder cannot express" };
+    }
+    field.havingConditions = [{ operator, value }];
+  }
+
+  const orderBy = ast.orderby ?? [];
+  if (orderBy.length > 1) {
+    return { ...result, unsupported: "Contains ORDER BY on more than one field" };
+  }
+  if (orderBy.length === 1) {
+    if (orderBy[0].nulls) {
+      return { ...result, unsupported: "Contains ORDER BY with NULLS placement" };
+    }
+    const field = fieldFor(orderBy[0].expr, true);
+    if (!field)
+      return { ...result, unsupported: "Contains ORDER BY on an expression not in SELECT" };
+    field.sortBy = orderBy[0].type?.toUpperCase() === "DESC" ? "DESC" : "ASC";
+    result.hasOrderBy = true;
+  }
+
+  const limitValues = ast.limit?.value ?? [];
+  if (limitValues.length > 1 || (limitValues.length === 1 && limitValues[0]?.type !== "number")) {
+    return { ...result, unsupported: "Contains OFFSET or a non-numeric LIMIT" };
+  }
+  if (limitValues.length === 1) result.limit = Number(limitValues[0].value);
+
+  return result;
 }
 
 /**
@@ -850,6 +996,7 @@ export const getFieldsFromQuery = async (query: any, timeField: string = "_times
     let fields = extractFields(ast, timeField, parser);
     let filters: any = extractFilters(ast);
     const joins = extractJoins(ast);
+    const clauses = applyQueryClauses(ast, fields, timeField);
 
     // remove wrong fields and filters (but keep raw fields)
     fields = fields.filter((field: any) => field.column || field.type === "raw");
@@ -868,6 +1015,7 @@ export const getFieldsFromQuery = async (query: any, timeField: string = "_times
       filters,
       streamName,
       joins,
+      ...clauses,
     };
   } catch (error) {
     return {
@@ -890,6 +1038,8 @@ export const getFieldsFromQuery = async (query: any, timeField: string = "_times
       },
       streamName: null,
       joins: [],
+      limit: 0,
+      hasOrderBy: false,
     };
   }
 };
