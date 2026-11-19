@@ -16040,7 +16040,7 @@
       "addGroup": "Add a group",
       "cardWhy": "{fit} · {detail}",
       "needsChoice": "Needs a choice",
-      "previewWaits": "Pick what the sentence leaves empty to see a preview",
+      "previewWaits": "Fill in the empty fields to see a preview",
       "promql": {
         "label": "Write PromQL"
       },
