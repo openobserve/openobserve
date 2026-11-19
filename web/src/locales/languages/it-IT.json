@@ -5196,6 +5196,8 @@
     "addToInterestingFields": "Aggiungi ai campi interessanti",
     "viewPatternsCount": "Visualizza {count} pattern | Visualizza {count} pattern",
     "addPattern": "Aggiungi pattern",
+    "sdrNonStringFieldWarning": "I pattern in fase di ricerca si applicano solo ai campi di testo, quindi questo non viene applicato. Usa invece un pattern in fase di ingestione.",
+    "sdrPartitionKeyWarning": "Una chiave di partizione riporta il valore grezzo nel percorso del file, quindi il suo pattern in fase di ricerca non viene applicato. Rimuovi il pattern o la chiave di partizione.",
     "editStream": "Modifica stream",
     "createNewStream": "Crea nuovo stream",
     "errorWhileDeletingStreams": "Errore durante l'eliminazione degli stream.",

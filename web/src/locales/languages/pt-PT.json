@@ -5196,6 +5196,8 @@
     "addToInterestingFields": "Adicionar aos campos interessantes",
     "viewPatternsCount": "Ver {count} padrão | Ver {count} padrões",
     "addPattern": "Adicionar padrão",
+    "sdrNonStringFieldWarning": "Os padrões no momento da pesquisa aplicam-se apenas a campos de texto, por isso este não é aplicado. Use um padrão no momento da ingestão.",
+    "sdrPartitionKeyWarning": "Uma chave de partição guarda o seu valor bruto no caminho do ficheiro, por isso o seu padrão no momento da pesquisa não é aplicado. Remova o padrão ou a chave de partição.",
     "editStream": "Editar stream",
     "createNewStream": "Criar novo stream",
     "errorWhileDeletingStreams": "Erro ao eliminar streams.",

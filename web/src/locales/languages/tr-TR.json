@@ -5196,6 +5196,8 @@
     "addToInterestingFields": "İlginç alanlara ekle",
     "viewPatternsCount": "{count} Deseni Görüntüle | {count} Deseni Görüntüle",
     "addPattern": "Desen ekle",
+    "sdrNonStringFieldWarning": "Arama zamanı desenleri yalnızca metin alanlarına uygulanır, bu nedenle bu desen uygulanmaz. Bunun yerine alım zamanı deseni kullanın.",
+    "sdrPartitionKeyWarning": "Bölüm anahtarı ham değerini dosya yolunda taşır, bu nedenle arama zamanı deseni uygulanmaz. Deseni veya bölüm anahtarını kaldırın.",
     "editStream": "Akışı düzenle",
     "createNewStream": "Yeni akış oluştur",
     "errorWhileDeletingStreams": "Akışlar silinirken hata oluştu.",

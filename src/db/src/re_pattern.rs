@@ -311,6 +311,47 @@ pub async fn remove_stream_associations_after_deletion(
     Ok(())
 }
 
+/// Associations saved before the scan-level redaction that it cannot honour: a non-string field
+/// is skipped by the scan, and a partition key carries its raw value in the file path.
+pub async fn warn_unenforceable_search_associations() {
+    let entries = match infra::table::re_pattern_stream_map::list_all().await {
+        Ok(entries) => entries,
+        Err(e) => {
+            log::warn!("[SDR] could not list pattern associations to check them: {e}");
+            return;
+        }
+    };
+    for entry in entries
+        .iter()
+        .filter(|e| infra::table::re_pattern_stream_map::is_search_rewrite(e.apply_at, e.policy))
+    {
+        let Ok(schema) = infra::schema::get(&entry.org, &entry.stream, entry.stream_type).await
+        else {
+            continue;
+        };
+        let settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
+        let partition_keys: Vec<&str> = settings
+            .partition_keys
+            .iter()
+            .filter(|p| !p.disabled)
+            .map(|p| p.field.as_str())
+            .collect();
+        if let Some(conflict) = infra::table::re_pattern_stream_map::search_association_conflict(
+            &schema,
+            &partition_keys,
+            &entry.field,
+        ) {
+            log::warn!(
+                "[SDR] search-time pattern {} on {}/{}/{} is not fully enforced: {conflict}",
+                entry.pattern_id,
+                entry.org,
+                entry.stream_type,
+                entry.stream
+            );
+        }
+    }
+}
+
 pub async fn watch_patterns() -> Result<(), anyhow::Error> {
     let prefix = RE_PATTERN_PREFIX;
     let cluster_coordinator = get_coordinator().await;

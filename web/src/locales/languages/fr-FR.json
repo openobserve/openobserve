@@ -5196,6 +5196,8 @@
     "addToInterestingFields": "Ajouter aux champs intéressants",
     "viewPatternsCount": "Voir {count} motif | Voir {count} motifs",
     "addPattern": "Ajouter un motif",
+    "sdrNonStringFieldWarning": "Les modèles appliqués à la recherche ne concernent que les champs texte, celui-ci n'est donc pas appliqué. Utilisez plutôt un modèle appliqué à l'ingestion.",
+    "sdrPartitionKeyWarning": "Une clé de partition porte sa valeur brute dans le chemin du fichier, son modèle appliqué à la recherche n'est donc pas appliqué. Supprimez le modèle ou la clé de partition.",
     "editStream": "Modifier le flux",
     "createNewStream": "Créer un nouveau flux",
     "errorWhileDeletingStreams": "Erreur lors de la suppression des flux.",

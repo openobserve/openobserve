@@ -5196,6 +5196,8 @@
     "addToInterestingFields": "添加到关注字段",
     "viewPatternsCount": "查看 {count} 个模式 | 查看 {count} 个模式",
     "addPattern": "添加模式",
+    "sdrNonStringFieldWarning": "搜索时模式仅适用于字符串字段，因此此模式不会生效。请改用摄取时模式。",
+    "sdrPartitionKeyWarning": "分区键会在文件路径中携带原始值，因此其搜索时模式不会生效。请移除该模式或分区键。",
     "editStream": "编辑流",
     "createNewStream": "创建新流",
     "errorWhileDeletingStreams": "删除流时出错。",

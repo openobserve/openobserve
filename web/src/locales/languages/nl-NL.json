@@ -5196,6 +5196,8 @@
     "addToInterestingFields": "Toevoegen aan interessante velden",
     "viewPatternsCount": "Bekijk {count} patroon | Bekijk {count} patronen",
     "addPattern": "Patroon toevoegen",
+    "sdrNonStringFieldWarning": "Zoektijdpatronen gelden alleen voor tekstvelden, dus dit patroon wordt niet toegepast. Gebruik in plaats daarvan een innametijdpatroon.",
+    "sdrPartitionKeyWarning": "Een partitiesleutel bevat de ruwe waarde in het bestandspad, dus het zoektijdpatroon wordt niet toegepast. Verwijder het patroon of de partitiesleutel.",
     "editStream": "Stream bewerken",
     "createNewStream": "Nieuwe stream maken",
     "errorWhileDeletingStreams": "Fout bij het verwijderen van streams.",
