@@ -77,7 +77,6 @@ const GATED_IN_OSS = [
   "shortcuts.pages.iamInvitations",
   "shortcuts.pages.regexPatterns",
   "shortcuts.pages.cipherKeys",
-  "shortcuts.pages.modelPricing",
   "shortcuts.pages.llmProviders",
   "shortcuts.pages.aiToolsets",
   "shortcuts.pages.orgManagement",
@@ -185,6 +184,12 @@ describe("shortcut cheatsheet OSS gating", () => {
     // llmProviders follows online_evals_enabled; modelPricing follows model_pricing_enabled.
     expect(pages.has("shortcuts.pages.llmProviders")).toBe(false);
     expect(pages.has("shortcuts.pages.modelPricing")).toBe(false);
+  });
+
+  it("lists Model Pricing on an OSS build while model_pricing_enabled is on", () => {
+    expect(
+      visiblePages({ ...OSS, modelPricingEnabled: true }).has("shortcuts.pages.modelPricing"),
+    ).toBe(true);
   });
 
   it("hides Downtimes on enterprise and cloud while downtimes_enabled is off", () => {

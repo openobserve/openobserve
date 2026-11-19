@@ -92,7 +92,7 @@ const cloud = (c: ShortcutCapabilities) => c.isCloud;
 const enterpriseOrCloud = (c: ShortcutCapabilities) => c.isEnterprise || c.isCloud;
 const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.incidentsEnabled;
 const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
-const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
+const modelPricing = (c: ShortcutCapabilities) => c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
 const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
 const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
