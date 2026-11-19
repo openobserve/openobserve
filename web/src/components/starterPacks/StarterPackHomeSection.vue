@@ -24,7 +24,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { StarterPack } from "@/composables/starterPacks/types";
 import { matchSource, useHomePacks, type HomePacks } from "@/composables/starterPacks/useHomePacks";
 import { usePackGate } from "@/composables/starterPacks/usePackGate";
-import type { RailPack } from "@/composables/starterPacks/useStarterPackPopup";
+import { useStarterPackPopup, type RailPack } from "@/composables/starterPacks/useStarterPackPopup";
 import { useI18nTyped } from "@/types/i18n";
 import StarterPackListPane from "./StarterPackListPane.vue";
 import StarterPackUndoDialog from "./StarterPackUndoDialog.vue";
@@ -62,7 +62,12 @@ const selected = computed(() => {
   const id = selectedId.value ?? bestStartId.value;
   return offered.find((item) => item.pack.id === id) ?? offered[0] ?? null;
 });
-const busy = computed(() => !!selected.value?.flow.running.value);
+const opening = useStarterPackPopup(props.org).opening;
+const busy = computed(
+  () =>
+    !!selected.value &&
+    (selected.value.flow.running.value || opening.value === selected.value.pack.id),
+);
 </script>
 
 <template>

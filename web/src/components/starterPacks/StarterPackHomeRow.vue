@@ -30,6 +30,7 @@ import {
   type PackCardKind,
 } from "@/composables/starterPacks/packCardText";
 import type { HomePackRowItem } from "@/composables/starterPacks/useHomePacks";
+import { useStarterPackPopup } from "@/composables/starterPacks/useStarterPackPopup";
 import type { PackItemKind } from "@/composables/starterPacks/types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
@@ -67,7 +68,10 @@ const shownStreams = computed(() => streams.value.slice(0, SHOWN_STREAMS));
 const moreStreams = computed(() => streams.value.slice(SHOWN_STREAMS));
 const clusters = computed(() => props.item.matcher.clusters.value);
 const forbidden = computed(() => props.item.view.value === "forbidden");
-const busy = computed(() => flow.running.value || props.item.view.value === "loading");
+const opening = useStarterPackPopup(flow.org).opening;
+const busy = computed(
+  () => flow.running.value || props.item.view.value === "loading" || opening.value === pack.id,
+);
 
 const plannedIds = (kind: PackItemKind) =>
   (flow.preview.value?.items ?? [])

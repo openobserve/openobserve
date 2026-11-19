@@ -129,14 +129,14 @@ watch(
 
 // Reopening while a setup runs goes straight back to it.
 const openFromChip = () => {
-  if (running.value) popup.openPack(running.value.pack.id);
+  if (running.value) popup.openPack(running.value.pack.id, [], { fromList: true });
   else popup.openList();
 };
 const select = (id: string) => {
   packId.value = id;
 };
 const openSelected = () => {
-  if (selected.value) popup.openPack(selected.value.entry.pack.id);
+  if (selected.value) void popup.openWhenReady(selected.value.entry, { fromList: true });
 };
 </script>
 
@@ -187,12 +187,12 @@ const openSelected = () => {
 
   <ODialog
     v-model:open="popupOpen"
-    size="lg"
+    size="xl"
     :show-close="false"
     :aria-title="t('starterPacks.popup.title')"
     data-test="starter-pack-popup"
   >
-    <div class="-mx-dialog-content-px -my-dialog-content-py h-150 max-h-[calc(90vh-0.125rem)]">
+    <div class="-mx-dialog-content-px -my-dialog-content-py h-180 max-h-[calc(90vh-0.125rem)]">
       <StarterPackDrawer
         v-if="screen === 'pack' && current"
         :key="current.pack.id"
@@ -200,6 +200,7 @@ const openSelected = () => {
         :clusters="popup.clustersOf(current.pack.id, current.matcher.clusters.value)"
         :choices="popup.choicesOf(current.pack.id)"
         @close="popup.close()"
+        :show-back="popup.fromList.value"
         @back="popup.back()"
       />
       <div
@@ -284,6 +285,8 @@ const openSelected = () => {
             variant="primary"
             size="sm-action"
             class="min-w-35"
+            :loading="popup.opening.value === selected.entry.pack.id"
+            :disabled="popup.opening.value === selected.entry.pack.id"
             data-test="starter-pack-list-primary-btn"
             @click="openSelected"
           >
