@@ -143,6 +143,7 @@ interface Props {
   searchQuery?: string;
   /** Selected stream name */
   selectedStream?: string;
+  selectedStreamType?: string;
   /** Selected date time */
   selectedDateTime?: {
     start_time: number | string;
@@ -164,6 +165,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   searchQuery: "",
   selectedStream: "",
+  selectedStreamType: "logs",
   selectedDateTime: undefined,
   isFirstToggle: true,
   isSqlMode: true,
@@ -322,7 +324,8 @@ const initializeFromQuery = async () => {
     const savedFields = urlConfig.fields;
     dashboardPanelData.data.queries[0].fields.stream =
       savedFields.stream || props.selectedStream || "";
-    dashboardPanelData.data.queries[0].fields.stream_type = savedFields.stream_type || "logs";
+    dashboardPanelData.data.queries[0].fields.stream_type =
+      savedFields.stream_type || props.selectedStreamType || "logs";
     dashboardPanelData.data.queries[0].fields.x = savedFields.x || [];
     dashboardPanelData.data.queries[0].fields.y = savedFields.y || [];
     dashboardPanelData.data.queries[0].fields.breakdown = savedFields.breakdown || [];
@@ -365,7 +368,7 @@ const initializeFromQuery = async () => {
     const freeTextFilter = props.freeTextFilter;
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
       await updateGroupedFields();
       if (seq !== initSeq) return;
     }
@@ -424,7 +427,7 @@ const initializeFromQuery = async () => {
   if (isEmptyOrSelectAll) {
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
       await updateGroupedFields();
     }
     dashboardPanelData.data.queries[0].customQuery = false;
@@ -444,7 +447,7 @@ const initializeFromQuery = async () => {
     // Complex query - use custom mode
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
     }
     dashboardPanelData.data.queries[0].query = props.searchQuery;
     dashboardPanelData.data.queries[0].customQuery = true;
@@ -461,7 +464,7 @@ const initializeFromQuery = async () => {
     holdGeneratedQuery.value = true;
     try {
       // Try to parse the query
-      const parsed = await parseSQL(searchQuery, "logs");
+      const parsed = await parseSQL(searchQuery, props.selectedStreamType || "logs");
       if (seq !== initSeq) return;
       holdGeneratedQuery.value = false;
 
@@ -469,7 +472,8 @@ const initializeFromQuery = async () => {
         // Parsing failed or complex query detected
         if (props.selectedStream) {
           dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-          dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+          dashboardPanelData.data.queries[0].fields.stream_type =
+            props.selectedStreamType || "logs";
         }
         dashboardPanelData.data.queries[0].query = searchQuery;
         dashboardPanelData.data.queries[0].customQuery = true;
@@ -485,7 +489,8 @@ const initializeFromQuery = async () => {
         // Set stream from parsed query or fallback to selected stream
         const streamName = panelFields.stream || props.selectedStream;
         dashboardPanelData.data.queries[0].fields.stream = streamName;
-        dashboardPanelData.data.queries[0].fields.stream_type = panelFields.stream_type || "logs";
+        dashboardPanelData.data.queries[0].fields.stream_type =
+          panelFields.stream_type || props.selectedStreamType || "logs";
 
         // Apply parsed fields to builder
         dashboardPanelData.data.queries[0].fields.x = panelFields.x;
@@ -529,7 +534,7 @@ const initializeFromQuery = async () => {
       // Fall back to custom mode
       if (props.selectedStream) {
         dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-        dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+        dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
       }
       dashboardPanelData.data.queries[0].query = searchQuery;
       dashboardPanelData.data.queries[0].customQuery = true;
