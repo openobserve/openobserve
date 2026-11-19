@@ -616,6 +616,15 @@ async fn search_hits(
     let resp = search_service::search(&trace_id, org_id, StreamType::Logs, None, &req)
         .await
         .map_err(|e| anyhow::anyhow!("reading {ANOMALY_STREAM} failed: {e}"))?;
+    complete_hits(resp)
+}
+
+/// A partial result can miss the newest anomalous bucket, so it must fail, not read as normal.
+fn complete_hits(resp: config::meta::search::Response) -> anyhow::Result<Vec<serde_json::Value>> {
+    anyhow::ensure!(
+        !resp.is_partial,
+        "reading {ANOMALY_STREAM} returned partial results"
+    );
     Ok(resp.hits)
 }
 
@@ -1164,5 +1173,14 @@ mod tests {
             freshness(false, None, Some(8 * B), B, 10 * B).no_new_data_since_us,
             None
         );
+    }
+
+    #[test]
+    fn a_partial_search_result_fails_the_read() {
+        let mut resp = config::meta::search::Response::new(0, 10);
+        resp.hits = vec![serde_json::json!({"is_anomaly": false})];
+        assert_eq!(complete_hits(resp.clone()).unwrap().len(), 1);
+        resp.is_partial = true;
+        assert!(complete_hits(resp).is_err());
     }
 }
