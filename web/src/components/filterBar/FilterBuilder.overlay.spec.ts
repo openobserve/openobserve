@@ -56,7 +56,7 @@ const saved = () => ({
       filterType: "group",
       logicalOperator: "AND",
       groupId: "nested",
-      conditions: [leaf("status", ">=", "500"), leaf("message", "contains", "timeout", "OR")],
+      conditions: [leaf("status", ">=", "500"), leaf("message", "contains", "timeout")],
     },
   ],
 });

@@ -112,6 +112,28 @@ describe("SearchBar — adding a filter term to the query", () => {
     expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("");
   });
 
+  describe("two streams joined in SQL mode", () => {
+    const base = `SELECT * FROM "a" JOIN "b" ON "a".k = "b".k WHERE "a".x = 1`;
+
+    beforeEach(() => {
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.data.stream.selectedStream = ["a", "b"];
+    });
+
+    afterEach(() => {
+      wrapper.vm.searchObj.data.stream.selectedStream = [];
+    });
+
+    it.each([
+      ["k = 'v'", `"a".k = 'v'`],
+      ["(k is null OR k = '')", `("a".k is null OR "a".k = '')`],
+      ["(k = 'x' OR k = 'y')", `("a".k = 'x' OR "a".k = 'y')`],
+    ])("qualifies every condition of %s with the first stream", async (filter, qualified) => {
+      wrapper.vm.searchObj.data.query = base;
+      expect(await addFilterTerm(filter)).toBe(`${base} AND ${qualified}`);
+    });
+  });
+
   describe("a field whose name ends another field's name", () => {
     const base = `SELECT * FROM "qa" WHERE db_operation_name = 'SELECT'`;
 

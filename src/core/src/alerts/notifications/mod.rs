@@ -39,7 +39,7 @@ pub mod send;
 pub mod test_send;
 
 pub use context::{LegacyPayload, NotificationContext, build_row_columns};
-pub use custom::apply_custom_template;
+pub use custom::{apply_custom_template, apply_template_body};
 pub use format::{ChannelFormat, derive_channel_format, teams_format_for_url};
 pub use preview::{PreviewError, PreviewRequest, PreviewResponse, preview};
 pub use render::{RenderError, RenderedMessage, render, severity_color};

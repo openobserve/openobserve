@@ -34,6 +34,8 @@ test.describe("Traces shared URL", () => {
       'Precondition: seeded error traces must produce the error-count badge'
     ).toBe(true);
     await pm.tracesPage.toggleErrorOnlyFilter();
+    // Share stays disabled until the toggled filter has run.
+    await pm.tracesPage.runSearch();
     await pm.tracesPage.waitForTraceSearchResults();
 
     const beforeShare = await pm.tracesPage.getQueryEditorContent();
