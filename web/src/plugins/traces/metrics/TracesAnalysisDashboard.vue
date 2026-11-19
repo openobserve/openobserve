@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`dimension-row-${dimension.value}`"
                       @click="toggleDimension(dimension.value)"
                     >
-                      <div class="flex shrink-0 items-center" @click.stop>
+                      <div class="flex shrink-0 items-center">
                         <OCheckbox
                           :model-value="selectedDimensions.includes(dimension.value)"
                           @update:model-value="toggleDimension(dimension.value)"

@@ -20,6 +20,7 @@ import { createMemoryHistory, createRouter } from "vue-router";
 import {
   bindLogsUrlRouter,
   changedParams,
+  replaceNextLogsWrite,
   decodeColumns,
   dropLineLinkParams,
   encodeColumns,
@@ -226,6 +227,13 @@ describe("useLogsUrl (4c C7b)", () => {
       const current = { stream: "app", period: "15m" };
       expect(urlWriteMode(current, { ...current, period: "1h" })).toBe("push");
       expect(urlWriteMode(current, { ...current, query: "x" })).toBe("push");
+    });
+
+    it("replaces only the next write after a history step re-applies a search", () => {
+      const current = { stream: "app", period: "15m" };
+      replaceNextLogsWrite();
+      expect(urlWriteMode(current, { ...current, sql_mode: "true" })).toBe("replace");
+      expect(urlWriteMode(current, { ...current, sql_mode: "true" })).toBe("push");
     });
 
     it("compares values as the router stores them (strings)", () => {

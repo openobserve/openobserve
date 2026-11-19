@@ -15,7 +15,12 @@
 
 import { describe, expect, it } from "vitest";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { cachedSearchMatchesRoute, lastRunSearch, type CachedLogsSearch } from "./logsRouteCache";
+import {
+  cachedSearchMatchesRoute,
+  lastRunSearch,
+  lastRunSurface,
+  type CachedLogsSearch,
+} from "./logsRouteCache";
 import type { ShownEntry } from "./useLogsUrl";
 
 const cached: CachedLogsSearch = {
@@ -93,6 +98,16 @@ describe("cachedSearchMatchesRoute", () => {
 
   it("treats a different stream order as the same selection", () => {
     expect(matches({ stream: "web,app" }, { streams: ["app", "web"] })).toBe(true);
+  });
+});
+
+describe("lastRunSurface", () => {
+  it("maps each tab to the surface its run is recorded on", () => {
+    expect(lastRunSurface("patterns")).toBe("patterns");
+    expect(lastRunSurface("visualize")).toBe("visualize");
+    expect(lastRunSurface("build")).toBe("build");
+    expect(lastRunSurface("drilldown")).toBe("logs");
+    expect(lastRunSurface(undefined)).toBe("logs");
   });
 });
 

@@ -706,7 +706,11 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
-import { cachedSearchMatchesRoute, lastRunSearch } from "@/composables/useLogs/logsRouteCache";
+import {
+  cachedSearchMatchesRoute,
+  lastRunSearch,
+  lastRunSurface,
+} from "@/composables/useLogs/logsRouteCache";
 import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
@@ -796,8 +800,9 @@ import {
 import {
   endLogsArrival,
   parseSharedPage,
+  replaceNextLogsWrite,
   resetShownSearch,
-  shownSearch,
+  shownEntryFor,
   sharedPage,
   sharedPageNotice,
 } from "@/composables/useLogs/useLogsUrl";
@@ -1234,7 +1239,10 @@ export default defineComponent({
     let stopHistoryRestore: (() => void) | undefined;
     onMounted(() => {
       registerBeforeAppReload();
-      stopHistoryRestore = useLogsHistoryRestore(router, () => requestLogsReapply(true, "url"));
+      stopHistoryRestore = useLogsHistoryRestore(router, () => {
+        replaceNextLogsWrite();
+        requestLogsReapply(true, "url");
+      });
     });
 
     onActivated(() => {
@@ -1581,7 +1589,7 @@ export default defineComponent({
               endTime: store.state.logs.logs.data.datetime?.endTime,
               toggle: store.state.logs.logs.meta?.logsVisualizeToggle,
             },
-            shownSearch.logs,
+            shownEntryFor(lastRunSurface(store.state.logs.logs.meta?.logsVisualizeToggle)),
           ),
         )
       ) {

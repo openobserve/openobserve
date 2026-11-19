@@ -58,6 +58,13 @@ export const cachedSearchMatchesRoute = (
   return !("logs_visualize_toggle" in route) || route.logs_visualize_toggle === cache.toggle;
 };
 
+const SURFACE_TOGGLES = ["patterns", "visualize", "build"];
+
+/** The tab's own last run is what the URL carries; drill down and logs share the logs surface. */
+export const lastRunSurface = (toggle?: string) =>
+  (SURFACE_TOGGLES.includes(toggle ?? "") ? toggle : "logs") as
+    "logs" | "patterns" | "visualize" | "build";
+
 /** The URL carries the last run search, so unrun editor edits in the cache must not count as a difference. */
 export const lastRunSearch = (
   cache: CachedLogsSearch,
