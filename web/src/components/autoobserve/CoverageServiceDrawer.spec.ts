@@ -370,7 +370,7 @@ describe("CoverageServiceDrawer in live mode", () => {
     expect(wrapper.text()).not.toContain("No scoped monitor");
   });
 
-  it("lists each learning stream with the paired engine's reason", () => {
+  it("shows a learning service no alert watches as a gap that lists each learning stream's reason", () => {
     const until = (Date.now() + 5 * 86_400_000) * 1000;
     const streams = [
       {
@@ -392,17 +392,22 @@ describe("CoverageServiceDrawer in live mode", () => {
       { errors: cell("none"), latency: cell("none"), absence: cell("none") },
       streams as never,
     );
-    const rows = mountDrawer(row, "gap")
+    const wrapper = mountDrawer(row, row.status!.state as "gap");
+    const rows = wrapper
       .findAll('[data-test="autoobserve-coverage-drawer-learning-stream"]')
       .map((r) => r.text());
     expect(rows).toEqual([
       expect.stringMatching(/^fresh.*9 of 14/),
       expect.stringMatching(/^kept.*less than 14/),
     ]);
-    const learning = mountDrawer(row, "learning");
-    const chips = learning.findAll('[data-test^="autoobserve-coverage-drawer-chip-"]');
-    expect(chips.map((c) => c.text()).every((text) => text.endsWith("Learning"))).toBe(true);
-    expect(learning.text()).not.toContain("Coverage gap");
+    expect(wrapper.find('[data-test="autoobserve-coverage-drawer-state"]').text()).toBe(
+      "Coverage gap",
+    );
+    expect(chips(wrapper).map((c) => c.text())).toEqual([
+      "Errors: Coverage gap",
+      "Latency: Coverage gap",
+      "Stops sending: Coverage gap",
+    ]);
   });
 
   it("has no learning line when the server sends no learning_until", () => {
