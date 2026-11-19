@@ -220,6 +220,10 @@ const groupLabelsOf = (qc: NotifyQueryCondition | null | undefined): string[] | 
   return (qc.aggregation.group_by ?? []).filter((f): f is string => !!f?.trim());
 };
 
+/** Whether each group (or series) notifies and repeats on its own. */
+export const notifiesPerGroup = (qc: NotifyQueryCondition | null | undefined): boolean =>
+  groupLabelsOf(qc) !== null;
+
 /** The help lines of Notify at most every and Suppress repeats, naming what each wait covers. */
 export function notifyHelp(
   qc: NotifyQueryCondition | null | undefined,

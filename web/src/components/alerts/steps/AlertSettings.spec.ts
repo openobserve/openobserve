@@ -22,12 +22,14 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { mount, flushPromises, type VueWrapper } from "@vue/test-utils";
-import { defineComponent, inject, nextTick, ref, type Ref } from "vue";
+import { computed, defineComponent, inject, nextTick, ref, type Ref } from "vue";
 import { createStore } from "vuex";
 import { z } from "zod";
 import i18n from "@/locales";
 import config from "@/aws-exports";
 import AlertSettings from "./AlertSettings.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -356,6 +358,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       trigger: TriggerValues = defaults,
       minAutoRefreshInterval = 60,
       values: Record<string, unknown> = {},
+      context: Record<string, unknown> = {},
     ) =>
       mount(
         defineComponent({
@@ -374,7 +377,9 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
         {
           global: {
             plugins: [makeStore({ min_auto_refresh_interval: minAutoRefreshInterval }), i18n],
-            provide: withConditionLine(),
+            provide: {
+              [ALERT_FORM_CONTEXT_KEY as symbol]: { conditionNote: ref(null), ...context },
+            },
           },
         },
       );
@@ -552,6 +557,36 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
 
       expect(trigger.silence).toBe(row.warns ? 10 : 60);
       expect(note(host, "alert-settings-silence-hint").exists()).toBe(row.warns);
+    });
+
+    it.each([
+      { name: "80 groups firing per group", count: 80, multi: true, warns: true },
+      { name: "2 groups firing per group", count: 2, multi: true, warns: false },
+      { name: "80 groups in one alert", count: 80, multi: false, warns: false },
+      {
+        name: "80 groups with repeats suppressed",
+        count: 80,
+        multi: true,
+        suppress: true,
+        warns: false,
+      },
+    ])("Notify at most every warns about $name", (row) => {
+      const query_condition = {
+        type: "custom",
+        aggregation: { multi_alert: row.multi, group_by: ["pod"], having: {} },
+      };
+      const previewStatus = computed(() => ({
+        wouldTrigger: true,
+        grouped: true,
+        count: row.count,
+      }));
+      const host = mountLive(
+        defaults,
+        60,
+        { query_condition, suppress_repeats: !!row.suppress },
+        { previewStatus },
+      );
+      expect(note(host, "alert-settings-silence-many-groups").exists()).toBe(row.warns);
     });
 
     it("Notify at most every shorter than the checks: the amber line's action matches them", async () => {
@@ -735,7 +770,7 @@ describe("AlertSettings — Notify on recovery with nowhere to send", () => {
 describe("AlertSettings — Notify on recovery summary for Jira", () => {
   const destinationObjects = [
     { name: "ops-jira", type: "http", destination_type_name: "jira" },
-    { name: "ops-slack", type: "http", destination_type_name: "slack" },
+    { name: "ops-slack", type: "http", destination_type_name: "slack", template: "ops-card" },
   ];
   const mountPlan = (destinations: string[], recoveryDestinations: string[] = []) =>
     mount(
@@ -780,6 +815,20 @@ describe("AlertSettings — Notify on recovery summary for Jira", () => {
 
   it("says the same when the recovery is redirected to Jira", () => {
     expect(planText(["ops-slack"], ["ops-jira"])).toEqual([`ops-jira — ${comment}`]);
+  });
+
+  it.each([
+    ["{alert_name} fired", true],
+    ["[{alert_status}] {alert_name}", false],
+  ])("reads the row from template body %j", (body, warns) => {
+    const looksNew = t("alerts.alertSettings.recoveryLooksNew", { template: "ops-card" });
+    queryClient.setQueryData(templatesQuery("test-org").queryKey, [{ name: "ops-card", body }]);
+    const host = mountPlan(["ops-slack"]);
+    expect(host.find('[data-test="alert-notify-on-recovery-plan-ops-slack"]').text()).toBe(
+      `ops-slack — ${warns ? looksNew : message}`,
+    );
+    expect(host.find('[data-test="alert-notify-on-recovery-hint"]').exists()).toBe(false);
+    queryClient.clear();
   });
 
   it("shows the template hint only when a destination renders the template", () => {
@@ -1022,7 +1071,11 @@ describe("AlertSettings — combined destinations + workflows target control", (
       { global: { plugins: [makeStore(), i18n] } },
     );
     expect(findTargets(host).props("describe")).toEqual({
-      ops: { type: t("components.badge.destinationType.email"), target: "oncall@x.io" },
+      ops: {
+        type: t("components.badge.destinationType.email"),
+        target: "oncall@x.io",
+        usedBy: null,
+      },
     });
   });
 

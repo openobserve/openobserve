@@ -155,7 +155,7 @@ describe("AlertTargetsSelect", () => {
     it("describe names each destination's type and target in its row and search, not its chip", () => {
       const describe = {
         pager: { type: "PagerDuty", target: "events.pagerduty.com" },
-        chat: { type: "Slack webhook", target: null },
+        chat: { type: "Slack webhook", target: null, usedBy: 3 },
       };
       const options = ["pager", "chat"];
       const rows = select(createWrapper({ destinationOptions: options, describe })).props(
@@ -172,9 +172,11 @@ describe("AlertTargetsSelect", () => {
         undefined,
       );
       const list = createWrapper({ destinationOptions: options, describe, list: true });
-      expect(list.find('[data-test="alert-destinations-list"]').text()).toContain(
-        "pager · PagerDuty · events.pagerduty.com",
-      );
+      const meta = list.findAll('[data-test="alert-destinations-list-option-meta"]');
+      expect(meta.map((m) => m.text())).toEqual([
+        "PagerDuty · events.pagerduty.com",
+        `Slack webhook · ${i18n.global.t("alerts.form.destination.usedBy", { count: 3 }, 3)}`,
+      ]);
     });
 
     it("normalizes plain-string workflow options", () => {

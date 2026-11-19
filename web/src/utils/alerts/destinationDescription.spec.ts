@@ -61,4 +61,12 @@ describe("describeDestinations", () => {
     const described = describeDestinations([destination, null], t);
     expect([described.a.type, described.a.target]).toEqual(expected);
   });
+
+  it.each([
+    [undefined, null],
+    [[], 0],
+    [[{ consumer: "alert" }, { consumer: "composite_alert" }, { consumer: "pipeline" }], 2],
+  ])("counts the alerts in uses %j as %s", (uses, expected) => {
+    expect(describeDestinations([{ name: "a", type: "http", uses }], t).a.usedBy).toBe(expected);
+  });
 });

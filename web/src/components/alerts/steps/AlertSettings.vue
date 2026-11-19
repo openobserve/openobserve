@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destination-details="destinationDetails"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
-            @refresh="$emit('refresh:destinations')"
+            @refresh="refreshDestinations"
           />
 
           <OSettingRow
@@ -367,7 +367,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="row in recoveryPlan"
                       :key="row.name"
-                      class="text-text-secondary text-xs"
+                      class="text-xs"
+                      :class="row.warn ? 'text-status-warning-text' : 'text-text-secondary'"
                       :data-test="`alert-notify-on-recovery-plan-${row.name}`"
                     >
                       {{ row.name }} — {{ row.action }}
@@ -377,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="text-text-secondary text-xs"
                       data-test="alert-notify-on-recovery-hint"
                     >
-                      {{ t("alerts.alertSettings.notifyOnRecoveryTemplateHint") }}
+                      {{ t("alerts.alertSettings.recoveryStatusHint") }}
                     </div>
                   </template>
                 </div>
@@ -396,10 +397,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destination-options="formattedDestinations"
                 :label="t('alerts.alertSettings.recoveryDestinations')"
                 :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
+                :placeholder="t('alerts.alertSettings.recoverySameAsAlert')"
                 :supports-workflows="false"
                 :destination-details="destinationDetails"
                 @update:destinations="$emit('update:recoveryDestinations', $event)"
-                @refresh="$emit('refresh:destinations')"
+                @refresh="refreshDestinations"
               />
             </AlertTierPlace>
 
@@ -497,7 +499,10 @@ import {
 } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useQuery } from "@tanstack/vue-query";
 import config from "@/aws-exports";
+import { templatesQuery } from "@/services/alert_templates.queries";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -511,7 +516,13 @@ import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
 import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
 import { ALERT_FORM_CONTEXT_KEY, type AlertLineNote } from "@/components/alerts/alertFormContext";
 import { describeDestinations } from "@/utils/alerts/destinationDescription";
-import { durationWords, everyWords, notifyHelp } from "@/utils/alerts/alertCopy";
+import {
+  durationWords,
+  everyWords,
+  formatNumber,
+  notifiesPerGroup,
+  notifyHelp,
+} from "@/utils/alerts/alertCopy";
 import {
   crossesOnlyWhenEverySampleDoes,
   finerCheckMinutes,
@@ -532,6 +543,9 @@ import { visibleFieldError } from "@/lib/forms/Form/fieldError";
 import { shownFieldError } from "@/composables/alerts/shownFieldError";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/zincutils";
 import { useLookBackLink, type LinkedField } from "@/composables/alerts/useLookBackLink";
+
+// Below this many groups firing at once, a repeat per group is not a flood.
+const MANY_GROUPS = 5;
 
 export default defineComponent({
   name: "Step3AlertConditions",
@@ -616,6 +630,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
+    const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
 
     // Same gate as the Incidents menu: enterprise/cloud build AND the backend
     // /config flag. `=== true` keeps it hidden while /config is still loading.
@@ -656,7 +671,27 @@ export default defineComponent({
           oncall_team: props.formData?.oncall_team,
         }),
     );
-    const destinationDetails = computed(() => describeDestinations(props.destinationObjects, t));
+    // The parent's list has no usage; this read adds how many alerts already send to each one.
+    const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
+    const destinationUsage = useQuery(() => ({
+      ...destinationsQuery(orgId.value, "alert", true),
+      enabled: !!orgId.value,
+    }));
+    const destinationDetails = computed(() => {
+      const uses = new Map(
+        (destinationUsage.data.value ?? []).map((d: any) => [d?.name, d?.uses ?? []]),
+      );
+      return describeDestinations(
+        props.destinationObjects.map((d: any) =>
+          uses.has(d?.name) ? { ...d, uses: uses.get(d.name) } : d,
+        ),
+        t,
+      );
+    });
+    const refreshDestinations = () => {
+      emit("refresh:destinations");
+      void destinationUsage.refetch();
+    };
     const pendingPeriodError = fieldError("_ui.pendingPeriod");
     // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
     const isForecastMode = form
@@ -812,7 +847,7 @@ export default defineComponent({
       });
       if (missed === undefined) return null;
       return {
-        text: t("alerts.guard.breachUnseen", { duration: durationWords(missed, t) }),
+        text: t("alerts.guard.breachStraddles", { duration: durationWords(missed, t) }),
         ...checkEveryFix(period),
         warning: true,
         dataTest: "alert-settings-breach-warning",
@@ -926,7 +961,8 @@ export default defineComponent({
     const silenceHint = computed<AlertLineNote | null>(() => {
       const checkMinutes = frequencyMinutes();
       const silenceMinutes = Number(fv("trigger_condition.silence"));
-      if (!(silenceMinutes > 0) || !(checkMinutes > silenceMinutes)) return null;
+      if (!(silenceMinutes > 0)) return null;
+      if (!(checkMinutes > silenceMinutes)) return manyGroupsHint.value;
       const minutes = Math.ceil(checkMinutes);
       return {
         text: t("alerts.form.remind.noEffect", { every: everyWords(minutes, t) }),
@@ -934,6 +970,40 @@ export default defineComponent({
         warning: true,
         run: () => setFV("trigger_condition.silence", minutes),
         dataTest: "alert-settings-silence-hint",
+      };
+    });
+
+    // Each group repeats on its own wait, so many groups over at once means that many messages per wait.
+    const manyGroupsHint = computed<AlertLineNote | null>(() => {
+      const status = formContext?.previewStatus?.value;
+      const count = Number(status?.count ?? 0);
+      const query = fv("query_condition");
+      if (!status?.wouldTrigger || count < MANY_GROUPS || !notifiesPerGroup(query)) return null;
+      if (fv("suppress_repeats") === true) return null;
+      const params = {
+        count: formatNumber(count),
+        wait: durationWords(Number(fv("trigger_condition.silence")), t),
+      };
+      const key: I18nKey =
+        query?.type === "promql"
+          ? status.atLeast
+            ? "alerts.form.remind.manySeriesAtLeast"
+            : "alerts.form.remind.manySeries"
+          : status.atLeast
+            ? "alerts.form.remind.manyGroupsAtLeast"
+            : "alerts.form.remind.manyGroups";
+      return {
+        text: t(key, params, count),
+        action:
+          repeatSuppressionAvailable && formContext?.openSetting
+            ? t("alerts.alertSettings.suppressRepeats")
+            : null,
+        warning: true,
+        run: () => {
+          setFV("suppress_repeats", true);
+          void formContext?.openSetting?.("suppressRepeats");
+        },
+        dataTest: "alert-settings-silence-many-groups",
       };
     });
 
@@ -966,6 +1036,29 @@ export default defineComponent({
         ? "alerts.alertSettings.recoveryJiraComment"
         : "alerts.alertSettings.recoveryChatMessage";
 
+    // The alert's own template wins over the destination's (server choose_template); only one that
+    // prints the status tells a recovery apart from a new firing.
+    const templates = useQuery(() => ({
+      ...templatesQuery(store.state.selectedOrganization?.identifier ?? ""),
+      enabled: !!store.state.selectedOrganization?.identifier,
+    }));
+    const templateOf = (name: any) => {
+      const destination = props.destinationObjects.find((d: any) => d?.name === name);
+      const templateName = props.formData?.template || destination?.template;
+      return (templates.data.value ?? []).find((tp: any) => tp?.name === templateName) ?? null;
+    };
+    const messageRow = (name: any) => {
+      const template = isJira(name) ? null : templateOf(name);
+      const hides = !!template && !String(template.body ?? "").includes("alert_status");
+      return {
+        action: hides
+          ? t("alerts.alertSettings.recoveryLooksNew", { template: raw(template.name) })
+          : t(messageKeyFor(name)),
+        warn: hides,
+        known: !!template || isJira(name),
+      };
+    };
+
     // Ticket closes always go to the firing's own destinations; only the message can be
     // redirected, so an override lists both halves rather than replacing the first.
     const recoveryPlan = computed(() => {
@@ -977,7 +1070,9 @@ export default defineComponent({
           return {
             name: String(name),
             isPlatform: !!platformKey || isJira(name),
-            action: t(platformKey ?? messageKeyFor(name)),
+            ...(platformKey
+              ? { action: t(platformKey), warn: false, known: true }
+              : messageRow(name)),
           };
         });
       if (!redirected) return rows;
@@ -985,11 +1080,11 @@ export default defineComponent({
         props.recoveryDestinations.map((name: any) => ({
           name: String(name),
           isPlatform: isJira(name),
-          action: t(messageKeyFor(name)),
+          ...messageRow(name),
         })),
       );
     });
-    const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.isPlatform));
+    const hasChatRecovery = computed(() => recoveryPlan.value.some((row) => !row.known));
 
     // Row and group-by values exist only at fire time, so their placeholders stay as chips.
     const incidentTitlePreview = computed(() => {
@@ -1181,7 +1276,6 @@ export default defineComponent({
         ]
       : [];
     onBeforeUnmount(() => unregister.forEach((off) => off()));
-    const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
     watchEffect(() => {
       if (formContext?.conditionNote) formContext.conditionNote.value = conditionNote.value;
     });
@@ -1226,6 +1320,7 @@ export default defineComponent({
       setPendingPeriodMinutes,
       notifyLines,
       destinationDetails,
+      refreshDestinations,
       // Field refs for the parent focus manager
       periodFieldRef,
       silenceFieldRef,

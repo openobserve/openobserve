@@ -50,7 +50,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="option.listLabel ?? option.label"
             class="border-border-default rounded-default border px-3 py-2"
             data-test="alert-destinations-list-option"
-          />
+          >
+            <template v-if="option.listMeta" #label>
+              <span class="flex min-w-0 flex-col">
+                <span class="text-text-body text-sm break-words">{{ option.label }}</span>
+                <span
+                  class="text-text-secondary text-xs break-words"
+                  data-test="alert-destinations-list-option-meta"
+                  >{{ option.listMeta }}</span
+                >
+              </span>
+            </template>
+          </OCheckbox>
         </div>
       </OCheckboxGroup>
       <p v-else class="text-text-secondary m-0 text-sm" data-test="alert-destinations-list-empty">
@@ -164,6 +175,8 @@ interface Option {
   label: I18nText;
   value: string;
   listLabel?: I18nText;
+  /** What the destination is, who it reaches and how many alerts already use it. */
+  listMeta?: I18nText;
   searchText?: string;
 }
 // Option lists may be plain strings (destinations = `getFormattedDestinations`
@@ -260,10 +273,15 @@ const described = (name: string, label: I18nText): Partial<Option> => {
   const detail = props.describe?.[name];
   if (!detail) return {};
   const params = { name: label, type: detail.type, target: detail.target };
+  const facts = [detail.type, detail.target].filter((fact): fact is I18nText => !!fact);
+  if (typeof detail.usedBy === "number") {
+    facts.push(t("alerts.form.destination.usedBy", { count: detail.usedBy }, detail.usedBy));
+  }
   return {
     listLabel: detail.target
       ? t("alerts.form.destination.row", params)
       : t("alerts.form.destination.rowNoTarget", params),
+    listMeta: raw(facts.join(" · ")),
     searchText: [detail.type, detail.target].filter(Boolean).join(" "),
   };
 };

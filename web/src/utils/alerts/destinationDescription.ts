@@ -26,6 +26,8 @@ import { joinListMore } from "@/utils/alerts/alertCopy";
 export interface DestinationDescription {
   type: I18nText;
   target: I18nText | null;
+  /** Alerts that send here, when the list was read with its usage; null when unknown. */
+  usedBy: number | null;
 }
 
 interface DestinationLike {
@@ -37,8 +39,11 @@ interface DestinationLike {
   destination_type_name?: string | null;
   template?: string | null;
   metadata?: string | Record<string, string> | null;
+  uses?: { consumer?: string }[] | null;
   [key: string]: unknown;
 }
+
+const ALERT_CONSUMERS = new Set(["alert", "composite_alert"]);
 
 const SLACK = raw("Slack");
 
@@ -74,7 +79,12 @@ export function describeDestination(
   destination: DestinationLike,
   t: TranslateFn,
 ): DestinationDescription {
-  return { type: typeOf(destination, t), target: targetOf(destination, t) };
+  const uses = Array.isArray(destination.uses) ? destination.uses : null;
+  return {
+    type: typeOf(destination, t),
+    target: targetOf(destination, t),
+    usedBy: uses ? uses.filter((use) => ALERT_CONSUMERS.has(use?.consumer ?? "")).length : null,
+  };
 }
 
 /** Descriptions keyed by destination name; entries without a name are skipped. */
