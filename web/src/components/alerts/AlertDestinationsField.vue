@@ -125,20 +125,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("workflow.create") }}
           </OButton>
         </span>
+        <ORefreshButton
+          v-if="settingRow"
+          class="-my-1"
+          layout="inline"
+          data-test="alert-settings-refresh-destinations-btn"
+          :tooltip="t('alerts.alertSettings.refreshDestinations')"
+          @click="refreshTargets"
+        />
       </div>
     </div>
-    <template v-if="settingRow" #actions>
-      <OButton
-        data-test="alert-settings-refresh-destinations-btn"
-        variant="ghost"
-        size="icon-circle-sm"
-        :title="t('alerts.alertSettings.refreshDestinations')"
-        :aria-label="t('alerts.alertSettings.refreshDestinations')"
-        @click="refreshTargets"
-      >
-        <OIcon name="refresh" size="sm" />
-      </OButton>
-    </template>
   </component>
 </template>
 
@@ -152,6 +148,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import { workflowsQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
@@ -229,7 +226,7 @@ const tooltipText = computed<I18nText>(() =>
 );
 const rootProps = computed(() =>
   props.settingRow
-    ? { label: labelText.value, info: tooltipText.value || undefined, fill: true }
+    ? { label: labelText.value, info: tooltipText.value || undefined, fill: true, wide: true }
     : { class: "flex items-start max-md:flex-col max-md:gap-1" },
 );
 

@@ -42,7 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="t('alerts.destination')"
         @update:model-value="onUpdate"
       >
-        <div class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-x-4 gap-y-1">
+        <!-- Two columns wrap each name over its meta, so they only pay off for a long list. -->
+        <div
+          class="grid gap-x-4 gap-y-1"
+          :class="
+            listOptions.length > 8
+              ? 'grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]'
+              : 'grid-cols-1'
+          "
+        >
           <OCheckbox
             v-for="option in listOptions"
             :key="option.value"

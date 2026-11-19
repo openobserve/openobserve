@@ -122,14 +122,12 @@ describe("AlertDestinationsField workflows", () => {
     expect(wrapper.emitted("refresh")).toHaveLength(1);
   });
 
-  it("as a setting row, puts refresh in the actions column and New destination on the status line", async () => {
+  it("as a setting row, puts refresh beside New destination on the links line", async () => {
     wrapper = mountField({ settingRow: true });
     await flushPromises();
     expect(wrapper.findComponent(TargetsStub).props("oneLine")).toBe(true);
-    const refresh = wrapper.find(
-      '[data-o-setting-row-actions] [data-test="alert-settings-refresh-destinations-btn"]',
-    );
-    await refresh.trigger("click");
+    expect(wrapper.find("[data-o-setting-row-actions]").exists()).toBe(false);
+    await wrapper.find('[data-test="alert-settings-refresh-destinations-btn"]').trigger("click");
     await flushPromises();
     expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
     expect(wrapper.emitted("refresh")).toHaveLength(1);
