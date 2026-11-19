@@ -12263,7 +12263,9 @@
         "anomalyLearns": "Learns what is normal from the last {days} days.",
         "anomalyLearnsHas": "Learns what is normal from the {count} day this stream has. | Learns what is normal from the {count} days this stream has.",
         "anomalyLearnsFlat": "Learns what is normal from the {count} day this stream has, the same at every hour of the day. | Learns what is normal from the {count} days this stream has, the same at every hour of the day.",
-        "anomalyLearnsWaits": "Starts learning once it has {measures} measures (about {duration})."
+        "anomalyLearnsWaits": "Starts learning once it has {measures} measures (about {duration}).",
+        "compareNeedsBaseline": "Stays quiet while the earlier window has no data, so a rise from zero never fires.",
+        "compareAnyBaseline": "While the earlier window has no data, any match fires."
       },
       "watch": {
         "title": "What should we watch?",
@@ -12335,15 +12337,14 @@
         "whichEventsSql": "Each returned row counts. To alert on a value, filter it with HAVING.",
         "whichEventsPromql": "The value it returns is checked",
         "rowTemplate": "How each row reads",
-        "descriptionPlaceholder": "What should someone do when this fires?"
+        "descriptionPlaceholder": "What should someone do when this fires?",
+        "whichEventsSqlSpans": "Each returned row counts. To alert on a value, filter it with HAVING. Span duration is stored in microseconds: 500 ms is 500000."
       }
     },
     "moreActions": "More actions",
-    "promRuleMode": "Rule mode",
     "promRulePreview": "{count} returned series match now. Each series must complete the pending period before firing.",
     "promRuleModeDescription": "Alerts on every series the query returns, so put the comparison in the query (for example > 0.9). With Must last set, each series alerts on its own.",
     "promRuleModePendingMulti": "A pending period requires an independent timer for each series, so Multi alert cannot be disabled.",
-    "promRuleModeConflict": "Rule mode can't use a threshold or warning. Put the comparison in the query.",
     "allAlerts": "All Alerts",
     "compositeAlert": "Composite",
     "import": {
@@ -13933,7 +13934,6 @@
       "notifyOnRecovery": "Recovery message",
       "notifyOnRecoveryNeedsDestination": "Needs a destination first",
       "notifyOnRecoveryTooltip": "Send one message to the destinations above when this alert stops firing.",
-      "notifyOnRecoveryTemplateHint": "Destinations that reuse your template must include {'{'}alert_status{'}'}, or the recovery message will look like a new alert.",
       "recoveryDestinations": "Recovery destination",
       "recoveryDestinationsTooltip": "Leave empty to announce the recovery wherever the alert fired. Pick destinations here to send it somewhere else instead. PagerDuty, Opsgenie and ServiceNow still close the ticket their own firing opened.",
       "recoveryResolvesIncident": "resolves the incident",
@@ -13952,7 +13952,10 @@
       "learnAboutVariables": "Learn about variables",
       "suppressRepeatsHelp": "Notifies only when it starts firing or changes level; no repeats while it stays firing.",
       "suppressRepeatsHelpEach": "Per {labels}: notifies only when one starts firing or changes level; no repeats.",
-      "suppressRepeatsHelpEachSeries": "Per series: notifies only when one starts firing or changes level; no repeats."
+      "suppressRepeatsHelpEachSeries": "Per series: notifies only when one starts firing or changes level; no repeats.",
+      "recoveryLooksNew": "new message that reads like a new alert: template {template} doesn't show the status",
+      "recoveryStatusHint": "A template that doesn't print the alert's status makes the recovery read like a new alert.",
+      "recoverySameAsAlert": "Same as the alert"
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -14006,7 +14009,6 @@
       "hideVrlEditor": "Remove function",
       "vrlToggle": "Function",
       "alertIfValueIsTooltip": "Alert when a series' value meets this comparison. Example: at least 100 alerts when a series is 100 or more.",
-      "sqlHavingClauseWarning": "Having clause in query will apply before the filters of alert if condition",
       "havingSeriesTooltip": "Minimum number of time series that must satisfy the condition above to trigger the alert.",
       "clearMultiWindowsMessage": "Multi-windows are configured. To enable {mode} mode, we need to clear them. Do you want to proceed?",
       "cron": "Cron",
@@ -14045,7 +14047,8 @@
       },
       "customMode": "Custom",
       "groupByHelpLabels": "Checks each combination of these labels. Choose below: one alert, or one per combination.",
-      "alertWhenTooltip": "Alert when a series value meets this comparison. Example: more than 100 alerts when a series is above 100."
+      "alertWhenTooltip": "Alert when a series value meets this comparison. Example: more than 100 alerts when a series is above 100.",
+      "sqlHavingRunsFirst": "The query's HAVING runs first, so only the rows it keeps are checked against the condition below."
     },
     "anomaly": {
       "addFilter": "Add filter",
@@ -15404,7 +15407,6 @@
         "tags": "Tags",
         "generatedSql": "Generated SQL",
         "vrl": "Function",
-        "ruleExpression": "Rule mode",
         "anomalyDirection": "Direction",
         "anomalyWindow": "Alert window",
         "anomalySqlPreview": "Generated SQL",
@@ -15413,7 +15415,8 @@
         "suppressRepeats": "Suppress repeats",
         "anomalyRecordOnly": "Record only",
         "anomalyTags": "Tags",
-        "anomalyPriority": "Priority"
+        "anomalyPriority": "Priority",
+        "queryComparison": "Threshold in query"
       },
       "add": {
         "warning": "Add warning",
@@ -15716,7 +15719,11 @@
         "matchChecks": "Set to {duration}",
         "whileFiring": "While it stays firing, it repeats after this long.",
         "whileFiringEach": "Per {labels}: while one stays firing, it repeats after this long.",
-        "whileFiringEachSeries": "Per series: while one stays firing, it repeats after this long."
+        "whileFiringEachSeries": "Per series: while one stays firing, it repeats after this long.",
+        "manyGroups": "{count} group over now: up to {count} message every {wait}. | {count} groups over now: up to {count} messages every {wait}.",
+        "manyGroupsAtLeast": "{count}+ groups over now: {count}+ messages every {wait}.",
+        "manySeries": "{count} series over now: up to {count} message every {wait}. | {count} series over now: up to {count} messages every {wait}.",
+        "manySeriesAtLeast": "{count}+ series over now: {count}+ messages every {wait}."
       },
       "units": {
         "days": "days",
@@ -15754,7 +15761,10 @@
         "cron": "Each check looks at the {period} minutes before it runs.",
         "realtime": "Each event is checked as it arrives.",
         "composite": "Checks whenever one of its alerts changes state.",
-        "forecast": "Each check fits the trend over the last {window}."
+        "forecast": "Each check fits the trend over the last {window}.",
+        "alignedBlocks": "Each check counts the last {period} as one fixed block on the clock, so a burst split across two blocks is counted half in each.",
+        "promqlLatest": "Each check reads each series' latest value within the last {period}.",
+        "promqlAny": "Each check counts a series that crossed at any point in the last {period}. {overlap}"
       },
       "header": {
         "editName": "Edit name",
@@ -15837,7 +15847,9 @@
         },
         "factorLine": "Fires at more than {factor} times that window's count",
         "factor": "Times the past window",
-        "needsBaseline": "Only fire once the past window has data"
+        "needsBaseline": "Only fire once the past window has data",
+        "needsBaselineOn": "A rise from zero never fires, and nothing fires until the stream has history.",
+        "needsBaselineOff": "Any match fires while the earlier window is empty, such as on a new stream."
       },
       "forecast": {
         "thresholdPlaceholder": "e.g. 90",
@@ -15871,11 +15883,14 @@
         "fromQueryMany": "Reads {metrics}, from the query"
       },
       "ruleMode": {
-        "keptThreshold": "Kept your threshold in the query: {expression}"
+        "keptThreshold": "Kept your threshold in the query: {expression}",
+        "help": "Each series the query returns fires, so write the comparison (for example > 0.9) in the query.",
+        "conflict": "With the threshold in the query, clear the threshold and warning here."
       },
       "destination": {
         "row": "{name} · {type} · {target}",
-        "rowNoTarget": "{name} · {type}"
+        "rowNoTarget": "{name} · {type}",
+        "usedBy": "Not used by any alert yet | Used by {count} alert | Used by {count} alerts"
       },
       "window": {
         "inTheLast": "in the last {n} minute | in the last {n} minutes"
@@ -15933,12 +15948,12 @@
       "fieldEmptyIn": "{field} has no values in the last {window}.",
       "mustLastOneCheckFix": "Checks every {every}, so this is 1 check.",
       "checkEvery": "Check every {every}",
-      "breachUnseen": "A breach can go unseen for {duration} between checks.",
       "ratioRange": "Values here run from {min} to {max}, so {value} % is {fix}.",
       "ratioDeclared": "This metric is a ratio where 1 means 100 %, so {value} % is {fix}.",
       "ratioUse": "Use {fix}",
       "valueRange": "Values here run from {min} to {max}.",
-      "valueRangePending": "The preview shows recent values to compare with."
+      "valueRangePending": "The preview shows recent values to compare with.",
+      "breachStraddles": "A breach under {duration} can straddle two checks and be missed."
     },
     "discovery": {
       "lastEvent": "Last event {ago} ago · {rate}/h",
@@ -16106,7 +16121,6 @@
       "heldWait": "The other firing came within {wait} of a notification, so Notify at most every held it back. | The other {count} firings came within {wait} of a notification, so Notify at most every held them back."
     },
     "conditionCountWith": "{noun} with",
-    "promRuleModeHelp": "Every series the query returns alerts: the comparison is in the query (for example > 0.9), with no threshold here.",
     "lookAlike": {
       "line": "Similar alert already set up: {names} | Similar alerts already set up: {names}"
     }
