@@ -227,6 +227,10 @@ describe("AddAlert with an AutoObserve prefill", () => {
     sessionStorage.clear();
     queryClient.clear();
     vi.mocked(toast).mockClear();
+    // The folder list feeds the duplicate-name check on mount; a listed name left by an earlier test blocks Save.
+    vi.mocked(alertsService.listByFolderId)
+      .mockReset()
+      .mockResolvedValue({ data: { list: [] } } as any);
     vi.mocked(alertsService.get_by_alert_id).mockImplementation(
       async () => ({ data: structuredClone(savedAlert) }) as any,
     );
