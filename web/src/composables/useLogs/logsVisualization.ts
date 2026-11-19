@@ -79,6 +79,7 @@ export const getBuildConfig = (dashboardPanelData: any) => {
       },
     },
     joins: currentQuery.joins || [],
+    limit: currentQuery.config?.limit || 0,
     customQuery: currentQuery.customQuery || false,
     query: currentQuery.query || "",
   };
