@@ -239,6 +239,8 @@ const props = defineProps<{ alert: any; anomalyId: string }>();
 const emit = defineEmits<{
   /** The page shows another model than the server: reload the config, and this chart follows. */
   reload: [];
+  /** A forced summary read landed; a run since the last one may have changed the config's notice. */
+  refreshed: [];
 }>();
 
 const { t } = useI18nTyped();
@@ -574,6 +576,7 @@ async function loadSummary(force = false) {
     summary.value = res;
     summaryFailed.value = false;
     nowUs.value = Date.now() * 1000;
+    if (force) emit("refreshed");
     // Keyed by both models, so a second retrain to 0 is not taken for the first.
     if (res.model_version !== loadedModel.value) {
       requestReload(`model:${loadedModel.value}:${res.model_version}`);

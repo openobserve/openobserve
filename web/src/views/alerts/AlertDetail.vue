@@ -354,11 +354,11 @@
               <template v-else-if="alert">
                 <!-- The notice text is the server's own message: it carries the dropped row count. -->
                 <OBanner
-                  v-if="alert.notice_class === 'duplicate_rows' && alert.last_error"
+                  v-if="duplicateRowsNotice"
                   variant="warning"
                   icon="warning"
                   class="mb-3"
-                  :content="raw(alert.last_error)"
+                  :content="raw(duplicateRowsNotice)"
                   data-test="alerts-alertdetail-anomaly-duplicate-rows"
                 />
                 <AnomalyDetectionChart
@@ -366,6 +366,7 @@
                   :alert="alert"
                   :anomaly-id="alertId"
                   @reload="fetchAlert"
+                  @refreshed="noticeQuery.refetch()"
                 />
               </template>
             </OContent>
@@ -485,6 +486,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
 import { alertAcksQuery, alertsListQuery } from "@/services/alerts.queries";
+import { anomalyConfigQuery } from "@/services/anomaly_detection.queries";
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
@@ -782,6 +784,17 @@ const listRow = computed<AlertListRow | null>(
 );
 
 const folderId = computed(() => routeFolderId.value || listRow.value?.folder_id || "");
+// The notice is rewritten by each run, so the summary's scheduled refresh re-reads it here.
+const noticeQuery = useQuery(() =>
+  Object.assign(anomalyConfigQuery(orgId.value, alertId.value), {
+    enabled: !!orgId.value && !!alertId.value && isAnomalyAlert.value && !anomalyLocked.value,
+  }),
+);
+const duplicateRowsNotice = computed<string | null>(() => {
+  const config = noticeQuery.data.value ?? alert.value;
+  return config?.notice_class === "duplicate_rows" ? config.last_error || null : null;
+});
+
 const acksQuery = useQuery(() =>
   Object.assign(alertAcksQuery(orgId.value, alertId.value, folderId.value), {
     enabled: !!orgId.value && !!alertId.value && !!folderId.value,

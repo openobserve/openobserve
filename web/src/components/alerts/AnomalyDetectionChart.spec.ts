@@ -600,6 +600,14 @@ describe("AnomalyDetectionChart", () => {
       expect(explore).toHaveBeenCalledTimes(2);
     });
 
+    it("reports each forced read, not the mount read, so the page re-reads the notice", async () => {
+      wrapper = await mountChart();
+      expect(wrapper.emitted("refreshed")).toBeUndefined();
+      await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "6h");
+      await settle();
+      expect(wrapper.emitted("refreshed")).toHaveLength(1);
+    });
+
     it("opens the endpoint's link from the primary button", async () => {
       wrapper = await mountChart();
       await wrapper.find('[data-test="alerts-anomalysummarystrip-open"]').trigger("click");

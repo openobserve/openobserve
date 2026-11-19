@@ -30,6 +30,11 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/anomaly_detection", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { get: vi.fn() } });
+});
+
 // The view reads its identity from the route; a hermetic route beats standing
 // up the whole app router with its guards.
 const mockRouterPush = vi.fn();
@@ -55,6 +60,7 @@ import AlertDetail from "@/views/alerts/AlertDetail.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import alertsService from "@/services/alerts";
+import anomalyService from "@/services/anomaly_detection";
 import { queryClient } from "@/composables/query/queryClient";
 import type { AlertGroupTransition } from "@/ts/interfaces/alert";
 
@@ -200,6 +206,7 @@ async function mountView({
       data: alert,
     } as any);
   }
+  vi.mocked(anomalyService.get).mockResolvedValue({ data: alert } as any);
   vi.mocked(alertsService.list_groups).mockResolvedValue({
     data: groupsResponse,
   } as any);
@@ -672,6 +679,29 @@ describe("AlertDetail — anomaly alerts", () => {
     expect(wrapper.find('[data-test="alerts-alertdetail-anomaly-duplicate-rows"]').exists()).toBe(
       false,
     );
+  });
+
+  it("raises then clears the duplicate-rows notice as scheduled refreshes land", async () => {
+    const banner = '[data-test="alerts-alertdetail-anomaly-duplicate-rows"]';
+    const clean = { ...makeAnomalyAlert(), notice_class: null, last_error: null };
+    wrapper = await mountView({ alert: clean as any });
+    await flushPromises();
+    expect(wrapper.find(banner).exists()).toBe(false);
+    const chart = wrapper.findComponent({ name: "AnomalyDetectionChart" });
+
+    const notice = "Last run kept one row per time bucket and dropped 37 rows.";
+    vi.mocked(anomalyService.get).mockResolvedValue({
+      data: { ...clean, notice_class: "duplicate_rows", last_error: notice },
+    } as any);
+    chart.vm.$emit("refreshed");
+    await flushPromises();
+    expect(wrapper.find(banner).text()).toContain("dropped 37 rows");
+
+    vi.mocked(anomalyService.get).mockResolvedValue({ data: clean } as any);
+    chart.vm.$emit("refreshed");
+    await flushPromises();
+    expect(wrapper.find(banner).exists()).toBe(false);
+    expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(1);
   });
 
   it("reloads the config when the chart reports another model", async () => {
