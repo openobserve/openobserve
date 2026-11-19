@@ -102,7 +102,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destinations. Deliberately NOT name=-bound: one control writes two
              form fields, so both go up through the parent's setFieldValue via
              the events below. -->
+          <!-- A new alert, or one opened with nobody to tell, gets the Who to tell line; its Pick holds this same field. -->
+          <OSettingRow
+            v-if="whoToTellLine"
+            ref="destinationsFieldRef"
+            :label="t('alertStarter.whoToTell.label')"
+            :error="whoToTellError"
+            fill
+            wide
+            data-test="alert-settings-who-to-tell-row"
+          >
+            <WhoToTell
+              bare
+              :model-value="destinations"
+              :workflows="workflows"
+              :oncall-team="formData?.oncall_team"
+              :stream-type="formData?.stream_type"
+              :stream-name="formData?.stream_name"
+              @update:model-value="$emit('update:destinations', $event)"
+              @update:workflows="$emit('update:workflows', $event)"
+            />
+          </OSettingRow>
           <AlertDestinationsField
+            v-else
             :wrap="!!sectionTargets"
             :setting-row="!!sectionTargets"
             :list="!!sectionTargets"
@@ -449,6 +471,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import WhoToTell from "@/components/alerts/starter/WhoToTell.vue";
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
 import AlertTierPlace from "@/components/alerts/AlertTierPlace.vue";
 import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
@@ -493,6 +516,7 @@ export default defineComponent({
     OSelect,
     OSettingRow,
     AlertDestinationsField,
+    WhoToTell,
     AlertSentenceRow,
     AlertTierPlace,
     AlertMessageLine,
@@ -605,6 +629,13 @@ export default defineComponent({
           oncall_team: props.formData?.oncall_team,
         }),
     );
+    // Decided once on open, so picking a destination in an edit never swaps the row under the user.
+    const openedWithoutDestinations =
+      !formContext?.isEditing?.value || (props.destinations ?? []).length === 0;
+    const whoToTellLine = computed(
+      () => !!props.sectionTargets && !props.destinationRequired && openedWithoutDestinations,
+    );
+    const whoToTellError = computed(() => raw(destinationsError.value) || undefined);
     // The parent's list has no usage; this read adds how many alerts already send to each one.
     const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
     const destinationUsage = useQuery(() => ({
@@ -1210,6 +1241,8 @@ export default defineComponent({
       isForecastMode,
       silenceError,
       destinationsError,
+      whoToTellLine,
+      whoToTellError,
       notifiesNobody,
       pendingPeriodError,
       pendingPeriodWarning,

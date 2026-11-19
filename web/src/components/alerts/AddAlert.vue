@@ -1202,6 +1202,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span>{{ t("alerts.guard.firesOnSave") }}</span>
         </p>
+        <OInlineNotice
+          v-else-if="nobodyTold && !silentAutoObserveDraft"
+          variant="warning"
+          :text="t('alertStarter.whoToTell.nobodyTold')"
+          data-test="add-alert-nobody-told"
+        />
         <OButton
           data-test="add-alert-cancel-btn"
           variant="outline"
@@ -1308,6 +1314,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -1460,7 +1467,7 @@ import AlertRecentRuns from "./AlertRecentRuns.vue";
 import { useAlertEditHeader } from "@/composables/alerts/useAlertEditHeader";
 import { useAlertUnsavedChanges } from "@/composables/alerts/useAlertUnsavedChanges";
 import { cloneDeep, get } from "lodash-es";
-import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
+import { reachesSomeone, unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
 import { useOnCallSetup } from "@/composables/useOnCallSetup";
 import { getFoldersListByType } from "@/utils/commons";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -1523,6 +1530,7 @@ export default defineComponent({
   emits: ["update:list", "cancel:hideform", "refresh:destinations", "refresh:templates"],
   components: {
     OIcon,
+    OInlineNotice,
     OPageLayout,
     OBanner,
     JsonEditor,
@@ -2259,6 +2267,14 @@ export default defineComponent({
       if (alertForm.valueThresholdMissing.value) return null;
       return alertForm.valueThresholdUntouched.value ? "untouched" : "set";
     });
+    // Anomaly detection with its alerting off never notifies, so it is not told that nobody hears.
+    const nobodyTold = computed(() => {
+      if (alertForm.isAnomalyMode.value) {
+        const anomaly = alertForm.anomalyConfig.value ?? {};
+        return !!anomaly.alert_enabled && !anomaly.alert_destination_ids?.length;
+      }
+      return !reachesSomeone(alertForm.formData.value ?? {}, store.state.zoConfig);
+    });
 
     const tierContext = computed(() =>
       alertTierContext({
@@ -2939,6 +2955,7 @@ export default defineComponent({
       discardChanges,
       railVerdict,
       firesOnSave,
+      nobodyTold,
       RAIL_VERDICT_ICONS,
       tiers,
       onTierAdd,
