@@ -149,6 +149,14 @@ export interface AlertReviewLine {
   more?: Omit<AlertReviewLine, "id" | "more">[];
 }
 
+/** What a starter saves with unless the user opens a setting; null parts do not apply. */
+export interface AlertSaveDefaults {
+  targets: I18nText | null;
+  every: I18nText | null;
+  repeat: I18nText | null;
+  group: I18nText | null;
+}
+
 type ConditionKind =
   | "events"
   | "rows"
@@ -301,6 +309,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
   items: ComputedRef<SectionNavItem[]>;
   errorCounts: ComputedRef<Record<AlertSectionId, number>>;
   review: ComputedRef<AlertReviewLine[]>;
+  defaults: ComputedRef<AlertSaveDefaults>;
 } {
   const { t } = input;
   const { fieldMeta } = input;
@@ -1170,5 +1179,22 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     return lines;
   });
 
-  return { sections, items, errorCounts, review };
+  const defaults = computed<AlertSaveDefaults>(() => {
+    const fd = input.formData.value ?? {};
+    const tc = fd.trigger_condition ?? {};
+    const targets = targetNames(fd, { typed: true, oncall: true });
+    const silence = Number(tc.silence ?? 0);
+    const labels = mode.value === "false" && perGroup(fd) ? groupLabels(fd) : [];
+    return {
+      targets: targets.length ? joinListMore(targets, t) : null,
+      every:
+        mode.value === "false" && tc.frequency_type !== "cron"
+          ? compactDuration(Number(tc.frequency ?? 10) * 60, t)
+          : null,
+      repeat: silence > 0 ? compactDuration(silence * 60, t) : null,
+      group: labels.length ? joinListMore(labels, t) : null,
+    };
+  });
+
+  return { sections, items, errorCounts, review, defaults };
 }

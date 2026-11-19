@@ -166,6 +166,40 @@ describe("useAlertFormSections", () => {
     expect(byId(items.value, "notify")).toMatchObject({ state: "none", summary: "No one yet" });
   });
 
+  const perService = {
+    type: "custom",
+    aggregation: { function: "count", group_by: ["svc"], multi_alert: true, having: {} },
+  };
+  it.each([
+    [
+      "a grouped count with a destination",
+      scheduled({
+        destinations: ["O2K8SAlerts"],
+        logGroupBy: ["svc"],
+        query_condition: perService,
+        trigger_condition: every(5),
+      }),
+      { targets: "O2K8SAlerts (Slack webhook)", every: "5 min", repeat: "30 min", group: "svc" },
+    ],
+    [
+      "one alert telling no one",
+      scheduled({ trigger_condition: every(10) }),
+      { targets: null, every: "10 min", repeat: "30 min", group: null },
+    ],
+    [
+      "a real-time alert repeating on every event",
+      {
+        ...scheduled({ destinations: ["x"] }),
+        is_real_time: "true",
+        trigger_condition: every(1, { silence: 0 }),
+      },
+      { targets: "x", every: null, repeat: null, group: null },
+    ],
+  ])("states the defaults a starter saves with: %s", (_, form, want) => {
+    const { defaults } = setup(form, {}, false, true, false, { aggregation: true });
+    expect(defaults.value).toEqual(want);
+  });
+
   it("does not tick the condition before a stream is picked", () => {
     const { items } = setup(scheduled());
     expect(byId(items.value, "condition").state).toBe("none");
