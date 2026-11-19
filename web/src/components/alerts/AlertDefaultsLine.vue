@@ -16,10 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- What a starter saves with, each part a jump to its setting, so Save from step 1 hides nothing. -->
 <script setup lang="ts">
-import { inject } from "vue";
+import { computed, inject } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { AlertSaveDefaults } from "@/composables/alerts/useAlertFormSections";
+import { useIntentState } from "@/composables/alerts/useIntentState";
+import { describeIntent } from "@/utils/alerts/alertIntents";
+import { intentPhrase } from "@/utils/alerts/alertCopy";
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 
 const props = defineProps<{
@@ -32,14 +36,36 @@ const { t } = useI18nTyped();
 const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
 const open = (id: string) => void formContext?.openSetting?.(id);
 const separator = raw(" · ");
+
+// Step 1's picks, so the line opens with what the alert watches, as its suggested name does.
+const form = inject(FORM_CONTEXT_KEY, null);
+const intentState = useIntentState(form);
+const stream = form?.useStore(
+  (s: { values: { stream_name?: string; stream_type?: string } }) => s.values,
+);
+const watches = computed(() => {
+  const intent = intentState.intent;
+  const name = stream?.value?.stream_name ?? "";
+  if (!intent || !name) return null;
+  const type = stream?.value?.stream_type ?? "";
+  const d = describeIntent(intent, intentState.slots, {
+    stream: name,
+    metrics: type === "metrics",
+  });
+  return intentPhrase(d, type, t);
+});
 </script>
 
-<!-- Two lines held from first paint, so a longer destination or name never moves what is below. -->
+<!-- Three lines held from first paint, so a longer phrase, destination or name never moves what is below. -->
 <template>
   <p
-    class="text-text-secondary m-0 min-h-8 min-w-0 text-xs leading-4 break-words"
+    class="text-text-secondary m-0 min-h-12 min-w-0 text-xs leading-4 break-words"
     data-test="add-alert-defaults-line"
   >
+    <template v-if="watches"
+      ><span class="text-text-body" data-test="add-alert-defaults-watches">{{ watches }}</span
+      >{{ separator }}</template
+    >
     <i18n-t
       v-if="props.defaults.targets"
       keypath="alerts.intent.defaults.sendsTo"

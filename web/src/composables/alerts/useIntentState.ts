@@ -14,11 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive } from "vue";
-import type { IntentSlots } from "@/utils/alerts/alertIntents";
+import type { IntentId, IntentSlots } from "@/utils/alerts/alertIntents";
 
 export interface IntentState {
   /** The stream the picks were made on; another stream starts them over. */
   stream: string;
+  /** The starter the picks belong to, so the save line can say what the alert watches. */
+  intent: IntentId | null;
   slots: IntentSlots;
   /** The values a starter suggested; the user's first pick replaces them instead of joining them. */
   seeded: string[];
@@ -35,6 +37,7 @@ const states = new WeakMap<object, IntentState>();
 const fresh = (): IntentState =>
   reactive({
     stream: "",
+    intent: null,
     slots: {},
     seeded: [],
     alternative: undefined,

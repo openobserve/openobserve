@@ -204,6 +204,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-bind="STATE_TAG"
           :label="t('alerts.intent.needsChoice')"
         />
+        <OTag
+          v-else-if="unseenValues.length"
+          variant="warning-soft"
+          size="xs"
+          :label="t('alerts.intent.notSeen', { values: joinListMore(unseenValues, t) })"
+          data-test="add-alert-intent-value-not-seen"
+        />
         <OButton
           v-if="swapOffer"
           variant="link"
@@ -261,6 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :debounce="300"
               :error="!(periodMinutes > 0)"
               :aria-label="t('alerts.form.names.lookBack')"
+              :class="NO_SPIN"
               data-test="add-alert-intent-slot-window"
               @update:model-value="
                 setWindow($event === '' || $event === null ? '' : Number($event))
@@ -289,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               fit-content
               :min="1"
               :aria-label="t('alerts.intent.slots.factor')"
+              :class="NO_SPIN"
               data-test="add-alert-intent-slot-factor"
               @update:model-value="setFactor($event)"
             />
@@ -314,12 +323,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="guide.change(threshold.operator, $event)"
           />
           <span class="inline-flex" data-error-focus>
+            <!-- A form field binds its path once, so a measure turning into a duration needs a new field. -->
             <OFormInput
+              :key="guide.spanDuration.value ? DURATION_PATH : threshold.value"
               :name="guide.spanDuration.value ? DURATION_PATH : threshold.value"
               type="number"
               size="sm"
               fit-content
-              class="min-w-28!"
+              :class="['min-w-28!', NO_SPIN]"
               :placeholder="t('alerts.placeholders.value')"
               :aria-label="t('alerts.alertIfNoOfEvents')"
               data-test="add-alert-intent-slot-threshold-input"
@@ -498,6 +509,7 @@ import {
   buildMetricFill,
   cardsFolded,
   defaultAgg,
+  errorRateValues,
   fieldsBySamplePresence,
   intentsFor,
   isCounterLike,
@@ -585,6 +597,10 @@ const SLOT_MENU = { minWidth: "min(18rem, calc(100vw - 2rem))" };
 const LABEL_MENU = { minWidth: "min(28rem, calc(100vw - 2rem))" };
 // A slot hugs its value, never cut below the row's width, and keeps a field's width when nearly empty.
 const SLOT_FIELD = "w-fit! max-w-full min-w-28";
+// A narrow number field puts its spin arrows under the cursor: a triple-click there steps the value
+// instead of selecting it, so the next key appends ("10" became "75").
+const NO_SPIN =
+  "[&_input]:[appearance:textfield] [&_input::-webkit-inner-spin-button]:appearance-none [&_input::-webkit-outer-spin-button]:appearance-none";
 const STATE_TAG = {
   variant: "default-soft",
   size: "xs",
@@ -665,6 +681,7 @@ const categoriesFor = (id: IntentId | null): Ranked =>
           ? rankMetricCategory(profile.value, {
               groups: slots.groups,
               series: series.value[props.streamName],
+              outcome: id === "ratio",
             })
           : rankCategory(stringFields.value, shapes.value, id === "anyEvent" ? "variety" : "split"),
         ...(slots.groups ?? []),
@@ -830,6 +847,12 @@ watch(
     }
     if (isMetrics.value && props.streamName) await loadSeries(props.streamName);
   },
+  { immediate: true },
+);
+
+watch(
+  () => props.active,
+  (id) => (state.intent = id),
   { immediate: true },
 );
 
@@ -1091,6 +1114,14 @@ const seedValues = async (id: IntentId) => {
     return;
   }
   if (!wantsValue(id) || slots.values?.length) return;
+  if (isMetrics.value && id === "ratio") {
+    const picked = errorRateValues(spellingValues.value);
+    slots.values = picked.values;
+    slots.patterns = picked.patterns;
+    seeded.value = [...picked.values];
+    alternative.value = undefined;
+    return;
+  }
   if (isMetrics.value) {
     const value = starterValue(labelValues.value);
     slots.values = value ? [value] : [];
@@ -1100,6 +1131,11 @@ const seedValues = async (id: IntentId) => {
   }
   const field = slots.field;
   if (!field) return;
+  // Which one kind of event alerts is the user's pick; any value of ours would be a guess.
+  if (id === "anyEvent") {
+    void loadValueCounts(valueContext.value, field);
+    return;
+  }
   const [day, recent] = await Promise.all([
     loadValueCounts(valueContext.value, field),
     loadValueCounts({ ...valueContext.value, windowUs: previewWindowUs() }, field),
@@ -1207,6 +1243,50 @@ const addValue = (value: string) => {
 };
 
 const seenValues = computed(() => (isMetrics.value ? labelValues.value : fieldValues.value));
+// One label under every spelling the metric's series use, so a value on either reads as seen.
+const spellingValues = computed(() => {
+  const label = slots.label;
+  if (!label) return [];
+  const spellings = familyMember(label, series.value[props.streamName] ?? [])?.labels ?? [label];
+  return profile.value.filter((p) => spellings.includes(p.label)).flatMap((p) => p.values);
+});
+const searchedFor = (value: string) =>
+  slots.field ? cachedValueCounts(valueContext.value, slots.field, value) : undefined;
+// Typed values nothing carried in the last 24 hours; a pattern is meant to match broadly, so never one.
+const unseenValues = computed(() => {
+  const typed = (slots.values ?? []).filter((v) => v !== "" && !slots.patterns?.includes(v));
+  if (!valueSource.value || !typed.length) return [];
+  if (isMetrics.value) {
+    if (!series.value[props.streamName]) return [];
+    return typed.filter((v) => !spellingValues.value.some((s) => s.value === v));
+  }
+  const day = slots.field ? cachedValueCounts(valueContext.value, slots.field) : undefined;
+  if (day?.state !== "ready") return [];
+  return typed.filter((v) => {
+    if (day.values.some((s) => s.value === v)) return false;
+    if (!day.truncated) return true;
+    const found = searchedFor(v);
+    return found?.state === "ready" && !found.values.some((s) => s.value === v);
+  });
+});
+// The day's top values are capped, so a typed value past them is looked up before it is flagged.
+watch(
+  () =>
+    [
+      slots.field,
+      slots.field && cachedValueCounts(valueContext.value, slots.field)?.state,
+      ...(slots.values ?? []),
+    ].join("\n"),
+  () => {
+    const field = slots.field;
+    const day =
+      field && !isMetrics.value ? cachedValueCounts(valueContext.value, field) : undefined;
+    if (!field || !day?.truncated) return;
+    for (const v of slots.values ?? [])
+      if (!day.values.some((s) => s.value === v) && !searchedFor(v))
+        void loadValueCounts(valueContext.value, field, v);
+  },
+);
 // Shown only while the suggested value still stands, so a user's own pick is never second-guessed.
 const swapOffer = computed(() =>
   alternative.value &&

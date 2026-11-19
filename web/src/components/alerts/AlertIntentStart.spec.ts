@@ -39,8 +39,44 @@ vi.mock("@/services/alerts.queries", async (importOriginal) => ({
 }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
+// A logs stream whose one text field splits its events three ways, as the sample and shape searches see it.
+const { REASONS } = vi.hoisted(() => ({ REASONS: { Killing: 60, Pulled: 30, Failed: 10 } }));
+vi.mock("@/composables/alerts/useAlertStreamQuery", async () => {
+  const { ref } = await import("vue");
+  return {
+    useAlertStreamQuery: () => {
+      const state = ref("idle");
+      const hits = ref<Record<string, unknown>[]>([]);
+      const run = async (req: { size: number }) => {
+        state.value = "loading";
+        await Promise.resolve();
+        const reasons = Object.entries(REASONS);
+        hits.value =
+          req.size === 1
+            ? [{ t: 100, c0: 100, d0: 3, v0: reasons.map(([value, count]) => ({ value, count })) }]
+            : reasons.map(([reason]) => ({ reason }));
+        state.value = "ready";
+      };
+      return { state, hits, run, cancel: () => {} };
+    },
+  };
+});
+vi.mock("@/composables/alerts/useStreamDiscovery", async (importOriginal) => {
+  const entry = {
+    state: "ready",
+    truncated: false,
+    at: 0,
+    values: Object.entries(REASONS).map(([value, count]) => ({ value, count })),
+  };
+  return {
+    ...(await importOriginal<object>()),
+    cachedValueCounts: () => entry,
+    loadValueCounts: async () => entry,
+  };
+});
+
 // Stands in for AddAlert: it writes what a chip fills into the form and folds step 1 away and back.
-const mountStep = () => {
+const mountStep = (stream: "metrics" | "logs" = "metrics") => {
   const values = reactive<Record<string, unknown>>({});
   const form = { useStore: <R>(pick: (s: any) => R) => computed(() => pick({ values })) };
   const shown = ref(true);
@@ -53,9 +89,12 @@ const mountStep = () => {
       return () =>
         shown.value
           ? h(AlertIntentStart, {
-              streamType: "metrics",
+              streamType: stream,
               streamName: "m",
-              columns: [{ value: "host" }, { value: "value" }],
+              columns:
+                stream === "logs"
+                  ? [{ value: "reason", type: "Utf8" }]
+                  : [{ value: "host" }, { value: "value" }],
               metricStreams: [{ name: "m", metrics_meta: { metric_type: "gauge" } }],
               periodMinutes: 10,
               anomalyAvailable: false,
@@ -123,5 +162,22 @@ describe("AlertIntentStart", () => {
     await flushPromises();
     await toggleStep();
     expect(select("label").props("modelValue")).toBe("host");
+  });
+
+  it("leaves which events a per-event alert fires on to the user, and flags a typed value no event carried", async () => {
+    const { wrapper, select } = mountStep("logs");
+    await flushPromises();
+    await wrapper.find('[data-test="add-alert-intent-anyEvent"]').trigger("click");
+    await flushPromises();
+    expect(select("field").props("modelValue")).toBe("reason");
+    expect(select("value").props("modelValue")).toEqual([]);
+    expect(wrapper.find('[data-test="add-alert-intent-sentence-state"]').exists()).toBe(true);
+    const notSeen = () => wrapper.find('[data-test="add-alert-intent-value-not-seen"]');
+    select("value").vm.$emit("create", "OOMKilled");
+    await flushPromises();
+    expect(notSeen().text()).toContain("OOMKilled");
+    select("value").vm.$emit("update:modelValue", ["Killing"]);
+    await flushPromises();
+    expect(notSeen().exists()).toBe(false);
   });
 });
