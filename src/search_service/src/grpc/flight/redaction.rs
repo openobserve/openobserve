@@ -39,7 +39,7 @@ impl ScanRedaction {
         schema: &Schema,
     ) -> Result<Self, Error> {
         use o2_enterprise::enterprise::re_patterns::{
-            get_pattern_manager, search_redact::sdr_redact_udf,
+            get_pattern_manager, search_redact_udf::sdr_redact_udf,
         };
 
         let manager = get_pattern_manager().await.map_err(|e| {
