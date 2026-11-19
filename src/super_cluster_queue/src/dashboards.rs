@@ -32,7 +32,7 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
             ..
         } => {
             // `clone` is always true for super cluster
-            table::dashboards::put(
+            let dashboard = table::dashboards::put(
                 &org_id,
                 &folder_id,
                 new_folder_id.as_deref(),
@@ -40,6 +40,10 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
                 true,
             )
             .await?;
+            // Watchers on this region only learn of a replicated write from this event.
+            if let Some(id) = dashboard.dashboard_id() {
+                infra::coordinator::dashboards::emit_put_event(&org_id, id).await?;
+            }
         }
         DashboardMessage::Delete {
             org_id,
@@ -47,6 +51,7 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
             dashboard_id,
         } => {
             table::dashboards::delete_from_folder(&org_id, &folder_id, &dashboard_id).await?;
+            infra::coordinator::dashboards::emit_delete_event(&org_id, &dashboard_id).await?;
         }
         DashboardMessage::TimedAnnotationCreate {
             dashboard_id,

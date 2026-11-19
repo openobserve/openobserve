@@ -1084,7 +1084,9 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    let mut updated = active_model.update(db).await?;
+    let mut updated = anomaly_config_table::save_changes(db, active_model)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if let Some((from, to)) = moved_folders {
         repoint_folder(anomaly_id, &from, &to).await;
     }

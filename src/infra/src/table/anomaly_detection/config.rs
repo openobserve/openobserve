@@ -158,6 +158,7 @@ pub async fn create<C: TransactionTrait + ConnectionTrait>(
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
     txn.commit().await?;
     log::info!("[anomaly_detection_config] create: inserted id={anomaly_id}");
+    publish_put(&result.org_id, &anomaly_id).await;
     Ok(result)
 }
 
@@ -170,6 +171,7 @@ pub async fn create_if_not_exists<C: TransactionTrait + ConnectionTrait>(
     let txn = conn.begin().await?;
 
     let anomaly_id = config.anomaly_id.clone();
+    let org_id = config.org_id.clone();
     let exists = anomaly_detection_config::Entity::find_by_id(&anomaly_id)
         .one(&txn)
         .await
@@ -189,6 +191,9 @@ pub async fn create_if_not_exists<C: TransactionTrait + ConnectionTrait>(
     }
 
     txn.commit().await?;
+    if !exists {
+        publish_put(&org_id, &anomaly_id).await;
+    }
     Ok(())
 }
 
@@ -238,6 +243,20 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
 
     txn.commit().await?;
+    publish_put(&updated.org_id, &updated.anomaly_id).await;
+    Ok(updated)
+}
+
+/// Saves a partial edit and publishes it; `conn` must not be an open transaction.
+pub async fn save_changes<C: ConnectionTrait>(
+    conn: &C,
+    active: anomaly_detection_config::ActiveModel,
+) -> Result<Model> {
+    let updated: Model = active
+        .update(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    publish_put(&updated.org_id, &updated.anomaly_id).await;
     Ok(updated)
 }
 
@@ -278,26 +297,41 @@ pub async fn put<C: TransactionTrait + ConnectionTrait>(
     };
 
     txn.commit().await?;
+    publish_put(&result.org_id, &anomaly_id).await;
     Ok(result)
 }
 
 /// Deletes a config by `anomaly_id` + `org_id`.
 pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str) -> Result<()> {
-    anomaly_detection_config::Entity::delete_many()
+    let deleted = anomaly_detection_config::Entity::delete_many()
         .filter(anomaly_detection_config::Column::AnomalyId.eq(anomaly_id))
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
         .exec(conn)
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    if deleted.rows_affected > 0 {
+        publish_delete(org_id, anomaly_id).await;
+    }
     Ok(())
 }
 
 pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<()> {
+    let ids = anomaly_detection_config::Entity::find()
+        .select_only()
+        .column(anomaly_detection_config::Column::AnomalyId)
+        .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
+        .into_tuple::<String>()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
     anomaly_detection_config::Entity::delete_many()
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
         .exec(conn)
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+    for id in &ids {
+        publish_delete(org_id, id).await;
+    }
     Ok(())
 }
 
@@ -307,6 +341,24 @@ pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result
 
 /// `Status::Training` in the enterprise scheduler, which owns this column's values.
 const STATUS_TRAINING: i32 = 2;
+
+/// Sent after the write is durable; a failure is logged because the row already changed.
+async fn publish_put(org_id: &str, anomaly_id: &str) {
+    if let Err(e) = crate::coordinator::anomaly_detection::emit_put_event(org_id, anomaly_id).await
+    {
+        log::error!("[anomaly_detection_config] put event failed for {org_id}/{anomaly_id}: {e}");
+    }
+}
+
+async fn publish_delete(org_id: &str, anomaly_id: &str) {
+    if let Err(e) =
+        crate::coordinator::anomaly_detection::emit_delete_event(org_id, anomaly_id).await
+    {
+        log::error!(
+            "[anomaly_detection_config] delete event failed for {org_id}/{anomaly_id}: {e}"
+        );
+    }
+}
 
 /// Overwrites every non-PK field of `active` with the values from `src`.
 /// `created_at` is intentionally excluded — it must never be overwritten.

@@ -159,6 +159,7 @@ pub async fn put(
         }
     };
 
+    publish_put(org_id, folder_type, &model.folder_id).await;
     Ok((model_ksuid(&model)?, model.into()))
 }
 
@@ -174,10 +175,15 @@ pub async fn get_or_create(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder, bool), errors::Error> {
-    get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await
+    let created =
+        get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await?;
+    if created.2 {
+        publish_put(org_id, folder_type, &created.1.folder_id).await;
+    }
+    Ok(created)
 }
 
-/// [`get_or_create`] on a given connection.
+/// [`get_or_create`] on a given connection; the caller publishes the change once it commits.
 pub async fn get_or_create_with<C: ConnectionTrait>(
     client: &C,
     org_id: &str,
@@ -221,9 +227,12 @@ pub async fn delete(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), errors::Error> {
-    delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await
+    delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await?;
+    publish_delete(org_id, folder_type, folder_id).await;
+    Ok(())
 }
 
+/// [`delete`] on a given connection; the caller publishes the change once it commits.
 pub async fn delete_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -398,11 +407,35 @@ async fn list_models(
         .await
 }
 
+/// Sent after the write is durable; a failure is logged because the folder already changed.
+async fn publish_put(org_id: &str, folder_type: FolderType, folder_id: &str) {
+    if let Err(e) =
+        crate::coordinator::folders::emit_put_event(org_id, folder_type, folder_id).await
+    {
+        log::error!("[FOLDERS] put event failed for {org_id}/{folder_id}: {e}");
+    }
+}
+
+async fn publish_delete(org_id: &str, folder_type: FolderType, folder_id: &str) {
+    if let Err(e) =
+        crate::coordinator::folders::emit_delete_event(org_id, folder_type, folder_id).await
+    {
+        log::error!("[FOLDERS] delete event failed for {org_id}/{folder_id}: {e}");
+    }
+}
+
 /// Deletes all folders of the org and returns each one's `(folder_id, type)`.
 pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, i16)>, errors::Error> {
     let client = get_orm_client_rw().await;
     let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
-    Ok(super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?)
+    let deleted: Vec<(String, i16)> =
+        super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?;
+    for (folder_id, kind) in &deleted {
+        if let Some(folder_type) = folder_type_from_i16(*kind) {
+            publish_delete(org_id, folder_type, folder_id).await;
+        }
+    }
+    Ok(deleted)
 }
 
 #[cfg(test)]
