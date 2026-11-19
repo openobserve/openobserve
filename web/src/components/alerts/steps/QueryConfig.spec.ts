@@ -2908,6 +2908,24 @@ describe("QueryConfig.vue", () => {
       expect(shown).toEqual(unit ? [unit, unit] : []);
     });
 
+    it("a percent typed against 0-1 values offers the ratio in place, and one click sets it", async () => {
+      streamFixtures.node_cpu_seconds_total = { schema: [{ name: "value" }] };
+      const query = "1 - avg(rate(node_cpu_seconds_total{mode='idle'}[5m]))";
+      const form = metricPromqlForm(query, { column: "value", operator: ">", value: 90 });
+      remount(
+        { ...promqlProps(query), previewValueRange: { min: 0, max: 0.85, fractional: true } },
+        form,
+      );
+      await flushPromises();
+      const hint = () => host.find('[data-test="alert-threshold-ratio-hint"]');
+      expect(hint().attributes("class")).toContain("text-status-warning-text");
+
+      await host.find('[data-test="alert-threshold-ratio-hint-action"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.promql_condition.value")).toBe(0.9);
+      expect(hint().exists()).toBe(false);
+    });
+
     it("Rule mode moves a typed threshold into the query, and back when turned off", async () => {
       const query = "max by (pod) (mem)";
       remount(promqlProps(query), metricPromqlForm(query));

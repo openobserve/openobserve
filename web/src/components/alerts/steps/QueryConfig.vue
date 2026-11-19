@@ -620,6 +620,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :minutes="periodMinutes"
                               @update:minutes="emit('update:period', $event)"
                             />
+                            <AlertLinkNote
+                              v-if="ratioHint && !havingValueError"
+                              class="basis-full"
+                              :text="ratioHint.text"
+                              :action="ratioHint.action"
+                              warning
+                              data-test="alert-threshold-ratio-hint"
+                              @action="ratioHint.run"
+                            />
                           </div>
                           <!-- Optional WARNING level (alerts_2.md Feature 1). Shares
                            critical's operator, so the row only echoes it. -->
@@ -1637,6 +1646,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               >{{ thresholdUnit }}</span
                             >
                           </div>
+                          <AlertLinkNote
+                            v-if="ratioHint && !promqlValueError"
+                            :text="ratioHint.text"
+                            :action="ratioHint.action"
+                            warning
+                            data-test="alert-threshold-ratio-hint"
+                            @action="ratioHint.run"
+                          />
                           <!-- Optional WARNING on the PromQL VALUE (alerts_2.md Feature 1).
                          PromQL bakes the threshold into the query itself, so severity
                          belongs here — not on the series-count row, which is coverage.
@@ -1893,6 +1910,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import AlertWarningRow from "@/components/alerts/AlertWarningRow.vue";
 import AlertWindowPhrase from "@/components/alerts/AlertWindowPhrase.vue";
+import AlertLinkNote from "@/components/alerts/AlertLinkNote.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -1906,13 +1924,14 @@ import {
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
-import { dataNoun, joinListMore } from "@/utils/alerts/alertCopy";
+import { dataNoun, formatNumber, joinListMore } from "@/utils/alerts/alertCopy";
 import { metricPromql } from "@/utils/alerts/alertIntents";
 import { isSpanDurationMeasure, UNIT_KEEPING_FUNCTIONS } from "@/utils/alerts/alertReadBack";
 import { alwaysOneRow, oneRowMeetsLimit } from "@/utils/alerts/alertSqlUtils";
 import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
 import { promqlScaledToPercent, promqlWithMetric } from "@/utils/alerts/promqlMetrics";
 import { groupRanking } from "@/composables/alerts/groupRanking";
+import { ratioThresholdFix, type ValueRange } from "@/utils/alerts/ratioThreshold";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
 import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
@@ -1961,6 +1980,7 @@ const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/Query
 export default defineComponent({
   name: "Step2QueryConfig",
   components: {
+    AlertLinkNote,
     AlertWarningRow,
     AlertWindowPhrase,
     OTag,
@@ -1992,6 +2012,11 @@ export default defineComponent({
     // Opt-in: the sectioned alert editor renders the condition and schedule rows in its own sections.
     sectionTargets: {
       type: Object as PropType<AlertSectionTargets | null>,
+      default: null,
+    },
+    // What the preview drew, so a percent typed against 0-1 ratio values is caught in place.
+    previewValueRange: {
+      type: Object as PropType<ValueRange | null>,
       default: null,
     },
     tab: {
@@ -2917,7 +2942,9 @@ export default defineComponent({
       isForecastMode.value ? forecastExpression.value : localPromqlQuery.value,
     );
     // Labels and unit per metric the condition reads; null while loading or when the stream has no schema.
-    const metricInfo = ref<Record<string, { labels: string[]; unit: string } | null>>({});
+    const metricInfo = ref<Record<string, { labels: string[]; unit: string; help: string } | null>>(
+      {},
+    );
     const conditionMetrics = computed(() => {
       if (props.streamType !== "metrics") return [];
       const names =
@@ -2938,6 +2965,7 @@ export default defineComponent({
               [name]: {
                 labels: stream.schema.map((f: any) => String(f.name)),
                 unit: stream.metrics_meta?.unit ?? "",
+                help: stream.metrics_meta?.help ?? "",
               },
             };
           } catch {
@@ -2978,23 +3006,65 @@ export default defineComponent({
       return (unit && suffixes[unit]) || "";
     };
     // The builder's value and a bare PromQL selector read in the metric's own unit.
-    const thresholdUnit = computed(() => {
-      if (props.streamType !== "metrics") return "";
+    const unitMetric = computed((): string | undefined => {
+      if (props.streamType !== "metrics") return undefined;
       if (localTab.value === "custom") {
         return UNIT_KEEPING_FUNCTIONS.has(selectedFunction.value) &&
           logMeasureColumn.value === "value"
-          ? unitSuffix(props.streamName)
-          : "";
+          ? props.streamName
+          : undefined;
       }
-      if (localTab.value !== "promql") return "";
+      if (localTab.value !== "promql") return undefined;
       const query = editorPromqlQuery.value ?? "";
-      if (promqlScaledToPercent(query)) return raw("%");
       const bare = query
         .replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, "")
         .replace(/\{[^}]*\}/g, "")
         .replace(/\[[^\]]*\]/g, "");
       const metrics = promqlMetricNames(query);
-      return metrics.length === 1 && !PROMQL_UNIT_CHANGERS.test(bare) ? unitSuffix(metrics[0]) : "";
+      return metrics.length === 1 && !PROMQL_UNIT_CHANGERS.test(bare) ? metrics[0] : undefined;
+    });
+    const promqlPercent = computed(
+      () => localTab.value === "promql" && promqlScaledToPercent(editorPromqlQuery.value ?? ""),
+    );
+    const thresholdUnit = computed(() =>
+      promqlPercent.value ? raw("%") : unitSuffix(unitMetric.value),
+    );
+    // A percent typed against 0-1 values never fires (90 vs 0.9), so the field offers the ratio.
+    const ratioHint = computed(() => {
+      if (props.streamType !== "metrics" || thresholdUnit.value || promqlPercent.value) return null;
+      const field =
+        localTab.value === "promql"
+          ? "query_condition.promql_condition.value"
+          : localTab.value === "custom" && selectedFunction.value !== "total_events"
+            ? "query_condition.aggregation.having.value"
+            : null;
+      if (!field || (localTab.value === "promql" && isForecastMode.value)) return null;
+      const info = unitMetric.value ? metricInfo.value[unitMetric.value] : null;
+      const declaredRatio =
+        normalizeDeclaredUnit(info?.unit) === "percent-1" ||
+        /\b(ratio|fraction)\b/i.test(info?.help ?? "");
+      const typed = fv(field);
+      const range = props.previewValueRange;
+      const fix = ratioThresholdFix({ value: typed, declaredRatio, range });
+      if (fix === null) return null;
+      const value = formatNumber(typed);
+      const shownFix = formatNumber(fix);
+      return {
+        text: range
+          ? t("alerts.guard.ratioRange", {
+              min: formatNumber(range.min),
+              max: formatNumber(range.max),
+              value,
+              fix: shownFix,
+            })
+          : t("alerts.guard.ratioDeclared", { value, fix: shownFix }),
+        action: t("alerts.guard.ratioUse", { fix: shownFix }),
+        run: () => {
+          setFV(field, fix);
+          if (localTab.value === "promql") onPromqlValueChange(fix);
+          else onConditionValueChange(fix);
+        },
+      };
     });
 
     // A loaded query longer than the fold reads as its first lines; typing or focusing opens it.
@@ -4534,6 +4604,7 @@ export default defineComponent({
       promqlLabelIssue,
       sqlOneRowWarning,
       thresholdUnit,
+      ratioHint,
       keptThresholdText,
       switchedToCountNote,
       groupTotalBy,

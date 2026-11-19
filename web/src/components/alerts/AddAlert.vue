@@ -477,6 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :isRealTime="formData.is_real_time"
                   :sqlQuery="formData.query_condition.sql"
                   :promqlQuery="formData.query_condition.promql"
+                  :preview-value-range="previewValueRange"
                   :vrlFunction="decodedVrlFunction"
                   :streamName="formData.stream_name"
                   :sqlQueryErrorMsg="sqlQueryErrorMsg"
@@ -1024,6 +1025,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :range-target="sectionTargets.previewRange ?? null"
                         labelled-limit
                         @schema-updated="handleSqlSchemaUpdated"
+                        @value-range="previewValueRange = $event"
                       />
                     </template>
                   </template>
@@ -1320,6 +1322,7 @@ import AlertStreamOption from "./AlertStreamOption.vue";
 import AlertIntentStart from "./AlertIntentStart.vue";
 import type { IntentFill, IntentId } from "@/utils/alerts/alertIntents";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
+import type { ValueRange } from "@/utils/alerts/ratioThreshold";
 import { buildPrefillFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
 import { withPackTag } from "@/components/alertLibrary/libraryInstall";
 import AlertMetricLabels from "./AlertMetricLabels.vue";
@@ -1598,6 +1601,7 @@ export default defineComponent({
     // refresh) — reuse that response instead of a second, differently-timed
     // fetch. QueryConfig's own watcher on this prop does the actual
     // clear-if-missing comparison; this handler only forwards the list.
+    const previewValueRange = ref<ValueRange | null>(null);
     const handleSqlSchemaUpdated = (payload: { projections: string[]; hasHaving: boolean }) => {
       alertForm.sqlAggColumnOptions.value = payload.projections;
       alertForm.sqlQueryHasHaving.value = payload.hasHaving;
@@ -2828,6 +2832,7 @@ export default defineComponent({
       viaIncidentLine,
       onCompositeValidation,
       handleSqlSchemaUpdated,
+      previewValueRange,
     };
   },
 });
