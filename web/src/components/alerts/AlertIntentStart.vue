@@ -17,10 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- Section 1 after the stream pick: intent chips whose slots fill from this stream, then ready-made alerts. -->
 <template>
   <div class="flex min-w-0 flex-col gap-2 pt-2.5 pb-2" data-test="add-alert-intent-start">
-    <p class="text-text-heading m-0 text-sm font-medium" data-test="add-alert-intent-question">
-      {{ t("alerts.intent.question", { stream: raw(streamName) }) }}
-    </p>
-    <div class="flex min-w-0 flex-wrap gap-1.5" role="group" :aria-label="questionText">
+    <div
+      class="flex min-w-0 flex-wrap items-center gap-1.5"
+      role="group"
+      :aria-label="questionText"
+    >
+      <span
+        class="text-text-heading me-1.5 text-xs font-semibold whitespace-nowrap"
+        aria-hidden="true"
+        data-test="add-alert-intent-question"
+        >{{ t("alerts.intent.lead") }}</span
+      >
       <OButton
         v-for="id in intents"
         :key="id"
@@ -303,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-if="showLibrary && area.state !== 'absent'">
       <div
-        class="flex min-h-8 min-w-0 items-center justify-between gap-2 pt-1"
+        class="flex min-h-7 min-w-0 items-center justify-between gap-2"
         data-test="add-alert-suggestions-header"
       >
         <p
