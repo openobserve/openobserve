@@ -1300,14 +1300,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :searchable="false"
               @update:model-value="onFrequencyUnitChange"
             />
-            <div
-              v-if="checkEveryError"
-              class="text-input-error-text order-last basis-full text-xs"
-              data-test="alert-check-every-error"
-              role="alert"
-            >
-              {{ checkEveryError }}
-            </div>
+            <AlertMessageLine
+              class="order-last w-0 min-w-full"
+              :error="checkEveryError"
+              error-data-test="alert-check-every-error"
+              :note="checkGap"
+              data-test="alert-check-every-message"
+            />
             <OButton
               variant="link"
               size="xs"
@@ -1525,6 +1524,7 @@ import { missingByLabel, promqlMetricNames } from "@/utils/alerts/promqlLabels";
 import { promqlScaledToPercent, promqlWithMetric } from "@/utils/alerts/promqlMetrics";
 import { groupRanking } from "@/composables/alerts/groupRanking";
 import { ratioThresholdFix, type ValueRange } from "@/utils/alerts/ratioThreshold";
+import { checkGapNote } from "@/utils/alerts/scheduleOverlap";
 import { promqlByLabels, sqlGroupByLabels } from "@/utils/alerts/queryGroupLabels";
 import { normalizeDeclaredUnit } from "@/utils/metrics/metricDefaults";
 import { groupByChoices } from "@/utils/alerts/alertQueryBuilder";
@@ -3439,6 +3439,26 @@ export default defineComponent({
       emitTriggerUpdate();
     };
 
+    // Checks further apart than the look back never read the minutes between them.
+    const checkGap = computed<AlertLineNote | null>(() => {
+      const floor = Math.ceil(Number(store.state?.zoConfig?.min_auto_refresh_interval) / 60) || 1;
+      const frequency = Number(fv("trigger_condition.frequency"));
+      const note = checkGapNote(periodMinutes.value, frequency, floor, t);
+      if (!note) return null;
+      return {
+        text: note.text,
+        action: note.fix,
+        warning: true,
+        run: () => {
+          if (note.fixMinutes === null) return;
+          const hours = note.fixMinutes % 60 === 0;
+          frequencyMode.value = hours ? "hours" : "minutes";
+          onCheckEveryChange(hours ? note.fixMinutes / 60 : note.fixMinutes);
+        },
+        dataTest: "alert-check-every-gap",
+      };
+    });
+
     const restoreDefaultFrequency = () => {
       if (
         checkEveryFrequency.value === null ||
@@ -4375,6 +4395,7 @@ export default defineComponent({
       removePromqlWarning,
       promqlValueError,
       checkEveryError,
+      checkGap,
       havingValueError,
       periodError,
       havingColumn,

@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText, TranslateFn } from "@/types/i18n";
+import { durationWords, everyWords } from "./alertCopy";
+
 export type ScheduleOverlapKind = "overlap" | "equal" | "gaps";
 
 /** How consecutive checks' look-back windows relate: shared minutes, or unread minutes between them. */
@@ -24,4 +27,23 @@ export function scheduleOverlap(
   if (diff > 0) return { kind: "overlap", minutes: diff };
   if (diff < 0) return { kind: "gaps", minutes: -diff };
   return { kind: "equal", minutes: 0 };
+}
+
+/** Checks further apart than the look back leave minutes no check reads; the fix checks as often as
+ * the look back, unless the org's minimum interval is longer. */
+export function checkGapNote(
+  periodMin: number,
+  frequencyMin: number,
+  floorMin: number,
+  t: TranslateFn,
+): { text: I18nText; fix: I18nText | null; fixMinutes: number | null } | null {
+  if (!(periodMin > 0) || !(frequencyMin > 0)) return null;
+  const { kind, minutes } = scheduleOverlap(periodMin, frequencyMin);
+  if (kind !== "gaps") return null;
+  const fixable = periodMin >= floorMin;
+  return {
+    text: t("alerts.form.schedule.gapNote", { minutes: durationWords(minutes, t) }, minutes),
+    fix: fixable ? t("alerts.guard.checkEvery", { every: everyWords(periodMin, t) }) : null,
+    fixMinutes: fixable ? periodMin : null,
+  };
 }
