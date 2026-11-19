@@ -1669,7 +1669,7 @@ describe("validatePanel on a treemap with more than one query", () => {
     fields: { x: [field("region")], y: [field("count")], breakdown: [], z: [] },
     config: { hide },
   });
-  const run = (queries: any[]) => {
+  const run = (queries: ReturnType<typeof query>[]) => {
     const errors: string[] = [];
     validatePanel(
       gt,

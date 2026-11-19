@@ -49,10 +49,16 @@ const groupName = (key: string | null): string => {
 
 const isStandIn = (key: string | null) => key === null || key === "";
 
+/** The query parts the category builder reads: the group levels, the size field and whether the query is hidden. */
+export interface CategoryQuery {
+  fields?: { x?: { alias: string }[]; y?: { alias: string }[]; breakdown?: { alias: string }[] };
+  config?: { hide?: boolean };
+}
+
 /** Nests rows by the x fields and then the breakdown field, summing the first y field into the leaves and counting the rows left out. */
 export const buildTreemapNodes = (
-  panelSchema: any,
-  data: any[],
+  panelSchema: { queries?: CategoryQuery[] } | null | undefined,
+  data: unknown[],
 ): { nodes: TreemapNode[]; skippedRows: number } => {
   const root: TreemapNode = { name: "", value: 0, path: [], rawPath: [], children: [] };
   let skippedRows = 0;
