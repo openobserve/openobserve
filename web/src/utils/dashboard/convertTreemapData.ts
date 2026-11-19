@@ -135,12 +135,16 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
 
   paintByPalette(nodes, config, store?.state?.theme);
   contrastLabels(nodes);
-  const size = panelSchema.queries[drawn]?.fields?.y?.[0];
-  // A count is a whole number, so without a unit its decimals are only trailing zeros.
+  const drawnQuery = panelSchema.queries[drawn];
+  const size = drawnQuery?.fields?.y?.[0];
+  // A builder count is a whole number; in custom SQL "count" is only the field's label.
+  const isBuilderCount =
+    !drawnQuery?.customQuery &&
+    size?.type === "build" &&
+    !size?.isDerived &&
+    size?.functionName === "count";
   const decimals =
-    size?.functionName === "count" && (!config.unit || config.unit === "default")
-      ? 0
-      : config.decimals;
+    isBuilderCount && (!config.unit || config.unit === "default") ? 0 : config.decimals;
   const format = (value: unknown) =>
     formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, decimals));
   const nested = nodes.some((node) => node.children?.length);
