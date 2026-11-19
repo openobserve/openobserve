@@ -482,6 +482,12 @@ export function withCaseVariants(picked: readonly string[], seen: readonly Value
   return [...new Set([...picked, ...variants])];
 }
 
+/** Whether two seen values differ only in case, so a pick there also adds the other spelling. */
+export function hasCaseVariants(seen: readonly ValueCount[]): boolean {
+  const lower = seen.map((v) => v.value.toLowerCase());
+  return new Set(lower).size < lower.length;
+}
+
 const engineCondition = (field: string, values: string[], id: string) => ({
   filterType: "condition",
   column: field,

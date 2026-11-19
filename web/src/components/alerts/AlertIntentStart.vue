@@ -374,6 +374,7 @@ import {
   shapeQuerySql,
   slotFields,
   withCaseVariants,
+  hasCaseVariants,
   without,
   type IntentFill,
   type IntentId,
@@ -735,7 +736,9 @@ const patternOptions = computed<SelectOption[]>(() => {
 const valueHelp = computed(() =>
   isMetrics.value
     ? t("alerts.intent.slots.valueHelpSeries", { example: raw("5xx") })
-    : t("alerts.intent.slots.valueHelpEventsAnyCase", { noun: noun.value }),
+    : hasCaseVariants(fieldValues.value)
+      ? t("alerts.intent.slots.valueHelpEventsCaseAdded", { noun: noun.value })
+      : t("alerts.intent.slots.valueHelpEvents", { noun: noun.value }),
 );
 
 // The picked values read as words in the sentence, so the picker sizes to them like the other slots.

@@ -45,6 +45,7 @@ import {
   shapeQuerySql,
   slotFields,
   withCaseVariants,
+  hasCaseVariants,
   type FieldShape,
 } from "./alertIntents";
 
@@ -248,6 +249,8 @@ describe("alertIntents", () => {
     ])
       expect(starterValue(none)).toBeUndefined();
     expect(withCaseVariants(["ERROR"], seen)).toEqual(["ERROR", "error"]);
+    expect(hasCaseVariants(seen)).toBe(true);
+    expect(hasCaseVariants(seen.filter((v) => !["error", "info"].includes(v.value)))).toBe(false);
     expect(starterAlternative(seen)).toBe("WARN");
     expect(starterAlternative(seen.filter((v) => v.value !== "WARN"))).toBeUndefined();
     expect(spellingVariants(["WARN"], seen)).toEqual(["Warning"]);
