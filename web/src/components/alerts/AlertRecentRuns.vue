@@ -31,6 +31,7 @@ import {
   ksuidSeconds,
   newestRuns,
   noChecksNotice,
+  realtimeRowChip,
   recentRunsParams,
   RECENT_RUNS_LIMIT,
   runClock,
@@ -72,7 +73,12 @@ const historyQuery = useQuery(() =>
   ),
 );
 
-const runs = computed(() => newestRuns(historyQuery.data.value, props.limit));
+const runs = computed(() =>
+  newestRuns(historyQuery.data.value, props.limit).map((run) => ({
+    ...run,
+    sentLabel: props.isRealTime ? realtimeRowChip(t, run) : null,
+  })),
+);
 
 const timeText = (micros?: number) =>
   raw(micros ? formatInTimeZone(new Date(micros / 1000), zone.value, "MMM d, HH:mm") : "—");
@@ -158,6 +164,14 @@ const openRun = () =>
             timeText(run.timestamp)
           }}</span>
           <OTag
+            v-if="run.sentLabel"
+            variant="default-soft"
+            size="sm"
+            :label="run.sentLabel"
+            data-test="add-alert-recent-run-status"
+          />
+          <OTag
+            v-else
             type="alertState"
             :value="historyStatusOf(run)"
             size="sm"

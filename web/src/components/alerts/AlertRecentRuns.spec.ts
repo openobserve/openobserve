@@ -48,6 +48,23 @@ describe("AlertRecentRuns", () => {
     expect(rows[0].find('[data-test="add-alert-recent-run-error"]').exists()).toBe(false);
   });
 
+  it("a real-time alert's sent rows read as neutral notifications; a failed send stays red", async () => {
+    getHistory.mockResolvedValue({
+      hits: [
+        { timestamp: at(9, 10), status: "firing" },
+        { timestamp: at(8, 10), status: "notify_failed" },
+      ],
+    });
+    const wrapper = mount(AlertRecentRuns, { props: { alertId: "a1", isRealTime: true } });
+    await flushPromises();
+    const chips = wrapper.findAllComponents({ name: "OTag" });
+    expect(chips.map((c) => [c.text(), c.props("variant")])).toEqual([
+      ["Notified", "default-soft"],
+      [expect.not.stringContaining("Notified"), undefined],
+    ]);
+    expect(chips[1].props("value")).toBe("notify_failed");
+  });
+
   it("asks for the last day of this alert's runs, five at most", async () => {
     getHistory.mockResolvedValue({ hits: [] });
     mount(AlertRecentRuns, { props: { alertId: "a1" } });

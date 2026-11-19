@@ -115,3 +115,11 @@ export function realtimeRunChip(
     tooltip: t("alerts.runState.firedTooltip", { time }),
   };
 }
+
+const SENT_STATES = new Set(["firing", "completed"]);
+
+/** A real-time row that notified is a sent message, not a failure; other outcomes (a failed send) keep their state chip. */
+export function realtimeRowChip(t: TranslateFn, run: RecentRun): I18nText | null {
+  const state = String(historyStatusOf(run) ?? "").toLowerCase();
+  return SENT_STATES.has(state) ? t("alerts.runState.notified") : null;
+}
