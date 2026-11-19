@@ -41,8 +41,9 @@ import {
   measureWords as measurePhrase,
 } from "@/utils/alerts/alertCopy";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
-import { compareFactor } from "@/utils/alerts/alertIntents";
-import { promqlScaledToPercent } from "@/utils/alerts/promqlMetrics";
+import { compareFactor, compareRule } from "@/utils/alerts/alertIntents";
+import { promqlMetricNames, promqlScaledToPercent } from "@/utils/alerts/promqlMetrics";
+import { sqlWhereText } from "@/utils/alerts/alertSqlUtils";
 import {
   CONDITION_GAP_KEYS,
   conditionGap,
@@ -198,6 +199,8 @@ const OFFSET_KEYS: Record<string, I18nKey> = {
 };
 
 const NAV_SEPARATOR = " · ";
+// A WHERE clause longer than this is cut in the read-back; the query itself is one step up.
+const WHERE_CLIP = 80;
 
 const STREAM_TYPE_LABELS: Record<string, I18nKey> = {
   logs: "alerts.sections.dataTypes.logs.label",
@@ -390,6 +393,13 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     const builder =
       mode.value === "true" || (mode.value === "false" && (qc.type ?? "custom") === "custom");
     return builder ? filterPhrase(qc.conditions, "alert", t) : null;
+  };
+  const sqlFilterOf = (fd: AlertSectionsFormData) => {
+    const qc = fd.query_condition ?? {};
+    const where = mode.value === "false" && qc.type === "sql" ? sqlWhereText(qc.sql ?? "") : null;
+    if (!where) return null;
+    const flat = where.replace(/\s+/g, " ");
+    return { text: raw(flat.length > WHERE_CLIP ? `${flat.slice(0, WHERE_CLIP)}…` : flat) };
   };
   // A query scaled by 100 reads in percent, so its limits do too.
   const promqlValueText = (fd: AlertSectionsFormData, value: unknown): I18nText =>
@@ -749,11 +759,13 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       return { keypath: "alerts.sections.review.watchNoStream", parts: {} };
     }
     const typeKey = STREAM_TYPE_LABELS[fd.stream_type ?? ""];
+    const qc = fd.query_condition ?? {};
+    const metrics = qc.type === "promql" ? promqlMetricNames(qc.promql ?? "") : [];
     const parts: ReviewSentence["parts"] = {
       type: strong(typeKey ? t(typeKey) : raw(fd.stream_type)),
-      stream: strong(raw(fd.stream_name)),
+      stream: strong(metrics.length > 1 ? joinListMore(metrics, t) : raw(fd.stream_name)),
     };
-    const filter = filterOf(fd);
+    const filter = filterOf(fd) ?? sqlFilterOf(fd);
     if (!filter) {
       return { keypath: WATCH_KEYS[mode.value] ?? "alerts.sections.review.watchScheduled", parts };
     }
@@ -962,7 +974,15 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       });
     }
     const offsets = compareOffsets(fd);
-    if (pastComparison(fd)) return extras;
+    if (pastComparison(fd)) {
+      extras.push({
+        keypath: compareRule(fd.query_condition?.vrl_function)?.needsBaseline
+          ? "alerts.sections.review.compareNeedsBaseline"
+          : "alerts.sections.review.compareAnyBaseline",
+        parts: {},
+      });
+      return extras;
+    }
     if (offsets.length) {
       extras.push({
         keypath: hasFunction(fd)

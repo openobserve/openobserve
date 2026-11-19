@@ -781,19 +781,41 @@ describe("useAlertFormSections", () => {
         stream_name: "error_logs",
         query_condition: {
           type: "sql",
-          sql: "SELECT count(*) AS events FROM error_logs",
+          sql: "SELECT count(*) AS events FROM error_logs WHERE severity = 'ERROR'",
           multi_time_range: [{ offSet: "1w" }],
-          vrl_function: compareFunction(2.5),
+          vrl_function: compareFunction(2.5, true),
         },
         trigger_condition: every(60),
       },
       card: [
-        "Watches Logs in error_logs, on a schedule.",
-        "Fires when the count in the last 1 hour is more than 2.5 times the same window 1 week earlier.",
+        "Watches Logs in error_logs where severity = 'ERROR', on a schedule.",
+        "Fires when the count in the last 1 hour is more than 2.5 times the same window 1 week earlier. Stays quiet while the earlier window has no data, so a rise from zero never fires.",
         "Tells no one yet.",
         "Checks every hour, looking at the last 1 hour.",
       ],
       nav: ["More than 2.5× the same window 1 week earlier", "No one yet"],
+    },
+    {
+      scenario: "ERR: a share of two metrics names both",
+      form: {
+        stream_name: "http_a_count",
+        stream_type: "metrics",
+        query_condition: {
+          type: "promql",
+          promql:
+            'sum by (service_name) (rate(http_a_count{code=~"5.."}[5m])) / sum by (service_name) (rate(http_b_count[5m]))',
+          promql_condition: { operator: ">", value: 0.05 },
+          promql_multi_alert: true,
+        },
+        trigger_condition: every(5),
+      },
+      card: [
+        "Watches Metrics in http_a_count and http_b_count, on a schedule.",
+        "Fires for each service_name whose latest value is more than 0.05.",
+        "Tells no one yet.",
+        "Checks every 5 minutes, looking at the last 5 minutes.",
+      ],
+      nav: ["> 0.05 · One per service_name", "No one yet"],
     },
   ])("reads back $scenario", ({ form, card, nav, anomaly, aggregation }) => {
     const { review, items } = setup(
