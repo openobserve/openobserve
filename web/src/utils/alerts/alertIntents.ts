@@ -67,6 +67,8 @@ export interface IntentSlots {
   measure?: string;
   factor?: number;
   label?: string;
+  /** The builder function a gauge above a value reads, as step 2's function picker. */
+  agg?: string;
 }
 
 /** A metric stream of the org, as the stream list carries it. */
@@ -775,12 +777,52 @@ export function buildMetricFill(
     vrl: false,
     values: {
       "query_condition.type": "custom",
-      "query_condition.aggregation": groupAggregation("avg", "value", slots.group, {
+      "query_condition.aggregation": groupAggregation(slots.agg || "avg", "value", slots.group, {
         operator: ">",
         value: "",
       }),
     },
   };
+}
+
+/** Functions a gauge above a value offers in its sentence; the rest stay in step 2's picker. */
+export const METRIC_AGGS = ["avg", "max", "min", "sum"] as const;
+
+export interface ThresholdPaths {
+  operator: string;
+  value: string;
+}
+
+/** Where a starter's threshold lives in the form; null when its sentence has none to type. */
+export function thresholdPaths(fill: IntentFill | null | undefined): ThresholdPaths | null {
+  if (!fill || fill.intent === "promql" || fill.howItChecks !== "false" || fill.vrl) return null;
+  const values = fill.values;
+  if (values["query_condition.type"] === "promql") {
+    return {
+      operator: "query_condition.promql_condition.operator",
+      value: "query_condition.promql_condition.value",
+    };
+  }
+  if (values["query_condition.aggregation"]) {
+    return {
+      operator: "query_condition.aggregation.having.operator",
+      value: "query_condition.aggregation.having.value",
+    };
+  }
+  return { operator: "trigger_condition.operator", value: "trigger_condition.threshold" };
+}
+
+/** The threshold typed under one fill, at the next fill's paths, so a slot change keeps it. */
+export function carriedThreshold(
+  previous: IntentFill | null | undefined,
+  next: IntentFill,
+  read: (path: string) => unknown,
+): Record<string, unknown> {
+  const from = previous?.intent === next.intent ? thresholdPaths(previous) : null;
+  const to = thresholdPaths(next);
+  const value = from ? read(from.value) : undefined;
+  if (!from || !to || value === "" || value === null || value === undefined) return {};
+  return { [to.operator]: read(from.operator), [to.value]: value };
 }
 
 const nameTokens = (name: string) =>

@@ -18,6 +18,7 @@ import {
   buildEventFill,
   buildMetricFill,
   cardsFolded,
+  carriedThreshold,
   compareFactor,
   compareFunction,
   compareSql,
@@ -45,6 +46,7 @@ import {
   readFieldShapes,
   shapeQuerySql,
   slotFields,
+  thresholdPaths,
   withCaseVariants,
   hasCaseVariants,
   type FieldShape,
@@ -456,13 +458,62 @@ describe("alertIntents", () => {
     },
   );
 
-  it("a gauge above a value keeps the builder's average", () => {
+  it("a gauge above a value keeps the builder's average unless the sentence picks another", () => {
     const fill = buildMetricFill(
       "metricAbove",
       { metric: "m", counter: false },
       { periodMinutes: 10 },
     );
     expect(fill.values["query_condition.type"]).toBe("custom");
+    expect(fill.values["query_condition.aggregation"]).toMatchObject({ function: "avg" });
+    const max = buildMetricFill("metricAbove", { metric: "m", agg: "max" }, { periodMinutes: 10 });
+    expect(max.values["query_condition.aggregation"]).toMatchObject({ function: "max" });
+  });
+
+  const HAVING = [
+    "query_condition.aggregation.having.operator",
+    "query_condition.aggregation.having.value",
+  ];
+  const PROMQL = [
+    "query_condition.promql_condition.operator",
+    "query_condition.promql_condition.value",
+  ];
+  const COUNT = ["trigger_condition.operator", "trigger_condition.threshold"];
+  const ev = (intent: string, slots: object) =>
+    buildEventFill(intent as any, slots, { stream: "s", id });
+  const mt = (intent: string, slots: object) =>
+    buildMetricFill(intent as any, { metric: "m", ...slots }, { periodMinutes: 10 });
+  it.each([
+    ["count per group", ev("countWhere", { group: "svc" }), HAVING],
+    ["count of all", ev("countWhere", {}), COUNT],
+    ["percentile", ev("percentile", { measure: "took" }), HAVING],
+    ["gauge above a value", mt("metricAbove", { counter: false }), HAVING],
+    ["counter above a value", mt("metricAbove", { counter: true }), PROMQL],
+    ["error-rate share", mt("ratio", { label: "code", values: ["5"] }), PROMQL],
+    ["as it happens", ev("anyEvent", {}), null],
+    ["compare with last week", ev("compareLastWeek", {}), null],
+    ["unusual volume", ev("unusualVolume", {}), null],
+    ["written PromQL", mt("promql", {}), null],
+  ])("the %s sentence types its threshold at %j", (_, fill, paths) => {
+    const got = thresholdPaths(fill);
+    expect(got ? [got.operator, got.value] : null).toEqual(paths);
+  });
+
+  it("keeps the typed threshold when a slot of the same intent changes, never across intents", () => {
+    const form: Record<string, unknown> = {
+      "query_condition.aggregation.having.operator": ">=",
+      "query_condition.aggregation.having.value": "50",
+    };
+    const read = (path: string) => form[path];
+    const grouped = ev("countWhere", { group: "svc" });
+    expect(carriedThreshold(grouped, ev("countWhere", { group: "host" }), read)).toEqual(form);
+    expect(carriedThreshold(grouped, ev("countWhere", {}), read)).toEqual({
+      "trigger_condition.operator": ">=",
+      "trigger_condition.threshold": "50",
+    });
+    expect(carriedThreshold(grouped, ev("percentile", { group: "svc" }), read)).toEqual({});
+    form["query_condition.aggregation.having.value"] = "";
+    expect(carriedThreshold(grouped, ev("countWhere", { group: "host" }), read)).toEqual({});
   });
 
   it("ranks metric labels for grouping by how many series carry them", () => {
