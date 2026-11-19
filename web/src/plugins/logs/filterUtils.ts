@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { splitOnAnd } from "@/utils/query/sqlFilterBuilder";
+import { removeConditions } from "@/utils/query/sqlFilterBuilder";
 
 /**
  * Extracts the field name from a filter expression.
@@ -25,6 +25,21 @@ export const getFieldFromExpression = (expression: string): string | null => {
   const match =
     cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) || cleaned.match(/^(\w+)\s*(?:=|!=|is)/i);
   return match ? match[1] : null;
+};
+
+/** Puts `"prefix".` before the field of every condition in a filter built for one field, outside quoted values. */
+export const qualifyFieldConditions = (filter: string, prefix: string): string => {
+  const field = /^[\s(]*("(?:[^"]|"")+"|\w+)/.exec(filter)?.[1];
+  if (!field) return `"${prefix}".${filter}`;
+  const esc = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const condition = new RegExp(
+    `(^[\\s(]*|\\(\\s*|\\s(?:and|or)\\s+)${esc}(?=\\s*(?:[=!<>]|(?:is|in|like|not)\\b))`,
+    "gi",
+  );
+  return filter
+    .split(/('(?:[^']|'')*')/)
+    .map((part, i) => (i % 2 ? part : part.replace(condition, `$1"${prefix}".${field}`)))
+    .join("");
 };
 
 /**
@@ -58,14 +73,7 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Match both comparison operators (=, !=, <, >) and IS / IS NOT (for null checks)
   const fieldPattern = new RegExp(`^"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
-  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*(?:[=!<>]|is\\s)`, "i");
-
-  const remaining = splitOnAnd(queryStr.trim()).filter((cond) => {
-    const trimmed = cond.trim();
-    return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
-  });
-
-  return remaining.join(" AND ");
+  return removeConditions(queryStr.trim(), (condition) => fieldPattern.test(condition));
 };
 
 /**

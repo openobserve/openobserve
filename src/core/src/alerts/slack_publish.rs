@@ -37,7 +37,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::alerts::notifications::{
-    apply_custom_template,
+    apply_template_body,
     context::NotificationContext,
     render::{
         DEFAULT_LINK_LABEL,
@@ -399,7 +399,7 @@ pub async fn send_form_test(
 pub fn render_wire(template: &Template, ctx: &NotificationContext) -> anyhow::Result<RenderedWire> {
     match template.kind {
         TemplateKind::Custom => Ok(wire_from_custom(
-            &apply_custom_template(&template.body, ctx, false),
+            &apply_template_body(template, ctx, false),
             ctx,
         )),
         TemplateKind::Content => {
@@ -510,7 +510,15 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
         .filter(|t| !t.is_empty());
     let has_header = wire.title != ctx.alert_name;
     match text {
-        Some(t) if !has_header => wire.title = t.to_string(),
+        Some(t) if !has_header => {
+            wire.title = t.to_string();
+            // A body that opens with its own bold title line, as the prebuilt Slack body does,
+            // would show the title twice.
+            let bold = format!("*{t}*");
+            if body.first().is_some_and(|b| b.trim() == bold) {
+                body.remove(0);
+            }
+        }
         Some(t) if body.is_empty() && t != wire.title => body.push(t.to_string()),
         _ => {}
     }
@@ -944,7 +952,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::alerts::notifications::resolve::Link;
+    use crate::alerts::notifications::{apply_custom_template, resolve::Link};
 
     const PREBUILT_SLACK: &str = r#"{
   "text": "[{alert_status}] {alert_name}",
@@ -1288,6 +1296,20 @@ mod tests {
         assert_ne!(
             wire.body, wire.title,
             "the text is not repeated as the body"
+        );
+        assert!(
+            !wire.body.contains("[firing] checkout-errors"),
+            "the bold title line is not repeated in the body: {wire:?}"
+        );
+        let starred = NotificationContext {
+            alert_name: "cpu_high*".into(),
+            ..ctx.clone()
+        };
+        let wire = render_wire(&built_in, &starred).unwrap();
+        assert_eq!(wire.title, "[firing] cpu_high*");
+        assert!(
+            !wire.body.contains("[firing] cpu_high*"),
+            "a name ending in * is not shown twice: {wire:?}"
         );
     }
 
