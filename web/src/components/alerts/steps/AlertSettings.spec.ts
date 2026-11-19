@@ -926,14 +926,14 @@ describe("AlertSettings — combined destinations + workflows target control", (
         template: `
           <OForm :schema="schema" :default-values="{ trigger_condition: { silence: 10, period: 10 } }">
             <AlertSettings :form-data="formData" is-real-time="false" :formatted-destinations="['ops']"
-              :destination-objects="[{ name: 'ops', type: 'http', url: 'https://hooks.example.com/x' }]" />
+              :destination-objects="[{ name: 'ops', type: 'email', emails: ['oncall@x.io'] }]" />
           </OForm>
         `,
       }),
       { global: { plugins: [makeStore(), i18n] } },
     );
     expect(findTargets(host).props("describe")).toEqual({
-      ops: { type: t("components.badge.destinationType.webhook"), target: "hooks.example.com" },
+      ops: { type: t("components.badge.destinationType.email"), target: "oncall@x.io" },
     });
   });
 
