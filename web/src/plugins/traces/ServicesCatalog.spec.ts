@@ -3486,41 +3486,92 @@ describe("ServicesCatalog", () => {
       });
     };
 
-    it("resolves a relative range against the time the panel opens", async () => {
+    const fifteenMinutesEndingAt = (ms: number) => ({
+      startTime: (ms - 15 * 60 * 1000) * 1000,
+      endTime: ms * 1000,
+    });
+    const panelRange = () =>
+      wrapper.findComponent('[data-test="services-catalog-node-side-panel"]').props("timeRange");
+
+    it("gives the panel the window the rows were loaded with, even after time has passed", async () => {
       mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
       wrapper = mountServicesCatalog();
       await flushPromises();
-      const openedAt = Date.UTC(2026, 0, 1, 12);
-      vi.setSystemTime(openedAt);
 
+      vi.setSystemTime(loadedAt + 10 * 60 * 1000);
       wrapper.vm.handleRowClick(wrapper.vm.services[0]);
       await flushPromises();
 
-      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
-      expect(panel.props("timeRange")).toEqual({
-        startTime: (openedAt - 15 * 60 * 1000) * 1000,
-        endTime: openedAt * 1000,
+      expect(panelRange()).toEqual(fifteenMinutesEndingAt(loadedAt));
+    });
+
+    it("moves the open panel with the rows on a refresh", async () => {
+      mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+
+      const refreshedAt = loadedAt + 10 * 60 * 1000;
+      vi.setSystemTime(refreshedAt);
+      await wrapper.find('[data-test="services-catalog-refresh-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(panelRange()).toEqual(fifteenMinutesEndingAt(refreshedAt));
+    });
+
+    it("moves the open panel with the rows on a range change", async () => {
+      mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      await flushPromises();
+
+      const changedAt = loadedAt + 10 * 60 * 1000;
+      vi.setSystemTime(changedAt);
+      mockSearchObj.data.datetime.relativeTimePeriod = "1h";
+      await flushPromises();
+
+      expect(panelRange()).toEqual({
+        startTime: (changedAt - 60 * 60 * 1000) * 1000,
+        endTime: changedAt * 1000,
       });
     });
 
-    it("re-resolves when the panel opens again later", async () => {
+    it("keeps the last loaded window when a reload fails", async () => {
       mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
       wrapper = mountServicesCatalog();
       await flushPromises();
-      const firstOpen = Date.UTC(2026, 0, 1, 12);
-      vi.setSystemTime(firstOpen);
-      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
-      await flushPromises();
-      wrapper.vm.handleCloseSidePanel();
+
+      mockFetchQueryDataWithHttpStream.mockImplementationOnce((_req: any, callbacks: any) => {
+        callbacks?.error?.(null, { message: "boom" });
+      });
+      vi.setSystemTime(loadedAt + 10 * 60 * 1000);
+      await wrapper.find('[data-test="services-catalog-refresh-btn"]').trigger("click");
       await flushPromises();
 
-      const secondOpen = firstOpen + 10 * 60 * 1000;
-      vi.setSystemTime(secondOpen);
-      wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+      expect(wrapper.vm.loadError).toBeTruthy();
+      expect(wrapper.vm.timeRange).toEqual(fifteenMinutesEndingAt(loadedAt));
+    });
+
+    it("shows when the rows last loaded on the refresh control", async () => {
+      mockOneService();
+      const loadedAt = Date.UTC(2026, 0, 1, 12);
+      vi.setSystemTime(loadedAt);
+      wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const panel = wrapper.findComponent('[data-test="services-catalog-node-side-panel"]');
-      expect(panel.props("timeRange").endTime).toBe(secondOpen * 1000);
+      const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+      expect(refresh.props("lastRunAt")).toBe(loadedAt);
+      expect(refresh.find('[data-test="services-catalog-refresh-btn"]').exists()).toBe(true);
     });
   });
 

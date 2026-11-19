@@ -321,16 +321,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :column-visibility="columnVisibility"
           @update:column-visibility="setColumnVisibility"
         />
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastRunAt"
           :loading="isLoading || isSearching"
           data-test="services-catalog-refresh-btn"
           @click="refreshCatalog"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
+        />
       </div>
     </div>
 
@@ -825,6 +823,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -1011,7 +1010,7 @@ const isLoading = ref(true);
 // A search in flight with results still on screen — the spinner, not the
 // empty state.
 const isSearching = ref(false);
-// Epoch-ms of the last completed load, shown on the page header's refresh control.
+// Epoch-ms of the last completed load, shown on the catalog's refresh control.
 const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
 // The failed search's server message; shown instead of the empty state so a broken query never reads as "no services".
@@ -1264,20 +1263,8 @@ const selectedServiceNode = computed(() => {
 
 const emptyGraphData = { nodes: [], edges: [] };
 
-// Stored relative start/end go stale, so the panel resolves "now" when it opens or the range changes.
+// The panel shows the window the rows were loaded with, so both always cover the same span.
 const timeRange = ref(getEffectiveTimeRange(searchObj.data.datetime));
-watch(
-  () => [
-    selectedServiceRow.value,
-    searchObj.data.datetime.type,
-    searchObj.data.datetime.relativeTimePeriod,
-    searchObj.data.datetime.startTime,
-    searchObj.data.datetime.endTime,
-  ],
-  () => {
-    if (selectedServiceRow.value) timeRange.value = getEffectiveTimeRange(searchObj.data.datetime);
-  },
-);
 
 let currentTraceId: string | null = null;
 const versionTraffic = ref(new Map<string, VersionTraffic>());
@@ -2341,6 +2328,7 @@ async function loadServicesCatalog() {
         publish();
         rowsCapped.value = rows.size >= CATALOG_ROWS;
         loadedFor.value = { stream: streamName, period, rows: services.value };
+        timeRange.value = { startTime: start_time, endTime: end_time };
         syncSelectedRow();
         isLoading.value = false;
         isSearching.value = false;
