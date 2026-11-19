@@ -32,7 +32,7 @@ export class AlertCreationWizard {
         this.conditions = new FilterBuilderDriver(page, 'alert-conditions');
     }
 
-    /** Fill the alert name (section 5). */
+    /** Fill the alert name (step 3, Who to tell). */
     async fillAlertNameField(name) {
         await fillAlertName(this.page, name);
     }

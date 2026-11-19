@@ -3,8 +3,8 @@
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
-/** Sections of the alert editor's snapping column, in order; rare settings hide behind a per-section "N more" link. */
-export const ALERT_SECTIONS = ['watch', 'condition', 'notify', 'schedule', 'details'];
+/** The alert editor's three steps, in order; the schedule sits in condition and the name in notify. */
+export const ALERT_SECTIONS = ['watch', 'condition', 'notify'];
 
 // Old tab names map onto the section that now holds the tab's first controls.
 const SECTION_FOR_TAB = {
@@ -58,7 +58,7 @@ async function unfoldWatchSection(page) {
 }
 
 /** Opens every section's "N more" group so tucked settings render. Opening only reveals; it sets no value. */
-export async function expandAlertSettingGroups(page, sections = ['condition', 'notify', 'details']) {
+export async function expandAlertSettingGroups(page, sections = ['condition', 'notify']) {
     for (const s of sections) {
         const more = page.locator(`[data-test="add-alert-section-${s}-more"]`).first();
         if (!(await more.isVisible().catch(() => false))) continue;
@@ -147,9 +147,9 @@ export async function selectAlertStreamType(page, streamType) {
     testLogger.info('Selected stream type', { streamType });
 }
 
-/** Types the alert name into section 5; the header only shows it. */
+/** Types the alert name into step 3, Who to tell; the header only shows it. */
 export async function fillAlertName(page, name) {
-    await goToAlertSection(page, 'details');
+    await goToAlertSection(page, 'notify');
     const field = page.locator(ALERT_NAME_FIELD).first();
     await field.waitFor({ state: 'visible', timeout: 15000 });
     await settleIntoView(page, field);

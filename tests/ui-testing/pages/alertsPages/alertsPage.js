@@ -76,7 +76,7 @@ export class AlertsPage {
             // Alert creation locators - Alerts 2.0 Wizard UI
             addAlertButton: '[data-test="alert-list-add-alert-btn"]',
             alertNameInput: '[data-test="add-alert-details-name-input"]',
-            // The name is typed in section 5; the header shows it as text with a pencil that jumps there.
+            // The name is typed in step 3; the header shows it as text with a pencil that jumps there.
             alertNameTrigger: '[data-test="add-alert-header-name-edit"]',
             alertNameInputField: '[data-test="add-alert-details-name-input-field"]',
             alertNameValue: '[data-test="add-alert-header-title"]',
@@ -451,7 +451,7 @@ export class AlertsPage {
         return this.page.locator(this.locators.addConditionButton);
     }
 
-    /** Section-list item for an editor section (watch, condition, notify, schedule, details). */
+    /** Section-list item for an editor section (watch, condition, notify). */
     getAlertSectionNavItemLocator(sectionId) {
         return this.page.locator(this.locators.alertSectionNavItem(sectionId)).first();
     }
@@ -1300,7 +1300,7 @@ export class AlertsPage {
 
     /** Assert the Advanced-panel priority select and tag input are both present. */
     async expectPriorityAndTagControlsVisible() {
-        await expandAlertSettingGroups(this.page, ['details']);
+        await expandAlertSettingGroups(this.page, ['notify']);
         await expect(this.page.locator(this.locators.prioritySelect)).toBeVisible({ timeout: 10000 });
         await expect(this.page.locator(this.locators.tagsInput)).toBeVisible({ timeout: 10000 });
     }
@@ -1317,7 +1317,7 @@ export class AlertsPage {
 
     /** Select a priority by its label (e.g. "P3"). */
     async selectPriority(label) {
-        await expandAlertSettingGroups(this.page, ['details']);
+        await expandAlertSettingGroups(this.page, ['notify']);
         await openOSelectDropdown(this.page, this.page.locator(this.locators.prioritySelect));
         await this.page
             .locator('[data-test$="-popover"] [data-test$="-option"]')
@@ -1334,7 +1334,7 @@ export class AlertsPage {
 
     /** Type a tag into the tag input and commit it with Enter. */
     async addTag(value) {
-        await expandAlertSettingGroups(this.page, ['details']);
+        await expandAlertSettingGroups(this.page, ['notify']);
         const input = this.page.locator(`${this.locators.tagsInput} input`).first();
         await input.fill(value);
         await input.press('Enter');
@@ -3240,7 +3240,7 @@ export class AlertsPage {
         testLogger.info('Clicked Add Alert button');
     }
 
-    /** Fill the alert name (section 5). */
+    /** Fill the alert name (step 3, Who to tell). */
     async fillAlertName(alertName) {
         await fillAlertName(this.page, alertName);
     }

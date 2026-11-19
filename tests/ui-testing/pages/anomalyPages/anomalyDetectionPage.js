@@ -66,7 +66,7 @@ class AnomalyDetectionPage {
             addBtn: '[data-test="alert-list-add-alert-btn"]',
             searchInput: '[data-test="alert-list-search-input"]',
 
-            // The name is typed in section 5; the header only shows it.
+            // The name is typed in step 3; the header only shows it.
             nameValue: '[data-test="add-alert-header-title"]',
             nameError: '[data-test="add-alert-details-name-input-error"]',
             streamTypeSelect: '[data-test="add-alert-stream-type-select-dropdown"]',
@@ -348,7 +348,7 @@ class AnomalyDetectionPage {
 
     /** Shows the settings anomaly tucks behind More options: SQL preview, Record only, priority and tags. */
     async showAnomalyMoreOptions() {
-        await expandAlertSettingGroups(this.page, ['condition', 'notify', 'details']);
+        await expandAlertSettingGroups(this.page, ['condition', 'notify']);
     }
 
     // Detection config
