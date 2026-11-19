@@ -24,6 +24,7 @@ import {
   type Ref,
 } from "vue";
 
+import type { FindMoreSource } from "./findMore";
 import type { StarterPack } from "./types";
 import { useStarterPackFlow, type StarterPackFlow } from "./useStarterPackFlow";
 import { useStarterPackMatcher } from "./useStarterPackMatcher";
@@ -35,6 +36,14 @@ export interface PackEntry {
   pack: StarterPack;
   flow: StarterPackFlow;
   matcher: ReturnType<typeof useStarterPackMatcher>;
+}
+
+/** One pack in a pack list: its state, what the last check found, and where its setup stands. */
+export interface RailPack {
+  entry: PackEntry;
+  source?: FindMoreSource;
+  setUp: boolean;
+  stopped: boolean;
 }
 
 /** What the user chose in a pack's review, kept while the app is open. */
