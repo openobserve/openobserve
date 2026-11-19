@@ -179,9 +179,8 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     labelKey: "settings.queryManagement",
     cloudOffers: false,
   },
-  // Self-hosted, but not enterprise-only: OSS runs clustered too (nodes join
-  // through the NATS coordinator with no edition check) and its node list API
-  // answers, so only pure Cloud — which hides it via `cloudOffers` — is shut out.
+  // Not enterprise-only: OSS clusters too and its node list API answers; pure Cloud hides it via
+  // `cloudOffers`.
   nodes: {
     predicate: (c) => c.isEnterprise || !c.isCloud,
     labelKey: "settings.nodes",

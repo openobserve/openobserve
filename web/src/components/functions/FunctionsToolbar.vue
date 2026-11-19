@@ -22,11 +22,8 @@
     "
   >
     <template #title>
-      <!-- Embedded (workflow NDV): no inline function name here — the name is asked at
-           SAVE time in the Update|Create dialog, mirroring the Logs editor.
-           Enter saves the function, as Enter in the panel and alert titles does
-           (OInlineEdit `submitOnEnter`). A new function does nothing until a
-           pipeline or query uses it, so saving before its body is tested is harmless. -->
+      <!-- Embedded (workflow NDV) asks for the name at save time instead. Standalone, Enter saves like
+           the panel and alert titles: an unused function has no effect, so an early save is harmless. -->
       <OFormInlineEdit
         v-if="!embedded"
         name="name"

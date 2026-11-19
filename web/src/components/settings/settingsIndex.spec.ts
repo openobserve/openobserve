@@ -539,9 +539,7 @@ describe("SettingsIndex.vue", () => {
     });
   });
 
-  // Clustering ships in OSS (nodes register through NATS with no edition check),
-  // and the node list API answers in OSS, so the page is meta-org-only, not
-  // enterprise-only.
+  // OSS clusters too and its node list API answers, so Nodes is meta-org-only, not enterprise-only.
   describe("nodes section", () => {
     const findEntry = (w: any) =>
       w.vm.sectionGroups
