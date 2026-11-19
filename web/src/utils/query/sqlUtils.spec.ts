@@ -35,6 +35,7 @@ import {
   parseWhereClauseToFilter,
   parseWhereClauseToFilterChecked,
   extractWhereClause,
+  applyQueryClauses,
 } from "./sqlUtils";
 
 // Mock the imported modules
@@ -758,6 +759,8 @@ describe("sqlUtils", () => {
         },
         streamName: null,
         joins: [],
+        limit: 0,
+        hasOrderBy: false,
       });
     });
 
@@ -3991,5 +3994,76 @@ describe("sqlUtils", () => {
       const result = await extractWhereClause("not valid sql");
       expect(result).toBe("");
     });
+  });
+});
+
+describe("applyQueryClauses", () => {
+  const clausesOf = async (query: string) => {
+    const { default: sqlParser }: any =
+      await import("@openobserve/node-sql-parser/build/datafusionsql");
+    const ast = new sqlParser.Parser().astify(query);
+    const fields = extractFields(ast, "_timestamp");
+    return { fields, ...applyQueryClauses(ast, fields, "_timestamp") };
+  };
+
+  it("maps a HAVING on an aggregate to that field", async () => {
+    const result = await clausesOf(
+      `SELECT service, count(*) FROM "default" GROUP BY service HAVING count(*) > 120`,
+    );
+    expect(result.unsupported).toBeUndefined();
+    expect(result.fields[1].havingConditions).toEqual([{ operator: ">", value: 120 }]);
+  });
+
+  it("maps HAVING conditions written against SELECT aliases", async () => {
+    const result = await clausesOf(
+      `SELECT service, count(*) AS c, avg(took) AS t FROM "default" GROUP BY service HAVING c != 5 AND t <= 10`,
+    );
+    expect(result.fields[1].havingConditions).toEqual([{ operator: "<>", value: 5 }]);
+    expect(result.fields[2].havingConditions).toEqual([{ operator: "<=", value: 10 }]);
+  });
+
+  it("maps LIMIT and a single ORDER BY", async () => {
+    const result = await clausesOf(
+      `SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC LIMIT 2`,
+    );
+    expect(result.limit).toBe(2);
+    expect(result.hasOrderBy).toBe(true);
+    expect(result.fields[1].sortBy).toBe("DESC");
+    expect(result.fields[0].sortBy).toBeUndefined();
+  });
+
+  it("maps an ORDER BY select-list position to that field", async () => {
+    const result = await clausesOf(
+      `SELECT service, count(*) FROM "default" GROUP BY service ORDER BY 2 DESC`,
+    );
+    expect(result.unsupported).toBeUndefined();
+    expect(result.fields[1].sortBy).toBe("DESC");
+  });
+
+  it("reads count(DISTINCT x) as count-distinct", async () => {
+    const result = await clausesOf(
+      `SELECT service, count(distinct level) FROM "default" GROUP BY service`,
+    );
+    expect(result.unsupported).toBeUndefined();
+    expect(result.fields[1]).toMatchObject({
+      column: "level",
+      aggregationFunction: "count-distinct",
+    });
+  });
+
+  it.each([
+    [
+      `SELECT service, count(*) FROM "default" GROUP BY service HAVING count(*) > 1 OR count(*) < 9`,
+    ],
+    [`SELECT service, count(*) FROM "default" GROUP BY service HAVING max(took) > 1`],
+    [
+      `SELECT service, count(*) FROM "default" GROUP BY service HAVING count(*) > 1 AND count(*) < 9`,
+    ],
+    [`SELECT service, count(*) FROM "default" GROUP BY service LIMIT 5 OFFSET 2`],
+    [`SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC, service`],
+    [`SELECT service, count(*) FROM "default" GROUP BY service HAVING 2 > 1`],
+    [`SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC NULLS LAST`],
+  ])("reports a clause the builder cannot express: %s", async (query) => {
+    expect((await clausesOf(query)).unsupported).toBeTruthy();
   });
 });
