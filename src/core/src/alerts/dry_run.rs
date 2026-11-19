@@ -211,6 +211,9 @@ pub struct Check {
     pub fired: bool,
     pub notified: bool,
     pub held_by: Option<HeldBy>,
+    /// The scheduler would not run this check (paused by Notify at most every): `state` carries
+    /// over, while `matched` and `value` show data it would not have seen.
+    pub skipped: bool,
     pub level: Option<CheckLevel>,
     pub value: Option<f64>,
     pub value_is_lower_bound: bool,
@@ -275,6 +278,7 @@ struct Decision {
     state: Option<CheckState>,
     notified: bool,
     held_by: Option<HeldBy>,
+    skipped: bool,
     level: Option<AlertLevel>,
     fired_groups: Vec<String>,
 }
@@ -336,6 +340,7 @@ impl<'a> Simulation<'a> {
             return Decision {
                 state: Some(self.last_state),
                 held_by: firing.then_some(HeldBy::NotifyAtMostEvery),
+                skipped: true,
                 level: self.last_level,
                 ..Default::default()
             };
@@ -414,6 +419,7 @@ impl<'a> Simulation<'a> {
             state: Some(state),
             notified,
             held_by: (matched && !notified).then(|| held_by(&delivery)),
+            skipped: false,
             level: if matched { r.level } else { self.last_level },
             fired_groups: Vec::new(),
         }
@@ -541,6 +547,7 @@ impl<'a> Simulation<'a> {
             state: Some(state),
             notified,
             held_by,
+            skipped: false,
             level: classification.rollup.filter(|l| l.is_firing()),
             fired_groups,
         }
@@ -732,6 +739,7 @@ fn build_check(
         fired,
         notified: decision.notified,
         held_by: decision.held_by,
+        skipped: decision.skipped,
         level: if fired {
             CheckLevel::of(decision.level)
         } else {
@@ -1253,6 +1261,9 @@ mod tests {
         assert_eq!(resp.checks[1].reason, Some(NotFiredReason::Pending));
         assert_eq!(resp.summary.notified_at, vec![T0 + 2 * step, T0 + 4 * step]);
         assert_eq!((resp.summary.fired, resp.summary.held), (4, 2));
+        let skipped: Vec<_> = resp.checks.iter().map(|c| c.skipped).collect();
+        assert_eq!(skipped, vec![false, false, false, true, false, true, false]);
+        assert_eq!(resp.checks[5].matched, 0);
     }
 
     #[tokio::test]
@@ -1314,6 +1325,7 @@ mod tests {
         );
         assert_eq!(resp.summary.groups_fired[0].checks, 3);
         assert_eq!(resp.summary.groups_fired_total, 2);
+        assert!(resp.checks.iter().all(|c| !c.skipped));
     }
 
     #[tokio::test]
