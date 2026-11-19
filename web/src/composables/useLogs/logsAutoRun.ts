@@ -669,6 +669,7 @@ function createLogsAutoRun() {
 
   function cancelPanelLoad(): void {
     outsideRunLoad = null;
+    if (panelRun) panelRun.scope = null;
   }
 
   function hasPanelRun(generationId: number): boolean {
