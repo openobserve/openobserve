@@ -25,27 +25,62 @@
 //! last-write-wins by primary key, transitions are identified by
 //! `(alert_id, group_key, at)`, and the deletes are deletes.
 
+use config::meta::alerts::{grouping::TouchedGroupPlan, state::StateTouch};
 use infra::{
     errors::{Error, Result},
     table,
 };
 use o2_enterprise::enterprise::super_cluster::queue::{AlertStateMessage, Message, MessageType};
 
+/// What one message on the `alert_states` key asks this region to apply.
+#[derive(Debug, PartialEq)]
+enum Replicated {
+    Write(Box<AlertStateMessage>),
+    Touch(StateTouch),
+    TouchedPlan(TouchedGroupPlan),
+}
+
 pub(crate) async fn process(msg: Message) -> Result<()> {
-    match msg.message_type {
-        MessageType::AlertStatesTable => {
-            process_msg(msg.try_into()?).await?;
+    match decode(msg)? {
+        Replicated::Write(write) => process_msg(*write).await?,
+        // A touch for a row this region lacks writes nothing; the next full row brings it.
+        Replicated::Touch(touch) => {
+            if !table::alert_states::touch(&touch).await? {
+                log::debug!(
+                    "[SUPER_CLUSTER:sync] alert {}: touch skipped, no rollup row or a newer one",
+                    touch.alert_id
+                );
+            }
         }
+        Replicated::TouchedPlan(touched) => {
+            if !table::alert_states::persist_touched_group_plan(&touched)
+                .await?
+                .written
+            {
+                log::debug!(
+                    "[SUPER_CLUSTER:sync] alert {}: touched plan dropped, alert missing or not grouped",
+                    touched.alert_id
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn decode(msg: Message) -> Result<Replicated> {
+    match msg.message_type {
+        MessageType::AlertStatesTable => Ok(Replicated::Write(Box::new(msg.try_into()?))),
+        MessageType::AlertStateTouch => Ok(Replicated::Touch(crate::payload(&msg)?)),
+        MessageType::AlertGroupPlanTouch => Ok(Replicated::TouchedPlan(crate::payload(&msg)?)),
         _ => {
             log::error!(
                 "[SUPER_CLUSTER:DB] Invalid message: type: {:?}, key: {}",
                 msg.message_type,
                 msg.key
             );
-            return Err(Error::Message("Invalid message type".to_string()));
+            Err(Error::Message("Invalid message type".to_string()))
         }
     }
-    Ok(())
 }
 
 async fn process_msg(msg: AlertStateMessage) -> Result<()> {
@@ -116,6 +151,66 @@ mod tests {
     };
 
     use super::*;
+
+    fn touch_message(message_type: MessageType, value: Option<Vec<u8>>) -> Message {
+        Message::new(
+            "/alert_states/".to_string(),
+            value.map(Into::into),
+            None,
+            false,
+            message_type,
+        )
+    }
+
+    fn a_touch() -> StateTouch {
+        config::utils::json::from_str(
+            r#"{"alert_id":"alert-1",
+                "stamps":{"last_outcome_at":2000,"level_at":2000,"last_seen":2000}}"#,
+        )
+        .unwrap()
+    }
+
+    fn a_touched_plan() -> TouchedGroupPlan {
+        config::utils::json::from_str(
+            r#"{"alert_id":"alert-1","plan":{"updates":[],"evicted":[]},
+                "touch":{"at":2000,"seen_since":1000}}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn each_touch_type_decodes_into_its_own_payload() {
+        let touch = config::utils::json::to_vec(&a_touch()).unwrap();
+        let plan = config::utils::json::to_vec(&a_touched_plan()).unwrap();
+
+        assert_eq!(
+            decode(touch_message(
+                MessageType::AlertStateTouch,
+                Some(touch.clone())
+            ))
+            .unwrap(),
+            Replicated::Touch(a_touch())
+        );
+        assert_eq!(
+            decode(touch_message(
+                MessageType::AlertGroupPlanTouch,
+                Some(plan.clone())
+            ))
+            .unwrap(),
+            Replicated::TouchedPlan(a_touched_plan())
+        );
+        // One type's payload under the other's byte must not be applied as something else.
+        assert!(decode(touch_message(MessageType::AlertStateTouch, Some(plan))).is_err());
+        assert!(decode(touch_message(MessageType::AlertGroupPlanTouch, Some(touch))).is_err());
+    }
+
+    #[test]
+    fn a_touch_with_a_malformed_or_missing_payload_is_an_error_not_a_panic() {
+        for value in [Some(b"not json".to_vec()), None] {
+            assert!(decode(touch_message(MessageType::AlertStateTouch, value.clone())).is_err());
+            assert!(decode(touch_message(MessageType::AlertGroupPlanTouch, value)).is_err());
+        }
+    }
 
     #[tokio::test]
     async fn a_message_from_another_table_is_rejected() {

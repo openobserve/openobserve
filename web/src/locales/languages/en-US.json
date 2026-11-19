@@ -29388,7 +29388,22 @@
         "learning": "{count} is still learning. | {count} are still learning."
       },
       "gapChip": "Gap",
-      "checksWatched": "{count} of {total} checks watched"
+      "checksWatched": "{count} of {total} checks watched",
+      "verdict": {
+        "allWatched": "Your 1 service is watched. | All {count} services are watched.",
+        "allWatchedSub": "Its errors, latency and stopped data are all covered. | Each one has errors, latency and stopped data covered.",
+        "one": "1 service has a coverage gap: {name}.",
+        "oneWhere": "1 service has a coverage gap: {name}, in {where}.",
+        "named": "{count} services have a coverage gap: {names}.",
+        "share": "{count} services have a coverage gap. The busiest {top} of them carry {share} of their measured traffic.",
+        "partly": "{count} more is partly watched. | {count} more are partly watched.",
+        "others": "The other {count} is watched. | The other {count} are watched.",
+        "unknown": "{count} has no traffic figure because its streams are shared; it sorts last. | {count} have no traffic figure because their streams are shared; they sort last.",
+        "nothingToAdd": "Nothing to add. New services show up here after the next check.",
+        "note": "A no-data alert for {name}, in a review list. Nothing is saved until you add it. | No-data alerts for the busiest {count}, in one review list. Nothing is saved until you add them.",
+        "nextNote": "No-data alerts for the next {count} by traffic, in one review list. Nothing is saved until you add them.",
+        "next": "Add alert for the next {count}"
+      }
     },
     "homeLive": {
       "andMore": "{count} more",
@@ -29505,6 +29520,14 @@
       "hexName": "{service}, {state}, {stream}, {detectors}",
       "legendOf": "Legend for {fill}, select to highlight",
       "mapLabel": "Coverage map, 1 service filled by {fill} | Coverage map, {count} services filled by {fill}",
+      "mapLabelGrouped": {
+        "service": "Coverage map, {services} under {groups}, filled by {fill}",
+        "place": "Coverage map, {services} in {groups}, filled by {fill}"
+      },
+      "mapGroupCount": {
+        "service": "1 name | {count} names",
+        "place": "1 place | {count} places"
+      },
       "bucketNone": "None",
       "bucketFresh": "Under 5 min",
       "bucketRecent": "5–15 min",
@@ -29594,7 +29617,36 @@
       "bucketFive": "5 detectors",
       "bucketFewer": "1–4 detectors",
       "logPatternsValue": "{known} known · {fresh} new today",
-      "bandLearning": "Learning the baseline · {days} of {total} days · normal range ready {day}"
+      "bandLearning": "Learning the baseline · {days} of {total} days · normal range ready {day}",
+      "needsAction": "Needs action",
+      "needsNone": "No service needs action",
+      "needsNoneSearch": "{count} service matches “{query}”, and it needs no action | {count} services match “{query}”, and none needs action",
+      "groupServices": "1 service | {count} services",
+      "groupPlaces": "1 place | {count} places",
+      "groupOf": "{count} of {total}",
+      "groupCount": {
+        "gap": "1 gap | {count} gaps",
+        "partial": "{count} partly watched",
+        "learning": "{count} learning",
+        "watched": "{count} watched"
+      },
+      "traffic": "Traffic",
+      "hexGroup": "{name} ×{count}",
+      "hexGroupName": "{name}, {state}",
+      "mapMore": "and 1 more | and {count} more",
+      "showInTable": "Show in table",
+      "trafficUnknown": "— traffic unknown: the service's streams are shared, so it sorts last",
+      "groupedBy": {
+        "service": "Grouped by service · 1 name | Grouped by service · {count} names",
+        "place": "Grouped by place · 1 place | Grouped by place · {count} places",
+        "none": "Not grouped"
+      },
+      "groupPick": {
+        "auto": "Automatic (recommended)",
+        "service": "By service",
+        "place": "By place",
+        "none": "Not grouped"
+      }
     },
     "activity": {
       "before": "Before",
@@ -29764,6 +29816,7 @@
   },
   "autoobserveLive": {
     "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
     "topbar": {
       "checked": "Checked {ago}",
       "firstCheck": "First check in progress"
@@ -29803,6 +29856,7 @@
     },
     "coverage": {
       "summaryWatched": "{watched} of {total} watched · {pct}%",
+      "summaryWatchedShare": "{watched} of {total} watched · {pct}",
       "splitLabel": "{watched} watched, {gaps} with a coverage gap",
       "stateWatched": "Watched",
       "stateGap": "Coverage gap",
@@ -32972,7 +33026,8 @@
         "service": "Service",
         "stream": "Stream",
         "firesWhen": "Fires when",
-        "usually": "Usually"
+        "usually": "Usually",
+        "check": "Check"
       },
       "tickGroup": "Tick every alert in {group}",
       "tickRow": "Tick {service}, {alert}",
@@ -33067,7 +33122,12 @@
       "undone": "{count} alert removed. | {count} alerts removed.",
       "undoFailed": "{failed} of {total} alerts couldn't be removed. Remove them from Alerts.",
       "more": "{count} more",
-      "usuallyLatency": "p95 {value} ms"
+      "usuallyLatency": "p95 {value} ms",
+      "waiting": {
+        "measuring": "Measuring {waiting} of {count} alert… | Measuring {waiting} of {count} alerts…",
+        "checking": "Checking {waiting} of {count} alert… | Checking {waiting} of {count} alerts…",
+        "both": "Checking {checking} and measuring {measuring} of {count} alerts…"
+      }
     },
     "decisions": {
       "reasons": {
@@ -33446,8 +33506,10 @@
       "latencySuffix": "ms (p95)",
       "errorsReason": "AutoObserve found no usual error count for {service} over the last 7 days. Set a threshold to add this alert.",
       "latencyReason": "AutoObserve found no usual latency for {service} over the last 7 days. Set a threshold to add this alert.",
-      "measuring": "Measuring the usual level over the last 7 days…",
+      "measuring": "Measuring the usual level over 7 days…",
       "noUsual": "None in 7 days",
+      "notMeasured": "Not measured",
+      "timedOut": "Measuring took too long. Set a threshold.",
       "placeholder": "Set a threshold",
       "placeholderShort": "Set value",
       "required": "Set a threshold",

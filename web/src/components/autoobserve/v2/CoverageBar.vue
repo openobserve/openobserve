@@ -41,7 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span class="size-2 rounded-full" :class="seg.color" />
         {{ seg.label }}
-        <span class="text-text-heading font-medium tabular-nums">{{ seg.count }}</span>
+        <span class="text-text-heading font-medium tabular-nums">{{
+          countText(locale, seg.count)
+        }}</span>
       </button>
     </div>
   </div>
@@ -50,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { coverageWord } from "../live/liveCopy";
+import { countText, coverageWord } from "../live/liveCopy";
 
 const props = defineProps<{
   watching: number;
@@ -61,7 +63,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ select: [filter: "watching" | "partial" | "learning" | "attention"] }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 
 // Same segments and colours as the coverage drawer's bar, so the two read as one thing.
 const shown = computed(() =>

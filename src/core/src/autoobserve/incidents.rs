@@ -19,6 +19,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use async_trait::async_trait;
 use config::meta::alerts::{incidents::AlertKind, rca_runs::RunSummaryFields};
+use futures::{StreamExt, TryStreamExt};
 use infra::table::{
     alert_incidents::CaseFilter,
     entity::{alert_incident_alerts, alert_incidents},
@@ -28,6 +29,7 @@ use infra::table::{
 use o2_enterprise::enterprise::autoobserve::{
     INTERVAL_SECS,
     api::Page,
+    context::{self, IssueContext, IssueRef, ViewerResolver, for_issues, issue_for},
     contract::ActionRequest,
     names::decision_kinds,
     page_routing::{catalogue, cohort_dimensions, stream_service},
@@ -37,6 +39,7 @@ use o2_enterprise::enterprise::autoobserve::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::ports::SearchAdapter;
 use crate::alerts::incidents::{
     FINDING_KIND_DIMENSION, FINDING_STREAM_NAME_DIMENSION, FINDING_STREAM_TYPE_DIMENSION,
     FindingIncident, FindingPager, OncallPager, finding_dimensions, incidents_enabled,
@@ -50,6 +53,13 @@ pub const REFUSED_INCIDENTS_OFF: &str = "incidents are off or not licensed";
 pub const PAGE_PENDING_US: i64 = 2 * INTERVAL_SECS * 1_000_000;
 /// The queue keeps one row per dimension path, so this many rows hold every recent sample.
 const UNROUTED_SCANNED: u64 = 500;
+/// Issue lookups in flight for one page of incidents.
+const ISSUE_READS: usize = 8;
+
+/// A finding's decision kind, stream entity id and onset.
+type IssueKey = (String, String, i64);
+/// One member's issue lookup: its incident's index, its key and the recovery its links recorded.
+type MemberIssue = (usize, IssueKey, Option<i64>);
 
 /// P6 over main's incident path: the incident's own automatic analysis is the investigation.
 pub struct IncidentInvestigation;
@@ -123,6 +133,9 @@ pub struct AutoObserveIncident {
     /// Who was paged, or why nobody was; left out only by bodies older than R8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page: Option<PageView>,
+    /// What changed before the finding and what it breaks, as this caller may see it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<IssueContext>,
 }
 
 /// One stream of an incident; its type and name are null once the org no longer has the stream.
@@ -274,6 +287,41 @@ pub async fn list_with(
     })
 }
 
+/// Each item's issue context, merged over its members, as the resolver's caller may see it.
+pub async fn attach_context(
+    org: &str,
+    items: &mut [AutoObserveIncident],
+    resolver: &dyn ViewerResolver,
+) -> anyhow::Result<()> {
+    if !context::enabled() {
+        return Ok(());
+    }
+    let members = member_issues(org, items);
+    let keys: Vec<IssueKey> = members.iter().map(|(_, key, _)| key.clone()).collect();
+    let issues: Vec<Option<IssueRef>> = futures::stream::iter(keys)
+        .map(|key| issue_of(org.to_string(), Some(key)))
+        .buffered(ISSUE_READS)
+        .try_collect()
+        .await?;
+    let grouped = per_incident(items.len(), &members, issues);
+    let found: Vec<IssueRef> = grouped.iter().flatten().cloned().collect();
+    if found.is_empty() {
+        return Ok(());
+    }
+    let mut contexts = for_issues(&SearchAdapter, org, &found, resolver)
+        .await?
+        .into_iter();
+    for (item, issues) in items.iter_mut().zip(&grouped) {
+        let mut parts: Vec<IssueContext> = contexts.by_ref().take(issues.len()).collect();
+        item.context = match parts.len() {
+            0 => None,
+            1 => parts.pop(),
+            _ => Some(context::merge(parts)),
+        };
+    }
+    Ok(())
+}
+
 pub fn members_of(
     links: &[alert_incident_alerts::Model],
     names: &HashMap<String, (String, String)>,
@@ -355,7 +403,64 @@ pub fn item_of(
         },
         members: Vec::new(),
         page: None,
+        context: None,
     }
+}
+
+/// The finding's decision kind, its stream's entity id and the onset its firing recorded.
+fn issue_key(item: &AutoObserveIncident) -> Option<IssueKey> {
+    let f = &item.finding;
+    let entity_id = format!("{}/{}", f.stream_type.as_ref()?, f.stream_name.as_ref()?);
+    Some((f.kind.clone()?, entity_id, f.first_seen_at))
+}
+
+/// Owns its inputs: a lookup future borrowing the item fails the handler's `Send` check.
+async fn issue_of(org: String, key: Option<IssueKey>) -> anyhow::Result<Option<IssueRef>> {
+    let Some((kind, entity_id, onset_us)) = key else {
+        return Ok(None);
+    };
+    issue_for(&SearchAdapter, &org, &kind, &entity_id, onset_us).await
+}
+
+/// Every member's issue, so a cohort shows each stream's context; a body without members uses the
+/// finding.
+fn member_issues(org: &str, items: &[AutoObserveIncident]) -> Vec<MemberIssue> {
+    let mut out = Vec::new();
+    for (n, item) in items.iter().enumerate() {
+        if item.members.is_empty() {
+            out.extend(issue_key(item).map(|key| (n, key, None)));
+        }
+        for m in &item.members {
+            let (Some(stream_type), Some(name)) = (&m.stream_type, &m.stream_name) else {
+                continue;
+            };
+            let entity = format!("{stream_type}/{name}");
+            let kind = decision_kinds::PAGED
+                .iter()
+                .find(|kind| finding_id(org, kind, &entity) == m.id);
+            if let Some(kind) = kind {
+                let key = (kind.to_string(), entity, m.first_seen_at);
+                out.push((n, key, m.recovered_at));
+            }
+        }
+    }
+    out
+}
+
+/// Each incident's issues; stream issue rows record no recovery, so the member's links supply it.
+fn per_incident(
+    len: usize,
+    members: &[MemberIssue],
+    found: Vec<Option<IssueRef>>,
+) -> Vec<Vec<IssueRef>> {
+    let mut out = vec![Vec::new(); len];
+    for ((n, _, recovered), issue) in members.iter().zip(found) {
+        if let Some(mut issue) = issue {
+            issue.recovered_us = issue.recovered_us.or(*recovered);
+            out[*n].push(issue);
+        }
+    }
+    out
 }
 
 async fn unrouted_samples(org: &str) -> anyhow::Result<HashSet<String>> {
@@ -625,6 +730,89 @@ mod tests {
         assert_eq!(
             item.investigation.summary, None,
             "an unreadable summary is null"
+        );
+    }
+
+    #[test]
+    fn a_cohort_reads_every_members_issue_with_its_recorded_recovery() {
+        use o2_enterprise::enterprise::autoobserve::context::subject_of;
+        const MINUTE: i64 = 60_000_000;
+        let (org, silence, drop) = (
+            "demo-org",
+            decision_kinds::STREAM_SILENCE,
+            decision_kinds::STREAM_DROP,
+        );
+        let member = |kind: &str, name: &str, seen: i64, recovered: Option<i64>| MemberView {
+            id: finding_id(org, kind, &format!("logs/{name}")),
+            title: String::new(),
+            stream_type: Some("logs".into()),
+            stream_name: Some(name.into()),
+            first_seen_at: seen,
+            recovered_at: recovered,
+        };
+        let checkout = finding_id(org, silence, "logs/checkout");
+        let mut cohort = item_of(&incident(finding_dims()), &link(&checkout));
+        cohort.members = vec![
+            member(silence, "checkout", 10, None),
+            member(drop, "okta_system_log", 20 * MINUTE, Some(95 * MINUTE)),
+            member(silence, "okta_admin", 30 * MINUTE, Some(210 * MINUTE)),
+            MemberView {
+                stream_type: None,
+                stream_name: None,
+                ..member(silence, "deleted", 40, None)
+            },
+        ];
+        let older = item_of(&incident(finding_dims()), &link(&checkout));
+        let items = [cohort, older];
+        let members = member_issues(org, &items);
+        let keys: Vec<(usize, &str, &str, i64)> = members
+            .iter()
+            .map(|(n, (kind, entity, onset), _)| (*n, kind.as_str(), entity.as_str(), *onset))
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                (0, silence, "logs/checkout", 10),
+                (0, drop, "logs/okta_system_log", 20 * MINUTE),
+                (0, silence, "logs/okta_admin", 30 * MINUTE),
+                (1, silence, "logs/checkout", 10),
+            ]
+        );
+        let found = members
+            .iter()
+            .map(|(_, (kind, entity, onset), _)| {
+                Some(IssueRef {
+                    org: org.into(),
+                    decision_kind: kind.clone(),
+                    subject: subject_of(kinds::STREAM, entity),
+                    decision_id: format!("{kind}/{entity}"),
+                    onset_us: *onset,
+                    detected_us: *onset,
+                    recovered_us: None,
+                    shadow: false,
+                })
+            })
+            .collect();
+        let incidents = per_incident(items.len(), &members, found);
+        let read: Vec<Vec<(&str, Option<i64>)>> = incidents
+            .iter()
+            .map(|issues| {
+                issues
+                    .iter()
+                    .map(|i| (i.decision_kind.as_str(), i.recovered_us))
+                    .collect()
+            })
+            .collect();
+        assert_eq!(
+            read,
+            [
+                vec![
+                    (silence, None),
+                    (drop, Some(95 * MINUTE)),
+                    (silence, Some(210 * MINUTE)),
+                ],
+                vec![(silence, None)],
+            ]
         );
     }
 
