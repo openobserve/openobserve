@@ -903,9 +903,13 @@ const validatePanelContentByType = (t: TranslateFn, panel: any, errors: string[]
 };
 
 // Only the editor asks for one query; an imported multi-query treemap still loads and draws its first visible query.
-const validateTreemapQueries = (t: TranslateFn, panel: any, errors: string[]) => {
+const validateTreemapQueries = (
+  t: TranslateFn,
+  panel: { type?: string; queries?: { config?: { hide?: boolean } }[] } | null | undefined,
+  errors: string[],
+) => {
   if (panel?.type !== "treemap") return;
-  const queries: { config?: { hide?: boolean } }[] = panel?.queries ?? [];
+  const queries = panel?.queries ?? [];
   if (queries.filter((query) => !query?.config?.hide).length > 1) {
     errors.push(t("dashboard.utils.treemapOneQuery"));
   }

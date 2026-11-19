@@ -1432,16 +1432,17 @@ describe("usePanelDrilldown", () => {
     const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     const deps = makeDeps();
     deps.panelSchema.value.type = "treemap";
-    deps.panelSchema.value.config.drilldown = [
-      {
-        name: "Link",
-        type: "byUrl",
-        targetBlank: true,
-        data: { url: "https://example.com/?n=${series.__name}&p=${series.__path}" },
-      } as any,
-    ];
-    deps.panelData.value.options.series = [{ type: "treemap" }] as any;
-    const api = usePanelDrilldown(deps as any);
+    const link = {
+      name: "Link",
+      type: "byUrl",
+      targetBlank: true,
+      data: { url: "https://example.com/?n=${series.__name}&p=${series.__path}" },
+    };
+    deps.panelSchema.value.config.drilldown = [link];
+    const api = usePanelDrilldown({
+      ...deps,
+      panelData: { value: { options: { xAxis: [{ data: [] }], series: [{ type: "treemap" }] } } },
+    });
 
     await api.onChartClick({
       componentType: "series",

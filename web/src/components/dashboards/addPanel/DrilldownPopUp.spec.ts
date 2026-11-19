@@ -639,7 +639,7 @@ describe("DrilldownPopUp", () => {
       mockDashboardPanelData.data.type = "treemap";
       wrapper = createWrapper();
 
-      const values = wrapper.vm.options.selectedValue.map((val: any) => val.value);
+      const values = wrapper.vm.options.selectedValue.map((val: { value: string }) => val.value);
       expect(values).toEqual(
         expect.arrayContaining(["${series.__name}", "${series.__value}", "${series.__path}"]),
       );

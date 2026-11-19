@@ -226,11 +226,13 @@ describe("treemap through convertPanelData", () => {
       [...rows, { x_axis_1: "api", y_axis_1: -500 }],
     ]);
     expect(extras.treemapNotice).toEqual({ skippedRows: 3 });
-    expect(options.series[0].data.find((node: any) => node.name === "api").value).toBe(40);
+    expect(options.series[0].data.find((node: { name: string }) => node.name === "api").value).toBe(
+      40,
+    );
   });
 
   it("draws only the first visible query of a saved multi-query panel, never a sum of measures", async () => {
-    const schema: any = panel("treemap", { x: [serviceX], y: [count] });
+    const schema = panel("treemap", { x: [serviceX], y: [count] });
     const second = JSON.parse(JSON.stringify(schema.queries[0]));
     schema.queries = [{ ...schema.queries[0], config: { hide: true } }, second, second];
     const { options } = await viaPanel(schema, [
@@ -238,9 +240,12 @@ describe("treemap through convertPanelData", () => {
       [{ x_axis_1: "api", y_axis_1: 7 }],
       [{ x_axis_1: "api", y_axis_1: 500 }],
     ]);
-    expect(options.series[0].data.map((node: any) => [node.name, node.value])).toEqual([
-      ["api", 7],
-    ]);
+    expect(
+      options.series[0].data.map((node: { name: string; value: number }) => [
+        node.name,
+        node.value,
+      ]),
+    ).toEqual([["api", 7]]);
   });
 
   it("shows No Data with the skipped rows when no row has a positive size", async () => {
@@ -255,7 +260,7 @@ describe("treemap through convertPanelData", () => {
   });
 
   it("shows a count as a whole number whatever the decimals, unless a unit is set", async () => {
-    const label = async (size: any, config: Record<string, any>) => {
+    const label = async (size: ReturnType<typeof field>, config: Record<string, unknown>) => {
       const { options } = await viaPanel(panel("treemap", { x: [serviceX], y: [size] }, config), [
         rows,
       ]);
