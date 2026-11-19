@@ -39,6 +39,7 @@ use {
                 DEFAULT_AGENT_TYPE, ImageAttachment, QueryRequest, RCA_AGENT_TYPE,
                 SESSION_OWNER_UNAVAILABLE, get_agent_client, is_session_owner_unavailable,
             },
+            toolsets::push::load_turn_memory,
         },
         common::{
             auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
@@ -168,6 +169,17 @@ impl ChatAudit {
             audit::audit(self.message(code, error_message)).await;
         }
     }
+}
+
+/// Whose personal memory goes with the turn: a registered user's, never an RCA turn's.
+#[cfg(feature = "enterprise")]
+async fn memory_owner(user_email: &str, agent_type: &str) -> Option<String> {
+    if agent_type == RCA_AGENT_TYPE {
+        return None;
+    }
+    openobserve_core::ai_chat::admission::resolve_owner(user_email)
+        .await
+        .ok()
 }
 
 /// Picks the agent and its context; RCA only when the caller clears the RCA endpoint's own bar.
@@ -750,8 +762,18 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                 .collect()
         });
 
-        let (tool_mcps, tool_clis, tool_skills) =
+        let (mut tool_mcps, tool_clis, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
+        // This endpoint never persists a turn, so its memory is read-only.
+        let owner = memory_owner(user_id, agent_type).await;
+        let memory = load_turn_memory(
+            org_id_str,
+            owner.as_deref(),
+            delegated,
+            false,
+            &mut tool_mcps,
+        )
+        .await;
         let query_req = QueryRequest {
             model: if prompt_body.model.is_empty() {
                 None
@@ -785,6 +807,8 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             known_opencode_session_id: None,
             session_epoch: None,
             confirm_timeout_secs: confirm_timeout(prompt_body.confirm_timeout_secs),
+            org_memory: memory.org,
+            user_memory: memory.user,
             ..QueryRequest::new(last_user_message, context)
         };
 
@@ -1205,8 +1229,19 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                 .collect()
         });
 
-        let (tool_mcps, tool_clis, tool_skills) =
+        let (mut tool_mcps, tool_clis, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
+        // A persisted turn always gets a turn id from admission below.
+        let persisted = o2_enterprise::enterprise::ai::chat::is_enabled();
+        let owner = memory_owner(&user_id, agent_type).await;
+        let memory = load_turn_memory(
+            &org_id_str,
+            owner.as_deref(),
+            delegated,
+            persisted,
+            &mut tool_mcps,
+        )
+        .await;
         let query_req = QueryRequest {
             model: if prompt_body.model.is_empty() {
                 None
@@ -1240,6 +1275,8 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             known_opencode_session_id: None,
             session_epoch: None,
             confirm_timeout_secs: confirm_timeout(prompt_body.confirm_timeout_secs),
+            org_memory: memory.org,
+            user_memory: memory.user,
             ..QueryRequest::new(last_user_message, context)
         };
 
@@ -1808,6 +1845,12 @@ pub async fn cancel(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_rca_turn_carries_no_personal_memory() {
+        assert_eq!(memory_owner("u@example.com", RCA_AGENT_TYPE).await, None);
+    }
 
     #[cfg(feature = "cloud")]
     #[tokio::test]

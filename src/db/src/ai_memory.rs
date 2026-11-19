@@ -27,8 +27,8 @@ use infra::{
     errors::Result,
     table::{
         ai_memory::{
-            self as table, Change, Memory, MemoryKey, Outcome, PendingRevision, Revision,
-            ToolsetDelete, Write, WriteMeta,
+            self as table, AgentOutcome, AgentWrite, Change, Memory, MemoryKey, Outcome,
+            PendingRevision, Revision, ToolsetDelete, Write, WriteMeta,
         },
         cipher,
     },
@@ -130,13 +130,8 @@ pub async fn submit(submission: Submission) -> Result<Submitted> {
     let outcome = match (mode, submission.change) {
         (WriteMode::Refuse, _) => return Ok(Submitted::Refused),
         (WriteMode::Hold, Change::Content(_)) => return Ok(Submitted::NeedsMemoryAdmin),
-        (WriteMode::Hold, Change::Edits(_)) if !submission.settings.is_empty() => {
-            return Ok(Submitted::NeedsMemoryAdmin);
-        }
-        (WriteMode::Hold, Change::Edits(edits)) => {
-            let base_rev = submission.base_rev;
-            table::hold_with(conn, &dek, key, toolset_id, base_rev, &edits, &meta).await?
-        }
+        // Only agents' edits are held, through `agent_write`; a person's text needs an admin.
+        (WriteMode::Hold, Change::Edits(_)) => return Ok(Submitted::NeedsMemoryAdmin),
         (WriteMode::Apply, change) => {
             let write = Write {
                 base_rev: submission.base_rev,
@@ -150,6 +145,18 @@ pub async fn submit(submission: Submission) -> Result<Submitted> {
         publish(key).await;
     }
     Ok(Submitted::Written(outcome))
+}
+
+/// An agent's edit for a running turn, checked and written in one transaction. [strong]
+pub async fn agent_write(mut write: AgentWrite) -> Result<AgentOutcome> {
+    write.origin_region = origin_region();
+    let dek = cipher::get_dek(&write.org).await?;
+    let outcome = table::agent_write_with(get_orm_client_rw().await, &dek, &write).await?;
+    if let AgentOutcome::Written(key, Outcome::Applied { .. } | Outcome::Pending { .. }) = &outcome
+    {
+        publish(key).await;
+    }
+    Ok(outcome)
 }
 
 /// Re-applies a pending revision of `key`'s memory to its latest content. [strong]

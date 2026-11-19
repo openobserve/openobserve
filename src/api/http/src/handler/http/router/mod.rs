@@ -1189,6 +1189,19 @@ pub fn basic_routes() -> Router {
         router = router.merge(public);
     }
 
+    // o2-ai's agent memory writes: the internal secret and the running turn are checked inside.
+    #[cfg(feature = "enterprise")]
+    {
+        router = router.route(
+            "/internal/ai/memory",
+            post(openobserve_api_management::request::ai::memory::internal_write).route_layer(
+                middleware::from_fn(|req, next| {
+                    require_features(&[Feature::AiAssistant], req, next)
+                }),
+            ),
+        );
+    }
+
     // Unauthenticated like status pages: the share token is checked in the handler.
     #[cfg(feature = "enterprise")]
     if get_config().public_ai_chat.enabled {
