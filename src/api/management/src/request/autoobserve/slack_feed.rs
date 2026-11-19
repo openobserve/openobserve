@@ -19,6 +19,7 @@ use o2_enterprise::enterprise::{
     autoobserve::{
         alert_findings::AlertFindingsRead,
         api::{self, Deps, MAX_LIMIT, Page, SuggestionFilter},
+        context::ChannelResolver,
     },
     slack::insights::feed::{
         FeedHooks,
@@ -54,6 +55,7 @@ async fn read(at: ReadAs) -> anyhow::Result<FeedInput> {
             at.now,
             readable,
             &LiveDigest,
+            &ChannelResolver,
         )
         .await
         .map_err(|e| anyhow::anyhow!("suggestions: {e:?}"))?;
