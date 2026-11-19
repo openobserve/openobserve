@@ -47,6 +47,7 @@ vi.mock("@/utils/query/sqlUtils", () => ({
   isExplainQuery: vi.fn(() => false),
   buildSqlQuery: vi.fn(),
   getFieldsFromQuery: vi.fn(),
+  extractWhereClause: vi.fn(async () => "level = 'ERROR'"),
   isSimpleSelectAllQuery: vi.fn((query) => {
     if (!query || typeof query !== "string") return false;
     const normalizedQuery = query.trim().replace(/\s+/g, " ");
@@ -1433,9 +1434,7 @@ describe("Logs Index", async () => {
         wrapper.vm.onBuildQueryGenerated(testQuery);
         await flushPromises();
 
-        // Should contain only the WHERE clause part, not the full SQL
-        // extractWhereClause is mocked, so it returns "" for the mock parser
-        expect(wrapper.vm.searchObj.data.query).not.toBe(testQuery);
+        expect(wrapper.vm.searchObj.data.query).toBe("level = 'ERROR'");
       });
 
       it("should not update query if onBuildQueryGenerated receives empty string", async () => {

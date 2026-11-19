@@ -999,21 +999,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
-                  variant="ghost"
+                  :data-run-pending="panelRunPending ? 'true' : undefined"
+                  :aria-label="panelRunPending ? t('search.runQueryPendingLabel') : undefined"
+                  :variant="panelRunPending ? 'pending' : 'ghost'"
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked"
                   size="sm-toolbar"
-                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
-                  :class="runButtonTone"
+                  class="rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  :class="
+                    panelRunPending
+                      ? 'border-e-button-pending-hover-bg!'
+                      : [
+                          runButtonTone,
+                          'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                        ]
+                  "
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-[2.125rem]! w-px" vertical />
+                <OSeparator v-if="!visualizeRunPending" class="h-[2.125rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
-                      variant="ghost"
+                      :variant="visualizeRunPending ? 'pending' : 'ghost'"
                       size="icon-xs"
                       class="h-[2.125rem]!"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
@@ -1021,10 +1030,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : [
-                              runButtonTone,
-                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                            ],
+                          : visualizeRunPending
+                            ? 'border-s-0'
+                            : [
+                                runButtonTone,
+                                'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                              ],
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -1061,21 +1072,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
-                  variant="ghost"
+                  :data-run-pending="panelRunPending ? 'true' : undefined"
+                  :aria-label="panelRunPending ? t('search.runQueryPendingLabel') : undefined"
+                  :variant="panelRunPending ? 'pending' : 'ghost'"
                   :title="t('search.runQuery')"
                   :disabled="buildRunBlocked || disable"
                   size="sm-toolbar"
-                  class="hover:shadow-button-primary/70 rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md"
-                  :class="runButtonTone"
+                  class="rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                  :class="
+                    panelRunPending
+                      ? 'border-e-button-pending-hover-bg!'
+                      : [
+                          runButtonTone,
+                          'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                        ]
+                  "
                   @click="handleRunQueryFn()"
                 >
                   {{ t("search.runQuery") }}
                 </OButton>
-                <OSeparator class="h-[2.125rem]! w-px" vertical />
+                <OSeparator v-if="!visualizeRunPending" class="h-[2.125rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
                     <OButton
-                      variant="ghost"
+                      :variant="visualizeRunPending ? 'pending' : 'ghost'"
                       size="icon-xs"
                       class="h-[2.125rem]!"
                       :aria-label="t('search.refreshCacheAndRunQuery')"
@@ -1083,10 +1103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :class="[
                         config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : [
-                              runButtonTone,
-                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                            ],
+                          : visualizeRunPending
+                            ? 'border-s-0'
+                            : [
+                                runButtonTone,
+                                'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
+                              ],
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
@@ -2227,6 +2249,15 @@ export default defineComponent({
         !!searchObj.meta.runPending ||
         !!searchObj.meta.editorDirty ||
         (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isRunDirty()),
+    );
+    // Logs-mode pending flags (a guard block, a dirty-time run) say nothing about a freshly loaded chart.
+    const panelRunPending = computed(
+      () => !!searchObj.meta.editorDirty || autoRun.isPanelScopeStale(),
+    );
+    const visualizeRunPending = computed(
+      () =>
+        panelRunPending.value &&
+        !(config.isEnterprise === "true" && visualizeSearchRequestTraceIds.value.length),
     );
     const isRunQueryCancelShown = computed(
       () =>
@@ -5159,6 +5190,8 @@ export default defineComponent({
       visualizeReason,
       isGridInFlight,
       showRunQueryPending,
+      visualizeRunPending,
+      panelRunPending,
       isRunQueryCancelShown,
       blockWithReason,
       flushEditorValue,
