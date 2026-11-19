@@ -183,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AlertStarter
               trigger="another-way"
               :alert-type="isAnomalyMode ? 'anomaly_detection' : 'scheduled'"
+              @created="cancelEditor"
             />
           </template>
         </OPageHeader>
