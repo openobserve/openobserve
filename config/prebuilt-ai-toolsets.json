@@ -1,0 +1,134 @@
+{
+  "revision": 1,
+  "presets": [
+    {
+      "id": "datadog",
+      "kind": "mcp",
+      "label": "Datadog",
+      "revision": 1,
+      "description": "Datadog: metrics, logs, spans and APM, monitors, events and incidents.",
+      "url_template": "https://mcp.{site}/v1/mcp?toolsets=core,apm",
+      "params": [
+        {
+          "name": "site",
+          "label": "Datadog site",
+          "options": ["datadoghq.com", "us3.datadoghq.com", "us5.datadoghq.com", "datadoghq.eu", "ap1.datadoghq.com", "ddog-gov.com"],
+          "default": "datadoghq.com"
+        }
+      ],
+      "headers": [
+        {"name": "DD_API_KEY", "placeholder": "API key"},
+        {"name": "DD_APPLICATION_KEY", "placeholder": "Application key"}
+      ],
+      "help": "Leave Datadog's \"MCP Write Access\" off; the AI only needs read access.",
+      "allowed_tools": [
+        "get_datadog_metric",
+        "search_datadog_metrics",
+        "search_datadog_logs",
+        "search_datadog_spans",
+        "get_datadog_trace",
+        "search_datadog_monitors",
+        "search_datadog_events",
+        "search_datadog_incidents",
+        "get_datadog_incident",
+        "search_datadog_entities",
+        "apm_*"
+      ],
+      "write_tools": [],
+      "tool_classes": [
+        {"tool": "*_datadog_metric*", "class": "metrics"},
+        {"tool": "search_datadog_logs", "class": "logs"},
+        {"tool": "search_datadog_spans", "class": "traces"},
+        {"tool": "get_datadog_trace", "class": "traces"},
+        {"tool": "apm_*", "class": "traces"},
+        {"tool": "search_datadog_events", "class": "change"},
+        {"tool": "*_datadog_monitors", "class": "context"},
+        {"tool": "*_datadog_incident*", "class": "context"},
+        {"tool": "search_datadog_entities", "class": "context"}
+      ]
+    },
+    {
+      "id": "dynatrace",
+      "kind": "mcp",
+      "label": "Dynatrace",
+      "revision": 1,
+      "description": "Dynatrace: DQL over logs, metrics, spans and Smartscape, problems and entities.",
+      "url_template": "https://{environment}.apps.dynatrace.com/platform-reserved/mcp-gateway/v0.1/servers/dynatrace-mcp/mcp",
+      "params": [
+        {"name": "environment", "label": "Environment ID", "placeholder": "abc12345"}
+      ],
+      "headers": [
+        {"name": "Authorization", "placeholder": "Bearer <platform token with read scopes only>"}
+      ],
+      "help": "Use a platform token that holds only read scopes.",
+      "allowed_tools": [
+        "execute-dql",
+        "query-problems",
+        "get-problem-by-id",
+        "get-entity-*",
+        "get-events-for-kubernetes-cluster"
+      ],
+      "write_tools": [],
+      "tool_classes": [
+        {"tool": "execute-dql", "class": "logs", "args": {"query": "^\\s*fetch\\s+logs\\b"}},
+        {"tool": "execute-dql", "class": "traces", "args": {"query": "^\\s*fetch\\s+spans\\b"}},
+        {"tool": "execute-dql", "class": "metrics", "args": {"query": "^\\s*(timeseries|fetch\\s+metrics)\\b"}},
+        {"tool": "execute-dql", "class": "context", "args": {"query": "smartscapeEdges"}},
+        {"tool": "get-events-for-kubernetes-cluster", "class": "infra"},
+        {"tool": "query-problems", "class": "context"},
+        {"tool": "get-problem-by-id", "class": "context"},
+        {"tool": "get-entity-*", "class": "context"}
+      ]
+    },
+    {
+      "id": "grafana",
+      "kind": "mcp",
+      "label": "Grafana",
+      "revision": 1,
+      "description": "Grafana: Prometheus and Loki queries, Tempo traces, alert groups and annotations.",
+      "url_template": "{url}",
+      "params": [
+        {"name": "url", "label": "mcp-grafana URL", "placeholder": "https://mcp-grafana.example.com/mcp"}
+      ],
+      "headers": [
+        {"name": "X-Grafana-Service-Account-Token", "placeholder": "Service account token"}
+      ],
+      "help": "Start mcp-grafana with --disable-write.",
+      "allowed_tools": [
+        "query_prometheus*",
+        "query_loki_*",
+        "*tempo*",
+        "list_alert_groups",
+        "get_annotations"
+      ],
+      "write_tools": [],
+      "tool_classes": [
+        {"tool": "query_prometheus*", "class": "metrics"},
+        {"tool": "query_loki_*", "class": "logs"},
+        {"tool": "*tempo*", "class": "traces"},
+        {"tool": "list_alert_groups", "class": "context"},
+        {"tool": "get_annotations", "class": "change"}
+      ]
+    },
+    {
+      "id": "kubectl",
+      "kind": "cli",
+      "label": "kubectl",
+      "revision": 1,
+      "command": "kubectl",
+      "allowed_subcommands": ["get", "describe", "logs", "top"],
+      "env": [],
+      "credential_files": ["KUBECONFIG"]
+    },
+    {
+      "id": "gh",
+      "kind": "cli",
+      "label": "gh",
+      "revision": 1,
+      "command": "gh",
+      "allowed_subcommands": ["*"],
+      "env": ["GH_TOKEN"],
+      "credential_files": []
+    }
+  ]
+}

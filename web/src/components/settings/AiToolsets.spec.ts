@@ -25,7 +25,19 @@ import router from "@/test/unit/helpers/router";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 vi.mock("@/services/ai_toolsets", () => ({
-  default: { list: vi.fn(async () => ({ data: { toolsets: [] } })), delete: vi.fn() },
+  default: {
+    list: vi.fn(async () => ({ data: { toolsets: [] } })),
+    delete: vi.fn(),
+    prebuilt: vi.fn(async () => ({
+      data: {
+        presets: [
+          { id: "datadog", kind: "mcp", label: "Datadog", revision: 2, allowed_tools: ["a", "b"] },
+          { id: "kubectl", kind: "cli", label: "kubectl", revision: 1 },
+        ],
+      },
+    })),
+    update: vi.fn(async () => ({ data: {} })),
+  },
 }));
 
 const mountPage = () =>
@@ -327,6 +339,87 @@ describe("AiToolsets failing badge", () => {
     vi.advanceTimersByTime(90_000);
     await flushPromises();
     expect(w.find("[data-test='ai-toolsets-down-failing']").exists()).toBe(false);
+    w.unmount();
+  });
+});
+
+describe("AiToolsets presets", () => {
+  afterEach(() => {
+    store.state.zoConfig.features = {};
+  });
+
+  it("offers the server's presets, flags updated and retired rows, and applies a review", async () => {
+    resetListViewState();
+    queryClient.clear();
+    store.state.zoConfig.features = { ai_toolsets: "enabled" };
+    vi.mocked(aiToolsetsService.list).mockResolvedValueOnce({
+      data: {
+        toolsets: [
+          {
+            id: "a",
+            name: "dd",
+            kind: "mcp",
+            data: {
+              allowed_tools: ["a"],
+              tools_verified_at: 1,
+              preset: { id: "datadog", revision: 1 },
+            },
+          },
+          {
+            id: "b",
+            name: "old",
+            kind: "mcp",
+            data: {
+              allowed_tools: ["a"],
+              tools_verified_at: 1,
+              preset: { id: "gone", revision: 1 },
+            },
+          },
+        ],
+      },
+    } as any);
+    const w = mount(AiToolsets, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: {
+          AddAiToolset: true,
+          ConfirmDialog: true,
+          ODialog: {
+            props: ["open"],
+            emits: ["click:primary", "click:secondary"],
+            template:
+              "<div v-if='open' data-test='review'><slot /><button data-test='apply' @click=\"$emit('click:primary')\" /><button data-test='dismiss' @click=\"$emit('click:secondary')\" /></div>",
+          },
+          OTable: {
+            props: ["data"],
+            template:
+              "<div><div v-for='row in data' :key='row.id'><slot name='cell-name' :row='row' /></div></div>",
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const vm = w.vm as any;
+    expect(vm.mcpPresets.map((p: any) => p.id)).toEqual(["datadog"]);
+    expect(vm.cliPresets.map((p: any) => p.id)).toEqual(["kubectl"]);
+    expect(w.find("[data-test='ai-toolsets-old-preset-retired']").exists()).toBe(true);
+
+    const push = vi.spyOn(router, "push");
+    vm.addToolset({ preset: "datadog" });
+    expect(push).toHaveBeenCalledWith({
+      query: expect.objectContaining({ action: "add", preset: "datadog" }),
+    });
+    push.mockRestore();
+
+    await w.find("[data-test='ai-toolsets-dd-preset-updated']").trigger("click");
+    await flushPromises();
+    expect(w.find("[data-test='ai-toolset-preset-diff-allowed_tools']").exists()).toBe(true);
+    await w.find("[data-test='apply']").trigger("click");
+    await flushPromises();
+    expect(aiToolsetsService.update).toHaveBeenCalledWith("default", "a", {
+      data: { allowed_tools: ["a", "b"], preset: { id: "datadog", revision: 2, skipped: {} } },
+    });
     w.unmount();
   });
 });

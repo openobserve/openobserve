@@ -58,6 +58,9 @@ const aiToolsets = {
   update: (org_identifier: string, id: string, data: ToolsetUpdateRequest) => {
     return http().put(`/api/${org_identifier}/ai/toolsets/${id}`, data);
   },
+  prebuilt: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/ai/toolsets/prebuilt`);
+  },
   discover: (org_identifier: string, body: ToolsetDiscoverRequest) => {
     return http().post(`/api/${org_identifier}/ai/toolsets/_discover`, body);
   },

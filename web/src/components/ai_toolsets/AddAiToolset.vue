@@ -76,6 +76,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mb-3 text-base font-medium font-semibold">
               {{ t("aiToolset.mcpConfig") }}
             </div>
+            <template v-if="mcpPreset">
+              <div v-for="param in mcpPreset.params ?? []" :key="param.name" class="o2-input mb-4">
+                <label class="mb-1 block text-sm">{{ param.label }}</label>
+                <select
+                  v-if="param.options?.length"
+                  class="border-border-default rounded-default w-full border px-2 py-1"
+                  :value="presetParams[param.name]"
+                  :data-test="`ai-toolset-preset-param-${param.name}`"
+                  @change="setPresetParam(param.name, ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="option in param.options" :key="option" :value="option">
+                    {{ option }}
+                  </option>
+                </select>
+                <input
+                  v-else
+                  class="border-border-default rounded-default w-full border px-2 py-1"
+                  :placeholder="param.placeholder"
+                  :value="presetParams[param.name]"
+                  :data-test="`ai-toolset-preset-param-${param.name}`"
+                  @input="setPresetParam(param.name, ($event.target as HTMLInputElement).value)"
+                />
+              </div>
+              <div v-if="mcpPreset.help" class="text-text-secondary mb-4 text-xs">
+                {{ mcpPreset.help }}
+              </div>
+            </template>
             <div class="o2-input mb-4">
               <OFormInput
                 :placeholder="raw('https://api.example.com/mcp/')"
@@ -137,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :tools="discoveredTools"
                 :status="discoveryStatus"
                 :error="discoveryError"
+                :preset-tools="mcpPreset ? (toolLists.allowed ?? []).length : undefined"
                 @update:lists="setToolLists"
                 @refresh="discoverTools"
               />
@@ -194,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center gap-1">
                 <span class="text-text-muted text-xs">{{ t("aiToolset.presets") }}:</span>
                 <OTag
-                  v-for="preset in CLI_PRESETS"
+                  v-for="preset in cliPresets"
                   :key="preset.id"
                   type="cliPreset"
                   :value="preset.id"
@@ -423,6 +451,9 @@ import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import AiToolsetToolPicker from "./AiToolsetToolPicker.vue";
 import { prefillFromDiscovery, type DiscoveredTool, type ToolLists } from "./toolPicker";
+import { defaultParams, paramsFromUrl, presetData, renderUrl, type Preset } from "./presets";
+import { aiToolsetPresetsQuery } from "@/services/ai_toolsets.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   makeAddAiToolsetSchema,
   addAiToolsetDefaults,
@@ -520,6 +551,13 @@ export default defineComponent({
       "tools_verified_at",
     ]);
 
+    // Older preset metadata held the template's values, which can be the URL itself.
+    const withoutUrlCopies = (extra: Record<string, any>) => {
+      if (!extra.preset?.params) return extra;
+      const { params: _params, ...preset } = extra.preset;
+      return { ...extra, preset };
+    };
+
     const blankToUndefined = (v: unknown) =>
       v === undefined || v === null || String(v).trim() === "" ? undefined : Number(v);
 
@@ -591,6 +629,8 @@ export default defineComponent({
           requires_confirmation: value.cli.requires_confirmation ?? false,
           env,
           credential_files,
+          // An edit's merge keeps the stored `preset` unless a chip set a new one.
+          ...(value.cli.preset ? { preset: value.cli.preset } : {}),
         };
       }
       if (kind === "skill") {
@@ -684,41 +724,62 @@ export default defineComponent({
     );
 
     // -----------------------------------------------------------------------
-    // Built-in CLI presets
+    // Presets, from `GET /ai/toolsets/prebuilt` (the server's file is the only copy)
     // -----------------------------------------------------------------------
-    const CLI_PRESETS = [
-      {
-        id: "kubectl",
-        label: "kubectl",
-        command: "kubectl",
-        allowed_subcommands: "get, describe, logs, top",
-        env: [] as Array<{ key: string; value: string; visible: boolean }>,
-        credential_files: [{ key: "KUBECONFIG", value: "" }],
-      },
-      {
-        id: "gh",
-        label: "gh",
-        command: "gh",
-        allowed_subcommands: "*",
-        env: [{ key: "GH_TOKEN", value: "", visible: false }],
-        credential_files: [] as Array<{ key: string; value: string }>,
-      },
-    ];
+    const presets = ref<Preset[]>([]);
+    const cliPresets = computed(() => presets.value.filter((p) => p.kind === "cli"));
+    // The MCP preset the form was opened with, and its URL template's fields.
+    const mcpPreset = ref<Preset | null>(null);
+    const presetParams = ref<Record<string, string>>({});
 
-    const applyPreset = (preset: (typeof CLI_PRESETS)[number]) => {
-      // Cross-field edits driven by a user action → setFieldValue (sanctioned).
-      form.setFieldValue("cli.command", preset.command);
-      form.setFieldValue("cli.allowed_subcommands_raw", preset.allowed_subcommands);
-      // Replace the form-owned env and cred arrays — keep empty placeholders so
-      // the user can see exactly which fields to fill in.
+    const applyPreset = (preset: Preset) => {
+      form.setFieldValue("cli.preset", { id: preset.id, revision: preset.revision });
+      form.setFieldValue("cli.command", preset.command ?? "");
+      form.setFieldValue(
+        "cli.allowed_subcommands_raw",
+        (preset.allowed_subcommands ?? []).join(", "),
+      );
       form.setFieldValue(
         "cli.env",
-        preset.env.map((e) => ({ ...e })),
+        (preset.env ?? []).map((key) => ({ key, value: "", visible: false })),
       );
       form.setFieldValue(
         "cli.credFiles",
-        preset.credential_files.map((c) => ({ key: c.key, value: c.value })),
+        (preset.credential_files ?? []).map((key) => ({ key, value: "" })),
       );
+    };
+
+    const applyMcpPreset = (preset: Preset) => {
+      mcpPreset.value = preset;
+      presetParams.value = defaultParams(preset);
+      const data = presetData(preset, presetParams.value);
+      form.setFieldValue("kind", "mcp");
+      if (!form.state.values.name) form.setFieldValue("name", preset.id);
+      form.setFieldValue("description", preset.description ?? "");
+      form.setFieldValue("mcp.url", data.url);
+      form.setFieldValue(
+        "mcp.headers",
+        (preset.headers ?? []).map((h) => ({ key: h.name, value: "", visible: false })),
+      );
+      setToolLists({ allowed: data.allowed_tools, blocked: null, write: data.write_tools });
+      form.setFieldValue("mcp.extra", { tool_classes: data.tool_classes, preset: data.preset });
+    };
+
+    // A template field rewrites the URL only; the values are never stored apart from it.
+    const setPresetParam = (name: string, value: string) => {
+      const preset = mcpPreset.value;
+      if (!preset) return;
+      presetParams.value = { ...presetParams.value, [name]: value };
+      form.setFieldValue("mcp.url", renderUrl(preset.url_template ?? "", presetParams.value));
+    };
+
+    const loadPresets = async () => {
+      const org = store.state.selectedOrganization.identifier;
+      try {
+        presets.value = await queryClient.fetchQuery(aiToolsetPresetsQuery(org));
+      } catch {
+        presets.value = [];
+      }
     };
 
     // -----------------------------------------------------------------------
@@ -880,8 +941,10 @@ export default defineComponent({
               typeof data.max_result_bytes === "number"
                 ? String(Math.ceil(data.max_result_bytes / 1024))
                 : "",
-            extra: Object.fromEntries(
-              Object.entries(data).filter(([key]) => !MCP_RENDERED_KEYS.has(key)),
+            extra: withoutUrlCopies(
+              Object.fromEntries(
+                Object.entries(data).filter(([key]) => !MCP_RENDERED_KEYS.has(key)),
+              ),
             ),
           };
         } else if (toolset.kind === "cli") {
@@ -1118,13 +1181,28 @@ export default defineComponent({
       const id = editId();
       const loaded = id ? await loadForEdit(id) : "loaded";
       if (loaded === "failed") return;
+      // The route's preset fills the form first, so a draft the user continues lands on top of it.
+      await loadPresets();
+      const query = router.currentRoute.value.query;
+      if (!id && query.kind === "skill") form.setFieldValue("kind", "skill");
+      const opened = !id && presets.value.find((p) => p.id === query.preset);
+      if (opened && opened.kind === "mcp") applyMcpPreset(opened);
+      if (opened && opened.kind === "cli") {
+        form.setFieldValue("kind", "cli");
+        applyPreset(opened);
+      }
       // A deleted toolset still starts the draft, so a draft left for it is dropped with a notice.
       await toolsetDraft.start();
+      if (mcpPreset.value) {
+        const url = (form.state.values as AddAiToolsetForm).mcp.url ?? "";
+        presetParams.value =
+          paramsFromUrl(mcpPreset.value.url_template ?? "", url) ?? presetParams.value;
+      }
       if (loaded === "gone") {
         emit("cancel:hideform");
         return;
       }
-      if (router.currentRoute.value.query.section === "tools") {
+      if (query.section === "tools") {
         await nextTick();
         toolPickerAnchor.value?.scrollIntoView?.({ block: "start" });
       }
@@ -1163,8 +1241,11 @@ export default defineComponent({
       addCredFile,
       removeCredFile,
       setCredValue,
-      CLI_PRESETS,
+      cliPresets,
       applyPreset,
+      mcpPreset,
+      presetParams,
+      setPresetParam,
       // Skill (Monaco content bridged into the form)
       skillContent,
       setSkillContent,

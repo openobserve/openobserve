@@ -51,7 +51,9 @@ use super::{
     rca_turn::{self, RcaPrompt, RcaTurnError, TurnStarted},
 };
 use crate::ai_chat::{
-    rca_ledger::{RunTranscript, TranscriptAck, TranscriptSteer, decode_run},
+    rca_ledger::{
+        RunTranscript, TranscriptAck, TranscriptSteer, decode_run_with, org_tool_classes,
+    },
     read_committed_events,
 };
 
@@ -333,7 +335,10 @@ impl SteerDeps for LiveDeps {
             return Ok(None);
         };
         let events = read_committed_events(&session, -1).await?;
-        Ok(Some(decode_run(&events)))
+        Ok(Some(decode_run_with(
+            &events,
+            &org_tool_classes(org_id).await,
+        )))
     }
 
     async fn relay(
@@ -1497,7 +1502,7 @@ mod tests {
     use crate::{
         ai_chat::{
             rca_ledger::{
-                split_steers,
+                decode_run, split_steers,
                 tests::{H1, H2, ack, ask, hypothesis, user_message},
             },
             rca_thread::tests::{Session, T},

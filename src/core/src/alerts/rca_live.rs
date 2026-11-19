@@ -51,7 +51,7 @@ use super::{
 };
 use crate::ai_chat::{
     CommittedPrefix, ReadError, fork,
-    rca_ledger::{RunTranscript, decode_run},
+    rca_ledger::{RunTranscript, decode_run_with, org_tool_classes},
     rca_thread::{self, RcaThread, Transcript},
     read_committed_prefix,
 };
@@ -498,7 +498,13 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
 
     async fn decoded(&self, session: &SessionRow) -> Result<&RunTranscript, &ReadError> {
         let prefix = self.events(session).await.as_ref()?;
-        Ok(self.decoded.get_or_init(|| decode_run(&prefix.events)))
+        if let Some(decoded) = self.decoded.get() {
+            return Ok(decoded);
+        }
+        let classes = org_tool_classes(&session.org_id).await;
+        Ok(self
+            .decoded
+            .get_or_init(|| decode_run_with(&prefix.events, &classes)))
     }
 }
 
@@ -1026,13 +1032,16 @@ pub(crate) mod tests {
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
 
     use super::*;
-    use crate::alerts::{
-        rca_runs::{
-            complete_run,
-            tests::{age, cancel_write, db, new_incident, start},
-            update_run,
+    use crate::{
+        ai_chat::rca_ledger::decode_run,
+        alerts::{
+            rca_runs::{
+                complete_run,
+                tests::{age, cancel_write, db, new_incident, start},
+                update_run,
+            },
+            rca_steering::guidance_row,
         },
-        rca_steering::guidance_row,
     };
 
     const SESSION: &str = "ses_live_stream";

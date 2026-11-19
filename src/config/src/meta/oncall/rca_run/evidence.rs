@@ -22,7 +22,8 @@ use utoipa::ToSchema;
 use super::{EvidenceLedger, Polarity, Strength, TimeWindow};
 use crate::meta::{
     oncall::confidence::{
-        CallLog, SignalClass, ToolCallRecord, UnverifiedCitation, is_prometheus_tool, signal_class,
+        CallLog, SignalClass, ToolCallRecord, ToolClassMap, UnverifiedCitation, is_prometheus_tool,
+        signal_class,
     },
     sql::resolve_stream_names,
 };
@@ -104,7 +105,9 @@ fn prometheus_time_us(v: Option<&Value>) -> Option<i64> {
 /// Stream, time range and query of one call, from its unwrapped input.
 pub fn evidence_target(tool: &str, input: &Value) -> EvidenceTarget {
     let mut target = EvidenceTarget {
-        signal: signal_class(tool, input),
+        // The ledger replaces it with the toolset-aware class, which needs the org's
+        // `tool_classes`.
+        signal: signal_class(tool, input, &ToolClassMap::default()),
         streams: Vec::new(),
         sql: None,
         promql: None,

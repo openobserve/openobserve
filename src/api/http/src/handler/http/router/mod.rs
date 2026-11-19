@@ -2032,6 +2032,7 @@ fn service_route_table() -> Router {
             // AI
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
             .route("/{org_id}/ai/toolsets/_discover", post(ai::toolsets::discover))
+            .route("/{org_id}/ai/toolsets/prebuilt", get(ai::toolsets::prebuilt))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
 
             // RE patterns

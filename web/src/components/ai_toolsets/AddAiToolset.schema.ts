@@ -94,6 +94,8 @@ export const makeAddAiToolsetSchema = (
         requires_confirmation: z.boolean().optional(),
         env: z.array(secretRowSchema).optional().default([]),
         credFiles: z.array(credFileRowSchema).optional().default([]),
+        // The applied CLI preset; a form field, so a resumed draft still saves it.
+        preset: z.object({ id: z.string(), revision: z.number() }).optional(),
       }),
 
       // ── Skill fields (content validated only when kind === "skill") ───────

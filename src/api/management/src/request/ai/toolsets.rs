@@ -391,6 +391,34 @@ pub async fn update(
 }
 
 // ---------------------------------------------------------------------------
+// Presets
+// ---------------------------------------------------------------------------
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/ai/toolsets/prebuilt",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "ListPrebuiltAiToolsets",
+    summary = "List AI toolset presets",
+    description = "Returns the presets shipped with this server (Datadog, Dynatrace, Grafana, kubectl, gh): \
+                   URL template, header names, tool lists and tool classes. A toolset saved from a \
+                   preset stores `preset: {id, revision}` in its `data`. \
+                   Only available in enterprise deployments.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "The presets", content_type = "application/json", body = config::prebuilt_ai_toolsets::PrebuiltAiToolsets),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn prebuilt(Path(_org_id): Path<String>) -> Response {
+    Json(config::prebuilt_ai_toolsets::prebuilt_ai_toolsets()).into_response()
+}
+
+// ---------------------------------------------------------------------------
 // Discover
 // ---------------------------------------------------------------------------
 
@@ -523,11 +551,22 @@ async fn hide_mcp_urls(org_id: &str, user_id: &str, toolsets: &mut [ToolsetRespo
         return;
     }
     for toolset in toolsets.iter_mut().filter(|t| t.kind == ToolsetKind::Mcp) {
-        if let Some(url) = toolset.data.as_mut().and_then(|d| d.get_mut("url"))
-            && let Some(raw) = url.as_str()
-        {
-            *url = serde_json::Value::String(config::utils::str::url_origin(raw));
-        }
+        hide_mcp_url(toolset);
+    }
+}
+
+// Preset metadata from older forms may hold the template's values, which can be the URL itself.
+fn hide_mcp_url(toolset: &mut ToolsetResponse) {
+    let Some(data) = toolset.data.as_mut() else {
+        return;
+    };
+    if let Some(url) = data.get_mut("url")
+        && let Some(raw) = url.as_str()
+    {
+        *url = serde_json::Value::String(config::utils::str::url_origin(raw));
+    }
+    if let Some(preset) = data.get_mut("preset").and_then(|p| p.as_object_mut()) {
+        preset.remove("params");
     }
 }
 
@@ -1004,6 +1043,38 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("invalid mcp data"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn the_presets_route_returns_the_shipped_presets() {
+        let resp = prebuilt(Path("org".to_string())).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        let ids: Vec<&str> = body["presets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids, ["datadog", "dynatrace", "grafana", "kubectl", "gh"]);
+        assert_eq!(body["presets"][1]["tool_classes"][0]["tool"], "execute-dql");
+    }
+
+    #[test]
+    fn a_hidden_url_has_no_copy_left_in_the_preset_metadata() {
+        let mut toolset = response("grafana");
+        toolset.data = Some(json!({
+            "url": "https://grafana.example.com/mcp?token=s3cret",
+            "preset": {"id": "grafana", "revision": 1, "params": {"url": "https://grafana.example.com/mcp?token=s3cret"}}
+        }));
+        hide_mcp_url(&mut toolset);
+        let data = toolset.data.unwrap();
+        assert_eq!(data["url"], "https://grafana.example.com");
+        assert_eq!(data["preset"], json!({"id": "grafana", "revision": 1}));
+        assert!(!data.to_string().contains("s3cret"));
     }
 
     #[test]

@@ -25,23 +25,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
     >
       <template #actions>
-        <OButton
-          data-test="ai-toolsets-add-btn"
-          variant="primary"
-          size="sm"
-          :aria-label="
-            toolsetDrafts.hasNew
-              ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
-              : undefined
-          "
-          @click="addToolset"
-          >{{ t("aiToolset.add") }}
-          <EditorDraftDot
-            v-if="toolsetDrafts.hasNew"
-            :saved-at="toolsetDrafts.savedAt(null)"
-            corner
-            data-test="ai-toolsets-add-draft-dot"
-        /></OButton>
+        <ODropdown align="end">
+          <template #trigger>
+            <OButton
+              data-test="ai-toolsets-add-btn"
+              variant="primary"
+              size="sm"
+              icon-right="keyboard-arrow-down"
+              :aria-label="
+                toolsetDrafts.hasNew
+                  ? t('common.editorDraft.newDot', { label: t('aiToolset.add') })
+                  : undefined
+              "
+              >{{ t("aiToolset.add") }}
+              <EditorDraftDot
+                v-if="toolsetDrafts.hasNew"
+                :saved-at="toolsetDrafts.savedAt(null)"
+                corner
+                data-test="ai-toolsets-add-draft-dot"
+            /></OButton>
+          </template>
+          <ODropdownItem
+            v-for="preset in mcpPresets"
+            :key="preset.id"
+            :data-test="`ai-toolsets-add-${preset.id}`"
+            @select="addToolset({ preset: preset.id })"
+          >
+            {{ preset.label }}
+          </ODropdownItem>
+          <ODropdownItem data-test="ai-toolsets-add-custom-mcp" @select="addToolset()">
+            {{ t("aiToolset.addCustomMcp") }}
+          </ODropdownItem>
+          <ODropdownSeparator />
+          <ODropdownItem
+            v-for="preset in cliPresets"
+            :key="preset.id"
+            :data-test="`ai-toolsets-add-${preset.id}`"
+            @select="addToolset({ preset: preset.id })"
+          >
+            {{ t("aiToolset.addCli", { name: preset.label }) }}
+          </ODropdownItem>
+          <ODropdownItem data-test="ai-toolsets-add-skill" @select="addToolset({ kind: 'skill' })">
+            {{ t("aiToolset.kindSkill") }}
+          </ODropdownItem>
+        </ODropdown>
       </template>
 
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
@@ -120,6 +147,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OBadge>
                 <OTooltip :max-width="'25rem'" :content="t('aiToolset.renameNeededHint')" />
               </span>
+              <button
+                v-if="row.presetBadge === 'updated'"
+                type="button"
+                :data-test="`ai-toolsets-${row.name}-preset-updated`"
+                @click.stop="openReview(row)"
+              >
+                <OBadge variant="primary-outline" size="sm">
+                  {{ t("aiToolset.presetUpdated") }}
+                </OBadge>
+              </button>
+              <OBadge
+                v-if="row.presetBadge === 'retired'"
+                variant="default-outline"
+                size="sm"
+                :data-test="`ai-toolsets-${row.name}-preset-retired`"
+              >
+                {{ t("aiToolset.presetRetired") }}
+              </OBadge>
               <OBadge
                 v-if="row.failing"
                 variant="error-outline"
@@ -167,6 +212,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
 
+  <AiToolsetPresetReview
+    v-model:open="review.open"
+    :row="review.row"
+    :preset="review.preset"
+    @saved="refreshData"
+  />
+
   <!-- Delete confirmation -->
   <ConfirmDialog
     :title="t('aiToolset.deleteTitle')"
@@ -180,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { aiToolsetsQuery } from "@/services/ai_toolsets.queries";
+import { aiToolsetPresetsQuery, aiToolsetsQuery } from "@/services/ai_toolsets.queries";
 import { aiToolsetKeys } from "@/services/ai_toolsets.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -212,6 +264,11 @@ import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Tabl
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
+import AiToolsetPresetReview from "@/components/ai_toolsets/AiToolsetPresetReview.vue";
+import { presetBadge, type Preset } from "@/components/ai_toolsets/presets";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import {
   failingSince,
   toolsetBadges,
@@ -234,6 +291,10 @@ export default defineComponent({
     OEmptyState,
     ConfirmDialog,
     AddAiToolset,
+    AiToolsetPresetReview,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
     OButton,
     ORefreshButton,
     OTag,
@@ -261,6 +322,25 @@ export default defineComponent({
       }),
     );
 
+    const presetsList = useQuery(() =>
+      Object.assign(aiToolsetPresetsQuery(orgIdForList.value), {
+        enabled: !!orgIdForList.value && !toolsetsLocked.value,
+      }),
+    );
+    const presets = computed<Preset[] | undefined>(() => presetsList.data.value);
+    const mcpPresets = computed(() => (presets.value ?? []).filter((p) => p.kind === "mcp"));
+    const cliPresets = computed(() => (presets.value ?? []).filter((p) => p.kind === "cli"));
+
+    const review = ref<{ open: boolean; row: any; preset: Preset | null }>({
+      open: false,
+      row: null,
+      preset: null,
+    });
+    const openReview = (row: any) => {
+      const preset = (presets.value ?? []).find((p) => p.id === row.data?.preset?.id) ?? null;
+      review.value = { open: true, row, preset };
+    };
+
     // Ticks while the list is shown, so a "Failing since" badge expires without new data.
     const nowMs = ref(Date.now());
     const clock = setInterval(() => (nowMs.value = Date.now()), 30_000);
@@ -276,6 +356,8 @@ export default defineComponent({
         rename_needed: !!item.rename_needed,
         badges: item.kind === "mcp" ? toolsetBadges(item.data) : [],
         failing: failingSince(item.health, nowMs.value * 1000),
+        presetBadge: presetBadge(item.data, presets.value),
+        data: item.data,
       })),
     );
     const showAddDialog = ref(false);
@@ -479,10 +561,11 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Navigation helpers
     // -----------------------------------------------------------------------
-    const addToolset = () => {
+    const addToolset = (from: { preset?: string; kind?: string } = {}) => {
       router.push({
         query: {
           action: "add",
+          ...from,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
@@ -611,6 +694,10 @@ export default defineComponent({
       editToolset,
       chooseTools,
       BADGE_LABELS,
+      mcpPresets,
+      cliPresets,
+      review,
+      openReview,
       formatTime,
       hideAddDialog,
       getData,

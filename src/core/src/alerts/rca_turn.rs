@@ -88,7 +88,7 @@ use crate::ai_chat::{
     admission::{self, AdmitError, AdmittedTurn},
     cancel::cancel_chat_turn,
     fork,
-    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run},
+    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run_with, org_tool_classes},
     rca_thread::{
         SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread, updated_part,
     },
@@ -654,12 +654,15 @@ async fn finalize(
         return false;
     }
 
+    let classes = org_tool_classes(&org_id).await;
     let ending = RunEnd {
         thread: events
             .as_deref()
             .map(|events| project_rca_thread(events, &turns, false, false).stats),
         reusable_steps: events.as_deref().and_then(fork::reusable_steps),
-        transcript: events.as_deref().map(decode_run),
+        transcript: events
+            .as_deref()
+            .map(|events| decode_run_with(events, &classes)),
         turn_error: turns
             .iter()
             .rev()
@@ -1851,7 +1854,7 @@ where
     }
     // What the transcript shows read stays read; every other row is not read.
     let transcript = match read_session(org_id, run.session_id.as_deref()).await {
-        Ok((events, _)) => Some(decode_run(&events)),
+        Ok((events, _)) => Some(decode_run_with(&events, &org_tool_classes(org_id).await)),
         Err(e) => {
             log::warn!("[RCA_TURN] cannot read the transcript of cancelled run {run_id}: {e:#}");
             None
@@ -2047,7 +2050,7 @@ async fn end_at_deadline(org_id: &str, run_id: &str) -> bool {
     let ending = RunEnd {
         org_id: org_id.to_string(),
         thread: Some(project_rca_thread(&events, &turns, false, false).stats),
-        transcript: Some(decode_run(&events)),
+        transcript: Some(decode_run_with(&events, &org_tool_classes(org_id).await)),
         reusable_steps: fork::reusable_steps(&events),
         turn_error: None,
         turn_message: None,
@@ -2266,7 +2269,10 @@ mod tests {
     use super::*;
     use crate::{
         ai_chat::{
-            rca_ledger::tests::{H1, H2, hypothesis, ledger_session, submit, verdict},
+            rca_ledger::{
+                decode_run,
+                tests::{H1, H2, hypothesis, ledger_session, submit, verdict},
+            },
             rca_thread::tests::{
                 SECOND_REPORT, Session, T, VISIBLE_TOOL_CALLS, hits, rca_session, search_sql,
                 without_report,

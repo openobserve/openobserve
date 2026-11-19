@@ -40,6 +40,26 @@ vi.mock("@/services/ai_toolsets", () => ({
     update: vi.fn(() => Promise.resolve({ data: {} })),
     delete: vi.fn(() => Promise.resolve({ data: {} })),
     discover: vi.fn(() => Promise.resolve({ data: { tools: [] } })),
+    prebuilt: vi.fn(() =>
+      Promise.resolve({
+        data: {
+          presets: [
+            {
+              id: "datadog",
+              kind: "mcp",
+              label: "Datadog",
+              revision: 1,
+              description: "Datadog preset",
+              url_template: "https://mcp.{site}/v1/mcp",
+              params: [{ name: "site", label: "Site", default: "datadoghq.com" }],
+              headers: [{ name: "DD_API_KEY" }],
+              allowed_tools: ["search_datadog_logs", "search_datadog_spans"],
+              write_tools: [],
+            },
+          ],
+        },
+      }),
+    ),
   },
 }));
 
@@ -245,6 +265,26 @@ describe("AddAiToolset drafts", () => {
     await flushPromises();
     expect(readEditorDraft(newScope)).toBeNull();
     expect(form().state.values.name).toBe("");
+  });
+
+  it("continuing a customized preset draft keeps the draft, not the preset's defaults", async () => {
+    await mountPage({ action: "add", preset: "datadog" });
+    expect(form().state.values.mcp.url).toBe("https://mcp.datadoghq.com/v1/mcp");
+    await edit({
+      description: "My Datadog",
+      "mcp.url": "https://mcp.datadoghq.eu/v1/mcp",
+      "mcp.allowed_tools": ["search_datadog_logs"],
+    });
+    window.dispatchEvent(new Event("pagehide"));
+
+    await remount({ action: "add", preset: "datadog" });
+    click("editor-draft-continue");
+    await flushPromises();
+    expect(form().state.values).toMatchObject({
+      description: "My Datadog",
+      mcp: { url: "https://mcp.datadoghq.eu/v1/mcp", allowed_tools: ["search_datadog_logs"] },
+    });
+    expect(form().state.values.mcp.extra.preset).toEqual({ id: "datadog", revision: 1 });
   });
 
   it("an edit draft refills unchanged headers by name and blocks Save on a changed one", async () => {

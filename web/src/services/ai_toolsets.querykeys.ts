@@ -25,4 +25,5 @@ import { orgKey } from "@/composables/query/keys";
 export const aiToolsetKeys = {
   all: (org: string) => orgKey(org, "settings", "aiToolsets"),
   list: (org: string) => orgKey(org, "settings", "aiToolsets"),
+  prebuilt: (org: string) => orgKey(org, "settings", "aiToolsets", "prebuilt"),
 };
