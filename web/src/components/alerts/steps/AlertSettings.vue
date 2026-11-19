@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="silence.amount"
                         :error="fieldInvalid(field)"
                         data-test="alert-settings-silence-duration-input"
-                        @update:model-value="(v: unknown) => silence.onAmount(v, field)"
+                        @update:model-value="(v: unknown) => onSilenceAmount(v, field)"
                         @blur="field.handleBlur"
                       />
                     </template>
@@ -1073,6 +1073,27 @@ export default defineComponent({
       return reactive({ unit, amount, onAmount, onUnit, options });
     };
     const silence = useDurationField("trigger_condition.silence", "min", ["min", "h"]);
+    // A wait nobody chose (not typed here, not saved) follows Check every up, and back down to
+    // where it started, so it never reads amber; a chosen one stays put and the amber line says why.
+    const silenceTyped = ref(false);
+    const silenceChosen = () => silenceTyped.value || !!fv("id");
+    const onSilenceAmount = (value: unknown, field: { handleChange: (v: unknown) => void }) => {
+      silenceTyped.value = true;
+      silence.onAmount(value, field);
+    };
+    let silenceFollow: { base: number; written: number } | null = null;
+    watch(
+      frequencyMinutes,
+      (minutes) => {
+        const current = Number(fv("trigger_condition.silence"));
+        if (!isScheduled.value || silenceChosen() || !(current > 0) || !(minutes > 0)) return;
+        const base = silenceFollow?.written === current ? silenceFollow.base : current;
+        const next = Math.max(base, Math.ceil(minutes));
+        silenceFollow = { base, written: next };
+        if (next !== current) setFV("trigger_condition.silence", next);
+      },
+      { immediate: true },
+    );
     const keepFiring = useDurationField(
       "keep_firing_for",
       "seconds",
@@ -1152,6 +1173,7 @@ export default defineComponent({
       formField,
       fieldInvalid,
       silence,
+      onSilenceAmount,
       keepFiring,
       keepFiringError,
       createsIncident,

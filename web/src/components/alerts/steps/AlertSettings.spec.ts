@@ -407,6 +407,11 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
         expected: { period: 5, frequency: 5 },
       },
       {
+        name: "look back raised, then lowered",
+        edit: async (host: VueWrapper) => (await typePeriod(host, "60"), typePeriod(host, "20")),
+        expected: { period: "20", frequency: 20 },
+      },
+      {
         name: "Check every, then look back",
         edit: async (host: VueWrapper) => (await typeCheckEvery(host, 5), typePeriod(host, "20")),
         expected: { period: "20", frequency: 20 },
@@ -430,13 +435,19 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
         edit: (host: VueWrapper) => typePeriod(host, "5"),
         expected: { period: "5", frequency: 5 },
       },
-    ])("$name: the other one follows, Notify at most every stays", async (row) => {
-      const host = mountLive(row.trigger ?? defaults, row.floor ?? 60);
+    ])(
+      "$name: the other one follows; an untouched Notify at most every never sits under the checks",
+      async (row) => {
+        const host = mountLive(row.trigger ?? defaults, row.floor ?? 60);
 
-      const trigger = await row.edit(host);
+        const trigger = await row.edit(host);
 
-      expect(trigger).toMatchObject({ ...row.expected, silence: 10 });
-    });
+        expect(trigger).toMatchObject({
+          ...row.expected,
+          silence: Math.max(10, Number(row.expected.frequency)),
+        });
+      },
+    );
 
     const saved = { period: 15, frequency: 5, silence: 30, frequency_type: "minutes" };
 
@@ -506,11 +517,30 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
       await typePeriod(host, "20");
       await loadTrigger(host, { ...defaults, period: 15, frequency: 15 });
 
-      expect(await typePeriod(host, "40")).toMatchObject({ frequency: 40, silence: 10 });
+      expect(await typePeriod(host, "40")).toMatchObject({ frequency: 40 });
     });
 
-    it("Notify at most every shorter than the checks warns in amber; its action matches them", async () => {
-      const host = mountLive();
+    it.each([
+      { name: "an untouched default follows them silently", warns: false },
+      { name: "a value the user typed stays and warns in amber", typed: "10", warns: true },
+      { name: "a saved alert's value stays and warns in amber", values: { id: "a1" }, warns: true },
+    ])("Notify at most every under the checks: $name", async (row) => {
+      const host = mountLive(defaults, 60, row.values);
+      if (row.typed) {
+        await host
+          .find('[data-test="alert-settings-silence-duration-input"] input')
+          .setValue(row.typed);
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+
+      const trigger = await typePeriod(host, "60");
+
+      expect(trigger.silence).toBe(row.warns ? 10 : 60);
+      expect(note(host, "alert-settings-silence-hint").exists()).toBe(row.warns);
+    });
+
+    it("Notify at most every shorter than the checks: the amber line's action matches them", async () => {
+      const host = mountLive(defaults, 60, { id: "a1" });
       const hint = () => note(host, "alert-settings-silence-hint");
       expect(hint().exists()).toBe(false);
 
