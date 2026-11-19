@@ -479,6 +479,14 @@ describe("alertIntents", () => {
     expect(rankMetricGroup(profile, { metric: "k8s_pod_memory_usage" }).fit[0]).toBe(
       "k8s_pod_name",
     );
+    const nodes = Array.from({ length: 300 }, (_, i) => ({
+      k8s_node_name: `ip-10-2-${100 + (i % 150)}-${100 + i}.ec2.internal`,
+      k8s_node_uid: `b5f932d0-6916-48a2-9f4f-${100000000000 + i}`,
+      k8s_cluster: `c${i % 8}`,
+    }));
+    expect(rankMetricGroup(labelProfile(nodes), { metric: "k8s_node_cpu_usage" }).fit[0]).toBe(
+      "k8s_node_name",
+    );
     const orgUse = orgGroupUse([
       { condition: { aggregation: { group_by: ["service_name"] } } },
       { condition: { promql: "sum by (service_name) (rate(x[5m]))" } },

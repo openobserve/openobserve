@@ -869,9 +869,15 @@ const entityScore = (metric: string, label: string, labels: readonly string[]): 
     .reduce((score, n) => score + 1 / n, 0);
 };
 
+// A host name built from an IP (ip-10-2-184-232.ec2.internal) is digit-heavy but still names a thing; ids never
+// carry an all-letter part outside a-f.
+const namesThing = (v: string) =>
+  isWord(v) ||
+  v.split(/[^a-z0-9]+/i).some((part) => /^[a-z]{2,}$/i.test(part) && /[g-z]/i.test(part));
+
 const wordValues = (p: ReturnType<typeof labelProfile>[number]) => {
   const total = p.values.reduce((sum, v) => sum + v.count, 0);
-  const words = p.values.filter((v) => isWord(v.value)).reduce((sum, v) => sum + v.count, 0);
+  const words = p.values.filter((v) => namesThing(v.value)).reduce((sum, v) => sum + v.count, 0);
   return total > 0 && words / total >= MIN_WORD_SHARE;
 };
 
