@@ -23,22 +23,27 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/timezone";
-import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
 import { dataNoun } from "@/utils/alerts/alertCopy";
+import { SAMPLE_SIZE, useStreamSamples, type StreamSamplesSource } from "./streamContents";
 
 const props = defineProps<{
   streamName: string;
   streamType: string;
+  /** Events already loaded by a parent that also counts them; loads its own when absent. */
+  source?: StreamSamplesSource;
 }>();
 
-const SAMPLE_SIZE = 5;
-const WINDOW_US = 60 * 60 * 1000 * 1000;
 const MESSAGE_FIELDS = ["message", "msg", "log", "body"];
 
 const { t } = useI18nTyped();
 const noun = computed(() => dataNoun(props.streamType, "custom", 2, t));
 const store = useStore();
-const query = useAlertStreamQuery();
+const query =
+  props.source ??
+  useStreamSamples(
+    () => props.streamName,
+    () => props.streamType,
+  );
 
 const timestampColumn = computed(() => store.state.zoConfig?.timestamp_column || "_timestamp");
 const openIndex = ref<number | null>(null);
@@ -60,19 +65,7 @@ const rows = computed(() =>
 
 watch(
   () => [props.streamName, props.streamType],
-  () => {
-    openIndex.value = null;
-    if (!props.streamName) return;
-    const now = Date.now() * 1000;
-    query.run({
-      sql: `SELECT * FROM "${props.streamName.replace(/"/g, '""')}" ORDER BY "${timestampColumn.value}" DESC`,
-      streamType: props.streamType,
-      startTime: now - WINDOW_US,
-      endTime: now,
-      size: SAMPLE_SIZE,
-    });
-  },
-  { immediate: true },
+  () => (openIndex.value = null),
 );
 </script>
 

@@ -23,18 +23,19 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import useStreams from "@/composables/useStreams";
-import { labelsOf } from "@/utils/metrics/metricFamily";
 import { formatNumber } from "@/utils/alerts/alertCopy";
 import {
-  DAY_US,
   cachedValueCounts,
   loadValueCounts,
   type ValueCountContext,
 } from "@/composables/alerts/useStreamDiscovery";
-import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
+import { useMetricLabels, type MetricLabelsSource } from "./streamContents";
 
-const props = defineProps<{ streamName: string }>();
+const props = defineProps<{
+  streamName: string;
+  /** Labels already loaded by a parent that also summarises them; loads its own when absent. */
+  source?: MetricLabelsSource;
+}>();
 const emit = defineEmits<{
   /** A label to group by, or with a value, a matcher to add to the query. */
   (e: "insert", payload: { label: string; value?: string }): void;
@@ -45,10 +46,8 @@ const VISIBLE_LABELS = 10;
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { getStream } = useStreams(t);
-const distinct = useAlertStreamQuery();
-const labels = ref<string[]>([]);
-const state = ref<"loading" | "ready" | "failed">("loading");
+const { labels, state, cardinality, settled } =
+  props.source ?? useMetricLabels(() => props.streamName);
 const showAll = ref(false);
 
 const context = computed<ValueCountContext>(() => ({
@@ -59,14 +58,6 @@ const context = computed<ValueCountContext>(() => ({
 
 const entryOf = (label: string) => cachedValueCounts(context.value, label);
 
-// One search counts every label's values, so the chips can rank and size themselves without a lookup each.
-const cardinality = computed<Record<string, number>>(() => {
-  const row = distinct.hits.value[0] ?? {};
-  return Object.fromEntries(
-    labels.value.map((label) => [label, Number(row[label])]).filter(([, n]) => Number.isFinite(n)),
-  );
-});
-
 const ranked = computed(() =>
   [...labels.value].sort(
     (a, b) => (cardinality.value[b] ?? -1) - (cardinality.value[a] ?? -1) || a.localeCompare(b),
@@ -76,8 +67,6 @@ const shown = computed(() =>
   showAll.value ? ranked.value : ranked.value.slice(0, VISIBLE_LABELS),
 );
 const hiddenCount = computed(() => ranked.value.length - VISIBLE_LABELS);
-// Chips wait for the counts, so they appear once in their final order.
-const settled = computed(() => ["ready", "failed"].includes(distinct.state.value));
 
 const chipText = (label: string): I18nText => {
   const count = cardinality.value[label];
@@ -89,36 +78,9 @@ const load = (label: string) => {
   if (props.streamName) void loadValueCounts(context.value, label);
 };
 
-const quote = (name: string) => `"${name.replace(/"/g, '""')}"`;
-
 watch(
   () => props.streamName,
-  async (name) => {
-    labels.value = [];
-    showAll.value = false;
-    state.value = "loading";
-    distinct.cancel();
-    if (!name) return;
-    try {
-      const stream = await getStream(name, "metrics", true);
-      if (name !== props.streamName) return;
-      labels.value = labelsOf(stream ?? {}) ?? [];
-      state.value = "ready";
-    } catch {
-      if (name === props.streamName) state.value = "failed";
-      return;
-    }
-    if (!labels.value.length) return;
-    const now = Date.now() * 1000;
-    distinct.run({
-      sql: `SELECT ${labels.value.map((l) => `approx_distinct(${quote(l)}) AS ${quote(l)}`).join(", ")} FROM ${quote(name)}`,
-      streamType: "metrics",
-      startTime: now - DAY_US,
-      endTime: now,
-      size: 1,
-    });
-  },
-  { immediate: true },
+  () => (showAll.value = false),
 );
 </script>
 
