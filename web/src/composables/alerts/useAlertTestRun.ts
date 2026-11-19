@@ -27,6 +27,7 @@ import {
 import alertsService from "@/services/alerts";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import type { EvaluateAlertBody, EvaluateAlertResponse } from "@/utils/alerts/alertEvaluate.types";
+import type { EventWindow } from "@/utils/alerts/alertBacktest";
 import { requestFailureReason, testRunKey } from "@/utils/alerts/alertTestRun";
 
 export type AlertTestRunState = "idle" | "running" | "ready" | "failed";
@@ -43,6 +44,13 @@ export interface AlertTestRun {
   fresh: ComputedRef<EvaluateAlertResponse | null>;
   run: (org: string, body: EvaluateAlertBody, t: TranslateFn, folder?: string) => Promise<void>;
   cancel: () => void;
+  /** The 24-hour row's own count of a real-time alert's events, uncapped, for its current query. */
+  eventDay: ShallowRef<RealtimeEventDay | null>;
+}
+
+export interface RealtimeEventDay {
+  events: number;
+  windows: EventWindow[];
 }
 
 export const ALERT_TEST_RUN_KEY: InjectionKey<AlertTestRun> = Symbol("alertTestRun");
@@ -99,7 +107,8 @@ export function createAlertTestRun(): AlertTestRun {
       : null,
   );
 
-  return { state, result, failure, currentKey, testedKey, fresh, run, cancel };
+  const eventDay = shallowRef<RealtimeEventDay | null>(null);
+  return { state, result, failure, currentKey, testedKey, fresh, run, cancel, eventDay };
 }
 
 /** The form's shared dry run; a host without one gets its own and passes it down. */

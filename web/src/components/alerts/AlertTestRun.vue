@@ -26,6 +26,7 @@ import destinationService from "@/services/alert_destination";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { formatNumber, joinList, joinListMore } from "@/utils/alerts/alertCopy";
+import { crossesOnlyWhenEverySampleDoes } from "@/utils/alerts/checkCadence";
 import type { EvaluateAlertBody } from "@/utils/alerts/alertEvaluate.types";
 import { requestFailureReason, testRunReport, type TestRunTone } from "@/utils/alerts/alertTestRun";
 
@@ -38,6 +39,8 @@ const props = defineProps<{
   template?: string | null;
   /** Why the form can't be tested again yet, said where the stale note goes. */
   blockedReason?: I18nText | null;
+  /** The past window a comparison reads, when it holds no data. */
+  baselineEmpty?: I18nText | null;
 }>();
 
 const emit = defineEmits<{ (e: "close"): void }>();
@@ -100,7 +103,18 @@ const report = computed(() => {
     nowMs: Date.now(),
     silenceMinutes: Number(tc?.silence) || 0,
     ratio: /\)\s*\/|\s\/\s/.test(props.body?.query_condition?.promql ?? ""),
+    eventDay: testRun.eventDay.value,
   });
+});
+// A lowest value above (or highest below) over the look back is already sustained by its window.
+const sustainedFn = computed(() => {
+  const qc = props.body?.query_condition;
+  const agg = qc?.aggregation;
+  return qc?.type === "custom" &&
+    agg &&
+    crossesOnlyWhenEverySampleDoes(agg.function, agg.having?.operator)
+    ? agg.function
+    : null;
 });
 const shownResult = computed(() => (report.value ? testRun.result.value : null));
 // The run is one request with no progress of its own, so the wait names how much it replays.
@@ -253,6 +267,8 @@ const send = async () => {
         :keep-firing-for="Number(body.keep_firing_for) || 0"
         :real-time="body.is_real_time"
         :compares="!!body.query_condition.multi_time_range?.length"
+        :baseline-empty="baselineEmpty"
+        :sustained-fn="sustainedFn"
       />
       <ul
         v-if="report && report.groups.length"

@@ -235,6 +235,22 @@ describe("backtestHintKey", () => {
       day: { pending: 6 },
       key: "alerts.sections.backtest.heldByMustLast",
     },
+    {
+      name: "a comparison whose past window was empty",
+      day: { compares: true, baselineEmpty: true },
+      key: "alerts.sections.backtest.neverNoBaseline",
+    },
+    {
+      name: "a comparison that never passed its multiple",
+      day: { compares: true },
+      key: "alerts.sections.backtest.neverCompare",
+    },
+    {
+      name: "a noisy lowest value above, already sustained by its window",
+      day: { sustained: true },
+      alerts: 288,
+      key: "alerts.sections.backtest.noisySustained",
+    },
   ])("$name advises $key", ({ day, alerts = 0, operator = ">=", key }) => {
     expect(backtestHintKey(alerts, 288, operator, day)).toBe(key);
   });
@@ -251,6 +267,10 @@ describe("realtimeDay", () => {
     expect(day.hours[0]).toBe(true);
     expect(day.hours[5]).toBe(true);
     expect(day.hours.filter(Boolean)).toHaveLength(2);
+    expect(day.windows).toEqual([
+      { events: 30, minutes: 60 },
+      { events: 12, minutes: 60 },
+    ]);
   });
 });
 
@@ -270,14 +290,22 @@ describe("dailyVolume", () => {
     },
     {
       name: "real-time with a 10-minute wait: at most six in each busy hour",
-      day: { events: 53_932, fired: 0, alerts: 0, hours: [true, false, true] },
+      day: {
+        events: 53_932,
+        fired: 0,
+        alerts: 0,
+        windows: [
+          { events: 53_930, minutes: 60 },
+          { events: 2, minutes: 60 },
+        ],
+      },
       realTime: true,
       silence: 10,
-      expected: { count: 54_000, noisy: true, notifications: 12 },
+      expected: { count: 54_000, noisy: true, notifications: 8 },
     },
     {
       name: "real-time with a wait: never more than the events",
-      day: { events: 3, fired: 0, alerts: 0, hours: [true, false] },
+      day: { events: 3, fired: 0, alerts: 0, windows: [{ events: 3, minutes: 60 }] },
       realTime: true,
       silence: 10,
       expected: { count: 3, noisy: false, notifications: 3 },

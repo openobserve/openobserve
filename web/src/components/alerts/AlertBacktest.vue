@@ -29,7 +29,7 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertLinkNote from "./AlertLinkNote.vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import { durationWords, formatNumber } from "@/utils/alerts/alertCopy";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
@@ -77,6 +77,10 @@ const props = defineProps<{
   tested?: EvaluateAlertResponse | null;
   /** Keep firing for, in seconds; once set, flapping advice has nothing to offer. */
   keepFiringFor?: number;
+  /** The past window a comparison reads, when it holds no data. */
+  baselineEmpty?: I18nText | null;
+  /** The function (min or max) whose look back already makes the condition last. */
+  sustainedFn?: string | null;
 }>();
 
 /** The advice under the day; its action opens a setting by name, or else the element it targets. */
@@ -94,6 +98,10 @@ const SAID_BY_TEST_IT: string[] = [
   emptyDayHintKey(true),
   emptyDayHintKey(false),
 ];
+const SUSTAINED_KEYS: string[] = [
+  "alerts.sections.backtest.noisySustained",
+  "alerts.sections.backtest.noisySustainedLower",
+];
 const REALTIME_BUCKET_MINUTES = 60;
 // Typing in a filter re-runs the query, so wait for a pause.
 const DEBOUNCE_MS = 700;
@@ -108,9 +116,11 @@ const suggestions = inject(ALERT_SUGGESTIONS_KEY, null);
 const inPanel = computed(() => props.tested !== undefined);
 // Once Test it has run the alert as it stands, the day is the server's answer, for any query.
 const testRun = inject(ALERT_TEST_RUN_KEY, null);
-const server = computed(() =>
-  inPanel.value ? (props.tested ?? null) : (testRun?.fresh.value ?? null),
-);
+// A real-time row counts its own events: the dry run's counts stop at a cap per check.
+const server = computed(() => {
+  if (inPanel.value) return props.tested ?? null;
+  return props.realTime ? null : (testRun?.fresh.value ?? null);
+});
 const serverDay = computed(() => (server.value ? testRunDay(server.value) : null));
 
 const isCron = computed(() => props.triggerCondition?.frequency_type === "cron");
@@ -218,6 +228,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (signal && !inPanel.value) signal.value = null;
+  if (testRun && !inPanel.value) testRun.eventDay.value = null;
   clearTimeout(debounce);
   clearTimeout(deadline);
   observer?.disconnect();
@@ -269,6 +280,14 @@ watchEffect(() => {
       : null;
 });
 
+// Test it states a real-time day from these counts, so its numbers and this row's are one.
+watchEffect(() => {
+  if (!testRun || inPanel.value || !props.realTime) return;
+  const ready = status.value === "ready" && !!sql.value;
+  const own = ready ? realtimeDay(search.hits.value, { startMs, hours: HOURS }) : null;
+  testRun.eventDay.value = own ? { events: own.events, windows: own.windows } : null;
+});
+
 // Without a WHERE, an empty day means the stream itself was quiet, not the filters.
 const filtered = computed(() => /\bWHERE\b/i.test(props.query));
 
@@ -280,12 +299,14 @@ const day = computed(() => {
 const counts = computed(() => serverDay.value ?? result.value);
 const silence = computed(() => Number(props.triggerCondition?.silence) || 0);
 const volume = computed(() => {
-  if (props.realTime)
+  if (props.realTime) {
+    const own = realtimeDay(search.hits.value, { startMs, hours: HOURS });
     return dailyVolume(
-      { events: day.value.events ?? 0, fired: 0, alerts: 0, hours: day.value.hours },
+      { events: own.events, fired: 0, alerts: 0, windows: own.windows },
       true,
       silence.value,
     );
+  }
   return dailyVolume({ ...counts.value, events: counts.value.events ?? 0 }, false);
 });
 const plural = (key: "matchingEvents" | "notifications", count: number) =>
@@ -340,6 +361,8 @@ const hint = computed<DayHint | null>(() => {
     filtered: filtered.value,
     pending: serverDay.value?.pending,
     compares: props.compares,
+    baselineEmpty: !!props.baselineEmpty,
+    sustained: !!props.sustainedFn,
   });
   if (!key) return null;
   // Test it's own lines already say the day matched nothing or Must last held it; its action stays.
@@ -348,11 +371,21 @@ const hint = computed<DayHint | null>(() => {
       ? { text: null, action: t("alerts.sections.backtest.changeMustLast"), setting: "holdFor" }
       : null;
   }
-  if (key === "alerts.sections.backtest.noisyCompare")
+  if (key === "alerts.sections.backtest.neverNoBaseline")
+    return { text: t(key, { offset: props.baselineEmpty ?? "" }), action: null };
+  if (
+    key === "alerts.sections.backtest.noisyCompare" ||
+    key === "alerts.sections.backtest.neverCompare"
+  )
     return {
       text: t(key),
       action: t("alerts.sections.backtest.changeCompare"),
       target: "add-alert-compare-needs-baseline",
+    };
+  if (SUSTAINED_KEYS.includes(key))
+    return {
+      text: t(key, { fn: raw(props.sustainedFn ?? "") }),
+      action: t("alerts.sections.backtest.changeThreshold"),
     };
   const mustLast = [
     "alerts.sections.backtest.heldByMustLast",

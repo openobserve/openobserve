@@ -16,6 +16,7 @@
 import { getIntlLocale } from "@/locales";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { durationWords, formatNumber, joinList, thresholdSide, valueWithUnit } from "./alertCopy";
+import { realtimeNotifications, type EventWindow } from "./alertBacktest";
 import { alertConditionsPayload } from "./alertConditionsLoad";
 import { getAlertPayload, type PayloadContext, type PayloadFormData } from "./alertPayload";
 import type { EvaluateAlertBody, EvaluateAlertResponse } from "./alertEvaluate.types";
@@ -156,6 +157,8 @@ export interface TestRunReportOptions {
   silenceMinutes?: number;
   /** The PromQL query divides one part by another, so "no value" means its top part matched nothing. */
   ratio?: boolean;
+  /** A real-time alert's events as the 24-hour row counted them; the dry run's counts stop at a cap. */
+  eventDay?: { events: number; windows: EventWindow[] } | null;
 }
 
 // A few times are listed; past that only the latest says when, since the first ones are a day old.
@@ -169,16 +172,40 @@ const notifiedTimes = (s: EvaluateAlertResponse["summary"], o: TestRunReportOpti
     : o.t("alerts.testRun.latestAt", { time: at(latest) });
 };
 
+/** A real-time day's events and the notifications its wait lets through, counted one way everywhere. */
+export function realtimeVolume(
+  r: EvaluateAlertResponse,
+  waitMinutes: number,
+  eventDay?: TestRunReportOptions["eventDay"],
+): { events: number; atLeast: boolean; notifications: number } {
+  const answered = r.checks.filter((c) => !c.error);
+  const windowMinutes = (c: EvaluateAlertResponse["checks"][number]) =>
+    Math.max(1, Math.round((c.window_end - c.window_start) / 60_000_000));
+  const windows =
+    eventDay?.windows ?? answered.map((c) => ({ events: c.value ?? 0, minutes: windowMinutes(c) }));
+  const events = eventDay?.events ?? windows.reduce((sum, w) => sum + w.events, 0);
+  return {
+    events,
+    atLeast: !eventDay && answered.some((c) => c.value_is_lower_bound),
+    notifications: Math.min(events, realtimeNotifications(windows, waitMinutes)),
+  };
+}
+
 // Real time notifies per event, so its day is events and notifications, never checks.
 function realtimeSummary(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine {
   const { t } = o;
-  const s = r.summary;
-  const events = r.checks.reduce((sum, c) => sum + (c.error ? 0 : (c.value ?? 0)), 0);
-  const params = {
-    events: t("alerts.sections.backtest.matchingEvents", { count: formatNumber(events) }, events),
-    count: formatNumber(s.notifications),
-  };
   const wait = o.silenceMinutes ?? 0;
+  const v = realtimeVolume(r, wait, o.eventDay);
+  if (v.events === 0) return { id: "summary", text: t("alerts.testRun.neverFired"), tone: "body" };
+  const events = formatNumber(v.events);
+  const params = {
+    events: t(
+      "alerts.sections.backtest.matchingEvents",
+      { count: v.atLeast ? t("alerts.verdict.atLeast", { value: events }) : events },
+      v.events,
+    ),
+    count: formatNumber(v.notifications),
+  };
   return {
     id: "summary",
     text:
@@ -186,9 +213,9 @@ function realtimeSummary(r: EvaluateAlertResponse, o: TestRunReportOptions): Tes
         ? t(
             "alerts.testRun.realtimeSentWait",
             { ...params, wait: durationWords(wait, t) },
-            s.notifications,
+            v.notifications,
           )
-        : t("alerts.testRun.realtimeSent", params, s.notifications),
+        : t("alerts.testRun.realtimeSent", params, v.notifications),
     tone: "body",
   };
 }
@@ -196,9 +223,9 @@ function realtimeSummary(r: EvaluateAlertResponse, o: TestRunReportOptions): Tes
 function summaryLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine {
   const { t } = o;
   const s = r.summary;
+  if (r.is_real_time) return realtimeSummary(r, o);
   if (s.notifications === 0)
     return { id: "summary", text: t("alerts.testRun.neverFired"), tone: "body" };
-  if (r.is_real_time) return realtimeSummary(r, o);
   const times = notifiedTimes(s, o);
   // Checks that fired and notifications are counted apart, so the held line below adds up to the first.
   const params = {
@@ -215,28 +242,35 @@ function summaryLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
       tone: "body",
     };
   const groups = t("alerts.testRun.groupCount", { count: formatNumber(groupTotal) }, groupTotal);
+  // One check can notify many groups, so the count is of checks that sent, not of notifications.
   return {
     id: "summary",
-    text: t("alerts.testRun.firedInChecksGroups", { ...params, groups }, s.notifications),
+    text: t("alerts.testRun.firedInChecksGroupsSent", { ...params, groups }, s.notifications),
     tone: "body",
   };
 }
 
-/** The value that came nearest the threshold in a check that matched but did not last long enough. */
+/** The value that came nearest the threshold: in a check Must last held, else in any check of the day. */
 function closestLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
   const side = thresholdSide(r.checks[0]?.operator);
   if (side !== "above" && side !== "below") return null;
   const pending = r.checks.filter((check) => check.state === "pending");
-  const keys = differingKeys(pending.flatMap((check) => (check.groups ?? []).map((g) => g.labels)));
-  let best: { value: number; labels: Record<string, string> | null; time: number } | null = null;
-  for (const check of pending) {
-    const group = check.groups?.[0];
-    const value = group?.value ?? check.value;
-    if (value === null || value === undefined) continue;
-    if (best && (side === "above" ? value <= best.value : value >= best.value)) continue;
-    best = { value, labels: group?.labels ?? null, time: check.time };
+  const scanned = pending.length ? pending : r.checks.filter((check) => !check.error);
+  const keys = differingKeys(scanned.flatMap((check) => (check.groups ?? []).map((g) => g.labels)));
+  type Seen = { value: number; labels: Record<string, string> | null; time: number };
+  const seen = scanned.flatMap((check): Seen[] =>
+    check.groups?.length
+      ? check.groups.map((g) => ({ value: g.value as number, labels: g.labels, time: check.time }))
+      : [{ value: check.value as number, labels: null, time: check.time }],
+  );
+  let best: Seen | null = null;
+  for (const item of seen) {
+    if (typeof item.value !== "number" || !Number.isFinite(item.value)) continue;
+    if (best && (side === "above" ? item.value <= best.value : item.value >= best.value)) continue;
+    best = item;
   }
-  if (!best) return null;
+  // A peak of nothing past an above threshold only repeats that nothing matched.
+  if (!best || (side === "above" && best.value === 0)) return null;
   const series = best.labels && keys.length ? String(groupLabel(best.labels, "", keys)) : "";
   const params = {
     value: testValueText(best.value, null, o.t),
@@ -313,36 +347,48 @@ function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn, ratio = false): 
   };
 }
 
+// Groups wait apart: a check notifies when any group is past its wait, so the rest are checks where none was.
+function heldLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
+  const { t } = o;
+  const s = r.summary;
+  const held = r.checks.filter((c) => c.held_by === "notify_at_most_every").length;
+  if (!held || r.is_real_time) return null;
+  const params = { count: formatNumber(held) };
+  const wait = o.silenceMinutes ?? 0;
+  const exact = held === s.fired - s.notifications && wait > 0;
+  const key: I18nKey = !exact
+    ? "alerts.testRun.held"
+    : s.groups_fired.length
+      ? "alerts.testRun.heldGroups"
+      : "alerts.testRun.heldWait";
+  return {
+    id: "held",
+    text: t(key, exact ? { ...params, wait: durationWords(wait, t) } : params, held),
+    tone: "secondary",
+  };
+}
+
 /** The lines Test it shows for one dry run: what would have fired over the day, and why not. */
 export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunReport {
   const { t } = o;
   const s = r.summary;
   const lines: TestRunLine[] = [summaryLine(r, o)];
-  if (s.notifications === 0 && s.pending > 0) {
+  if (s.notifications === 0 && s.pending > 0)
     lines.push({
       id: "pendingOnly",
       text: t("alerts.testRun.pendingOnly", { count: formatNumber(s.pending) }, s.pending),
       tone: "secondary",
     });
-    const closest = closestLine(r, o);
-    if (closest) lines.push(closest);
-  }
+  // A day that never fired says how near it came, so the threshold can be judged against it.
+  const closest = s.notifications === 0 && !r.is_real_time ? closestLine(r, o) : null;
+  if (closest) lines.push(closest);
   const answered = r.checks.filter((c) => !c.error);
   if (r.query_type !== "promql" && answered.length && answered.every((c) => c.reason === "no_data"))
     lines.push({ id: "matchedNothing", text: t("alerts.guard.matchedNothing"), tone: "secondary" });
   const latestGroups = latestGroupsLine(r, o);
   if (latestGroups) lines.push(latestGroups);
-  const held = r.checks.filter((c) => c.held_by === "notify_at_most_every").length;
-  if (held && !r.is_real_time)
-    lines.push({
-      id: "held",
-      text: t(
-        held === s.fired - s.notifications ? "alerts.testRun.heldOther" : "alerts.testRun.held",
-        { count: formatNumber(held) },
-        held,
-      ),
-      tone: "secondary",
-    });
+  const held = heldLine(r, o);
+  if (held) lines.push(held);
   const noSeries = noSeriesLine(r, t, o.ratio);
   if (noSeries) lines.push(noSeries);
   const failed = r.checks.find((c) => c.error);

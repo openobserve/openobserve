@@ -61,9 +61,9 @@ describe("testRunReport", () => {
       grouped,
       {
         summary:
-          "Over the last 24 hours this would have fired in 3 of 6 checks, for 2 groups, and notified 2 times (09:20 and 09:50).",
+          "Over the last 24 hours this would have fired in 3 of 6 checks, for 2 groups, and sent notifications in 2 of them (09:20 and 09:50).",
         latestGroups: "At the latest check (10:00), no group was above the threshold.",
-        held: "Notify at most every held back the other 1 firing.",
+        held: "In the other check, every firing group was within 30 minutes of its last notification, so Notify at most every held them back.",
       },
     ],
     [
@@ -95,7 +95,7 @@ describe("testRunReport", () => {
       },
     ],
   ])("states the run of a %s", (_name, fixture, expected) => {
-    const shown = lines(fixture);
+    const shown = lines(fixture, { silenceMinutes: 30 });
     expect(
       Object.fromEntries(Object.keys(shown).map((id) => [id, String(shown[id].text)])),
     ).toEqual(expected);
@@ -157,18 +157,33 @@ describe("testRunReport", () => {
     );
   });
 
-  it("says a real-time day in events and notifications, never checks", () => {
-    const realTime = {
-      ...grouped,
-      is_real_time: true,
-      checks: grouped.checks.map((c) => ({ ...c, value: 10 })),
-      summary: { ...grouped.summary, groups_fired: [] },
-    };
-    expect(Object.keys(lines(realTime, { silenceMinutes: 10 }))).toEqual(["summary"]);
-    expect(String(lines(realTime, { silenceMinutes: 10 }).summary.text)).toBe(
-      "Over the last 24 hours, 60 matching events would have sent 2 notifications, at most one every 10 minutes.",
-    );
-  });
+  it.each([
+    {
+      name: "the dry run's capped counts as a floor",
+      capped: true,
+      eventDay: null,
+      text: "Over the last 24 hours, at least 60 matching events would have sent 6 notifications, at most one every 10 minutes.",
+    },
+    {
+      name: "the 24-hour row's own count when it has one",
+      capped: true,
+      eventDay: { events: 900, windows: [{ events: 900, minutes: 60 }] },
+      text: "Over the last 24 hours, 900 matching events would have sent 6 notifications, at most one every 10 minutes.",
+    },
+  ])(
+    "says a real-time day in events and notifications from $name",
+    ({ capped, eventDay, text }) => {
+      const realTime = {
+        ...grouped,
+        is_real_time: true,
+        checks: grouped.checks.map((c) => ({ ...c, value: 10, value_is_lower_bound: capped })),
+        summary: { ...grouped.summary, groups_fired: [] },
+      };
+      const shown = lines(realTime, { silenceMinutes: 10, eventDay } as never);
+      expect(Object.keys(shown)).toEqual(["summary"]);
+      expect(String(shown.summary.text)).toBe(text);
+    },
+  );
 
   it("says a ratio with nothing in its top part is 0, not a broken query", () => {
     expect(String(lines(noSeries, { ratio: true }).noSeries.text)).toBe(
@@ -199,8 +214,11 @@ describe("testRunReport", () => {
     expect(lines(r).noSeries.tone).toBe(tone);
   });
 
-  it("names the series that came closest when none lasted long enough", () => {
-    const check = errorsTruncated.checks[0];
+  it.each([
+    ["none lasted long enough", "pending"],
+    ["the day never fired", "quiet"],
+  ])("names the series that came closest when %s", (_case, state) => {
+    const check = { ...errorsTruncated.checks[0], state };
     const r = {
       ...errorsTruncated,
       checks: [

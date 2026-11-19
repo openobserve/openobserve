@@ -26,18 +26,25 @@ const NOISY_SHARE = 0.25;
 
 // Which way the threshold should move depends on the comparison; exactly / not exactly have no direction.
 // A noisy alert is offered Must last first: the threshold is often a target the user was given.
-const HINT_KEYS: Record<"above" | "below" | "none", { never: I18nKey; noisy: I18nKey }> = {
+// A lowest (or highest) value over the look back already ignores short spikes, so Must last is no fix there.
+const HINT_KEYS: Record<
+  "above" | "below" | "none",
+  { never: I18nKey; noisy: I18nKey; sustained: I18nKey }
+> = {
   above: {
     never: "alerts.sections.backtest.never",
     noisy: "alerts.sections.backtest.noisyMustLast",
+    sustained: "alerts.sections.backtest.noisySustained",
   },
   below: {
     never: "alerts.sections.backtest.neverRaise",
     noisy: "alerts.sections.backtest.noisyMustLastLower",
+    sustained: "alerts.sections.backtest.noisySustainedLower",
   },
   none: {
     never: "alerts.sections.backtest.neverCheck",
     noisy: "alerts.sections.backtest.noisyCheck",
+    sustained: "alerts.sections.backtest.noisyCheck",
   },
 };
 
@@ -63,6 +70,12 @@ export interface BacktestResult {
   hours: boolean[];
   /** Matching events in the day's rows. */
   events: number;
+}
+
+/** Matching events in one stretch of time, for counting what a real-time wait lets through. */
+export interface EventWindow {
+  events: number;
+  minutes: number;
 }
 
 export interface BacktestReplay extends BacktestResult {
@@ -193,18 +206,33 @@ export function backtestWindows(
 export function realtimeDay(
   rows: Record<string, unknown>[],
   options: Pick<BacktestOptions, "startMs" | "hours">,
-): Pick<BacktestResult, "events" | "hours"> {
+): Pick<BacktestResult, "events" | "hours"> & { windows: EventWindow[] } {
   const hours = Array.from({ length: options.hours }, () => false);
+  const perHour = Array.from({ length: options.hours }, () => 0);
   let events = 0;
   for (const row of rows) {
     const at = keyToMs(row.zo_sql_key);
     const value = Number(row.zo_sql_val ?? 0);
     if (at === null || !(value > 0)) continue;
     events += value;
-    const hour = Math.floor((at - options.startMs) / HOUR_MS);
-    hours[Math.min(options.hours - 1, Math.max(0, hour))] = true;
+    const hour = Math.min(
+      options.hours - 1,
+      Math.max(0, Math.floor((at - options.startMs) / HOUR_MS)),
+    );
+    hours[hour] = true;
+    perHour[hour] += value;
   }
-  return { events, hours };
+  const windows = perHour.filter((n) => n > 0).map((n) => ({ events: n, minutes: 60 }));
+  return { events, hours, windows };
+}
+
+/** Notifications a real-time alert sends: each window with events lets one through per wait. */
+export function realtimeNotifications(windows: EventWindow[], waitMinutes: number): number {
+  return windows.reduce(
+    (sum, w) =>
+      sum + (waitMinutes > 0 ? Math.min(w.events, Math.ceil(w.minutes / waitMinutes)) : w.events),
+    0,
+  );
 }
 
 // Two significant figures: the count stands in for a typical day, not this exact one.
@@ -219,7 +247,7 @@ const aboutCount = (count: number) => {
  * real-time alert's matching events and the most notifications its wait lets through.
  */
 export function dailyVolume(
-  day: Pick<BacktestReplay, "events" | "fired" | "alerts"> & { hours?: boolean[] },
+  day: Pick<BacktestReplay, "events" | "fired" | "alerts"> & { windows?: EventWindow[] },
   realTime: boolean,
   silenceMinutes = 0,
 ): { count: number; noisy: boolean; notifications?: number } | null {
@@ -228,10 +256,10 @@ export function dailyVolume(
   // More than one a minute, the bar the read-back uses for a noisy real-time alert.
   const volume = { count: aboutCount(count), noisy: count > MAX_CHECKS };
   if (!realTime) return volume;
-  // A wait starts at each notification, so an hour with events sends at most one per wait.
-  const busyHours = day.hours?.length ? day.hours.filter(Boolean).length : 24;
-  const cap = silenceMinutes > 0 ? busyHours * Math.ceil(60 / silenceMinutes) : count;
-  return { ...volume, notifications: aboutCount(Math.min(count, cap)) };
+  // Without the events by hour, the day counts as 24 busy hours.
+  const windows = day.windows ?? Array.from({ length: 24 }, () => ({ events: count, minutes: 60 }));
+  const notifications = Math.min(count, realtimeNotifications(windows, silenceMinutes));
+  return { ...volume, notifications: aboutCount(notifications) };
 }
 
 function replayChecks(
@@ -270,7 +298,16 @@ export function backtestHintKey(
   alerts: number,
   total: number,
   operator: string,
-  day: { events?: number; filtered?: boolean; pending?: number; compares?: boolean } = {},
+  day: {
+    events?: number;
+    filtered?: boolean;
+    pending?: number;
+    compares?: boolean;
+    /** The past window a comparison reads held no data. */
+    baselineEmpty?: boolean;
+    /** The condition is a lowest value above (or highest below), which only a whole window crosses. */
+    sustained?: boolean;
+  } = {},
 ): I18nKey | null {
   if (total === 0) return null;
   // No event to count means the threshold is not what kept it quiet (or noisy).
@@ -278,8 +315,14 @@ export function backtestHintKey(
   const direction = thresholdSide(operator) ?? "none";
   // Matches Must last held back say the threshold already caught them.
   if (alerts === 0 && (day.pending ?? 0) > 0) return "alerts.sections.backtest.heldByMustLast";
+  // A comparison's threshold is its multiple, set in the comparison, not the row count.
+  if (alerts === 0 && day.compares)
+    return day.baselineEmpty
+      ? "alerts.sections.backtest.neverNoBaseline"
+      : "alerts.sections.backtest.neverCompare";
   if (alerts === 0) return HINT_KEYS[direction].never;
   if (alerts / total <= NOISY_SHARE) return null;
   // A comparison with an empty past fires on any match, which no threshold or Must last fixes.
-  return day.compares ? "alerts.sections.backtest.noisyCompare" : HINT_KEYS[direction].noisy;
+  if (day.compares) return "alerts.sections.backtest.noisyCompare";
+  return HINT_KEYS[direction][day.sustained ? "sustained" : "noisy"];
 }

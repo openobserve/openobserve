@@ -65,7 +65,7 @@ describe("AlertTestRun", () => {
     await flushPromises();
 
     expect(evaluate).toHaveBeenCalledWith("default", { alert: BODY }, "f1", expect.anything());
-    expect(text(wrapper, "summary")).toContain("notified 2 times");
+    expect(text(wrapper, "summary")).toContain("sent notifications in 2 of them");
     expect(text(wrapper, "groups")).toContain("checkout");
     expect(text(wrapper, "groups")).toContain("above the threshold in 2 checks");
     // The day's strip lives in this panel, so Test it never adds a row to the form.
