@@ -50,6 +50,7 @@ import {
   isPredicatePosition,
   parseOperatorContext,
   parseLogicalLeadContext,
+  aggregatesAllowed,
   logicalLeadNames,
   buildLogicalLead,
   groupEntries,
@@ -1522,6 +1523,38 @@ describe("parseLogicalLeadContext — after a complete predicate", () => {
   });
 });
 
+describe("aggregatesAllowed — never in a WHERE or ON condition", () => {
+  it("rules them out anywhere in WHERE, ON or the Logs filter", () => {
+    for (const [text, filterMode] of [
+      ["", true],
+      ["level = 'error' ", true],
+      ["a = 1 AND (b = 2 OR ", true],
+      ["lower(", true],
+      ["SELECT * FROM t WHERE ", false],
+      ["SELECT * FROM t WHERE a = 1 ", false],
+      ["SELECT * FROM t WHERE lower(", false],
+      ["SELECT * FROM t WHERE CASE WHEN a = 1 THEN ", false],
+      ["SELECT * FROM a JOIN b ON ", false],
+    ] as const) {
+      expect(aggregatesAllowed(text, filterMode), text).toBe(false);
+    }
+  });
+
+  it("keeps them in SELECT, HAVING, ORDER BY and a subquery's own SELECT", () => {
+    for (const [text, filterMode] of [
+      ["SELECT ", false],
+      ["SELECT CASE WHEN a = 1 THEN ", false],
+      ["SELECT k FROM t GROUP BY k HAVING ", false],
+      ["SELECT k FROM t GROUP BY k HAVING count(*) > 1 ", false],
+      ["SELECT k FROM t GROUP BY k ORDER BY ", false],
+      ["SELECT * FROM t WHERE a IN (SELECT ", false],
+      ["code IN (SELECT ", true],
+    ] as const) {
+      expect(aggregatesAllowed(text, filterMode), text).toBe(true);
+    }
+  });
+});
+
 describe("logicalLeadNames and buildLogicalLead — AND and OR lead, nothing removed", () => {
   const lead = (context: Partial<LogicalLeadContext>, filterMode = false) =>
     logicalLeadNames(
@@ -1548,6 +1581,14 @@ describe("logicalLeadNames and buildLogicalLead — AND and OR lead, nothing rem
     const sorted = [...out].sort((a, b) => (a.sortText < b.sortText ? -1 : 1));
     expect(sorted.slice(0, 4).map((e) => e.name)).toEqual(["and", "or", ")", "GROUP BY"]);
     expect(out).toHaveLength(catalog.length + 1);
+  });
+
+  it("gives a lead row the typed word as its filter prefix, so Monaco scores it as high as any match", () => {
+    const out = buildLogicalLead([...SQL_KEYWORDS], ["and", "or"], undefined, "An") as any[];
+    expect(out[0].filterText).toBe("And\u0001");
+    expect(out[1].filterText).toBeUndefined();
+    const none = buildLogicalLead([...SQL_KEYWORDS], ["and", "or"]) as any[];
+    expect(none[0].filterText).toBeUndefined();
   });
 
   it("in Automatic AND and OR insert without their space and carry the chain", () => {

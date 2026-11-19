@@ -755,6 +755,26 @@ export const parseLogicalLeadContext = (
   };
 };
 
+// CASE words are left out, so a CASE inside WHERE still counts as WHERE.
+const AGGREGATE_SCOPES = new Set([
+  ...PREDICATE_CLAUSES,
+  "SELECT",
+  "FROM",
+  "BY",
+  "LIMIT",
+  "OFFSET",
+  "UNION",
+]);
+
+/** Aggregate and window functions are never valid in a WHERE or ON condition, or in the Logs filter. */
+export const aggregatesAllowed = (textBefore: string, filterMode = false): boolean => {
+  for (let frame: Frame | null = scanFrames(textBefore); frame; frame = frame.parent) {
+    const scope = [...frame.tokens].reverse().find((token) => AGGREGATE_SCOPES.has(token));
+    if (scope) return scope !== "WHERE" && scope !== "ON";
+  }
+  return !filterMode;
+};
+
 interface OperatorSpec {
   label: string;
   insert: string;
@@ -1082,11 +1102,12 @@ const CLOSE_PAREN_ENTRY: LooseEntry = {
   filterText: ")",
 };
 
-/** Moves the lead to the top by sortText alone; every other entry stays in the menu. */
+/** Moves the lead to the top by sortText; every other entry stays in the menu. */
 export const buildLogicalLead = (
   entries: unknown[],
   leadNames: string[],
   chainCommand?: SqlCompletionEntry["command"],
+  typed = "",
 ): unknown[] => {
   const nameOf = (raw: unknown) =>
     raw && typeof raw === "object" ? String(entryName(raw as LooseEntry)).toLowerCase() : "";
@@ -1094,7 +1115,13 @@ export const buildLogicalLead = (
     const found = entries.find((raw) => nameOf(raw) === name) as LooseEntry | undefined;
     const base = found ?? (name === ")" ? CLOSE_PAREN_ENTRY : undefined);
     if (!base) return [];
-    const sorted: LooseEntry = { ...base, sortText: `${SORT_LANE.operator}${index}` };
+    // Monaco scores before it sorts, and `an` matches `any_value` better than `AND`; this ties them.
+    const prefixed = typed !== "" && name.startsWith(typed.toLowerCase());
+    const sorted: LooseEntry = {
+      ...base,
+      sortText: `${SORT_LANE.operator}${index}`,
+      ...(prefixed ? { filterText: `${typed}${name.slice(typed.length)}\u0001` } : {}),
+    };
     const chains = chainCommand && CHAINING_KEYWORDS.has(name);
     return [chains ? chainedKeyword(sorted, chainCommand) : sorted];
   });
