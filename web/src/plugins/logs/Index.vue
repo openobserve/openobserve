@@ -1234,7 +1234,7 @@ export default defineComponent({
     let stopHistoryRestore: (() => void) | undefined;
     onMounted(() => {
       registerBeforeAppReload();
-      stopHistoryRestore = useLogsHistoryRestore(router, () => requestLogsReapply(true));
+      stopHistoryRestore = useLogsHistoryRestore(router, () => requestLogsReapply(true, "url"));
     });
 
     onActivated(() => {
@@ -1312,7 +1312,9 @@ export default defineComponent({
           await extractFields();
           refreshData();
           // A newer restore started meanwhile; it carries its own run decision.
-          if (runRequested && logsReapplyRequest.value.seq === seq) runQueryFn();
+          if (runRequested && logsReapplyRequest.value.seq === seq) {
+            runQueryFn(logsReapplyRequest.value.reason);
+          }
         }
       },
     );
@@ -1339,13 +1341,13 @@ export default defineComponent({
       },
     );
 
-    const runQueryFn = async () => {
+    const runQueryFn = async (reason: "run" | "url" = "run") => {
       searchObj.runQuery = false;
       if (!searchObj.data.stream.selectedStream.length) {
         searchObj.loading = false;
         return;
       }
-      autoRun.engine.requestRun("run");
+      autoRun.engine.requestRun(reason === "url" ? "url" : "run");
     };
 
     const showRanFilter = (generationId: number, ranQuery: string) => {
