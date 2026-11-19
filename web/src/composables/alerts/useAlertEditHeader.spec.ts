@@ -176,6 +176,20 @@ describe("useAlertEditHeader", () => {
     expect(api().state.value).toEqual(state);
   });
 
+  // The row is a rollup of the checks; when it and Recent checks describe one check, the check's record decides.
+  it.each([
+    ["the check's record for the same check", 10_000_050, "pending", "normal"],
+    ["the row when it is a later check", 20_000_000, "firing", "firing"],
+  ])("chips %s", async (_, outcomeAt, rowOutcome, chip) => {
+    listRows = [
+      { alert_id: "a1", enabled: true, last_outcome: rowOutcome, last_outcome_at: outcomeAt },
+    ];
+    historyHits = [{ timestamp: 10_000_000, status: "normal" }];
+    const api = host();
+    await flushPromises();
+    expect(api().state.value).toEqual({ kind: "outcome", value: chip });
+  });
+
   it("does not treat a group mute as muting the whole alert", async () => {
     listRows = [
       {

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { historyStatusOf } from "@/utils/alerts/ackState";
+
 export interface RecentRun {
   timestamp?: number;
   status?: string;
@@ -46,6 +48,20 @@ export const recentRunsParams = (
 });
 
 // The endpoint pages but promises no order.
+// A row and a history record of one check land within moments of each other.
+const SAME_CHECK_US = 5_000_000;
+
+/** The outcome to chip: the newest check's record, unless the row's outcome is from a later check. */
+export function headerOutcome(
+  row: { last_outcome?: string | null; last_outcome_at?: number | null } | null | undefined,
+  newest: RecentRun | undefined,
+): string {
+  const check = newest ? String(historyStatusOf(newest) ?? "") : "";
+  if (!row?.last_outcome) return check;
+  if (!check || !newest?.timestamp || !row.last_outcome_at) return row.last_outcome;
+  return row.last_outcome_at - newest.timestamp > SAME_CHECK_US ? row.last_outcome : check;
+}
+
 export const newestRuns = (data: unknown, limit = RECENT_RUNS_LIMIT): RecentRun[] =>
   [...((data as { hits?: RecentRun[] } | undefined)?.hits ?? [])]
     .sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0))
