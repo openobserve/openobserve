@@ -12132,7 +12132,13 @@
         "addWait": "Add a wait",
         "lastHour": "Last hour",
         "heldByMustLast": "It matched, but never for as long as Must last, so Must last held every match back.",
-        "changeMustLast": "Change Must last"
+        "changeMustLast": "Change Must last",
+        "noisyMustLast": "That is often, so people may start to ignore it. Must last skips short spikes; a higher threshold also makes it quieter.",
+        "noisyMustLastLower": "That is often, so people may start to ignore it. Must last skips short dips; a lower threshold also makes it quieter.",
+        "noisyCompare": "That is often. While the past window has no data, every match fires; Only fire once the past window has data holds it back.",
+        "changeCompare": "Change the comparison",
+        "hourFired": "{from}–{to}: would have alerted",
+        "hourQuiet": "{from}–{to}: quiet"
       },
       "filtersMode": "Filters",
       "typeHelp": {
@@ -15456,7 +15462,8 @@
       "promqlFires": "Would alert now: {count} {label} (threshold {limit}).",
       "promqlQuiet": "Quiet now: {count} {label} (threshold {limit}).",
       "eventCount": "number of {noun}",
-      "eventCountWith": "number of {noun} with {field}"
+      "eventCountWith": "number of {noun} with {field}",
+      "now": "Now: {count} {label} in the last {window}."
     },
     "readBack": {
       "title": "Here's your alert",
@@ -15797,7 +15804,8 @@
         "ruleMatch": "no series match | {count} series matches. It must keep matching for {duration} before it fires | {count} series match. Each must keep matching for {duration} before it fires",
         "ruleMatchNow": "no series match | {count} series matches | {count} series match",
         "compareNote": "The preview runs this window alone. Test it also reads the same window {offset} earlier.",
-        "compareNoBaseline": "No data {offset} earlier to compare with, so any match may fire."
+        "compareNoBaseline": "No data {offset} earlier to compare with, so any match may fire.",
+        "compareWaitsForBaseline": "No data {offset} earlier yet, so it stays quiet until there is."
       },
       "anomaly": {
         "sensitivityAuto": "Auto",
@@ -15836,7 +15844,8 @@
           "M": "month | months"
         },
         "factorLine": "Fires at more than {factor} times that window's count",
-        "factor": "Times the past window"
+        "factor": "Times the past window",
+        "needsBaseline": "Only fire once the past window has data"
       },
       "forecast": {
         "thresholdPlaceholder": "e.g. 90",
@@ -16085,7 +16094,15 @@
       "groupCount": "{count} group | {count} groups",
       "heldOther": "Notify at most every held back the other {count} firing. | Notify at most every held back the other {count} firings.",
       "closest": "Closest: {series} reached {value} at {time}.",
-      "closestValue": "Closest: {value} at {time}."
+      "closestValue": "Closest: {value} at {time}.",
+      "latestAt": "the latest at {time}",
+      "latestGroupsAbove": "At the latest check, no group was above the threshold. | At the latest check, {count} group was above the threshold. | At the latest check, {count} groups were above the threshold.",
+      "latestGroupsBelow": "At the latest check, no group was below the threshold. | At the latest check, {count} group was below the threshold. | At the latest check, {count} groups were below the threshold.",
+      "latestGroupsMatched": "At the latest check, no group matched the condition. | At the latest check, {count} group matched the condition. | At the latest check, {count} groups matched the condition.",
+      "realtimeSent": "Over the last 24 hours, {events} would have sent {count} notification, one per event. | Over the last 24 hours, {events} would have sent {count} notifications, one per event.",
+      "realtimeSentWait": "Over the last 24 hours, {events} would have sent {count} notification, at most one every {wait}. | Over the last 24 hours, {events} would have sent {count} notifications, at most one every {wait}.",
+      "noValueRatio": "The query returned no value: the top of its ratio matched nothing in the latest check, so the share was 0.",
+      "runningChecks": "Testing {count} check over the last 24 hours… | Testing {count} checks over the last 24 hours…"
     },
     "conditionCountWith": "{noun} with",
     "promRuleModeHelp": "Every series the query returns alerts: the comparison is in the query (for example > 0.9), with no threshold here."
