@@ -361,11 +361,14 @@ function createLogsAutoRun() {
   }
 
   function bindPayload(payload: TransportPayload): boolean {
-    if (payload.type === "search") leaveSearchAround();
     const generationId = payload.generationId;
-    if (generationId === null || generationId === undefined) return true;
+    if (generationId === null || generationId === undefined) {
+      if (payload.type === "search") leaveSearchAround();
+      return true;
+    }
     const role = ROLE_BY_TYPE[payload.type] ?? "other";
     if (!engine.registerTrace(generationId, payload.traceId, role)) return false;
+    if (payload.type === "search") leaveSearchAround();
     traceGeneration.set(payload.traceId, generationId);
     if (!generationEpoch.has(generationId)) generationEpoch.set(generationId, freeTextScanEpoch);
     if (payload.type === "search") {

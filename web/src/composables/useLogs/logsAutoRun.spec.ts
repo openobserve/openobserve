@@ -644,7 +644,7 @@ describe("refinement de-duplication and search-around", () => {
     });
     run().request("run");
     const decision = run().engine.canPersistOrShare("logs", "share-link");
-    expect(decision.ok || decision.code !== "search-around").toBe(true);
+    expect(decision).toMatchObject({ ok: false, code: "needs-run" });
   });
 
   it("keeps the shown rows when search-around invalidates the record", () => {
