@@ -268,9 +268,9 @@
     },
     "noStorageConfig": {
       "title": "Nessun bucket configurato",
-      "description": "Usa un tuo bucket per conservare i dati di questa organizzazione in uno storage di tua proprietà, separato dalle altre organizzazioni e dalle impostazioni globali predefinite.",
+      "description": "Usa un tuo bucket per conservare i dati di questa organizzazione in uno storage di tua proprietà, separato dalle altre organizzazioni e dai valori predefiniti globali.",
       "action": "Configura bucket",
-      "actionDesc": "Collega un bucket S3 o Azure"
+      "actionDesc": "Connetti un bucket S3 o Azure"
     },
     "noPhoneProvider": {
       "title": "Nessun provider telefonico connesso",
@@ -3721,8 +3721,8 @@
     "ent_lincese_detail_lbl": "Dettagli della licenza Enterprise",
     "lincese_id_lbl": "ID della licenza",
     "status_lbl": "Stato",
-    "create_at_lbl": "Data di creazione",
-    "expires_at_lbl": "Data di scadenza",
+    "create_at_lbl": "Creato il",
+    "expires_at_lbl": "Scade il",
     "usage_limits": "Limiti di utilizzo",
     "feature_comparison_lbl": "Confronto delle funzionalità",
     "feature_comparision_ent_msg": "Stai utilizzando OpenObserve Enterprise Edition con accesso a tutte le funzionalità avanzate elencate di seguito.",
@@ -4726,7 +4726,7 @@
       "effectStillAllowed": "Nessuna modifica all'accesso: un permesso più ampio lo consente ancora.",
       "moduleGroupSecurity": "Sicurezza",
       "presetSocAnalystTitle": "Analista SOC",
-      "presetSocAnalystDescription": "Triage degli avvisi e dei casi di Security, con accesso in lettura a rilevamenti, stream di origine di Security e liste di threat intelligence",
+      "presetSocAnalystDescription": "Triage degli avvisi e dei casi di sicurezza, con accesso in lettura ai rilevamenti, agli stream di origine Sicurezza e agli elenchi di threat intelligence.",
       "presetDetectionEngineerTitle": "Ingegnere dei rilevamenti",
       "presetDetectionEngineerDescription": "Creare, ottimizzare, attivare ed eseguire rilevamenti, installare contenuti, collegare sorgenti con le relative funzioni e pipeline e gestire tabelle di arricchimento come gli elenchi di threat intelligence, con accesso in lettura a Sicurezza, casi e stream",
       "presetSecurityAdminTitle": "Amministratore Sicurezza",
@@ -4837,7 +4837,7 @@
       "createFailed": "Creazione dell'organizzazione fallita."
     },
     "listOrganizations": {
-      "subtitle": "Tutte le organizzazioni a cui puoi accedere. Passa a una oppure rinominala dalle azioni della riga.",
+      "subtitle": "Tutte le organizzazioni a cui puoi accedere. Passa a una o rinominala dalle azioni della relativa riga.",
       "switch": "Passa a questa organizzazione",
       "current": "Corrente",
       "cannotEditWhileDeleting": "Impossibile modificare durante l'eliminazione in corso",
@@ -5108,10 +5108,10 @@
       "characters": "{count} / {max}",
       "variantOption": "{name} — {help}",
       "variantHelp": {
-        "info": "Comunicazioni generali e novità sulle release",
+        "info": "Comunicazioni generali e novità sulle versioni",
         "warning": "Servizio degradato o manutenzione imminente",
-        "critical": "Interruzioni; mostrato per primo e nasconde le promozioni",
-        "promo": "Eventi e offerte; mostrato per ultimo, nascosto durante le interruzioni"
+        "critical": "Interruzioni del servizio; mostrate per prime e nascondono le promozioni",
+        "promo": "Eventi e offerte; mostrati per ultimi, nascosti durante le interruzioni del servizio"
       },
       "toolbar": {
         "bold": "Grassetto",
@@ -6167,8 +6167,8 @@
     "periodInfoLine1": "Periodo per cui la query deve essere eseguita.",
     "periodInfoLine2": "ad es. 10 minuti significa che ogni volta che la query viene eseguita, utilizzerà gli ultimi 10 minuti di dati. Se la query viene eseguita alle 16:00, utilizzerà i dati dalle 15:50 alle 16:00.",
     "periodShouldMatchFrequency": "Nota: il periodo deve essere uguale alla frequenza.",
-    "delayInfoLine1": "Tempo di attesa dopo l'orario pianificato, così che i dati in ritardo possano arrivare.",
-    "delayInfoLine2": "ad es. con un ritardo di 10 minuti, una pipeline oraria viene eseguita alle 10:10 e legge i dati dalle 9:00 alle 10:00.",
+    "delayInfoLine1": "Tempo di attesa dopo l'orario pianificato, per consentire l'arrivo dei dati in ritardo.",
+    "delayInfoLine2": "Ad esempio, con un ritardo di 10 minuti, una pipeline oraria viene eseguita alle 10:10 e legge i dati dalle 9:00 alle 10:00.",
     "closeDrawer": "Chiudi il pannello",
     "conditionValueGuidelines": "Linee guida per il valore della condizione:",
     "customColumnGuideline": "Per aggiungere una colonna personalizzata, digita il nome della colonna e premi",
@@ -11470,7 +11470,7 @@
     "configure": "Configura",
     "runNow": "Esegui ora",
     "runNowHint": "Richiede un'esecuzione immediata invece di attendere la successiva. Se un'esecuzione è già in programma o in corso, soddisfa invece la richiesta.",
-    "runRequested": "Esecuzione richiesta. I risultati appariranno qui al termine.",
+    "runRequested": "Esecuzione richiesta. I relativi risultati appariranno qui al termine.",
     "runFailed": "Impossibile richiedere l'esecuzione: {message}",
     "runDenied": "Non hai i permessi per eseguire la Calibrazione avvisi. Chiedi a un amministratore l'accesso in modifica.",
     "runNeedsConfig": "Attiva la calibrazione degli avvisi nelle sue impostazioni per eseguirla.",
@@ -11899,7 +11899,7 @@
       "statAlertsInScope": "Avvisi nell'ambito",
       "statDeclined": "Rifiutati",
       "statDeclinedSub": "Non superato",
-      "statDeclinedTooltip": "Coppie regola-avviso che una regola non giudicherebbe. Un controllo, non un via libera. Una soglia minima non raggiunta viene solo conteggiata; una regola che non ha potuto essere eseguita, o che ha esaminato e rifiutato, è elencata di seguito con il motivo.",
+      "statDeclinedTooltip": "Coppie regola-avviso che una regola non giudicherebbe. Un criterio di selezione, non un'approvazione. Una soglia minima non raggiunta viene solo conteggiata; una regola che non è riuscita a essere eseguita, o che ha esaminato e rifiutato, è elencata di seguito con il motivo.",
       "limitations": "Limiti delle evidenze",
       "declinedHeading": "Rifiutati con un motivo",
       "declinedDesc": "Regole che non hanno potuto essere eseguite per un avviso, o che hanno esaminato e rifiutato. Non è un via libera.",
@@ -15476,7 +15476,7 @@
     "urlHelpText": "URL di base senza barra finale (es. https://your-domain.com)",
     "organizationHelpText": "Identificatore dell'organizzazione OpenObserve",
     "streamHelpText": "Nome dello stream OpenObserve",
-    "endpointPathLabel": "Percorso dell'endpoint",
+    "endpointPathLabel": "Percorso endpoint",
     "endpointPathHelpText": "Il percorso verrà aggiunto all'URL di base (deve iniziare con /)",
     "esBulkIndexHelpText": "Nome dell'indice in cui verranno scritti i dati in Elasticsearch",
     "metadataConfigurationTitle": "Configurazione dei metadati",
@@ -15536,7 +15536,7 @@
     "payloadFormatAuto": "Automatico",
     "payloadFormatLegacy": "JSON legacy",
     "payloadFormatRendered": "Template renderizzato",
-    "payloadFormatHelp": "Automatico invia il vecchio corpo JSON per i messaggi di anomalia, Synthetics, reperibilità e downtime finché non viene allegato un template.",
+    "payloadFormatHelp": "Automatico invia il vecchio corpo JSON per i messaggi di anomalia, Synthetics, reperibilità e downtime finché non viene associato un template.",
     "output_format": "Formato di output",
     "readonly": "Sola lettura",
     "additional_settings": "Impostazioni aggiuntive",
@@ -15699,7 +15699,7 @@
     "featureOwnDataDesc": "Archivia i dati acquisiti direttamente nel tuo bucket e mantieni il controllo completo di chi può accedervi.",
     "featureSecureTitle": "Sicuro e conforme",
     "featureSecureDesc": "Chiavi di accesso granulari, i tuoi dati sensibili rimangono nella tua infrastruttura.",
-    "newStorageConfiguration": "Nuova configurazione del bucket",
+    "newStorageConfiguration": "Nuova configurazione bucket",
     "selectProviderDesc": "seleziona un provider di cloud storage per archiviare i dati di questa organizzazione.",
     "bucketNameRequired": "Il nome del bucket è obbligatorio",
     "accessKeyRequired": "La chiave di accesso è obbligatoria",
@@ -15712,7 +15712,7 @@
     "continue": "Continua",
     "save": "Salva",
     "update": "Aggiorna",
-    "awsStsCloudInfo": "Usa AWS STS per assumere il ruolo. Aggiungi l'account AWS {product} come entità attendibile per questo ruolo nella console AWS. Contatta il team {product} per i dettagli dell'account o per assistenza nella configurazione.",
+    "awsStsCloudInfo": "Usa AWS STS per assumere il ruolo. Aggiungi l'account AWS di {product} come entità attendibile per questo ruolo nella console AWS. Contatta il team di {product} per i dettagli dell'account o per assistenza nella configurazione.",
     "awsStsSelfHostedInfo": "Usa AWS STS per assumere il ruolo. Assicurati che l'ambiente di installazione disponga di credenziali AWS in grado di assumere questo ruolo."
   },
   "metrics": {
@@ -16194,7 +16194,7 @@
     "cipherKeysDesc": "Chiavi di cifratura per i campi sensibili",
     "aiToolsetsDesc": "Server MCP e strumenti CLI utilizzabili dall'Assistente AI",
     "regexPatternsDesc": "Pattern regex riutilizzabili per la redazione",
-    "domainManagementDesc": "Analisi delle claim SSO e restrizioni di accesso per dominio",
+    "domainManagementDesc": "Analisi dei claim SSO e restrizioni di accesso per dominio",
     "passwordPolicy": "Criteri password",
     "passwordPolicyDesc": "Criteri di autenticazione per gli account nativi con email/password, applicati all'intera istanza.",
     "pipelineDestinationsDesc": "Destinazioni esterne per l'output della pipeline",
@@ -16211,12 +16211,12 @@
     "logoLabel": "Trascina e rilascia l'immagine del logo",
     "deleteLogoTitle": "Elimina logo",
     "deleteLogoMessage": "Sei sicuro di voler eliminare l'immagine del logo {name}? Fai clic su OK per eliminare.",
-    "customLogoText": "Testo del logo personalizzato",
+    "customLogoText": "Testo logo personalizzato",
     "orgLabel": "Parametri dell'organizzazione",
     "logDetails": "Dettagli del log",
     "tracesHeading": "Tracce",
-    "traceIdFieldName": "Nome del campo Trace ID",
-    "spanIdFieldName": "Nome del campo Span ID",
+    "traceIdFieldName": "Nome del campo ID traccia",
+    "spanIdFieldName": "Nome del campo ID span",
     "toggleIngestionLogsLabel": "Log di ingestione",
     "usageStreamEnabledLabel": "Stream di utilizzo",
     "redInsightsEnabledLabel": "Insight RED automatici per le tracce",
@@ -16349,12 +16349,12 @@
       "fieldAliasesSaveError": "Impossibile salvare gli alias dei campi",
       "fieldAliasesUnsavedConfirm": "Hai modifiche alle mappature dei campi non salvate. Vuoi annullarle e uscire?",
       "discoveredServicesTitle": "Servizi scoperti",
-      "discoveredServicesDescription": "I servizi vengono rilevati dalla telemetria e raggruppati per nome del servizio. Le regole di rilevamento stabiliscono come vengono identificati.",
+      "discoveredServicesDescription": "I servizi vengono rilevati dalla tua telemetria e raggruppati per nome del servizio. Le regole di rilevamento decidono come vengono identificati.",
       "noServicesYet": "Nessun servizio ancora scoperto",
       "noServicesDescription": "I servizi verranno visualizzati qui quando i dati di telemetria vengono inseriti con gli attributi di identificazione del servizio (come k8s-deployment, nome del servizio, ecc.)",
       "searchServiceName": "Cerca servizi o stream",
-      "telemetryCoverage": "Copertura della telemetria",
-      "serviceName": "Nome del servizio",
+      "telemetryCoverage": "Copertura telemetria",
+      "serviceName": "Nome servizio",
       "service": "Servizio",
       "logs": "Log",
       "traces": "Tracce",
@@ -16403,7 +16403,7 @@
       "noDimensions": "nessuna dimensione",
       "defaultSetWarningTitle": "La correlazione potrebbe non essere affidabile.",
       "defaultSetWarningBody": "Questa istanza non ha disambiguazione — è stata scoperta senza corrispondenza di workload (nessun contesto di cluster, namespace o ambiente). Log e tracce potrebbero provenire da distribuzioni diverse dello stesso nome di servizio.",
-      "instanceIdentity": "Identità dell'istanza",
+      "instanceIdentity": "Identità istanza",
       "noDimensionsCatchAll": "Nessuna dimensione — istanza catch-all",
       "streamSources": "Origini degli stream",
       "fieldNameMapping": "Mappatura dei nomi dei campi",
@@ -16500,7 +16500,7 @@
       "subtitle": "Archivia i dati di questa organizzazione in un bucket di tua proprietà",
       "awsCredentials": "Credenziali AWS",
       "azureCredentials": "Credenziali Azure",
-      "awsRoleArn": "ARN del ruolo AWS"
+      "awsRoleArn": "ARN ruolo AWS"
     },
     "dataRetentionDefaults": {
       "title": "Valori predefiniti di conservazione dei dati",
@@ -16534,7 +16534,7 @@
       "subtitle": "Configura integrazioni di strumenti AI"
     },
     "cipherKeysPage": {
-      "subtitle": "Chiavi che cifrano e decifrano i valori sensibili dei campi",
+      "subtitle": "Chiavi che cifrano e decifrano i valori dei campi sensibili",
       "delete": "Elimina",
       "deleteCipherKeyTitle": "Elimina chiave crittografica",
       "deleteCipherKeyMessage": "Sei sicuro di voler eliminare la chiave di cifratura {name}?",
@@ -16639,7 +16639,7 @@
       "contractRevokedSuccess": "Contratto esterno revocato con successo.",
       "revokeContractError": "Impossibile revocare il contratto esterno.",
       "enableByobTitle": "Attiva BYOB",
-      "enablingStorage": "Abilitazione delle impostazioni di archiviazione...",
+      "enablingStorage": "Abilitazione impostazioni di archiviazione...",
       "storageEnabledSuccess": "Impostazioni di archiviazione attivate con successo.",
       "enableStorageError": "Impossibile attivare le impostazioni di archiviazione.",
       "processingTrialExtension": "Attendi mentre viene elaborata la richiesta di estensione del periodo di prova...",
@@ -16675,7 +16675,7 @@
     },
     "orgStorageEditor": {
       "chooseTypeTitle": "Scegli provider",
-      "selectProviderDescCont": "Una volta configurato, tutti i nuovi dati di questa organizzazione vengono scritti nel tuo bucket.",
+      "selectProviderDescCont": "Una volta completata la configurazione, tutti i nuovi dati di questa organizzazione vengono scritti nel tuo bucket.",
       "irreversibleWarnPre": "Questa azione è ",
       "irreversibleWarnEmphasis": "irreversibile",
       "irreversibleWarnPost": ". Una volta impostato, non puoi cambiare provider di archiviazione o eliminare questa configurazione. Per utilizzare un provider diverso, devi creare una nuova organizzazione.",
@@ -17170,7 +17170,7 @@
     },
     "selectOption": "Seleziona un'opzione",
     "runningQueries": "Interrogazioni in esecuzione",
-    "search": "Cerca query",
+    "search": "Query di ricerca",
     "queryList": "Dettagli della richiesta",
     "duration": "Durata esec.",
     "files": "File",
@@ -17183,7 +17183,7 @@
     "queryType": "Tipo di query",
     "numOfQueries": "Numero di query",
     "totalDuration": "Durata esec. totale",
-    "totalTimeRange": "Intervallo totale delle query",
+    "totalTimeRange": "Intervallo query totale",
     "searchType": "Tipo di ricerca",
     "querySource": "Origine query",
     "traceId": "ID traccia",
@@ -17754,7 +17754,7 @@
       "failedToLoad": "Caricamento Insights fallito",
       "retry": "Riprova",
       "noAgentsInRange": "Nessun agente in questo intervallo",
-      "noAgentsDescription": "Nessun agente GenAI rilevato per l'intervallo di tempo selezionato. Prova con un intervallo più ampio, passa alla scheda Stream o configura la mappatura degli agenti.",
+      "noAgentsDescription": "Nessun agente GenAI rilevato per l'intervallo di tempo selezionato. Prova un intervallo più ampio, passa alla scheda Stream o configura la mappatura degli agenti.",
       "viewByStream": "Visualizza per Stream",
       "totalCost": "Costo totale",
       "totalTokens": "Token totali",
@@ -18082,7 +18082,7 @@
     "createdSuccessfully": "Set di strumenti AI creato con successo",
     "updatedSuccessfully": "AI Toolset aggiornato con successo",
     "deletedSuccessfully": "AI Toolset eliminato con successo",
-    "mcpConfig": "Configurazione del server MCP",
+    "mcpConfig": "Configurazione server MCP",
     "mcpUrl": "URL dell'endpoint",
     "mcpUrlRequired": "L'URL dell'endpoint è obbligatorio",
     "timeoutSeconds": "Timeout (secondi)",
@@ -18090,7 +18090,7 @@
     "headerKey": "Nome dell'intestazione",
     "headerValue": "Valore dell'intestazione",
     "addHeader": "Aggiungi intestazione",
-    "cliConfig": "Configurazione degli strumenti CLI",
+    "cliConfig": "Configurazione dello strumento CLI",
     "presets": "Riempimento rapido",
     "cliCommand": "Comando",
     "cliCommandRequired": "Il comando è obbligatorio",
@@ -19962,7 +19962,7 @@
         "failHeadline": "{agent} ha riscontrato {count} errori “{cls}”.",
         "costHeadline": "{agent}: ${cost} spesi · {tokens} token · {errors} errori.",
         "loopExplain": "Un tasso di ripetizione alto di solito indica che l'agente non memorizza i risultati nella cache o sta ritentando. Apri le tracce peggiori qui sotto per vedere le chiamate ripetute.",
-        "failExplain": "Questi sono tutti i messaggi di errore di questo agente, di ogni classe di errore, non solo di questa. Leggili per trovare la soluzione, oppure apri una traccia per vedere dove è successo.",
+        "failExplain": "Questi sono tutti i messaggi di errore di questo agente, di ogni classe di errore, non solo di questa. Leggili per trovare la soluzione oppure apri una traccia per vedere dove è successo.",
         "costExplain": "Queste tracce hanno determinato la spesa dell'agente. Apri quelle più costose per vedere cosa è stato eseguito.",
         "explain": "Spiega con O2 AI",
         "explainHelp": "O2 AI analizza questo segnale dai suoi messaggi di errore e dalle tracce peggiori, va oltre gli span AI fino a log, metriche, Kubernetes e deploy, e cita le prove."
@@ -20949,7 +20949,7 @@
       },
       "noProviders": {
         "title": "Aggiungi prima un provider",
-        "description": "I valutatori richiedono un Provider LLM (OpenAI, Anthropic, ecc.) per essere eseguiti. Aggiungine uno in Provider LLM prima di creare valutatori."
+        "description": "I valutatori richiedono un provider LLM (OpenAI, Anthropic, ecc.) per essere eseguiti. Aggiungine uno in Provider LLM prima di creare valutatori."
       },
       "import": {
         "title": "Importa valutatore",
@@ -21463,7 +21463,7 @@
       "defaultModel": "Modello predefinito"
     },
     "empty": {
-      "title": "Nessun provider LLM ancora",
+      "title": "Nessun provider LLM presente",
       "description": "I provider LLM memorizzano i dettagli di connessione (URL di base + credenziali) per i modelli linguistici chiamati dai tuoi valutatori LLM Judge. Aggiungine uno per iniziare a eseguire valutazioni basate su LLM Judge."
     }
   },
@@ -22723,7 +22723,7 @@
       "deleteConfirmTitle": "Elimina località",
       "deleteFailed": "Eliminazione località fallita",
       "deleteSuccess": "Località eliminata con successo",
-      "description": "Posizioni probe pubbliche per il monitoraggio sintetico",
+      "description": "Posizioni pubbliche di probe per il monitoraggio sintetico",
       "disable": "Disabilita",
       "disabledSuccess": "Località disabilitata",
       "disabling": "Disabilitazione in corso…",
@@ -22770,7 +22770,7 @@
       "region": "Regione",
       "regionPlaceholder": "es. us-east-1",
       "regionRequired": "La regione è obbligatoria",
-      "searchPlaceholder": "Cerca posizioni",
+      "searchPlaceholder": "Cerca località",
       "title": "Sedi",
       "publicTitle": "Posizioni pubbliche",
       "privateTitle": "Località private",
@@ -25376,9 +25376,9 @@
     "unitAttempts": "tentativi",
     "unitSeconds": "secondi",
     "minLength": "Lunghezza minima",
-    "minLengthDesc": "La password più corta accettata.",
+    "minLengthDesc": "Lunghezza minima della password accettata.",
     "maxLength": "Lunghezza massima",
-    "maxLengthDesc": "La password più lunga accettata, fino a 128.",
+    "maxLengthDesc": "Lunghezza massima della password accettata, fino a 128.",
     "requireUppercase": "Richiedi lettera maiuscola",
     "requireUppercaseDesc": "Almeno una lettera A–Z.",
     "requireLowercase": "Richiedi lettera minuscola",
@@ -25386,7 +25386,7 @@
     "requireDigit": "Richiedi cifra",
     "requireDigitDesc": "Almeno una cifra 0–9.",
     "requireSpecial": "Richiedi carattere speciale",
-    "requireSpecialDesc": "Almeno un carattere dell'insieme consentito.",
+    "requireSpecialDesc": "Almeno un carattere dall'insieme consentito.",
     "specialCharSet": "Caratteri speciali consentiti",
     "specialCharSetDesc": "Se vuoto, accetta qualsiasi carattere non alfanumerico.",
     "maxLengthTooSmall": "La lunghezza massima deve essere compresa tra la lunghezza minima e 128.",
@@ -25404,7 +25404,7 @@
     "rotationDesc": "Quando una password scade e con quanto preavviso viene comunicato.",
     "rotationDaysDesc": "Giorni prima della scadenza di una password. 0 significa che le password non scadono mai.",
     "rotationWarningDays": "Avvisa prima della scadenza",
-    "rotationWarningDaysDesc": "Giorni di preavviso all'accesso. 0 disattiva il preavviso.",
+    "rotationWarningDaysDesc": "Giorni di preavviso all'accesso. 0 non mostra alcun avviso.",
     "rotationWarningDaysOffDesc": "Giorni di preavviso all'accesso. Usato quando le password sono scadute.",
     "warningDaysTooLong": "La finestra di avviso non può essere più lunga del periodo di rotazione.",
     "rotationPreview": "Una password impostata oggi scade {expires}. L'avviso all'accesso inizia {warns}.",
@@ -25422,9 +25422,9 @@
     "lockoutDesc": "Cosa succede dopo ripetuti tentativi di accesso non riusciti.",
     "lockoutThresholdDesc": "0 disattiva il blocco.",
     "lockoutBucketSize": "Tentativi prima di ogni ulteriore blocco",
-    "lockoutBucketSizeDesc": "Quanti altri errori attivano il blocco successivo. 0 usa lo stesso numero del primo.",
+    "lockoutBucketSizeDesc": "Quanti altri tentativi falliti attivano il successivo. 0 usa lo stesso numero del primo.",
     "lockoutStartSecs": "Durata del primo blocco",
-    "lockoutStartSecsDesc": "Quanto dura il primo blocco.",
+    "lockoutStartSecsDesc": "Durata del primo blocco.",
     "lockoutMaxSecs": "Durata massima del blocco",
     "lockoutMaxSecsDesc": "Il limite massimo a cui si ferma l'escalation.",
     "lockoutStartTooLong": "Il primo blocco non può essere più lungo del blocco massimo.",
@@ -25436,9 +25436,9 @@
     "sessionEnforcement": "Sessione e applicazione",
     "sessionEnforcementDesc": "Quanto dura un accesso e se root segue queste regole.",
     "cookieMaxAge": "Durata della sessione",
-    "cookieMaxAgeDesc": "Quanto a lungo resta valida una sessione attiva. 0 usa il valore predefinito dell'istanza da {envVar}.",
+    "cookieMaxAgeDesc": "Per quanto tempo una sessione autenticata rimane valida. 0 usa il valore predefinito dell'istanza da {envVar}.",
     "applyToRoot": "Applica all'account root",
-    "applyToRootDesc": "Root è esente da tutte le regole precedenti a meno che questa opzione sia attiva.",
+    "applyToRootDesc": "Root è esente da tutte le regole precedenti, a meno che questa opzione non sia attiva.",
     "rootWarning": "Bloccare root potrebbe mettere il sistema in uno stato irrecuperabile.",
     "rootDialogTitle": "Applicare i criteri a root?",
     "rootDialogMessage": "Root sarà soggetto a blocco, rotazione e reimpostazioni forzate come qualsiasi altro account nativo. Se root è il tuo unico account amministrativo, un blocco o una scadenza che non può soddisfare non lascerà alcun modo per rientrare in questa istanza.",
@@ -30460,15 +30460,15 @@
       "intro": "Ecco cosa faccio, in cinque passaggi.",
       "gotIt": "Ho capito",
       "s1Title": "Trovo i tuoi servizi",
-      "s1": "Esamino i dati che già invii e trovo i servizi al loro interno. Un nuovo servizio compare dopo il mio controllo successivo; non devi aggiungerlo.",
+      "s1": "Esamino i dati che già invii e trovo i servizi al loro interno. Un nuovo servizio compare dopo il mio prossimo controllo; non devi aggiungerlo.",
       "s2Title": "Imparo a riconoscere la normalità",
-      "s2": "Imparo quanti dati invia normalmente ogni stream dai suoi 14 giorni di storico. Finché uno stream non ha quello storico, lo segnalo come ancora in apprendimento e non lo valuto.",
+      "s2": "Imparo quanti dati invia normalmente ogni stream dai suoi 14 giorni di cronologia. Finché uno stream non ha questa cronologia, dico che è ancora in apprendimento e non lo valuto.",
       "s3Title": "Invio notifiche solo quando uno stream si ferma",
-      "s3": "Quando uno stream smette di inviare dati, apro un incidente e, se le notifiche sono attive, notifico il team di reperibilità che possiede il servizio. Cali e aumenti bruschi compaiono come rilevazioni e non generano mai notifiche. Le cose più piccole attendono il riepilogo giornaliero.",
+      "s3": "Quando uno stream smette di inviare dati, apro un incidente e, se le notifiche sono attive, invio una notifica al team di reperibilità che possiede il servizio. Cali e aumenti improvvisi compaiono come rilevazioni e non generano mai notifiche. Le anomalie minori attendono il riepilogo giornaliero.",
       "s4Title": "Dico cosa è successo",
-      "s4": "Ogni incidente indica cosa si è fermato e da quando. Con l'analisi AI attiva, contiene anche la migliore interpretazione del perché.",
-      "s5Title": "Decidi tu cosa cambia",
-      "s5": "Suggerisco avvisi per ciò che nessuno monitora e correzioni per gli avvisi che non possono scattare. Nulla cambia finché non lo esamini e lo applichi, e puoi annullare ciò che hai applicato."
+      "s4": "Ogni incidente indica cosa si è fermato e da quando. Con l'analisi AI attiva, include anche la migliore ipotesi sul perché.",
+      "s5Title": "Decidi tu cosa cambiare",
+      "s5": "Suggerisco avvisi per ciò che nessuno monitora e correzioni per avvisi che non possono attivarsi. Nulla cambia finché non lo rivedi e applichi, e puoi annullare ciò che hai applicato."
     },
     "outcome": {
       "active": "In corso ora",
@@ -30483,7 +30483,7 @@
       "standard": "Standard",
       "nerd": "Dettagliata",
       "standardTooltip": "La vista Standard offre la lettura rapida: cosa richiede il tuo intervento e cosa è successo negli ultimi 7 giorni",
-      "nerdTooltip": "La vista dettagliata mostra per intero ogni rilevatore, ciclo e impostazione",
+      "nerdTooltip": "La vista dettagliata mostra per intero ogni rilevatore, ciclo e impostazione.",
       "label": "Vista"
     },
     "suggestions": {
@@ -30548,7 +30548,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "Passo 1 · Prerequisiti del server",
+      "title": "Passaggio 1 · Prerequisiti del server",
       "subtitle": "Verificati su questo server prima di qualsiasi operazione su Slack",
       "columnSetting": "Impostazione",
       "columnResult": "Risultato",
@@ -30622,7 +30622,7 @@
       "back": "Indietro",
       "finish": "Completa",
       "connection": {
-        "title": "Passo 2 · Connessione",
+        "title": "Passaggio 2 · Connessione",
         "description": "La verifica raggiunge Slack da questo server tramite lo stesso percorso di codice usato in produzione.",
         "allPassed": "Slack è raggiungibile da questo server",
         "someFailed": "Slack non è raggiungibile da questo server. Consenti *.slack.com tramite il proxy o il firewall, quindi esegui di nuovo la verifica.",
@@ -30631,7 +30631,7 @@
         "socketHost": "Host WebSocket {host}"
       },
       "create": {
-        "title": "Passo 3 · Crea l'app",
+        "title": "Passaggio 3 · Crea l'app",
         "modeLabel": "Modalità di connessione",
         "socket": "Modalità Socket",
         "socketDescription": "Consigliata. OpenObserve apre la connessione, quindi Slack non richiede un URL pubblico",
@@ -30660,7 +30660,7 @@
         "signingSecretRequired": "La modalità HTTP richiede il signing secret"
       },
       "install": {
-        "title": "Passo 4 · Installa",
+        "title": "Passaggio 4 · Installa",
         "created": "App creata · {appId}",
         "allowHint": "Apre la schermata di installazione di Slack: fai clic su Consenti. Il token del bot arriva da Slack da solo; non c'è nulla da copiare.",
         "allow": "Consenti in Slack",
@@ -30683,7 +30683,7 @@
         "appNotCreatedByO2": "OpenObserve non ha creato questa app, quindi resta in Slack. Eliminala lì se non ti serve più."
       },
       "test": {
-        "title": "Passo 5 · Test e collegamento",
+        "title": "Passaggio 5 · Test e collegamento",
         "run": "Esegui i controlli",
         "signIn": "Prova Accedi con Slack",
         "signInPassed": "Accedi con Slack funziona",
@@ -31768,7 +31768,7 @@
           "label": "Identità agente mancante",
           "detail": "{affected} di {total} span LLM ({pct}) non hanno gen_ai.agent.name, quindi le viste degli agenti non li mostrano.",
           "pass": "Ogni span LLM porta un nome o un id dell'agente.",
-          "fix": "Apri Mappatura agenti"
+          "fix": "Apri mappatura agenti"
         },
         "zero_duration_spans": {
           "label": "Span con durata zero",

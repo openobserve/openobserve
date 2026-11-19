@@ -302,7 +302,7 @@
       "source": "Kaynak",
       "matchedRules": "{n} algılama eşleşti | {n} algılama eşleşti",
       "openCase": "Vaka aç",
-      "openCaseHint": "Bu olay üzerinde başlığı, önceliği ve varlıkları doldurulmuş bir vaka aç",
+      "openCaseHint": "Bu olayda, başlığı, önceliği ve varlıkları doldurulmuş olarak bir vaka aç",
       "addToCase": "Vakaya ekle",
       "pickCase": "Açık bir vakaya ekle",
       "caseOpened": "Vaka açıldı: {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Korelasyonun zaman aralığına göre belirlenir",
       "createForbidden": "Algılama oluşturmak için Güvenlik izni gerekir",
       "preview": {
-        "run": "Geçmiş üzerinde önizle",
-        "hint": "Kuralı seçilen aralıkta zamanlayıcının yaptığı gibi çalıştırır ve neyin tetiklenmiş olacağını gösterir",
+        "run": "Geçmişte önizle",
+        "hint": "Kuralı seçilen aralıkta zamanlayıcının yaptığı gibi çalıştırır ve neyin tetiklenmiş olacağını söyler",
         "failed": "Sorgu başarısız oldu: {reason}",
         "time": "Zaman",
         "range": {
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Değişiklik günlüğü",
-      "hint": "Denetim izi tutulduğu sürece algılamaları, kaynakları, vakaları ve Güvenlik rolü atamalarını kimin değiştirdiğini gösterir",
+      "hint": "Denetim izi tutulduğu sürece algılamaları, kaynakları, vakaları ve Güvenlik rolü atamalarını kimin değiştirdiği",
       "includeReads": "Okumaları dahil et",
       "when": "Zaman",
       "who": "Değiştiren",
