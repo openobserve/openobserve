@@ -99,10 +99,29 @@ describe("buildPrefillFromLibrary", () => {
     expect(prefill.promqlCondition).toBeNull();
   });
 
-  it("keeps the query byte-for-byte — this path exists BECAUSE nothing is substituted", () => {
-    const file = sqlFile();
+  const P95 = `SELECT service_name, approx_percentile_cont(duration, 0.95) / 1000.0 AS p95_ms FROM "default" GROUP BY service_name`;
+  const perGroup = {
+    multi_alert: true,
+    function: "count",
+    group_by: [],
+    having: { column: "p95_ms", operator: ">", value: 2000 },
+  };
+  it.each([
+    ["no GROUP BY", sqlFile().query_condition.sql, 1, null, null],
+    [
+      "grouped HAVING",
+      `${P95} HAVING COUNT(*) >= 50 AND approx_percentile_cont(duration, 0.95) > 2000000`,
+      1,
+      `${P95} HAVING COUNT(*) >= 50 ORDER BY p95_ms DESC`,
+      perGroup,
+    ],
+    ["grouped, fires on 3 rows", `${P95} HAVING COUNT(*) >= 50`, 3, null, null],
+  ])("%s: the query opens as written or per group", (_, sql, threshold, perGroupSql, agg) => {
+    const file = { ...sqlFile(), trigger_condition: { operator: ">=", threshold } };
+    (file.query_condition as any).sql = sql;
     const prefill = buildPrefillFromLibrary({ entry: entry({ query_type: "sql" }), file });
-    expect(prefill.sql).toBe((file.query_condition as any).sql);
+    expect(prefill.sql).toBe(perGroupSql ?? sql);
+    expect(prefill.aggregation ?? null).toEqual(agg);
   });
 
   it("maps the stream from the file, which is what the query actually reads", () => {

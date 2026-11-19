@@ -165,6 +165,9 @@ const sqlEntry = (): AlertLibraryEntry =>
   }) as AlertLibraryEntry;
 
 /** A real library SQL alert: threshold lives in the SQL, trigger is curated. */
+// It groups, so it opens one per k8s_cluster with the HAVING threshold as the condition.
+const PER_GROUP_SQL =
+  'SELECT count(*) as event_count, k8s_cluster FROM "k8s_events" GROUP BY k8s_cluster ORDER BY event_count DESC';
 const sqlFile = (): AlertLibraryFile => ({
   name: "high_warning_event_rate",
   stream_type: "logs",
@@ -271,7 +274,7 @@ describe("AddAlert — a prefill seeds the form", () => {
 
       expect(data.name).toBe("high_warning_event_rate");
       expect(data.stream_name).toBe("k8s_events");
-      expect(data.query_condition.sql).toBe(sqlFile().query_condition!.sql);
+      expect(data.query_condition.sql).toBe(PER_GROUP_SQL);
       expect(data.trigger_condition.silence).toBe(30);
     });
   });
@@ -299,17 +302,21 @@ describe("AddAlert — a prefill seeds the form", () => {
       wrapper = await openWithPrefill(sqlEntry(), sqlFile());
 
       expect(wrapper.vm.formData.query_condition.type).toBe("sql");
-      expect(wrapper.vm.previewQuery).toBe(sqlFile().query_condition!.sql);
+      expect(wrapper.vm.previewQuery).toBe(PER_GROUP_SQL);
+      expect(wrapper.vm.formData.query_condition.aggregation).toMatchObject({
+        multi_alert: true,
+        having: { column: "event_count", operator: ">", value: 100 },
+      });
     });
 
-    it("draws the threshold line at the adopted threshold, with room to be seen", async () => {
+    it("draws the threshold line at the per-group threshold, with room to be seen", async () => {
       wrapper = await openWithPrefill(sqlEntry(), sqlFile());
       const config = previewConfig(wrapper);
 
       expect(config.mark_line).toEqual([
-        expect.objectContaining({ name: "threshold", value: "1" }),
+        expect.objectContaining({ name: "threshold", value: "100" }),
       ]);
-      expect(config.y_axis_max).toBeGreaterThan(1);
+      expect(config.y_axis_max).toBeGreaterThan(100);
     });
   });
 

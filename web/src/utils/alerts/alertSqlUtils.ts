@@ -360,16 +360,17 @@ export function sqlWhereText(sql: string): string | null {
   return clauseOf(sql ?? "", /\bwhere\b/i, CLAUSE_END);
 }
 
-/** A HAVING comparison restated on a column the query returns, for a per-row condition. A column
- * that scales the compared expression (`expr / 1000.0 AS p95_ms`) gets the value scaled with it. */
-export function sqlHavingCondition(
-  sql: string,
-): { column: string; operator: string; value: number } | null {
-  const having = clauseOf(
-    sql ?? "",
-    /\bhaving\b/i,
-    /\b(?:order\s+by|limit|qualify|union|window)\b|;/i,
-  );
+type HavingCondition = { column: string; operator: string; value: number };
+const HAVING_END = /\b(?:order\s+by|limit|qualify|union|window)\b|;/i;
+
+function havingThreshold(sql: string) {
+  const masked = maskNested(sql);
+  const head = /\bhaving\b/i.exec(masked);
+  if (!head) return null;
+  const from = head.index + head[0].length;
+  const stop = HAVING_END.exec(masked.slice(from));
+  const to = stop ? from + stop.index : sql.length;
+  const having = sql.slice(from, to).trim();
   if (!having || /\bor\b/i.test(maskNested(having))) return null;
   const list = clauseOf(sql, /^\s*select\b(?:\s+distinct\b)?/i, /\bfrom\b/i) ?? "";
   const columns = splitTop(list, /,/g).map((item) => {
@@ -378,9 +379,11 @@ export function sqlHavingCondition(
       ? { expr: squash(named[1]), name: named[2].replace(/["`]/g, "") }
       : { expr: squash(item), name: item.replace(/["`]/g, "") };
   });
-  let found: { column: string; operator: string; value: number } | null = null;
+  const parts = splitTop(having, /\band\b/gi);
+  let found: HavingCondition | null = null;
+  let term = -1;
   // The last comparison wins: a minimum-volume guard is written before the threshold it guards.
-  for (const part of splitTop(having, /\band\b/gi)) {
+  for (const [index, part] of parts.entries()) {
     const comparison = COMPARISON.exec(part);
     if (!comparison) continue;
     const lhs = squash(comparison[1]);
@@ -395,8 +398,36 @@ export function sqlHavingCondition(
         const restated = scaled![2] === "/" ? value / factor : value * factor;
         found = { column: column.name, operator, value: Number(restated.toPrecision(12)) };
       } else continue;
+      term = index;
       break;
     }
   }
-  return found;
+  return found ? { condition: found, parts, term, head: head.index, from, to } : null;
+}
+
+/** A HAVING comparison restated on a column the query returns, for a per-row condition. A column
+ * that scales the compared expression (`expr / 1000.0 AS p95_ms`) gets the value scaled with it. */
+export function sqlHavingCondition(sql: string): HavingCondition | null {
+  return havingThreshold(sql ?? "")?.condition ?? null;
+}
+
+/** A grouped query whose HAVING ends the statement, split into the SQL without its threshold term
+ * (sorted worst first) and that threshold as a per-group condition on a named column. */
+export function sqlHavingToCondition(
+  sql: string,
+): { sql: string; condition: HavingCondition } | null {
+  const text = (sql ?? "").trim();
+  const match = havingThreshold(text);
+  const { condition } = match ?? {};
+  if (!match || !condition || match.to !== text.length) return null;
+  if (!/\bgroup\s+by\b/i.test(maskNested(text.slice(0, match.head)))) return null;
+  if (![">", ">=", "<", "<="].includes(condition.operator) || !/^\w+$/.test(condition.column))
+    return null;
+  const rest = match.parts.filter((_, index) => index !== match.term);
+  const kept = rest.length
+    ? `${text.slice(0, match.from)} ${rest.join(" AND ")}`
+    : text.slice(0, match.head).trimEnd();
+  // The alert reads a bounded page of rows, so the groups past the threshold must come first.
+  const order = condition.operator.startsWith(">") ? "DESC" : "ASC";
+  return { sql: `${kept} ORDER BY ${condition.column} ${order}`, condition };
 }

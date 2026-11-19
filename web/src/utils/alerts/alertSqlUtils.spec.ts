@@ -4,6 +4,7 @@ import {
   alwaysOneRow,
   oneRowMeetsLimit,
   sqlHavingCondition,
+  sqlHavingToCondition,
   sqlWhereText,
 } from "./alertSqlUtils";
 
@@ -373,6 +374,28 @@ describe("alertSqlUtils", () => {
     [P95, null],
   ])("sqlHavingCondition(%s)", (sql, expected) => {
     expect(sqlHavingCondition(sql)).toEqual(expected);
+  });
+
+  it.each([
+    [
+      `${P95} HAVING COUNT(*) >= 50 AND approx_percentile_cont(duration, 0.95) > 2000000`,
+      {
+        sql: `${P95} HAVING COUNT(*) >= 50 ORDER BY p95_ms DESC`,
+        condition: { column: "p95_ms", operator: ">", value: 2000 },
+      },
+    ],
+    [
+      "SELECT k, avg(x) AS a FROM t GROUP BY k HAVING avg(x) <= 5",
+      {
+        sql: "SELECT k, avg(x) AS a FROM t GROUP BY k ORDER BY a ASC",
+        condition: { column: "a", operator: "<=", value: 5 },
+      },
+    ],
+    ['SELECT count(*) AS n FROM "k8s_events" HAVING n > 0', null],
+    [`${P95} HAVING COUNT(*) > 5 ORDER BY requests`, null],
+    [`${P95} HAVING COUNT(*) <> 3`, null],
+  ])("sqlHavingToCondition(%s)", (sql, expected) => {
+    expect(sqlHavingToCondition(sql)).toEqual(expected);
   });
 
   it.each([

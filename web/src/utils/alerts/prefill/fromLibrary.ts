@@ -17,13 +17,13 @@
  * A library alert → AlertPrefill ("Customize in editor").
  *
  * This is the tier-2 path of the settled tunables decision: the drawer edits the
- * structured fields, and anything deeper — a `HAVING … > N` living inside the
- * SQL text — is edited in the alert editor the user already knows.
+ * structured fields, and anything deeper is edited in the alert editor the user already knows.
  *
  * The other adapters *derive* a query from what a surface is showing. This one
- * carries an existing query across UNCHANGED, and that is the whole point: the
- * library stores exports of real alerts, so there is nothing to substitute and
- * any rewriting here would be a bug rather than a feature.
+ * carries an existing query across as written, with one exception: a grouped SQL
+ * query that fires on any row and ends in `HAVING … <op> N` opens as one alert per
+ * group, its threshold moved from the HAVING into the per-group condition so the
+ * form's number is the one that fires. The same groups fire either way.
  */
 
 import {
@@ -34,6 +34,7 @@ import {
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { MAX_PERIOD_MINUTES, clampPeriodMinutes, warn } from "../alertPrefill";
+import { sqlHavingToCondition } from "../alertSqlUtils";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import type { LibrarySuggestion } from "../librarySuggest.types";
 
@@ -59,6 +60,10 @@ const asText = (value: unknown): string | undefined =>
 
 const asFiniteNumber = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+// Only an any-row trigger keeps its meaning per group: the per-group form pins it to ">= 1".
+const firesOnAnyRow = (operator: unknown, threshold: unknown) =>
+  (operator ?? ">=") === ">=" ? (threshold ?? 1) === 1 : operator === ">" && threshold === 0;
 
 export const buildPrefillFromLibrary = (input: LibraryPrefillInput): AlertPrefill => {
   const warnings: AlertPrefillWarning[] = [];
@@ -93,6 +98,13 @@ export const buildPrefillFromLibrary = (input: LibraryPrefillInput): AlertPrefil
   }
 
   const aggregation = queryCondition.aggregation;
+  const sql = asText(queryCondition.sql);
+  const perGroup =
+    !isPromql &&
+    !asRecord(aggregation).function &&
+    firesOnAnyRow(trigger.operator, trigger.threshold)
+      ? sqlHavingToCondition(sql ?? "")
+      : null;
 
   return {
     version: ALERT_PREFILL_VERSION,
@@ -103,13 +115,20 @@ export const buildPrefillFromLibrary = (input: LibraryPrefillInput): AlertPrefil
     streamType: asText(file.stream_type) ?? entry.stream_type ?? "",
     streamName: asText(file.stream_name) ?? entry.stream ?? "",
     queryType: isPromql ? "promql" : "sql",
-    // Byte-for-byte, both ways. There are no placeholders in a library alert, so
-    // a query that changed on the way to the editor changed by accident.
-    ...(isPromql ? { promql: asText(queryCondition.promql) } : { sql: asText(queryCondition.sql) }),
+    ...(isPromql ? { promql: asText(queryCondition.promql) } : { sql: perGroup?.sql ?? sql }),
     promqlCondition: condition,
-    ...(asRecord(aggregation).function
-      ? { aggregation: aggregation as AlertPrefillAggregation }
-      : {}),
+    ...(perGroup
+      ? {
+          aggregation: {
+            multi_alert: true,
+            function: "count",
+            group_by: [],
+            having: perGroup.condition,
+          },
+        }
+      : asRecord(aggregation).function
+        ? { aggregation: aggregation as AlertPrefillAggregation }
+        : {}),
     vrlFunction: asText(queryCondition.vrl_function) ?? null,
     // The whole trigger travels, not just the window. A library alert is an
     // export of a real one and the drawer's tunables edit these very fields —
