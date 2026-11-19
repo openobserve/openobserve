@@ -723,6 +723,12 @@ fn fleet_mutation(method: &Method, path: &str) -> bool {
     module == Some("fleet") || (segments.get(org_at) == Some(&"v2") && module == Some("fleets"))
 }
 
+/// Routes whose handler writes its own audit entry, so their bodies never reach the generic one.
+#[cfg(feature = "enterprise")]
+fn audits_itself(path: &str) -> bool {
+    path.ends_with("ai/chat_stream") || path.ends_with("ai/toolsets/_discover")
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
@@ -734,7 +740,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
 
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
-            || path.ends_with("ai/chat_stream")
+            || audits_itself(&path)
             || common::meta::ingestion_routes::is_ingestion_write(
                 &http_method,
                 &path,
@@ -2025,6 +2031,7 @@ fn service_route_table() -> Router {
 
             // AI
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
+            .route("/{org_id}/ai/toolsets/_discover", post(ai::toolsets::discover))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
 
             // RE patterns
@@ -3832,6 +3839,15 @@ mod tests {
                 "{method} {path} delegated={delegated}"
             );
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn toolset_discovery_bodies_never_reach_the_generic_audit() {
+        assert!(audits_itself("api/acme/ai/toolsets/_discover"));
+        assert!(audits_itself("api/acme/ai/chat_stream"));
+        assert!(!audits_itself("api/acme/ai/toolsets"));
+        assert!(!audits_itself("api/acme/ai/toolsets/t1"));
     }
 
     fn audited(method: Method, path: &str, body: &str) -> String {

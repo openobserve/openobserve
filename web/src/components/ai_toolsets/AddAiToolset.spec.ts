@@ -46,6 +46,7 @@ vi.mock("@/services/ai_toolsets", async (importOriginal) => {
       update: vi.fn(),
       list: vi.fn(),
       delete: vi.fn(),
+      discover: vi.fn(),
     },
   });
 });
@@ -77,6 +78,7 @@ describe("AddAiToolset", () => {
     store.state.selectedOrganization = { identifier: "test-org" } as any;
     vi.mocked(aiToolsetsService.create).mockResolvedValue({ data: {} } as any);
     vi.mocked(aiToolsetsService.update).mockResolvedValue({ data: {} } as any);
+    vi.mocked(aiToolsetsService.discover).mockResolvedValue({ data: { tools: [] } } as any);
   });
 
   afterEach(() => {
@@ -445,6 +447,274 @@ describe("AddAiToolset", () => {
         }),
       );
       expect(wrapper.vm.skillContentError).toBe(false);
+    });
+  });
+
+  describe("MCP tool picker", () => {
+    const DISCOVERED = [
+      { name: "search_logs", description: "Search", read_only_hint: true },
+      { name: "create_monitor", read_only_hint: false },
+    ];
+
+    const editRecord = (data: Record<string, any>) => {
+      mockQuery = { action: "edit", id: "tool-1" };
+      vi.mocked(aiToolsetsService.get).mockResolvedValue({
+        data: { id: "tool-1", name: "dd", kind: "mcp", description: "", data },
+      } as any);
+    };
+
+    const savedData = () => vi.mocked(aiToolsetsService.update).mock.calls.at(-1)![2].data!;
+
+    const picker = () => wrapper.findComponent({ name: "AiToolsetToolPicker" });
+
+    const stateButton = (tool: string, state: string) =>
+      wrapper.find(
+        `[data-test="ai-toolset-tool-${tool}"] [data-test="ai-toolset-tool-state-${state}"]`,
+      );
+
+    it("discovers an edited toolset by id, keeps unknown keys, sends schema 2 and verifies", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        editRecord({
+          url: "https://mcp.example.com/mcp",
+          headers: { "DD-API-KEY": "***" },
+          timeout_seconds: 30,
+          allowed_tools: ["search_logs", "get_*", "gone_tool"],
+          write_tools: [],
+          rate_limit: { calls: 50, per_seconds: 10 },
+          tool_classes: [{ tool: "search_*", class: "logs" }],
+          preset: "datadog",
+        });
+        vi.mocked(aiToolsetsService.discover).mockResolvedValue({
+          data: { tools: DISCOVERED },
+        } as any);
+        wrapper = createWrapper();
+        await flushPromises();
+        vi.advanceTimersByTime(800);
+        await flushPromises();
+      } finally {
+        vi.useRealTimers();
+      }
+
+      expect(aiToolsetsService.discover).toHaveBeenCalledWith("test-org", {
+        id: "tool-1",
+        overrides: {
+          url: "https://mcp.example.com/mcp",
+          headers: { "DD-API-KEY": "***" },
+          timeout_seconds: 30,
+        },
+      });
+      expect(picker().props("status")).toBe("ok");
+      expect(wrapper.find('[data-test="ai-toolset-other-entries"]').text()).toContain("get_*");
+
+      await stateButton("create_monitor", "write").trigger("click");
+      await flushPromises();
+      await getForm().handleSubmit();
+      await flushPromises();
+
+      const data = savedData();
+      expect(data).toMatchObject({
+        schema: 2,
+        url: "https://mcp.example.com/mcp",
+        headers: { "DD-API-KEY": "***" },
+        allowed_tools: ["search_logs", "get_*", "gone_tool", "create_monitor"],
+        write_tools: ["create_monitor"],
+        rate_limit: { calls: 50, per_seconds: 10 },
+        tool_classes: [{ tool: "search_*", class: "logs" }],
+        preset: "datadog",
+      });
+      expect(data).not.toHaveProperty("blocked_tools");
+      expect(typeof data.tools_verified_at).toBe("number");
+    });
+
+    it("prefills a row without allowed_tools as all allowed, tagged tools as can change things", async () => {
+      editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30 });
+      vi.mocked(aiToolsetsService.discover).mockResolvedValue({
+        data: { tools: DISCOVERED },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      await (wrapper.vm as any).discoverTools();
+      await flushPromises();
+
+      expect(picker().props("lists")).toEqual({
+        allowed: ["search_logs", "create_monitor"],
+        blocked: null,
+        write: ["create_monitor"],
+      });
+    });
+
+    it("still saves after a failed discovery, without tools_verified_at, with typed tool names", async () => {
+      editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30, allowed_tools: [] });
+      vi.mocked(aiToolsetsService.discover).mockRejectedValue({
+        response: { status: 503, data: { code: "internal_secret_required", message: "no secret" } },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      await (wrapper.vm as any).discoverTools();
+      await flushPromises();
+
+      expect(picker().props("status")).toBe("failed");
+      expect(wrapper.find('[data-test="ai-toolset-tools-error"]').text()).toContain("no secret");
+      await wrapper.find('[data-test="ai-toolset-typed-tool"] input').setValue("run_query");
+      await wrapper.find('[data-test="ai-toolset-typed-tool-add"]').trigger("click");
+      await flushPromises();
+
+      await getForm().handleSubmit();
+      await flushPromises();
+      const data = savedData();
+      expect(data.allowed_tools).toEqual(["run_query"]);
+      expect(data).not.toHaveProperty("tools_verified_at");
+    });
+
+    it("warns when a tool that may write is only Allowed", async () => {
+      editRecord({
+        url: "https://mcp.example.com/mcp",
+        timeout_seconds: 30,
+        allowed_tools: [],
+        write_tools: [],
+      });
+      vi.mocked(aiToolsetsService.discover).mockResolvedValue({
+        data: { tools: DISCOVERED },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      await (wrapper.vm as any).discoverTools();
+      await flushPromises();
+
+      await stateButton("create_monitor", "allowed").trigger("click");
+      await flushPromises();
+      expect(picker().props("lists").write).toEqual(["create_monitor"]);
+      expect(wrapper.find('[data-test="ai-toolset-tool-write-warning"]').exists()).toBe(false);
+
+      await stateButton("create_monitor", "allowed").trigger("click");
+      await flushPromises();
+      expect(picker().props("lists").write).toEqual([]);
+      expect(wrapper.find('[data-test="ai-toolset-tool-write-warning"]').text()).toContain(
+        "automatic RCA",
+      );
+    });
+
+    it("drops a discovery for URL A that answers after the form moved to URL B", async () => {
+      const answers: Array<(tools: any[]) => void> = [];
+      vi.mocked(aiToolsetsService.discover).mockImplementation(
+        () =>
+          new Promise((resolve) => answers.push((tools) => resolve({ data: { tools } } as any))),
+      );
+      editRecord({ url: "https://a.example.com/mcp", timeout_seconds: 30 });
+      wrapper = createWrapper();
+      await flushPromises();
+      const discoverA = (wrapper.vm as any).discoverTools();
+      await flushPromises();
+
+      getForm().setFieldValue("mcp.url", "https://b.example.com/mcp");
+      await flushPromises();
+      expect(picker().props("tools")).toBeNull();
+      answers[0]([{ name: "only_on_a" }]);
+      await discoverA;
+      await flushPromises();
+      expect(picker().props("tools")).toBeNull();
+      expect(picker().props("lists").allowed).toBeNull();
+
+      const discoverB = (wrapper.vm as any).discoverTools();
+      await flushPromises();
+      answers[1]([{ name: "on_b", read_only_hint: true }]);
+      await discoverB;
+      await flushPromises();
+      expect(picker().props("tools")).toEqual([{ name: "on_b", read_only_hint: true }]);
+      expect(picker().props("lists").allowed).toEqual(["on_b"]);
+    });
+
+    it("saves exactly the tools shown as can change things, on a row that had no write_tools", async () => {
+      editRecord({
+        url: "https://mcp.example.com/mcp",
+        timeout_seconds: 30,
+        allowed_tools: ["create_monitor"],
+      });
+      vi.mocked(aiToolsetsService.discover).mockResolvedValue({
+        data: { tools: DISCOVERED },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      await (wrapper.vm as any).discoverTools();
+      await flushPromises();
+
+      await stateButton("search_logs", "write").trigger("click");
+      await flushPromises();
+      await getForm().handleSubmit();
+      await flushPromises();
+      const data = savedData();
+      expect(data.allowed_tools).toEqual(["create_monitor", "search_logs"]);
+      expect(data.write_tools).toEqual(["create_monitor", "search_logs"]);
+    });
+
+    it("drops a result that answers while a header row has a value but no key yet", async () => {
+      const answers: Array<(tools: any[]) => void> = [];
+      vi.mocked(aiToolsetsService.discover).mockImplementation(
+        () =>
+          new Promise((resolve) => answers.push((tools) => resolve({ data: { tools } } as any))),
+      );
+      editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30 });
+      wrapper = createWrapper();
+      await flushPromises();
+      const pending = (wrapper.vm as any).discoverTools();
+      await flushPromises();
+
+      getForm().pushFieldValue("mcp.headers", { key: "", value: "secret", visible: false });
+      await flushPromises();
+      answers[0]([{ name: "without_the_header" }]);
+      await pending;
+      await flushPromises();
+      expect(picker().props("tools")).toBeNull();
+      expect(picker().props("lists").allowed).toBeNull();
+    });
+
+    it("shows an inline error and adds nothing for a glob typed as a tool name", async () => {
+      editRecord({ url: "https://mcp.example.com/mcp", timeout_seconds: 30, allowed_tools: [] });
+      vi.mocked(aiToolsetsService.discover).mockRejectedValue({
+        response: { status: 503, data: { code: "internal_secret_required", message: "no secret" } },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      await (wrapper.vm as any).discoverTools();
+      await flushPromises();
+
+      await wrapper.find('[data-test="ai-toolset-typed-tool"] input').setValue("*");
+      await flushPromises();
+      expect(wrapper.find('[data-test="ai-toolset-tool-picker"]').text()).toContain(
+        "* isn't allowed here",
+      );
+      expect(
+        wrapper.find('[data-test="ai-toolset-typed-tool-add"]').attributes("disabled"),
+      ).toBeDefined();
+      await wrapper.find('[data-test="ai-toolset-typed-tool"] input').trigger("keydown.enter");
+      await flushPromises();
+      expect(picker().props("lists").allowed).toEqual([]);
+    });
+
+    it("sends a new toolset's limits and starts with every tool off", async () => {
+      wrapper = createWrapper();
+      const form = getForm();
+      form.setFieldValue("name", "new-mcp");
+      form.setFieldValue("mcp.url", "https://mcp.example.com/mcp");
+      form.setFieldValue("mcp.max_calls_per_turn", "10");
+      form.setFieldValue("mcp.rate_calls", "50");
+      form.setFieldValue("mcp.rate_seconds", "10");
+      form.setFieldValue("mcp.max_result_kib", "64");
+      await flushPromises();
+      await form.handleSubmit();
+      await flushPromises();
+
+      const data = vi.mocked(aiToolsetsService.create).mock.calls.at(-1)![1].data!;
+      expect(data).toMatchObject({
+        schema: 2,
+        allowed_tools: [],
+        write_tools: [],
+        max_calls_per_turn: 10,
+        rate_limit: { calls: 50, per_seconds: 10 },
+        max_result_bytes: 65536,
+      });
+      expect(data).not.toHaveProperty("tools_verified_at");
     });
   });
 

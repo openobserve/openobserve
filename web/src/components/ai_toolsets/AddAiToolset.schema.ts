@@ -17,6 +17,24 @@ import { z } from "zod";
 export const aiToolsetNameRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 export const AI_TOOLSET_NAME_MAX = 64;
 
+// The server's MCP limit bounds (o2-enterprise `McpPolicy::validate`); result size is entered in KiB.
+export const MCP_LIMITS = {
+  maxCallsPerTurn: [1, 500],
+  rateCalls: [1, 10_000],
+  rateSeconds: [1, 3_600],
+  resultKib: [1, 16_384],
+} as const;
+
+// A limit input is optional: blank keeps the agent's default.
+const optionalNumber = z.union([z.string(), z.number()]).optional();
+
+const isBlank = (v: unknown) => v === undefined || v === null || String(v).trim() === "";
+
+const inRange = (v: unknown, [min, max]: readonly [number, number]) => {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= min && n <= max;
+};
+
 // One row of a key/value secret list (mcp headers, cli env vars). All fields are
 // free-form and optional (a blank starter row is valid — only non-empty rows are
 // persisted on save). `visible` is the per-row password-visibility UI flag; it is
@@ -54,6 +72,16 @@ export const makeAddAiToolsetSchema = (
         url: z.string().optional(),
         timeout_seconds: z.coerce.number().optional(),
         headers: z.array(secretRowSchema).optional().default([]),
+        // `null` is an absent key, so the agent's default for that list applies.
+        allowed_tools: z.array(z.string()).nullable().default(null),
+        blocked_tools: z.array(z.string()).nullable().default(null),
+        write_tools: z.array(z.string()).nullable().default(null),
+        max_calls_per_turn: optionalNumber,
+        rate_calls: optionalNumber,
+        rate_seconds: optionalNumber,
+        max_result_kib: optionalNumber,
+        // Stored keys this form doesn't edit (e.g. `tool_classes`), sent back as they are.
+        extra: z.record(z.string(), z.any()).optional().default({}),
       }),
 
       // ── CLI fields (command validated only when kind === "cli") ───────────
@@ -103,6 +131,46 @@ export const makeAddAiToolsetSchema = (
           message: t("aiToolset.mcpUrlRequired"),
         });
       }
+      if (val.kind === "mcp") {
+        const mcp = val.mcp ?? ({} as any);
+        const limits: [string, unknown, readonly [number, number], string][] = [
+          [
+            "max_calls_per_turn",
+            mcp.max_calls_per_turn,
+            MCP_LIMITS.maxCallsPerTurn,
+            "aiToolset.maxCallsInvalid",
+          ],
+          [
+            "max_result_kib",
+            mcp.max_result_kib,
+            MCP_LIMITS.resultKib,
+            "aiToolset.resultSizeInvalid",
+          ],
+          ["rate_calls", mcp.rate_calls, MCP_LIMITS.rateCalls, "aiToolset.rateCallsInvalid"],
+          [
+            "rate_seconds",
+            mcp.rate_seconds,
+            MCP_LIMITS.rateSeconds,
+            "aiToolset.rateSecondsInvalid",
+          ],
+        ];
+        for (const [field, value, range, message] of limits) {
+          if (!isBlank(value) && !inRange(value, range)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["mcp", field],
+              message: t(message),
+            });
+          }
+        }
+        if (isBlank(mcp.rate_calls) !== isBlank(mcp.rate_seconds)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["mcp", isBlank(mcp.rate_calls) ? "rate_calls" : "rate_seconds"],
+            message: t("aiToolset.rateBothRequired"),
+          });
+        }
+      }
       // cli.command required when kind === "cli". Bare empty check (NO trim): a
       // whitespace-only command is accepted.
       if (val.kind === "cli" && !String(val.cli?.command ?? "")) {
@@ -132,7 +200,20 @@ export const addAiToolsetDefaults = (): AddAiToolsetForm => ({
   name: "",
   kind: "mcp",
   description: "",
-  mcp: { url: "", timeout_seconds: 30, headers: [] },
+  // A new custom MCP starts with every tool off; the picker turns tools on.
+  mcp: {
+    url: "",
+    timeout_seconds: 30,
+    headers: [],
+    allowed_tools: [],
+    blocked_tools: null,
+    write_tools: [],
+    max_calls_per_turn: "",
+    rate_calls: "",
+    rate_seconds: "",
+    max_result_kib: "",
+    extra: {},
+  },
   cli: {
     command: "",
     allowed_subcommands_raw: "",

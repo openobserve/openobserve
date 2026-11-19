@@ -21,18 +21,114 @@ use axum::{
 };
 use config::utils::time::now_micros;
 use infra::table::org_ai_toolsets::OrgToolset;
-use o2_enterprise::enterprise::ai::toolsets::{
-    ToolsetCreateRequest, ToolsetKind, ToolsetListResponse, ToolsetResponse, ToolsetUpdateRequest,
-    merge_update_data,
-    push::{colliding_names, normalize_tool_name},
-    validate_data, validate_name,
+use o2_enterprise::enterprise::{
+    ai::{
+        client::{DiscoverError, DiscoveredTool, McpEntry, get_agent_client},
+        toolsets::{
+            McpData, ToolsetCreateRequest, ToolsetKind, ToolsetListResponse, ToolsetResponse,
+            ToolsetUpdateRequest, merge_update_data,
+            push::{colliding_names, normalize_tool_name},
+            validate_data, validate_name,
+        },
+    },
+    common::{
+        auditor::{AuditMessage, Protocol, ResponseMeta},
+        config::get_config as get_o2_config,
+    },
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::{UserEmail, check_permissions};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use svix_ksuid::{Ksuid, KsuidLike};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
+
+/// Body of `_discover`: an unsaved config, or a saved toolset by `id` with unsaved `overrides`.
+#[derive(Debug, Default, Deserialize, utoipa::ToSchema)]
+pub struct DiscoverRequest {
+    #[serde(default)]
+    pub id: Option<String>,
+    /// `url`, `headers` and `timeout_seconds` merged over the saved row, as a `PUT` would.
+    #[serde(default)]
+    pub overrides: Option<serde_json::Value>,
+    #[serde(default)]
+    pub url: Option<String>,
+    #[serde(default)]
+    pub headers: Option<serde_json::Value>,
+    #[serde(default)]
+    pub timeout_seconds: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct DiscoverResponse {
+    pub tools: Vec<DiscoveredTool>,
+}
+
+/// A `_discover` that returned no tools: the HTTP status and the `{code, message}` body.
+#[derive(Debug, PartialEq)]
+struct DiscoverFailure {
+    status: StatusCode,
+    code: &'static str,
+    message: String,
+}
+
+impl DiscoverFailure {
+    fn refused(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            code: "discovery_failed",
+            message: message.into(),
+        }
+    }
+
+    fn not_found(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            code: "not_found",
+            message: message.into(),
+        }
+    }
+
+    fn into_response(self) -> Response {
+        (
+            self.status,
+            Json(serde_json::json!({"code": self.code, "message": self.message})),
+        )
+            .into_response()
+    }
+}
+
+impl From<DiscoverError> for DiscoverFailure {
+    fn from(e: DiscoverError) -> Self {
+        match e {
+            DiscoverError::Refused { code, message } => Self {
+                status: StatusCode::BAD_REQUEST,
+                code: if code == "url_refused" {
+                    "url_refused"
+                } else {
+                    "discovery_failed"
+                },
+                message,
+            },
+            DiscoverError::InternalSecretRequired => Self {
+                status: StatusCode::SERVICE_UNAVAILABLE,
+                code: "internal_secret_required",
+                message: "The AI service has no internal secret configured, so it can't list \
+                          tools; enter tool names by hand"
+                    .to_string(),
+            },
+            DiscoverError::Unavailable(detail) => {
+                log::warn!("[AI] toolset discovery: the AI service is unavailable: {detail}");
+                Self {
+                    status: StatusCode::SERVICE_UNAVAILABLE,
+                    code: "ai_service_unavailable",
+                    message: "The AI service is unavailable; enter tool names by hand or retry"
+                        .to_string(),
+                }
+            }
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Create
@@ -293,6 +389,66 @@ pub async fn update(
 }
 
 // ---------------------------------------------------------------------------
+// Discover
+// ---------------------------------------------------------------------------
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/ai/toolsets/_discover",
+    context_path = "/api",
+    tag = "AI",
+    operation_id = "DiscoverAiToolsetTools",
+    summary = "List an MCP toolset's tools",
+    description = "Asks the MCP server, through the AI service, which tools it offers, \
+                   without saving anything. The body is either an unsaved config \
+                   (`url`, `headers`, `timeout_seconds`; no header value may be `***`) or a \
+                   saved toolset's `id` with optional `overrides`, merged as a `PUT` would: \
+                   `***` keeps a stored header unless the URL's origin changes. \
+                   Only available in enterprise deployments.",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    request_body(
+        content = inline(DiscoverRequest),
+        description = "The MCP server to list",
+        content_type = "application/json",
+    ),
+    security(("Authorization" = [])),
+    responses(
+        (status = 200, description = "The server's tools", content_type = "application/json", body = DiscoverResponse),
+        (status = 400, description = "`{code, message}`: `url_refused` or `discovery_failed`", content_type = "application/json"),
+        (status = 404, description = "No MCP toolset with this id", content_type = "application/json"),
+        (status = 503, description = "`{code, message}`: `ai_service_unavailable` or `internal_secret_required`", content_type = "application/json"),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "update"})), ("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn discover(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<DiscoverRequest>,
+) -> Response {
+    let target = discover_target(&body);
+    let result = run_discovery(&org_id, body).await;
+    let (status, outcome, count) = match &result {
+        Ok(tools) => (StatusCode::OK, "ok", Some(tools.len())),
+        Err(f) => (f.status, f.code, None),
+    };
+    audit_discovery(
+        &org_id,
+        &user_email.user_id,
+        &target,
+        status,
+        outcome,
+        count,
+    )
+    .await;
+    match result {
+        Ok(tools) => Json(DiscoverResponse { tools }).into_response(),
+        Err(failure) => failure.into_response(),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Delete
 // ---------------------------------------------------------------------------
 
@@ -447,6 +603,163 @@ fn updated_data(
     let merged = Some(merge_update_data(kind, stored.as_ref(), incoming)?);
     validate_data(kind, &merged)?;
     Ok(merged.map(|v| v.to_string()))
+}
+
+async fn run_discovery(
+    org_id: &str,
+    body: DiscoverRequest,
+) -> Result<Vec<DiscoveredTool>, DiscoverFailure> {
+    let stored = match body.id.as_deref() {
+        Some(id) => {
+            let primary = infra::db::get_orm_client_rw().await;
+            match infra::table::org_ai_toolsets::get_with(primary, org_id, id).await {
+                Ok(row) => row,
+                Err(e) => {
+                    log::error!("[AI] toolset discovery: reading toolset {id} failed: {e}");
+                    return Err(DiscoverFailure {
+                        status: StatusCode::INTERNAL_SERVER_ERROR,
+                        code: "internal_error",
+                        message: "the toolset could not be read".to_string(),
+                    });
+                }
+            }
+        }
+        None => None,
+    };
+    let entry = discover_entry(stored.as_ref(), body)?;
+    let client = get_agent_client().ok_or_else(|| {
+        DiscoverFailure::from(DiscoverError::Unavailable(
+            "the agent client is not initialized".to_string(),
+        ))
+    })?;
+    client
+        .discover_toolset(org_id, &entry)
+        .await
+        .map_err(DiscoverFailure::from)
+}
+
+/// The config to list: the body's own, or the saved row with `overrides` merged as a `PUT` would.
+fn discover_entry(
+    stored: Option<&OrgToolset>,
+    body: DiscoverRequest,
+) -> Result<McpEntry, DiscoverFailure> {
+    let data = match (body.id.as_deref(), stored) {
+        (Some(id), None) => {
+            return Err(DiscoverFailure::not_found(format!(
+                "toolset '{id}' not found"
+            )));
+        }
+        (Some(id), Some(row)) => {
+            if row.kind.parse::<ToolsetKind>() != Ok(ToolsetKind::Mcp) {
+                return Err(DiscoverFailure::not_found(format!(
+                    "toolset '{id}' is not an MCP toolset"
+                )));
+            }
+            let saved = row
+                .data
+                .as_deref()
+                .and_then(|d| serde_json::from_str::<serde_json::Value>(d).ok());
+            let overrides = body
+                .overrides
+                .unwrap_or_else(|| serde_json::Value::Object(Default::default()));
+            merge_update_data(ToolsetKind::Mcp, saved.as_ref(), overrides)
+                .map_err(DiscoverFailure::refused)?
+        }
+        (None, _) => {
+            let mut data = serde_json::Map::new();
+            data.insert("url".into(), body.url.unwrap_or_default().into());
+            for (key, value) in [
+                ("headers", body.headers),
+                ("timeout_seconds", body.timeout_seconds),
+            ] {
+                if let Some(value) = value {
+                    data.insert(key.into(), value);
+                }
+            }
+            let data = serde_json::Value::Object(data);
+            // With no saved row a `***` would be sent to the server as the header's value.
+            merge_update_data(ToolsetKind::Mcp, None, data).map_err(DiscoverFailure::refused)?
+        }
+    };
+    validate_data(ToolsetKind::Mcp, &Some(data.clone())).map_err(DiscoverFailure::refused)?;
+    let mcp: McpData = serde_json::from_value(data)
+        .map_err(|e| DiscoverFailure::refused(format!("invalid mcp data: {e}")))?;
+    // A `Host` header would send a credential kept for the checked URL to another virtual host.
+    if mcp
+        .headers
+        .keys()
+        .any(|k| k.trim().eq_ignore_ascii_case("host"))
+    {
+        return Err(DiscoverFailure::refused(
+            "a `Host` header is not allowed; the URL decides which host is called",
+        ));
+    }
+    Ok(McpEntry {
+        name: "discovery".to_string(),
+        url: mcp.url,
+        headers: mcp.headers,
+        timeout_seconds: mcp.timeout_seconds,
+        ..Default::default()
+    })
+}
+
+/// What the audit entry names: the saved toolset, else the URL's origin, never a header.
+fn discover_target(body: &DiscoverRequest) -> serde_json::Value {
+    match (&body.id, &body.url) {
+        (Some(id), _) => serde_json::json!({"toolset_id": id}),
+        (None, Some(url)) => {
+            serde_json::json!({"url_origin": config::utils::str::url_origin(url)})
+        }
+        (None, None) => serde_json::json!({}),
+    }
+}
+
+fn discover_audit_body(
+    target: &serde_json::Value,
+    outcome: &str,
+    tool_count: Option<usize>,
+) -> String {
+    let mut body = target.clone();
+    body["outcome"] = outcome.into();
+    if let Some(count) = tool_count {
+        body["tools"] = count.into();
+    }
+    body.to_string()
+}
+
+/// The generic middleware skips `_discover`, whose body carries header values; this entry has none.
+async fn audit_discovery(
+    org_id: &str,
+    user_id: &str,
+    target: &serde_json::Value,
+    status: StatusCode,
+    outcome: &str,
+    tool_count: Option<usize>,
+) {
+    if !get_o2_config().common.audit_enabled {
+        return;
+    }
+    audit::audit(AuditMessage {
+        login_ip: None,
+        user_agent: None,
+        user_email: user_id.to_string(),
+        org_id: org_id.to_string(),
+        _timestamp: now_micros(),
+        protocol: Protocol::Http,
+        response_meta: ResponseMeta {
+            http_method: "POST".to_string(),
+            http_path: format!("/api/{org_id}/ai/toolsets/_discover"),
+            http_query_params: String::new(),
+            http_body: discover_audit_body(target, outcome, tool_count),
+            http_response_code: status.as_u16(),
+            error_msg: None,
+            trace_id: None,
+        },
+        delegated: None,
+        fleet_id: None,
+        target: None,
+    })
+    .await;
 }
 
 #[cfg(test)]
@@ -671,5 +984,175 @@ mod tests {
         mark_renames(&org_names, &mut toolsets);
         let flags: Vec<bool> = toolsets.iter().map(|t| t.rename_needed).collect();
         assert_eq!(flags, [true, true, false]);
+    }
+
+    fn row(kind: &str, data: Value) -> OrgToolset {
+        OrgToolset {
+            id: "t1".to_string(),
+            org: "org".to_string(),
+            name: "datadog-prod".to_string(),
+            kind: kind.to_string(),
+            description: None,
+            data: Some(data.to_string()),
+            created_by: "u".to_string(),
+            created_at: 1,
+            updated_at: 1,
+        }
+    }
+
+    fn by_id(overrides: Option<Value>) -> DiscoverRequest {
+        DiscoverRequest {
+            id: Some("t1".to_string()),
+            overrides,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn discovery_of_a_saved_toolset_uses_its_stored_secrets() {
+        let stored = row("mcp", serde_json::from_str(&stored_mcp()).unwrap());
+        let entry = discover_entry(Some(&stored), by_id(None)).unwrap();
+        assert_eq!(entry.url, "https://mcp.datadoghq.com/api/mcp");
+        assert_eq!(entry.headers["DD-API-KEY"], "api-secret");
+
+        let overrides = json!({"url": "https://mcp.datadoghq.com/v2/mcp", "headers": {"DD-API-KEY": "***"}, "timeout_seconds": 50});
+        let entry = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap();
+        assert_eq!(entry.url, "https://mcp.datadoghq.com/v2/mcp");
+        assert_eq!(entry.headers["DD-API-KEY"], "api-secret");
+        assert_eq!(entry.timeout_seconds, 50);
+    }
+
+    #[test]
+    fn discovery_refuses_stored_secrets_for_a_new_origin() {
+        let stored = row("mcp", serde_json::from_str(&stored_mcp()).unwrap());
+        for overrides in [
+            json!({"url": "https://attacker.example/mcp", "headers": {"DD-API-KEY": "***"}}),
+            json!({"url": "https://attacker.example/mcp"}),
+        ] {
+            let err = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap_err();
+            assert_eq!(err.status, StatusCode::BAD_REQUEST);
+            assert!(err.message.contains("re-enter secrets"), "{}", err.message);
+        }
+    }
+
+    #[test]
+    fn discovery_refuses_a_host_header_with_or_without_a_saved_row() {
+        let stored = row("mcp", serde_json::from_str(&stored_mcp()).unwrap());
+        for host in ["Host", "host", " HOST "] {
+            let overrides = json!({"headers": {"DD-API-KEY": "***", host: "internal.example"}});
+            let err = discover_entry(Some(&stored), by_id(Some(overrides))).unwrap_err();
+            assert_eq!(err.status, StatusCode::BAD_REQUEST, "{host}");
+            assert!(err.message.contains("`Host`"), "{}", err.message);
+
+            let unsaved = DiscoverRequest {
+                url: Some("https://mcp.example.com/mcp".to_string()),
+                headers: Some(json!({host: "internal.example"})),
+                ..Default::default()
+            };
+            let err = discover_entry(None, unsaved).unwrap_err();
+            assert_eq!(err.status, StatusCode::BAD_REQUEST, "{host}");
+        }
+    }
+
+    #[test]
+    fn discovery_of_an_unknown_or_non_mcp_id_is_404() {
+        let err = discover_entry(None, by_id(None)).unwrap_err();
+        assert_eq!(err.status, StatusCode::NOT_FOUND);
+        let cli = row("cli", json!({"command": "kubectl"}));
+        let err = discover_entry(Some(&cli), by_id(None)).unwrap_err();
+        assert_eq!(err.status, StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn discovery_without_an_id_refuses_redacted_values_and_bad_urls() {
+        let unsaved = |url: &str, headers: Value| DiscoverRequest {
+            url: Some(url.to_string()),
+            headers: Some(headers),
+            ..Default::default()
+        };
+        let entry = discover_entry(
+            None,
+            unsaved("https://mcp.example.com/mcp", json!({"X-Key": "k"})),
+        )
+        .unwrap();
+        assert_eq!(entry.headers["X-Key"], "k");
+        assert_eq!(entry.timeout_seconds, 30);
+
+        let err = discover_entry(
+            None,
+            unsaved("https://mcp.example.com/mcp", json!({"X-Key": "***"})),
+        )
+        .unwrap_err();
+        assert_eq!(err.status, StatusCode::BAD_REQUEST);
+        assert!(err.message.contains("X-Key"), "{}", err.message);
+
+        let err = discover_entry(
+            None,
+            unsaved("https://mcp.example.com\\@evil.example/", json!({})),
+        )
+        .unwrap_err();
+        assert!(
+            err.message.starts_with("invalid mcp url"),
+            "{}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn the_discovery_audit_entry_names_no_secret() {
+        let body = DiscoverRequest {
+            url: Some("https://user:pw@mcp.example.com/mcp?key=s3cret".to_string()),
+            headers: Some(json!({"DD-API-KEY": "api-secret"})),
+            ..Default::default()
+        };
+        let audited = discover_audit_body(&discover_target(&body), "ok", Some(12));
+        assert_eq!(
+            serde_json::from_str::<Value>(&audited).unwrap(),
+            json!({"url_origin": "https://mcp.example.com", "outcome": "ok", "tools": 12})
+        );
+        for secret in ["api-secret", "s3cret", "pw"] {
+            assert!(!audited.contains(secret), "{audited}");
+        }
+        let audited = discover_audit_body(&discover_target(&by_id(None)), "discovery_failed", None);
+        assert_eq!(
+            serde_json::from_str::<Value>(&audited).unwrap(),
+            json!({"toolset_id": "t1", "outcome": "discovery_failed"})
+        );
+    }
+
+    #[test]
+    fn discovery_errors_map_to_their_statuses() {
+        let cases = [
+            (
+                DiscoverError::Refused {
+                    code: "url_refused".to_string(),
+                    message: "loopback".to_string(),
+                },
+                StatusCode::BAD_REQUEST,
+                "url_refused",
+            ),
+            (
+                DiscoverError::Refused {
+                    code: "discovery_failed".to_string(),
+                    message: "HTTP 401".to_string(),
+                },
+                StatusCode::BAD_REQUEST,
+                "discovery_failed",
+            ),
+            (
+                DiscoverError::InternalSecretRequired,
+                StatusCode::SERVICE_UNAVAILABLE,
+                "internal_secret_required",
+            ),
+            (
+                DiscoverError::Unavailable("down".to_string()),
+                StatusCode::SERVICE_UNAVAILABLE,
+                "ai_service_unavailable",
+            ),
+        ];
+        for (error, status, code) in cases {
+            let failure = DiscoverFailure::from(error);
+            assert_eq!((failure.status, failure.code), (status, code));
+        }
     }
 }

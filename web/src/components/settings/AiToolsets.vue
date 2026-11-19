@@ -120,6 +120,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OBadge>
                 <OTooltip :max-width="'25rem'" :content="t('aiToolset.renameNeededHint')" />
               </span>
+              <OBadge
+                v-for="badge in row.badges"
+                :key="badge"
+                :variant="badge === 'allTools' ? 'default-outline' : 'warning-outline'"
+                size="sm"
+                :data-test="`ai-toolsets-${row.name}-badge-${badge}`"
+              >
+                {{ t(BADGE_LABELS[badge]) }}
+                <button
+                  v-if="badge === 'allTools'"
+                  type="button"
+                  class="text-primary-600 ms-1 underline"
+                  :data-test="`ai-toolsets-${row.name}-choose-tools`"
+                  @click.stop="chooseTools(row)"
+                >
+                  {{ t("aiToolset.chooseTools") }}
+                </button>
+              </OBadge>
             </div>
           </template>
 
@@ -172,6 +190,7 @@ import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Tabl
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
+import { toolsetBadges, type ToolsetBadge } from "@/components/ai_toolsets/toolPicker";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { forbiddenState } from "@/utils/featureGate";
@@ -224,6 +243,7 @@ export default defineComponent({
         kind: item.kind,
         description: item.description || "",
         rename_needed: !!item.rename_needed,
+        badges: item.kind === "mcp" ? toolsetBadges(item.data) : [],
       })),
     );
     const showAddDialog = ref(false);
@@ -436,6 +456,24 @@ export default defineComponent({
       });
     };
 
+    const BADGE_LABELS: Record<ToolsetBadge, string> = {
+      allTools: "aiToolset.badgeAllTools",
+      noTools: "aiToolset.badgeNoTools",
+      notVerified: "aiToolset.badgeNotVerified",
+    };
+
+    // Opens the editor scrolled to the tool picker.
+    const chooseTools = (row: any) => {
+      router.push({
+        query: {
+          action: "edit",
+          id: row.id,
+          section: "tools",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+
     const editToolset = (row: any) => {
       router.push({
         query: {
@@ -536,6 +574,8 @@ export default defineComponent({
       confirmDelete,
       addToolset,
       editToolset,
+      chooseTools,
+      BADGE_LABELS,
       hideAddDialog,
       getData,
       confirmDeleteToolset,

@@ -239,13 +239,71 @@ describe("AddAiToolset.schema", () => {
     });
   });
 
+  describe("mcp limits", () => {
+    const withMcp = (mcp: Record<string, unknown>) => ({
+      ...base(),
+      mcp: { ...base().mcp, ...mcp },
+    });
+
+    it("accepts blank limits and values at every bound", () => {
+      for (const mcp of [
+        {},
+        { max_calls_per_turn: "1", max_result_kib: "1", rate_calls: "1", rate_seconds: "1" },
+        { max_calls_per_turn: 500, max_result_kib: 16384, rate_calls: 10000, rate_seconds: 3600 },
+      ]) {
+        expect(schema.safeParse(withMcp(mcp)).success, JSON.stringify(mcp)).toBe(true);
+      }
+    });
+
+    it("refuses limits out of bounds or a half-set rate", () => {
+      const cases: [Record<string, unknown>, string, string][] = [
+        [{ max_calls_per_turn: "0" }, "mcp.max_calls_per_turn", "aiToolset.maxCallsInvalid"],
+        [{ max_calls_per_turn: "501" }, "mcp.max_calls_per_turn", "aiToolset.maxCallsInvalid"],
+        [{ max_calls_per_turn: "2.5" }, "mcp.max_calls_per_turn", "aiToolset.maxCallsInvalid"],
+        [{ max_result_kib: "16385" }, "mcp.max_result_kib", "aiToolset.resultSizeInvalid"],
+        [
+          { rate_calls: "10001", rate_seconds: "60" },
+          "mcp.rate_calls",
+          "aiToolset.rateCallsInvalid",
+        ],
+        [
+          { rate_calls: "5", rate_seconds: "3601" },
+          "mcp.rate_seconds",
+          "aiToolset.rateSecondsInvalid",
+        ],
+        [{ rate_calls: "5" }, "mcp.rate_seconds", "aiToolset.rateBothRequired"],
+        [{ rate_seconds: "5" }, "mcp.rate_calls", "aiToolset.rateBothRequired"],
+      ];
+      for (const [mcp, path, message] of cases) {
+        expect(messagesFor(withMcp(mcp), path), JSON.stringify(mcp)).toContain(message);
+      }
+    });
+
+    it("doesn't check MCP limits on another kind", () => {
+      const cli = { ...base(), kind: "cli", cli: { ...base().cli, command: "kubectl" } };
+      expect(errorPaths({ ...cli, mcp: { ...cli.mcp, max_calls_per_turn: "0" } })).toEqual([]);
+    });
+  });
+
   describe("addAiToolsetDefaults", () => {
     it("produces a schema-shaped blank record", () => {
       expect(addAiToolsetDefaults()).toEqual({
         name: "",
         kind: "mcp",
         description: "",
-        mcp: { url: "", timeout_seconds: 30, headers: [] },
+        mcp: {
+          url: "",
+          timeout_seconds: 30,
+          headers: [],
+          allowed_tools: [],
+          blocked_tools: null,
+          write_tools: [],
+          max_calls_per_turn: "",
+          rate_calls: "",
+          rate_seconds: "",
+          max_result_kib: "",
+          extra: {},
+        },
         cli: {
           command: "",
           allowed_subcommands_raw: "",

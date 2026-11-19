@@ -183,3 +183,69 @@ describe("AiToolsets rename needed badge", () => {
     w.unmount();
   });
 });
+
+describe("AiToolsets tool badges", () => {
+  afterEach(() => {
+    store.state.zoConfig.features = {};
+  });
+
+  it("shows each MCP row's tool badge and opens the editor at the picker", async () => {
+    resetListViewState();
+    queryClient.clear();
+    store.state.zoConfig.features = { ai_toolsets: "enabled" };
+    vi.mocked(aiToolsetsService.list).mockResolvedValueOnce({
+      data: {
+        toolsets: [
+          { id: "a", name: "legacy", kind: "mcp", data: { url: "u" } },
+          {
+            id: "b",
+            name: "empty",
+            kind: "mcp",
+            data: { allowed_tools: [], tools_verified_at: 1 },
+          },
+          { id: "c", name: "typed", kind: "mcp", data: { allowed_tools: ["x"] } },
+          {
+            id: "d",
+            name: "ok",
+            kind: "mcp",
+            data: { allowed_tools: ["x"], tools_verified_at: 1 },
+          },
+          { id: "e", name: "kube", kind: "cli", data: { command: "kubectl" } },
+        ],
+      },
+    } as any);
+    const w = mount(AiToolsets, {
+      global: {
+        plugins: [i18n, store, router],
+        provide: { store },
+        stubs: {
+          AddAiToolset: true,
+          ConfirmDialog: true,
+          OTable: {
+            props: ["data"],
+            template:
+              "<div><div v-for='row in data' :key='row.id'><slot name='cell-name' :row='row' /></div></div>",
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    const badges = w
+      .findAll("[data-test*='-badge-']")
+      .map((b) => [b.attributes("data-test"), b.text()]);
+    expect(badges).toEqual([
+      ["ai-toolsets-legacy-badge-allTools", "All tools allowed choose tools"],
+      ["ai-toolsets-empty-badge-noTools", "No tools allowed"],
+      ["ai-toolsets-typed-badge-notVerified", "Not verified"],
+    ]);
+
+    const push = vi.spyOn(router, "push");
+    await w.find("[data-test='ai-toolsets-legacy-choose-tools']").trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      query: expect.objectContaining({ action: "edit", id: "a", section: "tools" }),
+    });
+    push.mockRestore();
+    w.unmount();
+  });
+});

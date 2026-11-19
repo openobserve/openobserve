@@ -131,6 +131,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton variant="outline" size="sm" class="mb-4" @click="addHeader" icon-left="add">
               {{ t("aiToolset.addHeader") }}
             </OButton>
+            <div ref="toolPickerAnchor">
+              <AiToolsetToolPicker
+                :lists="toolLists"
+                :tools="discoveredTools"
+                :status="discoveryStatus"
+                :error="discoveryError"
+                @update:lists="setToolLists"
+                @refresh="discoverTools"
+              />
+            </div>
+            <div class="mb-2 text-sm font-medium">{{ t("aiToolset.limits") }}</div>
+            <div class="mb-4 grid grid-cols-2 gap-3">
+              <OFormInput
+                data-test="ai-toolset-mcp-max-calls"
+                name="mcp.max_calls_per_turn"
+                :label="t('aiToolset.maxCallsPerTurn')"
+                :placeholder="raw('40')"
+                class="o2-input showLabelOnTop"
+                type="number"
+                min="1"
+              />
+              <OFormInput
+                data-test="ai-toolset-mcp-max-result"
+                name="mcp.max_result_kib"
+                :label="t('aiToolset.maxResultKib')"
+                :placeholder="raw('1024')"
+                class="o2-input showLabelOnTop"
+                type="number"
+                min="1"
+              />
+              <OFormInput
+                data-test="ai-toolset-mcp-rate-calls"
+                name="mcp.rate_calls"
+                :label="t('aiToolset.rateCalls')"
+                :placeholder="raw('200')"
+                class="o2-input showLabelOnTop"
+                type="number"
+                min="1"
+              />
+              <OFormInput
+                data-test="ai-toolset-mcp-rate-seconds"
+                name="mcp.rate_seconds"
+                :label="t('aiToolset.rateSeconds')"
+                :placeholder="raw('60')"
+                class="o2-input showLabelOnTop"
+                type="number"
+                min="1"
+              />
+            </div>
+            <div class="text-text-secondary -mt-2 mb-4 text-xs">
+              {{ t("aiToolset.rateLimitHelp") }}
+            </div>
           </template>
 
           <!-- CLI fields -->
@@ -345,8 +397,10 @@ import {
   ref,
   computed,
   onMounted,
+  onBeforeUnmount,
   nextTick,
   shallowRef,
+  watch,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -367,6 +421,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useEditorDraft, useEditorDraftIds } from "@/composables/useEditorDraft";
 import { urlCarriesCredential } from "@/utils/drafts/urlCredentials";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import AiToolsetToolPicker from "./AiToolsetToolPicker.vue";
+import { prefillFromDiscovery, type DiscoveredTool, type ToolLists } from "./toolPicker";
 import {
   makeAddAiToolsetSchema,
   addAiToolsetDefaults,
@@ -405,6 +461,7 @@ export default defineComponent({
     OFormSwitch,
     QueryEditor,
     EditorDraftDialogs,
+    AiToolsetToolPicker,
   },
   emits: ["cancel:hideform", "update:list"],
   setup(_, { emit }) {
@@ -425,6 +482,75 @@ export default defineComponent({
     ];
 
     // -----------------------------------------------------------------------
+    // MCP tool discovery: the picker's tool list, and whether it was verified
+    // for the URL and headers being saved.
+    // -----------------------------------------------------------------------
+    const discoveredTools = ref<DiscoveredTool[] | null>(null);
+    const discoveryStatus = ref<"idle" | "loading" | "ok" | "failed">("idle");
+    const discoveryError = ref("");
+    // The URL and headers the last successful discovery used, and when it ran (microseconds).
+    let verified: { key: string; at: number } | null = null;
+    let discoverySeq = 0;
+
+    const headerMap = (rows: AddAiToolsetForm["mcp"]["headers"] | undefined) => {
+      const headers: Record<string, string> = {};
+      (rows ?? [])
+        .filter((h) => (h.key ?? "").trim())
+        .forEach((h) => {
+          headers[(h.key ?? "").trim()] = h.value ?? "";
+        });
+      return headers;
+    };
+
+    // Every row, half-typed ones included, so typing anywhere voids a result in flight.
+    const discoveryKey = (mcp: AddAiToolsetForm["mcp"]) =>
+      JSON.stringify([mcp.url ?? "", (mcp.headers ?? []).map((h) => [h.key ?? "", h.value ?? ""])]);
+
+    const MCP_RENDERED_KEYS = new Set([
+      "schema",
+      "url",
+      "headers",
+      "timeout_seconds",
+      "allowed_tools",
+      "blocked_tools",
+      "write_tools",
+      "max_calls_per_turn",
+      "rate_limit",
+      "max_result_bytes",
+      "tools_verified_at",
+    ]);
+
+    const blankToUndefined = (v: unknown) =>
+      v === undefined || v === null || String(v).trim() === "" ? undefined : Number(v);
+
+    // `schema: 2` makes the save replace the stored config, so every key this form doesn't edit is
+    // sent back from `extra`, and an absent list stays absent.
+    const buildMcpData = (mcp: AddAiToolsetForm["mcp"], headers: Record<string, string>) => {
+      const data: Record<string, any> = {
+        ...(mcp.extra ?? {}),
+        schema: 2,
+        url: mcp.url ?? "",
+        headers,
+        timeout_seconds: Number(mcp.timeout_seconds),
+      };
+      if (mcp.allowed_tools !== null) data.allowed_tools = mcp.allowed_tools;
+      if (mcp.blocked_tools !== null) data.blocked_tools = mcp.blocked_tools;
+      // The save stores what the picker shows, so `write_tools` is always explicit.
+      data.write_tools = mcp.write_tools ?? [];
+      const maxCalls = blankToUndefined(mcp.max_calls_per_turn);
+      if (maxCalls !== undefined) data.max_calls_per_turn = maxCalls;
+      const rateCalls = blankToUndefined(mcp.rate_calls);
+      const rateSeconds = blankToUndefined(mcp.rate_seconds);
+      if (rateCalls !== undefined && rateSeconds !== undefined) {
+        data.rate_limit = { calls: rateCalls, per_seconds: rateSeconds };
+      }
+      const resultKib = blankToUndefined(mcp.max_result_kib);
+      if (resultKib !== undefined) data.max_result_bytes = resultKib * 1024;
+      if (verified && verified.key === discoveryKey(mcp)) data.tools_verified_at = verified.at;
+      return data;
+    };
+
+    // -----------------------------------------------------------------------
     // Build the API payload from the validated submit value (single source of
     // truth — incl. the form-owned arrays and the bridged Monaco values).
     // -----------------------------------------------------------------------
@@ -437,11 +563,7 @@ export default defineComponent({
           .forEach((h) => {
             headers[(h.key ?? "").trim()] = h.value ?? "";
           });
-        return {
-          url: value.mcp.url ?? "",
-          headers,
-          timeout_seconds: Number(value.mcp.timeout_seconds),
-        };
+        return buildMcpData(value.mcp, headers);
       }
       if (kind === "cli") {
         const allowed = (value.cli.allowed_subcommands_raw ?? "")
@@ -540,6 +662,7 @@ export default defineComponent({
     // form change — used for the section toggle, the array v-for rows, the
     // Monaco editor value, and the submit-attempt-driven skill error.
     const selectedKind = form.useStore((s: any) => s.values.kind);
+    const formValues = form.useStore((s: { values: AddAiToolsetForm }) => s.values);
     // Selector returns are annotated as arrays so the template v-for index is `number`.
     const mcpHeaders = form.useStore(
       (s: any): AddAiToolsetForm["mcp"]["headers"] => s.values.mcp?.headers ?? [],
@@ -616,6 +739,83 @@ export default defineComponent({
       });
     };
 
+    const toolLists = computed<ToolLists>(() => ({
+      allowed: formValues.value.mcp?.allowed_tools ?? null,
+      blocked: formValues.value.mcp?.blocked_tools ?? null,
+      write: formValues.value.mcp?.write_tools ?? null,
+    }));
+
+    const setToolLists = (lists: ToolLists) => {
+      form.setFieldValue("mcp.allowed_tools", lists.allowed);
+      form.setFieldValue("mcp.blocked_tools", lists.blocked);
+      form.setFieldValue("mcp.write_tools", lists.write);
+    };
+
+    // Every header row is filled in, so a discovery won't run on half-typed credentials.
+    const readyToDiscover = (mcp: AddAiToolsetForm["mcp"] | undefined) =>
+      !!mcp?.url?.trim() &&
+      (mcp.headers ?? []).every((h) => !(h.key ?? "").trim() === !(h.value ?? ""));
+
+    // The toolset and endpoint a result belongs to; a result for anything else is dropped.
+    const discoveryTarget = () => {
+      const values = form.state.values as AddAiToolsetForm;
+      return `${editingId.value ?? ""}|${values.kind === "mcp" ? discoveryKey(values.mcp) : ""}`;
+    };
+
+    const discoverTools = async () => {
+      const values = form.state.values as AddAiToolsetForm;
+      if (values.kind !== "mcp" || !readyToDiscover(values.mcp)) return;
+      const org = store.state.selectedOrganization.identifier;
+      const key = discoveryKey(values.mcp);
+      const target = discoveryTarget();
+      const config = {
+        url: values.mcp.url ?? "",
+        headers: headerMap(values.mcp.headers),
+        timeout_seconds: Number(values.mcp.timeout_seconds) || 30,
+      };
+      const body =
+        isEditing.value && editingId.value ? { id: editingId.value, overrides: config } : config;
+      const seq = ++discoverySeq;
+      discoveryStatus.value = "loading";
+      try {
+        const res = await aiToolsetsService.discover(org, body);
+        if (seq !== discoverySeq || target !== discoveryTarget()) return;
+        const tools: DiscoveredTool[] = res.data?.tools ?? [];
+        discoveredTools.value = tools;
+        discoveryStatus.value = "ok";
+        discoveryError.value = "";
+        verified = { key, at: Date.now() * 1000 };
+        const spelled = prefillFromDiscovery(toolLists.value, tools);
+        if (spelled !== toolLists.value) setToolLists(spelled);
+      } catch (err: any) {
+        if (seq !== discoverySeq || target !== discoveryTarget()) return;
+        discoveredTools.value = null;
+        discoveryStatus.value = "failed";
+        discoveryError.value =
+          err?.response?.data?.message || err?.message || t("aiToolset.toolsUnknownError");
+        if (verified?.key === key) verified = null;
+      }
+    };
+
+    // Discovery follows the URL and header rows, so it also runs when an edit loads.
+    let discoveryTimer: ReturnType<typeof setTimeout> | undefined;
+    const mcpEndpoint = computed(() =>
+      formValues.value.kind === "mcp" ? discoveryKey(formValues.value.mcp) : "",
+    );
+    // Any change voids the request in flight and the tools shown, which belong to the old endpoint.
+    watch(mcpEndpoint, (key, previous) => {
+      if (key === previous) return;
+      discoverySeq++;
+      discoveredTools.value = null;
+      discoveryStatus.value = "idle";
+      discoveryError.value = "";
+      clearTimeout(discoveryTimer);
+      if (key) discoveryTimer = setTimeout(discoverTools, 800);
+    });
+    onBeforeUnmount(() => clearTimeout(discoveryTimer));
+
+    const toolPickerAnchor = ref<HTMLElement | null>(null);
+
     // CLI env vars
     const addEnvVar = () => form.pushFieldValue("cli.env", { key: "", value: "", visible: false });
     const removeEnvVar = (i: number) => form.removeFieldValue("cli.env", i);
@@ -660,6 +860,8 @@ export default defineComponent({
           description: toolset.description || "",
         };
         if (toolset.kind === "mcp") {
+          const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : null);
+          const asText = (v: unknown) => (typeof v === "number" ? String(v) : "");
           record.mcp = {
             url: data.url || "",
             timeout_seconds: data.timeout_seconds ?? 30,
@@ -668,6 +870,19 @@ export default defineComponent({
               value: v as string,
               visible: false,
             })),
+            allowed_tools: list(data.allowed_tools),
+            blocked_tools: list(data.blocked_tools),
+            write_tools: list(data.write_tools),
+            max_calls_per_turn: asText(data.max_calls_per_turn),
+            rate_calls: asText(data.rate_limit?.calls),
+            rate_seconds: asText(data.rate_limit?.per_seconds),
+            max_result_kib:
+              typeof data.max_result_bytes === "number"
+                ? String(Math.ceil(data.max_result_bytes / 1024))
+                : "",
+            extra: Object.fromEntries(
+              Object.entries(data).filter(([key]) => !MCP_RENDERED_KEYS.has(key)),
+            ),
           };
         } else if (toolset.kind === "cli") {
           record.cli = {
@@ -705,7 +920,6 @@ export default defineComponent({
       }
     };
 
-    const formValues = form.useStore((s: { values: AddAiToolsetForm }) => s.values);
     const editId = (): string | null => {
       const query = router.currentRoute.value.query;
       return query.action === "edit" && query.id ? String(query.id) : null;
@@ -906,7 +1120,14 @@ export default defineComponent({
       if (loaded === "failed") return;
       // A deleted toolset still starts the draft, so a draft left for it is dropped with a notice.
       await toolsetDraft.start();
-      if (loaded === "gone") emit("cancel:hideform");
+      if (loaded === "gone") {
+        emit("cancel:hideform");
+        return;
+      }
+      if (router.currentRoute.value.query.section === "tools") {
+        await nextTick();
+        toolPickerAnchor.value?.scrollIntoView?.({ block: "start" });
+      }
     });
 
     return {
@@ -922,6 +1143,14 @@ export default defineComponent({
       kindOptions,
       // MCP headers (form-owned array-field)
       mcpHeaders,
+      // MCP tool picker
+      toolLists,
+      setToolLists,
+      discoveredTools,
+      discoveryStatus,
+      discoveryError,
+      discoverTools,
+      toolPickerAnchor,
       addHeader,
       removeHeader,
       toggleHeaderVisible,
