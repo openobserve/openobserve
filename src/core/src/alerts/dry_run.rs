@@ -62,6 +62,8 @@ const DAY_MICROS: i64 = 24 * 3_600 * 1_000_000;
 const MINUTE_MICROS: i64 = 60 * 1_000_000;
 // apply_outcome rejects an empty alert id; the dry run state never leaves memory.
 const DRY_RUN_ID: &str = "dry-run";
+/// What a check shows for a failure that is not the user's query; the full error is logged.
+const CHECK_FAILED: &str = "The search failed on the server. Try again; if it keeps failing, ask your administrator to check the server logs.";
 
 /// When the checks run: explicit times, or the alert's own schedule inside a range.
 #[derive(Clone, Debug, PartialEq)]
@@ -748,10 +750,7 @@ fn build_check(
     };
     match result {
         Err(e) => {
-            check.error = Some(CheckError {
-                code: 500,
-                message: e.to_string(),
-            });
+            check.error = Some(check_error(alert, time, e));
             check.reason = (!fired).then_some(NotFiredReason::Error);
         }
         Ok(r) => {
@@ -760,6 +759,38 @@ fn build_check(
         }
     }
     check
+}
+
+/// A search error the search API shows users keeps its text; any other failure is only logged.
+fn check_error(alert: &Alert, time: i64, error: &anyhow::Error) -> CheckError {
+    use infra::errors::Error;
+
+    let code = match error.downcast_ref::<Error>() {
+        Some(Error::ErrorCode(code)) if code.http_status() < 500 => code,
+        _ => {
+            log::error!(
+                "[alert dry run] org {} alert {}: check at {time} failed: {error:#}",
+                alert.org_id,
+                alert.name
+            );
+            return CheckError {
+                code: 500,
+                message: CHECK_FAILED.to_string(),
+            };
+        }
+    };
+    let status = code.http_status();
+    let detail = code.get_error_detail();
+    // Only a 400 detail describes the query itself; the others carry internal context.
+    let message = if status == 400 && !detail.is_empty() {
+        format!("The query failed: {}: {detail}", code.get_message())
+    } else {
+        format!("The query failed: {}", code.get_message())
+    };
+    CheckError {
+        code: status,
+        message,
+    }
 }
 
 fn fill_observation(
@@ -1359,6 +1390,52 @@ mod tests {
         assert_eq!(resp.checks[4].reason, Some(NotFiredReason::NoData));
         assert!(resp.diagnostics.is_some());
         assert_eq!(resp.summary.errors, 1);
+    }
+
+    #[tokio::test]
+    async fn a_failed_check_shows_search_errors_meant_for_users_and_hides_the_rest() {
+        use infra::errors::{Error, ErrorCodes};
+
+        struct Failing;
+        #[async_trait]
+        impl CheckRunner for Failing {
+            async fn run(
+                &self,
+                _: &Alert,
+                (_, end): (i64, i64),
+            ) -> anyhow::Result<TriggerEvalResults> {
+                let error = match end {
+                    T0 => Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
+                        "sql parser error: Expected: an expression, found: FROM".into(),
+                    )),
+                    t if t == T0 + MIN => Error::ErrorCode(ErrorCodes::SearchTimeout(
+                        "promql->search: timeout".into(),
+                    )),
+                    _ => Error::Message("querier-3: /data/wal/7.parquet: No such file".into()),
+                };
+                let message = error.to_string();
+                Err(anyhow::Error::new(error).context(message))
+            }
+        }
+        let deadline = tokio::time::Instant::now() + DEADLINE;
+        let times = vec![T0, T0 + MIN, T0 + 2 * MIN];
+        let resp = evaluate(&Alert::default(), false, times, false, &Failing, deadline).await;
+        let errors: Vec<_> = resp.checks.iter().filter_map(|c| c.error.clone()).collect();
+        let error = |code, message: &str| CheckError {
+            code,
+            message: message.to_string(),
+        };
+        assert_eq!(
+            errors,
+            vec![
+                error(
+                    400,
+                    "The query failed: Search SQL not valid: sql parser error: Expected: an expression, found: FROM"
+                ),
+                error(408, "The query failed: Search query timed out"),
+                error(500, CHECK_FAILED),
+            ]
+        );
     }
 
     #[test]
