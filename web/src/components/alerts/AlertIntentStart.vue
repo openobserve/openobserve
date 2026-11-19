@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchable
               :placeholder="t('alerts.intent.slots.fieldPrompt')"
               :aria-label="t('alerts.intent.slots.field')"
+              :dropdown-style="SLOT_MENU"
               data-test="add-alert-intent-slot-field"
               @update:model-value="setSlot('field', $event)"
             />
@@ -80,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="!valueSource"
               :placeholder="t('alerts.intent.slots.valuePlaceholder')"
               :aria-label="t('alerts.intent.slots.value')"
+              :dropdown-style="SLOT_MENU"
               data-test="add-alert-intent-slot-value"
               @update:model-value="setValues($event)"
               @create="addValue($event)"
@@ -108,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchable
               :placeholder="t('alerts.intent.slots.groupPrompt')"
               :aria-label="t('alerts.intent.slots.group')"
+              :dropdown-style="SLOT_MENU"
               data-test="add-alert-intent-slot-group"
               @update:model-value="setSlot('group', $event)"
             />
@@ -123,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchable
               :placeholder="t('alerts.intent.slots.fieldPrompt')"
               :aria-label="t('alerts.intent.slots.measure')"
+              :dropdown-style="SLOT_MENU"
               data-test="add-alert-intent-slot-measure"
               @update:model-value="setSlot('measure', $event)"
             />
@@ -138,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchable
               :placeholder="t('alerts.intent.slots.labelPrompt')"
               :aria-label="t('alerts.intent.slots.label')"
+              :dropdown-style="SLOT_MENU"
               data-test="add-alert-intent-slot-label"
               @update:model-value="setSlot('label', $event)"
             />
@@ -232,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="card.id"
           :suggestion="card"
           :on-stream="onStream"
+          :set-up-comparison="setUpComparison(card)"
           @open="openCard(card)"
           @open-existing="emit('open-alert', $event)"
         />
@@ -286,6 +292,13 @@ import AlertWindowPhrase from "./AlertWindowPhrase.vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { librarySuggestionsQuery } from "@/services/alert_library.queries";
+import { firingAlertsQuery } from "@/services/alerts.queries";
+import {
+  installedThresholdDiffers,
+  type AlertThreshold,
+  type LookAlikeAlert,
+} from "@/utils/alerts/lookAlike";
+import { operatorSymbol } from "@/utils/alerts/alertReadBack";
 import { promqlDaySeriesQuery } from "@/services/alert_preview.queries";
 import { suggestionArea, useAnomalyLibraryAccess } from "@/composables/alerts/useAlertLibrary";
 import {
@@ -385,6 +398,8 @@ const FAMILY_CAP = 5;
 // The server's own ceiling on library matches per request.
 const ALL_SUGGESTIONS = 50;
 const NO_GROUP = "__none__";
+// The inline slot is as narrow as its word, so its menu takes room for full field names.
+const SLOT_MENU = { minWidth: "min(18rem, calc(100vw - 2rem))" };
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const isMetrics = computed(() => props.streamType === "metrics");
@@ -907,6 +922,22 @@ const area = computed(() => {
     all ? Infinity : undefined,
   );
 });
+// The org's alerts say whether a card's installed copy alerts at another value than the card does.
+const installed = useQuery(() =>
+  Object.assign(firingAlertsQuery(org.value), {
+    enabled: !!org.value && area.value.cards.some((c) => c.already_set_up.length > 0),
+  }),
+);
+const comparisonText = (c: AlertThreshold) =>
+  raw(`${operatorSymbol(c.operator)} ${formatNumber(c.value)}`);
+const setUpComparison = (card: LibrarySuggestion) => {
+  const id = card.already_set_up[0]?.alert_id;
+  const row = (installed.data.value?.list ?? []).find((r) => r.alert_id === id);
+  const differs = row ? installedThresholdDiffers(card.prefill, row as LookAlikeAlert) : null;
+  return differs
+    ? { installed: comparisonText(differs.installed), suggested: comparisonText(differs.suggested) }
+    : undefined;
+};
 const folded = ref(cardsFolded(props.orgAlertCount));
 // Cards that land after the user has started on the form stay folded in their header line, so nothing moves.
 let actedWhileLoading = false;

@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs"
       data-test="add-alert-suggestion-card-set-up"
     >
-      <OTruncatedText class="text-text-body min-w-0">{{ setUpText }}</OTruncatedText>
+      <OTruncatedText class="text-text-body min-w-0" :lines="2">{{ setUpText }}</OTruncatedText>
       <OButton
         variant="link"
         size="xs"
@@ -113,6 +113,8 @@ const props = defineProps<{
   suggestion: LibrarySuggestion;
   /** Fields and metrics of the picked stream; empty while its schema is unread. */
   onStream: ReadonlySet<string>;
+  /** Both comparisons when the installed copy alerts at another value than this card. */
+  setUpComparison?: { installed: I18nText; suggested: I18nText };
 }>();
 const emit = defineEmits<{
   (e: "open"): void;
@@ -122,14 +124,19 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const setUp = computed(() => props.suggestion.already_set_up[0]);
-const setUpText = computed<I18nText>(() =>
-  t(
-    setUp.value?.matched_by === "pack_tag"
-      ? "alerts.librarySuggest.alreadySetUpEdited"
-      : "alerts.librarySuggest.alreadySetUp",
-    { name: raw(setUp.value?.name ?? "") },
-  ),
-);
+// An edited copy says so; a copy at another value names that value, so "> 80 %" never sits beside a 90 alert unexplained.
+const setUpText = computed<I18nText>(() => {
+  const name = joinListMore(
+    props.suggestion.already_set_up.map((a) => a.name),
+    t,
+    1,
+  );
+  if (setUp.value?.matched_by === "pack_tag")
+    return t("alerts.librarySuggest.alreadySetUpEdited", { name });
+  if (props.setUpComparison)
+    return t("alerts.librarySuggest.alreadySetUpAt", { ...props.setUpComparison, name });
+  return t("alerts.librarySuggest.alreadySetUp", { name });
+});
 
 const fit = computed(() => cardFit(props.suggestion, props.onStream));
 const lacks = computed(() => fit.value.absent.length > 0 || props.suggestion.missing.length > 0);
