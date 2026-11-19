@@ -39,9 +39,33 @@ describe("previewCaption", () => {
       "Plotted: avg of value, one line per k8s_pod_name",
     ],
     [
-      "a PromQL query, which names its own rate",
-      { tab: "promql", query: "rate(x_total[10m])", measured: false },
-      "Plotted: rate(x_total[10m])",
+      "a PromQL rate, in words",
+      { tab: "promql", query: "sum by (svc) (rate(x_total[10m]))", measured: false },
+      "Plotted: x_total per second, one line per svc",
+    ],
+    [
+      "a PromQL percentile, in words and never per bucket bound",
+      {
+        tab: "promql",
+        query: "histogram_quantile(0.95, sum by (le, service_name) (rate(d_bucket[10m])))",
+        measured: false,
+      },
+      "Plotted: p95 of d_bucket, one line per service_name",
+    ],
+    [
+      "a PromQL share, in words",
+      {
+        tab: "promql",
+        query:
+          'sum by (svc) (rate(m_count{code=~"5.."}[10m])) / sum by (svc) (rate(m_count[10m])) * 100',
+        measured: false,
+      },
+      "Plotted: share of m_count matching the filter, in %, one line per svc",
+    ],
+    [
+      "a PromQL query with no plain words, as written",
+      { tab: "promql", query: "max(up) by (job)", measured: false },
+      "Plotted: max(up) by (job)",
     ],
     [
       "a SQL alert per group, by the column it judges",

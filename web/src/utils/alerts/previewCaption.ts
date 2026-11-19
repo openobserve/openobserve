@@ -15,6 +15,7 @@
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { joinList, measureWords } from "./alertCopy";
+import { promqlByLabels } from "./queryGroupLabels";
 
 export interface PreviewCaptionInput {
   tab: string;
@@ -38,9 +39,7 @@ export function previewCaption(input: PreviewCaptionInput, t: TranslateFn): I18n
     groups.length
       ? t("alerts.form.preview.plotsEach", { what, groups: joinList(groups) })
       : t("alerts.form.preview.plots", { what });
-  // A PromQL chart draws the query's own series, a counter as its per-second rate().
-  if (input.tab === "promql")
-    return input.query ? t("alerts.form.preview.plots", { what: raw(input.query) }) : null;
+  if (input.tab === "promql") return input.query ? promqlCaption(input.query, t) : null;
   if (input.tab === "sql") return input.sqlColumn ? each(raw(input.sqlColumn)) : null;
   if (!input.measured)
     return t("alerts.form.preview.plots", {
@@ -51,4 +50,29 @@ export function previewCaption(input: PreviewCaptionInput, t: TranslateFn): I18n
   if (!groups.length && input.streamType === "metrics")
     return t("alerts.form.preview.plotsAll", { what });
   return each(what);
+}
+
+const PROMQL_P95 =
+  /^histogram_quantile\(\s*0?\.95\s*,\s*sum by \([^)]*\)\s*\(rate\((\w+)\[\w+\]\)\)\s*\)$/;
+const PROMQL_SHARE = /^sum(?: by \([^)]*\))? \((?:rate\()?(\w+)\{.*\) \/ sum\b.*\* 100$/;
+const PROMQL_RATE = /^(?:sum by \([^)]*\)\s*\()?rate\((\w+)\[\w+\]\)\)?$/;
+
+/** The starters' PromQL shapes in words; any other query is shown as written. */
+function promqlCaption(query: string, t: TranslateFn): I18nText {
+  const q = query.trim();
+  const p95 = PROMQL_P95.exec(q)?.[1];
+  const share = PROMQL_SHARE.exec(q)?.[1];
+  const rate = PROMQL_RATE.exec(q)?.[1];
+  const what = p95
+    ? t("alerts.intent.rows.percentileOf", { measure: raw(p95) })
+    : share
+      ? t("alerts.form.preview.shareOf", { metric: raw(share) })
+      : rate
+        ? t("alerts.intent.rows.perSecond", { metric: raw(rate) })
+        : null;
+  if (!what) return t("alerts.form.preview.plots", { what: raw(query) });
+  const groups = promqlByLabels(q);
+  return groups.length
+    ? t("alerts.form.preview.plotsEach", { what, groups: joinList(groups) })
+    : t("alerts.form.preview.plots", { what });
 }

@@ -15817,7 +15817,8 @@
         "compareWaitsForBaseline": "No data {offset} earlier yet, so it stays quiet until there is.",
         "plots": "Plotted: {what}",
         "plotsEach": "Plotted: {what}, one line per {groups}",
-        "plotsAll": "Plotted: {what} across every series"
+        "plotsAll": "Plotted: {what} across every series",
+        "shareOf": "share of {metric} matching the filter, in %"
       },
       "anomaly": {
         "sensitivityAuto": "Auto",
