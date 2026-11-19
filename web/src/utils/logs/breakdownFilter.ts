@@ -30,6 +30,18 @@ export const emptyValueConditions = (
   return [isNull, action === "include" ? `${quoted} = ''` : `${quoted} != ''`];
 };
 
+/** With several streams selected, a field any of them types as a non-string checks NULL alone. */
+export const emptyValueFieldType = (
+  field: string,
+  listedType: string | undefined,
+  streams: { name: string; schema?: { name: string; type: string }[] }[],
+  selected: string[],
+): string | undefined =>
+  streams
+    .filter((stream) => selected.includes(stream.name))
+    .flatMap((stream) => (stream.schema ?? []).filter((f) => f.name === field).map((f) => f.type))
+    .find((type) => !STRING_TYPES.includes(type)) ?? listedType;
+
 // The (empty) series counts NULL and "" rows together, so its filter matches both.
 export const getEmptyBreakdownFilter = (
   field: string,

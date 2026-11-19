@@ -325,7 +325,7 @@ import { saveLogsStreamType } from "@/utils/streamPersist";
 import { bumpSelectionToken, currentSelectionToken } from "@/composables/useLogs/useSearchBar";
 import { compareStreamsByLatest } from "@/utils/logs/estimateScanMb";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
-import { emptyValueConditions } from "@/utils/logs/breakdownFilter";
+import { emptyValueConditions, emptyValueFieldType } from "@/utils/logs/breakdownFilter";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   filterForParsing,
@@ -1306,9 +1306,14 @@ export default defineComponent({
       if (value !== "") return [getFilterExpressionByFieldType(field, value, action)];
       const quote = (f: string) =>
         searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(f) : f;
-      const fieldType = searchObj.data.stream.selectedStreamFields.find(
-        (f: { name: string; dataType?: string }) => f.name === field,
-      )?.dataType;
+      const fieldType = emptyValueFieldType(
+        field,
+        searchObj.data.stream.selectedStreamFields.find(
+          (f: { name: string; dataType?: string }) => f.name === field,
+        )?.dataType,
+        searchObj.data.streamResults?.list ?? [],
+        searchObj.data.stream.selectedStream,
+      );
       return emptyValueConditions(
         field,
         action === "include" ? "include" : "exclude",
