@@ -77,7 +77,6 @@ export class AlertsPage {
             addAlertButton: '[data-test="alert-list-add-alert-btn"]',
             alertNameInput: '[data-test="add-alert-details-name-input"]',
             // The name is typed in step 3; the header shows it as text with a pencil that jumps there.
-            alertNameTrigger: '[data-test="add-alert-header-name-edit"]',
             alertNameInputField: '[data-test="add-alert-details-name-input-field"]',
             alertNameValue: '[data-test="add-alert-header-title"]',
             alertSubmitButton: '[data-test="add-alert-submit-btn"]',
@@ -1870,9 +1869,8 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // v3 UI validates non-empty name — open the inline editor, clear it, then
-        // submit to trigger validation.
-        await this.page.locator(this.locators.alertNameTrigger).click();
+        // v3 UI validates non-empty name — clear step 3's Name field, then submit to trigger validation.
+        await goToAlertSection(this.page, 'notify');
         await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).clear();
 
@@ -1900,7 +1898,7 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator(this.locators.alertNameTrigger).click();
+        await goToAlertSection(this.page, 'notify');
         await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill('abc');
 

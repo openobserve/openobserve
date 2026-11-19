@@ -2546,16 +2546,25 @@ describe("AddAlert (OForm owner)", () => {
       expect(messages).toHaveLength(1);
     });
 
-    it("the header pencil focuses the Name field", async () => {
+    it("the header renames in place: Enter keeps the step and saves nothing", async () => {
       wrapper = withHeader();
       await flushPromises();
-      expect(wrapper.get('[data-test="add-alert-header-title"]').text()).toBe(
-        i18n.global.t("alerts.sections.details.unnamed"),
-      );
-      await wrapper.get('[data-test="add-alert-header-name-edit"]').trigger("click");
+      const submit = vi.fn((e: Event) => e.preventDefault());
+      wrapper.get("form").element.addEventListener("submit", submit);
+      const scrollToSection = vi.fn();
+      wrapper.vm.$refs.snapScrollRef.scrollToSection = scrollToSection;
+      await wrapper.get('[data-test="add-alert-header-title-trigger"]').trigger("click");
+      const input = wrapper.get('[data-test="add-alert-header-title-input"]');
+      await input.setValue("checkout errors");
+      await input.trigger("keydown", { key: "Enter" });
       await flushPromises();
-      const input = document.querySelector('[data-test="add-alert-details-name-input"] input');
-      expect(document.activeElement).toBe(input);
+      expect(submit).not.toHaveBeenCalled();
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(scrollToSection).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="add-alert-header-title-input"]').exists()).toBe(false);
+      expect(wrapper.vm.formData.name).toBe("checkout_errors");
+      const field = wrapper.get('[data-test="add-alert-details-name-input"] input');
+      expect((field.element as HTMLInputElement).value).toBe("checkout_errors");
     });
 
     it.each([
@@ -2582,7 +2591,7 @@ describe("AddAlert (OForm owner)", () => {
         expect(wrapper.findAllComponents({ name: "InlineSelectFolderDropdown" })).toHaveLength(
           pick ? 1 : 0,
         );
-        expect(wrapper.find('[data-test="add-alert-header-name-edit"]').exists()).toBe(pick);
+        expect(wrapper.find('[data-test="add-alert-header-title-trigger"]').exists()).toBe(pick);
       },
     );
   });

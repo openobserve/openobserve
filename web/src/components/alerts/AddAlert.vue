@@ -37,23 +37,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           title-overflow="visible"
         >
+          <!-- Step 3's Name field shows the same value; its line under the field says the error once. -->
           <template #title>
-            <span class="flex min-w-0 items-center gap-1">
-              <OTruncatedText data-test="add-alert-header-title">{{
-                formData.name || t("alerts.sections.details.unnamed")
-              }}</OTruncatedText>
-              <OButton
-                v-if="!isEditing"
-                variant="ghost"
-                size="icon-sm"
-                icon-left="edit"
-                :aria-label="t('alerts.form.header.editName')"
-                data-test="add-alert-header-name-edit"
-                @click="editNameInDetails"
-              >
-                <OTooltip side="bottom" :content="t('alerts.form.header.editName')" />
-              </OButton>
-            </span>
+            <OInlineEdit
+              :model-value="formData.name ?? ''"
+              :readonly="isEditing"
+              :submit-on-enter="false"
+              :error="!!nameFieldError"
+              :placeholder="t('alerts.sections.details.unnamed')"
+              :aria-label="t('alerts.sections.details.name')"
+              :edit-hint="t('alerts.form.header.editName')"
+              data-test="add-alert-header-title"
+              @update:model-value="onHeaderNameInput"
+              @commit="onHeaderNameCommit"
+              @cancel="alertAutoName.onCommit"
+            />
           </template>
 
           <!-- EDIT MODE: the alert's state trails the name (anomaly: status, last run, retry) -->
@@ -1338,6 +1336,7 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import { childOptionsFrom } from "./composite/expression";
 import alertsService from "@/services/alerts";
@@ -1529,6 +1528,7 @@ export default defineComponent({
     OFormSelect,
     OPageHeader,
     OTruncatedText,
+    OInlineEdit,
     CompositeAlertForm,
     EditorDraftDialogs,
     OSnapScroll,
@@ -1982,14 +1982,6 @@ export default defineComponent({
     );
     // An edit keeps section 1 open, read-only: it cannot change, but it stays one jump away.
     const watchCollapsed = computed(() => !isEditing.value && leftWatch.value);
-    const editNameInDetails = () => {
-      goToSection("notify");
-      void nextTick(() =>
-        document
-          .querySelector<HTMLElement>('[data-test="add-alert-details-name-input"] input')
-          ?.focus({ preventScroll: true }),
-      );
-    };
     const expandWatch = () => {
       foldDue.value = false;
       leftWatch.value = false;
@@ -2582,6 +2574,14 @@ export default defineComponent({
       nameRewrittenFrom.value = "";
       alertAutoName.markManual();
     };
+    const onHeaderNameInput = (name: string) => {
+      alertForm.setF("name", name);
+      onNameInput();
+    };
+    const onHeaderNameCommit = (name: string) => {
+      applySavedName();
+      alertAutoName.onCommit(alertForm.formData.value?.name ?? name);
+    };
 
     // Its SQL is compiled from its Sigma rule, so the server refuses query edits from here.
     const siemDetectionId = computed(() => {
@@ -2870,7 +2870,8 @@ export default defineComponent({
       stepToSection,
       watchSummary,
       expandWatch,
-      editNameInDetails,
+      onHeaderNameInput,
+      onHeaderNameCommit,
       ALERT_SECTIONS,
       sectionTargets,
       setSectionTarget,
