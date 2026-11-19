@@ -452,7 +452,7 @@ interface AstSelect {
   columns?: AstColumn[];
   having?: AstExpr | null;
   orderby?: { expr: AstExpr; type?: string; nulls?: string | null }[] | null;
-  limit?: { value?: AstExpr[] } | null;
+  limit?: { seperator?: string; value?: AstExpr[] } | null;
 }
 
 interface ClauseField {
@@ -556,10 +556,13 @@ export function applyQueryClauses(
   }
 
   const limitValues = ast.limit?.value ?? [];
-  if (limitValues.length > 1 || (limitValues.length === 1 && limitValues[0]?.type !== "number")) {
-    return { ...result, unsupported: "Contains OFFSET or a non-numeric LIMIT" };
+  // The parser reports a lone OFFSET as one value, which would otherwise read as a LIMIT.
+  const hasOffset = ast.limit?.seperator === "offset" || limitValues.length > 1;
+  const limit = limitValues[0]?.type === "number" ? Number(limitValues[0].value) : NaN;
+  if (hasOffset || (limitValues.length === 1 && !(limit > 0))) {
+    return { ...result, unsupported: "Contains OFFSET or a LIMIT the builder cannot express" };
   }
-  if (limitValues.length === 1) result.limit = Number(limitValues[0].value);
+  if (limitValues.length === 1) result.limit = limit;
 
   return result;
 }

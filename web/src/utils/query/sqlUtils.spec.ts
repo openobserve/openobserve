@@ -4073,6 +4073,8 @@ describe("applyQueryClauses", () => {
       `SELECT service, count(*) FROM "default" GROUP BY service HAVING count(*) > 1 AND count(*) < 9`,
     ],
     [`SELECT service, count(*) FROM "default" GROUP BY service LIMIT 5 OFFSET 2`],
+    [`SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC OFFSET 5`],
+    [`SELECT service, count(*) FROM "default" GROUP BY service LIMIT 0`],
     [`SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC, count(*) ASC`],
     [`SELECT service, count(*) FROM "default" GROUP BY service HAVING 2 > 1`],
     [`SELECT service, count(*) AS c FROM "default" GROUP BY service ORDER BY c DESC NULLS LAST`],
