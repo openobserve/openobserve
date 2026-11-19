@@ -159,6 +159,7 @@ import {
 } from "vue";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
+import { seriesValueRange, type ValueRange } from "@/utils/alerts/ratioThreshold";
 import { keyToMs } from "@/utils/alerts/alertBacktest";
 import {
   isCountLimit,
@@ -249,6 +250,7 @@ const props = defineProps({
 // lockstep with "the preview query firing", not on a different cadence.
 const emit = defineEmits<{
   (e: "schema-updated", payload: { projections: string[]; hasHaving: boolean }): void;
+  (e: "value-range", range: ValueRange | null): void;
 }>();
 
 // Strip axis labels from field config so ECharts doesn't render axis titles
@@ -1816,7 +1818,8 @@ const chartDataSeries = (seriesData: any): any[] =>
 // Counts the drawn series in every mode; judges the verdict for PromQL only (every other mode is
 // evaluated from partition metadata in handleChartDataUpdate).
 const handleSeriesDataUpdate = (seriesData: any) => {
-  if (previewError.value?.message) return;
+  if (previewError.value?.message) return emit("value-range", null);
+  emit("value-range", seriesValueRange(chartDataSeries(seriesData)));
   const named = chartDataSeries(seriesData).length;
   const limit = seriesData?.extras?.seriesLimit;
   drawnSeries.value = { shown: named, total: Math.max(Number(limit?.total) || 0, named) };
