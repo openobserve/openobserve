@@ -874,14 +874,7 @@ pub async fn test_send(
                 "Exactly one of `definition` or `template_name` must be set",
             );
         }
-        // A draft is held to the save limit; a stored row by name is not, so an older large
-        // template keeps working until its body is edited.
-        (Some(definition), None) => {
-            if let Err(e) = openobserve_core::alerts::templates::check_spec_size(definition) {
-                return MetaHttpResponse::bad_request(e.to_string());
-            }
-            definition.clone()
-        }
+        (Some(definition), None) => definition.clone(),
         (None, Some(template_name)) => {
             let template = match db::alerts::templates::get(&org_id, template_name).await {
                 Ok(t) => t,

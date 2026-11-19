@@ -60,7 +60,7 @@ use crate::{
     request_body(content = inline(Template), description = "Template data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 400, description = "Error, including a template body over 5 MB (5242880 bytes)", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "create"})),
@@ -129,7 +129,7 @@ pub async fn save_template(
     request_body(content = inline(Template), description = "Template data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 400, description = "Error, including a template body over 5 MB (5242880 bytes)", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Templates", "operation": "update"})),

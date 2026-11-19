@@ -258,8 +258,6 @@ pub fn preview(req: &PreviewRequest) -> Result<PreviewResponse, PreviewError> {
     // spec that cannot be saved would report it as fine and defer the error
     // to the save click — and `preview_model.links` echoes the raw authored
     // URL back to the UI, so it must not carry a hostile scheme either.
-    crate::alerts::templates::check_spec_size(&req.definition)
-        .map_err(|e| PreviewError::InvalidContent(e.to_string()))?;
     req.definition
         .validate()
         .map_err(PreviewError::InvalidContent)?;
@@ -690,25 +688,6 @@ mod tests {
             let resp = preview(&req).unwrap();
             assert_eq!(resp.preview_model.title, expected, "{kind:?}");
         }
-    }
-
-    #[test]
-    fn a_draft_over_the_body_limit_is_refused() {
-        let req = PreviewRequest {
-            definition: ContentSpec {
-                body: "b".repeat(infra::table::templates::BODY_MAX_BYTES),
-                ..sample_spec()
-            },
-            channel: "slack".into(),
-            severity: None,
-            sample: None,
-            kind: NotificationKind::Alert,
-        };
-        let err = preview(&req).unwrap_err();
-        assert!(
-            matches!(&err, PreviewError::InvalidContent(m) if m.contains("over the limit")),
-            "{err}"
-        );
     }
 
     fn sample_title(kind: NotificationKind, severity: &str, title: &str) -> String {

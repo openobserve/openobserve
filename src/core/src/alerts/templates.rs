@@ -76,10 +76,8 @@ pub(crate) fn ownership_of(saved: &Template) -> (&str, Authz) {
     (&saved.org_id, Authz::new(&saved.name))
 }
 
-/// Holds a saved body to [`BODY_MAX_BYTES`] and returns the body to store (o2-enterprise#3431 B14).
-/// The stored body passes unchanged, so an older large row keeps saving edits to its other fields.
-/// The editor re-formats content JSON on every save, so a content body that parses to the stored
-/// spec counts as unchanged, and the stored bytes are kept: the row cannot grow that way.
+/// Holds a saved body to [`BODY_MAX_BYTES`]. An unchanged body, or a content body that parses to
+/// the stored spec, keeps the stored bytes, so an old large row keeps saving but cannot grow.
 pub(crate) fn limit_body(
     body: String,
     existing: Option<&str>,
@@ -109,37 +107,6 @@ fn same_spec(a: &str, b: &str) -> bool {
         serde_json::to_value(spec).ok()
     };
     matches!((value(a), value(b)), (Some(a), Some(b)) if a == b)
-}
-
-/// The body limit on a draft spec, measured as the editor saves it.
-pub fn check_spec_size(spec: &ContentSpec) -> Result<(), TemplateError> {
-    let size = draft_len(spec);
-    if size <= BODY_MAX_BYTES {
-        return Ok(());
-    }
-    Err(TemplateError::BodyTooLarge {
-        size,
-        max: BODY_MAX_BYTES,
-    })
-}
-
-/// An upper bound on the bytes `serializeContentSpec` in the editor writes for `spec`: the body
-/// text trimmed, JSON with two-space indents, every key. The editor writes `show_when: null` for a
-/// new field and omits it for a parsed one, so no exact count exists; counting every key means a
-/// draft that passes here never fails the save check.
-fn draft_len(spec: &ContentSpec) -> usize {
-    // A spec serializes to JSON infallibly; on a failure fall back to the body text alone.
-    serde_json::to_value(spec)
-        .map(|mut value| {
-            if let Some(body) = value.get_mut("body")
-                && let Some(text) = body.as_str()
-            {
-                *body = serde_json::Value::String(editor_trim(text).to_string());
-            }
-            value
-        })
-        .and_then(|value| serde_json::to_vec_pretty(&value))
-        .map_or(spec.body.len(), |json| json.len())
 }
 
 /// The body text as the editor saves it. JavaScript `trim` removes Rust's whitespace except
@@ -1589,42 +1556,9 @@ mod tests {
     }
 
     #[test]
-    fn a_draft_spec_over_the_limit_is_refused() {
-        let small = ContentSpec {
-            title: "t".into(),
-            body: "b".into(),
-            ..Default::default()
-        };
-        assert!(check_spec_size(&small).is_ok());
-        let large = ContentSpec {
-            body: "b".repeat(BODY_MAX_BYTES),
-            ..small
-        };
-        // The measured size is never below the editor's `JSON.stringify(spec, null, 2)` output,
-        // with or without `show_when: null`, so a draft that passes preview also saves.
-        let editor_json = |show_when: &str| {
-            format!(
-                "{{\n  \"title\": \"t\",\n  \"title_overrides\": {{}},\n  \"body\": \"b\",\n  \"fields\": [\n    {{\n      \"label\": \"l\",\n      \"value\": \"v\"{show_when}\n    }}\n  ],\n  \"rows\": {{\n    \"enabled\": false,\n    \"max\": 5,\n    \"columns\": null,\n    \"format\": null\n  }},\n  \"links\": [],\n  \"chart\": {{\n    \"enabled\": false\n  }}\n}}"
-            )
-        };
-        let with_key = editor_json(",\n      \"show_when\": null");
-        let without_key = editor_json("");
-        let one_field = ContentSpec::parse(&without_key).unwrap();
-        assert_eq!(draft_len(&one_field), with_key.len());
-        assert!(draft_len(&one_field) > without_key.len());
-        // Trailing blank lines are not measured: the editor trims them on save.
-        let padded_body = ContentSpec {
-            title: "t".into(),
-            body: format!("{}{}", "b".repeat(BODY_MAX_BYTES - 576), "\n".repeat(400)),
-            ..Default::default()
-        };
-        assert!(check_spec_size(&padded_body).is_ok());
+    fn editor_trim_matches_javascript_trim() {
         // JavaScript `trim` keeps U+0085 and removes U+FEFF.
         assert_eq!(editor_trim("\u{85}b\u{feff} \n"), "\u{85}b");
-        assert!(matches!(
-            check_spec_size(&large),
-            Err(TemplateError::BodyTooLarge { .. })
-        ));
     }
 
     /// Save refuses a new or changed large body, and keeps saving an old large row whose body is
