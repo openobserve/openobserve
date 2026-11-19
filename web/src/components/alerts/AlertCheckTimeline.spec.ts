@@ -29,6 +29,12 @@ describe("AlertCheckTimeline", () => {
   ] as const)("every %i min looking at %i min reads %j", (frequency, period, caption) => {
     const wrapper = mountTimeline(frequency, period);
     expect(wrapper.get('[data-test="add-alert-check-timeline-caption"]').text()).toBe(caption);
+  });
+
+  it("draws the strip only once Show is pressed", async () => {
+    const wrapper = mountTimeline(10, 10);
+    expect(wrapper.text()).not.toContain(i18n.global.t("alerts.sections.timeline.now"));
+    await wrapper.get('[data-test="add-alert-check-timeline-toggle"]').trigger("click");
     expect(wrapper.text()).toContain(i18n.global.t("alerts.sections.timeline.now"));
   });
 
@@ -47,10 +53,13 @@ describe("AlertCheckTimeline", () => {
     expect(text.text()).toBe(t(key, { period: "5 minutes", ...params }));
   });
 
-  it("draws the read window back from now, stopping at the edge of the line", () => {
-    const band = (period: number) =>
-      mountTimeline(10, period).get('[data-test="add-alert-check-timeline-band"]');
-    expect(Number(band(10).attributes("width"))).toBe(120);
-    expect(Number(band(1000).attributes("x"))).toBe(0);
+  it("draws the read window back from now, stopping at the edge of the line", async () => {
+    const band = async (period: number) => {
+      const wrapper = mountTimeline(10, period);
+      await wrapper.get('[data-test="add-alert-check-timeline-toggle"]').trigger("click");
+      return wrapper.get('[data-test="add-alert-check-timeline-band"]');
+    };
+    expect(Number((await band(10)).attributes("width"))).toBe(120);
+    expect(Number((await band(1000)).attributes("x"))).toBe(0);
   });
 });

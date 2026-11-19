@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { durationWords } from "@/utils/alerts/alertCopy";
@@ -51,6 +52,8 @@ const CAPTION: Record<ScheduleOverlapKind, I18nKey> = {
 };
 
 const { t } = useI18nTyped();
+// The sentence says how checks read the data; the strip that draws it opens on request.
+const stripOpen = ref(false);
 
 const ticks = computed(() =>
   Array.from({ length: TICKS }, (_, index) => {
@@ -95,33 +98,44 @@ const caption = computed(() => {
     wide
     data-test="add-alert-check-timeline"
   >
-    <svg :viewBox="`0 0 ${WIDTH} ${HEIGHT}`" class="w-full" aria-hidden="true">
-      <line x1="0" :y1="MID" :x2="WIDTH" :y2="MID" class="stroke-border-strong" />
-      <rect
-        :x="bandStart"
-        :y="MID - 8"
-        :width="NOW_X - bandStart"
-        height="16"
-        rx="4"
-        class="fill-accent/25"
-        data-test="add-alert-check-timeline-band"
-      />
-      <circle
-        v-for="tick in ticks"
-        :key="tick.x"
-        :cx="tick.x"
-        :cy="MID"
-        r="5"
-        class="fill-accent"
-      />
-    </svg>
-    <div class="text-text-secondary grid grid-cols-5 text-center text-xs">
-      <span v-for="tick in ticks" :key="tick.x">{{ tick.label }}</span>
-    </div>
-    <p class="text-text-body m-0 mt-2 text-sm" data-test="add-alert-check-timeline-caption">
-      {{
+    <p class="text-text-body m-0 text-sm">
+      <span data-test="add-alert-check-timeline-caption">{{
         forecastWindow ? t("alerts.form.schedule.forecast", { window: forecastWindow }) : caption
-      }}
+      }}</span>
+      <OButton
+        variant="link"
+        class="ms-1"
+        :aria-expanded="stripOpen"
+        data-test="add-alert-check-timeline-toggle"
+        @click="stripOpen = !stripOpen"
+      >
+        {{ stripOpen ? t("common.hide") : t("common.show") }}
+      </OButton>
     </p>
+    <template v-if="stripOpen">
+      <svg :viewBox="`0 0 ${WIDTH} ${HEIGHT}`" class="mt-2 w-full" aria-hidden="true">
+        <line x1="0" :y1="MID" :x2="WIDTH" :y2="MID" class="stroke-border-strong" />
+        <rect
+          :x="bandStart"
+          :y="MID - 8"
+          :width="NOW_X - bandStart"
+          height="16"
+          rx="4"
+          class="fill-accent/25"
+          data-test="add-alert-check-timeline-band"
+        />
+        <circle
+          v-for="tick in ticks"
+          :key="tick.x"
+          :cx="tick.x"
+          :cy="MID"
+          r="5"
+          class="fill-accent"
+        />
+      </svg>
+      <div class="text-text-secondary grid grid-cols-5 text-center text-xs">
+        <span v-for="tick in ticks" :key="tick.x">{{ tick.label }}</span>
+      </div>
+    </template>
   </OSettingRow>
 </template>
