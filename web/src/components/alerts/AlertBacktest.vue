@@ -29,7 +29,7 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import AlertLinkNote from "./AlertLinkNote.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { isCountLimit } from "@/utils/alerts/alertReadBack";
 import { durationWords, formatNumber } from "@/utils/alerts/alertCopy";
 import { useAlertStreamQuery } from "@/composables/alerts/useAlertStreamQuery";
@@ -37,6 +37,7 @@ import { ALERT_BACKTEST_SIGNAL_KEY } from "@/composables/alerts/useAlertSuggesti
 import { ALERT_TEST_RUN_KEY } from "@/composables/alerts/useAlertTestRun";
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 import { checkTimeText, testRunDay } from "@/utils/alerts/alertTestRun";
+import type { EvaluateAlertResponse } from "@/utils/alerts/alertEvaluate.types";
 import store from "@/stores";
 import {
   backtestBucketMinutes,
@@ -69,10 +70,25 @@ const props = defineProps<{
   realTime?: boolean;
   /** Compares with past windows, which fire on any match while they hold no data. */
   compares?: boolean;
+  /** Test it's panel passes the answer it shows; the day is then drawn from it alone, without a row. */
+  tested?: EvaluateAlertResponse | null;
 }>();
+
+/** The advice under the day; its action opens a setting by name, or else the element it targets. */
+interface DayHint {
+  text: I18nText | null;
+  action: I18nText | null;
+  setting?: string;
+  target?: string;
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOURS = 24;
+const SAID_BY_TEST_IT: string[] = [
+  "alerts.sections.backtest.heldByMustLast",
+  emptyDayHintKey(true),
+  emptyDayHintKey(false),
+];
 const REALTIME_BUCKET_MINUTES = 60;
 // Typing in a filter re-runs the query, so wait for a pause.
 const DEBOUNCE_MS = 700;
@@ -83,9 +99,12 @@ const { t } = useI18nTyped();
 const search = useAlertStreamQuery();
 
 const signal = inject(ALERT_BACKTEST_SIGNAL_KEY, null);
+const inPanel = computed(() => props.tested !== undefined);
 // Once Test it has run the alert as it stands, the day is the server's answer, for any query.
 const testRun = inject(ALERT_TEST_RUN_KEY, null);
-const server = computed(() => testRun?.fresh.value ?? null);
+const server = computed(() =>
+  inPanel.value ? (props.tested ?? null) : (testRun?.fresh.value ?? null),
+);
 const serverDay = computed(() => (server.value ? testRunDay(server.value) : null));
 
 const isCron = computed(() => props.triggerCondition?.frequency_type === "cron");
@@ -100,6 +119,7 @@ const cronTimes = (endMs: number) =>
   );
 
 const sql = computed(() => {
+  if (inPanel.value) return null;
   if (props.realTime) return windowedCountSql(props.query, REALTIME_BUCKET_MINUTES);
   if (isCron.value && !cronTimes(Date.now())?.length) return null;
   const bucket = backtestBucketMinutes({
@@ -191,7 +211,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
-  if (signal) signal.value = null;
+  if (signal && !inPanel.value) signal.value = null;
   clearTimeout(debounce);
   clearTimeout(deadline);
   observer?.disconnect();
@@ -228,7 +248,7 @@ const frequencyMinutes = computed(() => {
 });
 
 watchEffect(() => {
-  if (!signal) return;
+  if (!signal || inPanel.value) return;
   // Once Test it has answered, its checks are the day, so a replay never contradicts it.
   const r = serverDay.value ?? result.value;
   signal.value =
@@ -305,7 +325,7 @@ const resultText = computed(() => {
       });
 });
 
-const hint = computed(() => {
+const hint = computed<DayHint | null>(() => {
   if (props.realTime) return null;
   // A value or PromQL alert compares with its own operator, not the count gate's.
   const operator = server.value?.checks[0]?.operator ?? props.operator;
@@ -316,6 +336,12 @@ const hint = computed(() => {
     compares: props.compares,
   });
   if (!key) return null;
+  // Test it's own lines already say the day matched nothing or Must last held it; its action stays.
+  if (inPanel.value && SAID_BY_TEST_IT.includes(key)) {
+    return key === "alerts.sections.backtest.heldByMustLast"
+      ? { text: null, action: t("alerts.sections.backtest.changeMustLast"), setting: "holdFor" }
+      : null;
+  }
   if (key === "alerts.sections.backtest.noisyCompare")
     return {
       text: t(key),
@@ -330,10 +356,13 @@ const hint = computed(() => {
   return {
     text: t(key),
     action: mustLast ? t("alerts.sections.backtest.changeMustLast") : null,
-    target: "add-alert-hold-for-row",
+    setting: "holdFor",
   };
 });
 const openHintTarget = async () => {
+  const setting = hint.value?.setting;
+  // Must last can sit under More options, which only the setting search opens.
+  if (setting && formContext?.openSetting) return formContext.openSetting(setting);
   formContext?.goToSection("condition");
   await nextTick();
   const row = document.querySelector<HTMLElement>(`[data-test="${hint.value?.target}"]`);
@@ -353,13 +382,12 @@ const hourTitle = (hour: number, fired: boolean) => {
 </script>
 
 <template>
-  <OSettingRow
-    v-if="sql || server"
+  <component
+    :is="inPanel ? 'div' : OSettingRow"
+    v-if="inPanel ? server : sql || server"
     ref="rowRef"
-    :label="t('alerts.sections.backtest.label')"
-    fill
-    wide
-    data-test="add-alert-backtest"
+    v-bind="inPanel ? {} : { label: t('alerts.sections.backtest.label'), fill: true, wide: true }"
+    :data-test="inPanel ? 'alert-test-run-day' : 'add-alert-backtest'"
   >
     <p
       v-if="status !== 'ready'"
@@ -386,6 +414,7 @@ const hourTitle = (hour: number, fired: boolean) => {
     </p>
     <template v-else>
       <p
+        v-if="!inPanel"
         class="m-0 text-sm"
         :class="realTime && volume?.noisy ? 'text-status-warning-text' : 'text-text-body'"
         data-test="add-alert-backtest-result"
@@ -401,7 +430,7 @@ const hourTitle = (hour: number, fired: boolean) => {
           {{ waitAction }}
         </OButton>
       </p>
-      <div class="mt-2 grid grid-cols-24 gap-0.5" aria-hidden="true">
+      <div class="grid grid-cols-24 gap-0.5" :class="inPanel ? '' : 'mt-2'" aria-hidden="true">
         <span
           v-for="(fired, hour) in day.hours"
           :key="hour"
@@ -416,7 +445,7 @@ const hourTitle = (hour: number, fired: boolean) => {
         <span>{{ t("alerts.sections.backtest.lastHour") }}</span>
       </div>
       <AlertLinkNote
-        v-if="!realTime && volumeText"
+        v-if="!inPanel && !realTime && volumeText"
         class="mt-2"
         :text="volumeText"
         :action="waitAction"
@@ -433,5 +462,5 @@ const hourTitle = (hour: number, fired: boolean) => {
         @action="openHintTarget"
       />
     </template>
-  </OSettingRow>
+  </component>
 </template>

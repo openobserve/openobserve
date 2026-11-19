@@ -257,7 +257,7 @@ describe("AlertBacktest", () => {
     expect(calls).toHaveLength(1);
     wrapper.unmount();
   });
-  it("draws the day from Test it's answer for a query it can't replay, until the alert changes", async () => {
+  it("reads Test it's answer while the alert is unchanged; the panel draws that day with no row or signal, and its advice opens Must last", async () => {
     const testRun = createAlertTestRun();
     testRun.result.value = grouped as any;
     testRun.state.value = "ready";
@@ -275,6 +275,20 @@ describe("AlertBacktest", () => {
     testRun.currentKey.value = "edited";
     await flushPromises();
     expect(wrapper.find('[data-test="add-alert-backtest"]').exists()).toBe(false);
+
+    const panelSignal = ref<BacktestSignal | null>(null);
+    const formContext = { goToSection: vi.fn(), openSetting: vi.fn() };
+    const panel = mountBacktest("", panelSignal, { testRun, tested: grouped, formContext });
+    await vi.advanceTimersByTimeAsync(700);
+    expect(calls).toHaveLength(0);
+    expect(panel.find('[data-test="alert-test-run-day"]').exists()).toBe(true);
+    expect(panel.find('[data-test="add-alert-backtest-result"]').exists()).toBe(false);
+    expect(panel.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
+    expect(panelSignal.value).toBeNull();
+    // Must last may sit under More options, so its advice opens it by name.
+    await panel.find('[data-test="add-alert-backtest-hint-action"]').trigger("click");
+    expect(formContext.openSetting).toHaveBeenCalledWith("holdFor");
+    panel.unmount();
     wrapper.unmount();
   });
 });

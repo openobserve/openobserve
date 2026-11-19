@@ -20,6 +20,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import AlertBacktest from "@/components/alerts/AlertBacktest.vue";
 import { starterContentSpec } from "@/components/alerts/template-content/contentSpec";
 import destinationService from "@/services/alert_destination";
 import { useAlertTestRun } from "@/composables/alerts/useAlertTestRun";
@@ -99,6 +100,7 @@ const report = computed(() => {
     ratio: /\)\s*\/|\s\/\s/.test(props.body?.query_condition?.promql ?? ""),
   });
 });
+const shownResult = computed(() => (report.value ? testRun.result.value : null));
 // The run is one request with no progress of its own, so the wait names how much it replays.
 const runningText = computed(() => {
   const tc = props.body?.trigger_condition;
@@ -236,6 +238,18 @@ const send = async () => {
           @click="emit('close')"
         />
       </div>
+      <AlertBacktest
+        v-if="body && shownResult"
+        :class="running ? 'opacity-60' : ''"
+        :tested="shownResult"
+        query=""
+        :stream-type="body.stream_type"
+        :period="Number(body.trigger_condition.period)"
+        :operator="body.trigger_condition.operator"
+        :threshold="Number(body.trigger_condition.threshold)"
+        :real-time="body.is_real_time"
+        :compares="!!body.query_condition.multi_time_range?.length"
+      />
       <ul
         v-if="report && report.groups.length"
         class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs"

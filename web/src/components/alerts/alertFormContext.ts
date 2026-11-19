@@ -23,6 +23,8 @@ export interface AlertFormContext {
   goToSection(id: AlertSectionId): void;
   /** Scrolls an element inside the form into view. */
   reveal(el: HTMLElement): void;
+  /** Shows a setting even from under More options, scrolls to it and focuses it. */
+  openSetting?(id: string): Promise<void>;
 }
 
 export const ALERT_FORM_CONTEXT_KEY: InjectionKey<AlertFormContext> = Symbol("alertFormContext");

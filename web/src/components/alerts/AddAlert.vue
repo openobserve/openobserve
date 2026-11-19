@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-snap-stop
                 />
                 <AlertBacktest
-                  v-if="showsBacktest || showsTestedDay"
+                  v-if="showsBacktest"
                   :query="backtestQuery"
                   :stream-type="formData.stream_type"
                   :period="Number(formData.trigger_condition.period)"
@@ -1802,9 +1802,8 @@ export default defineComponent({
       replaysDay(alertForm.formData.value, alertForm.isAggregationEnabled.value),
     );
 
-    // Test it's answer draws the 24-hour row for any query while the alert is unchanged.
-    const alertTestRun = provideAlertTestRun();
-    const showsTestedDay = computed(() => !!alertTestRun.fresh.value);
+    // Test it's answer stays in its panel: a row it added here would push the form down under the user.
+    provideAlertTestRun();
 
     const backtestQuery = computed(() =>
       generateSqlQuery(
@@ -2317,6 +2316,7 @@ export default defineComponent({
       showAll,
       goToSection,
       reveal: (el: HTMLElement) => snapScrollRef.value?.revealElement(el),
+      openSetting: (id: string) => settingFind.select(id),
     });
 
     const checkTimelineForecastWindow = computed(() => {
@@ -2768,7 +2768,6 @@ export default defineComponent({
       showsCheckTimeline,
       showsBacktest,
       backtestQuery,
-      showsTestedDay,
       reviewLines,
       sentenceGap: SENTENCE_GAP,
       issueCount,
