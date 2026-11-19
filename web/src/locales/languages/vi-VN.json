@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "Các stream đã chọn không có trường toàn văn",
     "freeTextNoTextFields": "Stream này không có trường văn bản nào để tìm kiếm.",
     "freeTextNoTextFieldsNamed": "Không tìm kiếm: {streams} (không có trường văn bản).",
-    "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL."
+    "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL.",
+    "filterNotChartableNotice": "Bộ lọc này không thể vẽ biểu đồ trong trình tạo. Bộ lọc tìm kiếm của bạn không thay đổi; hãy chuyển sang {custom} để vẽ biểu đồ."
   },
   "menu": {
     "alertCalibration": "Hiệu chỉnh cảnh báo",
@@ -12949,6 +12950,7 @@
         "emptyQuery": "Không có truy vấn nào để tạo cảnh báo.",
         "noQueries": "Panel này không có truy vấn để tạo cảnh báo.",
         "noConstants": "Các mẫu đã chọn không có văn bản đặc trưng để khớp.",
+        "patternsShared": "{count} mẫu đã chọn có toàn bộ văn bản trùng với mẫu khác nên bộ lọc cảnh báo bỏ qua chúng.",
         "sqlModeFilterDropped": "Truy vấn SQL của bạn không được giữ lại — cảnh báo chỉ khớp với các mẫu đã chọn.",
         "patternsUnusable": "Không có mẫu nào trên trang này có văn bản đặc trưng để khớp, vì vậy cảnh báo chỉ sử dụng tìm kiếm của bạn.",
         "dbmRollupLag": "Các số liệu cơ sở dữ liệu được tổng hợp mỗi {minutes} phút, vì vậy cảnh báo này chỉ có thể kích hoạt với tần suất đó — đây không phải là thông báo trực theo thời gian thực.",
@@ -20192,6 +20194,7 @@
       "excludeFromQuery": "Loại trừ",
       "createAlertAction": "Tạo cảnh báo",
       "noMatchTerms": "Mẫu này không có văn bản đặc biệt để lọc.",
+      "noDistinctTextTooltip": "Mọi đoạn văn bản cố định trong mẫu này cũng xuất hiện trong mẫu khác, nên bộ lọc sẽ khớp cả nhật ký của chúng.",
       "noStreamSelected": "Chưa chọn stream. Vui lòng chọn stream trước khi tạo cảnh báo.",
       "alertBroadMatch": "Mẫu này không có văn bản hằng số đặc biệt — truy vấn cảnh báo sẽ khớp rộng. Cân nhắc thêm bộ lọc thủ công."
     },
