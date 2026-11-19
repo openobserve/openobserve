@@ -729,7 +729,7 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
-import { pageValuesWindow } from "@/composables/fieldValueStore";
+import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import {
@@ -962,6 +962,11 @@ export default defineComponent({
     const currentValuesWindow = () =>
       pageValuesWindow(searchObj.data.datetime ?? {}, getConsumableRelativeTime);
     setValuesTimeRange(currentValuesWindow);
+    // A lookup keeps the function it began with, so a new one tells a lookup in flight the range changed.
+    watch(
+      () => pageValuesSetting(searchObj.data.datetime ?? {}),
+      () => setValuesTimeRange(() => currentValuesWindow()),
+    );
     // The editor reads only whether a range is set and whether it was cut, so the clock need not refresh this.
     const valuesWindow = computed(currentValuesWindow);
 

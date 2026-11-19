@@ -386,6 +386,12 @@ export const pageValuesWindow = (
   return range ? valuesWindowFor(range.startTime, range.endTime) : null;
 };
 
+/** The range as picked, not where it lands now: a relative period keeps its name as the clock moves. */
+export const pageValuesSetting = (datetime: PageTimeRange): string =>
+  datetime.type === "relative"
+    ? `relative:${String(datetime.relativeTimePeriod ?? "")}`
+    : `${String(datetime.type ?? "")}:${String(datetime.startTime)}-${String(datetime.endTime)}`;
+
 // The read cache is filled synchronously so the next keystroke is local; IndexedDB persistence can wait.
 const storeAnswer = (
   ctx: StreamContext,

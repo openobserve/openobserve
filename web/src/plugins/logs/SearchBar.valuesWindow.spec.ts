@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createRouter, createMemoryHistory } from "vue-router";
 import i18n from "@/locales";
@@ -109,6 +109,24 @@ describe("SearchBar — value suggestions search the selected time range", () =>
     };
     await nextTick();
     expect(await askedRange()).toEqual({ startTime: END - 26 * HOUR, endTime: END - 24 * HOUR });
+  });
+
+  it("starts over on the new range when the range changes while values are loading", async () => {
+    await mountAt(END - 2 * HOUR, END);
+    let answerOldRange!: (values: string[]) => void;
+    vi.mocked(requestFieldValues)
+      .mockImplementationOnce(() => new Promise((resolve) => (answerOldRange = resolve)))
+      .mockResolvedValueOnce(["new"]);
+    const lookup = wrapper!.vm.resolveFieldValues("level");
+    await flushPromises();
+    const newRange = { startTime: END - 26 * HOUR, endTime: END - 24 * HOUR };
+    wrapper!.vm.searchObj.data.datetime = { type: "absolute", ...newRange };
+    await nextTick();
+    answerOldRange(["old"]);
+    expect(await lookup).toEqual(["new"]);
+    expect((vi.mocked(requestFieldValues).mock.calls.at(-1)![2] as any).timeRange).toEqual(
+      newRange,
+    );
   });
 
   it("looks up a relative range from now, not from when it last ran", async () => {
