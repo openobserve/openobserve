@@ -52,6 +52,11 @@ import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/c
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
 const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst", "funnel"];
 
+interface NamedItemParams {
+  name?: string;
+  data?: { rawName?: string | null; path?: string[]; rawPath?: (string | null)[] };
+}
+
 export function usePanelDrilldown({
   panelSchema,
   variablesData,
@@ -281,25 +286,24 @@ export function usePanelDrilldown({
     }
     if (panelSchema.value.type === "bar-gauge") return barGaugeDrilldownSeries(params);
     return {
-      // A tile standing in for a missing or empty group carries the blank its drilldown filters on.
       __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type)
-        ? params?.data?.rawName !== undefined
-          ? (params.data.rawName ?? "")
-          : params?.name
+        ? drilldownItemName(params)
         : params?.seriesName,
       __value: value,
-      // A gauge dial named "(empty)" stands in for a blank label; drilldowns filter on the blank.
-      __axisValue: params?.value?.[0] ?? params?.data?.rawName ?? params?.name,
-      // Tiles of the same name sit under different parents, so the path tells them apart; each value is encoded so a "/" in it stays one segment.
+      __axisValue: params?.value?.[0] ?? drilldownItemName(params),
+      // Tiles of the same name sit under different parents, so the path tells them apart.
       ...(panelSchema.value.type === "treemap"
-        ? {
-            __path: ((params?.data?.rawPath ?? params?.data?.path ?? []) as (string | null)[])
-              .map((segment) => encodeURIComponent(segment ?? ""))
-              .join("/"),
-          }
+        ? { __path: treemapPathSegments(params).join("/") }
         : {}),
     };
   };
+
+  // An item shown as "(empty)" or "(null)" stands in for a blank group; drilldowns filter on the blank.
+  const drilldownItemName = (params: NamedItemParams | undefined) =>
+    params?.data?.rawName !== undefined ? (params.data.rawName ?? "") : params?.name;
+
+  const treemapPathSegments = (params: NamedItemParams | undefined): string[] =>
+    (params?.data?.rawPath ?? params?.data?.path ?? []).map((segment) => segment ?? "");
 
   // get offset from parent
   function getOffsetFromParent(parent: any, child: any) {
@@ -823,7 +827,11 @@ export function usePanelDrilldown({
 
           let xAxisValue: any;
           if (isPieOrDonut) {
-            xAxisValue = drilldownParams[0]?.name;
+            // A stand-in tile matches the rows of the null or empty group it represents.
+            xAxisValue =
+              drilldownParams[0]?.data?.rawName !== undefined
+                ? drilldownParams[0].data.rawName
+                : drilldownParams[0]?.name;
           } else if (chartType === "heatmap") {
             xAxisValue = drilldownParams[0]?.value?.[0];
           } else {
@@ -844,7 +852,12 @@ export function usePanelDrilldown({
             for (const row of queryResult) {
               let matches = true;
               if (xFields.length > 0 && xAxisValue !== undefined) {
-                if (String(row[xFields[0].alias]) !== String(xAxisValue)) matches = false;
+                const cell = row[xFields[0].alias];
+                const mismatch =
+                  xAxisValue === null
+                    ? cell !== null && cell !== undefined
+                    : String(cell) !== String(xAxisValue);
+                if (mismatch) matches = false;
               }
               if (matches && breakdownFields.length > 0 && seriesName && !isPieOrDonut) {
                 if (String(row[breakdownFields[0].alias]) !== String(seriesName)) matches = false;
@@ -1177,7 +1190,20 @@ export function usePanelDrilldown({
           // save time, but that is client-side only: a direct dashboard PUT
           // stores anything, and dashboards saved before the schema existed
           // are still in the DB. A variable VALUE can also carry a scheme.
-          const resolved = replacePlaceholders(drilldownData.data.url, drilldownVariables);
+          const urlVariables =
+            drilldownVariables.series?.__path === undefined
+              ? drilldownVariables
+              : {
+                  ...drilldownVariables,
+                  series: {
+                    ...drilldownVariables.series,
+                    // Each segment is encoded on its own so a "/" inside a group value stays one segment.
+                    __path: treemapPathSegments(drilldownParams[0])
+                      .map((segment) => encodeURIComponent(segment))
+                      .join("/"),
+                  },
+                };
+          const resolved = replacePlaceholders(drilldownData.data.url, urlVariables);
           if (!isSafeNavigableUrl(resolved)) return;
           // open url
           return window.open(

@@ -46,6 +46,17 @@ vi.mock("@/services/search", async (importOriginal) => {
   });
 });
 
+const commonsMock = vi.hoisted(() => ({
+  getFoldersList: vi.fn(),
+  getAllDashboardsByFolderId: vi.fn(),
+  getDashboard: vi.fn(),
+}));
+
+vi.mock("@/utils/commons", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/commons")>()),
+  ...commonsMock,
+}));
+
 vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: (v: string) => `b64(${v})`,
   escapeSingleQuotes: (v: string) => v,
@@ -1428,23 +1439,17 @@ describe("usePanelDrilldown", () => {
     openSpy.mockRestore();
   });
 
-  it("hands a treemap tile's full path and the blank behind an empty tile to a URL drilldown", async () => {
-    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
-    const deps = makeDeps();
-    deps.panelSchema.value.type = "treemap";
-    const link = {
-      name: "Link",
-      type: "byUrl",
-      targetBlank: true,
-      data: { url: "https://example.com/?n=${series.__name}&p=${series.__path}" },
+  describe("treemap tile drilldowns", () => {
+    const treemapDeps = (drilldown: Record<string, unknown>) => {
+      const deps = makeDeps();
+      deps.panelSchema.value.type = "treemap";
+      Object.assign(deps.panelSchema.value.config, { drilldown: [drilldown] });
+      return {
+        ...deps,
+        panelData: { value: { options: { xAxis: [{ data: [] }], series: [{ type: "treemap" }] } } },
+      };
     };
-    deps.panelSchema.value.config.drilldown = [link];
-    const api = usePanelDrilldown({
-      ...deps,
-      panelData: { value: { options: { xAxis: [{ data: [] }], series: [{ type: "treemap" }] } } },
-    });
-
-    await api.onChartClick({
+    const emptyTile = {
       componentType: "series",
       seriesIndex: 0,
       name: "(empty)",
@@ -1453,19 +1458,152 @@ describe("usePanelDrilldown", () => {
         name: "(empty)",
         rawName: "",
         value: 4,
-        path: ["us-east", "a/b", "(empty)"],
-        rawPath: ["us-east", "a/b", ""],
+        path: ["us east", "a/b", "(empty)"],
+        rawPath: ["us east", "a/b", ""],
       },
       event: { offsetX: 1, offsetY: 1 },
-    });
-    await api.openDrilldown(0);
+    };
+    const nullTile = {
+      componentType: "series",
+      seriesIndex: 0,
+      name: "(null)",
+      value: 2,
+      data: { name: "(null)", rawName: null, value: 2, path: ["(null)"], rawPath: [null] },
+      event: { offsetX: 1, offsetY: 1 },
+    };
 
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://example.com/?n=&p=us-east/a%2Fb/",
-      "_blank",
-      "noopener,noreferrer",
-    );
-    openSpy.mockRestore();
+    it("hands a URL drilldown the blank behind an empty tile and its path encoded per segment", async () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      const api = usePanelDrilldown(
+        treemapDeps({
+          name: "Link",
+          type: "byUrl",
+          targetBlank: true,
+          data: { url: "https://example.com/?n=${series.__name}&p=${series.__path}" },
+        }),
+      );
+
+      await api.onChartClick(emptyTile);
+      await api.openDrilldown(0);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/?n=&p=us%20east/a%2Fb/",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    it("hands a dashboard drilldown the raw tile path", async () => {
+      commonsMock.getFoldersList.mockResolvedValue(undefined);
+      commonsMock.getAllDashboardsByFolderId.mockResolvedValue([
+        { title: "Target", dashboardId: "d-1" },
+      ]);
+      commonsMock.getDashboard.mockResolvedValue({
+        dashboardId: "d-1",
+        tabs: [{ name: "Main", tabId: "t-1" }],
+      });
+      const deps = treemapDeps({
+        name: "Dash",
+        type: "byDashboard",
+        targetBlank: false,
+        data: {
+          folder: "default",
+          dashboard: "Target",
+          tab: "Main",
+          passAllVariables: false,
+          variables: [{ name: "p", value: "${series.__path}" }],
+        },
+      });
+      Object.assign(deps.store.state, {
+        organizationData: { folders: [{ name: "default", folderId: "f-1" }] },
+      });
+      const api = usePanelDrilldown(deps);
+
+      await api.onChartClick(emptyTile);
+      await api.openDrilldown(0);
+
+      expect(deps.router.push).toHaveBeenCalledWith({
+        path: "/dashboards/view",
+        query: expect.objectContaining({ "var-p": "us east/a/b/" }),
+      });
+    });
+
+    it.each([
+      ["path", "${series.__path}", emptyTile, "'us east/a/b/'"],
+      ["axis value of a null tile", "${series.__axisValue}", nullTile, "''"],
+    ])("hands a logs drilldown the raw %s", async (_label, placeholder, tile, expected) => {
+      const deps = treemapDeps({
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: { logsMode: "custom", logsQuery: `SELECT * FROM "default" WHERE p = ${placeholder}` },
+      });
+      const api = usePanelDrilldown(deps);
+
+      await api.onChartClick(tile);
+      await api.openDrilldown(0);
+
+      await vi.waitFor(() =>
+        expect(deps.router.push).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query: expect.objectContaining({
+              query: `b64(SELECT * FROM "default" WHERE p = ${expected})`,
+            }),
+          }),
+        ),
+      );
+    });
+
+    it.each([
+      ["empty", emptyTile, "2"],
+      ["null", nullTile, "3"],
+    ])("opens a cross-link with the row behind the %s tile", async (_label, tile, expected) => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      resultSchemaMock.mockResolvedValue({
+        data: {
+          cross_links: {
+            stream_links: [
+              {
+                name: "Link",
+                url: "https://x.example/${field.__value}",
+                fields: [{ name: "f", alias: "f" }],
+              },
+            ],
+            org_links: [],
+          },
+        },
+      });
+      const deps = treemapDeps({
+        name: "None",
+        type: "byUrl",
+        data: { url: "https://example.com" },
+      });
+      deps.panelSchema.value.config.drilldown = [];
+      Object.assign(deps.panelSchema.value.queries[0].fields, { x: [{ alias: "x" }] });
+      Object.assign(deps.data, {
+        value: [
+          {
+            result: [
+              { x: "a", f: "1" },
+              { x: "", f: "2" },
+              { x: null, f: "3" },
+            ],
+          },
+        ],
+      });
+      const api = usePanelDrilldown(deps);
+
+      await api.onChartClick(tile);
+      await api.openDrilldown(0);
+
+      expect(openSpy).toHaveBeenCalledWith(
+        `https://x.example/${expected}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
   });
 
   describe("sankey return nodes", () => {
