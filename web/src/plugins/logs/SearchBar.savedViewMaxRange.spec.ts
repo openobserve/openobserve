@@ -77,7 +77,9 @@ const shortenedToast = {
   variant: "warning",
 };
 
-describe("SearchBar: saved view over the stream max query range", () => {
+// Mounting SearchBar is slow when the whole logs suite runs in parallel; a 5s test timeout
+// abandons the apply mid-flight and the next test inherits its half-applied state.
+describe("SearchBar: saved view over the stream max query range", { timeout: 30_000 }, () => {
   let wrapper: VueWrapper<any> | undefined;
   let applied: any;
 
@@ -96,7 +98,9 @@ describe("SearchBar: saved view over the stream max query range", () => {
     view.data.datetime = datetime;
     getViewDetail.mockResolvedValueOnce({ status: 200, data: { data: view } });
     await wrapper.vm.applySavedView({ view_id: "v1", view_name: "My view" });
-    await vi.waitFor(() => expect(toastMock).toHaveBeenCalledWith(toastArg));
+    await vi.waitFor(() => expect(toastMock).toHaveBeenCalledWith(toastArg), {
+      timeout: 15_000,
+    });
     applied = { ...searchObj.data.datetime };
   };
 
