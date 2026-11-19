@@ -583,7 +583,7 @@ pub fn get_ts_col_order_by(
         {
             let mut ts_col = String::new();
             for (original, alias) in &parsed_sql.aliases {
-                if original == _ts_col || original.contains("histogram") {
+                if original == _ts_col || is_histogram_call(original) {
                     ts_col = alias.clone();
                 }
             }
@@ -817,6 +817,13 @@ pub async fn delete_cache(
 
     disk::remove_result_cache_metas(&remove_files).await;
     Ok(true)
+}
+
+/// Only a `histogram(...)` call itself names a time bucket, not an expression containing one.
+#[cfg(not(feature = "enterprise"))]
+fn is_histogram_call(expr: &str) -> bool {
+    expr.get(..10)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("histogram("))
 }
 
 fn calculate_deltas_multi(
