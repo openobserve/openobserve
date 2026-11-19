@@ -1831,6 +1831,8 @@ pub(crate) mod tests {
                 pending_question_id: None,
                 questions_asked: 0,
                 deadline_closed_at: None,
+                run_number: None,
+                fenced: false,
             })
             .reset_all()
         };

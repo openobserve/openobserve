@@ -742,6 +742,12 @@ fn context_used(
     {
         used["history_reads_allowed"] = Value::Bool(allowed);
     }
+    // The finalize-time recovery probe and grader read these back from the stored row.
+    for key in ["affected_services", "first_alert_at_us", "capabilities"] {
+        if let Some(value) = context.get(key).filter(|v| !v.is_null()) {
+            used[key] = value.clone();
+        }
+    }
     used
 }
 
@@ -5244,9 +5250,15 @@ mod tests {
             "serving_region": "us-east-1",
             "previous_analysis": "earlier report",
             "past_causes": [],
+            "affected_services": ["checkout"],
+            "first_alert_at_us": 1_700_000_000_000_000_i64,
+            "capabilities": {"edition": "enterprise", "super_cluster": true},
         });
         let used = context_used(&ctx, &[], &[], &[], &["gh".to_string()]);
         assert_eq!(used["serving_region"], "us-east-1");
+        assert_eq!(used["affected_services"], json!(["checkout"]));
+        assert_eq!(used["first_alert_at_us"], 1_700_000_000_000_000_i64);
+        assert_eq!(used["capabilities"]["super_cluster"], true);
         assert_eq!(used["history_injected"], true);
         assert_eq!(used["withheld_toolsets"], json!(["gh"]));
 
@@ -5254,5 +5266,6 @@ mod tests {
         assert!(bare.get("serving_region").is_none());
         assert!(bare.get("history_injected").is_none());
         assert!(bare.get("withheld_toolsets").is_none());
+        assert!(bare.get("capabilities").is_none());
     }
 }

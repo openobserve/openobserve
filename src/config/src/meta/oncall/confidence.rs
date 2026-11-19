@@ -1087,7 +1087,7 @@ fn independent_classes(decisive: &[&ToolCallRecord]) -> usize {
     for r in decisive {
         let corroborates = match r.signal {
             SignalClass::Metrics | SignalClass::Infra => true,
-            SignalClass::Logs => !overlaps(*r),
+            SignalClass::Logs => !overlaps(r),
             _ => false,
         };
         if corroborates && !classes.contains(&r.signal) {

@@ -1091,6 +1091,7 @@ fn incident_page_url(web_url: &str, base_uri: &str, org_id: &str, incident_id: &
 
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 fn apply_incident_to_context(
     ctx: &mut crate::alerts::notifications::NotificationContext,
     org_id: &str,
@@ -5979,7 +5980,50 @@ pub async fn reconcile_drained_incidents(from_us: i64, to_us: i64) -> anyhow::Re
             started += 1;
         }
     }
-    Ok(started)
+    Ok(started + reconcile_drained_only_records(from_us, to_us).await?)
+}
+
+/// D'20 `Only` half: still-open records of the window whose team runs L0 `Only` get one run
+/// each; their promoting verdict is the only page. Returns how many runs were requested.
+#[cfg(feature = "enterprise")]
+async fn reconcile_drained_only_records(from_us: i64, to_us: i64) -> anyhow::Result<usize> {
+    use config::meta::{
+        alerts::rca_runs::{AutoRunOpts, RunTrigger},
+        oncall::SubjectType,
+    };
+    use o2_enterprise::enterprise::alerts::rca_service::drained_only_records;
+
+    let orgs = infra::table::organizations::list(infra::table::organizations::ListFilter {
+        exclude_deleted: true,
+        ..Default::default()
+    })
+    .await?;
+    let mut requested = 0;
+    for org in orgs {
+        let org_id = org.identifier;
+        for record in drained_only_records(&org_id, from_us, to_us).await? {
+            match record.subject.subject_type {
+                SubjectType::Incident => {
+                    let start = start_automatic_rca(
+                        &org_id,
+                        &record.subject.source_id,
+                        RunTrigger::AutoNewIncident,
+                        AutoRunOpts::for_trigger(RunTrigger::AutoNewIncident),
+                    )
+                    .await;
+                    if matches!(start, AutoStart::Started) {
+                        requested += 1;
+                    }
+                }
+                SubjectType::Alert => {
+                    if super::scheduler::handlers::rerequest_alert_analysis(&org_id, record).await {
+                        requested += 1;
+                    }
+                }
+            }
+        }
+    }
+    Ok(requested)
 }
 
 /// The incident's on-call records still waiting on an analysis, at their current ladder run.

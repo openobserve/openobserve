@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, fmt, str::FromStr, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    str::FromStr,
+    time::Duration,
+};
 
 use config::{
     meta::{
@@ -51,7 +56,7 @@ use super::{
     rca_turn::{self, RcaPrompt, RcaTurnError, TurnStarted},
 };
 use crate::ai_chat::{
-    rca_ledger::{RunTranscript, TranscriptAck, TranscriptSteer, decode_run},
+    rca_ledger::{self, RunTranscript, TranscriptAck, TranscriptSteer, decode_run},
     read_committed_events,
 };
 
@@ -1126,6 +1131,14 @@ pub async fn reconcile_steering(
     if rows.is_empty() {
         return;
     }
+    // D'11: only steering this run's relay persisted counts; other header-shaped text is data.
+    let relayed: HashSet<String> = rows.iter().map(|r| r.steer_id.clone()).collect();
+    let kept = transcript.map(|t| {
+        let mut t = t.clone();
+        rca_ledger::keep_relayed_steers(&mut t, &relayed);
+        t
+    });
+    let transcript = kept.as_ref();
 
     let steers = transcript_steers(transcript);
     let acks = first_acks(transcript);

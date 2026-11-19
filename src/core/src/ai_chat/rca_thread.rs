@@ -809,7 +809,7 @@ pub(crate) fn key_arg(tool: &str, input: &Map<String, Value>) -> Option<String> 
         // F-15: `service@version`, matched only as an exact tuple, never as a substring.
         COMPARE_SERVICE_VERSIONS => {
             let service = request_body.and_then(|rb| rb.get("service")?.as_str());
-            let version = request_body.and_then(|rb| rb.pointer("/a/version")?.as_str());
+            let version = request_body.and_then(|rb| rb.get("a")?.get("version")?.as_str());
             service
                 .zip(version)
                 .filter(|(s, v)| !s.is_empty() && !v.is_empty())

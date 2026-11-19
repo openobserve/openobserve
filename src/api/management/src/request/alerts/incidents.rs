@@ -3304,6 +3304,7 @@ mod tests {
                 Query(RcaThreadQuery {
                     known_version: known.map(str::to_string),
                 }),
+                axum::http::HeaderMap::new(),
             )
         };
 
@@ -3534,6 +3535,7 @@ mod tests {
                 Query(RcaThreadQuery {
                     known_version: known.map(str::to_string),
                 }),
+                axum::http::HeaderMap::new(),
             )
         };
 
@@ -3723,6 +3725,7 @@ mod tests {
                 Query(RcaThreadQuery {
                     known_version: known.map(str::to_string),
                 }),
+                axum::http::HeaderMap::new(),
             )
         };
 
@@ -4665,10 +4668,26 @@ mod tests {
                 user_id: STEER_ROOT.to_string(),
             })
         };
-        let (_, thread) =
-            status_and_body(get_incident_rca_thread(path(), analyst(), no_version()).await).await;
-        let (_, summary) =
-            status_and_body(get_incident_rca_summary(path(), analyst(), no_version()).await).await;
+        let (_, thread) = status_and_body(
+            get_incident_rca_thread(
+                path(),
+                analyst(),
+                no_version(),
+                axum::http::HeaderMap::new(),
+            )
+            .await,
+        )
+        .await;
+        let (_, summary) = status_and_body(
+            get_incident_rca_summary(
+                path(),
+                analyst(),
+                no_version(),
+                axum::http::HeaderMap::new(),
+            )
+            .await,
+        )
+        .await;
         let (_, steering) = steering_as(&org, "inc_1", "run_done", STEER_ROOT).await;
         assert_eq!(events["thread"], thread);
         assert_eq!(events["summary"], summary);
@@ -5625,12 +5644,13 @@ mod tests {
         };
 
         let refused = [
-            get_incident_events(case(), stranger()).await,
-            list_incident_rca_runs(case(), stranger(), runs()).await,
+            get_incident_events(case(), stranger(), axum::http::HeaderMap::new()).await,
+            list_incident_rca_runs(case(), stranger(), runs(), axum::http::HeaderMap::new()).await,
             cancel_incident_rca(case(), stranger()).await,
             get_incident_rca_run(
                 Path((org.clone(), sid(&org, "case"), "run".to_string())),
                 stranger(),
+                axum::http::HeaderMap::new(),
             )
             .await,
         ];
@@ -5638,7 +5658,12 @@ mod tests {
             assert_eq!(resp.status(), StatusCode::FORBIDDEN);
         }
 
-        let ops = get_incident_events(Path((org.clone(), sid(&org, "ops"))), stranger()).await;
+        let ops = get_incident_events(
+            Path((org.clone(), sid(&org, "ops"))),
+            stranger(),
+            axum::http::HeaderMap::new(),
+        )
+        .await;
         assert_eq!(ops.status(), StatusCode::OK);
     }
 }

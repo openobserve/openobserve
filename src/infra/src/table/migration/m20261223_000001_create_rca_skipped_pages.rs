@@ -370,13 +370,46 @@ mod tests {
     #[tokio::test]
     async fn up_twice_preserves_existing_runs_and_down_is_idempotent() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
+        up_and_down(&db).await;
+    }
+
+    /// The same on a fresh PostgreSQL database when `ZO_META_POSTGRES_DSN` is set.
+    #[tokio::test]
+    async fn up_and_down_on_postgres_when_configured() {
+        let dsn = std::env::var("ZO_META_POSTGRES_DSN").unwrap_or_default();
+        if dsn.trim().is_empty() {
+            println!("ZO_META_POSTGRES_DSN unset; postgres arm skipped");
+            return;
+        }
+        let name = format!(
+            "rca_migration_{}",
+            config::ider::generate().to_ascii_lowercase()
+        );
+        let admin = Database::connect(&dsn).await.unwrap();
+        admin
+            .execute_unprepared(&format!(r#"CREATE DATABASE "{name}""#))
+            .await
+            .unwrap();
+        let base = dsn.split('?').next().unwrap();
+        let (server, _) = base.rsplit_once('/').unwrap();
+        let db = Database::connect(format!("{server}/{name}")).await.unwrap();
+        up_and_down(&db).await;
+        db.close().await.unwrap();
+        admin
+            .execute_unprepared(&format!(r#"DROP DATABASE "{name}""#))
+            .await
+            .unwrap();
+        println!("postgres arm ran");
+    }
+
+    async fn up_and_down(db: &sea_orm::DatabaseConnection) {
         db.execute_unprepared("CREATE TABLE rca_runs (run_id TEXT PRIMARY KEY)")
             .await
             .unwrap();
         db.execute_unprepared("INSERT INTO rca_runs VALUES ('old')")
             .await
             .unwrap();
-        let manager = SchemaManager::new(&db);
+        let manager = SchemaManager::new(db);
         Migration.up(&manager).await.unwrap();
         Migration.up(&manager).await.unwrap();
         let row = db

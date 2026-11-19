@@ -2794,11 +2794,12 @@ async fn trigger_rca_for_alert_firing(
                         }),
                     None => Vec::new(),
                 };
-                let unowned = opened
+                let unowned: Vec<config::meta::oncall::SubjectRef> = opened
                     .iter()
-                    .map(|p| &p.response.subject)
-                    .filter(|subject| !owned.contains(subject));
-                release_subjects(&org_id, unowned).await;
+                    .map(|p| p.response.subject.clone())
+                    .filter(|subject| !owned.contains(subject))
+                    .collect();
+                release_subjects(&org_id, &unowned).await;
                 return;
             }
             Err(e) => {
@@ -2884,19 +2885,42 @@ async fn trigger_rca_for_alert_firing(
 }
 
 /// I10: nothing is coming, so nothing may go on holding a page for one.
+/// D'20: re-requests the analysis of one still-open alert record after a drain, as if its
+/// firing had paged now. `false` when the alert is gone.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn rerequest_alert_analysis(
+    org_id: &str,
+    record: config::meta::oncall::Response,
+) -> bool {
+    use std::str::FromStr;
+
+    let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&record.subject.source_id) else {
+        return false;
+    };
+    let Ok(alert) = crate::alerts::alert::get_by_id_db(org_id, alert_id).await else {
+        return false;
+    };
+    let opened = vec![o2_enterprise::enterprise::oncall::escalation::PagedGroup {
+        response: record,
+        dimensions: Default::default(),
+    }];
+    trigger_rca_for_alert_firing("drain-reconcile", &alert, opened).await;
+    true
+}
+
 #[cfg(feature = "enterprise")]
 async fn release_alert_firing_hold(
     org_id: &str,
     opened: &[o2_enterprise::enterprise::oncall::escalation::PagedGroup],
 ) {
-    release_subjects(org_id, opened.iter().map(|p| &p.response.subject)).await;
+    let subjects: Vec<config::meta::oncall::SubjectRef> =
+        opened.iter().map(|p| p.response.subject.clone()).collect();
+    release_subjects(org_id, &subjects).await;
 }
 
 #[cfg(feature = "enterprise")]
-async fn release_subjects<'a>(
-    org_id: &str,
-    subjects: impl IntoIterator<Item = &'a config::meta::oncall::SubjectRef>,
-) {
+// A slice, not a generic iterator: a closure type held across `.await` trips rust#100013.
+async fn release_subjects(org_id: &str, subjects: &[config::meta::oncall::SubjectRef]) {
     let now = config::utils::time::now_micros();
     for subject in subjects {
         if let Err(e) =
