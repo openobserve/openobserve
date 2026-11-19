@@ -4053,6 +4053,16 @@ describe("applyQueryClauses", () => {
     expect(result.fields[1].sortBy).toBe("DESC");
   });
 
+  it("keeps the same aggregate on two JOIN streams apart", async () => {
+    const join = `SELECT a.service, max(a.took) AS m1, max(b.took) AS m2 FROM "default" AS a JOIN "other" AS b ON a.id = b.id GROUP BY a.service`;
+    const having = await clausesOf(`${join} HAVING max(b.took) > 10`);
+    expect(having.fields[1].havingConditions).toBeUndefined();
+    expect(having.fields[2].havingConditions).toEqual([{ operator: ">", value: 10 }]);
+    const ordered = await clausesOf(`${join} ORDER BY max(b.took) DESC`);
+    expect(ordered.fields[1].sortBy).toBeUndefined();
+    expect(ordered.fields[2].sortBy).toBe("DESC");
+  });
+
   it("reads count(DISTINCT x) as count-distinct", async () => {
     const result = await clausesOf(
       `SELECT service, count(distinct level) FROM "default" GROUP BY service`,

@@ -479,13 +479,16 @@ function exprSignature(expr: AstExpr | undefined, timeField: string): string | n
   if (expr?.type === "column_ref") {
     return `${expr.table ?? ""}.${columnRefName(expr)}`;
   }
+  // The argument's table keeps max(a.took) and max(b.took) apart in a JOIN.
   if (expr?.type === "aggr_func") {
-    return `${aggregationName(expr)}(${nestedColumnName(expr.args?.expr) ?? timeField})`;
+    const arg = expr.args?.expr;
+    return `${aggregationName(expr)}(${arg?.table ?? ""}.${nestedColumnName(arg) ?? timeField})`;
   }
   if (expr?.type === "function") {
     const name =
       typeof expr.name === "object" ? expr.name?.name?.[0]?.value?.toLowerCase() : undefined;
-    return `${name}(${nestedColumnName(expr.args?.value?.[0]) ?? timeField})`;
+    const arg = expr.args?.value?.[0];
+    return `${name}(${arg?.table ?? ""}.${nestedColumnName(arg) ?? timeField})`;
   }
   return null;
 }
