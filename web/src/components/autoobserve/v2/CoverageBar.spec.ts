@@ -34,6 +34,12 @@ describe("CoverageBar legend", () => {
     ]);
   });
 
+  it("writes a count over a thousand with the locale's separator", () => {
+    expect(legend(mountBar({ watching: 0, learning: 0, gaps: 1345 }))).toEqual([
+      ["autoobserve2-headline-legend-gap", "Coverage gap 1,345"],
+    ]);
+  });
+
   it("drops a segment with no services", () => {
     const keys = legend(mountBar({ watching: 4, learning: 0, gaps: 0 })).map(([key]) => key);
     expect(keys).toEqual(["autoobserve2-headline-legend-watched"]);
