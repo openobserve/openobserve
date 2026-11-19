@@ -195,8 +195,8 @@
             <AlertEvaluationHistory :alert-id="alertId" :is-composite="isCompositeAlert" />
           </OTabPanel>
           <OTabPanel name="configuration" stretch>
-            <OContent class="flex h-full flex-col overflow-y-auto py-4">
-              <AlertConfigSummary v-if="alert" :alert="alert" class="flex-1" />
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" />
             </OContent>
           </OTabPanel>
         </OTabPanels>
@@ -424,8 +424,8 @@
           </OTabPanel>
 
           <OTabPanel name="configuration" stretch>
-            <OContent class="flex h-full flex-col overflow-y-auto py-4">
-              <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" class="flex-1" />
+            <OContent class="h-full overflow-y-auto py-4">
+              <AlertConfigSummary v-if="alert" :alert="alert" :slo-name="sloName" />
               <AlertCalibrationHeadroomCard v-if="alert && !isAnomalyAlert" :alert-id="alertId" />
             </OContent>
           </OTabPanel>
