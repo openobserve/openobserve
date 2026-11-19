@@ -2798,6 +2798,7 @@ async fn trigger_rca_for_alert_firing(
             alert_name: Some(alert_name.clone()),
             stream: Some(stream_name.clone()),
             dimensions,
+            evidence: None,
         };
 
         // The turn's finalizer delivers the report to `oncall_subjects` or releases them.

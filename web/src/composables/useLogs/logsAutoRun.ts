@@ -274,6 +274,7 @@ function createLogsAutoRun() {
     executors: {
       logs: (ctx) => {
         if (ctx.op === "full") {
+          leaveSearchAround();
           runReasons.clear();
           runReasons.set(ctx.generation.id, [...ctx.reasons]);
         }
@@ -357,15 +358,30 @@ function createLogsAutoRun() {
     engine.settleGeneration(generationId);
   }
 
+  function leaveSearchAround(): void {
+    engine.clearSearchAroundInvalidation();
+    searchAroundShown.value = false;
+    const around = searchObj().data.searchAround;
+    if (!around) return;
+    around.indexTimestamp = -1;
+    if (around.histogramHide) {
+      searchObj().meta.showHistogram = true;
+      around.histogramHide = false;
+    }
+  }
+
   function bindPayload(payload: TransportPayload): boolean {
     const generationId = payload.generationId;
-    if (generationId === null || generationId === undefined) return true;
+    if (generationId === null || generationId === undefined) {
+      if (payload.type === "search") leaveSearchAround();
+      return true;
+    }
     const role = ROLE_BY_TYPE[payload.type] ?? "other";
     if (!engine.registerTrace(generationId, payload.traceId, role)) return false;
+    if (payload.type === "search") leaveSearchAround();
     traceGeneration.set(payload.traceId, generationId);
     if (!generationEpoch.has(generationId)) generationEpoch.set(generationId, freeTextScanEpoch);
     if (payload.type === "search") {
-      searchAroundShown.value = false;
       engine.recordDispatch(generationId, {
         req: payload.queryReq,
         traceId: payload.traceId,

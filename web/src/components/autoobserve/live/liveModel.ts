@@ -178,6 +178,16 @@ export const useLiveZone = () => {
   }));
 };
 
+/** The `/config` flags of the issue context and its Next step; a server that omits one has it off. */
+export const useContextFlags = () => {
+  const store = useStore();
+  return computed(() => {
+    const zo = store.state.zoConfig;
+    const context = config.isEnterprise === "true" && zo?.autoobserve_context_enabled === true;
+    return { context, step: context && zo?.autoobserve_next_step_enabled === true };
+  });
+};
+
 // The fixture views mount this too, so nothing is fetched until the page is in live mode.
 // Gaps fold into one card, so the rail reads well past its cap to still fill it with other kinds.
 const RAIL_FETCH = 100;

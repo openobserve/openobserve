@@ -20,7 +20,7 @@ use config::{
     },
     utils::{
         base64,
-        sql::{is_complex_query, is_eligible_for_histogram, is_explain_query},
+        sql::{is_complex_query, is_eligible_for_histogram, is_explain_query, is_time_splittable},
     },
 };
 use infra::errors::Error;
@@ -82,6 +82,7 @@ impl PartitionSqlContext {
         // Non-UTC aggregates cannot share the persistent state that merges partition results.
         // Time slices are concatenated, so a non-time ranking needs one slice or the agg cache.
         let use_single_partition = is_explain
+            || !is_time_splittable(&req.sql).unwrap_or(false)
             || (is_streaming_agg && sql.histogram_offset != Some(0))
             || ((ts_column.is_none() || apply_over_hits || is_ranked_by_non_ts)
                 && !(req.streaming_output && is_streaming_agg));
@@ -197,6 +198,22 @@ mod tests {
         ] {
             let ctx = ctx_for(sql, None).await;
             assert!(ctx.use_single_partition, "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cross_slice_query_uses_single_partition() {
+        for sql in [
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) AS c FROM "default" WHERE service IN (SELECT service FROM "default" WHERE duration > 10) GROUP BY ts ORDER BY ts"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, sum(count(*)) OVER (ORDER BY histogram(_timestamp, '1 day')) AS cum FROM "default" GROUP BY ts ORDER BY ts"#,
+            r#"SELECT histogram(_timestamp, '1 day') AS ts, count(*) * 100 / sum(count(*)) OVER () AS pct FROM "default" GROUP BY ts ORDER BY ts"#,
+            r#"SELECT histogram(a._timestamp, '1 day') AS ts, count(*) AS c FROM "default" a JOIN "default" b ON a.service = b.service GROUP BY ts ORDER BY ts"#,
+            r#"SELECT * FROM "default" ORDER BY _timestamp DESC LIMIT 10 OFFSET 5"#,
+        ] {
+            for streaming_output in [true, false] {
+                let ctx = ctx_with_output(sql, None, streaming_output).await;
+                assert!(ctx.use_single_partition, "{sql}");
+            }
         }
     }
 

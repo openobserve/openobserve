@@ -3811,7 +3811,6 @@ export default defineComponent({
       clearPermalink();
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
-      searchObj.meta.sqlMode = false;
       const viewOrg = store.state.selectedOrganization.identifier;
       const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
@@ -3876,8 +3875,13 @@ export default defineComponent({
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
-                throw new Error(errMsg);
+                throw Object.assign(new Error(errMsg), { userFacing: true });
               }
+              // Reset only once the view is known to apply, so a failed view keeps the SQL query.
+              searchObj.meta.sqlMode = false;
+              // Let the SQL-mode watcher clear the old query before the view's query is merged.
+              await nextTick();
+              if (leftViewOrg()) return;
               // extractedObj.data.stream.selectedStream = [];
               // extractedObj.data.stream.selectedStream = selectedStreams;
               delete extractedObj.data.stream.streamLists;
@@ -4057,6 +4061,9 @@ export default defineComponent({
               if (leftViewOrg()) return;
             } else {
               // ----- Here we are explicitly handling stream change -----
+              searchObj.meta.sqlMode = false;
+              await nextTick();
+              if (leftViewOrg()) return;
               resetStreamData();
               searchObj.data.stream.streamType = extractedObj.data.stream.streamType;
 
@@ -4125,7 +4132,7 @@ export default defineComponent({
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
-                throw new Error(errMsg);
+                throw Object.assign(new Error(errMsg), { userFacing: true });
               }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -4229,7 +4236,7 @@ export default defineComponent({
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
             toast({
-              message: err.message || t("search.errorWhileApplyingSavedView"),
+              message: res.data?.message || t("search.errorWhileApplyingSavedView"),
               variant: "error",
             });
           }
@@ -4239,7 +4246,10 @@ export default defineComponent({
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
-            message: t("logs.searchBar.errorApplyingSavedView"),
+            message:
+              (err?.userFacing && err.message) ||
+              err?.response?.data?.message ||
+              t("logs.searchBar.errorApplyingSavedView"),
             variant: "error",
           });
           console.log("Error while applying saved view", err);
