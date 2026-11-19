@@ -648,20 +648,97 @@ describe("refinement de-duplication and search-around", () => {
 });
 
 describe("panel records for Visualize and Build (J7)", () => {
-  it("keeps a computed staleness in step with scope and panel loads", () => {
+  it("keeps a computed staleness in step with the scope the chart was handed", () => {
     run().setPanelConfigReader(() => ({ type: "bar" }));
     fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
     fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
     const stale = computed(() => run().isPanelScopeStale());
     expect(stale.value).toBe(false);
+    run().notePanelScopeApplied();
     run().panelLoadingChanged(true, false);
     run().panelLoadingChanged(false, false);
     fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
     expect(stale.value).toBe(true);
+    run().notePanelScopeApplied();
     run().panelLoadingChanged(true, false);
     expect(stale.value).toBe(true);
     run().panelLoadingChanged(false, false);
     expect(stale.value).toBe(false);
+  });
+
+  it.each(["visualize", "build"])(
+    "%s: a chart-type reload after a time change still shows the old window, so Run stays amber",
+    (mode) => {
+      run().setPanelConfigReader(() => ({ type: "bar" }));
+      fakeSearchObj.value.meta.logsVisualizeToggle = mode;
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+      run().markPanelDispatched(run().openPanelRun());
+      run().endPanelRun(true);
+      fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+      expect(run().isPanelScopeStale()).toBe(true);
+      run().setPanelConfigReader(() => ({ type: "line" }));
+      run().panelLoadingChanged(true, false);
+      run().panelLoadingChanged(false, false);
+      expect(run().isPanelScopeStale()).toBe(true);
+    },
+  );
+
+  it("a load outside a run with no scope handed to the chart records nothing", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("a cancelled load outside a run does not record the scope it was handed", () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    run().notePanelScopeApplied();
+    run().panelLoadingChanged(true, false);
+    run().cancelPanelLoad();
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(true);
+    run().panelLoadingChanged(true, false);
+    run().panelLoadingChanged(false, false);
+    expect(run().isPanelScopeStale()).toBe(false);
+  });
+
+  it("a Build run waits for the search bar query sync so its scope holds the query it ran", async () => {
+    run().setPanelConfigReader(() => ({ type: "bar" }));
+    fakeSearchObj.value.meta.logsVisualizeToggle = "build";
+    fakeSearchObj.value.data.query = "level = 'info'";
+    fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    let finishSync: () => void = () => undefined;
+    run().trackPanelQuerySync(
+      new Promise<void>((resolve) => {
+        finishSync = () => {
+          fakeSearchObj.value.data.query = "level = 'error'";
+          resolve();
+        };
+      }),
+    );
+    const synced = run().panelQuerySynced();
+    finishSync();
+    await synced;
+    run().markPanelDispatched(run().openPanelRun());
+    run().endPanelRun(true);
+    expect(run().isPanelScopeStale()).toBe(false);
+    fakeSearchObj.value.data.query = "level = 'info'";
+    expect(run().isPanelScopeStale()).toBe(true);
+  });
+
+  it("a failed query sync still lets the Build run go ahead", async () => {
+    run()
+      .trackPanelQuerySync(Promise.reject(new Error("parser")))
+      .catch(() => undefined);
+    await expect(run().panelQuerySynced()).resolves.toBeUndefined();
   });
 
   it("a dispatched panel run notes its scope even when its loading is not reported to the logs page", () => {
@@ -711,6 +788,7 @@ describe("panel records for Visualize and Build (J7)", () => {
     run().setPanelConfigReader(() => ({ type: "bar" }));
     fakeSearchObj.value.meta.logsVisualizeToggle = "visualize";
     fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
+    run().notePanelScopeApplied();
     run().panelLoadingChanged(true, false);
     run().panelLoadingChanged(false, false);
     fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
@@ -735,6 +813,7 @@ describe("panel records for Visualize and Build (J7)", () => {
       fakeSearchObj.value.meta.logsVisualizeToggle = mode;
       fakeSearchObj.value.data.datetime = { type: "relative", relativeTimePeriod: "15m" };
       expect(run().isPanelScopeStale()).toBe(false);
+      run().notePanelScopeApplied();
       run().panelLoadingChanged(true, false);
       run().panelLoadingChanged(false, false);
       run().setPanelConfigReader(() => ({ type: "line" }));
@@ -744,6 +823,7 @@ describe("panel records for Visualize and Build (J7)", () => {
       fakeSearchObj.value.meta.logsVisualizeToggle = "patterns";
       expect(run().isPanelScopeStale()).toBe(false);
       fakeSearchObj.value.meta.logsVisualizeToggle = mode;
+      run().notePanelScopeApplied();
       run().panelLoadingChanged(true, false);
       run().panelLoadingChanged(false, false);
       expect(run().isPanelScopeStale()).toBe(false);

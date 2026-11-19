@@ -688,6 +688,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
     const loadChartThenMoveTime = async (mode: string) => {
       const { searchObj } = await setup();
       searchObj.meta.logsVisualizeToggle = mode;
+      wrapper!.vm.autoRun.notePanelScopeApplied();
       wrapper!.vm.autoRun.panelLoadingChanged(true, false);
       wrapper!.vm.autoRun.panelLoadingChanged(false, false);
       await flushPromises();
@@ -715,6 +716,12 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         expect(run().classes()).toContain("bg-button-pending-bg");
         expect(separatorShown()).toBe(false);
 
+        wrapper!.vm.autoRun.panelLoadingChanged(true, false);
+        wrapper!.vm.autoRun.panelLoadingChanged(false, false);
+        await flushPromises();
+        expect(run().attributes("data-run-pending")).toBe("true");
+
+        wrapper!.vm.autoRun.notePanelScopeApplied();
         wrapper!.vm.autoRun.panelLoadingChanged(true, false);
         wrapper!.vm.autoRun.panelLoadingChanged(false, false);
         await flushPromises();

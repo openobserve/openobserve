@@ -564,6 +564,9 @@ function createLogsAutoRun() {
 
   // Charts also reload outside an engine run (tab switch, config re-render), so the scope is noted on every load.
   const panelScopes = shallowReactive<Partial<Record<"visualize" | "build", LogsSignature>>>({});
+  // A chart fetches with the window and query it was last handed, never the picker's live ones.
+  const appliedScopes: Partial<Record<"visualize" | "build", LogsSignature>> = {};
+  let panelQuerySync: Promise<unknown> = Promise.resolve();
 
   function panelSurface(): "visualize" | "build" | null {
     const mode = searchModeOf(searchObj().meta.logsVisualizeToggle);
@@ -581,6 +584,27 @@ function createLogsAutoRun() {
     return surface ? { surface, signature: readLogsSignature(searchObj()) } : null;
   }
 
+  function notePanelScopeApplied(): PanelScope | null {
+    const scope = currentPanelScope();
+    if (scope) appliedScopes[scope.surface] = scope.signature;
+    return scope;
+  }
+
+  function appliedPanelScope(): PanelScope | null {
+    const surface = panelSurface();
+    const signature = surface ? appliedScopes[surface] : undefined;
+    return surface && signature ? { surface, signature } : null;
+  }
+
+  function trackPanelQuerySync<T>(task: Promise<T>): Promise<T> {
+    panelQuerySync = Promise.allSettled([panelQuerySync, task]);
+    return task;
+  }
+
+  async function panelQuerySynced(): Promise<void> {
+    await panelQuerySync;
+  }
+
   // A cancelled or failed load never showed the new scope, so only a load that ends cleanly counts.
   function commitPanelScope(scope: PanelScope | null): void {
     if (scope) panelScopes[scope.surface] = scope.signature;
@@ -589,6 +613,8 @@ function createLogsAutoRun() {
   function clearPanelScopes(): void {
     delete panelScopes.visualize;
     delete panelScopes.build;
+    delete appliedScopes.visualize;
+    delete appliedScopes.build;
   }
 
   // Logs results reused by Visualize carry the time window they ran with, not the picker's.
@@ -605,7 +631,7 @@ function createLogsAutoRun() {
 
   function markPanelDispatched(generationId: number): void {
     if (panelRun?.generationId !== generationId || panelRun.dispatched !== null) return;
-    panelRun.scope = currentPanelScope();
+    panelRun.scope = notePanelScopeApplied();
     panelRun.dispatched = currentPanelSignature();
   }
 
@@ -638,7 +664,7 @@ function createLogsAutoRun() {
 
   function panelLoadingChanged(loading: boolean, hasErrors: boolean): void {
     if (!panelRun) {
-      if (loading) outsideRunLoad = currentPanelScope();
+      if (loading) outsideRunLoad = appliedPanelScope();
       else if (!hasErrors) commitPanelScope(outsideRunLoad);
       if (!loading) outsideRunLoad = null;
       return;
@@ -650,6 +676,10 @@ function createLogsAutoRun() {
     }
     if (!panelRun.started) return;
     endPanelRun(!panelRun.failed && !hasErrors);
+  }
+
+  function cancelPanelLoad(): void {
+    outsideRunLoad = null;
   }
 
   function hasPanelRun(generationId: number): boolean {
@@ -693,6 +723,10 @@ function createLogsAutoRun() {
     markPanelFailed,
     endPanelRun,
     panelLoadingChanged,
+    cancelPanelLoad,
+    notePanelScopeApplied,
+    trackPanelQuerySync,
+    panelQuerySynced,
     isPanelScopeStale,
     executedTimeMatches,
     hasPanelRun,

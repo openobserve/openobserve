@@ -2953,6 +2953,7 @@ export default defineComponent({
               dashboardPanelData.data.config.table_dynamic_columns = true;
             }
 
+            autoRun.notePanelScopeApplied();
             // run query
             await copyDashboardDataToVisualize();
 
@@ -3413,7 +3414,7 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle = "logs";
     };
 
-    const onBuildQueryGenerated = async (query: string) => {
+    const syncBuildQuery = async (query: string) => {
       if (searchObj.meta.sqlMode) {
         // SQL mode ON: sync the full generated SQL to the search bar
         searchObj.data.query = query;
@@ -3426,6 +3427,9 @@ export default defineComponent({
         searchObj.data.editorValue = whereClause;
       }
     };
+
+    const onBuildQueryGenerated = (query: string) =>
+      autoRun.trackPanelQuerySync(syncBuildQuery(query));
 
     const onCustomQueryModeChanged = (isCustomMode: boolean) => {
       // Disable query editor in build mode when customQuery is false (builder mode)
@@ -3773,12 +3777,15 @@ export default defineComponent({
     };
 
     // Listen to global cancelQuery event (fired by useCancelQuery composable)
+    const cancelPanelLoad = () => autoRun.cancelPanelLoad();
     onMounted(() => {
       window.addEventListener("cancelQuery", cancelFieldExtraction);
+      window.addEventListener("cancelQuery", cancelPanelLoad);
     });
 
     onBeforeUnmount(() => {
       window.removeEventListener("cancelQuery", cancelFieldExtraction);
+      window.removeEventListener("cancelQuery", cancelPanelLoad);
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components

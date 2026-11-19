@@ -26,6 +26,7 @@ vi.mock("@/stores", async () => {
 import router from "@/test/unit/helpers/router";
 import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 
 // Mock CSS.supports for test environment
 Object.defineProperty(global, "CSS", {
@@ -45,6 +46,7 @@ vi.mock("@/utils/query/sqlUtils", () => ({
   isExplainQuery: vi.fn(() => false),
   buildSqlQuery: vi.fn(),
   getFieldsFromQuery: vi.fn(),
+  extractWhereClause: vi.fn(async () => "level = 'ERROR'"),
   isSimpleSelectAllQuery: vi.fn((query) => {
     if (!query || typeof query !== "string") return false;
     const normalizedQuery = query.trim().replace(/\s+/g, " ");
@@ -1399,9 +1401,16 @@ describe("Logs Index", async () => {
         wrapper.vm.onBuildQueryGenerated(testQuery);
         await flushPromises();
 
-        // Should contain only the WHERE clause part, not the full SQL
-        // extractWhereClause is mocked, so it returns "" for the mock parser
-        expect(wrapper.vm.searchObj.data.query).not.toBe(testQuery);
+        expect(wrapper.vm.searchObj.data.query).toBe("level = 'ERROR'");
+      });
+
+      it("a Build run can wait for the WHERE clause sync before noting its scope", async () => {
+        wrapper.vm.searchObj.meta.sqlMode = false;
+        wrapper.vm.searchObj.data.query = "stale filter";
+        wrapper.vm.onBuildQueryGenerated("SELECT count(*) FROM \"logs\" WHERE level = 'ERROR'");
+        expect(wrapper.vm.searchObj.data.query).toBe("stale filter");
+        await useLogsAutoRun().panelQuerySynced();
+        expect(wrapper.vm.searchObj.data.query).toBe("level = 'ERROR'");
       });
 
       it("should not update query if onBuildQueryGenerated receives empty string", async () => {
