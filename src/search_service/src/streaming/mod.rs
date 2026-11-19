@@ -1257,8 +1257,13 @@ fn compute_vrl_responses(
 
     log::debug!("[trace_id {trace_id}] VRL compiled successfully, applying to results...");
 
+    let mut vrl_errors = transform::VrlRunErrors::default();
     let transformed_hits: Vec<json::Value> = if apply_over_hits {
         // Apply VRL on the entire 2D array at once
+        let row_count: usize = multi_hits
+            .iter()
+            .map(|v| v.as_array().map_or(0, |a| a.len()))
+            .sum();
         let (ret_val, err) = transform::apply_vrl_fn(
             &mut runtime,
             &VRLResultResolver {
@@ -1269,9 +1274,7 @@ fn compute_vrl_responses(
             org_id,
             std::slice::from_ref(&vrl_stream_name),
         );
-        if let Some(e) = err {
-            log::error!("[trace_id {trace_id}] Error applying vrl function in multi_stream: {e}");
-        }
+        vrl_errors.record_rows(row_count, err);
 
         match ret_val.as_array() {
             None => {
@@ -1304,9 +1307,7 @@ fn compute_vrl_responses(
                             org_id,
                             std::slice::from_ref(&vrl_stream_name),
                         );
-                        if let Some(e) = err {
-                            log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
-                        }
+                        vrl_errors.record(err);
                         if !ret_val.is_null() && ret_val.is_object() {
                             flatten::flatten(ret_val).ok()
                         } else {
@@ -1318,6 +1319,11 @@ fn compute_vrl_responses(
             })
             .collect()
     };
+
+    let vrl_error_msg = vrl_errors.message();
+    if let Some(msg) = &vrl_error_msg {
+        log::error!("[trace_id {trace_id}] Error applying vrl function in multi_stream: {msg}");
+    }
 
     log::debug!(
         "[trace_id {trace_id}] VRL execution complete, output has {} arrays (sizes: [{}])",
@@ -1365,6 +1371,9 @@ fn compute_vrl_responses(
 
             resp.hits = hits_for_query;
             resp.query_index = Some(qi);
+            if let Some(msg) = &vrl_error_msg {
+                resp.function_error.push(msg.clone());
+            }
             resp
         })
         .collect()
@@ -1552,6 +1561,62 @@ for_each(result) -> |_idx, query_hits| {
         // query_index should be set correctly
         assert_eq!(responses[0].query_index, Some(0));
         assert_eq!(responses[1].query_index, Some(1));
+    }
+
+    #[tokio::test]
+    async fn test_apply_vrl_runtime_error_sets_function_error_on_each_response() {
+        let vrl_fn = ".x = parse_json!(.m)";
+        let (tx, rx) = mpsc::channel(100);
+        let mut buffered = vec![
+            (
+                0,
+                vec![json::json!({"m": "{\"a\":1}"})],
+                Some(Response::new(0, 10)),
+            ),
+            (
+                1,
+                vec![json::json!({"m": "not json"})],
+                Some(Response::new(0, 10)),
+            ),
+        ];
+
+        apply_vrl_to_multi_results("test-trace", "", vrl_fn, &mut buffered, 2, &tx).await;
+        drop(tx);
+
+        let responses = collect_responses(rx).await;
+        assert_eq!(responses.len(), 2);
+        for resp in &responses {
+            assert_eq!(resp.function_error.len(), 1);
+            assert!(
+                resp.function_error[0].starts_with("Query function failed on 1 of 2 rows: "),
+                "{:?}",
+                resp.function_error
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_apply_vrl_result_array_runtime_error_counts_all_rows() {
+        let vrl_fn = "#ResultArray# \n. = parse_json!(\"not json\")";
+        let (tx, rx) = mpsc::channel(100);
+        let mut buffered = vec![
+            (
+                0,
+                vec![json::json!({"a": 1}), json::json!({"a": 2})],
+                Some(Response::new(0, 10)),
+            ),
+            (1, vec![json::json!({"a": 3})], Some(Response::new(0, 10))),
+        ];
+
+        apply_vrl_to_multi_results("test-trace", "", vrl_fn, &mut buffered, 2, &tx).await;
+        drop(tx);
+
+        let responses = collect_responses(rx).await;
+        assert!(
+            responses[0].function_error[0].starts_with("Query function failed on 3 of 3 rows: "),
+            "{:?}",
+            responses[0].function_error
+        );
     }
 
     /// Test that buffered results arriving out of order (e.g. query 1 finishes before

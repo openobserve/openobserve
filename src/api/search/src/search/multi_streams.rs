@@ -537,7 +537,13 @@ pub async fn search_multi(
         match program {
             Some(program) => {
                 report_function_usage = true;
-                if apply_over_hits {
+                let mut vrl_errors = transform::VrlRunErrors::default();
+                let out = if apply_over_hits {
+                    let row_count: usize = multi_res
+                        .hits
+                        .iter()
+                        .map(|v| v.as_array().map_or(1, |a| a.len()))
+                        .sum();
                     let (ret_val, err) = transform::apply_vrl_fn(
                         &mut runtime,
                         &VRLResultResolver {
@@ -548,9 +554,7 @@ pub async fn search_multi(
                         &org_id,
                         &[vrl_stream_name.clone()],
                     );
-                    if let Some(e) = err {
-                        log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
-                    }
+                    vrl_errors.record_rows(row_count, err);
                     // Use as_array() safely: if VRL execution failed and returned a
                     // non-array value (or a flat array when per_query_resp expects an
                     // array-of-arrays), fall back to an empty result instead of
@@ -596,8 +600,7 @@ pub async fn search_multi(
                             .collect(),
                     }
                 } else {
-                    let mut error: Option<String> = None;
-                    let res = multi_res
+                    multi_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
@@ -611,16 +614,17 @@ pub async fn search_multi(
                                 &org_id,
                                 &[vrl_stream_name.clone()],
                             );
-                            error = err;
+                            vrl_errors.record(err);
 
                             config::utils::flatten::flatten(ret_val).ok()
                         })
-                        .collect();
-                    if let Some(error) = error {
-                        log::error!("[trace_id {trace_id}] Error applying vrl function: {error}");
-                    }
-                    res
+                        .collect()
+                };
+                if let Some(msg) = vrl_errors.message() {
+                    log::error!("[trace_id {trace_id}] Error applying vrl function: {msg}");
+                    multi_res.function_error.push(msg);
                 }
+                out
             }
             None => multi_res.hits,
         }

@@ -1267,14 +1267,15 @@ pub fn apply_vrl_to_response(
             }
             Err(err) => {
                 log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
-                local_res.function_error.push(err.to_string());
-                local_res.is_partial = true;
+                res.function_error.push(err.to_string());
                 None
             }
         };
         match program {
             Some(program) => {
-                if apply_over_hits {
+                let mut vrl_errors = transform::VrlRunErrors::default();
+                let out: Vec<serde_json::Value> = if apply_over_hits {
+                    let row_count = local_res.hits.len();
                     let (ret_val, err) = transform::apply_vrl_fn(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
@@ -1285,9 +1286,7 @@ pub fn apply_vrl_to_response(
                         org_id,
                         &[stream_name.to_string()],
                     );
-                    if let Some(e) = err {
-                        log::error!("Error applying vrl function: {e}");
-                    }
+                    vrl_errors.record_rows(row_count, err);
                     ret_val
                         .as_array()
                         .unwrap()
@@ -1295,8 +1294,7 @@ pub fn apply_vrl_to_response(
                         .filter_map(|v| super::flatten_vrl_result(v.clone()))
                         .collect()
                 } else {
-                    let mut error = "".to_string();
-                    let res = local_res
+                    local_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
@@ -1310,17 +1308,16 @@ pub fn apply_vrl_to_response(
                                 org_id,
                                 &[stream_name.to_string()],
                             );
-                            if let Some(e) = err {
-                                error = e;
-                            }
+                            vrl_errors.record(err);
                             super::flatten_vrl_result(ret_val)
                         })
-                        .collect();
-                    if !error.is_empty() {
-                        log::error!("Error applying vrl function: {error}");
-                    }
-                    res
+                        .collect()
+                };
+                if let Some(msg) = vrl_errors.message() {
+                    log::error!("[trace_id {trace_id}] Error applying vrl function: {msg}");
+                    res.function_error.push(msg);
                 }
+                out
             }
             None => local_res.hits,
         }
@@ -1991,6 +1988,66 @@ mod tests {
             "test",
         );
         assert_eq!(hits, vec![json::json!({"nested_value": 42})]);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_reports_runtime_error_in_function_error() {
+        let mut response = config::meta::search::Response {
+            hits: vec![
+                json::json!({"m": "{\"a\":1}"}),
+                json::json!({"m": "not json"}),
+            ],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some(".x = parse_json!(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits.len(), 2);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(
+            response.function_error[0].starts_with("Query function failed on 1 of 2 rows: "),
+            "{:?}",
+            response.function_error
+        );
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_reports_compile_error_to_caller() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"m": "x"})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some(".x = not_a_function(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"m": "x"})]);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(!response.function_error[0].is_empty());
+        assert!(!response.is_partial);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_no_function_error_on_success() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"m": "{\"a\":1}"})],
+            ..Default::default()
+        };
+        apply_vrl_to_response(
+            Some(".x = parse_json!(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert!(response.function_error.is_empty());
     }
 
     #[test]

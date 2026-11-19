@@ -123,26 +123,25 @@ pub async fn search(
                 .collect_vec();
             match program {
                 Some(program) => {
-                    if apply_over_hits {
+                    let mut vrl_errors = transform::VrlRunErrors::default();
+                    let out = if apply_over_hits {
+                        let rows: Vec<json::Value> = json_rows
+                            .into_iter()
+                            .filter(|v| !v.is_empty())
+                            .map(json::Value::Object)
+                            .collect();
+                        let row_count = rows.len();
                         let (ret_val, err) = transform::apply_vrl_fn(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
                                 fields: program.fields.clone(),
                             },
-                            json::Value::Array(
-                                json_rows
-                                    .into_iter()
-                                    .filter(|v| !v.is_empty())
-                                    .map(json::Value::Object)
-                                    .collect(),
-                            ),
+                            json::Value::Array(rows),
                             &sql.org_id,
                             &stream_names,
                         );
-                        if let Some(e) = err {
-                            log::error!("[trace_id {trace_id}] Error applying vrl function: {e}");
-                        }
+                        vrl_errors.record_rows(row_count, err);
 
                         ret_val
                             .as_array()
@@ -157,8 +156,7 @@ pub async fn search(
                             })
                             .collect::<Vec<_>>()
                     } else {
-                        let mut error = "".to_string();
-                        let res = json_rows
+                        json_rows
                             .into_iter()
                             .filter(|v| !v.is_empty())
                             .filter_map(|hit| {
@@ -172,23 +170,20 @@ pub async fn search(
                                     &sql.org_id,
                                     &stream_names,
                                 );
-                                if let Some(e) = err {
-                                    error = e;
-                                }
+                                vrl_errors.record(err);
                                 if !ret_val.is_null() && ret_val.is_object() {
                                     flatten::flatten(ret_val).ok()
                                 } else {
                                     None
                                 }
                             })
-                            .collect::<Vec<_>>();
-                        if !error.is_empty() {
-                            log::error!(
-                                "[trace_id {trace_id}] Error applying vrl function: {error}"
-                            );
-                        }
-                        res
+                            .collect::<Vec<_>>()
+                    };
+                    if let Some(msg) = vrl_errors.message() {
+                        log::error!("[trace_id {trace_id}] Error applying vrl function: {msg}");
+                        result.function_error.push(msg);
                     }
+                    out
                 }
                 None => json_rows
                     .into_iter()

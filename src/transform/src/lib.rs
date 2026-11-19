@@ -156,6 +156,40 @@ impl Function for WithoutFileArgument {
     }
 }
 
+/// Tallies rows on which a query function failed at runtime, so a search can report
+/// one `function_error` message instead of silently returning the original rows.
+#[derive(Debug, Default)]
+pub struct VrlRunErrors {
+    total: usize,
+    failed: usize,
+    first: Option<String>,
+}
+
+impl VrlRunErrors {
+    /// Records the outcome of one `apply_vrl_fn` call that covered a single row.
+    pub fn record(&mut self, err: Option<String>) {
+        self.record_rows(1, err);
+    }
+
+    /// Records one `apply_vrl_fn` call that covered `rows` rows; an error fails all of them.
+    pub fn record_rows(&mut self, rows: usize, err: Option<String>) {
+        self.total += rows;
+        if let Some(err) = err {
+            self.failed += rows;
+            self.first.get_or_insert(err);
+        }
+    }
+
+    /// The message for `function_error`, or `None` when no row failed.
+    pub fn message(&self) -> Option<String> {
+        let first = self.first.as_ref()?;
+        Some(format!(
+            "Query function failed on {} of {} rows: {first}",
+            self.failed, self.total
+        ))
+    }
+}
+
 pub fn register_global_enrichment_table<T>(name: impl Into<String>, table: T)
 where
     T: Table + Send + Sync + 'static,
@@ -723,5 +757,64 @@ mod tests {
                 "{source}"
             );
         }
+    }
+
+    #[test]
+    fn run_errors_report_nothing_when_no_row_failed() {
+        let mut errors = VrlRunErrors::default();
+        errors.record(None);
+        errors.record(None);
+        assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn run_errors_count_failed_rows_and_keep_first_error() {
+        let mut errors = VrlRunErrors::default();
+        errors.record(None);
+        errors.record(Some("first".to_string()));
+        errors.record(Some("second".to_string()));
+        assert_eq!(
+            errors.message().as_deref(),
+            Some("Query function failed on 2 of 3 rows: first")
+        );
+    }
+
+    #[test]
+    fn run_errors_fail_every_row_of_a_whole_array_call() {
+        let mut errors = VrlRunErrors::default();
+        errors.record_rows(5, Some("boom".to_string()));
+        assert_eq!(
+            errors.message().as_deref(),
+            Some("Query function failed on 5 of 5 rows: boom")
+        );
+    }
+
+    #[test]
+    fn run_errors_ignore_an_empty_successful_array_call() {
+        let mut errors = VrlRunErrors::default();
+        errors.record_rows(0, None);
+        assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn apply_vrl_fn_flags_runtime_failure_on_only_the_bad_row() {
+        let program = compile_vrl_function(".x = parse_json!(.m)", "vrl_crate_test").unwrap();
+        let resolver = VRLResultResolver {
+            program: program.program.clone(),
+            fields: program.fields.clone(),
+        };
+        let mut runtime = init_vrl_runtime();
+        let streams = vec!["s".to_string()];
+        let mut errors = VrlRunErrors::default();
+        for m in ["{\"a\":1}", "not json"] {
+            let row = json::json!({ "m": m });
+            let (_, err) = apply_vrl_fn(&mut runtime, &resolver, row, "vrl_crate_test", &streams);
+            errors.record(err);
+        }
+        let message = errors.message().unwrap();
+        assert!(
+            message.starts_with("Query function failed on 1 of 2 rows: "),
+            "{message}"
+        );
     }
 }
