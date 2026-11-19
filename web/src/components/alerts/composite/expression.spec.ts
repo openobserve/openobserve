@@ -7,7 +7,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { letteredToRaw, rawToLettered, removeExpressionOperand } from "./expression";
+import {
+  childOptionsFrom,
+  letteredToRaw,
+  rawToLettered,
+  removeExpressionOperand,
+} from "./expression";
 
 const isBalanced = (expr: string): boolean => {
   let balance = 0;
@@ -59,5 +64,18 @@ describe("lettered <-> raw expression", () => {
 
   it("leaves unknown letters untouched for validation to reject", () => {
     expect(letteredToRaw("A && Z", children)).toBe("{id-a} && Z");
+  });
+});
+
+describe("childOptionsFrom", () => {
+  it("offers scheduled and SLO alerts but no composite or anomaly rows", () => {
+    const rows = [
+      { alert_id: "s1", name: "scheduled", alert_type: "scheduled" },
+      { alert_id: "slo1", name: "slo", alert_type: "slo" },
+      { alert_id: "c1", name: "composite", alert_type: "composite" },
+      { alert_id: "a1", name: "anomaly", alert_type: "anomaly_detection" },
+      { id: "s2", name: "legacy id field", alert_type: "scheduled" },
+    ];
+    expect(childOptionsFrom(rows).map((option) => option.alert_id)).toEqual(["s1", "slo1", "s2"]);
   });
 });

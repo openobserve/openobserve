@@ -471,6 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size="rowsPerPage"
             :page-size-options="rowsPerPageOptions"
             :current-page="currentPage"
+            :active-row-index="activeRowIndex"
             @update:current-page="currentPage = $event"
             @update:page-size="rowsPerPage = $event"
             table-id="services-catalog"
@@ -1793,12 +1794,32 @@ watch(
     }
     const row = catalogPanelRow(rows, state.service, state.where, state.kind, state.system);
     if (row) {
+      const opened = selectedServiceRow.value?.id !== row.id;
       selectedServiceRow.value = row;
       showSidePanel.value = true;
+      if (opened) showRowPage(row.id);
     }
   },
   { immediate: true },
 );
+const activeRowIndex = computed(() => {
+  const id = showSidePanel.value ? selectedServiceRow.value?.id : undefined;
+  const index = id ? sortedServices.value.findIndex((row) => row.id === id) : -1;
+  return index < 0 ? null : index;
+});
+// A reload sends the table back to page 1, which would hide the open panel's row; a sort or filter keeps page 1.
+watch(services, () => {
+  const id = showSidePanel.value ? selectedServiceRow.value?.id : undefined;
+  if (id) showRowPage(id);
+});
+// A linked row can sit past the first page; the table's own reset lands in a microtask, so the move waits a macrotask.
+function showRowPage(id: string) {
+  const index = sortedServices.value.findIndex((row) => row.id === id);
+  if (index < 0) return;
+  const page = Math.floor(index / rowsPerPage.value) + 1;
+  currentPage.value = page;
+  setTimeout(() => oTableRef.value?.restorePage?.(page), 0);
+}
 // A dependency row without a recorded kind cannot be told apart from a same-named service in the URL.
 function routedRow(row: ServiceRow) {
   return !row.infer_service_name || Boolean(row.infer_service_type);

@@ -325,6 +325,8 @@ import {
   buildSignatureHelp,
   buildHoverContents,
   buildOperatorLane,
+  buildFilledValueEntries,
+  buildFilledWordEntries,
   fieldEntriesOf,
   findCatalogEntry,
   findFunctionEntry,
@@ -1632,6 +1634,7 @@ export default defineComponent({
         config: EditorConfig,
         context: ValueContext,
         highlighted: boolean,
+        textUntilCaret: string,
       ): Promise<any[] | null> => {
         const allFields = fieldEntriesOf(config.keywords(), config.suggestions());
         // `x IN (sel` may start a subquery, so SELECT stays offered after the values and fields.
@@ -1650,7 +1653,6 @@ export default defineComponent({
                 .map(objectEntry)
                 .filter(isValueFunction)
             : [];
-        const fields = context.hasOpenQuote ? [] : [...allFields, ...subquery, ...functions];
         const named = (name: string) =>
           allFields.find((f) => (f.name ?? f.label).toLowerCase() === name.toLowerCase());
         const resolver = config.resolveFieldValues();
@@ -1658,6 +1660,20 @@ export default defineComponent({
           !context.hasOpenQuote && (isQualified(context.typed) || !!named(context.typed));
         // An empty field list means it has not loaded yet, not that the field is unknown.
         const unknownField = allFields.length > 0 && !named(context.field);
+        const filled =
+          groupsMenus(config) && !typedIsColumn && !unknownField
+            ? buildFilledValueEntries({
+                context,
+                textUntilCaret,
+                filterMode: config.filterMode(),
+                fieldType: named(context.field)?.detail,
+                lineNumber: position.lineNumber,
+                column: position.column,
+                closingQuoteAhead: lineAfterCaret(model, position).startsWith("'"),
+                catalog: [...config.keywords(), ...config.suggestions()].map(objectEntry),
+              })
+            : [];
+        const fields = context.hasOpenQuote ? [] : [...allFields, ...subquery, ...functions];
         if (!resolver || typedIsColumn || unknownField) return fields;
 
         const outcome = await awaitValues(config, token, (options) =>
@@ -1690,7 +1706,9 @@ export default defineComponent({
           pattern: context.operator === "like",
           typed: context.typed,
         });
-        return [...values, ...fields, ...capRow(context.field, outcome.length, position)];
+        // Only under a matching value: alone they would take Enter, which must close an open quote.
+        const withFilled = values.length ? [...fields, ...filled] : fields;
+        return [...values, ...withFilled, ...capRow(context.field, outcome.length, position)];
       };
 
       const promqlValueEntries = async (
@@ -1869,8 +1887,13 @@ export default defineComponent({
         // Inside avg( or approx_percentile_cont(, numeric columns lead; on a metrics stream every label would sort above `value`.
         const numericFirst = wantsNumericColumn(parseCallContext(textUntilPosition));
         const rank = (list: any[]) => (numericFirst ? rankNumericFieldsFirst(list) : list);
-        const entries = [...rank(config.keywords()), ...rank(config.suggestions())];
+        const catalog = [...rank(config.keywords()), ...rank(config.suggestions())];
         const textBeforeWord = textUntilPosition.slice(0, textUntilPosition.length - word.length);
+        const filled =
+          groupsMenus(config) && isPredicatePosition(textBeforeWord, config.filterMode())
+            ? buildFilledWordEntries(word, catalog.map(objectEntry))
+            : [];
+        const entries = [...catalog, ...filled];
         const canChain = chainsHere(config, model, position);
         const lead =
           language === "sql" ? parseLogicalLeadContext(textBeforeWord, config.filterMode()) : null;
@@ -1960,6 +1983,7 @@ export default defineComponent({
                 config,
                 valueContext,
                 highlighted,
+                textUntilPosition,
               );
               const qualified = isQualified(valueContext.typed);
               const typedRange = qualified

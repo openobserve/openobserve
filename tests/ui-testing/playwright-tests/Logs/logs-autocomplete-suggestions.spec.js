@@ -2022,7 +2022,9 @@ test.describe("Autocomplete group headers — never a target", () => {
         const whole = row.replace(/'/g, '');
         await page.keyboard.type(whole);
         const after = await waitForMenu(page, 5000);
-        expect(after.headers, `only values should match "${whole}"`).toEqual(['Values · recent']);
+        // The value-filled search functions follow a matching value; a field match would add Fields.
+        expect(after.headers, `only values should match "${whole}"`).toEqual(['Values · recent', 'Functions']);
+        expect(after.rows, 'the functions are on the same field').toContain('str_match (level');
         expect(after.focused).toBe(row);
     });
 

@@ -1263,6 +1263,8 @@ mod tests {
                 correlation_reason: Set(None),
                 created_at: Set(1),
                 resolved_at: Set(None),
+                labels: Set(None),
+                severity: Set(None),
             };
             alert_incident_alerts::Entity::insert(link)
                 .exec(infra::db::get_orm_client_rw().await)

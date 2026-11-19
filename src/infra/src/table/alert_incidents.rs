@@ -17,7 +17,7 @@
 //!
 //! Provides CRUD operations for incidents and incident-alert associations.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::alerts::{
     incidents::IncidentAlertGroup,
@@ -30,7 +30,7 @@ use sea_orm::{
 };
 use svix_ksuid::KsuidLike;
 
-use super::entity::{alert_incident_alerts, alert_incidents, oncall_responses};
+use super::entity::{alert_incident_alerts, alert_incidents, alert_states, oncall_responses};
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
@@ -40,6 +40,7 @@ use crate::{
 pub struct CorrelationCandidate {
     pub id: String,
     pub group_values: serde_json::Value,
+    pub first_alert_at: i64,
 }
 
 /// One incident [auto_resolve_stale] resolved, with the downtime that muted it until then.
@@ -111,6 +112,55 @@ pub struct FirstAlert<'a> {
     pub alert_name: &'a str,
     pub alert_kind: &'a str,
     pub correlation_reason: &'a str,
+    /// The firing's labels, as `config::meta::alerts::incidents::firing_labels_json` makes them.
+    pub labels: Option<&'a str>,
+    pub severity: Option<&'a str>,
+}
+
+/// What moving an alert out of an incident did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemberRemoval {
+    /// The alert's latest firing, as it now sits in `moved_to`.
+    pub latest: alert_incident_alerts::Model,
+    /// The alert's own incident, created in the move's transaction; resolved unless still firing.
+    pub moved_to: String,
+    /// The pair kept apart, against the opener read under the move's lock.
+    pub pair: Option<super::entity::alert_pair_verdicts::Model>,
+}
+
+impl MemberRemoval {
+    pub fn still_firing(&self) -> bool {
+        self.latest.resolved_at.is_none()
+    }
+}
+
+/// Why a removal did not happen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RemovalRefused {
+    NotAMember,
+    LastAlert,
+    Resolved,
+}
+
+/// Builds the pair a move out stores from the opener the move reads under its lock.
+pub type PairFor<'a> = &'a (dyn Fn(&str) -> super::entity::alert_pair_verdicts::Model + Sync);
+
+/// What [replan_severity] reads under the incident lock.
+#[derive(Debug, Clone, Copy)]
+pub struct SeverityPlan<'a> {
+    pub current: &'a str,
+    pub events: &'a [config::meta::alerts::incidents::IncidentEvent],
+    pub firings: &'a [alert_incident_alerts::Model],
+}
+
+/// What [add_labelled_alert_to_incident] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Linked {
+    Joined {
+        new_alert_type: bool,
+    },
+    /// The alert was moved out of incidents this one's opener started.
+    Separated,
 }
 
 /// What [create_with_first_alert] did.
@@ -299,6 +349,8 @@ async fn link_firing<C: ConnectionTrait>(
             correlation_reason: Set(Some(alert.correlation_reason.to_string())),
             created_at: Set(now),
             resolved_at: Set(None),
+            labels: Set(alert.labels.map(str::to_string)),
+            severity: Set(alert.severity.map(str::to_string)),
         }
         .insert(txn)
         .await
@@ -647,6 +699,8 @@ pub async fn create_with_first_alert_with(
         correlation_reason: Set(Some(alert.correlation_reason.to_string())),
         created_at: Set(incident.created_at),
         resolved_at: Set(None),
+        labels: Set(alert.labels.map(str::to_string)),
+        severity: Set(alert.severity.map(str::to_string)),
     }
     .insert(&txn)
     .await
@@ -669,67 +723,113 @@ pub async fn add_alert_to_incident(
     alert_fired_at: i64,
     correlation_reason: &str,
 ) -> Result<bool, errors::Error> {
-    link_alert(
-        incident_id,
-        alert_id,
-        alert_name,
-        alert_kind,
-        alert_fired_at,
-        correlation_reason,
-        None,
-    )
-    .await
-}
-
-/// [`add_alert_to_incident`] for a security case: its span widens to the firing's event time.
-pub async fn add_firing_to_case(
-    incident_id: &str,
-    alert_id: &str,
-    alert_name: &str,
-    alert_kind: &str,
-    alert_fired_at: i64,
-    correlation_reason: &str,
-    activity: CaseActivity,
-) -> Result<bool, errors::Error> {
-    link_alert(
-        incident_id,
-        alert_id,
-        alert_name,
-        alert_kind,
-        alert_fired_at,
-        correlation_reason,
-        Some(activity),
-    )
-    .await
-}
-
-async fn link_alert(
-    incident_id: &str,
-    alert_id: &str,
-    alert_name: &str,
-    alert_kind: &str,
-    alert_fired_at: i64,
-    correlation_reason: &str,
-    activity: Option<CaseActivity>,
-) -> Result<bool, errors::Error> {
-    let client = get_orm_client_rw().await;
-    let txn = client
-        .begin()
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     let alert = FirstAlert {
         alert_id,
         alert_name,
         alert_kind,
         correlation_reason,
+        labels: None,
+        severity: None,
     };
-    let is_new_alert_type =
-        link_firing(&txn, incident_id, &alert, alert_fired_at, activity).await?;
-    txn.commit()
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let linked = link_alert(incident_id, &alert, alert_fired_at, None, false).await?;
+    Ok(matches!(
+        linked,
+        Linked::Joined {
+            new_alert_type: true
+        }
+    ))
+}
 
-    Ok(is_new_alert_type)
+/// [`add_alert_to_incident`] that also stores the firing's labels and refuses a separated alert.
+pub async fn add_labelled_alert_to_incident(
+    incident_id: &str,
+    alert: &FirstAlert<'_>,
+    alert_fired_at: i64,
+) -> Result<Linked, errors::Error> {
+    link_alert(incident_id, alert, alert_fired_at, None, true).await
+}
+
+/// [`add_labelled_alert_to_incident`] for a firing another region already placed: it never refuses
+/// a separated alert, and reopens a resolved incident, as a move with the firing in it opens it.
+pub async fn add_placed_alert_to_incident(
+    org_id: &str,
+    incident_id: &str,
+    alert: &FirstAlert<'_>,
+    alert_fired_at: i64,
+) -> Result<Linked, errors::Error> {
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let txn = get_orm_client_rw().await.begin().await.map_err(db_err)?;
+    let held = alert_incidents::Entity::find_by_id(incident_id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .lock(LockType::Update)
+        .one(&txn)
+        .await
+        .map_err(db_err)?;
+    if held.is_some_and(|incident| incident.status == "resolved") {
+        update_status_with(&txn, org_id, incident_id, "open").await?;
+    }
+    let new_alert_type = link_firing(&txn, incident_id, alert, alert_fired_at, None).await?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(Linked::Joined { new_alert_type })
+}
+
+/// [`add_alert_to_incident`] for a security case: its span widens to the firing's event time.
+pub async fn add_firing_to_case(
+    incident_id: &str,
+    alert: &FirstAlert<'_>,
+    alert_fired_at: i64,
+    activity: CaseActivity,
+) -> Result<bool, errors::Error> {
+    let linked = link_alert(incident_id, alert, alert_fired_at, Some(activity), false).await?;
+    Ok(matches!(
+        linked,
+        Linked::Joined {
+            new_alert_type: true
+        }
+    ))
+}
+
+async fn link_alert(
+    incident_id: &str,
+    alert: &FirstAlert<'_>,
+    alert_fired_at: i64,
+    activity: Option<CaseActivity>,
+    guard: bool,
+) -> Result<Linked, errors::Error> {
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let client = get_orm_client_rw().await;
+    let txn = client.begin().await.map_err(db_err)?;
+    if guard && activity.is_none() && separated_locked(&txn, incident_id, alert.alert_id).await? {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(Linked::Separated);
+    }
+    let is_new_alert_type = link_firing(&txn, incident_id, alert, alert_fired_at, activity).await?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(Linked::Joined {
+        new_alert_type: is_new_alert_type,
+    })
+}
+
+// Under the row lock a move out takes, so a firing read before the move commits cannot rejoin.
+async fn separated_locked<C: ConnectionTrait>(
+    txn: &C,
+    incident_id: &str,
+    alert_id: &str,
+) -> Result<bool, errors::Error> {
+    let Some(incident) = alert_incidents::Entity::find_by_id(incident_id)
+        .lock(LockType::Update)
+        .one(txn)
+        .await?
+    else {
+        return Ok(false);
+    };
+    if incident.security_case {
+        return Ok(false);
+    }
+    if has_member_in(txn, incident_id, alert_id).await? {
+        return Ok(false);
+    }
+    super::incident_membership::separated_with(txn, &incident.org_id, incident_id, alert_id).await
 }
 
 /// Rewrites an incident's group values under a row lock; `edit` returns whether it changed them.
@@ -1122,6 +1222,52 @@ pub async fn retarget_muted_by_downtime_id(
     .await
 }
 
+/// Clears the mute a firing of `alert_id` ends, only while that alert is still a member; read
+/// under the incident lock a move out takes, so a moved alert's firing un-mutes nothing.
+pub async fn clear_mute_for_member(
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+    alert_id: &str,
+) -> Result<bool, errors::Error> {
+    let txn = get_orm_client_rw().await.begin().await?;
+    let locked = alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .lock(LockType::Update)
+        .one(&txn)
+        .await?;
+    let member = locked.is_some() && has_member_in(&txn, id, alert_id).await?;
+    if !member {
+        txn.rollback().await?;
+        return Ok(false);
+    }
+    let cleared = replace_muted_by_downtime_id_with(&txn, org_id, id, downtime_id, None).await?;
+    txn.commit().await?;
+    Ok(cleared)
+}
+
+/// Read on the primary, so an effect checked after a move out commits sees the alert gone.
+pub async fn has_member(incident_id: &str, alert_id: &str) -> Result<bool, errors::Error> {
+    Ok(has_member_in(get_orm_client_rw().await, incident_id, alert_id).await?)
+}
+
+/// Whether any firing of `alert_id` is in the incident, on the caller's connection.
+pub async fn has_member_in<C: ConnectionTrait>(
+    conn: &C,
+    incident_id: &str,
+    alert_id: &str,
+) -> Result<bool, sea_orm::DbErr> {
+    Ok(alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .into_tuple::<String>()
+        .one(conn)
+        .await?
+        .is_some())
+}
+
 /// Compare-and-set of the mute from `downtime_id` to `next`; `true` when this call changed it.
 pub async fn replace_muted_by_downtime_id_with<C: ConnectionTrait>(
     conn: &C,
@@ -1230,6 +1376,51 @@ pub async fn update_severity(
         .update(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Sets the severity and records the event `plan` picks from the history and members, all read
+/// and written under the incident lock a move out takes; returns (from, to).
+pub async fn replan_severity<F>(
+    org_id: &str,
+    id: &str,
+    plan: F,
+) -> Result<Option<(String, String)>, errors::Error>
+where
+    F: FnOnce(SeverityPlan<'_>) -> Option<(String, config::meta::alerts::incidents::IncidentEvent)>
+        + Send,
+{
+    let txn = get_orm_client_rw().await.begin().await?;
+    let Some(incident) = alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .lock(LockType::Update)
+        .one(&txn)
+        .await?
+    else {
+        txn.rollback().await?;
+        return Ok(None);
+    };
+    let firings = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::IncidentId.eq(id))
+        .all(&txn)
+        .await?;
+    let events = super::incident_events::get_with(&txn, org_id, id).await?;
+    let inputs = SeverityPlan {
+        current: &incident.severity,
+        events: &events,
+        firings: &firings,
+    };
+    let Some((to, event)) = plan(inputs).filter(|(to, _)| *to != incident.severity) else {
+        txn.rollback().await?;
+        return Ok(None);
+    };
+    let from = incident.severity.clone();
+    let mut active: alert_incidents::ActiveModel = incident.into();
+    active.severity = Set(to.clone());
+    active.updated_at = Set(chrono::Utc::now().timestamp_micros());
+    active.update(&txn).await?;
+    super::incident_events::append_in(&txn, org_id, id, event).await?;
+    txn.commit().await?;
+    Ok(Some((from, to)))
 }
 
 /// The titles of the incidents among `ids` in this org; untitled and unknown ids are absent.
@@ -1569,6 +1760,53 @@ pub async fn get_incident_alerts(
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// The incident a move out of `from_id` took the alert's firings to, named by its SplitFrom event
+/// (never its key type, which a later firing's dimensions change) and read on the primary.
+pub async fn moved_out_to(
+    org_id: &str,
+    from_id: &str,
+    alert_id: &str,
+) -> Result<Option<String>, errors::Error> {
+    use config::meta::alerts::incidents::IncidentEventType;
+    let conn = get_orm_client_rw().await;
+    let Some(from) = alert_incidents::Entity::find_by_id(from_id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .one(conn)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let holding = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .into_query();
+    let candidates: Vec<String> = alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::Id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::CreatedAt.gte(from.created_at))
+        .filter(alert_incidents::Column::Id.in_subquery(holding))
+        .order_by_asc(alert_incidents::Column::CreatedAt)
+        .into_tuple()
+        .all(conn)
+        .await?;
+    for id in candidates {
+        let events = super::incident_events::get_with(conn, org_id, &id).await?;
+        let split_from = events.iter().any(|e| {
+            matches!(&e.event_type, IncidentEventType::SplitFrom {
+                from_incident_id,
+                alert_id: moved,
+                ..
+            } if from_incident_id == from_id && moved == alert_id)
+        });
+        if split_from {
+            return Ok(Some(id));
+        }
+    }
+    Ok(None)
 }
 
 /// [get_incident_alerts] on the primary, for a decision right after a link write.
@@ -2101,15 +2339,44 @@ pub async fn update_topology(
     id: &str,
     topology: &config::meta::alerts::incidents::IncidentTopology,
 ) -> Result<(), errors::Error> {
-    let client = get_orm_client_rw().await;
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let txn = get_orm_client_rw().await.begin().await.map_err(db_err)?;
     let now = chrono::Utc::now().timestamp_micros();
 
-    let mut incident = get(org_id, id)
-        .await?
+    // Under the row lock Remove takes, so a late enrichment cannot bring a removed node back.
+    let mut incident = alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .lock(LockType::Update)
+        .one(&txn)
+        .await
+        .map_err(db_err)?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+    let drawn: HashSet<&str> = topology.nodes.iter().map(|n| n.alert_id.as_str()).collect();
+    let members: HashSet<String> = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
+        .filter(alert_incident_alerts::Column::IncidentId.eq(id))
+        .filter(alert_incident_alerts::Column::AlertId.is_in(drawn))
+        .distinct()
+        .into_tuple::<String>()
+        .all(&txn)
+        .await
+        .map_err(db_err)?
+        .into_iter()
+        .collect();
+    let mut topology = topology.clone();
+    for gone in topology
+        .nodes
+        .iter()
+        .filter(|n| !members.contains(&n.alert_id))
+        .map(|n| n.alert_id.clone())
+        .collect::<HashSet<_>>()
+    {
+        topology = drop_alert_node(topology, &gone);
+    }
 
     // Serialize topology to JSON - ONLY place this happens
-    let mut topology_json = topology_for_storage(topology).map_err(|e| {
+    let mut topology_json = topology_for_storage(&topology).map_err(|e| {
         Error::DbError(DbError::SeaORMError(format!(
             "Failed to serialize topology: {}",
             e
@@ -2130,11 +2397,8 @@ pub async fn update_topology(
     active.topology_context = Set(Some(topology_json));
     active.updated_at = Set(now);
 
-    active
-        .update(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
+    active.update(&txn).await.map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
     Ok(())
 }
 
@@ -2198,6 +2462,30 @@ pub async fn find_correlation_candidates_with<C: ConnectionTrait>(
         .all(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Ids of the open incidents in `org_id` that hold a firing of `alert_id`.
+pub async fn open_incident_ids_holding_alert_with<C: ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    alert_id: &str,
+) -> Result<HashSet<String>, errors::Error> {
+    let holding = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .into_query();
+    let ids: Vec<String> = alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::Id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::Id.in_subquery(holding))
+        .into_tuple()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(ids.into_iter().collect())
 }
 
 /// Upgrade incident group_values and key_type during hierarchical upgrade
@@ -2342,7 +2630,172 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .exec(client)
         .await?;
-    Ok(())
+    super::incident_membership::delete_by_org(org_id).await
+}
+
+/// The most urgent level the firings stored when they fired; none when none stored one.
+pub fn stored_severity(
+    firings: &[alert_incident_alerts::Model],
+) -> Option<config::meta::alerts::incidents::IncidentSeverity> {
+    use config::meta::alerts::incidents::IncidentSeverity;
+    let urgency = |s: &IncidentSeverity| 4 - *s as u8;
+    firings
+        .iter()
+        .filter_map(|l| l.severity.as_deref()?.parse::<IncidentSeverity>().ok())
+        .max_by_key(urgency)
+}
+
+/// Moves every firing of the alert and its graph node to its own incident in one transaction, as
+/// `moved_to` when another region named it and muted by `muted_by` while it still fires.
+pub async fn remove_member(
+    org_id: &str,
+    incident_id: &str,
+    split: &config::meta::alerts::incidents::SplitNote,
+    pair: Option<PairFor<'_>>,
+    moved_to: Option<&str>,
+    muted_by: Option<&str>,
+) -> Result<Result<MemberRemoval, RemovalRefused>, errors::Error> {
+    let alert_id = split.alert_id.as_str();
+    let db_err = |e: sea_orm::DbErr| Error::DbError(DbError::SeaORMError(e.to_string()));
+    let txn = get_orm_client_rw().await.begin().await.map_err(db_err)?;
+    let Some(incident) = alert_incidents::Entity::find_by_id(incident_id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .lock(LockType::Update)
+        .one(&txn)
+        .await
+        .map_err(db_err)?
+    else {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(Err(RemovalRefused::NotAMember));
+    };
+    // A replicated move follows its origin, which refused a resolved incident under its own lock.
+    if moved_to.is_none() && incident.status == "resolved" {
+        txn.rollback().await.map_err(db_err)?;
+        return Ok(Err(RemovalRefused::Resolved));
+    }
+    // The alert's rows are locked so a recovery resolving them waits for the move.
+    let removed = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .lock(LockType::Update)
+        .all(&txn)
+        .await
+        .map_err(db_err)?;
+    let kept = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::AlertId.ne(alert_id))
+        .all(&txn)
+        .await
+        .map_err(db_err)?;
+    if removed.is_empty() || kept.is_empty() {
+        txn.rollback().await.map_err(db_err)?;
+        let refused = if removed.is_empty() {
+            RemovalRefused::NotAMember
+        } else {
+            RemovalRefused::LastAlert
+        };
+        return Ok(Err(refused));
+    }
+    let moved_to = move_firings(&txn, &incident, &removed, (moved_to, muted_by), split).await?;
+    // The original incident keeps nothing of the moved alert, its firing entries included.
+    super::incident_events::forget_alert_in(&txn, org_id, incident_id, alert_id)
+        .await
+        .map_err(db_err)?;
+    let mut latest = removed
+        .iter()
+        .max_by_key(|l| l.alert_fired_at)
+        .cloned()
+        .ok_or_else(|| Error::Message("no firings to move".to_string()))?;
+    latest.incident_id = moved_to.clone();
+    let opener = kept
+        .iter()
+        .min_by(|a, b| (a.alert_fired_at, &a.alert_id).cmp(&(b.alert_fired_at, &b.alert_id)));
+    let pair = pair
+        .zip(opener)
+        .map(|(pair_for, opener)| pair_for(&opener.alert_id));
+    if let Some(pair) = &pair {
+        super::incident_membership::put_pair_with(&txn, pair.clone()).await?;
+    }
+    let now = chrono::Utc::now().timestamp_micros();
+    let mut active: alert_incidents::ActiveModel = incident.clone().into();
+    active.alert_count = Set(kept.len() as i32);
+    active.first_alert_at = Set(kept.iter().map(|l| l.alert_fired_at).min().unwrap_or(0));
+    active.last_alert_at = Set(kept.iter().map(|l| l.alert_fired_at).max().unwrap_or(0));
+    active.updated_at = Set(now);
+    if let Some(topology) = without_alert_node(incident.topology_context.as_ref(), alert_id) {
+        active.topology_context = Set(Some(topology));
+    }
+    active.update(&txn).await.map_err(db_err)?;
+    txn.commit().await.map_err(db_err)?;
+    Ok(Ok(MemberRemoval {
+        latest,
+        moved_to,
+        pair,
+    }))
+}
+
+/// Opens the moved alert's own incident, as `id` when another region named it, resolved when no
+/// firing is open, and moves its firings and recovery episode there.
+async fn move_firings(
+    txn: &sea_orm::DatabaseTransaction,
+    from: &alert_incidents::Model,
+    firings: &[alert_incident_alerts::Model],
+    (id, muted_by): (Option<&str>, Option<&str>),
+    split: &config::meta::alerts::incidents::SplitNote,
+) -> Result<String, errors::Error> {
+    use config::meta::alerts::incidents::KeyType;
+    let first = firings.iter().map(|l| l.alert_fired_at).min().unwrap_or(0);
+    let Some(latest) = firings.iter().max_by_key(|l| l.alert_fired_at) else {
+        return Err(Error::Message("no firings to move".to_string()));
+    };
+    let severity =
+        stored_severity(firings).map_or_else(|| from.severity.clone(), |s| s.to_string());
+    let mut row = new_incident(
+        &from.org_id,
+        &severity,
+        serde_json::json!({}),
+        &KeyType::AlertId.to_string(),
+        (first, latest.alert_fired_at),
+        Some(latest.alert_name.clone()),
+        None,
+        None,
+    );
+    if let Some(id) = id {
+        row.id = Set(id.to_string());
+    }
+    row.alert_count = Set(firings.len() as i32);
+    if latest.resolved_at.is_some() {
+        row.status = Set("resolved".to_string());
+        row.resolved_at = Set(firings.iter().filter_map(|l| l.resolved_at).max());
+    } else {
+        row.muted_by_downtime_id = Set(muted_by.map(str::to_string));
+    }
+    let opened = row.insert(txn).await?;
+    let event = config::meta::alerts::incidents::IncidentEvent::split_from(
+        split,
+        &from.id,
+        from.title.clone(),
+    );
+    super::incident_events::append_in(txn, &from.org_id, &opened.id, event).await?;
+    alert_incident_alerts::Entity::update_many()
+        .col_expr(
+            alert_incident_alerts::Column::IncidentId,
+            Expr::value(opened.id.clone()),
+        )
+        .filter(alert_incident_alerts::Column::IncidentId.eq(&from.id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(&latest.alert_id))
+        .exec(txn)
+        .await?;
+    alert_states::Entity::update_many()
+        .col_expr(
+            alert_states::Column::EpisodeIncidentId,
+            Expr::value(opened.id.clone()),
+        )
+        .filter(alert_states::Column::AlertId.eq(&latest.alert_id))
+        .filter(alert_states::Column::EpisodeIncidentId.eq(&from.id))
+        .exec(txn)
+        .await?;
+    Ok(opened.id)
 }
 
 /// Built apart from the call so its shape is testable without a database.
@@ -2407,6 +2860,7 @@ fn correlation_candidates_query(
         .columns([
             alert_incidents::Column::Id,
             alert_incidents::Column::GroupValues,
+            alert_incidents::Column::FirstAlertAt,
         ])
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Status.ne("resolved"));
@@ -2423,6 +2877,58 @@ fn stale_incidents_query(cutoff: i64) -> sea_orm::Select<alert_incidents::Entity
             Expr::col(alert_incidents::Column::Status).ne(SimpleExpr::Constant("resolved".into())),
         )
         .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+}
+
+/// The stored topology without the alert's node and its edges; `None` when nothing changes.
+fn without_alert_node(
+    stored: Option<&serde_json::Value>,
+    alert_id: &str,
+) -> Option<serde_json::Value> {
+    let topology: config::meta::alerts::incidents::IncidentTopology =
+        serde_json::from_value(stored?.clone()).ok()?;
+    if !topology.nodes.iter().any(|n| n.alert_id == alert_id) {
+        return None;
+    }
+    let topology = drop_alert_node(topology, alert_id);
+    let mut value = topology_for_storage(&topology).ok()?;
+    // The pre-run reports are not part of the struct but are still read as v1 reports.
+    if let (serde_json::Value::Object(new), Some(serde_json::Value::Object(old))) =
+        (&mut value, stored)
+    {
+        for key in [V1_REPORT_KEY, V1_PREVIOUS_REPORTS_KEY] {
+            if let Some(v) = old.get(key) {
+                new.insert(key.to_string(), v.clone());
+            }
+        }
+    }
+    Some(value)
+}
+
+/// Edges point at node indices, so every index past a dropped node shifts down.
+fn drop_alert_node(
+    mut topology: config::meta::alerts::incidents::IncidentTopology,
+    alert_id: &str,
+) -> config::meta::alerts::incidents::IncidentTopology {
+    let gone: Vec<usize> = topology
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| n.alert_id == alert_id)
+        .map(|(i, _)| i)
+        .collect();
+    let shift = |i: usize| i - gone.iter().filter(|g| **g < i).count();
+    topology.edges = topology
+        .edges
+        .into_iter()
+        .filter(|e| !gone.contains(&e.from_node_index) && !gone.contains(&e.to_node_index))
+        .map(|mut e| {
+            e.from_node_index = shift(e.from_node_index);
+            e.to_node_index = shift(e.to_node_index);
+            e
+        })
+        .collect();
+    topology.nodes.retain(|n| n.alert_id != alert_id);
+    topology
 }
 
 /// Display names are computed on read, so the stored topology never carries them.
@@ -2711,6 +3217,8 @@ mod tests {
             correlation_reason: Set(None),
             created_at: Set(fired_at),
             resolved_at: Set(None),
+            labels: Set(None),
+            severity: Set(None),
         }
         .insert(db)
         .await
@@ -2867,6 +3375,8 @@ mod tests {
                 correlation_reason: Set(None),
                 created_at: Set(fired_at),
                 resolved_at: Set(None),
+                labels: Set(None),
+                severity: Set(None),
             }
             .insert(db)
             .await
@@ -3347,18 +3857,18 @@ mod tests {
     async fn correlation_candidates_project_all_unresolved_rows_in_newest_first_order() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
         db.execute_unprepared(
-            "CREATE TABLE alert_incidents (id TEXT, org_id TEXT, status TEXT, group_values TEXT, created_at BIGINT)",
+            "CREATE TABLE alert_incidents (id TEXT, org_id TEXT, status TEXT, group_values TEXT, created_at BIGINT, first_alert_at BIGINT)",
         )
         .await
         .unwrap();
         db.execute_unprepared(
             r#"INSERT INTO alert_incidents VALUES
-                ('old', 'acme', 'open', '{"ns":"prod"}', 1),
-                ('resolved', 'acme', 'resolved', '{}', 5),
-                ('other', 'other', 'open', '{}', 6),
-                ('conflict', 'acme', 'open', '{"ns":"dev"}', 4),
-                ('acknowledged', 'acme', 'acknowledged', '{"ns":"prod","db":"redis"}', 3),
-                ('empty', 'acme', 'open', '{}', 2)"#,
+                ('old', 'acme', 'open', '{"ns":"prod"}', 1, 10),
+                ('resolved', 'acme', 'resolved', '{}', 5, 50),
+                ('other', 'other', 'open', '{}', 6, 60),
+                ('conflict', 'acme', 'open', '{"ns":"dev"}', 4, 40),
+                ('acknowledged', 'acme', 'acknowledged', '{"ns":"prod","db":"redis"}', 3, 30),
+                ('empty', 'acme', 'open', '{}', 2, 20)"#,
         )
         .await
         .unwrap();
@@ -3375,6 +3885,7 @@ mod tests {
         );
         assert_eq!(candidates[0].group_values, serde_json::json!({"ns": "dev"}));
         assert_eq!(candidates[2].group_values, serde_json::json!({}));
+        assert_eq!(candidates[2].first_alert_at, 20);
         assert!(
             find_correlation_candidates_with(&db, "absent", CaseFilter::All)
                 .await
@@ -3413,6 +3924,8 @@ mod tests {
                 correlation_reason: Set(None),
                 created_at: Set(1),
                 resolved_at: Set(None),
+                labels: Set(None),
+                severity: Set(None),
             }
             .insert(&db)
             .await
@@ -3478,14 +3991,14 @@ mod tests {
     }
 
     #[test]
-    fn correlation_candidates_select_only_id_and_dimensions_without_json_predicates() {
+    fn correlation_candidates_select_only_id_dimensions_and_start_without_json_predicates() {
         use sea_orm::{DbBackend, QueryTrait};
 
         for backend in [DbBackend::Sqlite, DbBackend::Postgres] {
             let stmt = correlation_candidates_query("acme", CaseFilter::All).build(backend);
             assert!(
                 stmt.sql.starts_with(
-                    r#"SELECT "alert_incidents"."id", "alert_incidents"."group_values" FROM "alert_incidents" WHERE "#
+                    r#"SELECT "alert_incidents"."id", "alert_incidents"."group_values", "alert_incidents"."first_alert_at" FROM "alert_incidents" WHERE "#
                 ),
                 "{}",
                 stmt.sql
@@ -3871,6 +4384,8 @@ mod tests {
             correlation_reason: Set(None),
             created_at: Set(at),
             resolved_at: Set(None),
+            labels: Set(None),
+            severity: Set(None),
         }
         .insert(db)
         .await
@@ -3977,6 +4492,8 @@ mod tests {
         alert_name: "checkout (logs) stopped sending data",
         alert_kind: "autoobserve",
         correlation_reason: "alert_id",
+        labels: None,
+        severity: None,
     };
 
     async fn open_fixed(

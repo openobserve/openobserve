@@ -5128,6 +5128,7 @@
     "storageSize": "攝取資料量",
     "compressedSize": "壓縮大小",
     "schemaHeader": "串流詳細資訊",
+    "searchFieldOrIndexType": "搜尋欄位或索引類型",
     "indexTypeOptions": {
       "fullTextSearch": "全文檢索",
       "secondaryIndex": "次要索引",
@@ -14447,6 +14448,7 @@
     "testSendGroupLabel": "傳送真實測試訊息",
     "testSend": "傳送測試",
     "testSendDestinationLabel": "目標",
+    "testSendFixedSample": "測試傳送使用固定範例。",
     "testSendConfirmTitle": "傳送真實測試訊息？",
     "testSendConfirm": "這會將真實訊息發佈到所選頻道，並標記為 [TEST]。",
     "testSendSuccess": "測試訊息已傳送",
@@ -20608,7 +20610,6 @@
       "pageOutOfRange": "頁碼超出範圍。請提供有效的頁碼。",
       "noMatchingService": "未找到匹配的關聯服務",
       "unableToRetrieveCorrelation": "無法檢索關聯數據",
-      "noMetricStreams": "未找到服務 \"{service}\" 的指標流",
       "correlationError": "關聯錯誤：{error}",
       "contentCopied": "內容已成功複製！",
       "noTraceIdForInspection": "沒有可檢查的追蹤 ID"

@@ -5127,6 +5127,7 @@
     "storageSize": "Ingested Data",
     "compressedSize": "Compressed Size",
     "schemaHeader": "Stream Detail",
+    "searchFieldOrIndexType": "ค้นหาฟิลด์หรือประเภทดัชนี",
     "indexTypeOptions": {
       "fullTextSearch": "Full text search",
       "secondaryIndex": "Secondary index",
@@ -10166,7 +10167,7 @@
       "dateEpochms": "มิลลิวินาทีแบบ Epoch: {example}",
       "dateEpochus": "ไมโครวินาทีแบบ Epoch: {example}"
     },
-    "add": "Add Panel",
+    "add": "เพิ่มพาเนล",
     "save": "บันทึก",
     "cancel": "ยกเลิก",
     "name": "Name of Panel",
@@ -14449,6 +14450,7 @@
     "testSendGroupLabel": "Send a real test message",
     "testSend": "Send test",
     "testSendDestinationLabel": "Destination",
+    "testSendFixedSample": "การส่งทดสอบใช้ตัวอย่างที่กำหนดไว้",
     "testSendConfirmTitle": "Send a real test message?",
     "testSendConfirm": "This will post a real message to the selected channel, marked [TEST].",
     "testSendSuccess": "Test message sent",
@@ -20610,7 +20612,6 @@
       "pageOutOfRange": "Page number is out of range. Please provide valid page number.",
       "noMatchingService": "No matching service found for correlation",
       "unableToRetrieveCorrelation": "Unable to retrieve correlation data",
-      "noMetricStreams": "No metric streams found for service \"{service}\"",
       "correlationError": "Correlation error: {error}",
       "contentCopied": "Content Copied Successfully!",
       "noTraceIdForInspection": "No trace ID available for inspection"

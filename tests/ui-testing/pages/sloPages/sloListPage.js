@@ -239,6 +239,11 @@ export class SloListPage {
     await this.page.waitForTimeout(500);
   }
 
+  async expectStatSelected(key, selected) {
+    await expect(this.page.locator(`[data-test="slos-slolist-stat-${key}"]`), `stat "${key}" selected`)
+      .toHaveAttribute('aria-pressed', String(selected), { timeout: 15000 });
+  }
+
   async closeDialogIfOpen() {
     const dialog = this.page.locator(this.locators.deleteDialog);
     if (await dialog.count() > 0 && await dialog.isVisible()) {

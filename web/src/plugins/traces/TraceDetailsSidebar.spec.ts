@@ -3097,6 +3097,11 @@ describe("TraceDetailsSidebar — correlation license lock", () => {
     await flushPromises();
     expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBeUndefined();
     expect(mockFindRelatedTelemetry).toHaveBeenCalled();
+    const spanStartUs = mockSpan.start_time / 1000;
+    expect(mockFindRelatedTelemetry.mock.calls[0][4]).toEqual({
+      start: spanStartUs - 300_000_000,
+      end: spanStartUs + 300_000_000,
+    });
     w.unmount();
   });
 });

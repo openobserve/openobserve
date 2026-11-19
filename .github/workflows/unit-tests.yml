@@ -13,7 +13,8 @@ on:
   merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
+  # A label that changes nothing here only mirrors results, so it must neither replace nor queue behind a real run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) && '-mirror' || '' }}
   # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
   cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
@@ -22,11 +23,14 @@ env:
   ZO_RESULT_CACHE_ENABLED: true
   # coverage mapping needs no DWARF; dropping debuginfo (test inherits dev) cuts compile and link time
   CARGO_PROFILE_DEV_DEBUG: "0"
+  # PR UI tests: shadow = full suite, picked set only reported; on = run only the picked specs and gate changed lines.
+  UI_TEST_SELECTION: shadow
 
 jobs:
   check_changes:
     # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
-    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
+    # Other labels change nothing here, so they skip every paid job and the required checks mirror the last real result.
+    if: ${{ (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -34,6 +38,11 @@ jobs:
     outputs:
       has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
       has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
+      ui_selection: ${{ steps.select.outputs.ui_selection || 'off' }}
+      ui_run: ${{ steps.select.outputs.ui_run || 'full' }}
+      ui_count: ${{ steps.select.outputs.ui_count || '0' }}
+      ui_shards: ${{ steps.select.outputs.ui_shards || '4' }}
+      ui_matrix: ${{ steps.select.outputs.ui_matrix || '[1,2,3,4]' }}
     steps:
       # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
       - if: github.event_name == 'pull_request'
@@ -62,6 +71,33 @@ jobs:
           else
             echo "has_ui_changes=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # A selector failure leaves the outputs unset, so the job-output defaults give a full run.
+      - id: select
+        if: github.event_name == 'pull_request' && steps.check.outputs.has_ui_changes == 'true'
+        continue-on-error: true
+        env:
+          BASE: origin/${{ github.base_ref }}
+          FORCE_FULL: ${{ contains(github.event.pull_request.labels.*.name, 'ci-full-ui-tests') }}
+        run: |
+          node web/scripts/select-ui-tests.mjs --base "$BASE" --head HEAD --out ui-picked-specs
+          mode=$(jq -r .mode ui-picked-specs/selection.json)
+          count=$(jq '.specs | length' ui-picked-specs/selection.json)
+          run=full shards=4
+          if [ "$UI_TEST_SELECTION" = on ] && [ "$FORCE_FULL" != true ] && [ "$mode" = picked ]; then
+            run=picked
+            [ "$count" -le 300 ] && shards=1
+          fi
+          matrix=$(jq -cn --argjson n "$shards" '[range(1; $n + 1)]')
+          printf '%s\n' "ui_selection=$UI_TEST_SELECTION" "ui_run=$run" "ui_count=$count" \
+            "ui_shards=$shards" "ui_matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+      - if: steps.select.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-picked-specs
+          path: ui-picked-specs
+          retention-days: 7
 
   backend_static_checks:
     needs: [check_changes]
@@ -274,7 +310,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: ${{ fromJSON(needs.check_changes.outputs.ui_matrix) }}
     runs-on:
       labels: eks-openobserve-standard-8
     permissions:
@@ -313,12 +349,31 @@ jobs:
           path: web/node_modules
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('web/package-lock.json', 'web/package.json', 'web/patches/**') }}
 
+      - if: needs.check_changes.outputs.ui_run == 'picked'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-picked-specs
+          path: ui-picked-specs
+
       - name: Run this shard with coverage
         working-directory: web
         env:
           UI_SHARD_BALANCE: '1'
+          UI_RUN: ${{ needs.check_changes.outputs.ui_run }}
+          SHARDS: ${{ needs.check_changes.outputs.ui_shards }}
+          # PR runs keep per-spec results for the selection shadow check.
+          JSON_OUT: ${{ github.event_name == 'pull_request' && format('../ui-results/shard-{0}.json', matrix.shard) || '' }}
         run: |
-          npx vitest run --coverage --shard=${{ matrix.shard }}/4 --reporter=default --reporter=blob \
+          specs=() extra=()
+          [ -n "$JSON_OUT" ] && extra=(--reporter=json --outputFile.json="$JSON_OUT")
+          if [ "$UI_RUN" = picked ] && [ ! -f ../ui-picked-specs/picked.txt ]; then
+            echo "::warning::picked spec list missing; running every spec"
+          elif [ "$UI_RUN" = picked ]; then
+            mapfile -t specs < ../ui-picked-specs/picked.txt
+            [ "${#specs[@]}" -gt 0 ] || { echo "No spec reaches this change."; exit 0; }
+          fi
+          npx vitest run "${specs[@]}" --coverage --shard="${{ matrix.shard }}/$SHARDS" --reporter=default --reporter=blob "${extra[@]}" \
             --coverage.reportOnFailure --coverage.reporter=json \
             --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
             --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
@@ -331,6 +386,13 @@ jobs:
           include-hidden-files: true
           retention-days: 1
           compression-level: 1
+
+      - uses: actions/upload-artifact@v4
+        if: always() && github.event_name == 'pull_request'
+        with:
+          name: ui-unit-results-${{ matrix.shard }}
+          path: ui-results
+          retention-days: 7
 
   # Keeps the required-check name `ui_unit_tests` while the work runs in shards.
   ui_unit_tests:
@@ -348,6 +410,7 @@ jobs:
           [ "${{ needs.ui_unit_test_shards.result }}" = "success" ] || { echo "shards: ${{ needs.ui_unit_test_shards.result }}"; exit 1; }
 
       - name: Clone the current repo
+        id: clone
         uses: actions/checkout@v5
 
       - name: Setup Node.js
@@ -371,31 +434,104 @@ jobs:
         run: npm ci
 
       - uses: actions/download-artifact@v4
+        if: needs.check_changes.outputs.ui_run == 'full' || needs.check_changes.outputs.ui_count != '0'
         with:
           pattern: ui-unit-blob-*
           path: web/.vitest-reports
           merge-multiple: true
 
       - name: Merge shard coverage and check thresholds
+        if: needs.check_changes.outputs.ui_run == 'full'
         working-directory: web
         env:
           # Merging the shard reports outgrows the default ~2GB heap and dies with exit 134.
           NODE_OPTIONS: "--max-old-space-size=4096"
         run: ./coverage.sh merge
 
-  ui_code_quality:
-    needs: [check_changes]
-    if: needs.check_changes.outputs.has_ui_changes == 'true'
-    runs-on:
-      labels: eks-openobserve-standard-8
+      # A picked run covers part of the app, so whole-app thresholds give way to the changed-lines gate.
+      - name: Merge shard coverage
+        if: needs.check_changes.outputs.ui_run == 'picked' && needs.check_changes.outputs.ui_count != '0'
+        working-directory: web
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: |
+          npx vitest --merge-reports --coverage --run \
+            --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
+            --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
+
+      - if: always() && github.event_name == 'pull_request' && steps.clone.outcome == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-picked-specs
+          path: ui-picked-specs
+
+      - name: Changed-lines coverage gate
+        if: needs.check_changes.outputs.ui_run == 'picked'
+        working-directory: web
+        run: node scripts/changed-lines-coverage.mjs --diff ../ui-picked-specs/changed.diff
+
+      - name: Changed-lines coverage (report only)
+        if: always() && github.event_name == 'pull_request' && steps.clone.outcome == 'success' && needs.check_changes.outputs.ui_run == 'full'
+        continue-on-error: true
+        working-directory: web
+        run: node scripts/changed-lines-coverage.mjs --diff ../ui-picked-specs/changed.diff --report-only
+
+  # Shadow check: would the picked specs have caught this run's failures? Never blocks.
+  ui_test_selection_shadow:
+    needs: [check_changes, ui_unit_test_shards]
+    if: always() && needs.check_changes.outputs.ui_selection == 'shadow' && needs.check_changes.outputs.has_ui_changes == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: web/scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: ui-picked-specs
+          path: ui-picked-specs
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ui-unit-results-*
+          path: ui-results
+          merge-multiple: true
+      - run: node web/scripts/select-ui-tests.mjs --compare ui-picked-specs/selection.json ui-results
+
+  ui_code_quality:
+    needs: [check_changes]
+    # Required check: a label-only run must mirror the last real result, since a skipped run would pass over a failure.
+    if: ${{ !cancelled() && (((contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) && contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) || (needs.check_changes.result == 'success' && needs.check_changes.outputs.has_ui_changes == 'true')) }}
+    runs-on: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) && 'ubuntu-latest' || 'eks-openobserve-standard-8' }}
+    permissions:
+      contents: read
+      checks: read
+      actions: read
+    env:
+      LABEL_NOISE: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) }}
 
     steps:
+      - name: Check out the mirror action
+        if: env.LABEL_NOISE == 'true'
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/mirror-check-result
+          persist-credentials: false
+      - name: Mirror the last real result
+        if: env.LABEL_NOISE == 'true'
+        uses: ./.github/actions/mirror-check-result
+        with:
+          check-name: ui_code_quality
+          # No UI change skips this job on a real run, and that skip is its passing verdict.
+          skipped-is-result: "true"
       - name: Clone the current repo
+        if: env.LABEL_NOISE != 'true'
         uses: actions/checkout@v5
 
       - name: Setup Node.js
+        if: env.LABEL_NOISE != 'true'
         uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -403,35 +539,43 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm ci
 
       # Cheapest first, so a failure skips the slower steps.
       - name: Check token-file purity (token files contain tokens only)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:token-purity
 
       - name: Check for undefined CSS custom properties
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:tokens
 
       - name: Lint styles (stylelint — bans legacy --o2-* tokens)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:styles
 
       - name: Check design-consistency ratchet (strict — hardcoded/arbitrary/raw-token, no slack)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:design:strict
 
       - name: Lint frontend code
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run lint:ci
 
       - name: Prettier format check (any unformatted file fails)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         run: npm run format:check
 
       - name: Type-check (any error fails)
+        if: env.LABEL_NOISE != 'true'
         working-directory: web
         env:
           # vue-tsc now peaks near 9GB of heap on this project; a lower ceiling
@@ -441,11 +585,28 @@ jobs:
 
   unit_tests_summary:
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
+      checks: read
+      actions: read
     needs: [check_changes, backend_unit_tests, ui_unit_tests, ui_code_quality]
     if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
+    env:
+      LABEL_NOISE: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","ci-full-ui-tests"]'), github.event.label.name)) }}
     steps:
+      - name: Check out the mirror action
+        if: env.LABEL_NOISE == 'true'
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/mirror-check-result
+          persist-credentials: false
+      - name: Mirror the last real result
+        if: env.LABEL_NOISE == 'true'
+        uses: ./.github/actions/mirror-check-result
+        with:
+          check-name: unit_tests_summary
       - name: Check test results
+        if: env.LABEL_NOISE != 'true'
         run: |
           if [ "${{ needs.check_changes.result }}" != "success" ]; then
             echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"

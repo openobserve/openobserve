@@ -1002,6 +1002,58 @@ export default class DashboardactionPage {
     }, scopeSelector);
   }
 
+  // Segments are [start, end, rowIndex, styleIndex] with styleIndex -1 for "no data" (dropped here);
+  // the hidden line series has one point per distinct sample time.
+  async getStateTimelineLayout(scopeSelector = this.chartRendererSelector) {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    if (!chart) return null;
+    const segmentSeries = chart.series.find((s) => s.type === "custom" && s.points.length > 0);
+    const sampleSeries = chart.series.find((s) => s.type === "line");
+    const rows = [];
+    for (const [start, end, rowIndex, styleIndex] of segmentSeries?.points ?? []) {
+      rows[rowIndex] ??= [];
+      if (styleIndex !== -1) rows[rowIndex].push({ start, end });
+    }
+    return { rows: Array.from(rows, (row) => row ?? []), sampleTimes: sampleSeries?.points.length ?? 0 };
+  }
+
+  // Polls because freshly ingested samples can miss the panel's first query.
+  async waitForStateTimelineLayout(rowCount, scopeSelector = this.chartRendererSelector) {
+    let layout = null;
+    await expect
+      .poll(
+        async () => {
+          layout = await this.getStateTimelineLayout(scopeSelector);
+          return layout ? layout.rows.filter((row) => row.length > 0).length : 0;
+        },
+        { timeout: 30000, message: `state timeline never drew ${rowCount} rows with data` },
+      )
+      .toBe(rowCount);
+    return layout;
+  }
+
+  async applyAndGetStateTimelineLayout(rowCount) {
+    await this.applyDashboardBtn();
+    await this.waitForChartToRender();
+    return this.waitForStateTimelineLayout(rowCount);
+  }
+
+  // Each seeded row holds one state, so Bands must join neighbours into segments wider than a bucket.
+  expectStateTimelineBands(layout, bucketMs) {
+    for (const row of layout.rows) {
+      expect(row.length).toBeLessThan(layout.sampleTimes);
+      expect(row.some((segment) => segment.end - segment.start > bucketMs)).toBe(true);
+    }
+  }
+
+  // Cells never join equal neighbours: one cell per sample, none wider than its bucket.
+  expectStateTimelineCells(layout, bucketMs) {
+    for (const row of layout.rows) {
+      expect(row.length).toBe(layout.sampleTimes);
+      expect(row.every((segment) => segment.end - segment.start <= bucketMs)).toBe(true);
+    }
+  }
+
   async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {
     const charts = await this.getChartOptionSnapshots(scopeSelector);
     if (charts.length !== 1) return [`expected one rendered chart, found ${charts.length}`];

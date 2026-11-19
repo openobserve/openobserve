@@ -5128,6 +5128,7 @@
     "storageSize": "Dữ liệu đã nhập",
     "compressedSize": "Kích thước nén",
     "schemaHeader": "Chi tiết stream",
+    "searchFieldOrIndexType": "Tìm trường hoặc loại chỉ mục",
     "indexTypeOptions": {
       "fullTextSearch": "Tìm kiếm toàn văn",
       "secondaryIndex": "Chỉ mục phụ",
@@ -14452,6 +14453,7 @@
     "testSendGroupLabel": "Gửi tin nhắn kiểm tra thực tế",
     "testSend": "Gửi kiểm tra",
     "testSendDestinationLabel": "Đích",
+    "testSendFixedSample": "Gửi thử dùng một mẫu cố định.",
     "testSendConfirmTitle": "Gửi một tin nhắn kiểm tra thực tế?",
     "testSendConfirm": "Thao tác này sẽ đăng một tin nhắn thực tế tới kênh đã chọn, được đánh dấu [TEST].",
     "testSendSuccess": "Tin nhắn kiểm tra đã được gửi",
@@ -20613,7 +20615,6 @@
       "pageOutOfRange": "Số trang nằm ngoài phạm vi. Vui lòng cung cấp số trang hợp lệ.",
       "noMatchingService": "Không tìm thấy dịch vụ phù hợp cho tương quan",
       "unableToRetrieveCorrelation": "Không thể truy xuất dữ liệu tương quan",
-      "noMetricStreams": "Không tìm thấy stream chỉ số nào cho dịch vụ \"{service}\"",
       "correlationError": "Lỗi tương quan: {error}",
       "contentCopied": "Đã sao chép nội dung thành công!",
       "noTraceIdForInspection": "Không có Trace ID để kiểm tra"

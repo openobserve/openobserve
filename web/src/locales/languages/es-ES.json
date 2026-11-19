@@ -5128,6 +5128,7 @@
     "storageSize": "Datos ingeridos",
     "compressedSize": "Tamaño comprimido",
     "schemaHeader": "Detalles del stream",
+    "searchFieldOrIndexType": "Buscar campo o tipo de índice",
     "indexTypeOptions": {
       "fullTextSearch": "Búsqueda de texto completo",
       "secondaryIndex": "Índice secundario",
@@ -14452,6 +14453,7 @@
     "testSendGroupLabel": "Enviar un mensaje de prueba real",
     "testSend": "Enviar prueba",
     "testSendDestinationLabel": "Destino",
+    "testSendFixedSample": "Los envíos de prueba usan una muestra fija.",
     "testSendConfirmTitle": "¿Enviar un mensaje de prueba real?",
     "testSendConfirm": "Esto publicará un mensaje real en el canal seleccionado, marcado como [TEST].",
     "testSendSuccess": "Mensaje de prueba enviado",
@@ -20613,7 +20615,6 @@
       "pageOutOfRange": "El número de página está fuera de rango. Proporciona un número de página válido.",
       "noMatchingService": "No se encontró un servicio coincidente para la correlación",
       "unableToRetrieveCorrelation": "No se pueden recuperar los datos de correlación",
-      "noMetricStreams": "No se encontraron streams de métricas para el servicio \"{service}\"",
       "correlationError": "Error de correlación: {error}",
       "contentCopied": "¡Contenido copiado exitosamente!",
       "noTraceIdForInspection": "No hay un ID de traza disponible para inspección"

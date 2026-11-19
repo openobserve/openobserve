@@ -305,7 +305,26 @@ export const userTimeZone = (setting: unknown): string => {
   }
 };
 
-const count = (locale: string, n: number): I18nText => raw(new Intl.NumberFormat(locale).format(n));
+/** A whole count as the reader's locale writes it, so every count on a screen reads alike. */
+export const countText = (locale: string, n: number): I18nText =>
+  raw(new Intl.NumberFormat(locale).format(n));
+
+/** A share floored, so it never reads 100% with a gap left; under 1% reads "<1%", never 0% with some there. */
+export const percentText = (
+  t: TranslateFn,
+  locale: string,
+  part: number,
+  whole: number,
+): I18nText => {
+  const format = (share: number) =>
+    new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(share);
+  if (part <= 0 || whole <= 0) return raw(format(0));
+  if (part >= whole) return raw(format(1));
+  const pct = Math.floor((100 * part) / whole);
+  return pct < 1
+    ? t("autoobserveLive.lessThan", { value: raw(format(0.01)) })
+    : raw(format(pct / 100));
+};
 
 export const formatDay = (us: number, locale: string, timeZone: string): I18nText =>
   raw(
@@ -620,17 +639,21 @@ export const coverageSentence = (
   if (gaps <= 0)
     return t(
       "autoobserveLive.coverage.sentence.allWatched",
-      { total: count(locale, total) },
+      { total: countText(locale, total) },
       total,
     );
   if (watched <= 0)
-    return t("autoobserveLive.coverage.sentence.allGaps", { total: count(locale, total) }, total);
+    return t(
+      "autoobserveLive.coverage.sentence.allGaps",
+      { total: countText(locale, total) },
+      total,
+    );
   return t("autoobserveLive.coverage.sentence.mixed", {
     watching: t("autoobserveLive.coverage.sentence.watching", {
-      watched: count(locale, watched),
-      total: count(locale, total),
+      watched: countText(locale, watched),
+      total: countText(locale, total),
     }),
-    gaps: t("autoobserveLive.coverage.sentence.gaps", { count: count(locale, gaps) }, gaps),
+    gaps: t("autoobserveLive.coverage.sentence.gaps", { count: countText(locale, gaps) }, gaps),
   });
 };
 
@@ -647,8 +670,8 @@ const learningParams = (
   learning: AutoObserveLearning,
   zone: { locale: string; timeZone: string },
 ) => ({
-  count: count(zone.locale, learning.streams_learning),
-  days: count(zone.locale, learning.history_days_needed),
+  count: countText(zone.locale, learning.streams_learning),
+  days: countText(zone.locale, learning.history_days_needed),
   date: learning.next_ready_at !== null ? dayText(learning.next_ready_at, zone) : raw(""),
 });
 
@@ -693,15 +716,20 @@ export const refreshFailedText = (
     what: t(WHAT_KEY[surface]),
   });
 
+// The approved copy names up to three, then counts the rest.
+export const NAMES_SHOWN = 3;
+
 export const moreCount = (total: number, shown: number) => Math.max(0, total - shown);
 
 export const moreText = (t: TranslateFn, locale: string, total: number, shown: number) => {
   const more = moreCount(total, shown);
-  return more ? t("autoobserveLive.suggestions.more", { count: count(locale, more) }, more) : null;
+  return more
+    ? t("autoobserveLive.suggestions.more", { count: countText(locale, more) }, more)
+    : null;
 };
 
 export const seeAllText = (t: TranslateFn, locale: string, total: number) =>
-  t("autoobserveLive.suggestions.seeAll", { total: count(locale, total) }, total);
+  t("autoobserveLive.suggestions.seeAll", { total: countText(locale, total) }, total);
 
 export type ChartReasonKind =
   | "empty"

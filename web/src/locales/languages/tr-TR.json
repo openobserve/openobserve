@@ -5128,6 +5128,7 @@
     "storageSize": "Alınan Veriler",
     "compressedSize": "Sıkıştırılmış Boyut",
     "schemaHeader": "Akış Detayı",
+    "searchFieldOrIndexType": "Alan veya dizin türü ara",
     "indexTypeOptions": {
       "fullTextSearch": "Tam metin arama",
       "secondaryIndex": "İkincil dizin",
@@ -14452,6 +14453,7 @@
     "testSendGroupLabel": "Gerçek bir test mesajı gönder",
     "testSend": "Test gönder",
     "testSendDestinationLabel": "Hedef",
+    "testSendFixedSample": "Test gönderimleri sabit bir örnek kullanır.",
     "testSendConfirmTitle": "Gerçek bir test mesajı gönderilsin mi?",
     "testSendConfirm": "Bu, seçilen kanala [TEST] olarak işaretlenmiş gerçek bir mesaj gönderir.",
     "testSendSuccess": "Test mesajı gönderildi",
@@ -20613,7 +20615,6 @@
       "pageOutOfRange": "Sayfa numarası aralık dışında. Lütfen geçerli bir sayfa numarası girin.",
       "noMatchingService": "Korelasyon için eşleşen hizmet bulunamadı",
       "unableToRetrieveCorrelation": "Korelasyon verileri alınamıyor",
-      "noMetricStreams": "\"{service}\" hizmeti için metrik akışı bulunamadı",
       "correlationError": "Korelasyon hatası: {error}",
       "contentCopied": "İçerik Başarıyla Kopyalandı!",
       "noTraceIdForInspection": "İnceleme için iz kimliği yok"

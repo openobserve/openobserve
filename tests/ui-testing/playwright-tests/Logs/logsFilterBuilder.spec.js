@@ -1,4 +1,4 @@
-// Logs with the filter builder on, the default the shared fixtures turn off for every other spec.
+// Logs with the filter builder turned on; every other spec runs on the default query editor.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');

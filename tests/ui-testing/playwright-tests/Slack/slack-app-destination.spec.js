@@ -188,7 +188,6 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
     await webhook(names.room, CH.oncall);
     const team = await api.ok(apiContext, 'post', `/api/${org}/oncall/teams`, { name: `pw-payments-${u}`, timezone: 'UTC' });
     teamId = team.id;
-    await api.ok(apiContext, 'post', `/api/${org}/oncall/teams/${teamId}/members`, { user_email: ROOT });
     await api.ok(apiContext, 'put', `/api/${org}/oncall/teams/${teamId}/channel`, { destinations: [names.room] });
     ready = true;
     context = await browser.newContext({ storageState: AUTH_FILE, viewport: { width: 1500, height: 1024 } });
@@ -370,6 +369,8 @@ test.describe('Slack app destinations (C4)', { tag: ['@slack', '@alerts'] }, () 
     const depthNow = async () =>
       (await api.listInstallations(apiContext, org)).installations.find((i) => i.id === install.id)?.health?.outbound_depth;
     await expect.poll(depthNow, { timeout: 40000 }).toEqual(expect.any(Number));
+    // The server's pre-shift job DMs unlinked on-call members 90 s after start; joining late keeps ROOT unreminded.
+    await api.ok(apiContext, 'post', `/api/${org}/oncall/teams/${teamId}/members`, { user_email: ROOT });
     await slack.settings.goto(org);
     const outbound = byTest('slack-workspace-outbound');
     await expect(outbound).toBeVisible({ timeout: 20000 });

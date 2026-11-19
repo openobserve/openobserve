@@ -452,9 +452,17 @@ describe("useMetricDrilldown", () => {
       expect(onDropped).toHaveBeenCalledWith(["namespace"]);
     });
 
-    it("opens traces on the stream's own field names, without a toast", async () => {
+    it("opens traces on the stream's own field names and their aliases, without a toast", async () => {
       api.correlate.mockResolvedValueOnce(
-        correlated([], [stream("default", { service_k8s_namespace_name: "shop" })]),
+        correlated(
+          [],
+          [
+            {
+              ...stream("default", { service_k8s_namespace_name: "shop" }),
+              filter_aliases: { service_k8s_namespace_name: ["k8s_namespace_name"] },
+            },
+          ],
+        ),
       );
       const { drilldown, router, onDropped } = setup({
         filters: [{ label: "service_name", value: "checkout" }],
@@ -465,7 +473,9 @@ describe("useMetricDrilldown", () => {
 
       const route = router.push.mock.calls[0][0];
       expect(route.name).toBe("traces");
-      expect(b64DecodeUnicode(route.query.query)).toBe(`"service_k8s_namespace_name" = 'shop'`);
+      expect(b64DecodeUnicode(route.query.query)).toBe(
+        `("service_k8s_namespace_name" = 'shop' OR "k8s_namespace_name" = 'shop')`,
+      );
       expect(onDropped).not.toHaveBeenCalled();
     });
   });

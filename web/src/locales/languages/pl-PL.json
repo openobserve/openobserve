@@ -5128,6 +5128,7 @@
     "storageSize": "Załadowane dane",
     "compressedSize": "Rozmiar skompresowany",
     "schemaHeader": "Szczegóły strumienia",
+    "searchFieldOrIndexType": "Szukaj pola lub typu indeksu",
     "indexTypeOptions": {
       "fullTextSearch": "Wyszukiwanie pełnotekstowe",
       "secondaryIndex": "Indeks pomocniczy",
@@ -14452,6 +14453,7 @@
     "testSendGroupLabel": "Wyślij prawdziwą wiadomość testową",
     "testSend": "Wyślij test",
     "testSendDestinationLabel": "Miejsce docelowe",
+    "testSendFixedSample": "Wiadomości testowe używają stałej próbki.",
     "testSendConfirmTitle": "Wysłać prawdziwą wiadomość testową?",
     "testSendConfirm": "To wyśle prawdziwą wiadomość do wybranego kanału, oznaczoną jako [TEST].",
     "testSendSuccess": "Wiadomość testowa wysłana",
@@ -20613,7 +20615,6 @@
       "pageOutOfRange": "Numer strony poza zakresem. Podaj poprawny numer strony.",
       "noMatchingService": "Nie znaleziono pasującej usługi dla korelacji",
       "unableToRetrieveCorrelation": "Nie można pobrać danych korelacji",
-      "noMetricStreams": "Nie znaleziono strumieni metrycznych dla usługi \"{service}\"",
       "correlationError": "Błąd korelacji: {error}",
       "contentCopied": "Treść skopiowana pomyślnie!",
       "noTraceIdForInspection": "Brak identyfikatora trace do inspekcji."

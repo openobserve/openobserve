@@ -5128,6 +5128,7 @@
     "storageSize": "البيانات المستوعدة",
     "compressedSize": "الحجم المضغوط",
     "schemaHeader": "تفاصيل التدفق",
+    "searchFieldOrIndexType": "البحث عن حقل أو نوع فهرس",
     "indexTypeOptions": {
       "fullTextSearch": "البحث الكامل",
       "secondaryIndex": "المؤشر الثانوي",
@@ -14452,6 +14453,7 @@
     "testSendGroupLabel": "إرسال رسالة اختبار حقيقية",
     "testSend": "إرسال اختبار",
     "testSendDestinationLabel": "الوجهة",
+    "testSendFixedSample": "تستخدم رسائل الاختبار عينة ثابتة.",
     "testSendConfirmTitle": "إرسال رسالة اختبار حقيقية؟",
     "testSendConfirm": "هذا سيرسل رسالة حقيقية إلى القناة المختارة، مع علامة [اختبار].",
     "testSendSuccess": "تم إرسال رسالة الاختبار",
@@ -20613,7 +20615,6 @@
       "pageOutOfRange": "رقم الصفحة خارج نطاق المعلومات. يرجى تقديم رقم صفحة صالح.",
       "noMatchingService": "لم يتم العثور على خدمة مطابقة للارتباط",
       "unableToRetrieveCorrelation": "غير قادر على استرجاع بيانات الارتباط",
-      "noMetricStreams": "لم يتم العثور على تدفقات مترية للخدمة \"{service}\"",
       "correlationError": "خطأ الارتباط: {error}",
       "contentCopied": "تم نسخ المحتوى بنجاح!",
       "noTraceIdForInspection": "لا يوجد معرف تتبع متاح للفحص"

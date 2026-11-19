@@ -593,9 +593,7 @@ pub async fn zo_config(
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
-    // Composite alerts are not available in super-cluster mode (§18, §19.2).
-    let composite_alerts_available =
-        config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
+    let composite_alerts_available = config::get_config().alert_composite.writes_enabled;
     let online_evals_enabled = enterprise_value!(
         false,
         o2cfg.llm_eval_config.enabled && check_features(&[Feature::AiObservability])
@@ -629,10 +627,9 @@ pub async fn zo_config(
 
     let usage_enabled = enterprise_value!(false, true);
 
-    // Usage calculations need data at most 10 minutes old.
     let usage_publish_interval = enterprise_value!(
         cfg.common.usage_publish_interval,
-        (10 * 60).min(cfg.common.usage_publish_interval)
+        config::enterprise_usage_publish_interval(&cfg)
     );
 
     #[cfg(feature = "cloud")]
