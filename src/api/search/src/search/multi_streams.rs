@@ -458,15 +458,15 @@ pub async fn search_multi(
 
                 if res.is_partial {
                     multi_res.is_partial = true;
-                    multi_res.function_error = if res.function_error.is_empty() {
-                        vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()]
-                    } else {
-                        vec![
-                            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
-                            res.function_error.join(", "),
-                        ]
-                    };
+                    SearchService::merge_function_errors(
+                        &mut multi_res.function_error,
+                        vec![PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()],
+                    );
                 }
+                SearchService::merge_function_errors(
+                    &mut multi_res.function_error,
+                    res.function_error,
+                );
                 if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {
                     multi_res.histogram_interval = res.histogram_interval;
                 }

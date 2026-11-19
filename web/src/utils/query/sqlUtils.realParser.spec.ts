@@ -15,6 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+
 import { parseWhereClauseToFilterChecked } from "./sqlUtils";
 
 describe("parseWhereClauseToFilterChecked with the real SQL parser", () => {
@@ -44,5 +46,75 @@ describe("parseWhereClauseToFilterChecked with the real SQL parser", () => {
     ["\"level\" = 'x'", true],
   ])("%s -> complete=%s", async (where, complete) => {
     expect((await parseWhereClauseToFilterChecked(where)).complete).toBe(complete);
+  });
+});
+
+describe("chart SQL generated from the checked filter", () => {
+  const panel: any = {
+    data: { queries: [{ fields: { stream: "logs" }, joins: [] }] },
+    layout: { currentQueryIndex: 0 },
+    meta: {
+      streamFields: {
+        groupedFields: [
+          {
+            stream_alias: null,
+            schema: [
+              { name: "level", type: "Utf8" },
+              { name: "message", type: "Utf8" },
+              { name: "status", type: "Int64" },
+              { name: "is_error", type: "Boolean" },
+            ],
+          },
+        ],
+      },
+    },
+  };
+  const chartSql = async (where: string) => {
+    const { filter, complete } = await parseWhereClauseToFilterChecked(where);
+    return { complete, sql: buildCondition(filter, panel) };
+  };
+
+  it.each([
+    ["level = 'info'", "(level = 'info')"],
+    ["status >= 5 AND is_error = true", "(status >= 5 AND is_error = true)"],
+    [
+      "level = 'a' AND (status > 1 OR is_error = true)",
+      "(level = 'a' AND (status > 1 OR is_error = true))",
+    ],
+    ["is_error IS NULL", "(is_error IS NULL)"],
+    ["is_error IS NOT NULL", "(is_error IS NOT NULL)"],
+    ["str_match(message, 'x')", "(str_match(message, 'x'))"],
+    ["str_match_ignore_case(message, 'a')", "(str_match_ignore_case(message, 'a'))"],
+    ["re_match(message, 'a.*')", "(re_match(message, 'a.*'))"],
+    ["match_all('x')", "(match_all('x'))"],
+    ["level IN ('a','b')", "(level IN ('a', 'b'))"],
+    ["status IN (1,2)", "(status IN (1, 2))"],
+    ["level NOT IN ('a','b')", "(level NOT IN ('a', 'b'))"],
+    ["level LIKE 'a%'", "(level LIKE 'a%')"],
+    ["level LIKE '%a'", "(level LIKE '%a')"],
+    ["level LIKE '%a%'", "(str_match(level, 'a'))"],
+    ["level NOT LIKE '%a%'", "(level NOT LIKE '%a%')"],
+  ])("charts %s as the same filter", async (where, sql) => {
+    expect(await chartSql(where)).toEqual({ complete: true, sql });
+  });
+
+  it.each([
+    "is_error IS TRUE",
+    "is_error IS FALSE",
+    "is_error IS NOT TRUE",
+    "is_error IS NOT FALSE",
+    "is_error IS UNKNOWN",
+    "str_match(lower(message), 'error')",
+    "str_match(message, lower('x'))",
+    "match_all(lower('x'))",
+    "level IN (lower('a'))",
+    "level IN ('a', NULL)",
+    "level = NULL",
+    "level LIKE 'abc'",
+    "level LIKE 'a%b'",
+    "level LIKE '%a_b%'",
+    "level NOT LIKE 'a%'",
+  ])("holds %s because the builder would change its meaning", async (where) => {
+    expect((await chartSql(where)).complete).toBe(false);
   });
 });

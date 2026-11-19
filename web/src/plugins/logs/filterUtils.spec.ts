@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   appendSqlFilter,
+  replaceInOuterWhere,
   getFieldFromExpression,
   hasFieldCondition,
   removeFieldCondition,
@@ -578,5 +579,37 @@ describe("appendSqlFilter", () => {
     expect(
       appendSqlFilter(`SELECT * FROM (SELECT * FROM t WHERE a = 1 OR b = 2 LIMIT 5) ORDER BY a`, f),
     ).toBe(`SELECT * FROM (SELECT * FROM t WHERE a = 1 OR b = 2 LIMIT 5) where ${f} ORDER BY a`);
+  });
+});
+
+describe("replaceInOuterWhere", () => {
+  const swap = (piece: string) =>
+    piece.includes("a = 1") ? piece.replace("a = 1", "a = 9") : null;
+
+  it("skips sub-selects and string literals", () => {
+    expect(
+      replaceInOuterWhere("SELECT 1 FROM t WHERE x IN (SELECT 1 FROM u WHERE a = 1)", swap),
+    ).toBeNull();
+    expect(replaceInOuterWhere("SELECT 1 FROM t WHERE m = 'a = 1'", swap)).toBeNull();
+    expect(replaceInOuterWhere("SELECT 1 FROM t WHERE m = 'a = 1' AND a = 1", swap)).toBe(
+      "SELECT 1 FROM t WHERE m = 'a = 1' AND a = 9",
+    );
+  });
+
+  it("ignores a comment and stops at the next clause", () => {
+    expect(replaceInOuterWhere("SELECT 1 FROM t WHERE b = 2 /* a = 1 */", swap)).toBeNull();
+    expect(replaceInOuterWhere("SELECT 1 FROM t WHERE b = 2 ORDER BY a = 1", swap)).toBeNull();
+    expect(replaceInOuterWhere("SELECT 1 FROM t", swap)).toBeNull();
+  });
+});
+
+describe("appendSqlFilter trailing line break", () => {
+  it("keeps the newline after a trailing line comment", () => {
+    expect(appendSqlFilter("SELECT 1 FROM t WHERE a = 1 -- c\n", "b = 2")).toBe(
+      "SELECT 1 FROM t WHERE a = 1 AND b = 2 -- c\n",
+    );
+    expect(appendSqlFilter("SELECT 1 FROM t -- c\n", "b = 2")).toBe(
+      "SELECT 1 FROM t where b = 2 -- c\n",
+    );
   });
 });

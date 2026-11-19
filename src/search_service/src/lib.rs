@@ -419,6 +419,7 @@ pub async fn search_multi(
                 } else {
                     multi_res.hits.extend(res.hits);
                 }
+                merge_function_errors(&mut multi_res.function_error, res.function_error);
             }
             Err(e) => {
                 log::error!("search_multi: search error: {e:?}");
@@ -970,6 +971,16 @@ pub async fn match_source(
     true
 }
 
+/// Child warnings (e.g. a failing query function) must reach the caller even when the child
+/// is not partial.
+pub fn merge_function_errors(acc: &mut Vec<String>, child: Vec<String>) {
+    for err in child {
+        if !acc.contains(&err) {
+            acc.push(err);
+        }
+    }
+}
+
 pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
 }
@@ -1158,6 +1169,16 @@ fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_merge_function_errors_keeps_non_partial_child_error_once() {
+        let msg = "Query function failed on 1 of 2 rows: boom".to_string();
+        let mut acc = vec![];
+        merge_function_errors(&mut acc, vec![msg.clone()]);
+        merge_function_errors(&mut acc, vec![msg.clone(), "other".to_string()]);
+        merge_function_errors(&mut acc, vec![]);
+        assert_eq!(acc, vec![msg, "other".to_string()]);
+    }
+
     use std::sync::Arc;
 
     use arrow_schema::{DataType, Field, Schema};

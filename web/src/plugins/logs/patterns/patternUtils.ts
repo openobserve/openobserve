@@ -46,10 +46,25 @@ const splitTemplate = (template: string): string[] =>
 const splitConstants = (template: string): string[] =>
   splitTemplate(template).filter((p) => /[\p{L}\p{N}]/u.test(p));
 
-// A term can only match another template whose constants contain it inside one segment.
-const sharedWith = (terms: string[], other: string): boolean => {
-  const segments = splitConstants(other).map((s) => s.toLowerCase());
-  return terms.every((t) => segments.some((s) => s.includes(t.toLowerCase())));
+const GAP = "\u0001";
+
+// The backend runs match_all(t) as a case-insensitive ILIKE '%t%' with the term unescaped, after
+// dropping a leading `re:` and edge `*`; so `_` and `%` in a term are wildcards, not literals.
+const termMatcher = (term: string): RegExp => {
+  const core = term
+    .replace(/^(re:)+/, "")
+    .replace(/^\*+/, "")
+    .replace(/\*+$/, "");
+  const source = [...core]
+    .map((ch) => (ch === "_" ? "." : ch === "%" ? ".*" : ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+    .join("");
+  return new RegExp(source, "isu");
+};
+
+// A placeholder can hold any value, so it becomes a gap only a wildcard term can match across.
+const sharedWith = (matchers: RegExp[], other: string): boolean => {
+  const text = other.split(PLACEHOLDER).join(GAP);
+  return matchers.every((m) => m.test(text));
 };
 
 /**
@@ -64,7 +79,11 @@ export const resolvePatternMatchTerms = (
   // Without the other templates nothing can vouch for short words, so only long constants are trusted.
   if (!allTemplates) return long.length ? long : null;
   const others = allTemplates.filter((t) => t !== template);
-  const unique = (terms: string[]) => terms.length > 0 && !others.some((o) => sharedWith(terms, o));
+  const unique = (terms: string[]) => {
+    if (!terms.length) return false;
+    const matchers = terms.map(termMatcher);
+    return !others.some((o) => sharedWith(matchers, o));
+  };
 
   if (unique(long)) return long;
   const all = splitConstants(template);

@@ -459,6 +459,28 @@ describe("resolvePatternMatchTerms", () => {
     expect(resolvePatternMatchTerms("GET <*>", ["GET <*>", "GET <*> 200"])).toBeNull();
   });
 
+  it("treats `_` in a term as a one-character wildcard, as the backend ILIKE does", () => {
+    const a = "foo_bar <*>";
+    const b = "fooxbar <*>";
+    expect(resolvePatternMatchTerms(a, [a, b])).toBeNull();
+    expect(patternFilterBlockedReason(a, [a, b])).toBe("shared");
+    expect(resolvePatternMatchTerms(b, [a, b])).toEqual(["fooxbar"]);
+  });
+
+  it("treats `%` in a term as a run wildcard, also across a placeholder", () => {
+    const a = "50%off <*>";
+    const b = "50 big sale off <*>";
+    const c = "50 <*> off sale";
+    expect(resolvePatternMatchTerms(a, [a, b])).toBeNull();
+    expect(resolvePatternMatchTerms(a, [a, c])).toBeNull();
+    expect(resolvePatternMatchTerms(a, [a, "plain <*> text"])).toEqual(["50%off"]);
+  });
+
+  it("matches case-insensitively and ignores a leading re: or surrounding stars", () => {
+    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>", "xget y <*>"])).toBeNull();
+    expect(resolvePatternMatchTerms("*abc* <*>", ["*abc* <*>", "zabcz <*>"])).toBeNull();
+  });
+
   it("returns null for an all-wildcard template", () => {
     expect(resolvePatternMatchTerms("<*> <*>", ["<*> <*>", A])).toBeNull();
   });

@@ -1941,6 +1941,7 @@ import {
   appendSqlFilter,
   hasFieldCondition,
   removeFieldCondition,
+  replaceInOuterWhere,
 } from "@/plugins/logs/filterUtils";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
@@ -5638,15 +5639,14 @@ export default defineComponent({
             // Append mode (SearchResult include/exclude) skips the replace so values AND together.
             const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
             const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
-            if (
-              query.toLowerCase().includes("where") &&
-              fieldNameSQL &&
-              hasFieldCondition(query, fieldNameSQL)
-            ) {
-              query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
-            } else {
-              query = appendSqlFilter(query, filter);
-            }
+            const replaced = fieldNameSQL
+              ? replaceInOuterWhere(query, (piece) =>
+                  hasFieldCondition(piece, fieldNameSQL)
+                    ? replaceExistingFieldCondition(piece, fieldNameSQL, filter)
+                    : null,
+                )
+              : null;
+            query = replaced ?? appendSqlFilter(query, filter);
             currentQuery[0] = query;
           } else {
             const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";
