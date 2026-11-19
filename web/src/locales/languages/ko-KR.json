@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "선택한 스트림에 전체 텍스트 필드가 없습니다",
     "freeTextNoTextFields": "이 스트림에는 검색할 텍스트 필드가 없습니다.",
     "freeTextNoTextFieldsNamed": "검색하지 않음: {streams}(텍스트 필드 없음).",
-    "freeTextBuildNotice": "이 필터에는 텍스트 검색이 있습니다. SQL에서 편집하세요."
+    "freeTextBuildNotice": "이 필터에는 텍스트 검색이 있습니다. SQL에서 편집하세요.",
+    "filterNotChartableNotice": "이 필터는 빌더에서 차트로 만들 수 없습니다. 검색 필터는 변경되지 않았습니다. 차트로 만들려면 {custom}로 전환하세요."
   },
   "menu": {
     "alertCalibration": "알림 캘리브레이션",
@@ -12930,6 +12931,7 @@
         "emptyQuery": "알림을 생성할 쿼리가 없습니다.",
         "noQueries": "이 패널에는 알림을 생성할 쿼리가 없습니다.",
         "noConstants": "선택된 패턴에는 일치시킬 고유한 텍스트가 없습니다.",
+        "patternsShared": "선택한 패턴 중 {count}개는 모든 텍스트가 다른 패턴과 같아 알림 필터에서 제외됩니다.",
         "sqlModeFilterDropped": "SQL 쿼리가 전달되지 않았습니다 — 알림은 선택된 패턴만 일치합니다.",
         "patternsUnusable": "이 페이지의 어떤 패턴에도 일치시킬 고유한 텍스트가 없으므로 알림은 검색어만 사용합니다.",
         "dbmRollupLag": "데이터베이스 수치는 {minutes}분마다 집계되므로 이 알림은 그 간격으로만 발생할 수 있습니다 — 실시간 페이지가 아닙니다.",
@@ -20132,6 +20134,7 @@
       "excludeFromQuery": "제외",
       "createAlertAction": "알림 생성",
       "noMatchTerms": "이 패턴에는 필터링할 구별되는 텍스트가 없습니다.",
+      "noDistinctTextTooltip": "이 패턴의 고정 텍스트는 모두 다른 패턴에도 나타나므로 필터가 해당 패턴의 로그와도 일치합니다.",
       "noStreamSelected": "선택된 스트림이 없습니다. 알림을 생성하기 전에 스트림을 선택하세요.",
       "alertBroadMatch": "이 패턴에는 구별되는 상수 텍스트가 없습니다. 알림 쿼리가 광범위하게 일치합니다. 수동 필터를 추가하는 것을 고려하세요."
     },

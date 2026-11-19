@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "Os streams selecionados não têm campos de texto completo",
     "freeTextNoTextFields": "Este stream não tem campos de texto para pesquisar.",
     "freeTextNoTextFieldsNamed": "Não pesquisado: {streams} (sem campos de texto).",
-    "freeTextBuildNotice": "Este filtro tem pesquisa de texto; edite-o em SQL."
+    "freeTextBuildNotice": "Este filtro tem pesquisa de texto; edite-o em SQL.",
+    "filterNotChartableNotice": "Este filtro não pode ser representado num gráfico no construtor. O seu filtro de pesquisa não foi alterado; mude para {custom} para o representar."
   },
   "menu": {
     "alertCalibration": "Calibração de alertas",
@@ -12930,6 +12931,7 @@
         "emptyQuery": "Não há consulta para criar um alerta.",
         "noQueries": "Este painel não tem consulta para criar um alerta.",
         "noConstants": "Os padrões selecionados não têm texto distintivo para corresponder.",
+        "patternsShared": "{count} dos padrões selecionados partilham todo o texto com outros padrões, por isso o filtro do alerta omite-os.",
         "sqlModeFilterDropped": "A sua consulta SQL não foi mantida — o alerta corresponde apenas aos padrões selecionados.",
         "patternsUnusable": "Nenhum dos padrões nesta página tem texto distintivo para corresponder, portanto o alerta usa apenas a sua pesquisa.",
         "dbmRollupLag": "Os números da base de dados são agregados a cada {minutes} minutos, por isso este alerta só pode disparar com esta frequência — não é um acionamento em tempo real.",
@@ -20132,6 +20134,7 @@
       "excludeFromQuery": "Excluir",
       "createAlertAction": "Criar alerta",
       "noMatchTerms": "Este padrão não possui texto distinto para filtrar.",
+      "noDistinctTextTooltip": "Cada parte de texto fixo deste padrão também aparece noutro padrão, por isso um filtro corresponderia também aos respetivos registos.",
       "noStreamSelected": "Nenhum stream selecionado. Selecione um stream antes de criar um alerta.",
       "alertBroadMatch": "Este padrão não possui texto constante distinto — a consulta do alerta corresponderá amplamente. Considere adicionar filtros manuais."
     },

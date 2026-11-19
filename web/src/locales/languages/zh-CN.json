@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "所选数据流没有全文检索字段",
     "freeTextNoTextFields": "此数据流没有可搜索的文本字段。",
     "freeTextNoTextFieldsNamed": "未搜索：{streams}（无文本字段）。",
-    "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。"
+    "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。",
+    "filterNotChartableNotice": "此筛选条件无法在构建器中绘制图表。您的搜索筛选条件未更改；请切换到 {custom} 以绘制图表。"
   },
   "menu": {
     "alertCalibration": "告警校准",
@@ -12930,6 +12931,7 @@
         "emptyQuery": "没有可用于创建告警的查询。",
         "noQueries": "此面板没有可用于创建告警的查询。",
         "noConstants": "所选的模式没有可匹配的独特文本。",
+        "patternsShared": "所选模式中有 {count} 个的全部文本与其他模式相同，因此告警过滤器未包含它们。",
         "sqlModeFilterDropped": "您的 SQL 查询未被保留——告警仅匹配所选模式。",
         "patternsUnusable": "此页面上的模式均没有可匹配的独特文本，因此告警仅使用您的搜索。",
         "dbmRollupLag": "数据库指标每 {minutes} 分钟聚合一次，因此此告警只能按该频率触发 — 它不是实时页面。",
@@ -20132,6 +20134,7 @@
       "excludeFromQuery": "排除",
       "createAlertAction": "创建告警",
       "noMatchTerms": "此模式没有可筛选的独特文本。",
+      "noDistinctTextTooltip": "此模式中的每段固定文本也出现在其他模式中，因此筛选器也会匹配它们的日志。",
       "noStreamSelected": "未选择数据流。请先选择数据流再创建告警。",
       "alertBroadMatch": "此模式没有独特的常量文本 — 告警查询将匹配广泛。请考虑添加手动筛选。"
     },

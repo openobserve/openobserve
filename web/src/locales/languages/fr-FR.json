@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "Les flux sélectionnés n'ont aucun champ en texte intégral",
     "freeTextNoTextFields": "Ce flux n'a aucun champ texte à rechercher.",
     "freeTextNoTextFieldsNamed": "Non recherché : {streams} (aucun champ texte).",
-    "freeTextBuildNotice": "Ce filtre comporte une recherche textuelle ; modifiez-le en SQL."
+    "freeTextBuildNotice": "Ce filtre comporte une recherche textuelle ; modifiez-le en SQL.",
+    "filterNotChartableNotice": "Ce filtre ne peut pas être représenté dans le générateur. Votre filtre de recherche est inchangé ; passez à {custom} pour le représenter."
   },
   "menu": {
     "alertCalibration": "Calibration des alertes",
@@ -12930,6 +12931,7 @@
         "emptyQuery": "Il n'y a aucune requête à partir de laquelle créer une alerte.",
         "noQueries": "Ce panneau n'a aucune requête pour créer une alerte.",
         "noConstants": "Les motifs sélectionnés n'ont aucun texte distinctif à faire correspondre.",
+        "patternsShared": "{count} des motifs sélectionnés partagent tout leur texte avec d'autres motifs ; le filtre de l'alerte les omet donc.",
         "sqlModeFilterDropped": "Votre requête SQL n'a pas été reportée — l'alerte ne correspond qu'aux motifs sélectionnés.",
         "patternsUnusable": "Aucun des motifs de cette page n'a de texte distinctif à faire correspondre, donc l'alerte n'utilise que votre recherche.",
         "dbmRollupLag": "Les chiffres de la base de données sont agrégés toutes les {minutes} minutes, donc cette alerte ne peut se déclencher qu'à cette fréquence — ce n'est pas une page en temps réel.",
@@ -20132,6 +20134,7 @@
       "excludeFromQuery": "Exclure",
       "createAlertAction": "Créer une alerte",
       "noMatchTerms": "Ce motif n'a pas de texte distinctif pour filtrer.",
+      "noDistinctTextTooltip": "Chaque élément de texte fixe de ce motif apparaît aussi dans un autre motif ; un filtre correspondrait donc aussi à leurs journaux.",
       "noStreamSelected": "Aucun flux sélectionné. Veuillez sélectionner un flux avant de créer une alerte.",
       "alertBroadMatch": "Ce motif n'a pas de texte constant distinctif — la requête d'alerte correspondra largement. Envisagez d'ajouter des filtres manuels."
     },

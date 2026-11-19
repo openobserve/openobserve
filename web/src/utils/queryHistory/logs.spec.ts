@@ -202,6 +202,11 @@ describe("restoring a Logs row", () => {
     expect(logsReapplyRequest.value).toEqual({ seq: before + 2, run: false });
   });
 
+  it("lets a history step ask to run as a URL entry, not as a Run click", () => {
+    requestLogsReapply(true, "url");
+    expect(logsReapplyRequest.value).toMatchObject({ run: true, reason: "url" });
+  });
+
   it("treats an empty editor and the untouched SQL template as empty", () => {
     expect(isUntouchedLogsQuery("", false)).toBe(true);
     expect(isUntouchedLogsQuery('SELECT * FROM "k8s_logs"', true)).toBe(true);

@@ -143,7 +143,7 @@ interface EditorConfig {
   /** Text after the caret that is never a menu row; null clears it. */
   showHint: (text: string | null) => void;
   /** Set when the value lookup searches a caller's own time range instead of the default lookback. */
-  valuesTimeRange: () => { startTime: number; endTime: number } | null;
+  valuesTimeRange: () => FieldValuesWindow | null;
   /** The user's recent queries, offered as clock rows that replace the editor text. */
   recents: () => string[];
 }
@@ -328,6 +328,7 @@ import {
   groupEntries,
   isValueFunction,
   parseLogicalLeadContext,
+  aggregatesAllowed,
   logicalLeadNames,
   buildLogicalLead,
   CHAINING_KEYWORDS,
@@ -349,7 +350,9 @@ import {
 } from "@/composables/usePromqlSuggestions";
 import {
   FIELD_VALUES_LOOKBACK_MINUTES,
+  FIELD_VALUES_MAX_RANGE_HOURS,
   isNoValueLookup,
+  type FieldValuesWindow,
   type ValueLookupOptions,
 } from "@/composables/fieldValueStore";
 import { findDoubleQuoteIssues } from "@/utils/query/doubleQuoteWarnings";
@@ -498,7 +501,7 @@ export default defineComponent({
     },
     /** The range the field-value resolver searches, in microseconds; null means the default lookback. */
     valuesTimeRange: {
-      type: Object as PropType<{ startTime: number; endTime: number } | null>,
+      type: Object as PropType<FieldValuesWindow | null>,
       default: null,
     },
     freeTextDecorations: {
@@ -1563,9 +1566,15 @@ export default defineComponent({
       ) => {
         const asHint = (inQuote && status !== "loading") || (highlighted && !others.length);
         // PromQL label values always use the default lookback.
-        const inRange = language === "sql" && status === "empty" && !!config.valuesTimeRange();
-        const text = inRange
-          ? t("sqlEditor.completion.valuesEmptyInRange", { field })
+        const lookupRange =
+          language === "sql" && status === "empty" ? config.valuesTimeRange() : null;
+        const text = lookupRange
+          ? t(
+              lookupRange.capped
+                ? "sqlEditor.completion.valuesEmptyInLatestHours"
+                : "sqlEditor.completion.valuesEmptyInRange",
+              { field, hours: FIELD_VALUES_MAX_RANGE_HOURS },
+            )
           : valueStatusText(t, status, field, { minutes: FIELD_VALUES_LOOKBACK_MINUTES });
         if (asHint) {
           config.showHint(text);
@@ -1576,7 +1585,7 @@ export default defineComponent({
         });
         const row = {
           ...entry,
-          label: inRange ? text : entry.label,
+          label: lookupRange ? text : entry.label,
           range: caretRange(position, 0),
         };
         return highlighted ? [...others, { ...row, sortText: "\uffff" }] : [row, ...others];
@@ -1841,8 +1850,12 @@ export default defineComponent({
         // Inside avg( or approx_percentile_cont(, numeric columns lead; on a metrics stream every label would sort above `value`.
         const numericFirst = wantsNumericColumn(parseCallContext(textUntilPosition));
         const rank = (list: any[]) => (numericFirst ? rankNumericFieldsFirst(list) : list);
-        const entries = [...rank(config.keywords()), ...rank(config.suggestions())];
         const textBeforeWord = textUntilPosition.slice(0, textUntilPosition.length - word.length);
+        const allowAggregates =
+          language !== "sql" || aggregatesAllowed(textBeforeWord, config.filterMode());
+        const entries = [...rank(config.keywords()), ...rank(config.suggestions())].filter(
+          (raw) => allowAggregates || !objectEntry(raw)?.aggregate,
+        );
         const canChain = chainsHere(config, model, position);
         const lead =
           language === "sql" ? parseLogicalLeadContext(textBeforeWord, config.filterMode()) : null;
@@ -1851,6 +1864,7 @@ export default defineComponent({
               entries,
               logicalLeadNames(lead, config.filterMode()),
               canChain ? acceptCommand("operator", true) : undefined,
+              word,
             )
           : entries;
         if (!canChain) return ranked;

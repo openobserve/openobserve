@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "Seçilen akışlarda tam metin alanı yok",
     "freeTextNoTextFields": "Bu akışta aranacak metin alanı yok.",
     "freeTextNoTextFieldsNamed": "Aranmadı: {streams} (metin alanı yok).",
-    "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin."
+    "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin.",
+    "filterNotChartableNotice": "Bu filtre oluşturucuda grafiğe dökülemez. Arama filtreniz değişmedi; grafiğe dökmek için {custom}'e geçin."
   },
   "menu": {
     "alertCalibration": "Uyarı Kalibrasyonu",
@@ -12930,6 +12931,7 @@
         "emptyQuery": "Uyarı oluşturmak için bir sorgu yok.",
         "noQueries": "Bu panelde uyarı oluşturmak için bir sorgu yok.",
         "noConstants": "Seçilen desenlerin eşleşecek ayırt edici bir metni yok.",
+        "patternsShared": "Seçilen desenlerden {count} tanesi tüm metnini diğer desenlerle paylaşıyor, bu yüzden uyarı filtresi bunları dışarıda bırakıyor.",
         "sqlModeFilterDropped": "SQL sorgunuz aktarılmadı — uyarı yalnızca seçilen desenlerle eşleşir.",
         "patternsUnusable": "Bu sayfadaki desenlerin hiçbirinde eşleşecek ayırt edici metin yok, bu nedenle uyarı yalnızca aramanızı kullanır.",
         "dbmRollupLag": "Veritabanı sayıları her {minutes} dakikada bir toplanır, bu nedenle bu uyarı yalnızca bu sıklıkta tetiklenebilir — gerçek zamanlı bir sayfa değildir.",
@@ -20132,6 +20134,7 @@
       "excludeFromQuery": "Hariç tut",
       "createAlertAction": "Uyarı oluştur",
       "noMatchTerms": "Bu desenin filtrelenecek ayırt edici metni yok.",
+      "noDistinctTextTooltip": "Bu desendeki sabit metnin her parçası başka bir desende de geçiyor, bu nedenle bir filtre onların günlüklerini de eşleştirir.",
       "noStreamSelected": "Akış seçilmedi. Uyarı oluşturmadan önce lütfen bir akış seçin.",
       "alertBroadMatch": "Bu desenin ayırt edici sabit metni yok — uyarı sorgusu geniş bir şekilde eşleşecek. Manuel filtre eklemeyi düşünün."
     },

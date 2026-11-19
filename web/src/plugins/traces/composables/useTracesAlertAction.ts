@@ -30,7 +30,7 @@ import {
 } from "@/utils/alerts/prefill/fromTraces";
 import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
-import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
+import { tracesQueryNotRun } from "@/plugins/traces/tracesSearchBar.utils";
 
 const DURATION_PERCENTILES: TracesAlertPercentile[] = [0.5, 0.95, 0.99];
 const DEFAULT_DURATION_INDEX = 1;
@@ -48,9 +48,7 @@ export const useTracesAlertAction = () => {
     streamName.value ? null : t("alerts.prefill.sources.traces.noStream"),
   );
 
-  const queryNotRun = computed(
-    () => searchObj.meta.lastRunSignature !== tracesSearchRunSignature(searchObj),
-  );
+  const queryNotRun = computed(() => tracesQueryNotRun(searchObj));
 
   const readSeed = async (input: TracesPrefillInput, startUs: number, endUs: number) => {
     const { sql, valueColumn } = buildTracesSeedQuery(input);

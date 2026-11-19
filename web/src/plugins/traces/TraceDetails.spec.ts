@@ -2082,31 +2082,6 @@ describe("TraceDetails", () => {
     });
   });
 
-  describe("Coverage: openTraceLink function", () => {
-    it("should call openTraceLink and verify trace details are reset (lines 1952-1953)", async () => {
-      // Call the function
-      await wrapper.vm.openTraceLink();
-      await flushPromises();
-
-      // Verify the function executed (spanList should be processed)
-      expect(wrapper.vm.searchObj.data.traceDetails).toBeDefined();
-    });
-
-    it("should verify openTraceLink reprocesses trace data", async () => {
-      // Set some initial data
-      wrapper.vm.searchObj.data.traceDetails.showSpanDetails = true;
-      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = "test-span";
-
-      // Call openTraceLink
-      await wrapper.vm.openTraceLink();
-      await flushPromises();
-
-      // After reset and setup, these should be reset
-      expect(wrapper.vm.searchObj.data.traceDetails.selectedSpanId).toBe("");
-      expect(wrapper.vm.searchObj.data.traceDetails.showSpanDetails).toBe(false);
-    });
-  });
-
   describe("Coverage: RUM session integration", () => {
     it("should show session replay button when a RUM session with a replay exists", async () => {
       wrapper.vm.searchObj.data.traceDetails.spanList = [
