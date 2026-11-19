@@ -1946,10 +1946,13 @@ import {
   clearPermalink,
   noteUserScopeChange,
 } from "@/composables/useLogs/useLogPermalink";
-import type {
-  PersistAction,
-  PersistSurface,
-  PersistReasonCode,
+import {
+  isAutoRunActive,
+  sameSignature,
+  type LogsSignature,
+  type PersistAction,
+  type PersistSurface,
+  type PersistReasonCode,
 } from "@/composables/useLogs/useAutoRun";
 import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transientSearchKeys";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -4891,6 +4894,29 @@ export default defineComponent({
       emit("buildModeToggle", false); // isCustomMode = false
     };
 
+    const GRID_TABS = ["logs", "drilldown"];
+    const AWAY_TABS = ["visualize", "build", "patterns"];
+    let scopeWhenGridLeft: LogsSignature | null = null;
+
+    // Build writes its own SQL and SQL/quick mode into the search, which is not a scope move.
+    const absorbBuildRewrite = (baseline: LogsSignature): LogsSignature => {
+      const { query, sqlMode, quickMode, quickModeFields } = autoRun.readSignature();
+      return { ...baseline, query, sqlMode, quickMode, quickModeFields };
+    };
+
+    const trackScopeAwayFromGrid = (from: string, to: string): boolean => {
+      if (GRID_TABS.includes(from) && AWAY_TABS.includes(to)) {
+        scopeWhenGridLeft = autoRun.readSignature();
+        return false;
+      }
+      if (!scopeWhenGridLeft || !AWAY_TABS.includes(from)) return false;
+      if (from === "build") scopeWhenGridLeft = absorbBuildRewrite(scopeWhenGridLeft);
+      if (!GRID_TABS.includes(to)) return false;
+      const baseline = scopeWhenGridLeft;
+      scopeWhenGridLeft = null;
+      return !sameSignature(autoRun.readSignature(), baseline);
+    };
+
     const onLogsVisualizeToggleUpdate = async (value: any) => {
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // here is what keeps the locked Patterns view from becoming active —
@@ -5025,6 +5051,11 @@ export default defineComponent({
           }
         }
       }
+      if (
+        trackScopeAwayFromGrid(searchObj.meta.logsVisualizeToggle, value) &&
+        isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta)
+      )
+        tabRunPending = "tab";
       searchObj.meta.logsVisualizeToggle = value;
       patchUrlViewState();
       if (tabRunPending) autoRun.request(tabRunPending);
