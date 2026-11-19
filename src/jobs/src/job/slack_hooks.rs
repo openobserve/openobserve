@@ -287,6 +287,8 @@ fn chart_payload(chart: &ChartSeries) -> Option<ChartPayload> {
         crit: None,
         warn: None,
         trigger_ts,
+        band: None,
+        marks: Vec::new(),
     })
 }
 

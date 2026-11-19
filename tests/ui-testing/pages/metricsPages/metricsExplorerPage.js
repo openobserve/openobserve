@@ -207,6 +207,12 @@ export class MetricsExplorerPage {
         await expect(this.page.locator(this.chartRenderer).first()).toBeVisible({ timeout: 30000 });
     }
 
+    /** The query ran and drew a series: a chart canvas, and no no-data placeholder. */
+    async expectChartDrawn() {
+        await expect(this.page.locator(`${this.chartRenderer} canvas`).first()).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="no-data"]')).toHaveCount(0);
+    }
+
     async expectGridVisible() {
         await expect(this.page.locator(this.scrollContainer)).toBeVisible({ timeout: 30000 });
     }

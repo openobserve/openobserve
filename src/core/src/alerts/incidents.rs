@@ -1100,6 +1100,7 @@ fn incident_page_url(web_url: &str, base_uri: &str, org_id: &str, incident_id: &
 
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 fn apply_incident_to_context(
     ctx: &mut crate::alerts::notifications::NotificationContext,
     notice: &IncidentNotice<'_>,
@@ -13071,7 +13072,7 @@ mod tests {
         };
         let slack: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert!(slack.get("incident").is_none(), "{body}");
-        assert!(slack["blocks"].is_array(), "{body}");
+        assert!(slack["attachments"][0]["blocks"].is_array(), "{body}");
         assert!(body.contains("incidents/inc-1"), "{body}");
 
         let custom = apply_custom_template(

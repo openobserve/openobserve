@@ -1,105 +1,125 @@
 {
   "slack_firing": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme|🔵 Nightly database upgrade started>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "CHG-1042 Postgres 17 upgrade"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#4A90D9",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nStarted"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme|🔵 Nightly database upgrade started>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Window*\n2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "CHG-1042 Postgres 17 upgrade"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Muted*\nalerts, synthetics checks"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-02 22:00:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nStarted"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Window*\n2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Muted*\nalerts, synthetics checks"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-02 22:00:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#4A90D9",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open downtime"
-            },
-            "url": "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme",
-            "style": "primary"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open downtime"
+                },
+                "url": "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
           }
         ]
       }
     ]
   },
   "slack_resolved": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme|🟢 Nightly database upgrade ended>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "CHG-1042 Postgres 17 upgrade"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nEnded"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme|🟢 Nightly database upgrade ended>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Window*\n2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "CHG-1042 Postgres 17 upgrade"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Muted*\nalerts, synthetics checks"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-11-03 00:00:00 UTC"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nEnded"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Window*\n2026-11-02 22:00 UTC to 2026-11-03 00:00 UTC"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Muted*\nalerts, synthetics checks"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-11-03 00:00:00 UTC"
+              }
+            ]
           }
         ]
       },
       {
-        "type": "actions",
-        "elements": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open downtime"
-            },
-            "url": "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme",
-            "style": "primary"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open downtime"
+                },
+                "url": "https://o2.acme.com/web/downtimes/dt_4k2?org_identifier=acme",
+                "style": "primary"
+              }
+            ]
           }
         ]
       }
