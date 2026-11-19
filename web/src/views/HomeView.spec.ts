@@ -403,18 +403,11 @@ describe("HomeView", () => {
       });
     }
 
-    it("shows one line of stream totals under the strip while Overview is hidden", async () => {
+    it("shows no stream totals line under the strip while Overview is hidden", async () => {
       setFlag(false);
       wrapper = mountHome();
       await flushPromises();
-      const line = wrapper.get('[data-test="home-stream-totals"]');
-      expect(line.get('[data-test="home-stream-totals-count"]').text()).toBe("9 streams");
-      expect(line.get('[data-test="home-stream-totals-today"]').text()).toBe("1.20 GB today");
-      const push = vi.spyOn(router, "push");
-      await line.get('[data-test="home-stream-totals-open-btn"]').trigger("click");
-      expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "logstreams" }));
-      push.mockRestore();
-      await setOffer(false);
+      expect(panelShown()).toBe(false);
       expect(has("home-stream-totals")).toBe(false);
     });
 
