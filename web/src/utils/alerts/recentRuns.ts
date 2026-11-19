@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { formatInTimeZone } from "date-fns-tz";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { historyStatusOf } from "@/utils/alerts/ackState";
 
 export interface RecentRun {
@@ -90,4 +92,26 @@ export function noChecksNotice(input: {
   const byMs = savedMs + input.everyMinutes * 60 * 1000 + FIRST_CHECK_GRACE_MS;
   if (input.nowMs < byMs) return { kind: "firstDue", byMs };
   return savedMs > input.nowMs - DAY_MS ? { kind: "missed", savedMs } : { kind: "missed" };
+}
+
+/** "HH:mm" today, "MMM d, HH:mm" on an earlier day, in the viewer's zone. */
+export function runClock(ms: number, zone: string, nowMs: number): string {
+  const day = (at: number) => formatInTimeZone(new Date(at), zone, "yyyyMMdd");
+  return formatInTimeZone(new Date(ms), zone, day(ms) === day(nowMs) ? "HH:mm" : "MMM d, HH:mm");
+}
+
+/** A real-time alert records only the matches that fired it, never a quiet check, so it has no outcome to chip. */
+export function realtimeRunChip(
+  t: TranslateFn,
+  firedUs: number | null | undefined,
+  clock: (ms: number) => string,
+): { label: I18nText; tooltip: I18nText } {
+  if (!firedUs) {
+    return { label: t("alerts.runState.noMatchYet"), tooltip: t("alerts.runState.noMatchTooltip") };
+  }
+  const time = raw(clock(firedUs / 1000));
+  return {
+    label: t("alerts.runState.fired", { time }),
+    tooltip: t("alerts.runState.firedTooltip", { time }),
+  };
 }

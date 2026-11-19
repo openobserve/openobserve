@@ -535,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     row.groups_observed !== undefined &&
                     row.groups_observed !== null
                   "
-                  class="flex flex-wrap items-center gap-1"
+                  class="flex items-center gap-1 whitespace-nowrap"
                   :data-test="`alert-list-${row.name}-groups`"
                 >
                   <OTag
@@ -562,12 +562,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <span class="text-text-secondary text-2xs">
                     {{
-                      t("alerts.groups.ofNGroups", {
-                        count: formatGroupCount(
-                          row.groups_observed,
-                          row.groups_observed_is_lower_bound,
-                        ),
-                      })
+                      t(
+                        "alerts.groups.ofNGroups",
+                        {
+                          count: formatGroupCount(
+                            row.groups_observed,
+                            row.groups_observed_is_lower_bound,
+                          ),
+                        },
+                        Number(row.groups_observed),
+                      )
                     }}
                   </span>
                 </div>
@@ -620,6 +624,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`alert-list-${row.name}-last-outcome`"
                   />
                 </OTooltip>
+                <OTooltip
+                  v-else-if="row.enabled && row.is_real_time === true"
+                  :content="realtimeChipOf(row).tooltip"
+                >
+                  <OTag
+                    variant="default-soft"
+                    size="sm"
+                    :label="realtimeChipOf(row).label"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
+                <OTag
+                  v-else-if="row.enabled && row.is_real_time === false && !row.last_outcome"
+                  variant="default-soft"
+                  size="sm"
+                  :label="t('alerts.editMode.state.notRun')"
+                  :data-test="`alert-list-${row.name}-last-outcome`"
+                />
                 <span v-else class="text-text-body">—</span>
               </template>
 
@@ -1392,6 +1414,8 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
+import { realtimeRunChip, runClock } from "@/utils/alerts/recentRuns";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import {
   isErrorOutcome,
@@ -1942,6 +1966,11 @@ export default defineComponent({
     // advertise "Firing" indefinitely.
     const showRunOutcome = (row: any): boolean =>
       shouldShowRunOutcome(row?.enabled, row?.last_outcome);
+    const viewerZone = useViewerTimezone();
+    const realtimeChipOf = (row: { last_satisfied_at_raw?: number | null }) =>
+      realtimeRunChip(t, row.last_satisfied_at_raw, (ms) =>
+        runClock(ms, viewerZone.value, Date.now()),
+      );
 
     // A firing that an active downtime keeps quiet: the state stays Firing, only the badge goes quiet.
     const isMutedFiring = (row: { active_downtime?: unknown; last_outcome?: unknown }): boolean =>
@@ -2535,9 +2564,10 @@ export default defineComponent({
         },
       ];
 
-      // insert folder_name column after the name column if applicable
+      // Folder goes after the state columns, so Last Outcome to Groups keep their place in both views.
       if (searchAcrossFolders.value) {
-        baseColumns.splice(1, 0, {
+        const afterGroups = baseColumns.findIndex((c) => c.id === "groups") + 1;
+        baseColumns.splice(afterGroups || 1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
           header: t("alerts.folder"),
@@ -5113,6 +5143,7 @@ export default defineComponent({
       splitterModel,
       alertStateLoadingMap,
       showRunOutcome,
+      realtimeChipOf,
       isMutedFiring,
       isAnomalyDataReadinessStatus,
       isAckedFiring,

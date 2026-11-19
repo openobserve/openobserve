@@ -52,12 +52,18 @@ interface AlertListRow {
   last_outcome?: string | null;
   /** When `last_outcome` was recorded, in microseconds. */
   last_outcome_at?: number | null;
+  is_real_time?: boolean;
+  /** When a real-time match last fired it, in microseconds. */
+  last_satisfied_at?: number | null;
   active_downtime?: (ActiveDowntime & { version?: number }) | null;
 }
 
-/** What the state chip shows: a run outcome, a disabled alert, or no run yet. */
+/** What the state chip shows: a run outcome, a disabled alert, no run yet, or a real-time alert's last fire. */
 export type AlertEditState =
-  { kind: "outcome"; value: string } | { kind: "disabled" } | { kind: "notRun" };
+  | { kind: "outcome"; value: string }
+  | { kind: "disabled" }
+  | { kind: "notRun" }
+  | { kind: "realtime"; firedUs: number | null };
 
 export interface AlertEditHeader {
   muteEnabled: ComputedRef<boolean>;
@@ -102,7 +108,9 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
     }),
   );
   const detail = computed(
-    () => detailQuery.data.value as { enabled?: boolean; folder_id?: string } | undefined,
+    () =>
+      detailQuery.data.value as
+        { enabled?: boolean; folder_id?: string; is_real_time?: boolean } | undefined,
   );
 
   // The alert GET carries no run state or mute, so the header reads the alert's list row, as AlertDetail does.
@@ -198,6 +206,10 @@ export function useAlertEditHeader(input: AlertEditHeaderInput): AlertEditHeader
 
   const state = computed<AlertEditState>(() => {
     if (!enabled.value) return { kind: "disabled" };
+    if (row.value?.is_real_time ?? detail.value?.is_real_time) {
+      const fired = row.value?.last_satisfied_at ?? newestCheck.value?.timestamp ?? null;
+      return { kind: "realtime", firedUs: fired };
+    }
     const outcome = headerOutcome(row.value, newestCheck.value);
     return outcome ? { kind: "outcome", value: outcome } : { kind: "notRun" };
   });

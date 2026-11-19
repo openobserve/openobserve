@@ -122,6 +122,11 @@ describe("AlertEditStatus", () => {
     expect(outcome.find('[data-test="add-alert-state-chip"]').text()).toContain("Firing");
     const fresh = mountStatus(fakeHeader({ state: { kind: "notRun" } }));
     expect(fresh.find('[data-test="add-alert-state-chip"]').text()).toContain("Not run yet");
+    const quiet = mountStatus(fakeHeader({ state: { kind: "realtime", firedUs: null } }));
+    expect(quiet.find('[data-test="add-alert-state-chip"]').text()).toBe("No match yet");
+    const firedMs = new Date().setHours(9, 47, 0, 0);
+    const fired = mountStatus(fakeHeader({ state: { kind: "realtime", firedUs: firedMs * 1000 } }));
+    expect(fired.find('[data-test="add-alert-state-chip"]').text()).toMatch(/^Fired \d\d:\d\d$/);
   });
 
   it.each([

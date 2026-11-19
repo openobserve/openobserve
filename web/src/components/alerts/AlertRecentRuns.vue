@@ -33,6 +33,7 @@ import {
   noChecksNotice,
   recentRunsParams,
   RECENT_RUNS_LIMIT,
+  runClock,
 } from "@/utils/alerts/recentRuns";
 
 const props = withDefaults(
@@ -45,12 +46,15 @@ const props = withDefaults(
     expectedEveryMinutes?: number;
     /** The alert's `updated_at` in seconds; without one, the id's creation time is used. */
     savedAt?: number;
+    /** A real-time alert lists only the matches that notified; it records no quiet checks. */
+    isRealTime?: boolean;
   }>(),
   {
     folderId: undefined,
     limit: RECENT_RUNS_LIMIT,
     expectedEveryMinutes: undefined,
     savedAt: undefined,
+    isRealTime: false,
   },
 );
 
@@ -73,19 +77,20 @@ const runs = computed(() => newestRuns(historyQuery.data.value, props.limit));
 const timeText = (micros?: number) =>
   raw(micros ? formatInTimeZone(new Date(micros / 1000), zone.value, "MMM d, HH:mm") : "—");
 
-const clockText = (ms: number) =>
-  raw(
-    formatInTimeZone(
-      new Date(ms),
-      zone.value,
-      formatInTimeZone(new Date(ms), zone.value, "yyyyMMdd") ===
-        formatInTimeZone(new Date(nowMs), zone.value, "yyyyMMdd")
-        ? "HH:mm"
-        : "MMM d, HH:mm",
-    ),
-  );
+const clockText = (ms: number) => raw(runClock(ms, zone.value, nowMs));
 
 const emptyNotice = computed(() => {
+  if (props.isRealTime) {
+    const savedSec = props.savedAt ?? ksuidSeconds(props.alertId);
+    const savedMs = savedSec ? savedSec * 1000 : 0;
+    return {
+      warn: false,
+      text:
+        savedMs > nowMs - 24 * 60 * 60 * 1000
+          ? t("alerts.editMode.recentRuns.emptyRealtimeSinceSave", { time: clockText(savedMs) })
+          : t("alerts.editMode.recentRuns.emptyRealtime"),
+    };
+  }
   const notice = noChecksNotice({
     everyMinutes: props.expectedEveryMinutes,
     savedAtSec: props.savedAt ?? ksuidSeconds(props.alertId),
@@ -120,7 +125,11 @@ const openRun = () =>
     data-test="add-alert-recent-runs"
   >
     <div class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2">
-      <span class="text-sm font-medium">{{ t("alerts.editMode.recentRuns.title") }}</span>
+      <span class="text-sm font-medium">{{
+        isRealTime
+          ? t("alerts.editMode.recentRuns.titleRealtime")
+          : t("alerts.editMode.recentRuns.title")
+      }}</span>
     </div>
     <p
       v-if="historyQuery.isError.value"
@@ -172,7 +181,11 @@ const openRun = () =>
       </li>
     </ol>
     <p class="text-text-secondary m-0 px-3 pb-2 text-xs">
-      {{ t("alerts.editMode.recentRuns.note") }}
+      {{
+        isRealTime
+          ? t("alerts.editMode.recentRuns.noteRealtime")
+          : t("alerts.editMode.recentRuns.note")
+      }}
     </p>
   </div>
 </template>

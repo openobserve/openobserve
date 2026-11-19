@@ -93,6 +93,26 @@ describe("AlertRecentRuns", () => {
     },
   );
 
+  it.each([
+    [savedMinutesAgo(30), "No matching events since it was saved at 11:30."],
+    [savedMinutesAgo(2 * 24 * 60), "No matching events in the last 24 hours."],
+  ])(
+    "names a quiet real-time alert's list for what it holds (saved at %s)",
+    async (savedAt, text) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.UTC(2026, 9, 30, 12, 0));
+      getHistory.mockResolvedValue({ hits: [] });
+      const wrapper = mount(AlertRecentRuns, {
+        props: { alertId: "a1", expectedEveryMinutes: 5, savedAt, isRealTime: true },
+      });
+      await flushPromises();
+      vi.useRealTimers();
+      expect(wrapper.text()).toContain("Recent notifications");
+      const empty = wrapper.find('[data-test="add-alert-recent-runs-empty"]');
+      expect(empty.text()).toContain(text);
+    },
+  );
+
   it("dates a never-updated alert from its id, which encodes when it was created", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(Date.UTC(2026, 10, 18, 21, 3));

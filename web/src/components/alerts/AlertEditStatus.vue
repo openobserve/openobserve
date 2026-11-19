@@ -25,6 +25,9 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
+import { realtimeRunChip, runClock } from "@/utils/alerts/recentRuns";
 
 const props = withDefaults(
   defineProps<{
@@ -40,6 +43,13 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const router = useRouter();
+
+const zone = useViewerTimezone();
+const realtimeChip = computed(() => {
+  const state = props.header.state.value;
+  if (state.kind !== "realtime") return null;
+  return realtimeRunChip(t, state.firedUs, (ms) => runClock(ms, zone.value, Date.now()));
+});
 
 const DEFAULT_PRESET = "1h";
 const presetKey = ref<string>(DEFAULT_PRESET);
@@ -107,6 +117,14 @@ const openHistory = () =>
       size="sm"
       data-test="add-alert-state-chip"
     />
+    <OTooltip v-else-if="realtimeChip" :content="realtimeChip.tooltip">
+      <OTag
+        variant="default-soft"
+        size="sm"
+        :label="realtimeChip.label"
+        data-test="add-alert-state-chip"
+      />
+    </OTooltip>
     <OTag
       v-else-if="header.state.value.kind === 'notRun'"
       variant="default-soft"
