@@ -129,6 +129,8 @@ const runningText = computed(() => {
 const stale = computed(
   () => testRun.state.value === "ready" && !!testRun.result.value && !sameAlert.value,
 );
+// A re-run's last answer and an answer for an older alert both read as not current.
+const dimmed = computed(() => (running.value && !!report.value) || stale.value);
 
 const confirmOpen = ref(false);
 const sending = ref(false);
@@ -189,18 +191,14 @@ const send = async () => {
 
 <template>
   <section
-    class="bg-surface-base absolute inset-0 z-10 flex flex-col"
+    class="bg-surface-base flex min-h-0 flex-1 flex-col"
     :aria-label="t('alerts.testRun.region')"
     :aria-busy="running"
     data-test="alert-test-run"
   >
     <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pt-2 pb-3">
       <div class="flex items-start gap-2">
-        <div
-          class="flex min-w-0 flex-1 flex-col gap-1"
-          :class="running && report ? 'opacity-60' : ''"
-          aria-live="polite"
-        >
+        <div class="flex min-w-0 flex-1 flex-col gap-1" aria-live="polite">
           <p
             v-if="running && !report"
             class="text-text-secondary m-0 text-sm"
@@ -227,21 +225,17 @@ const send = async () => {
             {{ t("alerts.testRun.failed", { reason: testRun.failure.value ?? "" }) }}
           </p>
           <template v-else-if="report">
+            <p v-if="stale" class="text-text-body m-0 text-sm" data-test="alert-test-run-stale">
+              {{ blockedReason || t("alerts.testRun.staleRunAgain") }}
+            </p>
             <p
               v-for="line in report.lines"
               :key="line.id"
               class="m-0"
-              :class="TONE_CLASS[line.tone]"
+              :class="[TONE_CLASS[line.tone], dimmed && 'opacity-60']"
               :data-test="`alert-test-run-${line.id}`"
             >
               {{ line.text }}
-            </p>
-            <p
-              v-if="stale"
-              class="text-text-secondary m-0 text-xs"
-              data-test="alert-test-run-stale"
-            >
-              {{ blockedReason || t("alerts.testRun.staleRunAgain") }}
             </p>
           </template>
         </div>
@@ -256,7 +250,7 @@ const send = async () => {
       </div>
       <AlertBacktest
         v-if="body && shownResult"
-        :class="running ? 'opacity-60' : ''"
+        :class="dimmed ? 'opacity-60' : ''"
         :tested="shownResult"
         query=""
         :stream-type="body.stream_type"
@@ -270,14 +264,21 @@ const send = async () => {
         :baseline-empty="baselineEmpty"
         :sustained-fn="sustainedFn"
       />
+      <p
+        v-if="report?.groupsHeading"
+        class="text-text-secondary m-0 text-xs"
+        :class="dimmed ? 'opacity-60' : ''"
+      >
+        {{ report.groupsHeading }}
+      </p>
       <ul
         v-if="report && report.groups.length"
         class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs"
-        :class="running ? 'opacity-60' : ''"
+        :class="dimmed ? 'opacity-60' : ''"
         data-test="alert-test-run-groups"
       >
         <li v-for="group in report.groups" :key="group.label" class="flex min-w-0 gap-2">
-          <OTruncatedText class="text-text-body min-w-0 font-medium">{{
+          <OTruncatedText class="text-text-body min-w-0 flex-1 font-medium">{{
             group.label
           }}</OTruncatedText>
           <span class="text-text-secondary shrink-0">{{ group.text }}</span>
@@ -321,7 +322,7 @@ const send = async () => {
       </div>
       <OButton
         class="shrink-0"
-        variant="outline"
+        :variant="stale ? 'primary' : 'outline'"
         size="xs"
         :loading="running"
         :disabled="!body"

@@ -433,15 +433,21 @@ const openHintTarget = async () => {
   if (row) formContext?.reveal(row);
 };
 
+// A run cut short never reached the day's first hours, so they read as untested, not quiet.
+const untestedHours = computed(() => serverDay.value?.untestedHours ?? 0);
+const HOUR_KEYS = {
+  fired: "alerts.sections.backtest.hourFired",
+  quiet: "alerts.sections.backtest.hourQuiet",
+  untested: "alerts.sections.backtest.hourUntested",
+} as const;
+const hourState = (hour: number, fired: boolean) =>
+  fired ? "fired" : hour < untestedHours.value ? "untested" : "quiet";
 // Each hour of the strip says when it is, so a firing hour can be placed on the clock.
 const hourTitle = (hour: number, fired: boolean) => {
   const dayStartMs = server.value ? server.value.end / 1000 - DAY_MS : startMs;
   const at = (ms: number) => checkTimeText(ms * 1000, store.state.timezone, Date.now());
   const from = dayStartMs + hour * 3_600_000;
-  return t(fired ? "alerts.sections.backtest.hourFired" : "alerts.sections.backtest.hourQuiet", {
-    from: at(from),
-    to: at(from + 3_600_000),
-  });
+  return t(HOUR_KEYS[hourState(hour, fired)], { from: at(from), to: at(from + 3_600_000) });
 };
 </script>
 
@@ -499,7 +505,11 @@ const hourTitle = (hour: number, fired: boolean) => {
           v-for="(fired, hour) in day.hours"
           :key="hour"
           class="rounded-default h-4"
-          :class="fired ? 'bg-accent' : 'bg-surface-subtle'"
+          :class="{
+            'bg-accent': hourState(hour, fired) === 'fired',
+            'bg-surface-subtle': hourState(hour, fired) === 'quiet',
+            'border-border-default border border-dashed': hourState(hour, fired) === 'untested',
+          }"
           :title="hourTitle(hour, fired)"
           :data-test="fired ? 'add-alert-backtest-hour-fired' : 'add-alert-backtest-hour'"
         />

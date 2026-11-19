@@ -99,6 +99,8 @@ export interface EvaluateCheck {
   fired: boolean;
   notified: boolean;
   held_by: EvaluateHeldBy | null;
+  /** Not run by the scheduler while Notify at most every holds; state carries over. Older servers omit it. */
+  skipped?: boolean;
   level: EvaluateLevel | null;
   value: number | null;
   /** The count hit the search cap, so `value` is "at least". */

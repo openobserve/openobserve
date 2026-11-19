@@ -54,6 +54,32 @@ const promqlFiredEarlier = {
   },
 };
 
+// Notified at the first check; the scheduler paused the second; the third found nothing.
+const pausedAfterNotify = (skipped?: boolean) => ({
+  ...noSeries,
+  checks: noSeries.checks.map((c, i) =>
+    i === 0
+      ? { ...c, state: "firing", fired: true, notified: true, matched: 2, reason: null }
+      : i === 1
+        ? {
+            ...c,
+            state: "firing",
+            fired: true,
+            held_by: "notify_at_most_every",
+            reason: null,
+            ...(skipped === undefined ? {} : { skipped }),
+          }
+        : c,
+  ),
+  summary: {
+    ...noSeries.summary,
+    fired: 2,
+    notifications: 1,
+    held: 1,
+    notified_at: [noSeries.checks[0].time],
+  },
+});
+
 describe("testRunReport", () => {
   it.each([
     [
@@ -87,11 +113,32 @@ describe("testRunReport", () => {
       "a failed check and a cut run",
       errorsTruncated,
       {
-        summary: "Over the last 24 hours this would not have fired.",
+        summary: "Over the last 30 minutes this would not have fired.",
         pendingOnly: "It matched in 1 check, but not for as long as Must last.",
         closest: "Closest: 1,000 at 09:40.",
         errors: "1 check failed: Search timed out",
-        truncated: "Tested the latest 3 checks only.",
+        truncated: "The test reached its time limit, so the 23 hours before that were not tested.",
+      },
+    ],
+    [
+      "check the scheduler paused after a notification",
+      pausedAfterNotify(true),
+      {
+        summary:
+          "Over the last 24 hours this would have fired in 1 of 2 checks and notified 1 time (09:50).",
+        paused:
+          "Notify at most every paused the other check: after a notification the alert waits 30 minutes before it checks again.",
+        latestGroups: "At the latest check (10:00), no series was above the threshold.",
+      },
+    ],
+    [
+      "server that does not mark paused checks",
+      pausedAfterNotify(),
+      {
+        summary:
+          "Over the last 24 hours this would have fired in 2 of 3 checks and notified 1 time (09:50).",
+        held: "The other firing came within 30 minutes of a notification, so Notify at most every held it back.",
+        latestGroups: "At the latest check (10:00), no series was above the threshold.",
       },
     ],
   ])("states the run of a %s", (_name, fixture, expected) => {
@@ -107,10 +154,10 @@ describe("testRunReport", () => {
   });
 
   it.each([
-    [">=", "above the threshold"],
-    ["<", "below the threshold"],
-    ["=", "matched the condition"],
-  ])("lists every group that fired with its checks, for %s", (operator, side) => {
+    [">=", "Most often above the threshold:"],
+    ["<", "Most often below the threshold:"],
+    ["=", "Most often matching the condition:"],
+  ])("lists every group that fired with its checks, for %s", (operator, heading) => {
     // A label every group shares names none of them, so only the one that differs is shown.
     const r = {
       ...grouped,
@@ -123,12 +170,43 @@ describe("testRunReport", () => {
         })),
       },
     };
-    const { groups, groupsMore } = report(r);
+    const { groupsHeading, groups, groupsMore } = report(r);
+    expect(String(groupsHeading)).toBe(heading);
     expect(groups.map((g) => `${g.label}: ${g.text}`)).toEqual([
-      `checkout: ${side} in 2 checks`,
-      `cart: ${side} in 1 check`,
+      "checkout: 2 checks",
+      "cart: 1 check",
     ]);
     expect(groupsMore).toBe(0);
+  });
+
+  it("names each group by the fewest labels that tell them apart, ids last", () => {
+    const pod = (cluster: string, ns: string, name: string, uid: string) => ({
+      key: name,
+      labels: {
+        k8s_cluster: cluster,
+        k8s_namespace_name: ns,
+        k8s_pod_name: name,
+        k8s_pod_uid: uid,
+      },
+      checks: 3,
+    });
+    const uid = (n: number) => `${n}aa0f3c2-6b1e-4d2a-9c11-0242ac120002`;
+    const r = {
+      ...grouped,
+      summary: {
+        ...grouped.summary,
+        groups_fired: [
+          pod("ap1", "openobserve", "ingester-0", uid(1)),
+          pod("ap1", "openobserve", "querier-0", uid(2)),
+          pod("eu1", "openobserve", "ingester-0", uid(3)),
+        ],
+      },
+    };
+    expect(report(r).groups.map((g) => String(g.label))).toEqual([
+      "ap1 · ingester-0",
+      "ap1 · querier-0",
+      "eu1 · ingester-0",
+    ]);
   });
 
   it("names the series of every metric when the query reads several", () => {
@@ -242,6 +320,13 @@ describe("testRunDay", () => {
     expect([day.refires, day.singleCheckSpikes]).toEqual([1, 1]);
     expect(day.hours.map((h, i) => (h ? i : -1)).filter((i) => i >= 0)).toEqual([23]);
     expect(day.events).toBeUndefined();
+    expect(day.untestedHours).toBe(0);
+  });
+
+  it("counts a paused check as neither a firing nor a refire, and leaves a cut run's early hours untested", () => {
+    const paused = testRunDay(pausedAfterNotify(true) as EvaluateAlertResponse);
+    expect([paused.fired, paused.refires]).toEqual([1, 0]);
+    expect(testRunDay(errorsTruncated as EvaluateAlertResponse).untestedHours).toBe(23);
   });
 });
 

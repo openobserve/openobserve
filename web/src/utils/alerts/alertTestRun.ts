@@ -22,18 +22,21 @@ import { getAlertPayload, type PayloadContext, type PayloadFormData } from "./al
 import type { EvaluateAlertBody, EvaluateAlertResponse } from "./alertEvaluate.types";
 
 const HOUR_MICROS = 3_600_000_000;
+const MINUTE_MICROS = 60_000_000;
 const DAY_HOURS = 24;
+const DAY_MINUTES = DAY_HOURS * 60;
 const SHOWN_TIMES = 3;
 const SHOWN_GROUPS = 5;
 // Stamps the save path adds for the record; they change every call and mean nothing to a dry run.
 const RECORD_STAMPS = ["createdAt", "updatedAt", "lastTriggeredAt", "lastEditedBy", "owner"];
 // What a dry run ignores, so editing them keeps an answer current.
 const NOT_EVALUATED = ["name", "description", "destinations", "template", "folder_id", "tags"];
-const GROUP_CHECKS_KEYS: Record<"above" | "below" | "none", I18nKey> = {
-  above: "alerts.testRun.groupChecksAbove",
-  below: "alerts.testRun.groupChecksBelow",
-  none: "alerts.testRun.groupChecksMatched",
+const GROUPS_HEADING_KEYS: Record<"above" | "below" | "none", I18nKey> = {
+  above: "alerts.testRun.groupsAbove",
+  below: "alerts.testRun.groupsBelow",
+  none: "alerts.testRun.groupsMatched",
 };
+const LABEL_KEYS_MAX = 3;
 const LATEST_GROUPS_KEYS: Record<"above" | "below" | "none", I18nKey> = {
   above: "alerts.testRun.latestGroupsAbove",
   below: "alerts.testRun.latestGroupsBelow",
@@ -60,6 +63,8 @@ export interface TestRunGroupRow {
 
 export interface TestRunReport {
   lines: TestRunLine[];
+  /** Says once what every group row counts. */
+  groupsHeading: I18nText | null;
   groups: TestRunGroupRow[];
   /** Groups that fired beyond the rows shown. */
   groupsMore: number;
@@ -77,6 +82,8 @@ export interface TestRunDay {
   pending?: number;
   /** Fire, clear, fire again: the pattern that reads as flapping. */
   refires: number;
+  /** Leading hours of the day a run cut short never reached. */
+  untestedHours: number;
   /** Notifying checks with a clear check on both sides. */
   singleCheckSpikes: number;
 }
@@ -128,18 +135,52 @@ export function checkTimeText(micros: number, timeZone: string | undefined, nowM
   );
 }
 
+// A check Notify at most every paused never ran, so it neither fired nor cleared.
+const skippedChecks = (r: EvaluateAlertResponse) => r.checks.filter((c) => c.skipped === true);
+const firedRan = (r: EvaluateAlertResponse) =>
+  r.summary.fired - skippedChecks(r).filter((c) => c.fired).length;
+
+/** How far back a run cut short reached, in minutes; null when it covered the day. */
+function testedMinutes(r: EvaluateAlertResponse): number | null {
+  if (!r.truncated || !r.checks.length) return null;
+  const first = r.checks[0];
+  const step =
+    r.checks.length > 1 ? r.checks[1].time - first.time : first.window_end - first.window_start;
+  const minutes = Math.round((r.end - first.time + step) / MINUTE_MICROS);
+  return minutes < DAY_MINUTES ? minutes : null;
+}
+// Whole hours past two, so a cut run reads "the last 8 hours", not "the last 497 minutes".
+const roundSpan = (minutes: number) =>
+  minutes >= 120 ? Math.floor(minutes / 60) * 60 : Math.max(1, minutes);
+const spanWords = (minutes: number, t: TranslateFn) => durationWords(roundSpan(minutes), t);
+
 // A label every series shares names none of them, so only the labels that differ are shown.
 const differingKeys = (all: Record<string, string>[]): string[] => {
   const keys = [...new Set(all.flatMap((labels) => Object.keys(labels ?? {})))];
   return keys.filter((k) => new Set(all.map((labels) => labels?.[k])).size > 1);
+};
+const looksLikeId = (value: string) => /^[0-9a-f-]{12,}$/i.test(value) || /^[\d.:]+$/.test(value);
+// The fewest labels that tell every row apart, most telling first; ids, numbers and gaps last.
+const labelKeys = (all: Record<string, string>[]): string[] => {
+  const rank = (k: string) => {
+    const values = all.map((labels) => labels?.[k] ?? "");
+    const weak = values.some((v) => v === "") || values.some(looksLikeId);
+    return (weak ? all.length + 1 : 0) - new Set(values).size;
+  };
+  const picked: string[] = [];
+  for (const key of differingKeys(all).sort((a, b) => rank(a) - rank(b))) {
+    picked.push(key);
+    const names = new Set(all.map((labels) => picked.map((k) => labels?.[k]).join("\u0000")));
+    if (names.size === all.length || picked.length === LABEL_KEYS_MAX) break;
+  }
+  return picked;
 };
 const groupLabel = (labels: Record<string, string>, key: string, keys?: string[]) => {
   const shown = keys?.length ? keys : Object.keys(labels ?? {});
   const values = [
     ...new Set(shown.map((k) => labels?.[k]).filter((v) => v !== undefined && v !== "")),
   ];
-  // Labels that differ together (pod, its uid, its start time) repeat one identity; two name it.
-  return raw(values.length ? values.slice(0, keys?.length ? 2 : undefined).join(" · ") : key);
+  return raw(values.length ? values.join(" · ") : key);
 };
 
 const listWithMore = (items: I18nText[], total: number, t: TranslateFn): I18nText => {
@@ -224,28 +265,46 @@ function summaryLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
   const { t } = o;
   const s = r.summary;
   if (r.is_real_time) return realtimeSummary(r, o);
+  // A run cut short names the hours it reached instead of the day.
+  const tested = testedMinutes(r);
+  const span = tested === null ? null : spanWords(tested, t);
   if (s.notifications === 0)
-    return { id: "summary", text: t("alerts.testRun.neverFired"), tone: "body" };
+    return {
+      id: "summary",
+      text: span ? t("alerts.testRun.neverFiredSpan", { span }) : t("alerts.testRun.neverFired"),
+      tone: "body",
+    };
   const times = notifiedTimes(s, o);
   // Checks that fired and notifications are counted apart, so the held line below adds up to the first.
   const params = {
     count: formatNumber(s.notifications),
-    fired: formatNumber(s.fired),
-    checks: formatNumber(s.checks),
+    fired: formatNumber(firedRan(r)),
+    checks: formatNumber(s.checks - skippedChecks(r).length),
     times,
+    ...(span ? { span } : {}),
   };
   const groupTotal = Math.max(s.groups_fired_total, s.groups_fired.length);
   if (!s.groups_fired.length)
     return {
       id: "summary",
-      text: t("alerts.testRun.firedInChecks", params, s.notifications),
+      text: t(
+        span ? "alerts.testRun.firedInChecksSpan" : "alerts.testRun.firedInChecks",
+        params,
+        s.notifications,
+      ),
       tone: "body",
     };
   const groups = t("alerts.testRun.groupCount", { count: formatNumber(groupTotal) }, groupTotal);
   // One check can notify many groups, so the count is of checks that sent, not of notifications.
   return {
     id: "summary",
-    text: t("alerts.testRun.firedInChecksGroupsSent", { ...params, groups }, s.notifications),
+    text: t(
+      span
+        ? "alerts.testRun.firedInChecksGroupsSentSpan"
+        : "alerts.testRun.firedInChecksGroupsSent",
+      { ...params, groups },
+      s.notifications,
+    ),
     tone: "body",
   };
 }
@@ -255,8 +314,8 @@ function closestLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
   const side = thresholdSide(r.checks[0]?.operator);
   if (side !== "above" && side !== "below") return null;
   const pending = r.checks.filter((check) => check.state === "pending");
-  const scanned = pending.length ? pending : r.checks.filter((check) => !check.error);
-  const keys = differingKeys(scanned.flatMap((check) => (check.groups ?? []).map((g) => g.labels)));
+  const scanned = pending.length ? pending : r.checks.filter((c) => !c.error && !c.skipped);
+  const keys = labelKeys(scanned.flatMap((check) => (check.groups ?? []).map((g) => g.labels)));
   type Seen = { value: number; labels: Record<string, string> | null; time: number };
   const seen = scanned.flatMap((check): Seen[] =>
     check.groups?.length
@@ -288,7 +347,7 @@ function closestLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRun
 /** How many groups the latest check found past the threshold; its time sets it apart from the preview's "now". */
 function latestGroupsLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
   const { t } = o;
-  const latest = r.checks[r.checks.length - 1];
+  const latest = r.checks.findLast((c) => !c.skipped);
   if (!latest || latest.error) return null;
   const time = checkTimeText(latest.time, o.timeZone, o.nowMs);
   // One PromQL alert has no groups; its filtered query returns just the series past the threshold.
@@ -351,11 +410,11 @@ function noSeriesLine(r: EvaluateAlertResponse, t: TranslateFn, ratio = false): 
 function heldLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
   const { t } = o;
   const s = r.summary;
-  const held = r.checks.filter((c) => c.held_by === "notify_at_most_every").length;
+  const held = r.checks.filter((c) => c.held_by === "notify_at_most_every" && !c.skipped).length;
   if (!held || r.is_real_time) return null;
   const params = { count: formatNumber(held) };
   const wait = o.silenceMinutes ?? 0;
-  const exact = held === s.fired - s.notifications && wait > 0;
+  const exact = held === firedRan(r) - s.notifications && wait > 0;
   const key: I18nKey = !exact
     ? "alerts.testRun.held"
     : s.groups_fired.length
@@ -368,11 +427,44 @@ function heldLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLin
   };
 }
 
+// The scheduler does not run an alert again until its wait ends, so those checks are not counted as runs.
+function pausedLine(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunLine | null {
+  const paused = skippedChecks(r).length;
+  const wait = o.silenceMinutes ?? 0;
+  if (!paused || r.is_real_time || wait <= 0) return null;
+  return {
+    id: "paused",
+    text: o.t(
+      "alerts.testRun.paused",
+      { count: formatNumber(paused), wait: durationWords(wait, o.t) },
+      paused,
+    ),
+    tone: "secondary",
+  };
+}
+
+function truncatedLine(r: EvaluateAlertResponse, t: TranslateFn): TestRunLine | null {
+  if (!r.truncated) return null;
+  const tested = r.is_real_time ? null : testedMinutes(r);
+  return {
+    id: "truncated",
+    text:
+      tested === null
+        ? t("alerts.testRun.truncated", { count: formatNumber(r.summary.checks) })
+        : t("alerts.testRun.truncatedSpan", {
+            rest: spanWords(DAY_MINUTES - roundSpan(tested), t),
+          }),
+    tone: "warning",
+  };
+}
+
 /** The lines Test it shows for one dry run: what would have fired over the day, and why not. */
 export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions): TestRunReport {
   const { t } = o;
   const s = r.summary;
   const lines: TestRunLine[] = [summaryLine(r, o)];
+  const truncated = truncatedLine(r, t);
+  if (truncated) lines.push(truncated);
   if (s.notifications === 0 && s.pending > 0)
     lines.push({
       id: "pendingOnly",
@@ -387,6 +479,8 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
     lines.push({ id: "matchedNothing", text: t("alerts.guard.matchedNothing"), tone: "secondary" });
   const latestGroups = latestGroupsLine(r, o);
   if (latestGroups) lines.push(latestGroups);
+  const paused = pausedLine(r, o);
+  if (paused) lines.push(paused);
   const held = heldLine(r, o);
   if (held) lines.push(held);
   const noSeries = noSeriesLine(r, t, o.ratio);
@@ -402,23 +496,19 @@ export function testRunReport(r: EvaluateAlertResponse, o: TestRunReportOptions)
       ),
       tone: "error",
     });
-  if (r.truncated)
-    lines.push({
-      id: "truncated",
-      text: t("alerts.testRun.truncated", { count: formatNumber(s.checks) }),
-      tone: "warning",
-    });
-  const groupChecks = GROUP_CHECKS_KEYS[thresholdSide(r.checks[0]?.operator) ?? "none"];
-  const keys = differingKeys(s.groups_fired.map((g) => g.labels));
+  const keys = labelKeys(s.groups_fired.map((g) => g.labels));
   const groups = s.groups_fired.slice(0, SHOWN_GROUPS).map((g) => ({
     label: groupLabel(g.labels, g.key, keys),
-    text: t(groupChecks, { count: formatNumber(g.checks) }, g.checks),
+    text: t("alerts.testRun.checkCount", { count: formatNumber(g.checks) }, g.checks),
   }));
   const groupsMore = Math.max(
     0,
     Math.max(s.groups_fired_total, s.groups_fired.length) - groups.length,
   );
-  return { lines, groups, groupsMore };
+  const groupsHeading = groups.length
+    ? t(GROUPS_HEADING_KEYS[thresholdSide(r.checks[0]?.operator) ?? "none"])
+    : null;
+  return { lines, groupsHeading, groups, groupsMore };
 }
 
 /** The tested day by the hour, for the 24-hour strip. */
@@ -437,23 +527,26 @@ export function testRunDay(r: EvaluateAlertResponse): TestRunDay {
     : empty
       ? 0
       : undefined;
-  const firing = r.checks.map((c) => c.fired);
+  const ran = r.checks.filter((c) => !c.skipped);
+  const firing = ran.map((c) => c.fired);
   let refires = 0;
   let singleCheckSpikes = 0;
-  r.checks.forEach((check, i) => {
+  ran.forEach((check, i) => {
     if (!check.fired) return;
     if (i + 2 < firing.length && !firing[i + 1] && firing[i + 2]) refires += 1;
     if (check.notified && !firing[i - 1] && i + 1 < firing.length && !firing[i + 1])
       singleCheckSpikes += 1;
   });
+  const tested = testedMinutes(r);
   return {
-    fired: r.summary.fired,
+    fired: firedRan(r),
     alerts: r.summary.notifications,
     total: r.summary.checks,
     pending: r.summary.pending ?? 0,
     hours,
     refires,
     singleCheckSpikes,
+    untestedHours: tested === null ? 0 : Math.floor((DAY_MINUTES - tested) / 60),
     ...(events === undefined ? {} : { events }),
   };
 }

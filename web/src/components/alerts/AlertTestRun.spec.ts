@@ -67,7 +67,7 @@ describe("AlertTestRun", () => {
     expect(evaluate).toHaveBeenCalledWith("default", { alert: BODY }, "f1", expect.anything());
     expect(text(wrapper, "summary")).toContain("sent notifications in 2 of them");
     expect(text(wrapper, "groups")).toContain("checkout");
-    expect(text(wrapper, "groups")).toContain("above the threshold in 2 checks");
+    expect(text(wrapper, "groups")).toContain("2 checks");
     // The day's strip lives in this panel, so Test it never adds a row to the form.
     expect(wrapper.findAll('[data-test="add-alert-backtest-hour-fired"]')).toHaveLength(1);
 
