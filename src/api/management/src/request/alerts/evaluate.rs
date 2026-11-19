@@ -159,47 +159,15 @@ fn unsaved_alert(body: CreateAlertRequestBody) -> Result<MetaAlert, DryRunError>
     Ok(alert)
 }
 
-/// The `_search_stream` check for every stream the alert's query reads.
+/// The stream check saving this alert runs: every source its query can read, PromQL by the engine's
+/// own selector names, so a selector with no concrete name is refused for a non-admin.
 #[cfg(feature = "enterprise")]
 async fn search_denied(org_id: &str, user_id: &str, alert: &MetaAlert) -> Option<Response> {
-    use config::meta::{
-        sql::{TableReferenceExt, resolve_stream_names_with_type},
-        stream::StreamType,
-    };
-    use openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions};
+    use openobserve_core::background_access::{alert_sources, guard_write};
 
-    let mut streams = vec![(alert.stream_name.clone(), alert.stream_type)];
-    let qc = &alert.query_condition;
-    match qc.query_type {
-        QueryType::SQL => {
-            let refs = resolve_stream_names_with_type(qc.sql.as_deref().unwrap_or_default())
-                .unwrap_or_default();
-            streams.extend(
-                refs.iter()
-                    .map(|r| (r.stream_name(), r.get_stream_type(alert.stream_type))),
-            );
-        }
-        QueryType::PromQL => streams.extend(
-            dry_run::promql_metric_names(qc.promql.as_deref().unwrap_or_default())
-                .into_iter()
-                .map(|name| (name, StreamType::Metrics)),
-        ),
-        _ => {}
-    }
-    for (name, stream_type) in streams {
-        if let Some(denied) = check_stream_permissions(
-            &name,
-            org_id,
-            user_id,
-            &stream_type,
-            StreamPermissionResourceType::Search,
-        )
+    guard_write(org_id, user_id, &alert_sources(org_id, alert))
         .await
-        {
-            return Some(denied);
-        }
-    }
-    None
+        .err()
 }
 
 #[cfg(test)]
@@ -250,5 +218,63 @@ mod tests {
             unsaved_alert(composite).unwrap_err(),
             DryRunError::Unsupported
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod stream_access {
+        use axum::{body::to_bytes, http::StatusCode};
+        use config::meta::stream::StreamType;
+        use openobserve_core::authz::{TypedStream, fake_checker};
+
+        use super::*;
+
+        fn promql_alert(query: &str) -> MetaAlert {
+            let mut alert = unsaved_alert(request(serde_json::json!({})).alert).unwrap();
+            alert.stream_type = StreamType::Metrics;
+            alert.stream_name = "up".to_string();
+            alert.query_condition.query_type = QueryType::PromQL;
+            alert.query_condition.promql = Some(query.to_string());
+            alert
+        }
+
+        #[tokio::test]
+        async fn dry_run_needs_read_on_every_metric_the_promql_can_read() {
+            let user = "evaluate-promql@dry.run";
+            fake_checker().grant_read(
+                user,
+                &TypedStream {
+                    org_id: "dry_run_org".to_string(),
+                    stream_type: StreamType::Metrics,
+                    name: "up".to_string(),
+                },
+            );
+            let cases = [
+                ("up", None),
+                (
+                    "topk(scalar(secret_metric), up)",
+                    Some("metrics/secret_metric"),
+                ),
+                (
+                    "holt_winters(secret_metric[5m], 0.5, 0.5)",
+                    Some("metrics/secret_metric"),
+                ),
+                (
+                    r#"up + {__name__=~"secret.*"}"#,
+                    Some("metric name is required"),
+                ),
+            ];
+            for (query, denied) in cases {
+                let resp = search_denied("dry_run_org", user, &promql_alert(query)).await;
+                let Some(text) = denied else {
+                    assert!(resp.is_none(), "{query} should run");
+                    continue;
+                };
+                let resp = resp.unwrap_or_else(|| panic!("{query} should be refused"));
+                assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{query}");
+                let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+                let body = String::from_utf8_lossy(&body);
+                assert!(body.contains(text), "{query}: {body}");
+            }
+        }
     }
 }

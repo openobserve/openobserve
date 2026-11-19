@@ -1048,48 +1048,20 @@ fn cron_times(
     Ok(times.into())
 }
 
-/// Every metric a PromQL query names, by bare selector or `__name__` equality.
-pub fn promql_metric_names(query: &str) -> Vec<String> {
-    let Ok(expr) = promql_parser::parser::parse(query) else {
+/// The metrics the engine reads for `query`; none when a selector has no concrete name.
+fn promql_metric_names(query: &str) -> Vec<String> {
+    use promql::ast::{name_visitor::MetricNameVisitor, visitor::walk_expr};
+
+    let Ok(expr) = promql::parse(query) else {
         return Vec::new();
     };
-    let mut names = Vec::new();
-    collect_metric_names(&expr, &mut names);
-    names.sort();
-    names.dedup();
-    names
-}
-
-fn collect_metric_names(expr: &promql_parser::parser::Expr, out: &mut Vec<String>) {
-    use promql_parser::parser::Expr;
-    match expr {
-        Expr::VectorSelector(vs) => out.extend(selector_name(vs)),
-        Expr::MatrixSelector(ms) => out.extend(selector_name(&ms.vs)),
-        Expr::Aggregate(a) => collect_metric_names(&a.expr, out),
-        Expr::Unary(u) => collect_metric_names(&u.expr, out),
-        Expr::Paren(p) => collect_metric_names(&p.expr, out),
-        Expr::Subquery(s) => collect_metric_names(&s.expr, out),
-        Expr::Binary(b) => {
-            collect_metric_names(&b.lhs, out);
-            collect_metric_names(&b.rhs, out);
-        }
-        Expr::Call(c) => c
-            .args
-            .args
-            .iter()
-            .for_each(|a| collect_metric_names(a, out)),
-        _ => {}
+    let mut visitor = MetricNameVisitor::new();
+    if walk_expr(&mut visitor, &expr).is_err() {
+        return Vec::new();
     }
-}
-
-fn selector_name(vs: &promql_parser::parser::VectorSelector) -> Option<String> {
-    vs.name.clone().or_else(|| {
-        vs.matchers
-            .matchers
-            .iter()
-            .find(|m| m.name == "__name__" && m.op == promql_parser::label::MatchOp::Equal)
-            .map(|m| m.value.clone())
-    })
+    let mut names: Vec<String> = visitor.into_names().into_iter().collect();
+    names.sort_unstable();
+    names
 }
 
 async fn count_series(org_id: &str, metric: &str, (start, end): (i64, i64)) -> u64 {
