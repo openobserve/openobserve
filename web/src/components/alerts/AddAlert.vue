@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="snapScrollRef"
             v-model:active="activeSection"
             :snap="lgUp"
-            class="min-h-0 min-w-0 flex-1 max-lg:flex-none"
+            class="min-h-0 min-w-0 flex-1 max-lg:flex-none lg:scroll-pb-12"
             data-test="add-alert-sections"
           >
             <AlertFormSection
@@ -787,36 +787,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       :aria-label="t('alerts.sections.details.name')"
                       data-test="add-alert-details-name-input"
-                    />
-                    <span
-                      v-if="nameSavedAs"
-                      class="text-text-secondary text-xs"
-                      data-test="add-alert-details-name-saved-as"
-                      >{{ t("alerts.form.names.savesAs", { name: nameSavedAs }) }}</span
                     >
-                    <span
-                      v-else-if="nameRewrittenFrom"
-                      class="text-text-secondary text-xs"
-                      data-test="add-alert-details-name-rewritten"
-                      >{{ t("alerts.form.names.rewritten") }}</span
+                      <template #error />
+                    </OFormInput>
+                    <AlertMessageLine
+                      :error="nameFieldError"
+                      error-data-test="add-alert-details-name-error"
+                      data-test="add-alert-details-name-line"
                     >
-                    <span
-                      v-else-if="alertAutoName.isAuto.value && formData.name"
-                      class="text-text-secondary text-xs"
-                      data-test="add-alert-details-name-auto"
-                      >{{ t("alerts.sections.details.autoName") }}</span
-                    >
-                    <OButton
-                      v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
-                      class="self-start"
-                      variant="link"
-                      size="xs"
-                      data-test="add-alert-details-name-suggest"
-                      @click="alertAutoName.resetToAuto"
-                      >{{
-                        t("alerts.sections.details.useSuggestion", { name: alertNameSuggestion })
-                      }}</OButton
-                    >
+                      <span
+                        v-if="nameSavedAs"
+                        class="text-text-secondary text-xs"
+                        data-test="add-alert-details-name-saved-as"
+                        >{{ t("alerts.form.names.savesAs", { name: nameSavedAs }) }}</span
+                      >
+                      <span
+                        v-else-if="nameRewrittenFrom"
+                        class="text-text-secondary text-xs"
+                        data-test="add-alert-details-name-rewritten"
+                        >{{ t("alerts.form.names.rewritten") }}</span
+                      >
+                      <span
+                        v-else-if="
+                          formData.name &&
+                          (alertAutoName.isAuto.value || formData.name === alertNameSuggestion)
+                        "
+                        class="text-text-secondary text-xs"
+                        data-test="add-alert-details-name-auto"
+                        >{{ t("alerts.sections.details.autoName") }}</span
+                      >
+                      <OButton
+                        v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
+                        class="self-start"
+                        variant="link"
+                        size="xs"
+                        data-test="add-alert-details-name-suggest"
+                        @click="alertAutoName.resetToAuto"
+                        >{{
+                          t("alerts.sections.details.useSuggestion", { name: alertNameSuggestion })
+                        }}</OButton
+                      >
+                    </AlertMessageLine>
                   </div>
                 </OSettingRow>
                 <OSettingRow
@@ -1058,6 +1069,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :folder-id="editFolderId"
                 :expected-every-minutes="recentChecksExpectedEvery"
                 :saved-at="modelValue?.updated_at"
+                :is-real-time="formData.is_real_time === 'true'"
               />
             </div>
           </Teleport>
@@ -1330,6 +1342,7 @@ import AlertSampleEvents from "./AlertSampleEvents.vue";
 import AlertStreamOption from "./AlertStreamOption.vue";
 import AlertIntentStart from "./AlertIntentStart.vue";
 import AlertLookAlike from "./AlertLookAlike.vue";
+import AlertMessageLine from "./AlertMessageLine.vue";
 import type { IntentFill, IntentId } from "@/utils/alerts/alertIntents";
 import type { AlreadySetUp, LibrarySuggestion } from "@/utils/alerts/librarySuggest.types";
 import type { ValueRange } from "@/utils/alerts/ratioThreshold";
@@ -1511,6 +1524,7 @@ export default defineComponent({
     AlertStreamOption,
     AlertIntentStart,
     AlertLookAlike,
+    AlertMessageLine,
     AlertMetricLabels,
     AlertCheckTimeline,
     AlertBacktest,
@@ -1929,11 +1943,18 @@ export default defineComponent({
       document.removeEventListener("scroll", onJumpScroll, { capture: true });
       clearTimeout(jumpSettle);
     });
+    const focusMovedOn = () =>
+      !!document.activeElement?.closest('[data-snap-section]:not([data-snap-section="watch"])');
     watch(activeSection, (now, left) => {
       if (now === "details") nameDue.value = true;
       visitedSections.value = new Set([...visitedSections.value, left]);
       if (now === "watch") foldDue.value = false;
-      else if (left === "watch" && alertForm.formData.value.stream_name) foldDue.value = true;
+      // Scrolling past section 1 keeps it open; a jump, or focus moving on from it, folds it.
+      else if (
+        alertForm.formData.value.stream_name &&
+        (jumping.value || (left === "watch" && focusMovedOn()))
+      )
+        foldDue.value = true;
       foldWhenDue();
     });
 
@@ -2824,6 +2845,7 @@ export default defineComponent({
       applySavedName,
       saveAlert,
       nameRewrittenFrom,
+      nameFieldError,
       onNameInput,
       onNameFocus,
       onNameEnter,

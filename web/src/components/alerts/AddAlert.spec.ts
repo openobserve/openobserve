@@ -2351,20 +2351,27 @@ describe("AddAlert (OForm owner)", () => {
       expect(watch().exists()).toBe(true);
     });
 
-    it("create collapses section 1 after moving on and Change reopens it", async () => {
-      wrapper = mountAlert();
+    it("create collapses section 1 after moving on, never on a scroll past it, and Change reopens it", async () => {
+      wrapper = mountAlert({}, { attachTo: document.body });
       await flushPromises();
-      wrapper.vm.activeSection = "watch";
-      await flushPromises();
-      wrapper.vm.activeSection = "condition";
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(true);
+      const next = wrapper.get('[data-test="add-alert-section-condition-next"]')
+        .element as HTMLElement;
+      const leaveWatch = async (focusOn: boolean) => {
+        wrapper.vm.activeSection = "watch";
+        await flushPromises();
+        if (focusOn) next.focus();
+        else next.blur();
+        wrapper.vm.activeSection = "condition";
+        await flushPromises();
+      };
+      const watchOpen = () => wrapper.find('[data-test="add-alert-section-watch"]').exists();
+      await leaveWatch(true);
+      expect(watchOpen()).toBe(true);
       wrapper.vm.form.setFieldValue("stream_name", "app_logs");
-      wrapper.vm.activeSection = "watch";
-      await flushPromises();
-      wrapper.vm.activeSection = "condition";
-      await flushPromises();
-      expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(false);
+      await leaveWatch(false);
+      expect(watchOpen()).toBe(true);
+      await leaveWatch(true);
+      expect(watchOpen()).toBe(false);
       await wrapper.get('[data-test="add-alert-watch-summary-change"]').trigger("click");
       await flushPromises();
       expect(wrapper.find('[data-test="add-alert-section-watch"]').exists()).toBe(true);

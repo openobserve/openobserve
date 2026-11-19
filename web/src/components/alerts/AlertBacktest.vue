@@ -336,7 +336,10 @@ const waitAction = computed(() =>
       )
     : null,
 );
-const openWait = () => formContext?.goToSection("notify");
+const openWait = () =>
+  formContext?.openSetting
+    ? formContext.openSetting("cooldown")
+    : formContext?.goToSection("notify");
 
 const resultText = computed(() => {
   if (props.realTime) return volumeText.value ?? t(emptyDayHintKey(filtered.value));

@@ -433,10 +433,12 @@ const SLOT_MENU = { minWidth: "min(18rem, calc(100vw - 2rem))" };
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const isMetrics = computed(() => props.streamType === "metrics");
 // A type a chip set does not narrow the chips, so the row never loses the chip beside the one clicked.
+// The type as it was when a chip was pressed: a chip that sets the type keeps its row, one picked under it filters it.
+const typeAtPick = ref<string | undefined>();
 const intents = computed(() =>
   intentsFor(props.streamType, {
     anomaly: props.anomalyAvailable,
-    howItChecks: props.active ? undefined : props.howItChecks,
+    howItChecks: props.active ? typeAtPick.value : props.howItChecks,
   }),
 );
 const noun = computed(() => dataNoun(props.streamType, "custom", 2, t));
@@ -865,6 +867,7 @@ const seedValues = async (id: IntentId) => {
 
 const choose = async (id: IntentId) => {
   analytics.track("alert_intent_applied", { intent: id, stream_type: props.streamType });
+  if (!props.active) typeAtPick.value = props.howItChecks;
   choosing.value = id;
   await whenRanked();
   if (choosing.value !== id) return;
