@@ -315,6 +315,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ scheduleIntervalError }}
             </div>
+            <template v-if="scheduleDelayNote" #note>
+              <span data-test="anomaly-schedule-delay-note">{{ scheduleDelayNote }}</span>
+            </template>
           </OSettingRow>
           <OSettingRow
             :label="t('alerts.form.schedule.lookingAtRow')"
@@ -422,25 +425,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-50!"
             />
           </OSettingRow>
-          <AlertSentenceRow
-            v-if="formContext"
-            :label="t('alerts.groups.schedule')"
-            :description="scheduleDelayNote"
-            data-test="anomaly-schedule-line"
-            changeable
-            @change="
-              formContext.openSetting
-                ? formContext.openSetting('anomalyCheckEvery')
-                : formContext.goToSection('condition')
-            "
-          >
-            {{
-              t("alerts.form.anomaly.scheduleLine", {
-                every: scheduleEvery,
-                window: scheduleWindow,
-              })
-            }}
-          </AlertSentenceRow>
           <AlertSentenceRow
             v-if="!sensitivityOpened"
             :label="t('alerts.sensitivity')"
@@ -638,7 +622,7 @@ import {
   isIngestArtifact,
   useFilterDiscovery,
 } from "@/composables/alerts/useStreamDiscovery";
-import { dataNoun, durationText, everyDuration, everyWords } from "@/utils/alerts/alertCopy";
+import { dataNoun, durationText, everyDuration } from "@/utils/alerts/alertCopy";
 import { toFilterFields, type FilterField } from "@/utils/query/filterBar";
 import QueryEditor from "@/components/QueryEditor.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -651,7 +635,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
 import AlertFilterSentence from "@/components/alerts/AlertFilterSentence.vue";
 import AlertSentenceRow from "@/components/alerts/AlertSentenceRow.vue";
-import { ALERT_FORM_CONTEXT_KEY } from "@/components/alerts/alertFormContext";
 import {
   ALERT_SETTING_TIERS_KEY,
   useTierVisibility,
@@ -834,7 +817,6 @@ export default defineComponent({
 
     const tierShows = useTierVisibility();
     const tiers = inject(ALERT_SETTING_TIERS_KEY, null);
-    const formContext = inject(ALERT_FORM_CONTEXT_KEY, null);
 
     // Auto reads as one sentence row; Change, a stored level or a stored budget opens the controls.
     const sensitivityOpened = ref(false);
@@ -1342,19 +1324,6 @@ export default defineComponent({
       };
     });
 
-    const intervalText = (value: unknown, unit: unknown) => {
-      const secs = anomalyIntervalSeconds(Number(value), String(unit));
-      return secs === null ? raw("—") : secondsInWords(secs);
-    };
-    // "Every hour", never "Every 1 hour": the same words the read-back uses.
-    const UNIT_MINUTES: Record<string, number> = { m: 1, h: 60, d: 1440 };
-    const scheduleEvery = computed(() =>
-      everyWords(
-        Number(scheduleIntervalValue.value) *
-          (UNIT_MINUTES[String(scheduleIntervalUnit.value)] ?? 1),
-        t,
-      ),
-    );
     // Detection runs only on a check, so an hourly check can hold a spike back for up to an hour.
     const scheduleDelayNote = computed(() => {
       const secs = anomalyIntervalSeconds(
@@ -1367,9 +1336,6 @@ export default defineComponent({
         duration: durationText(secs, t),
       });
     });
-    const scheduleWindow = computed(() =>
-      intervalText(detectionWindowValue.value, detectionWindowUnit.value),
-    );
 
     // No stream context means no value lookup; the picker then takes typed values only.
     const filterDiscovery = useFilterDiscovery(() => {
@@ -1447,15 +1413,12 @@ export default defineComponent({
       onCustomSqlChange,
       tierShows,
       tiers,
-      formContext,
       sensitivityOpened,
       filtersOpen,
       addFilter,
       filterBuilderRef,
       filterGroup,
       openFilters,
-      scheduleEvery,
-      scheduleWindow,
       scheduleDelayNote,
     };
   },

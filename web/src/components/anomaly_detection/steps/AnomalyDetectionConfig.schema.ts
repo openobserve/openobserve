@@ -544,6 +544,19 @@ export const anomalyWindowShareEffective = (
   };
 };
 
+/** The window share as whole counts of the last N measures: the server fires at count × 100 / N ≥ fire %. */
+export const anomalyWindowCounts = (
+  cfg: Record<string, any> | null | undefined,
+): { buckets: number; fire: number; recover: number } => {
+  const { buckets, fire, recover } = anomalyWindowShareEffective(cfg);
+  // The epsilon absorbs float drift: 1 × 100 / 3 × 3 / 100 is a hair above 1.
+  const count = (pct: number) => Math.ceil((pct * buckets) / 100 - 1e-9);
+  return { buckets, fire: count(fire), recover: count(recover) };
+};
+
+/** The percent stored for "count of the last N", computed as the server computes its share. */
+export const anomalyWindowPct = (count: number, buckets: number): number => (count * 100) / buckets;
+
 /** Locale keys for the window-share inputs that break the server's rules; null where the value is valid. */
 export const anomalyWindowShareErrors = (
   cfg: Record<string, any> | null | undefined,
@@ -576,8 +589,8 @@ export const anomalyWindowShareErrors = (
       : spanOk
         ? null
         : "alerts.anomaly.windowBucketsSpan",
-    fire: fireOk ? null : "alerts.anomaly.windowFireRange",
-    recover: recoverOk ? null : "alerts.anomaly.windowRecoverRange",
+    fire: fireOk ? null : "alerts.anomaly.windowFireCountRange",
+    recover: recoverOk ? null : "alerts.anomaly.windowRecoverCountRange",
   };
 };
 

@@ -182,7 +182,9 @@ describe("AnomalyAlerting - direction and window share", () => {
       config: makeConfig({ alert_window_fire_pct: 50, alert_window_recover_pct: 60 }),
     });
     const errors = w.findAll('[data-test="anomaly-window-share-error"]');
-    expect(errors.map((e) => e.text())).toEqual([t("alerts.anomaly.windowRecoverRange")]);
+    expect(errors.map((e) => e.text())).toEqual([
+      t("alerts.anomaly.windowRecoverCountRange", { max: 1 }),
+    ]);
   });
 
   it("flags a bucket count below 1", async () => {
@@ -237,23 +239,43 @@ describe("AnomalyAlerting - setting rows", () => {
     expect(w.find(".step-content").classes()).toContain("border");
   });
 
-  it("puts the fire and recover inputs on two clause lines, each named for screen readers", async () => {
-    const w = await mountComp({ config: makeConfig({ alert_window_buckets: 1 }) });
-    expect(w.find('[data-test="anomaly-window-sentence"]').text()).toContain("measure");
-    expect(w.find('[data-test="anomaly-window-sentence"]').text()).not.toContain("measures");
-    const inputs = w.find('[data-test="anomaly-window-share-row"]').findAll("input");
-    expect(inputs.map((i) => i.attributes("aria-label"))).toEqual([
-      i18n.global.t("alerts.anomaly.windowFirePct"),
-      i18n.global.t("alerts.anomaly.windowBuckets"),
-      i18n.global.t("alerts.anomaly.windowRecoverPct"),
-    ]);
+  it.each([
+    [
+      { alert_window_buckets: 1 },
+      "count is unusual",
+      "Alerts as soon as one 5-minute count is unusual",
+    ],
+    [
+      { alert_window_buckets: 5, alert_window_fire_pct: 60 },
+      "counts are unusual",
+      "Alerts when 3 of the 5-minute counts in the last 25 minutes are unusual",
+    ],
+    [
+      { alert_window_buckets: 3, alert_window_fire_pct: 100, detection_function: "avg" },
+      "values are unusual",
+      "Alerts when every 5-minute value in the last 15 minutes is unusual",
+    ],
+  ])("reads the window as counts in plain words: %j", async (window, sentence, note) => {
+    const config = makeConfig({
+      detection_function: "count",
+      histogram_interval_value: 5,
+      histogram_interval_unit: "m",
+      ...window,
+    });
+    const w = await mountComp({ config });
+    expect(w.find('[data-test="anomaly-window-sentence"]').text()).toContain(sentence);
+    expect(w.find('[data-test="anomaly-window-note"]').text()).toBe(note);
   });
 
-  it("writes a typed bucket count back into the config as a number", async () => {
-    const config = makeConfig({ alert_window_buckets: 1 });
+  it("stores counts as the server's percent and keeps the shown count while N is retyped", async () => {
+    const config = makeConfig({ alert_window_buckets: 5, alert_window_fire_pct: 60 });
     const w = await mountComp({ config });
-    await w.find('[data-test="anomaly-window-buckets"] input').setValue("4");
-    expect(config.alert_window_buckets).toBe(4);
+    const buckets = w.find('[data-test="anomaly-window-buckets"] input');
+    for (const typed of ["", "1", "10"]) await buckets.setValue(typed);
+    expect(config.alert_window_buckets).toBe(10);
+    expect(config.alert_window_fire_pct).toBe(30);
+    await w.find('[data-test="anomaly-window-recover-count"] input').setValue("2");
+    expect(config.alert_window_recover_pct).toBe(20);
   });
 
   it("opens the destinations page from the add button", async () => {

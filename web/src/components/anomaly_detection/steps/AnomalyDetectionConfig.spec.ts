@@ -78,6 +78,8 @@ import {
   isAnomalyDataReadinessStatus,
   anomalyCanCheckDataNow,
   anomalySensitivityModel,
+  anomalyWindowCounts,
+  anomalyWindowPct,
   anomalyWindowShareErrors,
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
@@ -1625,31 +1627,24 @@ describe("AnomalyDetectionConfig — section 2 in the sectioned editor (E1)", ()
     expect(levelInput(w).exists()).toBe(true);
   });
 
-  it("the schedule line states both numbers and links to How often to check", async () => {
-    const { w, goToSection } = mountSectioned({
-      schedule_interval_value: 1,
-      schedule_interval_unit: "h",
-      detection_window_value: 3,
-      detection_window_unit: "h",
-    });
-    await flushPromises();
-    const line = w.find('[data-test="anomaly-schedule-line"]');
-    expect(line.text()).toContain("Every hour");
-    expect(line.text()).toContain("3 hours");
-    await w.find('[data-test="anomaly-schedule-line-change"]').trigger("click");
-    expect(goToSection).toHaveBeenCalledWith("condition");
-  });
-
   it.each([
     [1, "h", "Checks every hour, so a spike can wait up to 1 hour to alert."],
     [10, "m", ""],
-  ])("a check every %s %s says how long a spike can wait: %j", async (value, unit, note) => {
-    const { w } = mountSectioned({ schedule_interval_value: value, schedule_interval_unit: unit });
-    await flushPromises();
-    const line = w.find('[data-test="anomaly-schedule-line"]');
-    expect(line.text().includes("so a spike can wait")).toBe(!!note);
-    if (note) expect(line.text()).toContain(note);
-  });
+  ])(
+    "states the schedule once: a check every %s %s notes how long a spike can wait: %j",
+    async (value, unit, note) => {
+      const { w } = mountSectioned({
+        schedule_interval_value: value,
+        schedule_interval_unit: unit,
+      });
+      await flushPromises();
+      expect(w.find('[data-test="anomaly-schedule-line"]').exists()).toBe(false);
+      const delay = w.find(
+        '[data-test="anomaly-check-every-row"] [data-test="anomaly-schedule-delay-note"]',
+      );
+      expect(delay.exists() ? delay.text() : "").toBe(note);
+    },
+  );
 
   it("offers the Builder / SQL toggle from the start, and SQL switches to custom SQL", async () => {
     const { w, config } = mountSectioned();
@@ -1774,7 +1769,7 @@ describe("anomalyWindowShareErrors", () => {
   });
 
   it.each([0, -5, 100.1])("rejects a fire share of %s", (n) => {
-    expect(errors({ alert_window_fire_pct: n }).fire).toBe("alerts.anomaly.windowFireRange");
+    expect(errors({ alert_window_fire_pct: n }).fire).toBe("alerts.anomaly.windowFireCountRange");
   });
 
   it("rejects a window longer than 24h of buckets", () => {
@@ -1801,13 +1796,38 @@ describe("anomalyWindowShareErrors", () => {
 
   it("rejects a recover share above fire, or of zero", () => {
     expect(errors({ alert_window_fire_pct: 50, alert_window_recover_pct: 60 }).recover).toBe(
-      "alerts.anomaly.windowRecoverRange",
+      "alerts.anomaly.windowRecoverCountRange",
     );
     expect(errors({ alert_window_recover_pct: 0 }).recover).toBe(
-      "alerts.anomaly.windowRecoverRange",
+      "alerts.anomaly.windowRecoverCountRange",
     );
     // A blank fire share is 100, so recover may go up to it.
     expect(errors({ alert_window_recover_pct: 100 }).recover).toBeNull();
+  });
+});
+
+// The server fires at count × 100 / buckets >= fire %, so the form's counts round-trip exactly.
+describe("anomalyWindowCounts", () => {
+  it.each([
+    [1, 1],
+    [1, 3],
+    [2, 3],
+    [3, 7],
+    [4, 5],
+  ])("%s of the last %s survives the stored percent", (count, buckets) => {
+    const pct = anomalyWindowPct(count, buckets);
+    const cfg = { alert_window_buckets: buckets, alert_window_fire_pct: pct };
+    expect(anomalyWindowCounts(cfg).fire).toBe(count);
+  });
+
+  it("reads a stored share as the count the server needs: 80% of 3 is 3, recovery below 40% is 2", () => {
+    expect(
+      anomalyWindowCounts({
+        alert_window_buckets: 3,
+        alert_window_fire_pct: 80,
+        alert_window_recover_pct: 40,
+      }),
+    ).toEqual({ buckets: 3, fire: 3, recover: 2 });
   });
 });
 

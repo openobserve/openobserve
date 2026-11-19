@@ -200,60 +200,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSettingRow
             v-if="tierShows('anomalyWindow')"
             :label="t('alerts.tiers.names.anomalyWindow')"
-            :info="t('alerts.anomaly.windowShareTooltip')"
+            :info="t('alerts.form.anomaly.windowTooltip', { noun: bucketNoun(1) })"
             data-test="anomaly-window-share-row"
             fill
           >
             <div class="flex flex-col gap-2">
               <i18n-t
-                keypath="alerts.form.anomaly.windowFireWords"
+                keypath="alerts.form.anomaly.windowCountWords"
                 :plural="windowBucketCount"
                 tag="div"
                 class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm"
                 data-test="anomaly-window-sentence"
               >
                 <template #fire>
-                  <span class="inline-flex min-w-0 items-center gap-0.5">
-                    <OInput
-                      v-model="configModel.alert_window_fire_pct"
-                      type="number"
-                      :model-modifiers="{ number: true }"
-                      fit-content
-                      :aria-label="t('alerts.anomaly.windowFirePct')"
-                      :placeholder="raw('100')"
-                      :error="!!windowShareErrors.fire"
-                      data-test="anomaly-window-fire-pct"
-                    />{{ raw("%") }}</span
-                  >
-                </template>
-                <template #buckets>
                   <OInput
-                    v-model="configModel.alert_window_buckets"
+                    v-model="fireCountModel"
                     type="number"
                     :model-modifiers="{ number: true }"
                     fit-content
-                    :aria-label="t('alerts.anomaly.windowBuckets')"
+                    :aria-label="t('alerts.anomaly.windowFireCount')"
+                    :placeholder="raw(String(windowBucketCount))"
+                    :error="!!windowShareErrors.fire"
+                    data-test="anomaly-window-fire-count"
+                  />
+                </template>
+                <template #buckets>
+                  <OInput
+                    v-model="bucketsModel"
+                    type="number"
+                    :model-modifiers="{ number: true }"
+                    fit-content
+                    :aria-label="t('alerts.anomaly.windowRecent')"
                     :placeholder="raw('1')"
                     :error="!!windowShareErrors.buckets"
                     data-test="anomaly-window-buckets"
                   />
                 </template>
+                <template #noun>{{ bucketNoun(windowBucketCount, false) }}</template>
               </i18n-t>
               <i18n-t
-                keypath="alerts.form.anomaly.windowRecoverWords"
+                keypath="alerts.form.anomaly.windowRecoverCountWords"
                 tag="div"
                 class="text-text-body flex flex-wrap items-center gap-x-1.5 gap-y-2 text-sm"
               >
                 <template #recover>
                   <OInput
-                    v-model="configModel.alert_window_recover_pct"
+                    v-model="recoverCountModel"
                     type="number"
                     :model-modifiers="{ number: true }"
                     fit-content
-                    :aria-label="t('alerts.anomaly.windowRecoverPct')"
-                    :placeholder="raw(String(config.alert_window_fire_pct || 100))"
+                    :aria-label="t('alerts.anomaly.windowRecoverCount')"
+                    :placeholder="raw(String(windowCounts.fire))"
                     :error="!!windowShareErrors.recover"
-                    data-test="anomaly-window-recover-pct"
+                    data-test="anomaly-window-recover-count"
                   />
                 </template>
               </i18n-t>
@@ -267,6 +266,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ message }}
               </div>
             </div>
+            <template #note>
+              <span data-test="anomaly-window-note">{{ windowNote }}</span>
+            </template>
           </OSettingRow>
         </AlertTierPlace>
       </Teleport>
@@ -323,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, inject, ref, type PropType } from "vue";
+import { computed, defineComponent, inject, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -345,7 +347,24 @@ import {
 } from "@/composables/alerts/useAlertSettingTiers";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import type { AlertSectionTargets } from "@/components/alerts/alertFormSections";
-import { ANOMALY_DIRECTION_KEYS, anomalyWindowShareErrors } from "./AnomalyDetectionConfig.schema";
+import { durationText } from "@/utils/alerts/alertCopy";
+import type { I18nKey, I18nText } from "@/types/i18n";
+import {
+  ANOMALY_DIRECTION_KEYS,
+  anomalyIntervalSeconds,
+  anomalyWindowCounts,
+  anomalyWindowPct,
+  anomalyWindowShareErrors,
+} from "./AnomalyDetectionConfig.schema";
+
+const SPAN_UNITS: ReadonlyArray<readonly [I18nKey, number]> = [
+  ["alerts.form.anomaly.span.days", 86400],
+  ["alerts.form.anomaly.span.hours", 3600],
+  ["alerts.form.anomaly.span.minutes", 60],
+];
+const isBlank = (v: unknown): boolean => v === "" || v === null || v === undefined;
+const wholeCount = (v: unknown): number | null =>
+  Number.isInteger(Number(v)) && Number(v) >= 1 && !isBlank(v) ? Number(v) : null;
 
 export default defineComponent({
   name: "AnomalyAlerting",
@@ -426,18 +445,98 @@ export default defineComponent({
     });
 
     const windowShareErrors = computed(() => anomalyWindowShareErrors(props.config));
-    // Blank buckets mean 1, so the sentence reads "1 bucket" until a larger count is typed.
-    const windowBucketCount = computed(() => Number(props.config.alert_window_buckets) || 1);
-    const templatePickerRef = ref<{ openHelp: () => void } | null>(null);
-    const windowShareMessages = computed(() =>
-      [
-        windowShareErrors.value.buckets,
-        windowShareErrors.value.fire,
-        windowShareErrors.value.recover,
-      ]
-        .filter((key): key is string => key !== null)
-        .map((key) => t(key as any)),
+    // Counts convert at the last whole N typed, so clearing N to retype it keeps "2 of" as 2.
+    const lastBuckets = ref(wholeCount(props.config.alert_window_buckets) ?? 1);
+    watch(
+      () => wholeCount(props.config.alert_window_buckets),
+      (n) => {
+        if (n !== null) lastBuckets.value = n;
+      },
     );
+    const windowBucketCount = computed(
+      () => wholeCount(props.config.alert_window_buckets) ?? lastBuckets.value,
+    );
+    const windowCounts = computed(() =>
+      anomalyWindowCounts({ ...props.config, alert_window_buckets: windowBucketCount.value }),
+    );
+    // The counts the user last set, so typing "10" over N passes through "1" without losing "3 of".
+    const held = ref({ fire: windowCounts.value.fire, recover: windowCounts.value.recover });
+    watch(
+      () => props.config,
+      () => {
+        held.value = { fire: windowCounts.value.fire, recover: windowCounts.value.recover };
+      },
+    );
+    const countModel = (field: "fire" | "recover") =>
+      computed({
+        get: () =>
+          isBlank(props.config[`alert_window_${field}_pct`]) ? "" : windowCounts.value[field],
+        set: (v: unknown) => {
+          if (!isBlank(v)) held.value[field] = Number(v);
+          configModel.value[`alert_window_${field}_pct`] = isBlank(v)
+            ? null
+            : anomalyWindowPct(Number(v), windowBucketCount.value);
+        },
+      });
+    const fireCountModel = countModel("fire");
+    const recoverCountModel = countModel("recover");
+    // A new N keeps the counts the sentence shows, so "1 of the last 1" becomes "1 of the last 5".
+    const bucketsModel = computed({
+      get: () => props.config.alert_window_buckets ?? "",
+      set: (v: unknown) => {
+        const cfg = configModel.value;
+        cfg.alert_window_buckets = v;
+        const n = wholeCount(v);
+        if (n === null) return;
+        for (const field of ["fire", "recover"] as const) {
+          if (!isBlank(cfg[`alert_window_${field}_pct`]))
+            cfg[`alert_window_${field}_pct`] = anomalyWindowPct(Math.min(held.value[field], n), n);
+        }
+      },
+    });
+    const bucketSeconds = computed(() =>
+      anomalyIntervalSeconds(
+        Number(props.config.histogram_interval_value),
+        String(props.config.histogram_interval_unit),
+      ),
+    );
+    // "5-minute count": what one bucket holds, so the rule never says bucket or measure.
+    const bucketNoun = (count: number, withSpan = true): I18nText => {
+      const secs = withSpan ? bucketSeconds.value : null;
+      const unit = secs ? SPAN_UNITS.find(([, size]) => secs % size === 0) : undefined;
+      const span = !secs
+        ? raw("")
+        : unit
+          ? t(unit[0], { count: secs / unit[1] })
+          : t("alerts.form.anomaly.span.seconds", { count: secs });
+      const counts =
+        props.config.query_mode !== "custom_sql" && props.config.detection_function === "count";
+      return raw(
+        t(
+          counts ? "alerts.form.anomaly.bucketCount" : "alerts.form.anomaly.bucketValue",
+          { span },
+          count,
+        ).trim(),
+      );
+    };
+    const windowNote = computed(() => {
+      const { buckets, fire } = windowCounts.value;
+      if (fire <= 1) return t("alerts.form.anomaly.windowAtOnce", { noun: bucketNoun(1) });
+      const secs = bucketSeconds.value;
+      const span = secs ? durationText(secs * buckets, t) : raw("");
+      return fire >= buckets
+        ? t("alerts.form.anomaly.windowInARow", { noun: bucketNoun(1), span })
+        : t("alerts.form.anomaly.windowShareOf", { fire, noun: bucketNoun(2), span });
+    });
+    const templatePickerRef = ref<{ openHelp: () => void } | null>(null);
+    const windowShareMessages = computed(() => {
+      const e = windowShareErrors.value;
+      return [
+        e.buckets && t(e.buckets as any),
+        e.fire && t(e.fire as any, { max: windowBucketCount.value }),
+        e.recover && t(e.recover as any, { max: windowCounts.value.fire }),
+      ].filter((m): m is I18nText => !!m);
+    });
 
     // One name reads better than "1 destination"; more than one is a count.
     const destinationStatus = computed(() => {
@@ -504,6 +603,12 @@ export default defineComponent({
 
     return {
       windowBucketCount,
+      windowCounts,
+      fireCountModel,
+      recoverCountModel,
+      bucketsModel,
+      bucketNoun,
+      windowNote,
       templatePickerRef,
       t,
       raw,
