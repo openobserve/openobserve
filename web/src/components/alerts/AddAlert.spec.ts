@@ -2210,7 +2210,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(alertsService.update_by_alert_id).not.toHaveBeenCalled();
     });
 
-    it("can focus hold-for after it appears, though it was hidden when the editor opened", async () => {
+    it("can focus hold-for after it appears, and the look back on the Alert when line", async () => {
       breakpoint.lgUp.value = false;
       wrapper = mountAlert(
         { isUpdated: true, modelValue: savedAlert({ pending_period_sec: 0 }) },
@@ -2231,6 +2231,7 @@ describe("AddAlert (OForm owner)", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       wrapper.vm.focusManager.focusField("pending_period");
+      wrapper.vm.focusManager.focusField("period");
 
       expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("not registered"));
       warn.mockRestore();

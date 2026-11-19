@@ -190,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             }}</span
                           >
                           <AlertWindowPhrase
+                            ref="periodFieldRef"
                             class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
                             :minutes="periodMinutes"
                             @update:minutes="emit('update:period', $event)"
@@ -365,6 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >{{ t("alerts.matchingMetricsFound") }}</span
                           >
                           <AlertWindowPhrase
+                            ref="periodFieldRef"
                             class="text-text-secondary text-compact shrink-0 leading-8.5 whitespace-nowrap"
                             :minutes="periodMinutes"
                             @update:minutes="emit('update:period', $event)"
@@ -1000,6 +1002,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div class="flex min-w-0 flex-col gap-1.5">
                         <AlertWindowPhrase
+                          ref="periodFieldRef"
                           v-if="localTab === 'sql' || isPromRuleMode"
                           keypath="alerts.form.window.queryReads"
                           class="text-text-body text-sm leading-8.5"
@@ -1225,6 +1228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                         <div class="flex flex-col gap-1.5">
                           <AlertWindowPhrase
+                            ref="periodFieldRef"
                             keypath="alerts.form.window.queryReads"
                             class="text-text-body text-sm leading-8.5"
                             :minutes="periodMinutes"
@@ -1796,6 +1800,8 @@ export default defineComponent({
 
     // Field refs for focus manager
     const customPreviewRef = ref<HTMLElement | null>(null);
+    // The look-back field the summary and Find land on; one Alert when line draws it at a time.
+    const periodFieldRef = ref<unknown>(null);
     const sqlPromqlPreviewRef = ref(null);
 
     // Local query values
@@ -4283,6 +4289,7 @@ export default defineComponent({
       functionsList,
       // Field refs for focus manager
       customPreviewRef,
+      periodFieldRef,
       sqlPromqlPreviewRef,
       // Multi-window dialog
       showMultiWindowDialog,

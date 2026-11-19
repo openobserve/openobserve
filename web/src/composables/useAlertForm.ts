@@ -3225,18 +3225,6 @@ export function useAlertForm(
     (newVal) => {
       if (newVal) {
         nextTick(() => {
-          if ((newVal as any).periodFieldRef) {
-            focusManager.registerField("period", {
-              ref: (newVal as any).periodFieldRef,
-              onBeforeFocus: () => {
-                if (isAnomalyMode.value) {
-                  activeTab.value = "anomaly-alerting";
-                } else {
-                  activeTab.value = "condition";
-                }
-              },
-            });
-          }
           if ((newVal as any).thresholdFieldRef) {
             focusManager.registerField("threshold", {
               ref: (newVal as any).thresholdFieldRef,
@@ -3307,6 +3295,18 @@ export function useAlertForm(
     },
     { immediate: true },
   );
+
+  // The look back sits on step 2's Alert when line, which mounts only once a stream is picked.
+  focusManager.registerField("period", {
+    ref: {
+      get value() {
+        return (step2Ref.value as { periodFieldRef?: unknown } | null)?.periodFieldRef ?? null;
+      },
+    },
+    onBeforeFocus: () => {
+      activeTab.value = "condition";
+    },
+  });
 
   // Watch for step2Ref to register query field
   watch(
