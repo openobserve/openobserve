@@ -12143,7 +12143,9 @@
         "noisySustained": "That is often, so people may start to ignore it. The {fn} over the look back already ignores short spikes; a higher threshold makes it quieter.",
         "noisySustainedLower": "That is often, so people may start to ignore it. The {fn} over the look back already ignores short dips; a lower threshold makes it quieter.",
         "changeThreshold": "Change the threshold",
-        "hourUntested": "{from}–{to}: not tested"
+        "hourUntested": "{from}–{to}: not tested",
+        "hourFiredShare": "{from}–{to}: would have alerted in {count} of {total} checks",
+        "hourEvents": "{from}–{to}: {count} matching event | {from}–{to}: {count} matching events"
       },
       "filtersMode": "Filters",
       "typeHelp": {
@@ -14264,16 +14266,17 @@
       "windowBuckets": "Buckets",
       "windowBucketsRange": "Enter a whole number of 1 or more.",
       "windowBucketsSpan": "The window (buckets × detection resolution) must be at most 24 hours.",
-      "windowFirePct": "Fire at percent",
-      "windowFireRange": "Enter a percentage above 0 and at most 100.",
-      "windowRecoverPct": "Recover below (%)",
-      "windowRecoverRange": "Enter a percentage above 0 and no higher than the fire percentage.",
       "windowRecoverSameAsFire": "Same as fire",
       "windowShare": "Window share",
       "windowShareCompact": "{fire}% of a {buckets}-bucket window; recover below {recover}%",
       "windowShareHint": "Fires when at least {fire}% of a {buckets}-bucket window is outside the band; recovers when the share drops below {recover}%.",
       "windowShareTooltip": "Alert only when enough recent buckets fall outside the band. The newest bucket must be outside. Buckets with no data count as inside here; no data alerts separately. 100% of the last 1 bucket alerts on every bucket outside the band.",
-      "recordOnlyHelp": "Detects and saves anomalies; sends nothing"
+      "recordOnlyHelp": "Detects and saves anomalies; sends nothing",
+      "windowFireCount": "How many must be unusual",
+      "windowRecent": "How many recent ones to look at",
+      "windowRecoverCount": "Stop alerting below this many",
+      "windowFireCountRange": "Enter a whole number from 1 to {max}.",
+      "windowRecoverCountRange": "Enter a whole number from 1 to {max}, the count that alerts."
     },
     "variables": {
       "label": "Variable"
@@ -15780,7 +15783,8 @@
         "forecast": "Each check fits the trend over the last {window}.",
         "alignedBlocks": "Each check counts the last {period} as one fixed block on the clock, so a burst split across two blocks is counted half in each.",
         "promqlLatest": "Each check reads each series' latest value within the last {period}.",
-        "promqlAny": "Each check counts a series that crossed at any point in the last {period}. {overlap}"
+        "promqlAny": "Each check counts a series that crossed at any point in the last {period}. {overlap}",
+        "gapNote": "{minutes} between checks is never read. | {minutes} between checks are never read."
       },
       "header": {
         "editName": "Edit name",
@@ -15826,7 +15830,6 @@
       "anomaly": {
         "sensitivityAuto": "Auto",
         "learned": "· learned from your data",
-        "scheduleLine": "Every {every}, looking at the last {window}",
         "measure": "Measure",
         "of": "of",
         "per": "per",
@@ -15836,12 +15839,24 @@
         "retrainHelp": "Choose Never to keep the first model.",
         "directionHelp": "Which side of normal alerts",
         "templateNote": "To use a prebuilt template, copy it in Templates first.",
-        "windowFireWords": "Alert when {fire} of the last {buckets} measure is unusual | Alert when {fire} of the last {buckets} measures are unusual",
-        "windowRecoverWords": "Stop alerting when under {recover}% are unusual",
         "trainingReads": "Learns from the last {days} days",
         "trainingHas": "This stream has {count} day, so it learns from that day | This stream has {count} days, so it learns from those",
         "trainingFlat": "This stream has {count} day, so it uses the same normal level at every hour of the day until it has {pattern} days | This stream has {count} days, so it uses the same normal level at every hour of the day until it has {pattern} days",
-        "trainingWaits": "This stream has less than a day. Training needs {measures} measures (about {duration}) and uses the same normal level at every hour until it has {pattern} days"
+        "trainingWaits": "This stream has less than a day. Training needs {measures} measures (about {duration}) and uses the same normal level at every hour until it has {pattern} days",
+        "windowCountWords": "Alert when {fire} of the last {buckets} {noun} is unusual | Alert when {fire} of the last {buckets} {noun} are unusual",
+        "windowRecoverCountWords": "Stop alerting when fewer than {recover} are unusual",
+        "windowAtOnce": "Alerts as soon as one {noun} is unusual",
+        "windowInARow": "Alerts when every {noun} in the last {span} is unusual",
+        "windowShareOf": "Alerts when {fire} of the {noun} in the last {span} are unusual",
+        "windowTooltip": "The newest {noun} must be unusual too. A gap with no data counts as normal here; no data alerts separately.",
+        "bucketCount": "{span} count | {span} counts",
+        "bucketValue": "{span} value | {span} values",
+        "span": {
+          "seconds": "{count}-second",
+          "minutes": "{count}-minute",
+          "hours": "{count}-hour",
+          "days": "{count}-day"
+        }
       },
       "holdFor": {
         "label": "Must last",
@@ -15904,6 +15919,12 @@
       "window": {
         "inTheLast": "in the last {n} minute | in the last {n} minutes",
         "queryReads": "The query reads the last {n} minute | The query reads the last {n} minutes"
+      },
+      "generatedSql": {
+        "thresholdAfter": "The threshold {threshold} is compared with {column} after the query runs.",
+        "thresholdPerGroup": "The threshold {threshold} is compared with {column} for each group after the query runs.",
+        "thresholdRows": "The threshold {threshold} is compared with the number of rows the query returns.",
+        "storedAs": "{value} ({stored})"
       }
     },
     "copy": {
@@ -16082,6 +16103,24 @@
       },
       "scratch": {
         "label": "Build it myself"
+      },
+      "notSeen": "Not seen in 24 h: {values}",
+      "phrase": {
+        "count": "Count of {values} {noun}",
+        "countAll": "Count of {noun}",
+        "measure": "{agg} of {subject}",
+        "value": "Value",
+        "each": "Each {values} {noun}",
+        "eachAll": "Each {noun}",
+        "volume": "Unusual volume of {values} {noun}",
+        "volumeAll": "Unusual volume of {noun}",
+        "compare": "Count of {values} {noun} against {factor}× last week",
+        "compareAll": "Count of {noun} against {factor}× last week",
+        "errorRate": "{values} error rate of {subject}",
+        "errorRateAll": "Error rate of {subject}",
+        "change": "Unusual change in {subject}",
+        "promql": "PromQL over {subject}",
+        "per": "{what} per {groups}"
       }
     },
     "librarySuggest": {
@@ -16119,8 +16158,6 @@
       "sendFailed": "Couldn't send the test message to {targets}: {reason}",
       "noDestination": "Pick a destination to send a test message",
       "pendingOnly": "It matched in {count} check, but not for as long as Must last. | It matched in {count} checks, but never for as long as Must last.",
-      "metricSeries": "{metric} has {count}",
-      "noSeriesMany": "The query matched no series. Series per metric: {list}.",
       "serverStatus": "the server answered {status}",
       "noAnswer": "no answer from the server",
       "sendConfirm": "This posts a real message, marked [TEST], to {targets}.",
@@ -16154,7 +16191,15 @@
       "groupsAbove": "Most often above the threshold:",
       "groupsBelow": "Most often below the threshold:",
       "groupsMatched": "Most often matching the condition:",
-      "checkCount": "{count} check | {count} checks"
+      "checkCount": "{count} check | {count} checks",
+      "noValueRatioDay": "Nothing matched the top part of the ratio in 24 hours, so the share stayed at 0.",
+      "noDataOne": "{metric} has no data in the latest check, so the query has nothing to read.",
+      "noDataAny": "None of {metrics} has data in the latest check, so the query has nothing to read.",
+      "dataNoMatch": "{metrics} has data, but nothing matched the query in 24 hours. | {metrics} have data, but nothing matched the query in 24 hours.",
+      "noMatchSomeMissing": "Nothing matched the query in 24 hours, and {metrics} has no data in the latest check. | Nothing matched the query in 24 hours, and {metrics} have no data in the latest check.",
+      "betweenChecks": "Checks read the value every {every}; short peaks between checks (up to {value} at {time}) are not seen.",
+      "valueCount": "{value} {count}",
+      "byValue": "Of these: {list}."
     },
     "conditionCountWith": "{noun} with",
     "lookAlike": {
