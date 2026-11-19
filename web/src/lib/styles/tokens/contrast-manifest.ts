@@ -1226,6 +1226,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "an icon chip's glyph is painted on the chip's fill",
   },
   {
+    fg: "--color-icon-chip-purple-text",
+    bg: "--color-icon-chip-purple-bg",
+    under: ["--color-surface-base"],
+    category: "text",
+    why: "an icon chip's glyph is painted on the chip's fill",
+  },
+  {
     fg: "--color-icon-chip-primary-text",
     bg: "--color-icon-chip-primary-bg",
     under: ["--color-surface-base"],

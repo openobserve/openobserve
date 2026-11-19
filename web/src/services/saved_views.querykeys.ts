@@ -25,4 +25,5 @@ import { orgKey } from "@/composables/query/keys";
 export const savedViewKeys = {
   all: (org: string) => orgKey(org, "search", "savedViews"),
   list: (org: string) => orgKey(org, "search", "savedViews"),
+  detail: (org: string, id: string) => orgKey(org, "search", "savedViews", id),
 };

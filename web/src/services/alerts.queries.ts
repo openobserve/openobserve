@@ -42,9 +42,12 @@ export const alertsListQuery = (
   query?: string,
   alertType?: string,
   options?: { silentForbidden?: boolean },
+  withDependencies = false,
 ) =>
   queryOptions({
-    queryKey: alertKeys.list(org, folderId, query, alertType),
+    queryKey: withDependencies
+      ? [...alertKeys.list(org, folderId, query, alertType), "dependencies"]
+      : alertKeys.list(org, folderId, query, alertType),
     queryFn: async (): Promise<any[]> => {
       const args = [
         1,
@@ -57,15 +60,26 @@ export const alertsListQuery = (
         query ?? "",
         alertType ?? "",
       ] as const;
+      // Only an opted-in caller pays for the destination and template names.
       const res = await (options
-        ? alerts.listByFolderId(...args, undefined, options)
-        : alerts.listByFolderId(...args));
+        ? alerts.listByFolderId(...args, withDependencies || undefined, options)
+        : withDependencies
+          ? alerts.listByFolderId(...args, true)
+          : alerts.listByFolderId(...args));
       const list = res.data?.list ?? [];
       // Rows stay the cached shape every patch edits; each one carries that its live fields are unknown.
       return res.data?.status_unavailable
         ? list.map((row: Record<string, unknown>) => ({ ...row, status_unavailable: true }))
         : list;
     },
+    staleTime: LIVE_STALE_TIME,
+  });
+
+export const alertsByTagsQuery = (org: string, tags: string[], withDestinations = false) =>
+  queryOptions({
+    queryKey: [...alertKeys.byTags(org, tags), withDestinations],
+    queryFn: async (): Promise<any[]> =>
+      (await alerts.listByTags(org, tags, withDestinations)).data?.list ?? [],
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -228,6 +242,13 @@ export const saveAlertMutation = (org: string, isUpdate: () => boolean) =>
         ? alerts.update_by_alert_id(org, vars.payload, vars.folderId)
         : alerts.create_by_alert_id(org, vars.payload, vars.folderId),
     // Callers compose their own per-row or per-batch outcome messages.
+    meta: { invalidates: [alertKeys.all(org)], silentError: true },
+  });
+
+export const deleteAlertMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { alertId: string; folderId?: string }) =>
+      alerts.delete_by_alert_id(org, vars.alertId, vars.folderId),
     meta: { invalidates: [alertKeys.all(org)], silentError: true },
   });
 

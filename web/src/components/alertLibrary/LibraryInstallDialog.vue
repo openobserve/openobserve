@@ -261,7 +261,7 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import { useAlertLibrary, useAnomalyLibraryAccess } from "@/composables/alerts/useAlertLibrary";
+import { useAnomalyLibraryAccess } from "@/composables/alerts/useAlertLibrary";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -273,23 +273,15 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { saveAlertMutation } from "@/services/alerts.queries";
-import { alertKeys } from "@/services/alerts.querykeys";
-import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
-import { useMutation } from "@tanstack/vue-query";
 import analytics from "@/services/product_analytics";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getFoldersListByType } from "@/utils/commons";
 
 import { alertTypeOf } from "./libraryFacets";
-import {
-  buildAnomalyInstallPayload,
-  buildInstallPayload,
-  InstallPayloadError,
-  type InstallOverrides,
-} from "./libraryInstall";
-import { coerceTunable, fileForInstall, readTunables, DEFAULT_TUNABLES } from "./libraryTunables";
+import { InstallPayloadError, type InstallOverrides } from "./libraryInstall";
+import { coerceTunable, readTunables, DEFAULT_TUNABLES } from "./libraryTunables";
+import { useLibraryInstall } from "./useLibraryInstall";
 
 const props = defineProps<{
   open: boolean;
@@ -317,7 +309,6 @@ const LARGE_BATCH = 50;
 
 const { t } = useI18nTyped();
 const store = useStore();
-const { loadAlertFile } = useAlertLibrary();
 const anomalyAccess = useAnomalyLibraryAccess();
 
 /** Optional-chained: a missing organization must not throw out of a click handler. */
@@ -510,53 +501,7 @@ const setResult = (id: string, patch: Partial<InstallResult>) => {
   );
 };
 
-// Each create drops the scope itself, so nothing refreshes after the batch.
-const installAlert = useMutation(() => saveAlertMutation(orgIdentifier(), () => false));
-// The Alerts list shows anomaly configs too, and the shared mutation drops only the anomaly scope.
-const installAnomaly = useMutation(() => {
-  const options = saveAnomalyConfigMutation(orgIdentifier(), () => undefined);
-  return {
-    ...options,
-    meta: {
-      ...options.meta,
-      invalidates: [...(options.meta?.invalidates ?? []), alertKeys.all(orgIdentifier())],
-    },
-  };
-});
-
-const installOne = async (
-  entry: AlertLibraryEntry,
-  overrides: InstallOverrides | undefined,
-): Promise<boolean> => {
-  const file =
-    props.seed && props.seed.entry.id === entry.id
-      ? props.seed.file
-      : fileForInstall(entry, await loadAlertFile(entry));
-
-  // The file is checked too: on OSS an anomaly body is stored as a broken scheduled alert.
-  const isAnomaly = alertTypeOf(entry) === "anomaly" || file.alert_type === "anomaly_detection";
-  if (isAnomaly) {
-    if (anomalyAccess.value !== "enabled") throw new InstallPayloadError("anomaly_unavailable");
-    const payload = buildAnomalyInstallPayload({
-      entry,
-      file,
-      folderId: folderId.value,
-    });
-    await installAnomaly.mutateAsync({ payload, folderId: folderId.value });
-    return true;
-  }
-
-  const payload = buildInstallPayload({
-    entry,
-    file,
-    folderId: folderId.value,
-    owner: store.state.userInfo?.email ?? "",
-    timezone: store.state.timezone,
-    overrides,
-  });
-  await installAlert.mutateAsync({ payload, folderId: folderId.value });
-  return false;
-};
+const { installBatch } = useLibraryInstall(orgIdentifier);
 
 const install = async (ids: string[]) => {
   if (isInstalling.value) return;
@@ -587,27 +532,30 @@ const install = async (ids: string[]) => {
     ? { frequency: tuneFrequency.value, silence: tuneSilence.value }
     : undefined;
 
-  // Only what this pass created. Re-announcing everything in `results` would
-  // make a retry repeat ids the parent already counted.
-  const installedNow: string[] = [];
+  let installedNow: string[] = [];
   let anomalyNow = 0;
 
-  // Sequential on purpose: one rejected create must not take the rest of the
-  // batch with it, and a burst of parallel POSTs is what rate limits.
   try {
-    for (const entry of batch) {
-      setResult(entry.id, { status: "running", message: undefined });
-      try {
-        if (await installOne(entry, batchOverrides)) anomalyNow += 1;
-        setResult(entry.id, { status: "installed" });
-        installedNow.push(entry.id);
-      } catch (error) {
-        setResult(entry.id, { status: "failed", message: errorText(error) });
-      }
-    }
+    const outcome = await installBatch(
+      batch,
+      {
+        folderId: folderId.value,
+        owner: store.state.userInfo?.email ?? "",
+        timezone: store.state.timezone,
+        overrides: batchOverrides,
+        seed: props.seed,
+      },
+      {
+        onStart: (entry) => setResult(entry.id, { status: "running", message: undefined }),
+        onInstalled: (entry) => setResult(entry.id, { status: "installed" }),
+        onFailed: (entry, error) =>
+          setResult(entry.id, { status: "failed", message: errorText(error) }),
+      },
+    );
+    installedNow = outcome.installedIds;
+    anomalyNow = outcome.anomalyCount;
   } finally {
-    // Nothing escapes the per-alert catch today, but if anything ever did the
-    // dialog would become uncloseable by every path at once.
+    // An escaped error would otherwise leave the dialog uncloseable by every path at once.
     isInstalling.value = false;
   }
 
