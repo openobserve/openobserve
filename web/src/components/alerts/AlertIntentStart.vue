@@ -44,50 +44,123 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="active && active !== 'promql'"
-      class="text-text-body min-w-0 text-sm leading-8"
+      class="text-text-body flex min-w-0 flex-col text-sm"
       data-test="add-alert-intent-sentence"
     >
-      <OTag
-        variant="default-soft"
-        size="xs"
-        class="me-1.5 align-middle"
-        :label="
-          needsChoice
-            ? t('alerts.intent.needsChoice')
-            : thresholdMissing
-              ? t('alerts.sections.condition.noThreshold')
-              : t('alerts.librarySuggest.suggestedStarter')
-        "
-        data-test="add-alert-intent-sentence-state"
-      />
-      <i18n-t :keypath="sentenceKey" tag="span" scope="global">
-        <template #noun>{{ active === "anyEvent" ? nounOne : noun }}</template>
-        <template #field>
-          <span class="inline-flex align-middle">
+      <OSettingRow :label="t('alerts.intent.rows.watch')" data-test="add-alert-intent-row-watch">
+        <i18n-t :keypath="watchKey" tag="span" scope="global" class="contents">
+          <template #noun>{{ active === "anyEvent" ? nounOne : noun }}</template>
+          <template #metric>
+            <span class="text-text-heading min-w-0 font-medium wrap-anywhere">{{
+              raw(streamName)
+            }}</span>
+          </template>
+          <template #bucket>{{ bucketWords }}</template>
+          <template #measure>
+            <span v-if="isMetrics" class="text-text-heading min-w-0 font-medium wrap-anywhere">{{
+              raw(streamName)
+            }}</span>
+            <OSelect
+              v-else
+              :model-value="slots.measure ?? ''"
+              :options="measureOptions"
+              size="sm"
+              searchable
+              :class="SLOT_FIELD"
+              :placeholder="t('alerts.intent.rows.pickField')"
+              :aria-label="t('alerts.intent.slots.measure')"
+              :dropdown-style="SLOT_MENU"
+              data-test="add-alert-intent-slot-measure"
+              @update:model-value="setSlot('measure', $event)"
+            />
+          </template>
+          <template #agg>
+            <OSelect
+              :model-value="formAgg"
+              :options="aggOptions"
+              size="sm"
+              :searchable="false"
+              :class="SLOT_FIELD"
+              :aria-label="t('alerts.queryConfig.aggregationFunction')"
+              :dropdown-style="SLOT_MENU"
+              data-test="add-alert-intent-slot-agg"
+              @update:model-value="setSlot('agg', $event)"
+            />
+          </template>
+        </i18n-t>
+        <OTag
+          v-if="needsChoice && missingSlot === 'measure'"
+          v-bind="STATE_TAG"
+          :label="t('alerts.intent.needsChoice')"
+        />
+        <template v-if="active === 'ratio' && familyText.length" #note>
+          <span data-test="add-alert-intent-family">{{
+            t("alerts.intent.ratio.alsoCovers", { metrics: joinListMore(familyText, t) })
+          }}</span>
+        </template>
+      </OSettingRow>
+
+      <OSettingRow
+        v-if="wantsValueSlot || (active === 'unusualVolume' && groupCandidates.all.length)"
+        :label="t('alerts.intent.rows.where')"
+        data-test="add-alert-intent-row-where"
+      >
+        <OSelect
+          v-if="active === 'unusualVolume' && !scoped"
+          :model-value="NO_GROUP"
+          :options="fieldOptions"
+          size="sm"
+          searchable
+          :class="SLOT_FIELD"
+          :aria-label="t('alerts.intent.slots.field')"
+          :dropdown-style="SLOT_MENU"
+          data-test="add-alert-intent-slot-field"
+          @update:model-value="setSlot('field', $event)"
+        />
+        <i18n-t
+          v-else
+          :keypath="isMetrics ? 'alerts.intent.rows.labelMatches' : 'alerts.intent.rows.fieldIs'"
+          tag="span"
+          scope="global"
+          class="contents"
+        >
+          <template #field>
             <OSelect
               :model-value="slots.field ?? ''"
               :options="fieldOptions"
-              appearance="inline"
-              size="xs"
+              size="sm"
               searchable
-              :placeholder="t('alerts.intent.slots.fieldPrompt')"
+              :class="SLOT_FIELD"
+              :placeholder="t('alerts.intent.rows.pickField')"
               :aria-label="t('alerts.intent.slots.field')"
               :dropdown-style="SLOT_MENU"
               data-test="add-alert-intent-slot-field"
               @update:model-value="setSlot('field', $event)"
             />
-          </span>
-        </template>
-        <template #value>
-          <span class="inline-flex align-middle">
+          </template>
+          <template #label>
+            <OSelect
+              :model-value="slots.label ?? ''"
+              :options="labelOptions"
+              size="sm"
+              searchable
+              :class="SLOT_FIELD"
+              :placeholder="t('alerts.intent.rows.pickLabel')"
+              :aria-label="t('alerts.intent.slots.label')"
+              :dropdown-style="LABEL_MENU"
+              data-test="add-alert-intent-slot-label"
+              @update:model-value="setSlot('label', $event)"
+            />
+          </template>
+          <template #value>
             <OSelect
               :model-value="slots.values ?? []"
               :options="valueOptions"
               multiple
               searchable
               creatable
-              appearance="inline"
-              size="xs"
+              size="sm"
+              :class="SLOT_FIELD"
               :loading="valuesLoading"
               :disabled="!valueSource"
               :placeholder="t('alerts.intent.slots.valuePlaceholder')"
@@ -99,7 +172,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :search-debounce="300"
               @search="valueSearch = $event"
               @close="reapply"
-              ><template #trigger>{{ valuesText }}</template
+              ><template #trigger
+                ><span
+                  class="min-w-0 truncate text-start text-sm"
+                  :class="slots.values?.length ? 'text-select-text' : 'text-select-placeholder'"
+                  >{{ valuesText }}</span
+                ></template
               ><template #after-options
                 ><p
                   class="text-text-secondary border-border-default m-0 w-0 min-w-full border-t px-3 py-2 text-xs"
@@ -109,204 +187,178 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </p></template
               ></OSelect
             >
-          </span>
-        </template>
-        <template #group>
-          <span class="inline-flex align-middle">
-            <OSelect
-              :model-value="slots.group ?? ''"
-              :options="groupOptions"
-              appearance="inline"
-              size="xs"
-              searchable
-              :placeholder="t('alerts.intent.slots.groupPrompt')"
-              :aria-label="t('alerts.intent.slots.group')"
-              :dropdown-style="SLOT_MENU"
-              data-test="add-alert-intent-slot-group"
-              @update:model-value="setSlot('group', $event)"
+          </template>
+        </i18n-t>
+        <OTag
+          v-if="needsChoice && missingSlot === 'value'"
+          v-bind="STATE_TAG"
+          :label="t('alerts.intent.needsChoice')"
+        />
+        <OButton
+          v-if="swapOffer"
+          variant="link"
+          size="sm"
+          data-test="add-alert-intent-use-instead"
+          @click="swapValue"
+          >{{ t("alerts.intent.useInstead", { value: raw(swapOffer) }) }}</OButton
+        >
+        <OButton
+          v-if="otherSpellings.length"
+          variant="link"
+          size="sm"
+          data-test="add-alert-intent-also-match"
+          @click="addSpellings"
+          >{{ t("alerts.intent.alsoMatch", { values: joinListMore(otherSpellings, t) }) }}</OButton
+        >
+      </OSettingRow>
+
+      <OSettingRow
+        v-if="offersGroup"
+        :label="t('alerts.intent.rows.per')"
+        data-test="add-alert-intent-row-per"
+      >
+        <OSelect
+          :model-value="slots.group || NO_GROUP"
+          :options="groupOptions"
+          size="sm"
+          searchable
+          :class="SLOT_FIELD"
+          :aria-label="t('alerts.intent.slots.group')"
+          :dropdown-style="SLOT_MENU"
+          data-test="add-alert-intent-slot-group"
+          @update:model-value="setSlot('group', $event)"
+        />
+      </OSettingRow>
+
+      <OSettingRow
+        v-if="showsWindow"
+        :label="t('alerts.intent.rows.over')"
+        data-test="add-alert-intent-row-over"
+      >
+        <i18n-t
+          keypath="alerts.intent.rows.lastMinutes"
+          :plural="periodMinutes > 0 ? periodMinutes : 2"
+          tag="span"
+          scope="global"
+          class="contents"
+        >
+          <template #n>
+            <OInput
+              :model-value="periodMinutes > 0 ? periodMinutes : ''"
+              type="number"
+              size="sm"
+              fit-content
+              :min="1"
+              :debounce="300"
+              :error="!(periodMinutes > 0)"
+              :aria-label="t('alerts.form.names.lookBack')"
+              data-test="add-alert-intent-slot-window"
+              @update:model-value="
+                setWindow($event === '' || $event === null ? '' : Number($event))
+              "
             />
-          </span>
-        </template>
-        <template #measure>
-          <span class="inline-flex align-middle">
-            <OSelect
-              :model-value="slots.measure ?? ''"
-              :options="measureOptions"
-              appearance="inline"
-              size="xs"
-              searchable
-              :placeholder="t('alerts.intent.slots.fieldPrompt')"
-              :aria-label="t('alerts.intent.slots.measure')"
-              :dropdown-style="SLOT_MENU"
-              data-test="add-alert-intent-slot-measure"
-              @update:model-value="setSlot('measure', $event)"
-            />
-          </span>
-        </template>
-        <template #label>
-          <span class="inline-flex align-middle">
-            <OSelect
-              :model-value="slots.label ?? ''"
-              :options="labelOptions"
-              appearance="inline"
-              size="xs"
-              searchable
-              :placeholder="t('alerts.intent.slots.labelPrompt')"
-              :aria-label="t('alerts.intent.slots.label')"
-              :dropdown-style="LABEL_MENU"
-              data-test="add-alert-intent-slot-label"
-              @update:model-value="setSlot('label', $event)"
-            />
-          </span>
-        </template>
-        <template #factor>
-          <span class="inline-flex align-middle">
+          </template>
+        </i18n-t>
+      </OSettingRow>
+
+      <OSettingRow
+        v-if="active === 'compareLastWeek'"
+        :label="t('alerts.intent.rows.alertWhen')"
+        data-test="add-alert-intent-row-when"
+      >
+        <i18n-t
+          keypath="alerts.intent.rows.timesLastWeek"
+          tag="span"
+          scope="global"
+          class="contents"
+        >
+          <template #factor>
             <OInput
               :model-value="slots.factor ?? DEFAULT_FACTOR"
               type="number"
-              size="xs"
+              size="sm"
               fit-content
               :min="1"
               :aria-label="t('alerts.intent.slots.factor')"
               data-test="add-alert-intent-slot-factor"
               @update:model-value="setFactor($event)"
             />
+          </template>
+        </i18n-t>
+      </OSettingRow>
+
+      <OSettingRow
+        v-if="thresholdKind && (threshold || needsChoice)"
+        :label="t('alerts.intent.rows.alertWhen')"
+        data-test="add-alert-intent-row-when"
+      >
+        <template v-if="threshold && guide">
+          <OFormSelect
+            :name="threshold.operator"
+            :options="guide.operators.value"
+            size="sm"
+            :searchable="false"
+            :class="SLOT_FIELD"
+            :aria-label="t('alerts.form.names.comparison')"
+            :dropdown-style="SLOT_MENU"
+            data-test="add-alert-intent-slot-operator"
+            @update:model-value="guide.change(threshold.operator, $event)"
+          />
+          <span class="inline-flex" data-error-focus>
+            <OFormInput
+              :name="guide.spanDuration.value ? DURATION_PATH : threshold.value"
+              type="number"
+              size="sm"
+              fit-content
+              class="min-w-28!"
+              :placeholder="t('alerts.placeholders.value')"
+              :aria-label="t('alerts.alertIfNoOfEvents')"
+              data-test="add-alert-intent-slot-threshold-input"
+              @update:model-value="
+                typeThreshold(guide.spanDuration.value ? DURATION_PATH : threshold.value, $event)
+              "
+            >
+              <template #error />
+            </OFormInput>
           </span>
-        </template>
-        <template #metric>
-          <span class="font-mono">{{ raw(streamName) }}</span>
-        </template>
-        <template #bucket>{{ bucketWords }}</template>
-        <template #window>
-          <AlertWindowPhrase
-            :minutes="periodMinutes"
-            size="xs"
-            data-test="add-alert-intent-slot-window"
-            @update:minutes="setWindow"
+          <OSelect
+            v-if="guide.spanDuration.value"
+            :model-value="guide.durationUnit.value"
+            :options="guide.durationUnits.value"
+            size="sm"
+            :searchable="false"
+            :class="SLOT_FIELD"
+            :aria-label="t('common.unitFor', { label: t('alerts.alertIfNoOfEvents') })"
+            data-test="add-alert-intent-slot-threshold-unit-select"
+            @update:model-value="guide.setDurationUnit($event)"
+          />
+          <span v-else-if="unitWord" data-test="add-alert-intent-slot-threshold-unit">{{
+            unitWord
+          }}</span>
+          <OTag
+            v-if="thresholdMissing"
+            v-bind="STATE_TAG"
+            :label="t('alerts.sections.condition.noThreshold')"
           />
         </template>
-        <template #agg>
-          <span class="inline-flex align-middle">
-            <OSelect
-              :model-value="formAgg"
-              :options="aggOptions"
-              appearance="inline"
-              size="xs"
-              :searchable="false"
-              :aria-label="t('alerts.queryConfig.aggregationFunction')"
-              :dropdown-style="SLOT_MENU"
-              data-test="add-alert-intent-slot-agg"
-              @update:model-value="setSlot('agg', $event)"
-            />
-          </span>
+        <span v-else class="text-text-secondary" data-test="add-alert-intent-threshold-waits">{{
+          t("alerts.intent.rows.thresholdWaits")
+        }}</span>
+        <template #note>
+          <AlertMessageLine
+            :error="threshold ? thresholdError : null"
+            error-data-test="add-alert-intent-threshold-error"
+            :note="threshold ? guide?.note.value : null"
+            :help="threshold ? guide?.help.value : null"
+            data-test="add-alert-intent-threshold-message"
+          />
         </template>
-        <template #threshold>
-          <span
-            v-if="threshold && guide"
-            class="inline-flex items-center gap-1.5 align-middle"
-            data-test="add-alert-intent-slot-threshold"
-          >
-            <span class="inline-flex">
-              <OFormSelect
-                :name="threshold.operator"
-                :options="guide.operators.value"
-                appearance="inline"
-                size="xs"
-                :searchable="false"
-                :aria-label="t('alerts.form.names.comparison')"
-                :dropdown-style="SLOT_MENU"
-                data-test="add-alert-intent-slot-operator"
-                @update:model-value="guide.change(threshold.operator, $event)"
-              />
-            </span>
-            <span class="inline-flex" data-error-focus>
-              <OFormInput
-                :name="guide.spanDuration.value ? DURATION_PATH : threshold.value"
-                type="number"
-                size="xs"
-                fit-content
-                :placeholder="t('alerts.placeholders.value')"
-                :aria-label="t('alerts.alertIfNoOfEvents')"
-                data-test="add-alert-intent-slot-threshold-input"
-                @update:model-value="
-                  typeThreshold(guide.spanDuration.value ? DURATION_PATH : threshold.value, $event)
-                "
-              >
-                <template #error />
-              </OFormInput>
-            </span>
-            <span v-if="guide.spanDuration.value" class="inline-flex">
-              <OSelect
-                :model-value="guide.durationUnit.value"
-                :options="guide.durationUnits.value"
-                appearance="inline"
-                size="xs"
-                :searchable="false"
-                :aria-label="t('common.unitFor', { label: t('alerts.alertIfNoOfEvents') })"
-                data-test="add-alert-intent-slot-threshold-unit-select"
-                @update:model-value="guide.setDurationUnit($event)"
-              />
-            </span>
-            <span v-else-if="unitWord" data-test="add-alert-intent-slot-threshold-unit">{{
-              unitWord
-            }}</span>
-          </span>
-        </template>
-      </i18n-t>
-      <OButton
-        v-if="offersGroup && slots.group === undefined && groupCandidates.all.length"
-        variant="link"
-        size="xs"
-        class="ms-1.5"
-        data-test="add-alert-intent-add-group"
-        @click="addGroup"
-        >{{ t("alerts.intent.addGroup") }}</OButton
-      >
-      <OButton
-        v-if="active === 'unusualVolume' && !scoped && groupCandidates.all.length"
-        variant="link"
-        size="xs"
-        class="ms-1.5"
-        data-test="add-alert-intent-add-filter"
-        @click="addFilter"
-        >{{ t("alerts.intent.addFilter") }}</OButton
-      >
-      <OButton
-        v-if="swapOffer"
-        variant="link"
-        size="xs"
-        class="ms-1.5"
-        data-test="add-alert-intent-use-instead"
-        @click="swapValue"
-        >{{ t("alerts.intent.useInstead", { value: raw(swapOffer) }) }}</OButton
-      >
-      <OButton
-        v-if="otherSpellings.length"
-        variant="link"
-        size="xs"
-        class="ms-1.5"
-        data-test="add-alert-intent-also-match"
-        @click="addSpellings"
-        >{{ t("alerts.intent.alsoMatch", { values: joinListMore(otherSpellings, t) }) }}</OButton
-      >
-      <AlertMessageLine
-        v-if="thresholdKind"
-        class="leading-4"
-        :error="threshold ? thresholdError : null"
-        error-data-test="add-alert-intent-threshold-error"
-        :note="threshold ? guide?.note.value : null"
-        :help="threshold ? guide?.help.value : null"
-        data-test="add-alert-intent-threshold-message"
-      />
-      <slot v-if="offersDefaults" name="defaults" />
+      </OSettingRow>
+
+      <div v-if="offersDefaults" class="pt-1 pb-2">
+        <slot name="defaults" />
+      </div>
     </div>
-    <p
-      v-if="active === 'ratio' && familyText.length"
-      class="text-text-secondary m-0 text-xs"
-      data-test="add-alert-intent-family"
-    >
-      {{ t("alerts.intent.ratio.alsoCovers", { metrics: joinListMore(familyText, t) }) }}
-    </p>
 
     <template v-if="showLibrary && area.state !== 'absent'">
       <div
@@ -399,6 +451,7 @@ import { useStore } from "vuex";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -407,7 +460,6 @@ import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import LibraryDrawer from "@/components/alertLibrary/LibraryDrawer.vue";
 import AlertSuggestionCard from "./AlertSuggestionCard.vue";
-import AlertWindowPhrase from "./AlertWindowPhrase.vue";
 import AlertMessageLine from "./AlertMessageLine.vue";
 import { ALERT_FORM_CONTEXT_KEY } from "./alertFormContext";
 import { shownFieldError } from "@/composables/alerts/shownFieldError";
@@ -439,6 +491,7 @@ import {
 } from "@/utils/alerts/alertCopy";
 import {
   ANOMALY_BUCKET_MINUTES,
+  BUCKET_LABEL,
   DEFAULT_FACTOR,
   METRIC_AGGS,
   SHAPE_NUMBER_CAP,
@@ -532,16 +585,28 @@ const NO_GROUP = "__none__";
 const SLOT_MENU = { minWidth: "min(18rem, calc(100vw - 2rem))" };
 // Room for two spellings of one label side by side.
 const LABEL_MENU = { minWidth: "min(28rem, calc(100vw - 2rem))" };
+// A slot hugs its value, never cut below the row's width, and keeps a field's width when nearly empty.
+const SLOT_FIELD = "w-fit! max-w-full min-w-28";
+const STATE_TAG = {
+  variant: "default-soft",
+  size: "xs",
+  "data-test": "add-alert-intent-sentence-state",
+} as const;
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const isMetrics = computed(() => props.streamType === "metrics");
 // A type a chip set does not narrow the chips, so the row never loses the chip beside the one clicked.
 // The type as it was when a chip was pressed: a chip that sets the type keeps its row, one picked under it filters it.
 const typeAtPick = ref<string | undefined>();
+// A histogram's bucket series carry the bucket label; the schema says so before any series load.
+const isBucket = computed(
+  () => isMetrics.value && props.columns.some((c) => c.value === BUCKET_LABEL),
+);
 const intents = computed(() =>
   intentsFor(props.streamType, {
     anomaly: props.anomalyAvailable,
     howItChecks: props.active ? typeAtPick.value : props.howItChecks,
+    bucket: isBucket.value,
   }),
 );
 const noun = computed(() => dataNoun(props.streamType, "custom", 2, t));
@@ -854,60 +919,19 @@ const valueHelp = computed(() =>
       : t("alerts.intent.slots.valueHelpEvents", { noun: noun.value }),
 );
 
-// The picked values read as words in the sentence, so the picker sizes to them like the other slots.
+// The picked values read as one joined phrase, so the field sizes to them like the other slots.
 const valuesText = computed<I18nText>(() =>
   slots.values?.length
     ? joinListOrMore(
         slots.values.map((v) => patternText(v, slots.patterns)),
         t,
       )
-    : t("alerts.intent.slots.valuePrompt"),
+    : t("alerts.intent.slots.valuePlaceholder"),
 );
 
 const offersGroup = computed(() => !!props.active && wantsGroup(props.active));
 const scoped = computed(() => props.active === "unusualVolume" && slots.field !== undefined);
 const wantsValueSlot = computed(() => !!props.active && (wantsValue(props.active) || scoped.value));
-const SENTENCES: Record<IntentId, [I18nKey, I18nKey]> = {
-  countWhere: ["alerts.intent.countWhere.sentence", "alerts.intent.countWhere.sentenceAll"],
-  percentile: ["alerts.intent.percentile.sentencePer", "alerts.intent.percentile.sentenceAll"],
-  anyEvent: ["alerts.intent.anyEvent.sentence", "alerts.intent.anyEvent.sentence"],
-  unusualVolume: [
-    "alerts.intent.unusualVolume.sentenceWhere",
-    "alerts.intent.unusualVolume.sentence",
-  ],
-  compareLastWeek: [
-    "alerts.intent.compareLastWeek.sentenceWhere",
-    "alerts.intent.compareLastWeek.sentenceWhere",
-  ],
-  metricAbove: ["alerts.intent.metricAbove.sentencePer", "alerts.intent.metricAbove.sentenceAll"],
-  ratio: ["alerts.intent.ratio.sentenceWhere", "alerts.intent.ratio.sentenceWhereAll"],
-  unusualChange: ["alerts.intent.unusualChange.sentence", "alerts.intent.unusualChange.sentence"],
-  promql: ["alerts.intent.promql.label", "alerts.intent.promql.label"],
-};
-const RATE_SENTENCES: [I18nKey, I18nKey] = [
-  "alerts.intent.metricAbove.rateSentencePer",
-  "alerts.intent.metricAbove.rateSentenceAll",
-];
-// The same sentences ending in the threshold, for a starter whose threshold is typed here.
-const THRESHOLD_SENTENCES: Partial<Record<IntentId, [I18nKey, I18nKey]>> = {
-  countWhere: [
-    "alerts.intent.countWhere.sentenceAbove",
-    "alerts.intent.countWhere.sentenceAllAbove",
-  ],
-  percentile: [
-    "alerts.intent.percentile.sentencePerAbove",
-    "alerts.intent.percentile.sentenceAllAbove",
-  ],
-  metricAbove: [
-    "alerts.intent.metricAbove.sentencePerAbove",
-    "alerts.intent.metricAbove.sentenceAllAbove",
-  ],
-  ratio: ["alerts.intent.ratio.sentenceWhereAbove", "alerts.intent.ratio.sentenceWhereAllAbove"],
-};
-const RATE_THRESHOLD_SENTENCES: [I18nKey, I18nKey] = [
-  "alerts.intent.metricAbove.rateSentencePerAbove",
-  "alerts.intent.metricAbove.rateSentenceAllAbove",
-];
 // Only a type the metric declares turns "above a value" into a rate; an unknown one keeps the average.
 const isCounter = computed(
   () =>
@@ -915,22 +939,34 @@ const isCounter = computed(
     !!pickedMetric.value?.metrics_meta?.metric_type &&
     isCounterLike(pickedMetric.value),
 );
-// An empty group ("") is one the user asked for but has not picked yet.
-const sentenceKey = computed<I18nKey>(() => {
-  const rate = props.active === "metricAbove" && isCounter.value;
-  const typed = threshold.value && THRESHOLD_SENTENCES[props.active ?? "countWhere"];
-  const pair = typed
-    ? rate
-      ? RATE_THRESHOLD_SENTENCES
-      : typed
-    : rate
-      ? RATE_SENTENCES
-      : SENTENCES[props.active ?? "countWhere"];
-  if (props.active === "unusualVolume") return scoped.value ? pair[0] : pair[1];
-  return slots.group !== undefined ? pair[0] : pair[1];
-});
+const WATCH: Record<IntentId, I18nKey> = {
+  countWhere: "alerts.intent.rows.countOf",
+  percentile: "alerts.intent.rows.percentileOf",
+  anyEvent: "alerts.intent.rows.eachEvent",
+  unusualVolume: "alerts.intent.rows.unusualNumber",
+  compareLastWeek: "alerts.intent.rows.countOf",
+  metricAbove: "alerts.intent.rows.aggOf",
+  ratio: "alerts.intent.rows.shareOf",
+  unusualChange: "alerts.intent.rows.unusualChange",
+  promql: "alerts.intent.promql.label",
+};
+const watchKey = computed<I18nKey>(() =>
+  props.active === "metricAbove" && isCounter.value
+    ? "alerts.intent.rows.perSecond"
+    : WATCH[props.active ?? "countWhere"],
+);
+const WINDOWED = new Set<IntentId>([
+  "countWhere",
+  "percentile",
+  "compareLastWeek",
+  "metricAbove",
+  "ratio",
+]);
+const showsWindow = computed(() => !!props.active && WINDOWED.has(props.active));
 const intentLabel = (id: IntentId) =>
-  t(`alerts.intent.${id}.label` as I18nKey, { noun: noun.value });
+  id === "percentile" && isMetrics.value
+    ? t("alerts.intent.percentile.labelMetric")
+    : t(`alerts.intent.${id}.label` as I18nKey, { noun: noun.value });
 
 // ── Filling the form ─────────────────────────────────────────────────────────
 const fillFor = (id: IntentId): IntentFill =>
@@ -951,12 +987,17 @@ const wantsGroup = (id: IntentId) =>
   ["countWhere", "percentile", "metricAbove", "ratio"].includes(id);
 const wantsValue = (id: IntentId) =>
   ["countWhere", "anyEvent", "compareLastWeek", "ratio"].includes(id);
-/** A filter or measure the intent cannot run without is still empty. */
-const missingFor = (id: IntentId) =>
+/** The slot the intent cannot run without that is still empty. */
+const missingSlotFor = (id: IntentId): "value" | "measure" | null =>
   (wantsValue(id) && (!valueSource.value || !slots.values?.length)) ||
-  (id === "unusualVolume" && !!slots.field && !slots.values?.length) ||
-  (id === "percentile" && !slots.measure);
-const needsChoice = computed(() => !!props.active && missingFor(props.active));
+  (id === "unusualVolume" && !!slots.field && !slots.values?.length)
+    ? "value"
+    : id === "percentile" && !isMetrics.value && !slots.measure
+      ? "measure"
+      : null;
+const missingFor = (id: IntentId) => missingSlotFor(id) !== null;
+const missingSlot = computed(() => (props.active ? missingSlotFor(props.active) : null));
+const needsChoice = computed(() => missingSlot.value !== null);
 
 // ── The threshold: step 2's own form fields, typed at the end of the sentence ──
 const form = inject(FORM_CONTEXT_KEY, null);
@@ -1020,7 +1061,7 @@ const apply = (id: IntentId) => {
 const seedSlots = (id: IntentId) => {
   if (!wantsGroup(id)) slots.group = undefined;
   else if (slots.group === undefined) slots.group = groupCandidates.value.fit[0];
-  if (id === "percentile") slots.measure ??= measureCandidates.value.fit[0];
+  if (id === "percentile" && !isMetrics.value) slots.measure ??= measureCandidates.value.fit[0];
   if (id === "compareLastWeek") slots.factor ??= DEFAULT_FACTOR;
   if (!wantsValue(id)) return;
   if (isMetrics.value) slots.label ??= categoriesFor(id).fit[0];
@@ -1091,12 +1132,6 @@ const setSlot = async (
   reapply();
 };
 
-const addGroup = () => {
-  const first = groupCandidates.value.fit[0];
-  if (first) void setSlot("group", first);
-  else slots.group = "";
-};
-
 // Only a regex the picker made from a typed "5xx" stays a pattern; a value the series carry is matched literally.
 const keepPatterns = (added: string[]) => {
   slots.patterns = [...new Set([...(slots.patterns ?? []), ...added])].filter((p) =>
@@ -1158,10 +1193,6 @@ const addSpellings = () => {
   slots.values = [...(slots.values ?? []), ...otherSpellings.value];
   seeded.value = [];
   reapply();
-};
-
-const addFilter = () => {
-  void setSlot("field", groupCandidates.value.fit[0] ?? groupCandidates.value.all[0] ?? "");
 };
 
 // A rate window is written into the query, so the query follows a new window.
