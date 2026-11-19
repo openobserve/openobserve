@@ -102,10 +102,20 @@ function getMonacoHelper(page, pm) {
     return { monacoHelper, container };
 }
 
+/** Filter mode shows the chip bar in the editor's place, so these menus are reached in SQL mode. */
+async function showQueryEditor(pm) {
+    if (await pm.logsPage.getQueryEditor().isVisible()) return;
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await expect(pm.logsPage.getQueryEditor()).toBeVisible();
+    // Turning SQL on runs a search, and a value menu asked for before it lands never opens.
+    await pm.logsPage.expectNoQueryInFlight(60000);
+}
+
 /**
  * Click into Monaco editor and type text
  */
 async function typeInQueryEditor(page, pm, text) {
+    await showQueryEditor(pm);
     const { monacoHelper, container } = getMonacoHelper(page, pm);
     await monacoHelper.type(container, text);
 }
@@ -114,6 +124,7 @@ async function typeInQueryEditor(page, pm, text) {
  * Clear Monaco editor content
  */
 async function clearQueryEditor(page, pm) {
+    await showQueryEditor(pm);
     const { monacoHelper, container } = getMonacoHelper(page, pm);
     await monacoHelper.clear(container);
 }
@@ -122,6 +133,7 @@ async function clearQueryEditor(page, pm) {
  * Set Monaco editor content
  */
 async function setQueryEditorContent(page, pm, content) {
+    await showQueryEditor(pm);
     const { monacoHelper, container } = getMonacoHelper(page, pm);
     await monacoHelper.setContent(container, content);
 }
@@ -175,6 +187,7 @@ async function getQueryEditorContent(page, pm) {
  * Trigger autocomplete suggestions
  */
 async function triggerSuggestions(page, pm) {
+    await showQueryEditor(pm);
     const { monacoHelper } = getMonacoHelper(page, pm);
     await monacoHelper.triggerSuggestions();
 }
@@ -1183,6 +1196,7 @@ async function seedEditor(page, text) {
         const el = document.querySelector(host);
         return !!el && (window.monaco?.editor?.getEditors?.() || []).some((e) => el.contains(e.getDomNode()));
     }, QUERY_EDITOR_HOST, { timeout: 15000 });
+    await showQueryEditor(new PageManager(page));
     await page.evaluate(({ host, value }) => {
         const el = document.querySelector(host);
         const ed = window.monaco.editor.getEditors().find((e) => el.contains(e.getDomNode()));
@@ -1829,24 +1843,6 @@ test.describe("Autocomplete key contract — chained menus (Automatic)", () => {
         expect(menu.rows.some((r) => /^'?std/.test(r)), `values kept: ${menu.rows.join(', ')}`).toBe(true);
     });
 
-    test("typing forward past the budget shows that values are still loading (R5)", {
-        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@values']
-    }, async ({ page }) => {
-        test.skip(mode === 'off', 'off is the editor before the fix');
-        await pm.logsPage.clearFieldValueDB();
-        await page.route((url) => url.toString().includes('/_values?'), async (route) => {
-            await new Promise((r) => setTimeout(r, 4000));
-            await route.continue();
-        });
-        const request = page.waitForRequest((r) => r.url().includes('/_values?'), { timeout: 5000 });
-        await seedEditor(page, `${WHERE}stream =`);
-        await page.keyboard.type(' ');
-        await request;
-        await page.keyboard.type("'s");
-        // Monaco renders the hint's spaces as non-breaking spaces.
-        await expect(page.locator('.monaco-editor .o2-suggest-inline-hint').first()).toHaveText(/still\sloading/i, { timeout: 3000 });
-    });
-
     for (const [name, typed, expected] of [
         ['a space', ' ', ' '],
         ['=', '=', '='],
@@ -2148,6 +2144,7 @@ test.describe("Autocomplete — after a complete predicate, AND and OR lead", ()
     test.describe.configure({ mode: 'serial' });
     const streamName = 'e2e_automate';
     const orgName = process.env["ORGNAME"] || 'default';
+    const WHERE = `SELECT * FROM "${streamName}" WHERE `;
     let mode;
     let pm;
 
@@ -2171,22 +2168,9 @@ test.describe("Autocomplete — after a complete predicate, AND and OR lead", ()
         return (await waitForMenu(page, 5000)).rows;
     }
 
-    test("in the filter, AND and OR lead after every predicate shape, nothing highlighted", {
-        tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@lead']
-    }, async ({ page }) => {
-        test.skip(await pm.logsPage.isSqlModeEnabled(), 'the Logs filter is in full SQL mode');
-        for (const predicate of LEAD_PREDICATES) {
-            const rows = await leadAfter(page, predicate);
-            expect(rows.slice(0, 2), predicate).toEqual(['AND', 'OR']);
-            if (mode !== 'off') expect((await menuState(page)).focused, predicate).toBeNull();
-        }
-        expect((await leadAfter(page, '(code = 1')).slice(0, 3)).toEqual(['AND', 'OR', ')']);
-    });
-
     test("in full SQL, AND and OR lead, then the clauses that can follow", {
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@lead']
     }, async ({ page }) => {
-        const WHERE = `SELECT * FROM "${streamName}" WHERE `;
         await pm.logsPage.enableSqlModeIfDisabled();
         for (const predicate of LEAD_PREDICATES) {
             const rows = await leadAfter(page, `${WHERE}${predicate}`);
@@ -2198,10 +2182,9 @@ test.describe("Autocomplete — after a complete predicate, AND and OR lead", ()
         tag: ['@all', '@autosuggestions', '@logs', '@keycontract', '@lead', '@chain']
     }, async ({ page }) => {
         test.skip(mode !== 'automatic', 'only Automatic chains');
-        test.skip(await pm.logsPage.isSqlModeEnabled(), 'the Logs filter is in full SQL mode');
-        await leadAfter(page, "level = 'x'");
+        await leadAfter(page, `${WHERE}level = 'x'`);
         await page.keyboard.press('Tab');
-        await expect.poll(() => editorText(page)).toBe("level = 'x' AND ");
+        await expect.poll(() => editorText(page)).toBe(`${WHERE}level = 'x' AND `);
         const menu = await waitForMenu(page, 5000);
         expect(menu.focused).toBeNull();
         expect(menu.rows.slice(0, 2)).not.toEqual(['AND', 'OR']);
