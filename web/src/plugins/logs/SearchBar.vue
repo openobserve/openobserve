@@ -1860,7 +1860,11 @@ import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
-import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
+import {
+  hasFieldCondition,
+  qualifyFieldConditions,
+  removeFieldCondition,
+} from "@/plugins/logs/filterUtils";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -5433,7 +5437,7 @@ export default defineComponent({
               const parsedSQL = this.fnParsedSQL();
               const streamPrefix: string =
                 parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
-              filter = `"${streamPrefix}".${filter}`;
+              filter = qualifyFieldConditions(filter, streamPrefix);
             }
 
             // if query contains order by clause or limit clause then add where clause before that
