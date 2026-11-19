@@ -802,6 +802,16 @@ async fn page_with_ack(org_id: &str, response_id: &str, ack: serde_json::Value) 
     }
 }
 
+/// A page acknowledged without its problem still counts as a response on its incident's issues.
+#[cfg(feature = "enterprise")]
+fn responded_to(after: &config::meta::oncall::Response) {
+    use openobserve_core::autoobserve::incidents::{RespondedAs, respond_to_page};
+
+    if let Some((by, at)) = after.acked_by.clone().zip(after.acked_at) {
+        respond_to_page(after, RespondedAs::Acknowledged { by, at });
+    }
+}
+
 /// Acknowledges a page's problem as `actor`; a page whose alert is gone is stopped on its own.
 #[cfg(feature = "enterprise")]
 async fn acknowledge_page(
@@ -838,6 +848,7 @@ async fn acknowledge_page(
                 .await
                 .map_err(to_response)?,
         };
+        responded_to(&after);
         let changed =
             before.is_some_and(|b| (b.acked_by, b.acked_at) != (after.acked_by, after.acked_at));
         return Ok(serde_json::json!({ "changed": changed }));
@@ -2438,7 +2449,7 @@ async fn act_by_phone(
                     &actor,
                 )
                 .await
-                .map(|_| ())
+                .map(|after| responded_to(&after))
                 .map_err(|e| AckError::Internal(e.to_string())),
             };
             if let Err(e) = acked {
@@ -2842,6 +2853,16 @@ pub async fn resolve_response(
             Ok(record) => record,
             Err(e) => return to_response(e),
         };
+        openobserve_core::autoobserve::incidents::respond_to_page(
+            &record,
+            openobserve_core::autoobserve::incidents::RespondedAs::Resolved {
+                by: user_email.user_id.clone(),
+                at: record
+                    .closed_at
+                    .unwrap_or_else(config::utils::time::now_micros),
+                cause: record.cause,
+            },
+        );
         // Closed first, so a failed clear is retried by resolving the closed page again.
         if let Some(p) = problem.as_ref() {
             let source = ack_source(delegated.as_deref(), &headers);

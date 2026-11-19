@@ -45,7 +45,7 @@ use utoipa::ToSchema;
 use super::{
     agent::{
         AnalysisVerdict, ChangeKind, Confidence, EvidenceRef, PageAction, PageRecommendation,
-        ProposedAction, SuspectChange,
+        ProposedAction, SubmittedNextStep, SuspectChange,
     },
     confidence::{
         ConfidenceGrade, ToolCallRecord, UnverifiedCitation, apply_outcome, grade_confidence,
@@ -117,6 +117,8 @@ pub struct SubmittedVerdict {
     #[serde(default)]
     pub proposed_actions: Vec<ProposedAction>,
     pub report_ref: String,
+    #[serde(default)]
+    pub next_step: Option<SubmittedNextStep>,
 }
 
 /// The suspect change with the agent's own reading of it.
@@ -439,6 +441,7 @@ fn parse_verdict(input: &Value, defects: &mut Vec<String>) -> Option<SubmittedVe
         ),
         proposed_actions: r.list("proposed_actions"),
         report_ref: r.required("report_ref", String::new(), "empty"),
+        next_step: r.optional("next_step"),
     })
 }
 
@@ -469,6 +472,7 @@ pub fn to_analysis_verdict(
         page_recommendation: v.page_recommendation.clone(),
         proposed_actions: v.proposed_actions.clone(),
         report_ref: v.report_ref.clone(),
+        next_step: v.next_step.clone(),
     }
 }
 
@@ -854,6 +858,7 @@ pub(crate) mod fixtures {
             },
             proposed_actions: vec![],
             report_ref: "inc_1/rca/1".into(),
+            next_step: None,
         }
     }
 
@@ -983,6 +988,7 @@ mod tests {
                     detail: "to v0.14.1".into(),
                 }],
                 report_ref: "inc_9/rca/1".into(),
+                next_step: None,
             }
         );
         assert_eq!(
@@ -1008,6 +1014,45 @@ mod tests {
                 },
             ]
         );
+    }
+
+    /// The next step reaches the graded verdict when sent; absent or malformed, the verdict stays.
+    #[test]
+    fn a_next_step_is_kept_when_sent_and_dropped_when_malformed() {
+        let mut with_step = full_payload();
+        with_step["verdict"]["next_step"] =
+            json!({"action": "A1", "leads": ["B1", "B3"], "why": "errors began first"});
+        let mut check_only = full_payload();
+        check_only["verdict"]["next_step"] = json!({"leads": ["B2"], "why": "verify the deploy"});
+        let mut malformed = full_payload();
+        malformed["verdict"]["next_step"] = json!({"action": "A1", "leads": "B1", "why": "x"});
+        let step = |action: Option<&str>, leads: &[&str], why: &str| SubmittedNextStep {
+            action: action.map(str::to_string),
+            leads: leads.iter().map(|l| l.to_string()).collect(),
+            why: why.to_string(),
+        };
+        let cases = [
+            (full_payload(), None, vec![]),
+            (
+                with_step,
+                Some(step(Some("A1"), &["B1", "B3"], "errors began first")),
+                vec![],
+            ),
+            (
+                check_only,
+                Some(step(None, &["B2"], "verify the deploy")),
+                vec![],
+            ),
+            (malformed, None, vec!["verdict.next_step: invalid, dropped"]),
+        ];
+        for (payload, want, defects) in cases {
+            let submit = parse_submit(&payload).unwrap();
+            assert_eq!(submit.defects, defects);
+            let verdict = submit.verdict.unwrap();
+            let grade = grade_confidence(&verdict, None, &[], &[], &BTreeMap::new());
+            assert_eq!(verdict.next_step, want);
+            assert_eq!(to_analysis_verdict(&verdict, &grade, &[]).next_step, want);
+        }
     }
 
     /// A stray `evidence_links` is ignored, at the top level and in the verdict.

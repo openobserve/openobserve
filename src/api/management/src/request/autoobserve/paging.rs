@@ -15,6 +15,8 @@
 
 //! The org's paging opt-in (R5): whether a stopped stream opens an incident and pages on-call.
 
+use std::num::NonZeroU32;
+
 use axum::{
     Json,
     body::Bytes,
@@ -37,6 +39,10 @@ pub const UNAVAILABLE_MESSAGE: &str = "Paging is turned off for this deployment.
 #[serde(deny_unknown_fields)]
 pub struct PagingBody {
     pub page_on_stop: bool,
+    /// Left out, the stored budget is kept; 0 is refused because `page_on_stop` is the off switch.
+    #[serde(default)]
+    #[schema(value_type = Option<u32>, minimum = 1)]
+    pub pages_per_day: Option<NonZeroU32>,
 }
 
 #[utoipa::path(
@@ -46,7 +52,7 @@ pub struct PagingBody {
     tag = "AutoObserve",
     operation_id = "AutoObserveGetPagingSettings",
     summary = "Read whether AutoObserve pages for this organization",
-    description = "`page_on_stop` says whether a stream that stops sending data opens an incident and pages on-call through the organization's routing rules. It is off until someone turns it on. `available` says whether this deployment lets AutoObserve page at all (`O2_AUTOOBSERVE_PAGING_ENABLED`); while it is false nothing pages, whatever the organization chose.",
+    description = "`page_on_stop` says whether a stream that stops sending data opens an incident and pages on-call through the organization's routing rules. It is off until someone turns it on. `pages_per_day` is the organization's page budget: at most that many AutoObserve pages reach a team in any `O2_AUTOOBSERVE_PAGE_BUDGET_WINDOW_HOURS` window; an organization that set none reads `O2_AUTOOBSERVE_PAGES_PER_DAY`. A stop past the budget still opens an incident and gets its analysis, but pages nobody. `available` says whether this deployment lets AutoObserve page at all (`O2_AUTOOBSERVE_PAGING_ENABLED`); while it is false nothing pages, whatever the organization chose.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
@@ -76,7 +82,7 @@ pub async fn get_paging_settings(Path(org_id): Path<String>) -> Response {
     tag = "AutoObserve",
     operation_id = "AutoObservePutPagingSettings",
     summary = "Turn AutoObserve paging on or off for this organization",
-    description = "With `page_on_stop` true, a stream that stops sending data opens an incident and pages on-call: an ownership rule on the stream's service picks the team, otherwise the organization's default team, otherwise it waits on the unrouted queue. Streams that stop together share one incident and one page. Needs the permission that changes on-call routing.",
+    description = "With `page_on_stop` true, a stream that stops sending data opens an incident and pages on-call: an ownership rule on the stream's service picks the team, otherwise the organization's default team, otherwise it waits on the unrouted queue. Streams that stop together share one incident and one page. `pages_per_day`, optional and at least 1, caps how many AutoObserve pages reach a team in any `O2_AUTOOBSERVE_PAGE_BUDGET_WINDOW_HOURS` window; left out, the stored value is kept. A stop past it still opens an incident and gets its analysis, but pages nobody. Needs the permission that changes on-call routing.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(PagingBody), content_type = "application/json"),
@@ -113,7 +119,8 @@ pub async fn put_paging_settings(
         return unavailable();
     }
     serve(|deps| async move {
-        paging_settings::put_paging(&deps, &org_id, body.page_on_stop, true).await
+        paging_settings::put_paging(&deps, &org_id, body.page_on_stop, body.pages_per_day, true)
+            .await
     })
     .await
 }
@@ -163,6 +170,9 @@ mod tests {
             "{}",
             r#"{"page_on_stop":"yes"}"#,
             r#"{"page_on_stop":true,"x":1}"#,
+            r#"{"page_on_stop":true,"pages_per_day":0}"#,
+            r#"{"page_on_stop":true,"pages_per_day":-1}"#,
+            r#"{"page_on_stop":true,"pages_per_day":"1"}"#,
         ] {
             let (status, text) = send("PUT", uri, body).await;
             assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {text}");
