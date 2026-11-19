@@ -2829,7 +2829,9 @@ export default defineComponent({
               return s.replace(/\s+/g, " ").trim().toLowerCase();
             };
             const queryMatchesResults =
-              !!lastRunSql && normalizeSQL(currentSql) === normalizeSQL(lastRunSql);
+              !!lastRunSql &&
+              normalizeSQL(currentSql) === normalizeSQL(lastRunSql) &&
+              autoRun.executedTimeMatches();
 
             // Only reuse cached search results when the current query
             // matches the query that produced them. When they differ (e.g.
