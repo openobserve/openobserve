@@ -98,3 +98,55 @@ export const replaceExistingFieldCondition = (
 
   return queryStr;
 };
+
+const TOP_LEVEL_KEYWORD = /(where|group\s+by|having|order\s+by|limit|offset|or)\b/iy;
+
+// Keyword offsets outside quotes, comments and brackets; `or` is only reported when asked for.
+const topLevelKeywords = (sql: string): { kw: string; index: number }[] => {
+  const found: { kw: string; index: number }[] = [];
+  let quote = "";
+  let depth = 0;
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (quote) {
+      if (ch === quote) quote = "";
+    } else if (ch === "'" || ch === '"') quote = ch;
+    else if (sql.startsWith("--", i)) {
+      const eol = sql.indexOf("\n", i);
+      if (eol === -1) break;
+      i = eol;
+    } else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (depth === 0 && !/\w/.test(sql[i - 1] ?? " ")) {
+      TOP_LEVEL_KEYWORD.lastIndex = i;
+      const m = TOP_LEVEL_KEYWORD.exec(sql);
+      if (m) {
+        found.push({ kw: m[1].toLowerCase().replace(/\s+/g, " "), index: i });
+        i += m[1].length - 1;
+      }
+    }
+  }
+  return found;
+};
+
+/**
+ * Appends `filter` to the query's top-level WHERE (adding one if absent), bracketing
+ * existing conditions that hold a top-level OR so the new AND binds to all of them.
+ */
+export const appendSqlFilter = (query: string, filter: string): string => {
+  const keywords = topLevelKeywords(query);
+  const where = keywords.find((k) => k.kw === "where");
+  const end = keywords.find(
+    (k) => k.kw !== "or" && k.kw !== "where" && (!where || k.index > where.index),
+  );
+  const head = query.slice(0, end ? end.index : query.length).trim();
+  const tail = end ? " " + query.slice(end.index) : "";
+  if (!where) return `${head} where ${filter}${tail}`;
+  const condStart = where.index + "where".length;
+  const hasOr = keywords.some(
+    (k) => k.kw === "or" && k.index > where.index && (!end || k.index < end.index),
+  );
+  const conditions = head.slice(condStart).trim();
+  const wrapped = hasOr ? `(${conditions})` : conditions;
+  return `${head.slice(0, condStart)} ${wrapped} AND ${filter}${tail}`;
+};

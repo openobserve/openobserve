@@ -15,6 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  appendSqlFilter,
   getFieldFromExpression,
   hasFieldCondition,
   removeFieldCondition,
@@ -467,5 +468,70 @@ describe("a field whose name ends another field's name", () => {
         "(name = 'al' OR name = 'eve')",
       ),
     ).toBe("username = 'bob' and (name = 'al' OR name = 'eve')");
+  });
+});
+
+describe("appendSqlFilter", () => {
+  const f = "svc_name = 'alpha'";
+  const base = `SELECT * FROM "qb_logs"`;
+  const or = "level = 'error' OR level = 'warn'";
+
+  it("brackets a top-level OR before AND", () => {
+    expect(appendSqlFilter(`${base} WHERE ${or}`, f)).toBe(`${base} WHERE (${or}) AND ${f}`);
+  });
+
+  it.each([
+    ["ORDER BY _timestamp DESC", "ORDER BY _timestamp DESC"],
+    ["LIMIT 10", "LIMIT 10"],
+    ["GROUP BY level", "GROUP BY level"],
+    ["group by level having count(*) > 1", "group by level having count(*) > 1"],
+    ["ORDER BY a LIMIT 5 OFFSET 2", "ORDER BY a LIMIT 5 OFFSET 2"],
+    ["OFFSET 2", "OFFSET 2"],
+  ])("brackets the OR and keeps trailing %s", (tail, expectedTail) => {
+    expect(appendSqlFilter(`${base} WHERE ${or} ${tail}`, f)).toBe(
+      `${base} WHERE (${or}) AND ${f} ${expectedTail}`,
+    );
+  });
+
+  it("adds WHERE when there is none, before a trailing clause", () => {
+    expect(appendSqlFilter(base, f)).toBe(`${base} where ${f}`);
+    expect(appendSqlFilter(`${base} ORDER BY a`, f)).toBe(`${base} where ${f} ORDER BY a`);
+  });
+
+  it("does not bracket AND-only conditions", () => {
+    expect(appendSqlFilter(`${base} WHERE a = 1 AND b = 2`, f)).toBe(
+      `${base} WHERE a = 1 AND b = 2 AND ${f}`,
+    );
+  });
+
+  it("does not re-bracket an already bracketed expression or nested OR", () => {
+    expect(appendSqlFilter(`${base} WHERE (${or})`, f)).toBe(`${base} WHERE (${or}) AND ${f}`);
+    expect(appendSqlFilter(`${base} WHERE a = 1 AND (b = 1 OR b = 2)`, f)).toBe(
+      `${base} WHERE a = 1 AND (b = 1 OR b = 2) AND ${f}`,
+    );
+  });
+
+  it("ignores OR and keywords inside quoted literals", () => {
+    expect(appendSqlFilter(`${base} WHERE msg = 'a OR b'`, f)).toBe(
+      `${base} WHERE msg = 'a OR b' AND ${f}`,
+    );
+    expect(appendSqlFilter(`${base} WHERE msg = 'order by x'`, f)).toBe(
+      `${base} WHERE msg = 'order by x' AND ${f}`,
+    );
+  });
+
+  it("works for Exclude filters", () => {
+    expect(appendSqlFilter(`${base} WHERE ${or}`, "svc_name != 'alpha'")).toBe(
+      `${base} WHERE (${or}) AND svc_name != 'alpha'`,
+    );
+  });
+
+  it("does not touch a WHERE inside a subquery or CTE", () => {
+    expect(
+      appendSqlFilter(`WITH x AS (SELECT * FROM t WHERE a = 1 OR b = 2) SELECT * FROM x`, f),
+    ).toBe(`WITH x AS (SELECT * FROM t WHERE a = 1 OR b = 2) SELECT * FROM x where ${f}`);
+    expect(
+      appendSqlFilter(`SELECT * FROM (SELECT * FROM t WHERE a = 1 OR b = 2 LIMIT 5) ORDER BY a`, f),
+    ).toBe(`SELECT * FROM (SELECT * FROM t WHERE a = 1 OR b = 2 LIMIT 5) where ${f} ORDER BY a`);
   });
 });
