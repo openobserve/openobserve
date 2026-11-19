@@ -849,6 +849,16 @@ fn format_tool_call_event(
     Some(event)
 }
 
+/// `update_memory` answers in one line ("Saved to org memory · rev 4"), which the chat shows as is.
+fn memory_result_line(tool: &str, result: &Map<String, Value>) -> Option<String> {
+    if tool != "update_memory" {
+        return None;
+    }
+    let text = result.get("output")?.as_str()?;
+    let line = text.trim().lines().next()?.trim();
+    (!line.is_empty()).then(|| line.to_string())
+}
+
 fn format_tool_result_event(
     tool_name: &str,
     result: &Map<String, Value>,
@@ -894,6 +904,8 @@ fn format_tool_result_event(
         let (message, error_type) = parse_error(&response_body, Some(result));
         event.insert("error_type".into(), Value::String(error_type));
         event.insert("message".into(), message);
+    } else if let Some(line) = memory_result_line(&actual_tool, result) {
+        event.insert("message".into(), Value::String(line));
     } else {
         event.insert(
             "message".into(),
@@ -1640,6 +1652,21 @@ mod tests {
             ),
         ]);
         assert!(frames.is_empty(), "{frames:?}");
+    }
+
+    #[test]
+    fn an_update_memory_result_shows_its_own_line() {
+        let output =
+            "Sent for approval: org memory changes need a memory admin's approval.\nUse it.";
+        let mut result = Map::new();
+        result.insert("output".into(), Value::String(output.to_string()));
+        let event = format_tool_result_event("update_memory", &result, false, None).unwrap();
+        assert_eq!(
+            event["message"],
+            "Sent for approval: org memory changes need a memory admin's approval."
+        );
+        let other = format_tool_result_event("search_logs", &result, false, None).unwrap();
+        assert_eq!(other["message"], "search_logs completed successfully");
     }
 
     #[test]

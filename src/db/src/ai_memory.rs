@@ -129,8 +129,14 @@ pub async fn submit(submission: Submission) -> Result<Submitted> {
     let toolset_id = submission.toolset_id.as_deref();
     let outcome = match (mode, submission.change) {
         (WriteMode::Refuse, _) => return Ok(Submitted::Refused),
-        (WriteMode::Hold, Change::Content(_)) => return Ok(Submitted::NeedsMemoryAdmin),
-        // Only agents' edits are held, through `agent_write`; a person's text needs an admin.
+        (WriteMode::Hold, _) if !submission.settings.is_empty() => {
+            return Ok(Submitted::NeedsMemoryAdmin);
+        }
+        (WriteMode::Hold, Change::Content(content)) => {
+            let base_rev = submission.base_rev;
+            table::propose_with(conn, &dek, key, toolset_id, base_rev, &content, &meta).await?
+        }
+        // Agents' edits are held through `agent_write`; a person sends whole text.
         (WriteMode::Hold, Change::Edits(_)) => return Ok(Submitted::NeedsMemoryAdmin),
         (WriteMode::Apply, change) => {
             let write = Write {

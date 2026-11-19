@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, getCurrentInstance } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { NavigationAction } from "@/ts/interfaces/chat";
 import {
@@ -15,6 +15,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { navigationFeature } from "@/components/O2AIChat.navigation";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
+import { useStore } from "vuex";
+import { memoryLine } from "@/components/ai_memory/memory";
 
 const props = defineProps<{
   block: ToolCallBlock;
@@ -45,10 +47,47 @@ const navLockReason = computed(() => {
   const key = props.block.navigationAction ? navigationFeature(props.block.navigationAction) : null;
   return key && isLocked(key) ? lockedReason(key) : null;
 });
+
+const store = useStore();
+// The page is registered only where its feature is offered (`useManagementRoutes`).
+const hasMemoryPage = !!getCurrentInstance()?.proxy?.$router?.hasRoute("aiMemory");
+// A memory write is one line linking to the page where it can be reviewed.
+const memory = computed(() =>
+  props.block.tool === "update_memory" && !props.block.pendingConfirmation
+    ? memoryLine(props.block.resultMessage)
+    : null,
+);
+const memoryText = computed(() =>
+  memory.value?.kind === "pending" ? t("aiMemory.sentForApproval") : memory.value?.text,
+);
 </script>
 
 <template>
   <div
+    v-if="memory"
+    class="tool-call-item text-text-secondary text-compact mb-2 flex items-center gap-2 px-3 py-1"
+    data-test="o2-ai-chat-memory-line"
+  >
+    <OIcon
+      :name="memory.kind === 'refused' ? 'error' : 'psychology'"
+      size="sm"
+      :class="memory.kind === 'refused' ? 'text-status-negative' : 'text-status-positive'"
+    />
+    <span class="flex-1">{{ memoryText }}</span>
+    <router-link
+      v-if="!readonly && hasMemoryPage"
+      :to="{
+        name: 'aiMemory',
+        query: { org_identifier: store?.state.selectedOrganization?.identifier },
+      }"
+      class="text-primary text-xs"
+      data-test="o2-ai-chat-memory-link"
+    >
+      {{ t("aiMemory.open") }}
+    </router-link>
+  </div>
+  <div
+    v-else
     class="tool-call-item text-text-secondary rounded-default text-compact mb-2 flex max-w-full min-w-0 flex-col px-3 py-2"
     :class="[
       { 'has-details': hasToolCallDetails(block) },

@@ -45,6 +45,7 @@
           </div>
 
           <div class="chat-header-actions flex shrink-0 items-center gap-1">
+            <AiMemoryPanel />
             <OButton
               v-if="currentChatId"
               variant="ghost"
@@ -482,6 +483,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import AiMemoryPanel from "@/components/ai_memory/AiMemoryPanel.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -526,6 +528,7 @@ export default defineComponent({
   name: "O2AIChat",
   components: {
     AiChatShareDialog,
+    AiMemoryPanel,
     OButton,
     BetaBadge,
     ConfirmDialog,
