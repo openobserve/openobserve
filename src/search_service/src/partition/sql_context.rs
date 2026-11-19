@@ -87,8 +87,7 @@ impl PartitionSqlContext {
             || ((ts_column.is_none() || apply_over_hits || is_ranked_by_non_ts)
                 && !(req.streaming_output && is_streaming_agg));
 
-        let (is_histogram_eligible, _) =
-            is_eligible_for_histogram(&req.sql, false).unwrap_or((false, false));
+        let is_histogram_eligible = is_eligible_for_histogram(&req.sql, false).unwrap_or(false);
 
         let sql_order_by = sql
             .order_by

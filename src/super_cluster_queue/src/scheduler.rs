@@ -16,7 +16,7 @@
 use std::str::FromStr;
 
 use config::{
-    meta::triggers::{Trigger, TriggerModule},
+    meta::triggers::{Trigger, TriggerModule, TriggerRunStamp},
     utils::json,
 };
 #[allow(clippy::single_component_path_imports)]
@@ -49,6 +49,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
         }
         MessageType::BulkSchedulerStatusUpdate => {
             bulk_update_status(msg).await?;
+        }
+        MessageType::SchedulerRunStamp => {
+            run_stamp(msg).await?;
         }
         _ => {
             log::error!(
@@ -402,6 +405,20 @@ async fn bulk_update_status(msg: Message) -> Result<()> {
     Ok(())
 }
 
+/// A stamp for a job this region lacks writes nothing; the next full row brings it.
+async fn run_stamp(msg: Message) -> Result<()> {
+    let mut stamp: TriggerRunStamp = crate::payload(&msg)?;
+    stamp.module_key = alert_id_key(&stamp.org, &stamp.module_key).await?;
+    if !scheduler::apply_run_stamp(&stamp).await? {
+        log::debug!(
+            "[SUPER_CLUSTER:sync] alert job {}/{}: run stamp skipped, no row or a newer claim",
+            stamp.org,
+            stamp.module_key
+        );
+    }
+    Ok(())
+}
+
 async fn delete(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
     if trigger.module == TriggerModule::Alert {
@@ -423,16 +440,24 @@ async fn delete(msg: Message) -> Result<()> {
 }
 
 async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
-    // Return if the module_key is in new format (alert_id only)
-    if !trigger.module_key.contains("/") || trigger.module != TriggerModule::Alert {
+    if trigger.module != TriggerModule::Alert {
         return Ok(());
     }
-    let parts = trigger.module_key.split("/").collect::<Vec<&str>>();
+    trigger.module_key = alert_id_key(&trigger.org, &trigger.module_key).await?;
+    Ok(())
+}
+
+/// The alert-id key for a legacy `stream_type/stream/name` key; any other key comes back as is.
+async fn alert_id_key(org: &str, module_key: &str) -> Result<String> {
+    // Return if the module_key is in new format (alert_id only)
+    if !module_key.contains("/") {
+        return Ok(module_key.to_string());
+    }
+    let parts = module_key.split("/").collect::<Vec<&str>>();
 
     if parts.len() != 3 {
         return Err(Error::Message(format!(
-            "Invalid module_key format: {}",
-            trigger.module_key
+            "Invalid module_key format: {module_key}"
         )));
     }
     let stream_type = parts[0];
@@ -441,10 +466,48 @@ async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
 
     // get alert id from alert name
     if let Some(alert) =
-        db::alerts::alert::get_by_name(&trigger.org, stream_type.into(), stream_name, alert_name)
-            .await?
+        db::alerts::alert::get_by_name(org, stream_type.into(), stream_name, alert_name).await?
     {
-        trigger.module_key = alert.get_unique_key();
+        return Ok(alert.get_unique_key());
     }
-    Ok(())
+    Ok(module_key.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stamp_message(value: Option<Vec<u8>>) -> Message {
+        Message::new(
+            "/scheduler/".to_string(),
+            value.map(Into::into),
+            None,
+            false,
+            MessageType::SchedulerRunStamp,
+        )
+    }
+
+    #[tokio::test]
+    async fn a_run_stamp_with_a_malformed_or_missing_payload_is_an_error_not_a_panic() {
+        for value in [Some(b"not json".to_vec()), None] {
+            assert!(process(stamp_message(value)).await.is_err());
+        }
+    }
+
+    /// A two-part key is neither an alert id nor a legacy name, and is refused before any write.
+    #[tokio::test]
+    async fn a_run_stamp_key_goes_through_the_legacy_key_mapping() {
+        let wire = br#"{"org":"o","module_key":"logs/default","status":"Waiting","retries":0,
+            "start_time":2000,"end_time":2500,"next_run_at":3000,"period_end_time":1900,
+            "tolerance":7,"last_satisfied_at":2000}"#;
+
+        let err = process(stamp_message(Some(wire.to_vec())))
+            .await
+            .unwrap_err();
+
+        assert!(
+            err.to_string().contains("Invalid module_key format"),
+            "{err}"
+        );
+    }
 }
