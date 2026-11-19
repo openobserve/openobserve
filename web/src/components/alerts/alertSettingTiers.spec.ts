@@ -50,7 +50,7 @@ const SECTIONS: AlertSectionId[] = ["watch", "condition", "notify"];
 
 describe("sectionTierView: the More options line per mockup screen", () => {
   it.each<[string, AlertSectionId, Partial<AlertTierContext>, AlertSettingId[]]>([
-    ["A2 filters, total events too", "condition", {}, ["holdFor", "generatedSql", "groupBy"]],
+    ["A2 filters, total events too", "condition", {}, ["holdFor", "generatedSql"]],
     ["B0/B1 SQL", "condition", { shape: "sql" }, ["holdFor", "compareWithPast", "vrl"]],
     ["DRY-C2 PromQL", "condition", { shape: "promql" }, ["holdFor", "ruleExpression"]],
     [
@@ -103,6 +103,7 @@ describe("AlertTierLinks: the More options line names every unset rare setting",
         (d) =>
           d.section === section &&
           d.tier !== "add" &&
+          !d.always &&
           tierAvailable(d.id, c) &&
           !set.includes(d.id),
       );

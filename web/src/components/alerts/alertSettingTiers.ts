@@ -65,6 +65,8 @@ export interface AlertSettingTierDef {
   noteKey?: I18nKey;
   /** The owning step renders its "+ name" link beside the control it extends. */
   inline?: boolean;
+  /** Renders wherever it is available, so it is never named on the More options line. */
+  always?: boolean;
   row?: "message";
 }
 
@@ -140,7 +142,7 @@ const tierDef = (
 export const ALERT_SETTING_TIERS: readonly AlertSettingTierDef[] = [
   tierDef("holdFor", "condition", "smart", "alerts.tiers.names.holdFor"),
   tierDef("generatedSql", "condition", "more", "alerts.tiers.names.generatedSql"),
-  tierDef("groupBy", "condition", "more", "alerts.tiers.names.groupBy"),
+  tierDef("groupBy", "condition", "more", "alerts.tiers.names.groupBy", { always: true }),
   tierDef("compareWithPast", "condition", "more", "alerts.tiers.names.compareWithPast"),
   tierDef("vrl", "condition", "more", "alerts.tiers.names.vrl"),
   tierDef("ruleExpression", "condition", "smart", "alerts.tiers.names.queryComparison"),
@@ -393,6 +395,7 @@ export function isTierVisible(id: AlertSettingId, state: AlertTierState): boolea
   const def = defOf(id);
   if (!def || state.isSet(id) || state.revealed.has(id)) return true;
   if (!state.available(id)) return false;
+  if (def.always) return true;
   if (state.showAll) return true;
   return def.tier !== "add" && state.expanded(def.section);
 }
@@ -406,6 +409,7 @@ export function sectionTierView(
   const own = ALERT_SETTING_TIERS.filter(
     (d) =>
       d.section === section &&
+      !d.always &&
       state.available(d.id) &&
       !state.isSet(d.id) &&
       !state.revealed.has(d.id),
@@ -423,7 +427,7 @@ export function sectionPlacementOrder(
   state: Pick<AlertTierState, "available">,
 ): AlertSettingId[] {
   const own = ALERT_SETTING_TIERS.filter(
-    (d) => d.section === section && !d.inline && state.available(d.id),
+    (d) => d.section === section && !d.inline && !d.always && state.available(d.id),
   );
   return [
     ...inMoreOrder(

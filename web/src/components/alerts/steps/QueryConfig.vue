@@ -277,96 +277,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </AlertThresholdLevels>
                       </div>
                     </OSettingRow>
-
-                    <!-- group by row (hidden for count mode) -->
-                    <AlertTierPlace id="groupBy">
-                      <template v-if="groupBySettled">
-                        <AlertSentenceRow
-                          v-if="!groupByWithAnswer"
-                          :label="t('alerts.tiers.names.groupBy')"
-                          :description="switchedToCountNote"
-                          data-test="add-alert-group-by-sentence"
-                          changeable
-                          removable
-                          @change="groupByEditing = true"
-                          @remove="clearGroupBy"
-                        >
-                          {{ raw(groupLabelsText(shownGroupLabels(groupByLabels), locale)) }}
-                        </AlertSentenceRow>
-                      </template>
-                      <OSettingRow
-                        v-else-if="selectedFunction !== 'total_events' && tierShows('groupBy')"
-                        data-test="alert-group-by-row"
-                        :label="t('alerts.plain.groupedBy')"
-                        :description="
-                          streamType === 'metrics'
-                            ? t('alerts.queryConfig.groupByHelpLabels')
-                            : t('alerts.queryConfig.groupByTooltip')
-                        "
-                        fill
-                      >
-                        <div class="flex flex-wrap items-center gap-2">
-                          <template v-for="(group, index) in logGroupByRows" :key="index">
-                            <div class="flex items-center gap-1">
-                              <OFormSelect
-                                :aria-label="t('alerts.groupBy')"
-                                :name="`logGroupBy[${index}]`"
-                                :options="groupByOptions"
-                                searchable
-                                :placeholder="t('alerts.placeholders.selectColumn')"
-                                :data-test="`alert-group-by-select-${index}`"
-                                @update:model-value="onLogGroupByChange"
-                              />
-                              <OButton
-                                :aria-label="t('common.remove')"
-                                variant="ghost"
-                                size="icon-circle-sm"
-                                class="text-icon-color hover:text-status-error-text"
-                                @click="deleteLogGroupByColumn(index)"
-                              >
-                                <OIcon name="close" size="sm" />
-                              </OButton>
-                            </div>
-                          </template>
-                          <OButton
-                            variant="ghost-primary"
-                            size="icon-circle-sm"
-                            data-test="alert-group-by-add-btn"
-                            @click="addLogGroupByColumn"
-                          >
-                            <OIcon name="add" size="sm" />
-                            <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
-                          </OButton>
-                        </div>
-                      </OSettingRow>
-                      <OSettingRow
-                        v-else-if="selectedFunction === 'total_events' && tierShows('groupBy')"
-                        data-test="alert-group-by-row"
-                        :label="t('alerts.plain.groupedBy')"
-                        :description="
-                          streamType === 'metrics'
-                            ? t('alerts.queryConfig.groupByHelpLabels')
-                            : t('alerts.queryConfig.groupByTooltip')
-                        "
-                        fill
-                      >
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span class="text-text-secondary text-compact whitespace-nowrap">{{
-                            t("alerts.form.group.totalPer", { noun: countedNoun })
-                          }}</span>
-                          <OSelect
-                            :aria-label="t('alerts.groupBy')"
-                            :model-value="null"
-                            :options="groupByOptions"
-                            searchable
-                            :placeholder="t('alerts.placeholders.selectColumn')"
-                            class="w-50!"
-                            data-test="alert-group-by-select-0"
-                            @update:model-value="groupTotalBy"
-                          />
-                        </div>
-                      </OSettingRow>
-                    </AlertTierPlace>
                   </template>
 
                   <!-- METRICS -->
@@ -510,164 +420,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ></AlertThresholdLevels>
                       </div>
                     </OSettingRow>
-
-                    <!-- group by row — hidden for count mode -->
-                    <AlertTierPlace id="groupBy">
-                      <template v-if="groupBySettled">
-                        <AlertSentenceRow
-                          v-if="!groupByWithAnswer"
-                          :label="t('alerts.tiers.names.groupBy')"
-                          :description="switchedToCountNote"
-                          data-test="add-alert-group-by-sentence"
-                          changeable
-                          removable
-                          @change="groupByEditing = true"
-                          @remove="clearGroupBy"
-                        >
-                          {{ raw(groupLabelsText(shownGroupLabels(groupByLabels), locale)) }}
-                        </AlertSentenceRow>
-                      </template>
-                      <OSettingRow
-                        v-else-if="
-                          inputData.aggregation &&
-                          selectedFunction !== 'total_events' &&
-                          tierShows('groupBy')
-                        "
-                        :label="t('alerts.plain.groupedBy')"
-                        :description="
-                          streamType === 'metrics'
-                            ? t('alerts.queryConfig.groupByHelpLabels')
-                            : t('alerts.queryConfig.groupByTooltip')
-                        "
-                        fill
-                      >
-                        <div class="flex flex-wrap items-center gap-2">
-                          <template v-for="(group, index) in metricGroupByRows" :key="index">
-                            <div class="flex items-center gap-1">
-                              <OFormSelect
-                                :aria-label="t('alerts.groupBy')"
-                                :name="`query_condition.aggregation.group_by[${index}]`"
-                                :options="groupByOptions"
-                                searchable
-                                :placeholder="t('alerts.placeholders.selectColumn')"
-                                class="w-50!"
-                                @update:model-value="syncMetricGroupByToProps"
-                              />
-                              <OButton
-                                :aria-label="t('common.remove')"
-                                variant="ghost"
-                                size="icon-circle-sm"
-                                class="text-icon-color hover:text-status-error-text"
-                                @click="deleteGroupByColumn(index)"
-                              >
-                                <OIcon name="close" size="sm" />
-                              </OButton>
-                            </div>
-                          </template>
-                          <OButton
-                            variant="ghost-primary"
-                            size="icon-circle-sm"
-                            @click="addGroupByColumn"
-                          >
-                            <OIcon name="add" size="sm" />
-                            <OTooltip :content="t('alerts.queryConfig.addGroupByField')" />
-                          </OButton>
-                        </div>
-                      </OSettingRow>
-                      <OSettingRow
-                        v-else-if="selectedFunction === 'total_events' && tierShows('groupBy')"
-                        data-test="alert-group-by-row"
-                        :label="t('alerts.plain.groupedBy')"
-                        :description="
-                          streamType === 'metrics'
-                            ? t('alerts.queryConfig.groupByHelpLabels')
-                            : t('alerts.queryConfig.groupByTooltip')
-                        "
-                        fill
-                      >
-                        <div class="flex flex-wrap items-center gap-2">
-                          <span class="text-text-secondary text-compact whitespace-nowrap">{{
-                            t("alerts.form.group.totalPer", { noun: countedNoun })
-                          }}</span>
-                          <OSelect
-                            :aria-label="t('alerts.groupBy')"
-                            :model-value="null"
-                            :options="groupByOptions"
-                            searchable
-                            :placeholder="t('alerts.placeholders.selectColumn')"
-                            class="w-50!"
-                            data-test="alert-group-by-select-0"
-                            @update:model-value="groupTotalBy"
-                          />
-                        </div>
-                      </OSettingRow>
-                    </AlertTierPlace>
                   </template>
                   <OSettingRow
-                    v-if="groupQuestion.offered"
-                    :label="
-                      groupByWithAnswer ? t('alerts.tiers.names.groupBy') : groupQuestionTitle
-                    "
-                    :description="groupByWithAnswer ? switchedToCountNote : undefined"
+                    v-if="isRealTime === 'false'"
+                    :label="t('alerts.tiers.names.groupBy')"
+                    :description="switchedToCountNote"
                     fill
                     data-test="add-alert-group-question-row"
                     wide
                   >
                     <div class="flex min-w-0 flex-col gap-1.5">
                       <div class="flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1">
-                        <span
-                          v-if="groupByWithAnswer"
-                          class="flex min-w-0 flex-wrap items-center gap-x-1"
-                          data-test="add-alert-group-by-sentence"
-                        >
-                          <span class="text-text-body text-sm leading-8.5">{{
-                            raw(groupLabelsText(shownGroupLabels(groupByLabels), locale))
-                          }}</span>
-                          <OButton
-                            variant="ghost-primary"
-                            size="sm"
-                            data-test="add-alert-group-by-sentence-change"
-                            @click="groupByEditing = true"
-                          >
-                            {{ t("alerts.form.change") }}
-                          </OButton>
-                          <OButton
-                            variant="ghost-primary"
-                            size="sm"
-                            data-test="add-alert-group-by-sentence-remove"
-                            @click="clearGroupBy"
-                          >
-                            {{ t("common.remove") }}
-                          </OButton>
-                        </span>
                         <OToggleGroup
-                          :model-value="groupAnswer"
-                          :aria-label="groupQuestionTitle"
-                          :disabled="isRuleMultiRequired"
+                          :model-value="builderGroupAnswer"
+                          :aria-label="t('alerts.tiers.names.groupBy')"
                           class="self-center"
                           data-test="add-alert-group-question"
-                          @update:model-value="onGroupAnswer"
+                          @update:model-value="onBuilderGroupAnswer"
                         >
                           <OToggleGroupItem
                             value="one"
                             size="sm"
                             data-test="add-alert-group-question-one"
                           >
-                            {{ groupOneLabel }}
+                            {{ t("alerts.form.group.one") }}
                           </OToggleGroupItem>
                           <OToggleGroupItem
                             value="each"
                             size="sm"
                             data-test="add-alert-group-question-each"
                           >
-                            {{ groupEachLabel }}
+                            {{ builderEachLabel }}
                           </OToggleGroupItem>
                         </OToggleGroup>
-                        <!-- Kept mounted at zero size while "One per" is picked: a value typed there lands, and no blank line is held. -->
+                        <AlertGroupByPicker
+                          v-if="builderGroupAnswer === 'each' || groupByLabels.length"
+                          :model-value="groupByLabels"
+                          :options="groupByOptions"
+                          @update:model-value="setGroupBy"
+                        />
                         <div
+                          v-if="groupByLabels.length"
                           class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
-                          :class="groupAnswer === 'one' ? '' : 'invisible h-0 w-0 overflow-hidden'"
-                          :inert="groupAnswer !== 'one' || undefined"
+                          :class="
+                            builderGroupAnswer === 'one' ? '' : 'invisible h-0 w-0 overflow-hidden'
+                          "
+                          :inert="builderGroupAnswer !== 'one' || undefined"
                           data-test="add-alert-group-limit"
                         >
                           <template v-if="countOperatorShown">
@@ -718,18 +516,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                       <AlertMessageLine
-                        v-show="groupAnswer === 'one' || thresholdError"
+                        v-show="
+                          (builderGroupAnswer === 'one' && groupByLabels.length) || thresholdError
+                        "
                         :error="thresholdError"
                         :error-data-test="countErrorTest"
                         data-test="alert-group-limit-message"
                       />
-                      <p v-if="isRuleMultiRequired" class="text-text-secondary text-xs">
-                        {{ t("alerts.promRuleModePendingMulti") }}
-                      </p>
                     </div>
-                  </OSettingRow>
-                </div></Teleport
-              >
+                  </OSettingRow></div
+              ></Teleport>
             </div>
 
             <div
@@ -1244,7 +1040,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :disabled="isRuleMultiRequired"
                               class="self-center"
                               data-test="add-alert-group-question"
-                              @update:model-value="onGroupAnswer"
+                              @update:model-value="onQueryGroupAnswer"
                             >
                               <OToggleGroupItem
                                 value="one"
@@ -1686,6 +1482,7 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import AlertThresholdLevels from "@/components/alerts/AlertThresholdLevels.vue";
+import AlertGroupByPicker from "@/components/alerts/AlertGroupByPicker.vue";
 import AlertWindowPhrase from "@/components/alerts/AlertWindowPhrase.vue";
 import AlertMessageLine from "@/components/alerts/AlertMessageLine.vue";
 import {
@@ -1775,6 +1572,7 @@ export default defineComponent({
   components: {
     AlertMessageLine,
     AlertThresholdLevels,
+    AlertGroupByPicker,
     AlertWindowPhrase,
     OTag,
     ForecastAlertFields,
@@ -3123,14 +2921,6 @@ export default defineComponent({
       ),
     );
     // A loaded group-by reads as a sentence; once the user edits it, the pickers stay open under the cursor.
-    const groupByEditing = ref(false);
-    const groupBySettled = computed(
-      () =>
-        !!props.sectionTargets &&
-        selectedFunction.value !== "total_events" &&
-        groupByLabels.value.length > 0 &&
-        !groupByEditing.value,
-    );
     const groupQuestion = computed<{
       offered: boolean;
       grouped: boolean;
@@ -3268,10 +3058,6 @@ export default defineComponent({
 
     // The field a Group by pick switched "total events" to "count" for; its note says so.
     const switchedToCount = ref("");
-    // The group-by value and its One/each answer are one decision, so they share a row.
-    const groupByWithAnswer = computed(
-      () => groupBySettled.value && groupQuestion.value.offered && !tiers?.placedBelow("groupBy"),
-    );
     const switchedToCountNote = computed(() =>
       switchedToCount.value && selectedFunction.value === "count"
         ? t("alerts.form.group.switchedToCount", {
@@ -3302,7 +3088,6 @@ export default defineComponent({
       });
       emitAggregationUpdate();
       switchedToCount.value = field;
-      groupByEditing.value = false;
     };
     const clearGroupBy = () => {
       // Removing a Group by that made the count goes back to the total it came from.
@@ -3325,8 +3110,62 @@ export default defineComponent({
       }
       triggerThreshold.value = back ? back.value : 1;
       triggerOperator.value = back?.operator || ">=";
-      groupByEditing.value = false;
       tiers?.conceal("groupBy");
+    };
+
+    // A query that groups is the user's own grouping: it opens one alert per group until the toggle is set by hand.
+    let queryGroupSetByHand = false;
+    const onQueryGroupAnswer = (answer: unknown) => {
+      queryGroupSetByHand = true;
+      onGroupAnswer(answer);
+    };
+    watch(
+      () =>
+        localTab.value !== "custom" && groupQuestion.value.offered
+          ? groupQuestion.value.labels.join(",")
+          : null,
+      (key) => {
+        if (key === null || queryGroupSetByHand || props.beingUpdated || props.isSeeding) return;
+        const each = groupQuestion.value.labels.length > 0;
+        if ((groupAnswer.value === "each") !== each) onGroupAnswer(each ? "each" : "one");
+      },
+    );
+
+    // "One per" picked before any field: the picker opens, and the alert splits once a field is ticked.
+    const groupEachWanted = ref(false);
+    const builderGroupAnswer = computed(() =>
+      groupEachWanted.value || (isMultiAlert.value && groupByLabels.value.length) ? "each" : "one",
+    );
+    const builderEachLabel = computed(() =>
+      groupByLabels.value.length
+        ? t("alerts.form.group.eachOfPlain", {
+            labels: joinListMore(shownGroupLabels(groupByLabels.value), t),
+          })
+        : t("alerts.form.group.eachOfPlain", { labels: raw("…") }),
+    );
+    const onBuilderGroupAnswer = (answer: unknown) => {
+      if (answer === "each") {
+        groupEachWanted.value = true;
+        if (groupByLabels.value.length) onGroupAnswer("each");
+        return;
+      }
+      groupEachWanted.value = false;
+      if (groupByLabels.value.length || isMultiAlert.value) clearGroupBy();
+    };
+    // Unticking every field is "One alert"; a total becomes a count per the first field, as one pick did.
+    const setGroupBy = (labels: string[]) => {
+      if (!labels.length) {
+        groupEachWanted.value = false;
+        clearGroupBy();
+        return;
+      }
+      if (selectedFunction.value === "total_events") groupTotalBy(labels[0]);
+      if (isEventBased.value) setFV("logGroupBy", [...labels]);
+      writeAggregation((agg) => {
+        agg.group_by = [...labels];
+      });
+      emitAggregationUpdate();
+      if (groupEachWanted.value && !isMultiAlert.value) onGroupAnswer("each");
     };
 
     // The choice only appears once a group-by exists, so normalise then —
@@ -4034,49 +3873,6 @@ export default defineComponent({
       }
     };
 
-    // Log group-by management — form-owned field array (Rule ①, :key=index).
-    // add/remove via the form so the RENDERED inputs track the array; each change
-    // is bridged into props.inputData.aggregation.group_by (in place) + emitted,
-    // preserving the SQL-gen cadence.
-    const addLogGroupByColumn = () => {
-      groupByEditing.value = true;
-      form?.pushFieldValue?.("logGroupBy", "");
-    };
-    const deleteLogGroupByColumn = (index: number) => {
-      form?.removeFieldValue?.("logGroupBy", index);
-      onLogGroupByChange();
-      // Reset threshold to 1 when last group-by field is removed (form-backed
-      // computeds; no direct prop mutation / re-emit).
-      if (((fv("logGroupBy") as string[]) ?? []).filter((f: string) => f?.trim()).length === 0) {
-        triggerThreshold.value = 1;
-        triggerOperator.value = ">=";
-        // The Simple/Multi toggle only renders while a group-by exists, so with
-        // the last one gone the user can no longer turn multi-alert off — turn it
-        // off here or every Save 400s (M-10 requires ≥1 group_by for per-group).
-        setFV("query_condition.aggregation.multi_alert", false);
-      }
-    };
-    const onLogGroupByChange = () => {
-      if (!fv("query_condition.aggregation")) return;
-      // OFormSelect fires this consumer `@update:model-value` BEFORE its own
-      // internal `field.handleChange` commits the picked value into
-      // logGroupBy[index] — the two update:model-value listeners run in
-      // registration order, and the consumer's is registered first. Reading
-      // logGroupBy synchronously here therefore copies the STALE array into
-      // aggregation.group_by, dropping the column the user just picked (it
-      // persisted as [""]; pre-migration avoided this with a direct v-model into
-      // group_by[index]). Defer to nextTick so the copy reads the committed
-      // logGroupBy — logGroupBy is a stripped _meta field, so group_by is the
-      // only thing that survives to the payload and it MUST hold the real value.
-      nextTick(() => {
-        if (!fv("query_condition.aggregation")) return;
-        writeAggregation((agg) => {
-          agg.group_by = [...((fv("logGroupBy") as string[]) ?? [])];
-        });
-        emitAggregationUpdate();
-      });
-    };
-
     // When condition operator changes. The name= binding OWNS the value
     // (trigger_condition.operator in count mode, aggregation.having.operator in
     // measure mode) but has NOT written it yet — field.handleChange commits after
@@ -4126,52 +3922,6 @@ export default defineComponent({
     // Legacy toggle kept for compatibility — not used in new UI
     const toggleAggregation = () => {
       emit("update:isAggregationEnabled", localIsAggregationEnabled.value);
-    };
-
-    // Metric group-by field array (form-owned; name="query_condition.aggregation.
-    // group_by[i]"). form is the source; props.inputData.aggregation.group_by is
-    // the write-through copy that feeds SQL-gen.
-    const syncMetricGroupByToProps = () => {
-      // group_by is form-owned via the name= bindings; just refresh the preview.
-      // Deferred to nextTick for the same reason as onLogGroupByChange: this
-      // consumer @update:model-value runs BEFORE OFormSelect's internal
-      // field.handleChange commits group_by[index], so emitting synchronously
-      // would push a stale aggregation up to the parent's setF and clobber the
-      // just-picked value. nextTick reads the committed group_by.
-      nextTick(() => {
-        if (fv("query_condition.aggregation")) {
-          emitAggregationUpdate();
-        }
-      });
-    };
-
-    // Add group by column
-    const addGroupByColumn = () => {
-      groupByEditing.value = true;
-      if (fv("query_condition.aggregation")) {
-        form?.pushFieldValue?.("query_condition.aggregation.group_by", "");
-        syncMetricGroupByToProps();
-      }
-    };
-
-    // Delete group by column
-    const deleteGroupByColumn = (index: string | number) => {
-      const idx = typeof index === "string" ? parseInt(index) : index;
-      if (!fv("query_condition.aggregation")) return;
-      form?.removeFieldValue?.("query_condition.aggregation.group_by", idx);
-      syncMetricGroupByToProps();
-      // Reset threshold to 1 when last group-by field is removed (form-backed
-      // computeds; no direct prop mutation / re-emit).
-      const remaining = ((fv("query_condition.aggregation.group_by") as string[]) || []).filter(
-        (f: string) => f?.trim(),
-      ).length;
-      if (remaining === 0) {
-        triggerThreshold.value = 1;
-        triggerOperator.value = ">=";
-        // Same reason as the log branch: with no group-by left the toggle is
-        // hidden, so multi_alert must be cleared here or Save 400s (M-10).
-        setFV("query_condition.aggregation.multi_alert", false);
-      }
     };
 
     // Emit aggregation update — read the fresh value off the form (props.inputData
@@ -4545,8 +4295,6 @@ export default defineComponent({
       triggerOperators,
       numericColumns,
       toggleAggregation,
-      addGroupByColumn,
-      deleteGroupByColumn,
       emitAggregationUpdate,
       emitPromqlConditionUpdate,
       // V3.1 inline condition
@@ -4578,9 +4326,11 @@ export default defineComponent({
       countTestIds,
       countOperatorShown,
       onGroupAnswer,
-      groupByEditing,
-      groupBySettled,
-      groupByWithAnswer,
+      builderGroupAnswer,
+      builderEachLabel,
+      onBuilderGroupAnswer,
+      onQueryGroupAnswer,
+      setGroupBy,
       clearGroupBy,
       groupLabelsText,
       locale,
@@ -4635,9 +4385,6 @@ export default defineComponent({
       onMetricFunctionChange,
       onLogFunctionChange,
       onLogMeasureColumnChange,
-      addLogGroupByColumn,
-      deleteLogGroupByColumn,
-      onLogGroupByChange,
       onConditionOperatorChange,
       onConditionValueChange,
       filtersSectionRef,
@@ -4677,10 +4424,7 @@ export default defineComponent({
       insertPromqlSample,
       onPromqlOperatorChange,
       onPromqlValueChange,
-      syncMetricGroupByToProps,
       // Reactive views of the group-by field arrays (render source, Rule ①)
-      logGroupByRows: logGroupByStore,
-      metricGroupByRows: metricGroupByStore,
     };
   },
 });

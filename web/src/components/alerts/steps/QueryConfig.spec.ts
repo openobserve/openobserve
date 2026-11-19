@@ -2089,45 +2089,6 @@ describe("QueryConfig.vue", () => {
       await flushPromises();
       expect(form.state.isValid).toBe(true);
     });
-
-    // ── group_by field array — MANDATORY non-last-row delete test (Rule ①) ──
-    it("deletes a NON-last logs group-by row and the RENDERED inputs shift correctly", async () => {
-      // Enter logs measure mode so the group-by row renders.
-      wrapper.vm.selectedFunction = "avg";
-      await nextTick();
-
-      const form = hostForm();
-      form.setFieldValue("logGroupBy", ["field1", "field2", "field3"]);
-      await nextTick();
-      await flushPromises();
-
-      const namesFor = () =>
-        wrapper
-          .findAllComponents(OFormSelect)
-          .filter((c: any) => /^logGroupBy\[\d+\]$/.test(c.props("name")));
-
-      // 3 rendered rows, values in order.
-      let rows = namesFor();
-      expect(rows.length).toBe(3);
-      expect(rows.map((c: any) => c.findComponent(OSelect).props("modelValue"))).toEqual([
-        "field1",
-        "field2",
-        "field3",
-      ]);
-
-      // Delete the MIDDLE (non-last) row.
-      wrapper.vm.deleteLogGroupByColumn(1);
-      await nextTick();
-      await flushPromises();
-
-      rows = namesFor();
-      expect(rows.length).toBe(2);
-      // The RENDERED inputs (not just form.state.values) must be ["field1","field3"].
-      expect(rows.map((c: any) => c.findComponent(OSelect).props("modelValue"))).toEqual([
-        "field1",
-        "field3",
-      ]);
-    });
   });
 
   describe("Real OForm behavior — metrics / promql modes", () => {
@@ -2697,7 +2658,10 @@ describe("QueryConfig.vue", () => {
       remount({ ...sectioned, ...qc }, form);
       const q = wrapper.vm.groupQuestion;
       expect(q.offered).toBe(offered);
-      expect(host.find('[data-test="add-alert-group-question"]').exists()).toBe(offered);
+      // The builder's own Group by toggle shows even before anything is grouped.
+      expect(host.find('[data-test="add-alert-group-question"]').exists()).toBe(
+        offered || qc.tab === "custom",
+      );
       if (!offered) return;
       expect(q.labels).toEqual(labels);
       if (titleKey === "grouped") {
@@ -2998,11 +2962,10 @@ describe("QueryConfig.vue", () => {
         {
           trigger_condition: { ...hostDefaults().trigger_condition, operator: ">", threshold: 50 },
         },
-        tiersWith(["groupBy"]),
+        tiersWith(),
       );
       await flushPromises();
-      expect(host.find('[data-test="alert-group-by-select-0"]').exists()).toBe(true);
-      wrapper.vm.groupTotalBy("service");
+      wrapper.vm.setGroupBy(["service"]);
       await flushPromises();
       expect(hostForm().getFieldValue("query_condition.aggregation")).toMatchObject({
         function: "count",
@@ -3011,16 +2974,45 @@ describe("QueryConfig.vue", () => {
       });
       expect(hostForm().getFieldValue("trigger_condition.threshold")).toBe(1);
       const groupRow = host.find('[data-test="add-alert-group-question-row"]');
-      expect(groupRow.find('[data-test="add-alert-group-by-sentence"]').text()).toContain(
+      expect(groupRow.find('[data-test="add-alert-group-question-each"]').text()).toContain(
         "service",
       );
       expect(groupRow.text()).toContain("Switched to count, so it counts events per service");
-      wrapper.vm.clearGroupBy();
+      wrapper.vm.setGroupBy([]);
       await flushPromises();
       expect(wrapper.vm.selectedFunction).toBe("total_events");
       expect(hostForm().getFieldValue("trigger_condition")).toMatchObject({
         operator: ">",
         threshold: 50,
+      });
+    });
+
+    it("Group by opens on One alert; One per with two fields splits by both, unticking all is One alert again", async () => {
+      remount({ ...sectioned, columns });
+      await flushPromises();
+      const toggle = () => host.find('[data-test="add-alert-group-question"]');
+      const picker = () => host.find('[data-test="alert-group-by-picker"]');
+      expect(wrapper.vm.builderGroupAnswer).toBe("one");
+      expect(picker().exists()).toBe(false);
+
+      await host.find('[data-test="add-alert-group-question-each"]').trigger("click");
+      expect(picker().exists()).toBe(true);
+      host
+        .findComponent({ name: "AlertGroupByPicker" })
+        .vm.$emit("update:modelValue", ["service", "status"]);
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.aggregation")).toMatchObject({
+        group_by: ["service", "status"],
+        multi_alert: true,
+      });
+      expect(toggle().text()).toContain("service");
+
+      host.findComponent({ name: "AlertGroupByPicker" }).vm.$emit("update:modelValue", []);
+      await flushPromises();
+      expect(wrapper.vm.builderGroupAnswer).toBe("one");
+      expect(hostForm().getFieldValue("query_condition.aggregation")).toMatchObject({
+        group_by: [],
+        multi_alert: false,
       });
     });
 

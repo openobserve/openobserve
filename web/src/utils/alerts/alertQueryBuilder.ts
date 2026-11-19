@@ -165,7 +165,11 @@ export const groupByChoices = <T extends { label?: unknown; value: string }>(
     ranked?: readonly string[];
   },
 ): T[] => {
-  const dropped = new Set([opts.timestamp, ...(opts.streamType === "metrics" ? ["__name__"] : [])]);
+  // A histogram's bucket bound is how the value is measured, never what an alert is split by.
+  const dropped = new Set([
+    opts.timestamp,
+    ...(opts.streamType === "metrics" ? ["__name__", "le"] : []),
+  ]);
   const rank = new Map((opts.ranked ?? []).map((name, i) => [name, i]));
   const kept = columns
     .filter((c) => !dropped.has(c.value) || opts.selected.includes(c.value))

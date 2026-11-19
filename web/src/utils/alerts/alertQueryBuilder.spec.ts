@@ -88,7 +88,7 @@ describe("alertQueryBuilder", () => {
 });
 
 describe("groupByChoices", () => {
-  const cols = ["_timestamp", "__name__", "pod", "__hash__"].map((value) => ({
+  const cols = ["_timestamp", "__name__", "pod", "__hash__", "le"].map((value) => ({
     label: value,
     value,
   }));
@@ -102,13 +102,13 @@ describe("groupByChoices", () => {
     }).map((c) => `${c.value}:${c.label}`);
   it.each([
     ["metrics", [], [], ["__hash__:Series", "pod:pod"]],
-    ["logs", [], [], ["__name__:__name__", "pod:pod", "__hash__:__hash__"]],
+    ["logs", [], [], ["__name__:__name__", "pod:pod", "__hash__:__hash__", "le:le"]],
     ["metrics", ["__name__"], [], ["__hash__:Series", "__name__:__name__", "pod:pod"]],
     [
       "logs",
       [],
       ["__hash__", "gone", "pod"],
-      ["__hash__:__hash__", "pod:pod", "__name__:__name__"],
+      ["__hash__:__hash__", "pod:pod", "__name__:__name__", "le:le"],
     ],
   ])("offers a %s stream (saved %j, ranked %j) %j", (streamType, selected, ranked, shown) => {
     expect(choose(streamType, selected, ranked)).toEqual(shown);
