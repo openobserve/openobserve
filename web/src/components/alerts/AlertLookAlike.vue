@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -73,6 +73,16 @@ const text = computed(() =>
   ),
 );
 
+const dismissed = ref(false);
+const root = ref<HTMLElement | null>(null);
+// The ✕ leaves with the line, so focus moves on to the footer's next control instead of dropping to the page.
+const dismiss = async () => {
+  const footer = root.value?.closest('[data-test="add-alert-footer"]');
+  dismissed.value = true;
+  await nextTick();
+  footer?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
+};
+
 const open = () => {
   const first = matches.value[0];
   if (first?.alert_id)
@@ -82,7 +92,8 @@ const open = () => {
 
 <template>
   <p
-    v-if="matches.length"
+    v-if="matches.length && !dismissed"
+    ref="root"
     class="text-text-secondary m-0 flex min-w-0 items-center gap-1.5 text-xs"
     data-test="add-alert-look-alike"
   >
@@ -96,5 +107,14 @@ const open = () => {
       @click="open"
       >{{ t("alerts.librarySuggest.open") }}</OButton
     >
+    <OButton
+      variant="ghost"
+      size="icon-xs"
+      icon-left="close"
+      class="shrink-0"
+      :aria-label="t('common.dismiss')"
+      data-test="add-alert-look-alike-dismiss"
+      @click="dismiss"
+    />
   </p>
 </template>
