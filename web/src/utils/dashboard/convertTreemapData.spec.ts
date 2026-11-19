@@ -36,6 +36,7 @@ const field = (alias: string, label: string, functionName: string | null = null)
   label,
   alias,
   column: alias,
+  type: "build",
   functionName,
   args: [{ type: "field", value: { field: alias } }],
 });
@@ -270,6 +271,13 @@ describe("treemap through convertPanelData", () => {
     expect(await label(count, { decimals: 2 })).toBe("api\n40");
     expect(await label(field("y_axis_1", "Bytes", "sum"), { decimals: 2 })).toBe("api\n40.00");
     expect(await label(count, { decimals: 2, unit: "percent" })).toBe("api\n40.00%");
+  });
+
+  it("keeps the decimals of a custom SQL value labelled count", async () => {
+    const schema = panel("treemap", { x: [serviceX], y: [count] }, { decimals: 2 });
+    schema.queries[0].customQuery = true;
+    const { options } = await viaPanel(schema, [rows]);
+    expect(options.series[0].label.formatter({ name: "api", value: 12.67 })).toBe("api\n12.67");
   });
 
   it("draws every level when the breadcrumb is hidden, since a click cannot zoom", async () => {
