@@ -627,10 +627,9 @@ pub async fn zo_config(
 
     let usage_enabled = enterprise_value!(false, true);
 
-    // Usage calculations need data at most 10 minutes old.
     let usage_publish_interval = enterprise_value!(
         cfg.common.usage_publish_interval,
-        (10 * 60).min(cfg.common.usage_publish_interval)
+        config::enterprise_usage_publish_interval(&cfg)
     );
 
     #[cfg(feature = "cloud")]
