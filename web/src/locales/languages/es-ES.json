@@ -1928,7 +1928,7 @@
     "freeTextNoTextFields": "Este stream no tiene campos de texto que buscar.",
     "freeTextNoTextFieldsNamed": "No se buscó en: {streams} (sin campos de texto).",
     "freeTextBuildNotice": "Este filtro tiene búsqueda de texto; edítalo en SQL.",
-    "filterNotChartableNotice": "Este filtro no se puede representar en un gráfico con el generador. Tu filtro de búsqueda no ha cambiado; cambia a Custom SQL para graficarlo."
+    "filterNotChartableNotice": "Este filtro no se puede representar en un gráfico con el generador. Tu filtro de búsqueda no ha cambiado; cambia a {custom} para graficarlo."
   },
   "menu": {
     "alertCalibration": "Calibración de alertas",
@@ -13465,6 +13465,7 @@
         "emptyQuery": "No hay una consulta desde la cual crear una alerta.",
         "noQueries": "Este panel no tiene una consulta desde la cual crear una alerta.",
         "noConstants": "Los patrones seleccionados no tienen texto distintivo para coincidir.",
+        "patternsShared": "{count} de los patrones seleccionados comparten todo su texto con otros patrones, por lo que el filtro de la alerta los omite.",
         "sqlModeFilterDropped": "Tu consulta SQL no se transfirió — la alerta solo coincide con los patrones seleccionados.",
         "patternsUnusable": "Ninguno de los patrones en esta página tiene texto distintivo para coincidir, por lo que la alerta usa solo tu búsqueda.",
         "dbmRollupLag": "Los números de la base de datos se agregan cada {minutes} minutos, por lo que esta alerta solo puede dispararse con esa frecuencia — no es una página en tiempo real.",

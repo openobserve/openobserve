@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ref } from "vue";
 
 const { mockSearch } = vi.hoisted(() => ({ mockSearch: vi.fn() }));
 vi.mock("@/services/search", () => ({ default: { search: mockSearch } }));
@@ -24,6 +25,7 @@ import {
   fetchPatternVolume,
   parseBucketKey,
   resolveBaseFilter,
+  usePatternVolumeCache,
 } from "./usePatternVolume";
 
 const usFor = (iso: string) => Date.parse(iso) * 1000;
@@ -297,5 +299,37 @@ describe("fetchPatternVolume", () => {
       allTemplates: [A, B],
     });
     expect(c?.allTemplates).toEqual([A, B]);
+  });
+});
+
+describe("usePatternVolumeCache unavailable reason", () => {
+  const A = "core event seq=<:NUM> info from <*> status 500";
+  const SHARED = "core event seq=<:NUM> info from <*>";
+  const ctx = {
+    orgId: "o",
+    streamName: "logs",
+    startUs: 0,
+    endUs: 1_000_000 * 3600,
+    allTemplates: [A, SHARED],
+  };
+
+  it("records why a pattern with no distinct filter has no volume", async () => {
+    const cache = usePatternVolumeCache(ref(ctx));
+    await cache.request({ template: SHARED });
+    expect(cache.get({ template: SHARED })).toEqual({
+      buckets: null,
+      total: null,
+      intervalSecs: null,
+      loading: false,
+      unavailableReason: "shared",
+    });
+  });
+
+  it("records no reason for a pattern that has a volume", async () => {
+    mockSearch.mockReset();
+    mockSearch.mockResolvedValue({ data: { hits: [] } });
+    const cache = usePatternVolumeCache(ref(ctx));
+    await cache.request({ template: A });
+    expect(cache.get({ template: A })?.unavailableReason).toBeUndefined();
   });
 });

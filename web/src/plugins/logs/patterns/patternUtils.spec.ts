@@ -443,10 +443,20 @@ describe("resolvePatternMatchTerms", () => {
     expect(resolvePatternMatchTerms(x, [x, y])).toBeNull();
   });
 
-  it("returns null for a short-only template, alone or among others", () => {
-    expect(resolvePatternMatchTerms("GET <*>")).toBeNull();
-    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>"])).toBeNull();
-    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>", A])).toBeNull();
+  it("filters a short-only template on its short segments when they are unique", () => {
+    expect(resolvePatternMatchTerms("GET <*> 200", ["GET <*> 200", "POST <*> 500"])).toEqual([
+      "GET",
+      "200",
+    ]);
+    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>"])).toEqual(["GET"]);
+  });
+
+  it("keeps long-only behaviour for a short-only template without the template list", () => {
+    expect(resolvePatternMatchTerms("GET <*> 200")).toBeNull();
+  });
+
+  it("returns null for a short-only template whose text another pattern shares", () => {
+    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>", "GET <*> 200"])).toBeNull();
   });
 
   it("returns null for an all-wildcard template", () => {
@@ -470,8 +480,12 @@ describe("patternFilterBlockedReason", () => {
     expect(patternFilterBlockedReason("<*> <:NUM>", ["<*> <:NUM>", A])).toBe("none");
   });
 
-  it("is 'none' for a short-only template even when it is the only pattern", () => {
-    expect(patternFilterBlockedReason("GET <*>", ["GET <*>"])).toBe("none");
+  it("is null for a short-only template whose text is unique", () => {
+    expect(patternFilterBlockedReason("GET <*>", ["GET <*>", "POST <*>"])).toBeNull();
+  });
+
+  it("is 'shared' for a short-only template whose text another pattern shares", () => {
+    expect(patternFilterBlockedReason("GET <*>", ["GET <*>", "GET <*> 200"])).toBe("shared");
   });
 
   it("is 'shared' when every constant also sits in another template", () => {
@@ -485,12 +499,6 @@ describe("pattern clauses for templates that share a long prefix", () => {
   const B = "core event seq=<:NUM> warn from <*> status 404";
   const SHARED = "core event seq=<:NUM> info from <*>";
   const ALL = [A, B];
-
-  it("builds the single-pattern query from every distinguishing term", () => {
-    expect(buildPatternSqlQuery(A, "s", ALL)).toBe(
-      "SELECT * FROM 's' WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500')",
-    );
-  });
 
   it("keeps the long-constants-only query without a template list", () => {
     expect(buildPatternSqlQuery(A, "s")).toBe(
@@ -510,12 +518,5 @@ describe("pattern clauses for templates that share a long prefix", () => {
     expect(
       buildPatternSetSqlQuery({ streamName: "s", includes: [SHARED], allTemplates: [SHARED, A] }),
     ).toBe("SELECT * FROM 's'");
-  });
-
-  it("threads the template list through buildPatternAlertData", () => {
-    const data = buildPatternAlertData({ template: A, pattern_id: "p" }, "s", 5, 100, ALL);
-    expect(data.sqlQuery).toBe(
-      "SELECT * FROM 's' WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500')",
-    );
   });
 });

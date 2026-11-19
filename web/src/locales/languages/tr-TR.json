@@ -1928,7 +1928,7 @@
     "freeTextNoTextFields": "Bu akışta aranacak metin alanı yok.",
     "freeTextNoTextFieldsNamed": "Aranmadı: {streams} (metin alanı yok).",
     "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin.",
-    "filterNotChartableNotice": "Bu filtre oluşturucuda grafiğe dökülemez. Arama filtreniz değişmedi; grafiğe dökmek için Custom SQL'e geçin."
+    "filterNotChartableNotice": "Bu filtre oluşturucuda grafiğe dökülemez. Arama filtreniz değişmedi; grafiğe dökmek için {custom}'e geçin."
   },
   "menu": {
     "alertCalibration": "Uyarı Kalibrasyonu",
@@ -13465,6 +13465,7 @@
         "emptyQuery": "Uyarı oluşturmak için bir sorgu yok.",
         "noQueries": "Bu panelde uyarı oluşturmak için bir sorgu yok.",
         "noConstants": "Seçilen desenlerin eşleşecek ayırt edici bir metni yok.",
+        "patternsShared": "Seçilen desenlerden {count} tanesi tüm metnini diğer desenlerle paylaşıyor, bu yüzden uyarı filtresi bunları dışarıda bırakıyor.",
         "sqlModeFilterDropped": "SQL sorgunuz aktarılmadı — uyarı yalnızca seçilen desenlerle eşleşir.",
         "patternsUnusable": "Bu sayfadaki desenlerin hiçbirinde eşleşecek ayırt edici metin yok, bu nedenle uyarı yalnızca aramanızı kullanır.",
         "dbmRollupLag": "Veritabanı sayıları her {minutes} dakikada bir toplanır, bu nedenle bu uyarı yalnızca bu sıklıkta tetiklenebilir — gerçek zamanlı bir sayfa değildir.",

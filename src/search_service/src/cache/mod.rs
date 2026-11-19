@@ -1276,7 +1276,7 @@ pub fn apply_vrl_to_response(
                 let mut vrl_errors = transform::VrlRunErrors::default();
                 let out: Vec<serde_json::Value> = if apply_over_hits {
                     let row_count = local_res.hits.len();
-                    let (ret_val, err) = transform::apply_vrl_fn(
+                    let (ret_val, err) = transform::apply_vrl_fn_checked(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -1298,7 +1298,7 @@ pub fn apply_vrl_to_response(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = transform::apply_vrl_fn(
+                            let (ret_val, err) = transform::apply_vrl_fn_checked(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),

@@ -32,23 +32,19 @@ import { stripSqlComments } from "@/utils/query/sqlComments";
  * (and combining values across slots can yield a combination that never
  * occurred), so such patterns simply have no reliable Include/Exclude filter.
  */
-export const extractConstantsFromPattern = (template: string): string[] => {
-  const constants: string[] = [];
-  const parts = template.split(/<[*:][^>]*>/);
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (trimmed.length > 10) {
-      constants.push(trimmed);
-    }
-  }
-  return constants;
-};
+export const extractConstantsFromPattern = (template: string): string[] =>
+  splitTemplate(template).filter((part) => part.length > 10);
+
+const PLACEHOLDER = /<[*:][^>]*>/;
+
+const splitTemplate = (template: string): string[] =>
+  template
+    .split(PLACEHOLDER)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
 const splitConstants = (template: string): string[] =>
-  template
-    .split(/<[*:][^>]*>/)
-    .map((p) => p.trim())
-    .filter((p) => /[\p{L}\p{N}]/u.test(p));
+  splitTemplate(template).filter((p) => /[\p{L}\p{N}]/u.test(p));
 
 // A term can only match another template whose constants contain it inside one segment.
 const sharedWith = (terms: string[], other: string): boolean => {
@@ -58,16 +54,15 @@ const sharedWith = (terms: string[], other: string): boolean => {
 
 /**
  * `match_all()` terms selecting only this pattern: long constants, else every
- * constant when long ones exist but are shared. Null when nothing separates it.
+ * constant. Null when there is no constant text or no term set separates it.
  */
 export const resolvePatternMatchTerms = (
   template: string,
   allTemplates?: string[],
 ): string[] | null => {
   const long = extractConstantsFromPattern(template);
-  // Short words alone never identify a pattern, and without the other templates nothing vouches for them.
-  if (!long.length) return null;
-  if (!allTemplates) return long;
+  // Without the other templates nothing can vouch for short words, so only long constants are trusted.
+  if (!allTemplates) return long.length ? long : null;
   const others = allTemplates.filter((t) => t !== template);
   const unique = (terms: string[]) => terms.length > 0 && !others.some((o) => sharedWith(terms, o));
 
@@ -78,12 +73,17 @@ export const resolvePatternMatchTerms = (
 
 export type PatternFilterBlock = "none" | "shared";
 
-/** Why a pattern cannot be filtered on: no long constant text, or every piece is shared. */
+export const FILTER_BLOCKED_MESSAGE = {
+  none: "logs.patternList.noMatchTerms",
+  shared: "logs.patternList.noDistinctTextTooltip",
+} as const satisfies Record<PatternFilterBlock, string>;
+
+/** Why a pattern cannot be filtered on: it has no constant text, or every piece is shared. */
 export const patternFilterBlockedReason = (
   template: string,
   allTemplates?: string[],
 ): PatternFilterBlock | null => {
-  if (extractConstantsFromPattern(template).length === 0) return "none";
+  if (splitConstants(template).length === 0) return "none";
   return resolvePatternMatchTerms(template, allTemplates) === null ? "shared" : null;
 };
 
@@ -370,11 +370,8 @@ export const buildPatternSetSqlQuery = (options: PatternSetSqlOptions): string =
  * Kept as its own name because that is how the rest of the pattern UI refers to
  * it, but there is only one code path underneath.
  */
-export const buildPatternSqlQuery = (
-  template: string,
-  streamName: string,
-  allTemplates?: string[],
-): string => buildPatternSetSqlQuery({ streamName, includes: [template], allTemplates });
+export const buildPatternSqlQuery = (template: string, streamName: string): string =>
+  buildPatternSetSqlQuery({ streamName, includes: [template] });
 
 /**
  * Derive a human-readable alert name from a pattern template and stream name.
@@ -419,13 +416,12 @@ export const buildPatternAlertData = (
   streamName: string,
   periodMinutes: number,
   totalLogsAnalyzed: number,
-  allTemplates?: string[],
 ): PatternAlertData => {
   const isAnomaly = !!pattern.is_anomaly;
   return {
     streamName,
     streamType: "logs",
-    sqlQuery: buildPatternSqlQuery(pattern.template, streamName, allTemplates),
+    sqlQuery: buildPatternSqlQuery(pattern.template, streamName),
     patternTemplate: pattern.template,
     alertName: buildAlertNameFromPattern(pattern.template, streamName, isAnomaly),
     periodMinutes,

@@ -1257,14 +1257,16 @@ fn compute_vrl_responses(
 
     log::debug!("[trace_id {trace_id}] VRL compiled successfully, applying to results...");
 
-    let mut vrl_errors = transform::VrlRunErrors::default();
+    let mut query_errors: Vec<transform::VrlRunErrors> = (0..total_queries)
+        .map(|_| transform::VrlRunErrors::default())
+        .collect();
     let transformed_hits: Vec<json::Value> = if apply_over_hits {
         // Apply VRL on the entire 2D array at once
         let row_count: usize = multi_hits
             .iter()
             .map(|v| v.as_array().map_or(0, |a| a.len()))
             .sum();
-        let (ret_val, err) = transform::apply_vrl_fn(
+        let (ret_val, err) = transform::apply_vrl_fn_checked(
             &mut runtime,
             &VRLResultResolver {
                 program: program.program.clone(),
@@ -1274,7 +1276,10 @@ fn compute_vrl_responses(
             org_id,
             std::slice::from_ref(&vrl_stream_name),
         );
-        vrl_errors.record_rows(row_count, err);
+        // A whole-array call fails every query's rows together.
+        let mut whole = transform::VrlRunErrors::default();
+        whole.record_rows(row_count, err);
+        query_errors = vec![whole];
 
         match ret_val.as_array() {
             None => {
@@ -1289,7 +1294,8 @@ fn compute_vrl_responses(
         // Apply VRL per-hit within each query's array
         multi_hits
             .into_iter()
-            .map(|query_hits_val| {
+            .enumerate()
+            .map(|(qi, query_hits_val)| {
                 let query_hits = match query_hits_val.as_array() {
                     Some(arr) => arr.clone(),
                     None => vec![],
@@ -1297,7 +1303,7 @@ fn compute_vrl_responses(
                 let transformed: Vec<json::Value> = query_hits
                     .into_iter()
                     .filter_map(|hit| {
-                        let (ret_val, err) = transform::apply_vrl_fn(
+                        let (ret_val, err) = transform::apply_vrl_fn_checked(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
@@ -1307,7 +1313,9 @@ fn compute_vrl_responses(
                             org_id,
                             std::slice::from_ref(&vrl_stream_name),
                         );
-                        vrl_errors.record(err);
+                        if let Some(errors) = query_errors.get_mut(qi) {
+                            errors.record(err);
+                        }
                         if !ret_val.is_null() && ret_val.is_object() {
                             flatten::flatten(ret_val).ok()
                         } else {
@@ -1320,8 +1328,8 @@ fn compute_vrl_responses(
             .collect()
     };
 
-    let vrl_error_msg = vrl_errors.message();
-    if let Some(msg) = &vrl_error_msg {
+    let query_msgs: Vec<Option<String>> = query_errors.iter().map(|e| e.message()).collect();
+    for msg in query_msgs.iter().flatten() {
         log::error!("[trace_id {trace_id}] Error applying vrl function in multi_stream: {msg}");
     }
 
@@ -1371,7 +1379,13 @@ fn compute_vrl_responses(
 
             resp.hits = hits_for_query;
             resp.query_index = Some(qi);
-            if let Some(msg) = &vrl_error_msg {
+            // The whole-array path has one shared message at index 0.
+            let msg = if apply_over_hits {
+                query_msgs.first()
+            } else {
+                query_msgs.get(qi)
+            };
+            if let Some(Some(msg)) = msg {
                 resp.function_error.push(msg.clone());
             }
             resp
@@ -1564,7 +1578,7 @@ for_each(result) -> |_idx, query_hits| {
     }
 
     #[tokio::test]
-    async fn test_apply_vrl_runtime_error_sets_function_error_on_each_response() {
+    async fn test_apply_vrl_runtime_error_sets_function_error_only_on_failing_query() {
         let vrl_fn = ".x = parse_json!(.m)";
         let (tx, rx) = mpsc::channel(100);
         let mut buffered = vec![
@@ -1585,14 +1599,13 @@ for_each(result) -> |_idx, query_hits| {
 
         let responses = collect_responses(rx).await;
         assert_eq!(responses.len(), 2);
-        for resp in &responses {
-            assert_eq!(resp.function_error.len(), 1);
-            assert!(
-                resp.function_error[0].starts_with("Query function failed on 1 of 2 rows: "),
-                "{:?}",
-                resp.function_error
-            );
-        }
+        assert!(responses[0].function_error.is_empty());
+        assert_eq!(responses[1].function_error.len(), 1);
+        assert!(
+            responses[1].function_error[0].starts_with("Query function failed on 1 of 1 rows: "),
+            "{:?}",
+            responses[1].function_error
+        );
     }
 
     #[tokio::test]

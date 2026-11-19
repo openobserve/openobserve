@@ -48,7 +48,7 @@ vi.mock("@/components/dashboards/PanelEditor/PanelEditor.vue", () => ({
   default: {
     name: "PanelEditor",
     template: '<div data-test="panel-editor" />',
-    emits: ["queryGenerated"],
+    emits: ["queryGenerated", "customQueryModeChanged"],
     mounted(this: any) {
       this.$emit(
         "queryGenerated",
@@ -56,6 +56,10 @@ vi.mock("@/components/dashboards/PanelEditor/PanelEditor.vue", () => ({
       );
     },
     methods: {
+      switchMode(this: any, isCustom: boolean) {
+        this.$parent.dashboardPanelData.data.queries[0].customQuery = isCustom;
+        this.$emit("customQueryModeChanged", isCustom);
+      },
       runQuery(this: any, ...args: unknown[]) {
         panelRuns.push(args);
         panelQueries.push(this.$parent.dashboardPanelData.data.queries[0].query);
@@ -164,27 +168,30 @@ describe(
         await flushPromises();
       };
 
+      const toCustom = async () => {
+        wrapper.vm.buildQueryPageRef.panelEditorRef.switchMode(true);
+        await flushPromises();
+      };
+
       it("keeps the Search query when switching Builder to Custom and seeds the chart query", async () => {
         await openIncomplete();
-        await wrapper.vm.onBuildModeToggle(true);
-        await flushPromises();
+        await toCustom();
 
         const { searchObj, buildDashboardPanelData } = wrapper.vm;
         expect(searchObj.data.query).toBe(where);
         expect(searchObj.data.editorValue).toBe(where);
         expect(buildDashboardPanelData.data.queries[0].query).toBe(
-          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM "fts_a" WHERE ${where} GROUP BY x_axis_1 ORDER BY x_axis_1`,
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM "fts_a" WHERE ${where}\nGROUP BY x_axis_1 ORDER BY x_axis_1`,
         );
       });
 
       const histogramFrom = (from: string) =>
-        `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM ${from} WHERE ${where} GROUP BY x_axis_1 ORDER BY x_axis_1`;
+        `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM ${from} WHERE ${where}\nGROUP BY x_axis_1 ORDER BY x_axis_1`;
 
       it("quotes a stream name that contains a double quote in the seed", async () => {
         await openIncomplete();
         wrapper.vm.searchObj.data.stream.selectedStream = ['we"ird'];
-        await wrapper.vm.onBuildModeToggle(true);
-        await flushPromises();
+        await toCustom();
 
         expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe(
           histogramFrom('"we""ird"'),
@@ -196,8 +203,7 @@ describe(
         await openIncomplete();
         wrapper.vm.searchObj.data.stream.selectedStream = ["fts_a", "fts_b"];
         wrapper.vm.buildDashboardPanelData.data.queries[0].query = "";
-        await wrapper.vm.onBuildModeToggle(true);
-        await flushPromises();
+        await toCustom();
 
         expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe("");
         expect(wrapper.vm.searchObj.data.query).toBe(where);
@@ -212,12 +218,35 @@ describe(
         searchObj.data.query = sql;
         searchObj.data.editorValue = sql;
         await flushPromises();
-        await wrapper.vm.onBuildModeToggle(true);
-        await flushPromises();
+        await toCustom();
 
         expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe(sql);
         expect(searchObj.data.query).toBe(sql);
         expect(searchObj.data.editorValue).toBe(sql);
+      });
+
+      it("puts a trailing line comment before GROUP BY on its own line", async () => {
+        const commented = "NOT (level = 'info') -- keep";
+        showBuild(commented);
+        await vi.waitFor(() =>
+          expect(wrapper.find('[data-test="logs-build-incomplete-filter-notice"]').exists()).toBe(
+            true,
+          ),
+        );
+        await toCustom();
+
+        expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe(
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM "fts_a" WHERE ${commented}\nGROUP BY x_axis_1 ORDER BY x_axis_1`,
+        );
+      });
+
+      it("hides the notice once the panel is in Custom mode", async () => {
+        await openIncomplete();
+        await toCustom();
+
+        expect(wrapper.find('[data-test="logs-build-incomplete-filter-notice"]').exists()).toBe(
+          false,
+        );
       });
 
       it("keeps the Search query when SQL mode is toggled", async () => {

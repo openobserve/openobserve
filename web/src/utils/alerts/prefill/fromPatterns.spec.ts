@@ -281,7 +281,33 @@ describe("buildPrefillFromPatterns", () => {
         }),
       );
 
-      expect(p.warnings.some((w) => w.key === "noConstants" && w.level === "blocking")).toBe(true);
+      expect(p.warnings).toEqual([
+        { key: "patternsShared", level: "warning", params: { count: 1 } },
+        { key: "patternsShared", level: "blocking", params: { count: 1 } },
+        { key: "broadMatch", level: "warning" },
+      ]);
+    });
+
+    it("words the shared-pattern warning with the dropped count", () => {
+      expect(enUS.alerts.prefill.warnings.patternsShared.replace("{count}", "2")).toBe(
+        "2 of the selected patterns share all their text with other patterns, so the alert filter leaves them out.",
+      );
+    });
+
+    it("names the shared patterns dropped from a multi-pattern exclude, apart from textless ones", () => {
+      const p = buildPrefillFromPatterns(
+        patterns({
+          templates: [A, SHARED, "<*> <*>"],
+          allTemplates: [A, B, SHARED, "<*> <*>"],
+          mode: "exclude",
+        }),
+      );
+
+      expect(p.warnings).toEqual([
+        { key: "noConstants", level: "warning" },
+        { key: "patternsShared", level: "warning", params: { count: 1 } },
+        { key: "broadMatch", level: "warning" },
+      ]);
     });
   });
 });

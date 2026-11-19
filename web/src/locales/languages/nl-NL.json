@@ -1928,7 +1928,7 @@
     "freeTextNoTextFields": "Deze stream heeft geen tekstvelden om te doorzoeken.",
     "freeTextNoTextFieldsNamed": "Niet doorzocht: {streams} (geen tekstvelden).",
     "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL.",
-    "filterNotChartableNotice": "Dit filter kan niet in de builder worden weergegeven in een grafiek. Uw zoekfilter is ongewijzigd; schakel over naar Custom SQL om het weer te geven."
+    "filterNotChartableNotice": "Dit filter kan niet in de builder worden weergegeven in een grafiek. Uw zoekfilter is ongewijzigd; schakel over naar {custom} om het weer te geven."
   },
   "menu": {
     "alertCalibration": "Alarmkalibratie",
@@ -13465,6 +13465,7 @@
         "emptyQuery": "Er is geen query om een alarm van te maken.",
         "noQueries": "Dit paneel heeft geen query om een alarm van te maken.",
         "noConstants": "De geselecteerde patronen hebben geen onderscheidende tekst om op te matchen.",
+        "patternsShared": "{count} van de geselecteerde patronen delen al hun tekst met andere patronen en ontbreken daarom in het alertfilter.",
         "sqlModeFilterDropped": "Je SQL-query is niet overgenomen — het alarm komt alleen overeen met de geselecteerde patronen.",
         "patternsUnusable": "Geen van de patronen op deze pagina heeft onderscheidende tekst om op te matchen, dus het alarm gebruikt alleen je zoekopdracht.",
         "dbmRollupLag": "Databasenummers worden elke {minutes} minuten geaggregeerd, dus deze melding kan alleen zo vaak afgaan — het is geen realtime pagina.",

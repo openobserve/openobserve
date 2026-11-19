@@ -786,15 +786,15 @@ function countWhereLeaves(node: any): number {
 const COMPARISON_OPERATORS = ["=", "!=", "<>", "<", ">", "<=", ">="];
 const LITERAL_TYPES = ["number", "bool", "null", "string", "single_quote_string"];
 
-// A leaf the builder cannot hold: a non-column left side (e.g. lower(level)) or a
-// non-literal comparison value (e.g. a = b). Literal lefts (`1=1`) keep charting.
+// A leaf the builder cannot hold: a non-column left side (e.g. lower(level), 1=1) or a
+// non-literal comparison value (e.g. a = b); parseCondition leaves such a field undefined.
 function hasUnchartableLeaf(node: any): boolean {
   if (!node) return false;
   if (node.type === "binary_expr" && (node.operator === "AND" || node.operator === "OR")) {
     return hasUnchartableLeaf(node.left) || hasUnchartableLeaf(node.right);
   }
   if (node.type !== "binary_expr" || !node.left) return false;
-  const leftIsExpr = !node.left.column && !LITERAL_TYPES.includes(node.left.type);
+  const leftIsExpr = !node.left.column;
   const rightIsExpr =
     COMPARISON_OPERATORS.includes(node.operator) && !LITERAL_TYPES.includes(node.right?.type);
   return leftIsExpr || rightIsExpr;

@@ -133,14 +133,30 @@ export const appendSqlFilter = (query: string, filter: string): string => {
   const end = keywords.find(
     (k) => k.kw !== "or" && k.kw !== "where" && (!where || k.index > where.index),
   );
-  const head = query.slice(0, end ? end.index : query.length).trim();
-  const tail = end ? " " + query.slice(end.index) : "";
-  if (!where) return `${head} where ${filter}${tail}`;
+  const codeEnd = lastCodeEnd(query, end ? end.index : query.length);
+  const rest = query.slice(codeEnd).trim();
+  const tail = rest ? " " + rest : "";
+  if (!where) return `${query.slice(0, codeEnd)} where ${filter}${tail}`;
   const condStart = where.index + "where".length;
   const hasOr = keywords.some(
     (k) => k.kw === "or" && k.index > where.index && (!end || k.index < end.index),
   );
-  const conditions = head.slice(condStart).trim();
+  const conditions = query.slice(condStart, codeEnd).trim();
   const wrapped = hasOr ? `(${conditions})` : conditions;
-  return `${head.slice(0, condStart)} ${wrapped} AND ${filter}${tail}`;
+  return `${query.slice(0, condStart)} ${wrapped} AND ${filter}${tail}`;
+};
+
+// Trailing comments stay after the appended filter so a line comment cannot swallow it.
+const lastCodeEnd = (sql: string, limit: number): number => {
+  let last = 0;
+  for (let i = 0; i < limit; i++) {
+    const span = maskedSpanEnd(sql, i);
+    if (span === null) {
+      if (!/\s/.test(sql[i])) last = i + 1;
+    } else {
+      if (!sql.startsWith("--", i) && !sql.startsWith("/*", i)) last = span;
+      i = span - 1;
+    }
+  }
+  return last;
 };

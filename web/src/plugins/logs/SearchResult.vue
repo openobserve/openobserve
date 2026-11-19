@@ -936,7 +936,10 @@ import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
 import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
-import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
+import {
+  extractConstantsFromPattern,
+  FILTER_BLOCKED_MESSAGE,
+} from "@/plugins/logs/patterns/patternUtils";
 import {
   convertLogData,
   convertStackedLogData,
@@ -1409,11 +1412,14 @@ export default defineComponent({
      * surface.
      */
     const createAlertFromPattern = (pattern: any) => {
-      const launched = openAlertCreation(buildSinglePatternAlertPrefill(pattern));
+      const blocked = filterBlockedReason(pattern);
+      const launched = !blocked && openAlertCreation(buildSinglePatternAlertPrefill(pattern));
       if (!launched) {
         toast({
           variant: "warning",
-          message: t("logs.patternList.alertBroadMatch"),
+          message: t(
+            blocked ? FILTER_BLOCKED_MESSAGE[blocked] : "logs.patternList.alertBroadMatch",
+          ),
         });
       }
     };

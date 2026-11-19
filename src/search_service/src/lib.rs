@@ -476,7 +476,7 @@ pub async fn search_multi(
                     } else {
                         multi_res.hits.len()
                     };
-                    let (ret_val, err) = transform::apply_vrl_fn(
+                    let (ret_val, err) = transform::apply_vrl_fn_checked(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -512,7 +512,8 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = transform::apply_vrl_fn(
+                            let rows = hit.as_array().map_or(1, |a| a.len());
+                            let (ret_val, err) = transform::apply_vrl_fn_checked(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -522,7 +523,7 @@ pub async fn search_multi(
                                 org_id,
                                 &stream_names,
                             );
-                            vrl_errors.record(err);
+                            vrl_errors.record_rows(rows, err);
                             flatten_vrl_result(ret_val)
                         })
                         .collect()

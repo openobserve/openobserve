@@ -131,7 +131,7 @@ pub async fn search(
                             .map(json::Value::Object)
                             .collect();
                         let row_count = rows.len();
-                        let (ret_val, err) = transform::apply_vrl_fn(
+                        let (ret_val, err) = transform::apply_vrl_fn_checked(
                             &mut runtime,
                             &VRLResultResolver {
                                 program: program.program.clone(),
@@ -160,7 +160,7 @@ pub async fn search(
                             .into_iter()
                             .filter(|v| !v.is_empty())
                             .filter_map(|hit| {
-                                let (ret_val, err) = transform::apply_vrl_fn(
+                                let (ret_val, err) = transform::apply_vrl_fn_checked(
                                     &mut runtime,
                                     &VRLResultResolver {
                                         program: program.program.clone(),

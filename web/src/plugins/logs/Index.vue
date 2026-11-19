@@ -3435,6 +3435,24 @@ export default defineComponent({
       // Disable query editor in build mode when customQuery is false (builder mode)
       // In builder mode, query is auto-generated from fields - user shouldn't edit directly
       searchObj.meta.buildModeQueryEditorDisabled = !isCustomMode;
+      if (isCustomMode) seedCustomQueryFromHeldFilter();
+    };
+
+    // Builder -> Custom with a filter the builder could not chart: hand the user that filter as SQL.
+    const seedCustomQueryFromHeldFilter = () => {
+      const page = buildQueryPageRef.value as { incompleteFilterNotice?: boolean } | null;
+      const panelQuery = buildDashboardPanelData.data.queries[0];
+      const streams = searchObj.data.stream.selectedStream;
+      if (!page?.incompleteFilterNotice || !panelQuery) return;
+      if (searchObj.meta.sqlMode) {
+        panelQuery.query = searchObj.data.query;
+      } else if (streams.length === 1) {
+        // The WHERE sits on its own line so a trailing `-- comment` cannot swallow GROUP BY.
+        panelQuery.query =
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 ` +
+          `FROM ${quoteIdent(streams[0])} WHERE ${searchObj.data.query}\n` +
+          `GROUP BY x_axis_1 ORDER BY x_axis_1`;
+      }
     };
 
     // Handle build mode toggle from SearchBar (updates panel schema's customQuery)
@@ -3445,19 +3463,7 @@ export default defineComponent({
 
         // Builder → Custom: show the generated SQL in the editor for editing
         if (isCustomMode) {
-          if (isBuildFilterHeld()) {
-            const page = buildQueryPageRef.value as { incompleteFilterNotice?: boolean } | null;
-            const streams = searchObj.data.stream.selectedStream;
-            // The seed names one stream, so several selected streams get no seed.
-            if (page?.incompleteFilterNotice && searchObj.meta.sqlMode) {
-              buildDashboardPanelData.data.queries[0].query = searchObj.data.query;
-            } else if (page?.incompleteFilterNotice && streams.length === 1) {
-              buildDashboardPanelData.data.queries[0].query =
-                `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 ` +
-                `FROM ${quoteIdent(streams[0])} WHERE ${searchObj.data.query} GROUP BY x_axis_1 ORDER BY x_axis_1`;
-            }
-            return;
-          }
+          if (isBuildFilterHeld()) return;
           const generatedQuery = buildDashboardPanelData.data.queries[0]?.query || "";
           if (searchObj.meta.sqlMode) {
             searchObj.data.query = generatedQuery;

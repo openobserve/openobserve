@@ -544,7 +544,7 @@ pub async fn search_multi(
                         .iter()
                         .map(|v| v.as_array().map_or(1, |a| a.len()))
                         .sum();
-                    let (ret_val, err) = transform::apply_vrl_fn(
+                    let (ret_val, err) = transform::apply_vrl_fn_checked(
                         &mut runtime,
                         &VRLResultResolver {
                             program: program.program.clone(),
@@ -604,7 +604,8 @@ pub async fn search_multi(
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = transform::apply_vrl_fn(
+                            let rows = hit.as_array().map_or(1, |a| a.len());
+                            let (ret_val, err) = transform::apply_vrl_fn_checked(
                                 &mut runtime,
                                 &VRLResultResolver {
                                     program: program.program.clone(),
@@ -614,7 +615,7 @@ pub async fn search_multi(
                                 &org_id,
                                 &[vrl_stream_name.clone()],
                             );
-                            vrl_errors.record(err);
+                            vrl_errors.record_rows(rows, err);
 
                             config::utils::flatten::flatten(ret_val).ok()
                         })

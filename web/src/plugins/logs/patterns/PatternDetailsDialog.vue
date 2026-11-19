@@ -86,57 +86,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-secondary me-1 text-xs font-medium tracking-wide uppercase">
               {{ t("logs.patternList.actionsLabel") }}
             </span>
-            <OTooltip :disabled="canFilter" :content="filterBlockedTooltip">
-              <span
-                class="inline-flex"
-                :role="canFilter ? undefined : 'group'"
-                :aria-label="canFilter ? undefined : t('logs.patternList.includeInQuery')"
-                :tabindex="canFilter ? undefined : 0"
-                :aria-describedby="canFilter ? undefined : 'pattern-detail-filter-blocked-reason'"
-                data-test="pattern-detail-include-wrap"
-              >
-                <OButton
-                  variant="primary"
-                  size="xs"
-                  :disabled="!canFilter"
-                  data-test="pattern-detail-include-btn"
-                  @click="onInclude"
-                >
-                  <template #icon-left><EqualIcon class="size-2.5" /></template>
-                  {{ t("logs.patternList.includeInQuery") }}
-                </OButton>
-              </span>
-            </OTooltip>
-            <OTooltip :disabled="canFilter" :content="filterBlockedTooltip">
-              <span
-                class="inline-flex"
-                :role="canFilter ? undefined : 'group'"
-                :aria-label="canFilter ? undefined : t('logs.patternList.excludeFromQuery')"
-                :tabindex="canFilter ? undefined : 0"
-                :aria-describedby="canFilter ? undefined : 'pattern-detail-filter-blocked-reason'"
-                data-test="pattern-detail-exclude-wrap"
-              >
-                <OButton
-                  variant="outline-destructive"
-                  size="xs"
-                  :disabled="!canFilter"
-                  data-test="pattern-detail-exclude-btn"
-                  @click="onExclude"
-                >
-                  <template #icon-left><NotEqualIcon class="size-2.5" /></template>
-                  {{ t("logs.patternList.excludeFromQuery") }}
-                </OButton>
-              </span>
-            </OTooltip>
+            <OButton
+              variant="primary"
+              size="xs"
+              :disabled="!canFilter"
+              focusable-unavailable
+              data-test="pattern-detail-include-btn"
+              @click="onInclude"
+            >
+              <template #icon-left><EqualIcon class="size-2.5" /></template>
+              {{ t("logs.patternList.includeInQuery") }}
+              <OTooltip v-if="!canFilter" :content="filterBlockedTooltip" />
+              <template #unavailable-reason>{{ filterBlockedTooltip }}</template>
+            </OButton>
+            <OButton
+              variant="outline-destructive"
+              size="xs"
+              :disabled="!canFilter"
+              focusable-unavailable
+              data-test="pattern-detail-exclude-btn"
+              @click="onExclude"
+            >
+              <template #icon-left><NotEqualIcon class="size-2.5" /></template>
+              {{ t("logs.patternList.excludeFromQuery") }}
+              <OTooltip v-if="!canFilter" :content="filterBlockedTooltip" />
+              <template #unavailable-reason>{{ filterBlockedTooltip }}</template>
+            </OButton>
             <OTooltip v-if="alertsLocked" :content="alertsLockedReason">
-              <span
-                class="inline-flex"
-                role="group"
-                tabindex="0"
-                :aria-label="t('logs.patternList.createAlertAction')"
-                aria-describedby="pattern-detail-alert-locked-reason"
-                data-test="pattern-detail-create-alert-wrap"
-              >
+              <span class="inline-flex">
                 <OButton
                   variant="warning"
                   size="xs"
@@ -160,27 +137,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="warning"
               size="xs"
               icon-left="notifications"
+              :disabled="!canFilter"
+              focusable-unavailable
               data-test="pattern-detail-create-alert-btn"
               @click="onCreateAlert"
             >
               {{ t("logs.patternList.createAlertAction") }}
+              <OTooltip v-if="!canFilter" :content="filterBlockedTooltip" />
+              <template #unavailable-reason>{{ filterBlockedTooltip }}</template>
             </OButton>
-            <span
-              v-if="!canFilter"
-              id="pattern-detail-filter-blocked-reason"
-              class="sr-only"
-              data-test="pattern-detail-filter-blocked-reason"
-            >
-              {{ filterBlockedTooltip }}
-            </span>
-            <span
-              v-if="alertsLocked"
-              id="pattern-detail-alert-locked-reason"
-              class="sr-only"
-              data-test="pattern-detail-alert-locked-reason"
-            >
-              {{ alertsLockedReason }}
-            </span>
           </div>
 
           <!-- Statistics -->
@@ -202,8 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? t('logs.patternList.exactCountTooltip', {
                               count: volumeCount.toLocaleString(),
                             })
-                          : undefined
+                          : volumeUnavailableTitle
                       "
+                      data-test="pattern-detail-occurrences"
                     >
                       {{ occurrencesLabel }}
                     </div>
@@ -447,7 +413,7 @@ import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
 import analytics from "@/services/product_analytics";
 import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
-import { compactCount } from "./patternUtils";
+import { compactCount, FILTER_BLOCKED_MESSAGE } from "./patternUtils";
 import { PATTERN_VOLUME_CACHE, type PatternVolumeCache } from "./usePatternVolume";
 
 const props = withDefaults(
@@ -462,11 +428,7 @@ const props = withDefaults(
 
 const canFilter = computed(() => !props.filterBlockedReason);
 const filterBlockedTooltip = computed(() =>
-  t(
-    props.filterBlockedReason === "shared"
-      ? "logs.patternList.noDistinctTextTooltip"
-      : "logs.patternList.noMatchTerms",
-  ),
+  t(FILTER_BLOCKED_MESSAGE[props.filterBlockedReason ?? "none"]),
 );
 
 const emit = defineEmits<{
@@ -502,9 +464,15 @@ watch(
   { immediate: true },
 );
 
-const occurrencesLabel = computed(() =>
-  volumeCount.value !== null ? `~${compactCount(volumeCount.value)}` : "…",
-);
+const volumeUnavailableTitle = computed(() => {
+  const reason = volumeEntry.value?.unavailableReason;
+  return reason && volumeCount.value === null ? t(FILTER_BLOCKED_MESSAGE[reason]) : undefined;
+});
+
+const occurrencesLabel = computed(() => {
+  if (volumeCount.value !== null) return `~${compactCount(volumeCount.value)}`;
+  return volumeUnavailableTitle.value ? "—" : "…";
+});
 
 // Row-level actions now live in this side panel. Each fires the action and
 // closes the drawer (include/exclude switch to the logs view; create-alert
@@ -520,7 +488,7 @@ const onExclude = () => {
   emit("update:modelValue", false);
 };
 const onCreateAlert = () => {
-  if (!props.selectedPattern || alertsLocked.value) return;
+  if (!props.selectedPattern || alertsLocked.value || !canFilter.value) return;
   analytics.track("log_patterns_alert_started");
   emit("create-alert", props.selectedPattern.pattern);
   emit("update:modelValue", false);

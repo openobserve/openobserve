@@ -522,10 +522,10 @@ describe("appendSqlFilter", () => {
 
   it("ignores keywords inside comments, escaped quotes and quoted identifiers", () => {
     expect(appendSqlFilter(`${base} WHERE a = 1 /* order by x */`, f)).toBe(
-      `${base} WHERE a = 1 /* order by x */ AND ${f}`,
+      `${base} WHERE a = 1 AND ${f} /* order by x */`,
     );
     expect(appendSqlFilter(`${base} WHERE a = 1 /* ( */ ORDER BY a`, f)).toBe(
-      `${base} WHERE a = 1 /* ( */ AND ${f} ORDER BY a`,
+      `${base} WHERE a = 1 AND ${f} /* ( */ ORDER BY a`,
     );
     expect(appendSqlFilter(`${base} WHERE msg = 'it''s limit 5 or x'`, f)).toBe(
       `${base} WHERE msg = 'it''s limit 5 or x' AND ${f}`,
@@ -538,6 +538,30 @@ describe("appendSqlFilter", () => {
   it("matches keywords case-insensitively across newlines", () => {
     expect(appendSqlFilter(`${base}\nwhere a = 1\nor b = 2\norder\nby a`, f)).toBe(
       `${base}\nwhere (a = 1\nor b = 2) AND ${f} order\nby a`,
+    );
+  });
+
+  it("keeps offsets right for leading whitespace and indented UNION branches", () => {
+    expect(appendSqlFilter(`  ${base} WHERE ${or}`, f)).toBe(`  ${base} WHERE (${or}) AND ${f}`);
+    expect(appendSqlFilter(`\t\n${base} WHERE ${or} LIMIT 1`, f)).toBe(
+      `\t\n${base} WHERE (${or}) AND ${f} LIMIT 1`,
+    );
+    expect(appendSqlFilter(`\n  ${base} WHERE a = 1`, f)).toBe(`\n  ${base} WHERE a = 1 AND ${f}`);
+  });
+
+  it("keeps a trailing comment after the appended filter", () => {
+    expect(appendSqlFilter(`${base} WHERE ${or} -- note`, f)).toBe(
+      `${base} WHERE (${or}) AND ${f} -- note`,
+    );
+    expect(appendSqlFilter(`${base} WHERE a = 1 -- note`, f)).toBe(
+      `${base} WHERE a = 1 AND ${f} -- note`,
+    );
+    expect(appendSqlFilter(`${base} WHERE ${or} /* note */`, f)).toBe(
+      `${base} WHERE (${or}) AND ${f} /* note */`,
+    );
+    expect(appendSqlFilter(`${base} -- note`, f)).toBe(`${base} where ${f} -- note`);
+    expect(appendSqlFilter(`${base} WHERE ${or} -- note\nORDER BY a`, f)).toBe(
+      `${base} WHERE (${or}) AND ${f} -- note\nORDER BY a`,
     );
   });
 

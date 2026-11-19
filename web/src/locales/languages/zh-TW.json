@@ -1928,7 +1928,7 @@
     "freeTextNoTextFields": "此串流沒有可供搜尋的文字欄位。",
     "freeTextNoTextFieldsNamed": "未搜尋：{streams}（沒有文字欄位）。",
     "freeTextBuildNotice": "此篩選條件包含文字搜尋；請在 SQL 中編輯。",
-    "filterNotChartableNotice": "此篩選條件無法在建構器中繪製圖表。您的搜尋篩選條件未變更；請切換至 Custom SQL 以繪製圖表。"
+    "filterNotChartableNotice": "此篩選條件無法在建構器中繪製圖表。您的搜尋篩選條件未變更；請切換至 {custom} 以繪製圖表。"
   },
   "menu": {
     "alertCalibration": "警示校準",
@@ -13460,6 +13460,7 @@
         "emptyQuery": "沒有可用於建立警示的查詢。",
         "noQueries": "此面板沒有可用於建立警示的查詢。",
         "noConstants": "選取的模式沒有可匹配的獨特文字。",
+        "patternsShared": "所選模式中有 {count} 個的全部文字與其他模式相同，因此告警篩選器未包含它們。",
         "sqlModeFilterDropped": "您的 SQL 查詢未沿用 — 警示僅會匹配選取的模式。",
         "patternsUnusable": "此頁面上的模式皆沒有可匹配的獨特文字，因此警示僅使用您的搜尋。",
         "dbmRollupLag": "資料庫數字每 {minutes} 分鐘彙總一次，因此此警示只能在那麼頻繁的情況下觸發 — 它不是即時頁面。",

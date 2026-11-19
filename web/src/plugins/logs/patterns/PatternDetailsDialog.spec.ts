@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { PATTERN_VOLUME_CACHE } from "./usePatternVolume";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -185,6 +186,32 @@ describe("PatternDetailsDialog", () => {
       expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
     });
 
+    it("shows a dash with the reason for Occurrences when the volume has no distinct filter", () => {
+      const w = mount(PatternDetailsDialog, {
+        props: { modelValue: true, selectedPattern: mockSelectedPattern, totalPatterns },
+        global: {
+          ...globalConfig,
+          provide: {
+            store,
+            [PATTERN_VOLUME_CACHE as symbol]: {
+              request: () => Promise.resolve(),
+              get: () => ({
+                buckets: null,
+                total: null,
+                intervalSecs: null,
+                loading: false,
+                unavailableReason: "none",
+              }),
+            },
+          },
+        },
+      });
+      const occurrences = w.find('[data-test="pattern-detail-occurrences"]');
+      expect(occurrences.text()).toBe("—");
+      expect(occurrences.attributes("title")).toBe(enUS.logs.patternList.noMatchTerms);
+      w.unmount();
+    });
+
     describe("include/exclude availability", () => {
       const mountWith = (filterBlockedReason?: "none" | "shared" | null) =>
         mount(PatternDetailsDialog, {
@@ -196,105 +223,56 @@ describe("PatternDetailsDialog", () => {
           },
           global: {
             ...globalConfig,
-            stubs: { ...globalConfig.stubs, OTooltip: ContentTooltipStub },
+            stubs: { ...globalConfig.stubs, OButton, OTooltip: ContentTooltipStub },
           },
         });
-      const filterButtons = (w: any) =>
-        ["pattern-detail-include-btn", "pattern-detail-exclude-btn"].map((id) =>
-          w.findAllComponents(OButtonStub).find((c: any) => c.attributes("data-test") === id),
-        );
-      const filterTooltips = (w: any) =>
-        w
-          .findAll('[data-test-stub="o-tooltip"]')
-          .filter((el: any) =>
-            el
-              .find(
-                '[data-test="pattern-detail-include-btn"],[data-test="pattern-detail-exclude-btn"]',
-              )
-              .exists(),
-          );
+      const IDS = ["include", "exclude", "create-alert"] as const;
+      const btn = (w: any, id: string) => w.find(`[data-test="pattern-detail-${id}-btn"]`);
+      const reasonOf = (w: any, id: string) =>
+        w.find(`#${btn(w, id).attributes("aria-describedby")}`).text();
+      const tooltipOf = (w: any, id: string) =>
+        btn(w, id).find('[data-test-stub="o-tooltip"]').attributes("data-content");
 
-      it("leaves both buttons enabled with the tooltip off by default", () => {
+      it("leaves all three buttons available when nothing is blocked", () => {
         const w = mountWith();
-        expect(filterButtons(w).map((b: any) => b.props("disabled"))).toEqual([false, false]);
-        expect(filterTooltips(w).map((el: any) => el.attributes("data-disabled"))).toEqual([
-          "true",
-          "true",
-        ]);
-        w.unmount();
-      });
-
-      it("disables both with the shared-text reason", () => {
-        const w = mountWith("shared");
-        expect(filterButtons(w).map((b: any) => b.props("disabled"))).toEqual([true, true]);
-        expect(
-          filterTooltips(w).map((el: any) => [
-            el.attributes("data-disabled"),
-            el.attributes("data-content"),
-          ]),
-        ).toEqual([
-          ["false", enUS.logs.patternList.noDistinctTextTooltip],
-          ["false", enUS.logs.patternList.noDistinctTextTooltip],
-        ]);
-        w.unmount();
-      });
-
-      it("makes the blocked buttons focusable and described by the reason", () => {
-        const w = mountWith("shared");
-        const reason = enUS.logs.patternList.noDistinctTextTooltip;
-        for (const id of ["include", "exclude"]) {
-          const wrap = w.find(`[data-test="pattern-detail-${id}-wrap"]`);
-          expect(wrap.attributes("tabindex")).toBe("0");
-          const describedBy = wrap.attributes("aria-describedby")!;
-          expect(w.find(`#${describedBy}`).text()).toBe(reason);
+        for (const id of IDS) {
+          expect(btn(w, id).attributes("aria-disabled")).toBeUndefined();
+          expect(btn(w, id).attributes("aria-describedby")).toBeUndefined();
+          expect(btn(w, id).find('[data-test-stub="o-tooltip"]').exists()).toBe(false);
         }
         w.unmount();
       });
 
-      it("leaves the wrappers out of the tab order when nothing is blocked", () => {
-        const w = mountWith();
-        for (const id of ["include", "exclude"]) {
-          const wrap = w.find(`[data-test="pattern-detail-${id}-wrap"]`);
-          expect(wrap.attributes("tabindex")).toBeUndefined();
-          expect(wrap.attributes("aria-describedby")).toBeUndefined();
-        }
-        expect(w.find('[data-test="pattern-detail-filter-blocked-reason"]').exists()).toBe(false);
-        w.unmount();
-      });
-
-      it("keeps Create alert enabled and clickable when Include/Exclude is blocked", async () => {
-        for (const reason of ["none", "shared"] as const) {
+      it.each([
+        ["shared", enUS.logs.patternList.noDistinctTextTooltip],
+        ["none", enUS.logs.patternList.noMatchTerms],
+      ] as const)(
+        "keeps all three buttons focusable, unavailable and described by the %s reason",
+        (reason, text) => {
           const w = mountWith(reason);
-          const btn = w
-            .findAllComponents(OButtonStub)
-            .find((c: any) => c.attributes("data-test") === "pattern-detail-create-alert-btn");
-          expect(!!btn?.props("disabled")).toBe(false);
-          await w.find('[data-test="pattern-detail-create-alert-btn"]').trigger("click");
-          expect(w.emitted("create-alert")).toHaveLength(1);
+          for (const id of IDS) {
+            expect(btn(w, id).attributes("aria-disabled")).toBe("true");
+            expect(btn(w, id).attributes("disabled")).toBeUndefined();
+            expect(reasonOf(w, id)).toBe(text);
+            expect(tooltipOf(w, id)).toBe(text);
+          }
           w.unmount();
-        }
-      });
+        },
+      );
 
-      it("names each blocked wrapper after its button", () => {
+      it("emits nothing from any blocked button", async () => {
         const w = mountWith("shared");
-        const labels = ["include", "exclude"].map((id) => {
-          const wrap = w.find(`[data-test="pattern-detail-${id}-wrap"]`);
-          return [wrap.attributes("role"), wrap.attributes("aria-label")];
-        });
-        expect(labels).toEqual([
-          ["group", enUS.logs.patternList.includeInQuery],
-          ["group", enUS.logs.patternList.excludeFromQuery],
-        ]);
+        for (const id of IDS) await btn(w, id).trigger("click");
+        expect(w.emitted("add-to-search")).toBeUndefined();
+        expect(w.emitted("create-alert")).toBeUndefined();
+        expect(w.emitted("update:modelValue")).toBeUndefined();
         w.unmount();
       });
 
-      it("disables both with the no-constant-text reason", () => {
-        const w = mountWith("none");
-        expect(filterButtons(w).map((b: any) => b.props("disabled"))).toEqual([true, true]);
-        expect(filterTooltips(w).map((el: any) => el.attributes("data-content"))).toEqual([
-          enUS.logs.patternList.noMatchTerms,
-          enUS.logs.patternList.noMatchTerms,
-        ]);
+      it("emits create-alert when the filter is not blocked", async () => {
+        const w = mountWith(null);
+        await btn(w, "create-alert").trigger("click");
+        expect(w.emitted("create-alert")).toHaveLength(1);
         w.unmount();
       });
     });
@@ -327,11 +305,6 @@ describe("PatternDetailsDialog", () => {
           .find((c: any) => c.attributes("data-test") === "pattern-detail-create-alert-btn");
         expect(btnComponent?.props("disabled")).toBeDefined();
         expect(locked.find('[data-test="pattern-detail-create-alert-lock"]').exists()).toBe(true);
-        const wrap = locked.find('[data-test="pattern-detail-create-alert-wrap"]');
-        expect([wrap.attributes("role"), wrap.attributes("aria-label")]).toEqual([
-          "group",
-          enUS.logs.patternList.createAlertAction,
-        ]);
         await btn.trigger("click");
         expect(locked.emitted("create-alert")).toBeUndefined();
         locked.unmount();

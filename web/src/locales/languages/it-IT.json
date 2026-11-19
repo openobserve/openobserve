@@ -1928,7 +1928,7 @@
     "freeTextNoTextFields": "Questo stream non ha campi di testo da cercare.",
     "freeTextNoTextFieldsNamed": "Non cercati: {streams} (nessun campo di testo).",
     "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL.",
-    "filterNotChartableNotice": "Questo filtro non può essere rappresentato in un grafico nel builder. Il filtro di ricerca è invariato; passa a Custom SQL per visualizzarlo."
+    "filterNotChartableNotice": "Questo filtro non può essere rappresentato in un grafico nel builder. Il filtro di ricerca è invariato; passa a {custom} per visualizzarlo."
   },
   "menu": {
     "alertCalibration": "Calibrazione avvisi",
@@ -13465,6 +13465,7 @@
         "emptyQuery": "Non c'è alcuna query da cui creare un avviso.",
         "noQueries": "Questo pannello non ha una query da cui creare un avviso.",
         "noConstants": "I pattern selezionati non hanno un testo distintivo su cui basare la corrispondenza.",
+        "patternsShared": "{count} dei pattern selezionati condividono tutto il testo con altri pattern, quindi il filtro dell'avviso li esclude.",
         "sqlModeFilterDropped": "La tua query SQL non è stata trasferita — l'avviso corrisponde solo ai pattern selezionati.",
         "patternsUnusable": "Nessuno dei pattern in questa pagina ha un testo distintivo su cui basare la corrispondenza, quindi l'avviso usa solo la tua ricerca.",
         "dbmRollupLag": "I numeri del database vengono aggregati ogni {minutes} minuti, quindi questo avviso può scattare solo con quella frequenza — non è una notifica in tempo reale.",

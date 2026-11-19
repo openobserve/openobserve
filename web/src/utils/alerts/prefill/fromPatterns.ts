@@ -35,6 +35,7 @@ import {
 } from "../alertPrefill";
 import {
   buildPatternSetSqlQuery,
+  patternFilterBlockedReason,
   resolvePatternMatchTerms,
 } from "@/plugins/logs/patterns/patternUtils";
 
@@ -96,9 +97,12 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
   // pattern, have no filter that selects only them; wildcards are per-log samples.
   const allTemplates = input.allTemplates;
   const templates = usable(requested, allTemplates);
-  if (requested.length && templates.length < requested.length) {
-    warnings.push(warn("noConstants", "warning"));
-  }
+  const dropped = requested.filter((t) => !templates.includes(t));
+  const sharedDropped = dropped.filter(
+    (t) => patternFilterBlockedReason(t, allTemplates) === "shared",
+  ).length;
+  if (dropped.length > sharedDropped) warnings.push(warn("noConstants", "warning"));
+  if (sharedDropped) warnings.push(warn("patternsShared", "warning", { count: sharedDropped }));
 
   // With no usable patterns there is nothing to include or exclude, so the alert
   // is simply the user's current search. Degrade to "none" rather than blocking:
@@ -109,7 +113,12 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
   let effectiveMode = mode;
   if (mode !== "none" && !templates.length) {
     if (input.requirePatterns) {
-      warnings.push(warn("noConstants", "blocking"));
+      const allShared = sharedDropped > 0 && sharedDropped === dropped.length;
+      warnings.push(
+        allShared
+          ? warn("patternsShared", "blocking", { count: sharedDropped })
+          : warn("noConstants", "blocking"),
+      );
     } else {
       effectiveMode = "none";
       // Only worth saying when patterns existed but none could be used; a page

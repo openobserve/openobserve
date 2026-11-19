@@ -16,7 +16,12 @@
 import { ref, watch, type Ref } from "vue";
 import searchService from "@/services/search";
 import { extractWhereClause } from "@/utils/query/sqlUtils";
-import { resolvePatternMatchTerms, escapeForMatchAll } from "./patternUtils";
+import {
+  resolvePatternMatchTerms,
+  patternFilterBlockedReason,
+  escapeForMatchAll,
+  type PatternFilterBlock,
+} from "./patternUtils";
 
 /** Context shared by every volume query. */
 export interface PatternVolumeContext {
@@ -287,6 +292,8 @@ export interface PatternVolumeEntry {
   /** Width of each bucket in seconds; null until the volume resolves. */
   intervalSecs: number | null;
   loading: boolean;
+  /** Why no volume can exist for this pattern: no filter selects only its logs. */
+  unavailableReason?: PatternFilterBlock;
 }
 
 /** Stable identity for a pattern across re-renders. */
@@ -334,6 +341,8 @@ export function usePatternVolumeCache(ctx: Ref<PatternVolumeContext | null>) {
         total,
         intervalSecs: result?.intervalSecs ?? null,
         loading: false,
+        unavailableReason:
+          patternFilterBlockedReason(pattern?.template ?? "", c.allTemplates) ?? undefined,
       };
     } catch {
       entry = { buckets: [], total: null, intervalSecs: null, loading: false };

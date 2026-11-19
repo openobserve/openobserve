@@ -1928,7 +1928,7 @@
     "freeTextNoTextFields": "This stream has no text fields to search.",
     "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
     "freeTextBuildNotice": "This filter has text search; edit it in SQL.",
-    "filterNotChartableNotice": "ตัวกรองนี้ไม่สามารถสร้างกราฟในตัวสร้างได้ ตัวกรองการค้นหาของคุณไม่เปลี่ยนแปลง สลับไปที่ Custom SQL เพื่อสร้างกราฟ"
+    "filterNotChartableNotice": "ตัวกรองนี้ไม่สามารถสร้างกราฟในตัวสร้างได้ ตัวกรองการค้นหาของคุณไม่เปลี่ยนแปลง สลับไปที่ {custom} เพื่อสร้างกราฟ"
   },
   "menu": {
     "alertCalibration": "การปรับเทียบการแจ้งเตือน",
@@ -13462,6 +13462,7 @@
         "emptyQuery": "There is no query to create an alert from.",
         "noQueries": "This panel has no query to create an alert from.",
         "noConstants": "The selected patterns have no distinctive text to match on.",
+        "patternsShared": "{count} of the selected patterns share all their text with other patterns, so the alert filter leaves them out.",
         "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
         "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only.",
         "dbmRollupLag": "Database numbers are aggregated every {minutes} minutes, so this alert can only fire that often — it is not a real-time page.",

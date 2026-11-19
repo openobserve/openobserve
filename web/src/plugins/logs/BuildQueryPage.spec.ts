@@ -746,6 +746,30 @@ describe("BuildQueryPage Component", () => {
       expect(mockDashboardPanelData.data.config.table_dynamic_columns).toBe(true);
     });
 
+    it.each(["NOT (level = 'info')", "status BETWEEN 400 AND 450", "lower(level) = 'info'"])(
+      "runs SQL with an unchartable WHERE (%s) as custom SQL and never emits a generated query",
+      async (where) => {
+        const sql = `SELECT * FROM "qb_logs" WHERE ${where}`;
+        wrapper = createWrapper({ isSqlMode: true, searchQuery: sql, selectedStream: "qb_logs" });
+        await flushPromises();
+
+        expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
+        expect(mockDashboardPanelData.data.queries[0].query).toBe(sql);
+        expect(wrapper.emitted("queryGenerated")).toBeFalsy();
+      },
+    );
+
+    it("charts SQL with a WHERE the builder can hold in builder mode", async () => {
+      wrapper = createWrapper({
+        isSqlMode: true,
+        searchQuery: `SELECT * FROM "qb_logs" WHERE level = 'info'`,
+        selectedStream: "qb_logs",
+      });
+      await flushPromises();
+
+      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(false);
+    });
+
     it("should auto-select metric chart type when only Y-axis fields are present", async () => {
       const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
         await import("@/utils/query/sqlQueryParser");

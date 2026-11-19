@@ -22,6 +22,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   resolvePatternMatchTerms,
   patternFilterBlockedReason,
+  FILTER_BLOCKED_MESSAGE,
   escapeForMatchAll,
   patternSeverityKeyForPattern,
   type PatternFilterBlock,
@@ -111,12 +112,9 @@ export const usePatternActions = () => {
     const terms = resolvePatternMatchTerms(pattern.template, allTemplates());
 
     if (!terms) {
-      const shared = filterBlockedReason(pattern) === "shared";
       toast({
         variant: "warning",
-        message: t(
-          shared ? "logs.patternList.noDistinctTextTooltip" : "logs.patternList.noMatchTerms",
-        ),
+        message: t(FILTER_BLOCKED_MESSAGE[filterBlockedReason(pattern) ?? "none"]),
       });
       return;
     }

@@ -20,16 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="logs-build-query-page"
   >
     <OBanner
-      v-if="incompleteFilterNotice"
+      v-if="incompleteFilterNotice && !isCustomQuery"
       variant="warning"
       icon="warning"
       dense
       data-test="logs-build-incomplete-filter-notice"
     >
-      {{ t("search.filterNotChartableNotice") }}
+      {{ t("search.filterNotChartableNotice", { custom: t("panel.custom") }) }}
     </OBanner>
     <OBanner
-      v-else-if="freeTextNotice"
+      v-else-if="freeTextNotice && !isCustomQuery"
       variant="info"
       icon="info"
       dense
@@ -91,7 +91,7 @@ import {
   parsedQueryToPanelFields,
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
-import { parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
+import { extractWhereClause, parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -218,6 +218,8 @@ const {
   makeAutoSQLQuery,
   validatePanel,
 } = useDashboardPanelData("build", t);
+
+const isCustomQuery = computed(() => !!dashboardPanelData.data.queries[0]?.customQuery);
 
 const noticeText = computed(() =>
   props.heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice"),
@@ -471,7 +473,12 @@ const initializeFromQuery = async () => {
       // Try to parse the query
       const parsed = await parseSQL(props.searchQuery, "logs");
 
-      if (parsed.customQuery) {
+      const sqlWhere = parsed.customQuery ? "" : await extractWhereClause(props.searchQuery);
+      // A WHERE the builder cannot hold would chart every row, so run the SQL as written.
+      const whereHeld =
+        !!sqlWhere.trim() && !(await parseWhereClauseToFilterChecked(sqlWhere)).complete;
+
+      if (parsed.customQuery || whereHeld) {
         // Parsing failed or complex query detected
         if (props.selectedStream) {
           dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
