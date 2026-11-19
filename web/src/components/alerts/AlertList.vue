@@ -170,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               table-id="alerts-alert-list"
               :row-class="alertRowClass"
               :get-row-style="alertRowStyle"
+              :active-row-index="landedRowIndex"
               @row-click="triggerExpand"
             >
               <!-- A level from an Overview link has no chip, so it shows as a removable filter here. -->
@@ -1521,6 +1522,7 @@ import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { matchesAnyKey, readFilterKeys, toggleFilterKey } from "@/utils/filterKeys";
 import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
+import { ALERT_LIST_SAVED_NEW, savedAlertId } from "@/utils/alerts/alertListLanding";
 import {
   ALERT_DRAFT_KIND,
   ANOMALY_DRAFT_VARIANT,
@@ -1708,6 +1710,13 @@ export default defineComponent({
     // The current scope's read failed: its rows and counts are unknown, so nothing may claim it is quiet.
     const listLoadFailed = ref(false);
     const oTableRef: any = ref(null);
+    // A save hands its alert here (`?saved=` from the route editor); the list opens on that row's page.
+    const pendingLanding = ref<string | null>(
+      typeof router.currentRoute.value.query.saved === "string"
+        ? router.currentRoute.value.query.saved
+        : null,
+    );
+    const landedRowIndex = ref<number | null>(null);
     // The table's own progress line is the region's one loader while it keeps rows, so the refresh button keeps its age.
     const tableKeepsRows = computed(() => !!oTableRef.value?.keepingRows);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
@@ -3641,6 +3650,47 @@ export default defineComponent({
         }
       }
     };
+    let landingTimer: ReturnType<typeof setTimeout> | undefined;
+    const markLandedRow = (rowIndex: number) => {
+      clearTimeout(landingTimer);
+      landedRowIndex.value = rowIndex;
+      document
+        .querySelector(`[data-test="alert-list-table"] [data-test="o2-table-row-${rowIndex}"]`)
+        ?.scrollIntoView({ block: "center" });
+      landingTimer = setTimeout(() => (landedRowIndex.value = null), 2000);
+    };
+    // Waits for rows read after the save; the table's own reset-on-data-change runs first, hence the timeout.
+    const landOnSavedAlert = () => {
+      const saved = pendingLanding.value;
+      const table = oTableRef.value?.table;
+      if (!saved || !table || loading.value || refreshing.value || !displayedAlerts.value.length)
+        return;
+      pendingLanding.value = null;
+      if (router.currentRoute.value.query.saved !== undefined) {
+        const { saved: _saved, ...rest } = router.currentRoute.value.query;
+        void router.replace({ query: rest });
+      }
+      // The newest across the folder, not the tab: an alert the tab hides must not hand off to another.
+      const id = savedAlertId(
+        (allAlerts.value ?? []).map((r: any) => String(r?.alert_id)),
+        saved,
+        Date.now() / 1000,
+      );
+      const rows = table.getPrePaginationRowModel().rows;
+      const index = rows.findIndex((r: any) => String(r.original?.alert_id) === id);
+      if (!id || index < 0) return;
+      const page = Math.floor(index / pageSize.value) + 1;
+      currentPage.value = page;
+      setTimeout(async () => {
+        oTableRef.value?.restorePage?.(page);
+        await nextTick();
+        markLandedRow(rows[index].index);
+      }, 0);
+    };
+    watch([pendingLanding, displayedAlerts, loading, refreshing, oTableRef], landOnSavedAlert, {
+      flush: "post",
+    });
+    onBeforeUnmount(() => clearTimeout(landingTimer));
     // Unfiltered: a tile or search left set would hide the new, never-evaluated alert. Scope goes first,
     // or the forced read refreshes the org-wide list and the folder reopens from its pre-save cache.
     const showSavedAlert = async (folderId: string) => {
@@ -3858,6 +3908,7 @@ export default defineComponent({
     };
     const refreshList = async (folderId?: string, options?: AlertSavedOptions) => {
       const resolvedFolderId = folderId || activeFolderId.value || "default";
+      const { action, alert_id: editedId } = router.currentRoute.value.query;
       // An editor save lands here, and the editor opens alerts from their detail
       // cache (getAlertById): mark those stale, or a reopen within a minute shows
       // the pre-save copy.
@@ -3874,6 +3925,8 @@ export default defineComponent({
       }
       await showSavedAlert(resolvedFolderId);
       await hideForm();
+      pendingLanding.value =
+        action === "update" && editedId ? String(editedId) : ALERT_LIST_SAVED_NEW;
     };
     const hideForm = async () => {
       showAddAlertDialog.value = false;
@@ -5062,6 +5115,7 @@ export default defineComponent({
       recencyLevel,
       alertRowClass,
       alertRowStyle,
+      landedRowIndex,
       typeIconName,
       typeIconClass,
       isSloRow,

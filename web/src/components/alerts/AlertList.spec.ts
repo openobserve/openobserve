@@ -1426,6 +1426,26 @@ describe("AlertList - pagination restoration", () => {
     expect(wrapper.vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
   });
 
+  it("a save hand-off opens on the saved alert's page and marks its row", async () => {
+    (store.state as any).organizationData.allAlertsListByFolderId = {};
+    alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 1 });
+    router.currentRoute.value.query = { state: ALERT_LIST_ALL_STATES, saved: "alert-12" };
+    const replace = vi.spyOn(router, "replace");
+    const wrapper: any = await mountAlertList({ keepRoute: true });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+
+    const table = wrapper.vm.oTableRef.table;
+    const rows = table.getPrePaginationRowModel().rows;
+    const at = rows.findIndex((r: any) => r.original.alert_id === "alert-12");
+    expect(table.getState().pagination.pageIndex).toBe(Math.floor(at / 5));
+    expect(wrapper.vm.landedRowIndex).toBe(rows[at].index);
+    expect(replace).toHaveBeenCalledWith({ query: { state: ALERT_LIST_ALL_STATES } });
+    replace.mockRestore();
+  });
+
   it("resets the persisted page on a folder switch so it is not restored onto the new folder", async () => {
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
