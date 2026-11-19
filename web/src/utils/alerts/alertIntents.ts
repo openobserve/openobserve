@@ -842,6 +842,20 @@ export function familyMember(
   return { labels, whole: series.every((one) => labels.some((l) => carries(one, l))) };
 }
 
+/** Candidate labels grouped with their other spellings, each group once, in candidate order. */
+export function labelSpellings(
+  candidates: readonly string[],
+  series: readonly SeriesLabels[],
+): string[][] {
+  const taken = new Set<string>();
+  return candidates.flatMap((name) => {
+    if (taken.has(name)) return [];
+    const spellings = familyMember(name, series)?.labels ?? [name];
+    spellings.forEach((l) => taken.add(l));
+    return [spellings];
+  });
+}
+
 /** Label names of a metric's series, each with its distinct values and the share of series carrying it. */
 export function labelProfile(series: readonly SeriesLabels[]) {
   const profile = new Map<string, { values: Map<string, number>; series: number }>();

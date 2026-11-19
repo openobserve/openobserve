@@ -29,6 +29,7 @@ import {
   patternText,
   labelProfile,
   familyMember,
+  labelSpellings,
   metricFamilySiblings,
   rankCategory,
   rankGroup,
@@ -401,6 +402,9 @@ describe("alertIntents", () => {
       whole: true,
     });
     expect(familyMember("cpu", series("mode", ["idle"]))).toBeUndefined();
+    expect(
+      labelSpellings(["http_response_status_code", "service_name", "http_status_code"], mixed),
+    ).toEqual([["http_response_status_code", "http_status_code"], ["service_name"]]);
     expect(
       familyMember("code", [{ code: "500" }, { code: "200", status_code: "200" }, { pod: "a" }]),
     ).toEqual({ labels: ["code"], whole: false });

@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               searchable
               :placeholder="t('alerts.intent.slots.labelPrompt')"
               :aria-label="t('alerts.intent.slots.label')"
-              :dropdown-style="SLOT_MENU"
+              :dropdown-style="LABEL_MENU"
               data-test="add-alert-intent-slot-label"
               @update:model-value="setSlot('label', $event)"
             />
@@ -359,6 +359,7 @@ import {
   patternText,
   labelProfile,
   familyMember,
+  labelSpellings,
   metricFamilySiblings,
   rankCategory,
   rankGroup,
@@ -430,6 +431,8 @@ const ALL_SUGGESTIONS = 50;
 const NO_GROUP = "__none__";
 // The inline slot is as narrow as its word, so its menu takes room for full field names.
 const SLOT_MENU = { minWidth: "min(18rem, calc(100vw - 2rem))" };
+// Room for two spellings of one label side by side.
+const LABEL_MENU = { minWidth: "min(28rem, calc(100vw - 2rem))" };
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const isMetrics = computed(() => props.streamType === "metrics");
@@ -638,15 +641,18 @@ const family = computed<MetricFamilyMember[]>(() => {
   };
   return label ? [own, ...siblings.value.flatMap(memberOf)] : [own];
 });
+// The other naming generations are named before a label is picked, not only once it is.
 const familyText = computed(() =>
-  family.value.slice(1).map((m) =>
-    m.labels.length === 1 && m.labels[0] === slots.label
-      ? m.metric
-      : t("alerts.intent.ratio.memberReads", {
-          metric: raw(m.metric),
-          labels: joinListOrMore(m.labels, t),
-        }),
-  ),
+  slots.label
+    ? family.value.slice(1).map((m) =>
+        m.labels.length === 1 && m.labels[0] === slots.label
+          ? m.metric
+          : t("alerts.intent.ratio.memberReads", {
+              metric: raw(m.metric),
+              labels: joinListOrMore(m.labels, t),
+            }),
+      )
+    : [...siblings.value],
 );
 const labelValues = computed(
   () => profile.value.find((p) => p.label === slots.label)?.values ?? [],
@@ -680,7 +686,15 @@ const groupOptions = computed<SelectOption[]>(() => [
   ...asOptions(groupCandidates.value.all),
 ]);
 const measureOptions = computed(() => asOptions(measureCandidates.value.all));
-const labelOptions = computed(() => asOptions(categoryCandidates.value.all));
+// Spellings of one label from two naming generations are read together, so they are one choice.
+const labelOptions = computed<SelectOption[]>(() =>
+  labelSpellings(categoryCandidates.value.all, series.value[props.streamName] ?? []).map(
+    (spellings) => ({
+      label: spellings.length > 1 ? joinListOrMore(spellings, t) : raw(spellings[0]),
+      value: spellings.find((l) => l === slots.label) ?? spellings[0],
+    }),
+  ),
+);
 const valueSource = computed(() => (isMetrics.value ? slots.label : slots.field));
 // The top values come back capped, so a typed search also asks the server for values containing it.
 const valueSearch = ref("");
