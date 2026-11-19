@@ -67,7 +67,10 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // The last autoCompleteData the component created, so tests can read the stream context it was given.
-const suggestState = vi.hoisted(() => ({ autoCompleteData: null as any }));
+const suggestState = vi.hoisted(() => ({
+  autoCompleteData: null as any,
+  setValuesTimeRange: vi.fn(),
+}));
 
 vi.mock("@/composables/useSuggestions", () => ({
   default: () => ({
@@ -85,6 +88,7 @@ vi.mock("@/composables/useSuggestions", () => ({
     getSuggestions: vi.fn(),
     updateFieldKeywords: vi.fn(),
     updateStreamKeywords: vi.fn(),
+    setValuesTimeRange: suggestState.setValuesTimeRange,
   }),
 }));
 
@@ -387,6 +391,7 @@ const sharedStubs = {
       "hideNlToggle",
       "nlpMode",
       "transformGeneratedQuery",
+      "valuesTimeRange",
     ],
     emits: ["update:query", "run-query", "focus", "blur", "user-edit", "update:nlpMode"],
     setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
@@ -1415,6 +1420,52 @@ describe("SearchBar", () => {
     });
   });
 
+  describe("share link of an unrun query", () => {
+    const shareBtn = () => wrapper.find('[data-test="logs-search-bar-share-link-btn"]');
+    const markRun = () => {
+      searchObjInstance.meta.lastRunSignature = tracesSearchRunSignature(searchObjInstance);
+    };
+    const mountWithShare = () =>
+      mount(SearchBar, {
+        attachTo: "#app",
+        props: { fieldValues: {}, isLoading: false },
+        global: { plugins: [store, router], stubs: { ...sharedStubs, ShareButton: false } },
+      });
+
+    beforeEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, web_url: "http://localhost" };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, web_url: "" };
+    });
+
+    it("disables Share with the Logs reason once an edited filter waits for Run", async () => {
+      markRun();
+      wrapper = mountWithShare();
+      await flushPromises();
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
+
+      searchObjInstance.data.editorValue = "operation_name = 'POST /checkout'";
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+      expect(shareBtn().text()).toContain("search.autoRunPersistNeedsRun");
+
+      markRun();
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
+    });
+
+    it("disables Share before the first run", async () => {
+      wrapper = mountWithShare();
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+    });
+  });
+
   describe("toolbar collapse stages", () => {
     let widthSpy: ReturnType<typeof mockToolbarWidth>;
     const { isPinned, togglePin } = useToolbarPins("traces");
@@ -1770,6 +1821,44 @@ describe("SearchBar", () => {
       await flushPromises();
 
       expect(editorProps().props("filterMode")).toBe(true);
+    });
+
+    it("looks up values over the selected range, cut to its latest day", async () => {
+      const HOUR = 3_600_000_000;
+      const end = 29_000_000 * 60_000_000;
+      searchObjInstance.data.datetime.type = "absolute";
+      searchObjInstance.data.datetime.startTime = end - 7 * 24 * HOUR;
+      searchObjInstance.data.datetime.endTime = end;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const window = { startTime: end - 24 * HOUR, endTime: end, capped: true };
+      const readRange = suggestState.setValuesTimeRange.mock.calls.at(-1)![0];
+      expect(readRange()).toEqual(window);
+      expect(editorProps().props("valuesTimeRange")).toEqual(window);
+    });
+
+    it("looks up a relative range from the time of the lookup", async () => {
+      const MINUTE = 60_000_000;
+      const end = 29_000_000 * MINUTE;
+      searchObjInstance.data.datetime.type = "relative";
+      searchObjInstance.data.datetime.startTime = end - 15 * MINUTE;
+      searchObjInstance.data.datetime.endTime = end;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime((end + 60 * MINUTE) / 1000);
+        const readRange = suggestState.setValuesTimeRange.mock.calls.at(-1)![0];
+        expect(readRange()).toEqual({
+          startTime: end + 45 * MINUTE,
+          endTime: end + 60 * MINUTE,
+          capped: false,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("hands the query to suggestions after 100 ms, as Logs does", async () => {

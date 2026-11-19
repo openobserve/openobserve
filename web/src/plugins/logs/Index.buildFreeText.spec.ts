@@ -48,7 +48,7 @@ vi.mock("@/components/dashboards/PanelEditor/PanelEditor.vue", () => ({
   default: {
     name: "PanelEditor",
     template: '<div data-test="panel-editor" />',
-    emits: ["queryGenerated"],
+    emits: ["queryGenerated", "customQueryModeChanged"],
     mounted(this: any) {
       this.$emit(
         "queryGenerated",
@@ -56,6 +56,10 @@ vi.mock("@/components/dashboards/PanelEditor/PanelEditor.vue", () => ({
       );
     },
     methods: {
+      switchMode(this: any, isCustom: boolean) {
+        this.$parent.dashboardPanelData.data.queries[0].customQuery = isCustom;
+        this.$emit("customQueryModeChanged", isCustom);
+      },
       runQuery(this: any, ...args: unknown[]) {
         panelRuns.push(args);
         panelQueries.push(this.$parent.dashboardPanelData.data.queries[0].query);
@@ -149,6 +153,113 @@ describe(
       await vi.waitFor(() => expect(wrapper.vm.autoRun.engine.hasPendingRequest()).toBe(false));
       await flushPromises();
     };
+
+    describe("a filter the builder cannot chart", () => {
+      const where = "NOT (level = 'info')";
+      const openIncomplete = async () => {
+        showBuild(where);
+        await vi.waitFor(
+          () =>
+            expect(wrapper.find('[data-test="logs-build-incomplete-filter-notice"]').exists()).toBe(
+              true,
+            ),
+          { timeout: 15000 },
+        );
+        await flushPromises();
+      };
+
+      const toCustom = async () => {
+        wrapper.vm.buildQueryPageRef.panelEditorRef.switchMode(true);
+        await flushPromises();
+      };
+
+      it("keeps the Search query when switching Builder to Custom and seeds the chart query", async () => {
+        await openIncomplete();
+        await toCustom();
+
+        const { searchObj, buildDashboardPanelData } = wrapper.vm;
+        expect(searchObj.data.query).toBe(where);
+        expect(searchObj.data.editorValue).toBe(where);
+        expect(buildDashboardPanelData.data.queries[0].query).toBe(
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM "fts_a" WHERE ${where}\nGROUP BY x_axis_1 ORDER BY x_axis_1`,
+        );
+      });
+
+      const histogramFrom = (from: string) =>
+        `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM ${from} WHERE ${where}\nGROUP BY x_axis_1 ORDER BY x_axis_1`;
+
+      it("quotes a stream name that contains a double quote in the seed", async () => {
+        await openIncomplete();
+        wrapper.vm.searchObj.data.stream.selectedStream = ['we"ird'];
+        await toCustom();
+
+        expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe(
+          histogramFrom('"we""ird"'),
+        );
+        expect(wrapper.vm.searchObj.data.query).toBe(where);
+      });
+
+      it("seeds nothing and keeps Search when several streams are selected", async () => {
+        await openIncomplete();
+        wrapper.vm.searchObj.data.stream.selectedStream = ["fts_a", "fts_b"];
+        wrapper.vm.buildDashboardPanelData.data.queries[0].query = "";
+        await toCustom();
+
+        expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe("");
+        expect(wrapper.vm.searchObj.data.query).toBe(where);
+        expect(wrapper.vm.searchObj.data.editorValue).toBe(where);
+      });
+
+      it("seeds the custom query with the Search SQL in SQL mode and keeps Search", async () => {
+        await openIncomplete();
+        const sql = `SELECT * FROM "fts_a" WHERE ${where}`;
+        const { searchObj } = wrapper.vm;
+        searchObj.meta.sqlMode = true;
+        searchObj.data.query = sql;
+        searchObj.data.editorValue = sql;
+        await flushPromises();
+        await toCustom();
+
+        expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe(sql);
+        expect(searchObj.data.query).toBe(sql);
+        expect(searchObj.data.editorValue).toBe(sql);
+      });
+
+      it("puts a trailing line comment before GROUP BY on its own line", async () => {
+        const commented = "NOT (level = 'info') -- keep";
+        showBuild(commented);
+        await vi.waitFor(() =>
+          expect(wrapper.find('[data-test="logs-build-incomplete-filter-notice"]').exists()).toBe(
+            true,
+          ),
+        );
+        await toCustom();
+
+        expect(wrapper.vm.buildDashboardPanelData.data.queries[0].query).toBe(
+          `SELECT histogram(_timestamp) as x_axis_1, count(_timestamp) as y_axis_1 FROM "fts_a" WHERE ${commented}\nGROUP BY x_axis_1 ORDER BY x_axis_1`,
+        );
+      });
+
+      it("hides the notice once the panel is in Custom mode", async () => {
+        await openIncomplete();
+        await toCustom();
+
+        expect(wrapper.find('[data-test="logs-build-incomplete-filter-notice"]').exists()).toBe(
+          false,
+        );
+      });
+
+      it("keeps the Search query when SQL mode is toggled", async () => {
+        await openIncomplete();
+        wrapper.vm.searchObj.meta.sqlMode = true;
+        await flushPromises();
+        wrapper.vm.searchObj.meta.sqlMode = false;
+        await flushPromises();
+
+        expect(wrapper.vm.searchObj.data.query).toBe(where);
+        expect(wrapper.vm.searchObj.data.editorValue).toBe(where);
+      });
+    });
 
     it("disables Run, and a Run click or Ctrl+Enter sends no search", async () => {
       await openBuildWith("NOT timeout");

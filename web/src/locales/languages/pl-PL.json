@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "Wybrane strumienie nie mają pól pełnotekstowych",
     "freeTextNoTextFields": "Ten strumień nie ma pól tekstowych do przeszukania.",
     "freeTextNoTextFieldsNamed": "Nie przeszukano: {streams} (brak pól tekstowych).",
-    "freeTextBuildNotice": "Ten filtr zawiera wyszukiwanie tekstowe; edytuj go w SQL."
+    "freeTextBuildNotice": "Ten filtr zawiera wyszukiwanie tekstowe; edytuj go w SQL.",
+    "filterNotChartableNotice": "Tego filtra nie można przedstawić na wykresie w kreatorze. Filtr wyszukiwania pozostał bez zmian; przełącz na {custom}, aby go przedstawić na wykresie."
   },
   "menu": {
     "alertCalibration": "Kalibracja alertów",
@@ -12949,6 +12950,7 @@
         "emptyQuery": "Brak zapytania, na podstawie którego można utworzyć alert.",
         "noQueries": "Ten panel nie ma zapytania, na podstawie którego można utworzyć alert.",
         "noConstants": "Wybrane wzorce nie mają charakterystycznego tekstu do dopasowania.",
+        "patternsShared": "{count} z wybranych wzorców ma cały tekst wspólny z innymi wzorcami, więc filtr alertu je pomija.",
         "sqlModeFilterDropped": "Twoje zapytanie SQL nie zostało przeniesione — alert dopasowuje tylko wybrane wzorce.",
         "patternsUnusable": "Żaden ze wzorców na tej stronie nie ma charakterystycznego tekstu do dopasowania, więc alert używa tylko Twojego wyszukiwania.",
         "dbmRollupLag": "Liczby bazy danych są agregowane co {minutes} min, więc ten alert może się wyzwalać tylko z taką częstotliwością — to nie jest wezwanie w czasie rzeczywistym.",
@@ -20192,6 +20194,7 @@
       "excludeFromQuery": "Wyklucz",
       "createAlertAction": "Utwórz alert",
       "noMatchTerms": "Ten wzorzec nie ma charakterystycznego tekstu do filtrowania.",
+      "noDistinctTextTooltip": "Każdy stały fragment tekstu w tym wzorcu występuje także w innym wzorcu, więc filtr dopasowałby również ich logi.",
       "noStreamSelected": "Nie wybrano strumienia. Wybierz strumień przed utworzeniem alertu.",
       "alertBroadMatch": "Ten wzorzec nie ma charakterystycznego stałego tekstu — zapytanie alertu będzie pasować szeroko. Rozważ dodanie ręcznych filtrów."
     },

@@ -801,6 +801,29 @@ describe("BuildQueryPage Component", () => {
       expect(mockDashboardPanelData.data.queries[0].query).toBe(query);
     });
 
+    it("should drop a parse result that resolves after a newer initialisation", async () => {
+      const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
+        await import("@/utils/query/sqlQueryParser");
+      let resolveStale: (value: unknown) => void = () => {};
+      vi.mocked(parseSQL)
+        .mockReturnValueOnce(new Promise((resolve) => (resolveStale = resolve)))
+        .mockResolvedValueOnce({ customQuery: true } as Awaited<ReturnType<typeof parseSQL>>);
+      vi.mocked(shouldUseCustomMode).mockReturnValueOnce(false).mockReturnValueOnce(false);
+      const query = 'SELECT service, count(*) FROM "test_stream" GROUP BY service';
+
+      wrapper = createWrapper({ searchQuery: query, selectedStream: "test_stream" });
+      await flushPromises();
+      searchState().searchObj.meta.savedBuildConfig = { config: {} };
+      await flushPromises();
+      resolveStale({ customQuery: false, stream: "test_stream" });
+      await flushPromises();
+
+      expect(parseSQL).toHaveBeenCalledTimes(2);
+      expect(parsedQueryToPanelFields).not.toHaveBeenCalled();
+      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
+      expect(mockDashboardPanelData.data.queries[0].query).toBe(query);
+    });
+
     it("should carry the parsed LIMIT into the builder query config", async () => {
       const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
         await import("@/utils/query/sqlQueryParser");
@@ -823,9 +846,9 @@ describe("BuildQueryPage Component", () => {
         searchQuery: 'SELECT service, count(*) FROM "test_stream" GROUP BY service LIMIT 2',
         selectedStream: "test_stream",
       });
-      await flushPromises();
-
-      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(false);
+      await vi.waitFor(() =>
+        expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(false),
+      );
       expect(mockDashboardPanelData.data.queries[0].config.limit).toBe(2);
     });
 
@@ -856,27 +879,28 @@ describe("BuildQueryPage Component", () => {
       expect(mockDashboardPanelData.data.queries[0].config.limit).toBe(7);
     });
 
-    it("should drop a parse result that resolves after a newer initialisation", async () => {
-      const { parsedQueryToPanelFields, shouldUseCustomMode, parseSQL } =
-        await import("@/utils/query/sqlQueryParser");
-      let resolveStale: (value: unknown) => void = () => {};
-      vi.mocked(parseSQL)
-        .mockReturnValueOnce(new Promise((resolve) => (resolveStale = resolve)))
-        .mockResolvedValueOnce({ customQuery: true } as Awaited<ReturnType<typeof parseSQL>>);
-      vi.mocked(shouldUseCustomMode).mockReturnValueOnce(false).mockReturnValueOnce(false);
-      const query = 'SELECT service, count(*) FROM "test_stream" GROUP BY service';
+    it.each(["NOT (level = 'info')", "status BETWEEN 400 AND 450", "lower(level) = 'info'"])(
+      "runs SQL with an unchartable WHERE (%s) as custom SQL and never emits a generated query",
+      async (where) => {
+        const sql = `SELECT * FROM "qb_logs" WHERE ${where}`;
+        wrapper = createWrapper({ isSqlMode: true, searchQuery: sql, selectedStream: "qb_logs" });
+        await flushPromises();
 
-      wrapper = createWrapper({ searchQuery: query, selectedStream: "test_stream" });
-      await flushPromises();
-      searchState().searchObj.meta.savedBuildConfig = { config: {} };
-      await flushPromises();
-      resolveStale({ customQuery: false, stream: "test_stream" });
+        expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
+        expect(mockDashboardPanelData.data.queries[0].query).toBe(sql);
+        expect(wrapper.emitted("queryGenerated")).toBeFalsy();
+      },
+    );
+
+    it("charts SQL with a WHERE the builder can hold in builder mode", async () => {
+      wrapper = createWrapper({
+        isSqlMode: true,
+        searchQuery: `SELECT * FROM "qb_logs" WHERE level = 'info'`,
+        selectedStream: "qb_logs",
+      });
       await flushPromises();
 
-      expect(parseSQL).toHaveBeenCalledTimes(2);
-      expect(parsedQueryToPanelFields).not.toHaveBeenCalled();
-      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
-      expect(mockDashboardPanelData.data.queries[0].query).toBe(query);
+      expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(false);
     });
 
     it("should auto-select metric chart type when only Y-axis fields are present", async () => {
@@ -1108,6 +1132,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
   afterEach(() => wrapper?.unmount());
 
   const notice = () => wrapper.find('[data-test="logs-build-free-text-notice"]');
+  const incompleteNotice = () => wrapper.find('[data-test="logs-build-incomplete-filter-notice"]');
   const initialized = () => vi.waitFor(() => expect(wrapper.emitted("initialized")).toBeTruthy());
 
   it("keeps rendered match_all units as builder conditions and runs", async () => {
@@ -1143,6 +1168,23 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     expect(notice().text()).toContain("search.freeTextBuildNotice");
     expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
     expect(wrapper.emitted("initialized")).toBeTruthy();
+  });
+
+  it("shows the not-chartable notice and never applies a partial filter without free text", async () => {
+    wrapper = createWrapper({
+      isSqlMode: false,
+      selectedStream: "fts_a",
+      whereClause: "NOT (level = 'info')",
+      freeTextFilter: false,
+    });
+    await initialized();
+    await flushPromises();
+
+    expect(incompleteNotice().exists()).toBe(true);
+    expect(notice().exists()).toBe(false);
+    expect(incompleteNotice().text()).toContain("search.filterNotChartableNotice");
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+    expect(wrapper.emitted("queryGenerated")).toBeFalsy();
   });
 
   it("refuses Run after the notice: no panel run opens and the editor never queries", async () => {
@@ -1298,7 +1340,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
   });
 
-  it("leaves a SQL filter on today's path", async () => {
+  it("holds back a SQL filter the builder cannot represent", async () => {
     wrapper = createWrapper({
       isSqlMode: false,
       selectedStream: "fts_a",
@@ -1308,7 +1350,7 @@ describe("BuildQueryPage - text search WHERE (AC6.6)", () => {
     await initialized();
     await flushPromises();
 
-    expect(notice().exists()).toBe(false);
-    expect(mockMakeAutoSQLQuery).toHaveBeenCalled();
+    expect(incompleteNotice().exists()).toBe(true);
+    expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
   });
 });

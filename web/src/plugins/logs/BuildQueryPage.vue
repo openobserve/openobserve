@@ -20,13 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="logs-build-query-page"
   >
     <OBanner
-      v-if="freeTextNotice"
+      v-if="incompleteFilterNotice && !isCustomQuery"
+      variant="warning"
+      icon="warning"
+      dense
+      data-test="logs-build-incomplete-filter-notice"
+    >
+      {{ t("search.filterNotChartableNotice", { custom: t("panel.custom") }) }}
+    </OBanner>
+    <OBanner
+      v-else-if="freeTextNotice && !isCustomQuery"
       variant="info"
       icon="info"
       dense
       data-test="logs-build-free-text-notice"
     >
-      {{ heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice") }}
+      {{ noticeText }}
     </OBanner>
     <OBanner
       v-if="parserLoadFailed || retryingParser"
@@ -82,7 +91,7 @@ import {
   parsedQueryToPanelFields,
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
-import { parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
+import { extractWhereClause, parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -195,6 +204,7 @@ const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 const freeTextNotice = ref(false);
+const incompleteFilterNotice = ref(false);
 const parserLoadFailed = ref(false);
 const retryingParser = ref(false);
 const needsFilterInit = () =>
@@ -210,6 +220,12 @@ const {
   makeAutoSQLQuery,
   validatePanel,
 } = useDashboardPanelData("build", t);
+
+const isCustomQuery = computed(() => !!dashboardPanelData.data.queries[0]?.customQuery);
+
+const noticeText = computed(() =>
+  props.heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice"),
+);
 
 const runBlocked = computed(
   () =>
@@ -276,6 +292,7 @@ const restoreConfigFromUrl = (): {
 const initializeFromQuery = async () => {
   const seq = ++initSeq;
   freeTextNotice.value = false;
+  incompleteFilterNotice.value = false;
   parserLoadFailed.value = false;
   filterInitPending.value = needsFilterInit();
   holdGeneratedQuery.value = !props.isSqlMode && props.freeTextFilter;
@@ -394,7 +411,8 @@ const initializeFromQuery = async () => {
       }
       const { filter, complete } = parsed;
       if (seq !== initSeq) return;
-      if (freeTextFilter && (!whereClause?.trim() || !complete)) {
+      if ((freeTextFilter && !whereClause?.trim()) || !complete) {
+        incompleteFilterNotice.value = !freeTextFilter;
         freeTextNotice.value = true;
         filterInitPending.value = false;
         emit("initialized");
@@ -468,7 +486,13 @@ const initializeFromQuery = async () => {
       if (seq !== initSeq) return;
       holdGeneratedQuery.value = false;
 
-      if (parsed.customQuery) {
+      const sqlWhere = parsed.customQuery ? "" : await extractWhereClause(searchQuery);
+      // A WHERE the builder cannot hold would chart every row, so run the SQL as written.
+      const whereHeld =
+        !!sqlWhere.trim() && !(await parseWhereClauseToFilterChecked(sqlWhere)).complete;
+      if (seq !== initSeq) return;
+
+      if (parsed.customQuery || whereHeld) {
         // Parsing failed or complex query detected
         if (props.selectedStream) {
           dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
@@ -697,5 +721,7 @@ defineExpose({
   runBlocked,
   panelEditorRef,
   dashboardPanelData,
+  freeTextNotice,
+  incompleteFilterNotice,
 });
 </script>

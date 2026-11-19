@@ -19,6 +19,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { nextTick } from "vue";
+import { applyFilterTerm } from "@/utils/traces/filterUtils";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -276,7 +277,8 @@ function mountIndexList(props: Record<string, unknown> = {}) {
           ],
         },
         FieldExpansion: {
-          template: '<div data-test="field-expansion">Field Expansion<slot name="caption" /></div>',
+          template:
+            '<div data-test="field-expansion">Field Expansion<slot name="caption" /><slot name="body" /></div>',
           methods: { reset: fieldExpansionReset },
           props: [
             "field",
@@ -812,6 +814,63 @@ describe("IndexList Component", () => {
 
   // ─── handleAddSearchTerm / handleAddMultipleSearchTerms quote escaping ────
 
+  describe("duration percentile filters", () => {
+    it("filters on the exact microseconds while the label stays rounded", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({
+        fieldList: [{ name: "duration", label: "Duration", showValues: true, ftsKey: false }],
+      });
+      await flushPromises();
+      (wrapper.vm as any).durationPercentiles = {
+        p25: 1000,
+        p50: 2000,
+        p75: 3000,
+        p95: 4000,
+        p99: 5000,
+        max: 1234567,
+      };
+      await flushPromises();
+
+      const atMost = wrapper
+        .findAll("button")
+        .find((b) => b.attributes("title") === "duration <= 1.23s");
+      expect(atMost, "the Max row's ≤ button keeps its rounded label").toBeTruthy();
+      await atMost!.trigger("click");
+      expect((wrapper.vm as any).searchObj.data.stream.addToFilter).toBe("duration<=1234567");
+
+      const atLeast = wrapper
+        .findAll("button")
+        .find((b) => b.attributes("title") === "duration >= 5.00ms");
+      await atLeast!.trigger("click");
+      expect((wrapper.vm as any).searchObj.data.stream.addToFilter).toBe("duration>=5000");
+    });
+
+    it("offers no filter for a percentile the server did not return", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({
+        fieldList: [{ name: "duration", label: "Duration", showValues: true, ftsKey: false }],
+      });
+      await flushPromises();
+      (wrapper.vm as any).durationPercentiles = {
+        p25: null,
+        p50: 2000,
+        p75: 3000,
+        p95: 4000,
+        p99: 5000,
+        max: 6000,
+      };
+      await flushPromises();
+
+      for (const button of wrapper.findAll("button")) await button.trigger("click");
+      const written = (wrapper.vm as any).searchObj.data.stream.addToFilter;
+      expect(wrapper.text()).not.toContain("P25");
+      expect(wrapper.findAll("button").map((b) => b.attributes("title"))).not.toContain(
+        "duration >= ",
+      );
+      expect(written).not.toContain("null");
+    });
+  });
+
   describe("handleAddSearchTerm value escaping", () => {
     it("escapes an embedded single quote when including a value", () => {
       wrapper.vm.handleAddSearchTerm("service_name", "notificationHandling's", "include");
@@ -840,6 +899,23 @@ describe("IndexList Component", () => {
         "(service_name='o''brien' or service_name='plain')",
       );
     });
+
+    it.each([
+      ["include", "(code is null or code='200')"],
+      ["exclude", "(code is not null and code!='200')"],
+    ])("checks the null row for missing values next to another value (%s)", (action, expr) => {
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200"], action);
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(expr);
+    });
+
+    it("replaces the null row's group when a third value is ticked", () => {
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200"], "include");
+      const first = applyFilterTerm(wrapper.vm.searchObj.data.stream.addToFilter, "x='1'");
+      wrapper.vm.handleAddMultipleSearchTerms("code", ["null", "200", "500"], "include");
+      expect(applyFilterTerm(wrapper.vm.searchObj.data.stream.addToFilter, first)).toBe(
+        "x='1' and (code is null or code='200' or code='500')",
+      );
+    });
   });
 
   describe("field-values where clause with AND inside a quoted value (issue 11966)", () => {
@@ -861,6 +937,35 @@ describe("IndexList Component", () => {
     it("does not rewrite a quoted value when removing the other field", async () => {
       expect(await valuesSql(clause, "service_name")).toBe(
         `SELECT * FROM "test_stream" WHERE status = '1'`,
+      );
+    });
+  });
+
+  describe("field-values where clause with brackets", () => {
+    const valuesSql = async (editorValue: string, field: string) => {
+      mockSearchObj.data.editorValue = editorValue;
+      fieldValuesApi.fetchFieldValues.mockClear();
+      wrapper.vm.openFilterCreator({}, { name: field });
+      await flushPromises();
+      return atob(fieldValuesApi.fetchFieldValues.mock.calls[0][0].sql);
+    };
+    const clause = "(service_name='a' AND span_status='ERROR') OR duration > 1000";
+
+    it.each([
+      ["service_name", "(span_status='ERROR') OR duration > 1000"],
+      ["span_status", "(service_name='a') OR duration > 1000"],
+      ["http_status_code", clause],
+    ])("keeps the brackets balanced when the values of %s load", async (field, where) => {
+      expect(await valuesSql(clause, field)).toBe(`SELECT * FROM "test_stream" WHERE ${where}`);
+    });
+
+    it.each([
+      "(code is null or code='200') and service_name='a'",
+      "(code is not null and code!='200') and service_name='a'",
+      "code is null and service_name='a'",
+    ])("drops the field's own null check from %s when its values load", async (editor) => {
+      expect(await valuesSql(editor, "code")).toBe(
+        `SELECT * FROM "test_stream" WHERE service_name='a'`,
       );
     });
   });

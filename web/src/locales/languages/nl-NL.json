@@ -1724,7 +1724,8 @@
     "freeTextNoFtsTitleMulti": "De geselecteerde streams hebben geen full-text velden",
     "freeTextNoTextFields": "Deze stream heeft geen tekstvelden om te doorzoeken.",
     "freeTextNoTextFieldsNamed": "Niet doorzocht: {streams} (geen tekstvelden).",
-    "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL."
+    "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL.",
+    "filterNotChartableNotice": "Dit filter kan niet in de builder worden weergegeven in een grafiek. Uw zoekfilter is ongewijzigd; schakel over naar {custom} om het weer te geven."
   },
   "menu": {
     "alertCalibration": "Alarmkalibratie",
@@ -12949,6 +12950,7 @@
         "emptyQuery": "Er is geen query om een alarm van te maken.",
         "noQueries": "Dit paneel heeft geen query om een alarm van te maken.",
         "noConstants": "De geselecteerde patronen hebben geen onderscheidende tekst om op te matchen.",
+        "patternsShared": "{count} van de geselecteerde patronen delen al hun tekst met andere patronen en ontbreken daarom in het alertfilter.",
         "sqlModeFilterDropped": "Je SQL-query is niet overgenomen — het alarm komt alleen overeen met de geselecteerde patronen.",
         "patternsUnusable": "Geen van de patronen op deze pagina heeft onderscheidende tekst om op te matchen, dus het alarm gebruikt alleen je zoekopdracht.",
         "dbmRollupLag": "Databasenummers worden elke {minutes} minuten geaggregeerd, dus deze melding kan alleen zo vaak afgaan — het is geen realtime pagina.",
@@ -20192,6 +20194,7 @@
       "excludeFromQuery": "Uitsluiten",
       "createAlertAction": "Alarm maken",
       "noMatchTerms": "Dit patroon heeft geen onderscheidende tekst om op te filteren.",
+      "noDistinctTextTooltip": "Elk vast stuk tekst in dit patroon komt ook voor in een ander patroon, dus een filter zou ook hun logs matchen.",
       "noStreamSelected": "Geen stream geselecteerd. Selecteer een stream voordat u een alarm maakt.",
       "alertBroadMatch": "Dit patroon heeft geen onderscheidende constante tekst — de alarmquery zal breed matchen. Overweeg handmatige filters toe te voegen."
     },

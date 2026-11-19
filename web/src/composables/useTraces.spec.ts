@@ -1114,6 +1114,18 @@ describe("useTraces", () => {
       resetSearchObj();
       expect(tracesShareURL.value).toMatch(/^https?:\/\//);
     });
+
+    it("leaves trace_id out when the page has none", () => {
+      const route = mockCurrentRoute.value;
+      mockCurrentRoute.value = { ...route, query: {} };
+      try {
+        const { tracesShareURL, resetSearchObj } = useTraces();
+        resetSearchObj();
+        expect(new URL(tracesShareURL.value).searchParams.has("trace_id")).toBe(false);
+      } finally {
+        mockCurrentRoute.value = route;
+      }
+    });
   });
 
   // -------------------------------------------------------------------------
