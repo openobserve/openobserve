@@ -805,7 +805,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-else-if="alertNameSuggestion && formData.name !== alertNameSuggestion"
                       class="self-start"
-                      variant="ghost-primary"
+                      variant="link"
                       size="xs"
                       data-test="add-alert-details-name-suggest"
                       @click="alertAutoName.resetToAuto"
