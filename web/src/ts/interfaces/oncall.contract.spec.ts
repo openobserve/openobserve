@@ -324,6 +324,7 @@ const MIRRORED: Record<string, readonly string[]> = {
 
 /** Every discovered serde enum needs a mirror or an explicit boundary decision. */
 const SKIPPED: Record<string, string> = {
+  BundleRole: "labels evidence in the RCA agent context; the web does not receive the bundle",
   PageAction: "stored in verdicts; the UI does not branch on the raw paging action",
   ActionKind: "stored in verdict action plans; the UI renders the report, not typed plan actions",
   AnalysisStatus: "rides the internal trigger row; no endpoint serializes it",
