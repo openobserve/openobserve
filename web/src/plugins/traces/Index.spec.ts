@@ -956,9 +956,16 @@ describe("Index.vue (Main Traces Page)", () => {
       await pressCopyLink();
       expect(mockCopyTracesUrl).toHaveBeenCalledTimes(1);
 
+      mockToast.mockClear();
       mockSearchObj.data.editorValue = "operation_name = 'POST /checkout'";
       await pressCopyLink();
       expect(mockCopyTracesUrl).toHaveBeenCalledTimes(1);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "warning",
+          message: i18n.global.t("search.autoRunPersistNeedsRun"),
+        }),
+      );
       mockSearchObj.meta.lastRunSignature = null;
     });
   });
