@@ -781,7 +781,7 @@ describe("useAlertFormSections", () => {
         stream_name: "error_logs",
         query_condition: {
           type: "sql",
-          sql: "SELECT count(*) AS events FROM error_logs WHERE severity = 'ERROR'",
+          sql: "SELECT count(*) FILTER (WHERE severity = 'ERROR') AS events, count(*) AS all_events FROM error_logs",
           multi_time_range: [{ offSet: "1w" }],
           vrl_function: compareFunction(2.5, true),
         },
@@ -789,7 +789,7 @@ describe("useAlertFormSections", () => {
       },
       card: [
         "Watches Logs in error_logs where severity = 'ERROR', on a schedule.",
-        "Fires when the count in the last 1 hour is more than 2.5 times the same window 1 week earlier. Stays quiet while the earlier window has no data, so a rise from zero never fires.",
+        "Fires when the count in the last 1 hour is more than 2.5 times the same window 1 week earlier. Stays quiet while the earlier window has no events; a rise from zero matches still fires.",
         "Tells no one yet.",
         "Checks every hour, looking at the last 1 hour.",
       ],

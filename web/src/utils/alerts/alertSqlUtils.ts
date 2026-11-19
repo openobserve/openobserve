@@ -355,9 +355,23 @@ const squash = (text: string) => text.replace(/["`\s]/g, "").toLowerCase();
 const CLAUSE_END = /\b(?:group\s+by|having|order\s+by|limit|qualify|union|window)\b|;/i;
 const COMPARISON = /^([\s\S]+?)\s*(>=|<=|!=|<>|>|<|=)\s*(-?\d+(?:\.\d+)?(?:e[-+]?\d+)?)$/i;
 
-/** The outer query's WHERE clause as written, or null when it has none. */
+/** The outer query's WHERE clause as written, else the condition of the select list's one
+ * `FILTER (WHERE …)` (a comparison counts its matches that way); null when it has neither. */
 export function sqlWhereText(sql: string): string | null {
-  return clauseOf(sql ?? "", /\bwhere\b/i, CLAUSE_END);
+  return clauseOf(sql ?? "", /\bwhere\b/i, CLAUSE_END) ?? filterWhereText(sql ?? "");
+}
+
+function filterWhereText(sql: string): string | null {
+  const quoted = sql.replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"/g, (m) => " ".repeat(m.length));
+  const heads = [...quoted.matchAll(/\bfilter\s*\(\s*where\b/gi)];
+  if (heads.length !== 1) return null;
+  const from = (heads[0].index ?? 0) + heads[0][0].length;
+  let depth = 1;
+  for (let i = from; i < quoted.length; i++) {
+    if (quoted[i] === "(") depth++;
+    else if (quoted[i] === ")" && --depth === 0) return sql.slice(from, i).trim() || null;
+  }
+  return null;
 }
 
 type HavingCondition = { column: string; operator: string; value: number };

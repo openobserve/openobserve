@@ -632,33 +632,37 @@ export function anomalyFilterRows(slots: IntentSlots) {
 }
 
 const COMPARE_ALIAS = "events";
+const COMPARE_ALL_ALIAS = "all_events";
 
-/** The comparison's query: one count, run once for now and once for each past window. */
+/** The comparison's query, run once for now and once for each past window: the matching count, and
+ * with a filter also the stream's whole count, so a past window with no events reads apart from zero matches. */
 export function compareSql(stream: string, slots: IntentSlots): string {
   const values = (slots.values ?? []).filter((v) => v !== "");
-  const where =
-    slots.field && values.length
-      ? ` WHERE ${quoteId(slots.field)} ${
-          values.length > 1
-            ? `IN (${values.map(quoteText).join(", ")})`
-            : `= ${quoteText(values[0])}`
-        }`
-      : "";
-  return `SELECT count(*) AS ${COMPARE_ALIAS} FROM ${quoteId(stream)}${where}`;
+  const from = quoteId(stream);
+  if (!slots.field || !values.length) return `SELECT count(*) AS ${COMPARE_ALIAS} FROM ${from}`;
+  const match = `${quoteId(slots.field)} ${
+    values.length > 1 ? `IN (${values.map(quoteText).join(", ")})` : `= ${quoteText(values[0])}`
+  }`;
+  return `SELECT count(*) FILTER (WHERE ${match}) AS ${COMPARE_ALIAS}, count(*) AS ${COMPARE_ALL_ALIAS} FROM ${from}`;
 }
 
 const factorText = (f: number) => (Number.isInteger(f) ? f.toFixed(1) : String(f));
+
+// The past window held events of any kind: zero matches over a busy stream is a baseline, an empty stream is not.
+// A query without the whole count falls back to its matches.
+const COMPARE_HISTORY_LINE = `history = to_float(get(., [1, 0, "${COMPARE_ALL_ALIAS}"]) ?? 0) ?? 0.0`;
+const COMPARE_HISTORY_TEST = "(previous > 0.0 || history > 0.0) && ";
 
 /** `#ResultArray#` gets one result array per window, now first; the alert fires on the rows it
  * returns, so it returns one only when now beats the past by the factor. Ends on `.` as saved. */
 export function compareFunction(factor: number, needsBaseline = false): string {
   const f = Number.isFinite(factor) && factor > 0 ? factor : DEFAULT_FACTOR;
-  const baseline = needsBaseline ? "previous > 0.0 && " : "";
   return [
     "#ResultArray#",
     `current = to_float(get(., [0, 0, "${COMPARE_ALIAS}"]) ?? 0) ?? 0.0`,
     `previous = to_float(get(., [1, 0, "${COMPARE_ALIAS}"]) ?? 0) ?? 0.0`,
-    `. = if current > 0.0 && ${baseline}current > previous * ${factorText(f)} { [[{"${COMPARE_ALIAS}": current, "previous": previous}]] } else { [[]] }`,
+    ...(needsBaseline ? [COMPARE_HISTORY_LINE] : []),
+    `. = if current > 0.0 && ${needsBaseline ? COMPARE_HISTORY_TEST : ""}current > previous * ${factorText(f)} { [[{"${COMPARE_ALIAS}": current, "previous": previous}]] } else { [[]] }`,
     ".",
   ].join("\n");
 }
@@ -675,7 +679,7 @@ export function compareRule(
       .trim();
   const factor = Number(/previous \* ([\d.]+) \{/.exec(vrl ?? "")?.[1]);
   if (!(factor > 0)) return undefined;
-  const needsBaseline = /previous > 0\.0 && /.test(vrl ?? "");
+  const needsBaseline = (vrl ?? "").includes(COMPARE_HISTORY_TEST);
   return bare(vrl ?? "") === bare(compareFunction(factor, needsBaseline))
     ? { factor, needsBaseline }
     : undefined;

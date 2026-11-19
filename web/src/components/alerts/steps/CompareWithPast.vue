@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{
           needsBaseline
-            ? t("alerts.form.compare.needsBaselineOn")
+            ? t("alerts.form.compare.needsHistoryOn")
             : t("alerts.form.compare.needsBaselineOff")
         }}
       </p>

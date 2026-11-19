@@ -977,7 +977,7 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     if (pastComparison(fd)) {
       extras.push({
         keypath: compareRule(fd.query_condition?.vrl_function)?.needsBaseline
-          ? "alerts.sections.review.compareNeedsBaseline"
+          ? "alerts.sections.review.compareNeedsHistory"
           : "alerts.sections.review.compareAnyBaseline",
         parts: {},
       });

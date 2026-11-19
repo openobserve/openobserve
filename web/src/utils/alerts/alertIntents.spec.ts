@@ -20,6 +20,7 @@ import {
   cardsFolded,
   compareFactor,
   compareFunction,
+  compareSql,
   compareRule,
   fieldKind,
   fieldsBySamplePresence,
@@ -330,8 +331,9 @@ describe("alertIntents", () => {
     expect(fill.vrl).toBe(true);
     expect(fill.values["query_condition.type"]).toBe("sql");
     expect(fill.values["query_condition.sql"]).toBe(
-      `SELECT count(*) AS events FROM "app" WHERE "level" = 'it''s'`,
+      `SELECT count(*) FILTER (WHERE "level" = 'it''s') AS events, count(*) AS all_events FROM "app"`,
     );
+    expect(compareSql("app", {})).toBe(`SELECT count(*) AS events FROM "app"`);
     expect(fill.values["query_condition.multi_time_range"]).toMatchObject([{ offSet: "1w" }]);
     // The server keys the per-window input on a leading marker.
     expect(fill.values["query_condition.vrl_function"]).toBe(compareFunction(3));
@@ -342,8 +344,13 @@ describe("alertIntents", () => {
     expect(compareFactor(compareFunction(2.5))).toBe(2.5);
     expect(compareFactor(compareFunction(3).replace(/\n\.$/, ""))).toBe(3);
     expect(compareFactor(compareFunction(3).replace("current > 0.0 && ", ""))).toBeUndefined();
-    // Only fire once the past window has data: an empty past no longer passes as "0 × factor".
-    expect(compareFunction(2, true)).toContain("previous > 0.0 && current > previous * 2.0");
+    // Only fire once the past window has data: the stream's whole count, so zero matches is a baseline.
+    expect(compareFunction(2, true)).toContain(
+      `history = to_float(get(., [1, 0, "all_events"]) ?? 0) ?? 0.0`,
+    );
+    expect(compareFunction(2, true)).toContain(
+      "(previous > 0.0 || history > 0.0) && current > previous * 2.0",
+    );
     expect(compareRule(compareFunction(2, true))).toEqual({ factor: 2, needsBaseline: true });
     expect(compareRule(compareFunction(2))).toEqual({ factor: 2, needsBaseline: false });
   });

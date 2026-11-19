@@ -446,6 +446,10 @@ describe("alertSqlUtils", () => {
     [`${P95} HAVING COUNT(*) > 1`, "span_kind IN ('2', '5')"],
     ["SELECT count(*) FROM (SELECT * FROM t WHERE a = 1) WHERE b = 'x y' LIMIT 5", "b = 'x y'"],
     ["SELECT count(*) FROM t", null],
+    [
+      `SELECT count(*) FILTER (WHERE "s" IN ('a)', 'b')) AS e, count(*) AS n FROM t`,
+      `"s" IN ('a)', 'b')`,
+    ],
   ])("sqlWhereText(%s)", (sql, expected) => {
     expect(sqlWhereText(sql)).toBe(expected);
   });
