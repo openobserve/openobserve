@@ -224,11 +224,11 @@ const groupLabelsOf = (qc: NotifyQueryCondition | null | undefined): string[] | 
 export const notifiesPerGroup = (qc: NotifyQueryCondition | null | undefined): boolean =>
   groupLabelsOf(qc) !== null;
 
-/** The help lines of Notify at most every and Suppress repeats, naming what each wait covers. */
+/** The help lines of Notify at most every and Suppress repeats, and the short scope each wait covers. */
 export function notifyHelp(
   qc: NotifyQueryCondition | null | undefined,
   t: TranslateFn,
-): { remind: I18nText; suppress: I18nText } {
+): { remind: I18nText; suppress: I18nText; scope: I18nText | null } {
   const labels = groupLabelsOf(qc);
   const params = labels?.length ? { labels: joinListMore(labels, t) } : {};
   const [remind, suppress]: [I18nKey, I18nKey] = !labels
@@ -239,5 +239,10 @@ export function notifyHelp(
           "alerts.form.remind.whileFiringEachSeries",
           "alerts.alertSettings.suppressRepeatsHelpEachSeries",
         ];
-  return { remind: t(remind, params), suppress: t(suppress, params) };
+  const scope = !labels
+    ? null
+    : labels.length
+      ? t("alerts.form.remind.per", params)
+      : t("alerts.form.remind.perSeries");
+  return { remind: t(remind, params), suppress: t(suppress, params), scope };
 }

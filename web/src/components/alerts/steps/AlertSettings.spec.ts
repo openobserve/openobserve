@@ -1358,13 +1358,21 @@ describe("AlertSettings — notify and timing in their sections", () => {
     expect(warning?.textContent?.trim() ?? null).toBe(key && t(key, { every, minutes: frequency }));
   });
 
+  const perSvc = { query_condition: { aggregation: { multi_alert: true, group_by: ["svc"] } } };
   it.each([
-    ["true", {}, "alerts.form.remind.realtimeHelp"],
-    ["false", {}, "alerts.form.remind.whileFiring"],
-  ])("Notify at most every explains itself for is_real_time %s %j", (kind, values, key) => {
+    ["true", {}, "alerts.form.remind.realtimeHelp", null],
+    ["false", {}, "alerts.form.remind.whileFiring", null],
+    ["false", perSvc, "alerts.form.remind.whileFiringEach", "per svc"],
+  ])("Notify at most every explains itself for is_real_time %s %j", (kind, values, key, scope) => {
     const { targets } = mountSectioned(kind, values);
     const info = targets.settingsNotify.querySelectorAll("[aria-label]");
-    expect([...info].map((el) => el.getAttribute("aria-label"))).toContain(t(key));
+    expect([...info].map((el) => el.getAttribute("aria-label"))).toContain(
+      t(key, { labels: "svc" }),
+    );
+    const shown = targets.settingsNotify.querySelector(
+      '[data-test="alert-settings-silence-scope"]',
+    );
+    expect(shown?.textContent?.trim() ?? null).toBe(scope);
   });
 
   it("composite Must last lives in the condition section", () => {

@@ -122,6 +122,9 @@ describe("notifyHelp", () => {
     expect(notifyHelp(qc, t)).toEqual({
       remind: t(`alerts.form.remind.whileFiring${scope}` as any, params),
       suppress: t(`alerts.alertSettings.suppressRepeatsHelp${scope}` as any, params),
+      scope: scope
+        ? t(labels ? "alerts.form.remind.per" : "alerts.form.remind.perSeries", params)
+        : null,
     });
   });
 });

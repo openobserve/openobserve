@@ -101,14 +101,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="periodInline">
             <AlertLinkNote
               v-if="scheduleNote"
-              class="order-2 basis-full"
+              class="order-2"
               :text="scheduleNote.text"
               :action="scheduleNote.action"
               :separated="scheduleNote.separated"
               data-test="alert-settings-check-every-link"
               @action="scheduleNote.run"
             />
-            <p v-else class="order-2 m-0 min-h-4 basis-full" aria-hidden="true" />
+            <p v-else class="order-2 m-0 min-h-4" aria-hidden="true" />
           </template>
         </Teleport>
 
@@ -206,8 +206,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               isRealTime === 'true' ? t('alerts.form.remind.realtimeHelp') : notifyLines.remind
             "
             fill
+            wide
+            data-test="alert-settings-silence-row"
           >
-            <div class="flex min-w-0 flex-col gap-1 pe-2">
+            <!-- One sentence row; the message slot is held from first paint, so a warning never moves the rows below. -->
+            <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pe-2">
               <div class="flex items-center gap-2">
                 <div class="min-w-0">
                   <component :is="formField" v-if="formField" name="trigger_condition.silence">
@@ -239,7 +242,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:model-value="silence.onUnit"
                 />
               </div>
+              <span
+                v-if="isRealTime !== 'true' && notifyLines.scope"
+                class="text-text-secondary text-sm"
+                data-test="alert-settings-silence-scope"
+                >{{ notifyLines.scope }}</span
+              >
               <AlertMessageLine
+                class="min-w-0 flex-1 basis-48"
                 :error="silenceError"
                 error-data-test="alert-settings-silence-error"
                 :note="isScheduled ? silenceHint : null"
