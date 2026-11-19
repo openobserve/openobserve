@@ -12895,6 +12895,7 @@
         "stoppedAfter": "stopped after {duration}",
         "trigger": {
           "autoNewIncident": "Auto on incident open",
+          "evidenceSettled": "Auto on new evidence",
           "autoNewAlertType": "Auto on new alert type",
           "autoReopen": "Auto on reopen",
           "manual": "Analysis by {user}",
@@ -29675,6 +29676,74 @@
       "nextStep": "Next step",
       "fullReport": "Full report",
       "fullReportHint": "Everything above as one document, ready to copy or download"
+    },
+    "context": {
+      "title": "What changed just before",
+      "likely": "Likely",
+      "possible": "Possible",
+      "used": "Used",
+      "failed": "Could not check {sources}.",
+      "failedRetry": "Could not check {sources}. Trying again at {time}.",
+      "failedRetrySoon": "Could not check {sources}. Trying again shortly.",
+      "off": "Not checked: {sources}. This check is off on this server. | Not checked: {sources}. These checks are off on this server.",
+      "partial": "Only partly checked: {sources}.",
+      "nothingChanged": "Nothing changed on our side between {from} and {to}.",
+      "nothingChangedIn": "Nothing changed in {sources} between {from} and {to}.",
+      "noneSoFar": "No change found so far between {from} and {to}.",
+      "footerSettled": "Checked {sources} from {from} to {to}, and again at {time}.",
+      "footerAsking": "Checked {sources} from {from} to {to}. Recent changes may not be visible yet; checks again at {time}.",
+      "footerAskingSoon": "Checked {sources} from {from} to {to}. Recent changes may not be visible yet; checks again shortly.",
+      "footerAskingOpen": "Checked {sources} from {from} to {to}. Recent changes may not be visible yet.",
+      "footerRegionSettled": "Checked in this region only: {sources} from {from} to {to}, and again at {time}.",
+      "footerRegionAsking": "Checked in this region only: {sources} from {from} to {to}. Recent changes may not be visible yet; checks again at {time}.",
+      "footerRegionAskingSoon": "Checked in this region only: {sources} from {from} to {to}. Recent changes may not be visible yet; checks again shortly.",
+      "footerRegionAskingOpen": "Checked in this region only: {sources} from {from} to {to}. Recent changes may not be visible yet.",
+      "notRecorded": "{sources} is not recorded on this server. | {sources} are not recorded on this server.",
+      "foldMore": "and {count} more change | and {count} more changes",
+      "foldMoreUnused": "and {count} more change, not used in the next step | and {count} more changes, none used in the next step",
+      "foldLess": "Show fewer changes",
+      "unlisted": "{count} more change is not listed. | {count} more changes are not listed.",
+      "hidden": "{count} change you can't see | {count} changes you can't see",
+      "loading": "Loading what changed",
+      "loadFailed": "Couldn't load what changed.",
+      "link": {
+        "pipeline": "Open pipeline",
+        "streamSettings": "Open stream settings",
+        "versions": "Open versions",
+        "collector": "Open collector",
+        "rollout": "Open rollout",
+        "tokens": "Open ingestion tokens",
+        "alert": "Open alert",
+        "page": "Open"
+      },
+      "impact": {
+        "title": "What this affects",
+        "redacted": "Their names are shown to people with Security access.",
+        "open": {
+          "detection": "Open detection",
+          "alert": "Open alert",
+          "slo": "Open SLO",
+          "dashboard": "Open dashboard",
+          "service": "Open service"
+        }
+      },
+      "badge": {
+        "source": "Security source",
+        "quiet": "Security source, Quiet: detections cannot fire"
+      }
+    },
+    "nextStep": {
+      "title": "Next step",
+      "working": "Checking this with AI",
+      "ai": "AI suggestion",
+      "aiOne": "AI suggestion, based on the change below",
+      "aiAll": "AI suggestion, based on all {count} changes below",
+      "aiSome": "AI suggestion, based on {used} of the {count} changes below",
+      "notHelpful": "Not helpful",
+      "judged": "You marked this AI suggestion not helpful.",
+      "failed": "Couldn't save that. Try again.",
+      "openLogs": "Open logs",
+      "loading": "Loading the next step"
     },
     "issueLive": {
       "openIncident": "Open incident",

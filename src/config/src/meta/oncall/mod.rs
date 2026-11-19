@@ -32,10 +32,10 @@ pub mod team;
 
 pub use agent::{
     AnalysisState, AnalysisStatus, AnalysisVerdict, Confidence, ConfidenceRefusal, GatePlan,
-    L0Error, L0Metric, L0Mode, L0Modes, L0Policy, PageAction, PageRecommendation, ProposedAction,
-    SeverityDecision, VerdictOutcome, analysis_status_for_start, apply_verdict, confidence_refusal,
-    gate_plan, metrics_for, promotion_note, quieter_channels, ratchet, severity_pages,
-    update_channels, verdict_lines,
+    L0Error, L0Metric, L0Mode, L0Modes, L0Policy, MAX_STEP_WHY_CHARS, PageAction,
+    PageRecommendation, ProposedAction, SeverityDecision, SubmittedNextStep, VerdictOutcome,
+    analysis_status_for_start, apply_verdict, confidence_refusal, gate_plan, metrics_for,
+    promotion_note, quieter_channels, ratchet, severity_pages, update_channels, verdict_lines,
 };
 pub use chat::{
     ChatMessage, ChatMessageKind, ChatMessageStatus, SlackRoomEdit, SlackRoomEditError,
@@ -65,7 +65,10 @@ pub use preset::{
     RESTRICTED_PRIORITY, RegionGroup, build as build_preset, catalogue as preset_catalogue,
     resolve_anchor as preset_anchor,
 };
-pub use rca::RcaContext;
+pub use rca::{
+    BundleItem, BundleRole, EvidenceBundle, MAX_BUNDLE_ITEMS, MAX_OFFERED_ACTIONS, OfferedAction,
+    RcaContext,
+};
 pub use response::{
     DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NewAlertEffect, NoBlastRadius, PageDecision,
     ResolutionCause, ResponderRole, Response, ResponseEvent, ResponseEventKind, ResponseState,
