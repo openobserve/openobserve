@@ -16,6 +16,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  clusterMatcher,
   limitSqlClusters,
   promqlMetricTokens,
   rewriteAlert,
@@ -126,6 +127,14 @@ describe("rewritePromql", () => {
       promql: vi.fn().mockResolvedValue({ type: "unsupported", kind: "vector matching" }),
     };
     expect(await rewritePromql("up / on(a) other", map, checks)).toBe("o2_up / on(a) other");
+  });
+});
+
+describe("clusterMatcher", () => {
+  it("escapes regex characters and the PromQL string in two layers", () => {
+    expect(clusterMatcher("k8s_cluster", ["prod.eu"])).toBe('k8s_cluster=~"prod\\\\.eu"');
+    expect(clusterMatcher("k8s_cluster", ['a"b'])).toBe('k8s_cluster=~"a\\"b"');
+    expect(clusterMatcher("k8s_cluster", ["a\\b"])).toBe('k8s_cluster=~"a\\\\\\\\b"');
   });
 });
 

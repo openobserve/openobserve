@@ -321,8 +321,10 @@ export const rewriteSql = async (sql: string, renames: StreamRename[]): Promise<
   }
 };
 
+const escapePromqlString = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
 const escapeLabelValue = (value: string) =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\\\$&").replace(/"/g, '\\"');
+  escapePromqlString(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
 /** The matcher a cluster limit adds, also how a retry knows it is already there. */
 export const clusterMatcher = (label: string, clusters: string[]) =>
