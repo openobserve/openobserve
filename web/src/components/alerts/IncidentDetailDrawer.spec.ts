@@ -160,8 +160,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import IncidentTimeline from "./IncidentTimeline.vue";
 import { DateTime } from "luxon";
-import { incidentAge } from "@/utils/incidents/incidentUnfold";
-import { overviewLanes, peakWindow } from "@/utils/incidents/incidentOverview";
+import { incidentAge, unfoldDuration } from "@/utils/incidents/incidentUnfold";
+import { overviewLanes, overviewPeak } from "@/utils/incidents/incidentOverview";
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -1161,7 +1161,7 @@ describe("IncidentDetailDrawer.vue", () => {
             last_alert_at: t0 + 4 * MIN,
             updated_at: t0 + 4 * MIN,
             muted_by_downtime_id: "d1",
-            triggers: [...firings("a1", 1), ...firings("a2", 1, t0 + 4 * MIN)],
+            triggers: [...firings("a1", 2), ...firings("a2", 1, t0 + 20 * MIN)],
           },
           {},
           { timezone: zone },
@@ -1169,10 +1169,11 @@ describe("IncidentDetailDrawer.vue", () => {
         expect(wrapper.get('[data-test="incident-overview-step-first"]').text()).toContain(
           firstFiring,
         );
-        const age = incidentAge(t0, Date.now() * 1000);
         const peak = wrapper.get('[data-test="incident-overview-step-peak"]').text();
         expect(peak).toContain(firstFiring);
-        expect(peak).toContain(age);
+        expect(peak).not.toContain(firstBucket);
+        expect(peak).toContain(String(unfoldDuration(i18n.global.t, 15 * MIN)));
+        expect(peak).toContain(incidentAge(t0, Date.now() * 1000));
         expect(wrapper.get('[data-test="incident-detail-muted-banner"]').text()).toContain(
           `${mutedUntil} · `,
         );
@@ -1194,6 +1195,7 @@ describe("IncidentDetailDrawer.vue", () => {
     it("shows each fact once: no tiles, Manage box, Details card or Show Full Activity, one Timeline card", async () => {
       await openOverview({
         title: "Checkout errors",
+        status: "resolved",
         first_alert_at: t0,
         last_alert_at: t0 + 32 * MIN,
         created_at: t0 + 41,
@@ -1218,7 +1220,7 @@ describe("IncidentDetailDrawer.vue", () => {
         expect(overview().findAll(`[data-test="incident-overview-${key}"]`)).toHaveLength(1);
       }
       expect(wrapper.get('[data-test="incident-overview-step-peak"]').text()).toContain(
-        "2023-11-14 22:43",
+        "2023-11-14 22:30",
       );
       const copy = wrapper.get('[data-test="incident-overview-copy-id"]');
       expect(copy.element.tagName).toBe("BUTTON");
@@ -1239,15 +1241,23 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(model.lanes[0].counts[day - 1]).toBe(0);
     });
 
-    it("marks the Timeline's busiest five minutes as the Alerts card's peak, not its tallest bucket", () => {
-      const minutes = [1, 2, 3, 4, 120, 122, 124, 127, 130, 133, 240];
-      const triggers = minutes.map((m) =>
-        createAlert({ alert_id: "a1", alert_fired_at: t0 + m * MIN }),
-      );
-      const model = overviewLanes(triggers, "UTC", t0 + 240 * MIN, false)!;
-      expect(peakWindow(triggers)?.at).toBe(t0 + MIN);
-      expect(model.peak).toBe(0);
-      expect(Math.max(...model.lanes[0].counts)).toBeGreaterThan(model.lanes[0].counts[0]);
+    it.each([
+      [
+        "the tallest bar summed across alerts, not the busiest five minutes",
+        "a1:0 a1:1 a1:2 a1:60 a2:62 a1:70 a2:72",
+        [60, 4],
+      ],
+      ["the earliest bar on a tie", "a1:0 a1:1 a2:30 a2:31", [0, 2]],
+      ["no peak with one bar", "a1:0 a1:1 a1:2", null],
+      ["no peak when no bar holds two firings", "a1:0 a2:30", null],
+    ])("picks the Timeline's peak as %s", (_c, firings, expected) => {
+      const h0 = t0 + 2800 * 1_000_000;
+      const triggers = firings.split(" ").map((f) => {
+        const [alert_id, minute] = f.split(":");
+        return createAlert({ alert_id, alert_fired_at: h0 + Number(minute) * MIN });
+      });
+      const peak = overviewPeak(overviewLanes(triggers, "UTC", h0, false));
+      expect(peak && [(peak.at - h0) / MIN, peak.count]).toEqual(expected);
     });
 
     it.each([
