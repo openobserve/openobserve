@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import type { ShownEntry } from "@/composables/useLogs/useLogsUrl";
 
 export interface CachedLogsSearch {
   streams: string[];
@@ -55,4 +56,24 @@ export const cachedSearchMatchesRoute = (
     if (cache.timeType === "relative" || !sameRange) return false;
   }
   return !("logs_visualize_toggle" in route) || route.logs_visualize_toggle === cache.toggle;
+};
+
+/** The URL carries the last run search, so unrun editor edits in the cache must not count as a difference. */
+export const lastRunSearch = (
+  cache: CachedLogsSearch,
+  shown: ShownEntry | null,
+): CachedLogsSearch => {
+  if (!shown) return cache;
+  const { inputs, period } = shown;
+  return {
+    ...cache,
+    streams: inputs.streams,
+    streamType: inputs.streamType,
+    query: inputs.query,
+    sqlMode: inputs.sqlMode,
+    timeType: period.type,
+    period: period.type === "relative" ? period.period : null,
+    startTime: period.type === "absolute" ? period.startUs : cache.startTime,
+    endTime: period.type === "absolute" ? period.endUs : cache.endTime,
+  };
 };

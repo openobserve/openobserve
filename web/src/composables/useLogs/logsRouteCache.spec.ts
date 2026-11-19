@@ -15,7 +15,8 @@
 
 import { describe, expect, it } from "vitest";
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { cachedSearchMatchesRoute, type CachedLogsSearch } from "./logsRouteCache";
+import { cachedSearchMatchesRoute, lastRunSearch, type CachedLogsSearch } from "./logsRouteCache";
+import type { ShownEntry } from "./useLogsUrl";
 
 const cached: CachedLogsSearch = {
   streams: ["app"],
@@ -92,5 +93,44 @@ describe("cachedSearchMatchesRoute", () => {
 
   it("treats a different stream order as the same selection", () => {
     expect(matches({ stream: "web,app" }, { streams: ["app", "web"] })).toBe(true);
+  });
+});
+
+describe("lastRunSearch", () => {
+  const shown = (over: Partial<ShownEntry["inputs"]> = {}, period: ShownEntry["period"]) =>
+    ({
+      generation: 1,
+      inputs: { streams: ["app"], streamType: "logs", query: "select 1", sqlMode: true, ...over },
+      period,
+    }) as unknown as ShownEntry;
+
+  const staged: CachedLogsSearch = { ...cached, query: "select 2 -- typed, not run", period: "1h" };
+
+  it("keeps an unrun edit from dropping the cache when the URL carries the last run", () => {
+    const last = lastRunSearch(staged, shown({}, { type: "relative", period: "15m" }));
+    const route = {
+      stream: "app",
+      org_identifier: "default",
+      query: b64EncodeUnicode("select 1"),
+      period: "15m",
+    };
+    expect(cachedSearchMatchesRoute(route, staged)).toBe(false);
+    expect(cachedSearchMatchesRoute(route, last)).toBe(true);
+  });
+
+  it("still drops the cache for a link that differs from the last run", () => {
+    const last = lastRunSearch(staged, shown({}, { type: "relative", period: "15m" }));
+    expect(
+      cachedSearchMatchesRoute(
+        { stream: "app", org_identifier: "default", query: b64EncodeUnicode("select 3") },
+        last,
+      ),
+    ).toBe(false);
+  });
+
+  it("maps an absolute last run and falls back to the cache when nothing has run", () => {
+    const last = lastRunSearch(cached, shown({}, { type: "absolute", startUs: 5, endUs: 9 }));
+    expect(last).toMatchObject({ timeType: "absolute", startTime: 5, endTime: 9 });
+    expect(lastRunSearch(cached, null)).toBe(cached);
   });
 });

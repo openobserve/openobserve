@@ -706,7 +706,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
-import { cachedSearchMatchesRoute } from "@/composables/useLogs/logsRouteCache";
+import { cachedSearchMatchesRoute, lastRunSearch } from "@/composables/useLogs/logsRouteCache";
 import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
@@ -797,6 +797,7 @@ import {
   endLogsArrival,
   parseSharedPage,
   resetShownSearch,
+  shownSearch,
   sharedPage,
   sharedPageNotice,
 } from "@/composables/useLogs/useLogsUrl";
@@ -1563,18 +1564,24 @@ export default defineComponent({
         store.state.logs.logs.data != undefined &&
         Object.hasOwn(store.state.logs.logs.data, "stream") &&
         Object.hasOwn(store.state.logs.logs, "organizationIdentifier") &&
-        !cachedSearchMatchesRoute(router.currentRoute.value.query, {
-          streams: store.state.logs.logs.data.stream.selectedStream,
-          org: store.state.logs.logs.organizationIdentifier,
-          streamType: store.state.logs.logs.data.stream.streamType,
-          query: store.state.logs.logs.data.query,
-          sqlMode: store.state.logs.logs.meta?.sqlMode,
-          timeType: store.state.logs.logs.data.datetime?.type,
-          period: store.state.logs.logs.data.datetime?.relativeTimePeriod,
-          startTime: store.state.logs.logs.data.datetime?.startTime,
-          endTime: store.state.logs.logs.data.datetime?.endTime,
-          toggle: store.state.logs.logs.meta?.logsVisualizeToggle,
-        })
+        !cachedSearchMatchesRoute(
+          router.currentRoute.value.query,
+          lastRunSearch(
+            {
+              streams: store.state.logs.logs.data.stream.selectedStream,
+              org: store.state.logs.logs.organizationIdentifier,
+              streamType: store.state.logs.logs.data.stream.streamType,
+              query: store.state.logs.logs.data.query,
+              sqlMode: store.state.logs.logs.meta?.sqlMode,
+              timeType: store.state.logs.logs.data.datetime?.type,
+              period: store.state.logs.logs.data.datetime?.relativeTimePeriod,
+              startTime: store.state.logs.logs.data.datetime?.startTime,
+              endTime: store.state.logs.logs.data.datetime?.endTime,
+              toggle: store.state.logs.logs.meta?.logsVisualizeToggle,
+            },
+            shownSearch.logs,
+          ),
+        )
       ) {
         store.dispatch("logs/setIsInitialized", false);
       }
