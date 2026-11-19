@@ -193,6 +193,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- COUNT mode severity rows -->
                         <template v-if="selectedFunction === 'total_events'">
                           <div class="flex min-w-0 flex-wrap items-start gap-2">
+                            <OTag
+                              v-if="warningOffered"
+                              type="alertLevel"
+                              value="critical"
+                              size="sm"
+                              class="my-auto shrink-0"
+                              data-test="alert-threshold-level"
+                            />
                             <OFormSelect
                               :aria-label="t('alerts.form.names.comparison')"
                               name="trigger_condition.operator"
@@ -247,6 +255,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- MEASURE mode severity rows -->
                         <template v-else>
                           <div class="flex min-w-0 flex-wrap items-start gap-2">
+                            <OTag
+                              v-if="warningOffered"
+                              type="alertLevel"
+                              value="critical"
+                              size="sm"
+                              class="my-auto shrink-0"
+                              data-test="alert-threshold-level"
+                            />
                             <OFormSelect
                               :aria-label="t('alerts.form.names.comparison')"
                               name="query_condition.aggregation.having.operator"
@@ -522,6 +538,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Count mode severity rows -->
                         <template v-if="selectedFunction === 'total_events'">
                           <div class="flex min-w-0 flex-wrap items-start gap-2">
+                            <OTag
+                              v-if="warningOffered"
+                              type="alertLevel"
+                              value="critical"
+                              size="sm"
+                              class="my-auto shrink-0"
+                              data-test="alert-threshold-level"
+                            />
                             <OFormSelect
                               :aria-label="t('alerts.form.names.comparison')"
                               name="trigger_condition.operator"
@@ -572,6 +596,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Measure mode severity rows -->
                         <template v-else>
                           <div class="flex min-w-0 flex-wrap items-start gap-2">
+                            <OTag
+                              v-if="warningOffered"
+                              type="alertLevel"
+                              value="critical"
+                              size="sm"
+                              class="my-auto shrink-0"
+                              data-test="alert-threshold-level"
+                            />
                             <OFormSelect
                               :aria-label="t('alerts.form.names.comparison')"
                               name="query_condition.aggregation.having.operator"
@@ -1291,6 +1323,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="sqlPlainLimit"
                           class="text-text-body flex flex-wrap items-start gap-x-1 gap-y-1 text-sm"
                         >
+                          <OTag
+                            v-if="warningOffered"
+                            type="alertLevel"
+                            value="critical"
+                            size="sm"
+                            class="my-auto shrink-0"
+                            data-test="alert-threshold-level"
+                          />
                           <OFormSelect
                             :aria-label="t('alerts.form.names.comparison')"
                             name="trigger_condition.operator"
@@ -1421,6 +1461,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
                               data-test="add-alert-group-limit"
                             >
+                              <OTag
+                                v-if="warningOffered"
+                                type="alertLevel"
+                                value="critical"
+                                size="sm"
+                                class="my-auto shrink-0"
+                                data-test="alert-threshold-level"
+                              />
                               <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
                               <OFormSelect
                                 :aria-label="t('alerts.form.names.comparison')"
@@ -1456,6 +1504,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
                               data-test="add-alert-group-limit"
                             >
+                              <OTag
+                                v-if="warningOffered"
+                                type="alertLevel"
+                                value="critical"
+                                size="sm"
+                                class="my-auto shrink-0"
+                                data-test="alert-threshold-level"
+                              />
                               <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
                               <OFormSelect
                                 :aria-label="t('alerts.form.names.field')"
@@ -1595,6 +1651,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </template>
                         <div class="flex flex-col gap-1.5">
                           <div class="flex items-start gap-2">
+                            <OTag
+                              v-if="warningOffered"
+                              type="alertLevel"
+                              value="critical"
+                              size="sm"
+                              class="my-auto shrink-0"
+                              data-test="alert-threshold-level"
+                            />
                             <OFormSelect
                               :aria-label="t('alerts.alertIfValueIs')"
                               name="query_condition.promql_condition.operator"

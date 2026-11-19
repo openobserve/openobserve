@@ -2508,10 +2508,11 @@ describe("QueryConfig.vue", () => {
       ["SQL", sql, sqlForm],
       ["SQL with VRL", { ...sql, vrlFunction: ".x = 1" }, sqlForm],
       ["PromQL", promql, promqlForm],
-    ])("+ Add warning shows by default in %s", async (_c, qc, form) => {
+    ])("+ Add warning and the threshold's level show by default in %s", async (_c, qc, form) => {
       remount({ ...sectioned, ...qc }, form, tiersFor(false));
       await flushPromises();
       expect(shown("alert-add-warning-button")).toBe(true);
+      expect(shown("alert-threshold-level")).toBe(true);
     });
 
     it("the SQL warning can be added and removed", async () => {
