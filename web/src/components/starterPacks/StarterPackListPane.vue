@@ -44,18 +44,29 @@ const emit = defineEmits<{ select: [packId: string] }>();
 
 type Kind = "dashboard" | "alert" | "savedView";
 
+interface SeverityBadge {
+  level: LibrarySeverity;
+  label: I18nText;
+  variant: "error-soft" | "warning-soft" | "default-soft";
+}
+
 interface Tile {
   kind: Kind;
   icon: IconName;
   label: I18nText;
   summary?: I18nText;
-  severity?: I18nText;
+  severities?: SeverityBadge[];
 }
 
 const { t } = useI18nTyped();
 
 const KINDS: Kind[] = ["dashboard", "alert", "savedView"];
 const SEVERITY_ORDER: LibrarySeverity[] = ["critical", "warning", "info"];
+const SEVERITY_BADGE: Record<LibrarySeverity, SeverityBadge["variant"]> = {
+  critical: "error-soft",
+  warning: "warning-soft",
+  info: "default-soft",
+};
 const TILE_LOOKS: Record<Kind, { tile: string; chip: string; icon: IconName }> = {
   dashboard: {
     tile: "border-ingest-accent-blue/25",
@@ -114,7 +125,7 @@ const itemsOf = (row: RailPack, kind: Kind): Array<{ id: string; name: string }>
   return pack.savedViews.map(({ id, name }) => ({ id, name }));
 };
 
-const severityLine = (row: RailPack, ids: string[]): I18nText | undefined => {
+const severityBadges = (row: RailPack, ids: string[]): SeverityBadge[] | undefined => {
   const severities = row.entry.flow.preview.value?.severities;
   if (!severities) return undefined;
   const keys = {
@@ -122,11 +133,13 @@ const severityLine = (row: RailPack, ids: string[]): I18nText | undefined => {
     warning: "starterPacks.popup.sevWarning",
     info: "starterPacks.popup.sevInfo",
   } as const;
-  const parts = SEVERITY_ORDER.flatMap((level) => {
+  const badges = SEVERITY_ORDER.flatMap((level) => {
     const count = ids.filter((id) => severities[id] === level).length;
-    return count ? [t(keys[level], { count })] : [];
+    return count
+      ? [{ level, label: t(keys[level], { count }), variant: SEVERITY_BADGE[level] }]
+      : [];
   });
-  return parts.length ? raw(parts.join(" · ")) : undefined;
+  return badges.length ? badges : undefined;
 };
 
 const tiles = computed<Tile[]>(() => {
@@ -158,9 +171,9 @@ const tiles = computed<Tile[]>(() => {
       icon: look.icon,
       label: labels[kind],
       summary: raw(own ?? items.map(({ name }) => name).join(", ")),
-      severity:
+      severities:
         kind === "alert"
-          ? severityLine(
+          ? severityBadges(
               row,
               items.map(({ id }) => id),
             )
@@ -362,11 +375,19 @@ const tiles = computed<Tile[]>(() => {
             >
             <span v-else>{{ t("starterPacks.popup.noneInPack") }}</span>
             <span
-              v-if="tile.severity"
-              class="text-text-secondary"
+              v-if="tile.severities"
+              class="mt-auto flex flex-wrap gap-1"
               :data-test="`${testPrefix}-tile-severity`"
-              >{{ tile.severity }}</span
             >
+              <OBadge
+                v-for="badge in tile.severities"
+                :key="badge.level"
+                :variant="badge.variant"
+                size="sm"
+                :data-test="`${testPrefix}-tile-severity-${badge.level}`"
+                >{{ badge.label }}</OBadge
+              >
+            </span>
           </div>
         </div>
       </div>
