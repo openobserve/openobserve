@@ -121,7 +121,7 @@
     "noGroups": {
       "title": "아직 그룹이 없습니다",
       "description": "그룹을 사용하면 여러 사용자의 권한을 한 번에 관리할 수 있습니다.시작하려면 하나를 생성하세요.",
-      "action": "새 사용자 그룹",
+      "action": "새 그룹",
       "actionDesc": "사용자 그룹 생성"
     },
     "noRoles": {
@@ -197,7 +197,7 @@
     "noCipherKeys": {
       "title": "아직 암호 키가 없습니다.",
       "description": "암호 키는 데이터 스트림의 민감한 필드를 암호화하는 데 사용됩니다.",
-      "action": "새 암호 키",
+      "action": "새 키",
       "actionDesc": "암호 키 생성"
     },
     "noSlackChannelDefaults": {
@@ -225,7 +225,7 @@
     "noLlmProviders": {
       "title": "LLM 공급자가 구성되지 않았습니다.",
       "description": "언어 모델 공급자를 연결하여 AI 기반 기능을 활성화합니다.",
-      "action": "새 제공자",
+      "action": "공급자 추가",
       "actionDesc": "LLM 공급자 구성"
     },
     "noDiscoveredServices": {
@@ -268,9 +268,9 @@
     },
     "noStorageConfig": {
       "title": "버킷이 구성되지 않음",
-      "description": "자체 버킷을 사용하여 이 조직의 데이터를 다른 조직 및 전역 기본값과 분리된, 직접 소유한 스토리지에 보관하세요.",
-      "action": "버킷 구성",
-      "actionDesc": "S3 또는 Azure 버킷 연결"
+      "description": "이 조직의 데이터를 다른 조직 및 글로벌 기본값과 독립적으로 전용 버킷으로 라우팅합니다.",
+      "action": "스토리지 구성",
+      "actionDesc": "S3, GCS 또는 Azure 버킷 연결"
     },
     "noPhoneProvider": {
       "title": "전화 제공업체가 연결되지 않음",
@@ -435,7 +435,7 @@
     "noUsers": {
       "title": "아직 사용자 없음",
       "description": "팀원을 초대하여 이 조직에서 협업하세요.",
-      "action": "새 사용자",
+      "action": "사용자 추가",
       "actionDesc": "이메일로 팀원 초대하기"
     },
     "noReports": {
@@ -457,7 +457,7 @@
     "noServiceAccounts": {
       "title": "아직 서비스 계정 없음",
       "description": "서비스 계정을 사용하면 애플리케이션이 API를 통해 인증할 수 있습니다.계정을 만들어 시작하세요.",
-      "action": "새 서비스 계정",
+      "action": "서비스 계정 추가",
       "actionDesc": "API 서비스 계정 생성"
     },
     "noInvitations": {
@@ -3706,7 +3706,7 @@
     "agplFullName": "GNU Affero General Public License (AGPL)",
     "github": "GitHub",
     "website": "웹사이트",
-    "licenseAndUsage": "라이선스 및 사용량",
+    "licenseAndUsage": "라이선스 및 사용",
     "copyLicenseId": "라이선스 ID 복사",
     "editionLbl": "에디션",
     "gbPerDay": "GB / 일",
@@ -3727,8 +3727,8 @@
     "ent_lincese_detail_lbl": "엔터프라이즈 라이선스 세부 정보",
     "lincese_id_lbl": "라이선스 ID",
     "status_lbl": "상태",
-    "create_at_lbl": "생성일",
-    "expires_at_lbl": "만료일",
+    "create_at_lbl": "만든 날짜",
+    "expires_at_lbl": "만료 날짜",
     "usage_limits": "사용 제한",
     "feature_comparison_lbl": "기능 비교",
     "feature_comparision_ent_msg": "아래 나열된 모든 고급 기능에 액세스할 수 있는 OpenObserve 엔터프라이즈 에디션을 사용하고 있습니다.",
@@ -3787,17 +3787,17 @@
     "expired_lbl": "만료",
     "no_license_found": "라이선스를 찾을 수 없음",
     "installation_id": "설치 ID",
-    "contact_admin_license": "아래에 라이선스 키를 붙여넣거나, 라이선스를 요청하세요.",
+    "contact_admin_license": "관리자에게 문의하여 라이선스를 받고 여기에 키를 <strong>붙여넣거나:</strong>",
     "get_license": "라이선스 받기",
     "enter_license_key": "라이선스 키 입력",
     "paste_license_placeholder": "라이선스 키를 여기에 붙여넣으세요...",
-    "license_auto_filled": "URL에서 라이선스 키를 자동으로 채웠습니다. \"라이선스 업데이트\"를 클릭하여 적용하세요.",
+    "license_auto_filled": "URL에서 라이선스 키가 자동으로 채워집니다.“라이선스 업데이트”를 클릭하여 신청하세요.",
     "update_license": "라이선스 업데이트",
     "license_id": "라이선스 ID",
     "company": "회사",
     "license_key": "라이선스 키",
     "contact_name": "담당자 이름",
-    "contact_email": "담당자 이메일",
+    "contact_email": "연락처 이메일",
     "environment_type": "환경 유형",
     "features": "기능",
     "features_all_unlocked": "라이선스로 모든 기능을 사용할 수 있습니다.",
@@ -3895,7 +3895,7 @@
     "expiry_online": "라이선스가 {date}에 만료됩니다. 갱신된 라이선스를 확인하려면 지금 새로고침을 클릭하세요.",
     "expiry_viewer": "라이선스가 {date}에 만료됩니다. 관리자에게 라이선스 새로고침을 요청하세요.",
     "expiry_airgapped": "라이선스가 {date}에 만료됩니다. 갱신된 키는 OpenObserve에 문의하세요.",
-    "refresh_license_limits": "라이선스 한도 새로 고침",
+    "refresh_license_limits": "라이선스 제한 새로고침",
     "banner_paused_usage": "검색이 일시중지되었습니다. 이번 달 {exceeded}일 동안 수집이 일일 한도({allowed}일 허용)를 초과했습니다. 데이터는 계속 수집되고 있습니다. 라이선스 ID {licenseId}로 OpenObserve에 문의하세요. | 검색이 일시중지되었습니다. 이번 달 {exceeded}일 동안 수집이 일일 한도({allowed}일 허용)를 초과했습니다. 데이터는 계속 수집되고 있습니다. 라이선스 ID {licenseId}로 OpenObserve에 문의하세요.",
     "banner_paused_other": "라이선스 확인으로 인해 검색이 일시중지되었습니다. 데이터는 계속 수집되고 있습니다. 라이선스 ID {licenseId}로 OpenObserve에 문의하세요.",
     "banner_paused_no_id": "라이선스 확인으로 인해 검색이 일시중지되었습니다. 데이터는 계속 수집되고 있습니다.",
@@ -3975,7 +3975,7 @@
     "paste_new_license_placeholder": "새 라이선스 키를 여기에 붙여넣으세요...",
     "your_complete_license_key": "전체 라이선스 키:",
     "copy_key": "키 복사",
-    "usage_information": "사용량 정보",
+    "usage_information": "사용 정보",
     "usage_chart_title": "이번 달 일일 수집량",
     "no_license_ingestion_limit": "라이선스가 없으면 수집은 하루 <strong>{limit} GB</strong>로 제한됩니다.",
     "license_allows_ingestion": "현재 라이선스는 하루에 <strong>{limit} GB</strong>의 데이터 수집을 허용합니다.",
@@ -4732,7 +4732,7 @@
       "effectStillAllowed": "액세스 변경 없음: 더 넓은 권한 부여가 여전히 이를 허용합니다.",
       "moduleGroupSecurity": "보안",
       "presetSocAnalystTitle": "SOC 분석가",
-      "presetSocAnalystDescription": "보안 알림 및 케이스를 분류하고, 탐지, 보안 소스 스트림, 위협 인텔리전스 목록에 대한 읽기 권한을 가집니다",
+      "presetSocAnalystDescription": "보안 알림과 케이스를 트리아지하며, 탐지, 보안 소스 스트림, 위협 인텔리전스 목록에 대한 읽기 액세스 포함",
       "presetDetectionEngineerTitle": "탐지 엔지니어",
       "presetDetectionEngineerDescription": "탐지를 생성, 조정, 활성화, 실행하고 콘텐츠를 설치하며, 함수와 파이프라인과 함께 소스를 연결하고 위협 인텔리전스 목록 같은 보강 테이블을 관리하며, 보안, 케이스, 스트림에 대한 읽기 권한을 가집니다",
       "presetSecurityAdminTitle": "보안 관리자",
@@ -4843,7 +4843,7 @@
       "createFailed": "조직 생성 실패."
     },
     "listOrganizations": {
-      "subtitle": "액세스할 수 있는 모든 조직입니다. 조직으로 전환하거나 각 행의 작업에서 이름을 변경하세요.",
+      "subtitle": "액세스 가능한 조직",
       "switch": "이 조직으로 전환",
       "current": "현재",
       "cannotEditWhileDeleting": "삭제 진행 중에는 편집할 수 없습니다",
@@ -4996,7 +4996,9 @@
       "saved": "공지 배너가 업데이트되었습니다.",
       "saveFailed": "공지 배너를 저장할 수 없습니다.",
       "loadFailed": "공지 배너를 불러올 수 없습니다.",
-      "addBanner": "배너 추가"
+      "addBanner": "배너 추가",
+      "emptyTitle": "아직 배너가 없습니다.",
+      "emptyHint": "배너를 추가하여 앱 상단에 공지를 표시하세요."
     },
     "variants": {
       "info": "정보",
@@ -5116,8 +5118,8 @@
       "variantHelp": {
         "info": "일반 공지 및 릴리스 소식",
         "warning": "서비스 성능 저하 또는 예정된 점검",
-        "critical": "장애, 가장 먼저 표시되며 프로모션을 숨깁니다",
-        "promo": "이벤트 및 혜택, 마지막에 표시되며 장애 중에는 숨겨집니다"
+        "critical": "장애 발생 시 최우선으로 표시되고 프로모션은 숨김",
+        "promo": "이벤트 및 혜택, 마지막에 표시되며 장애 중에는 숨김"
       },
       "toolbar": {
         "bold": "굵게",
@@ -6173,8 +6175,8 @@
     "periodInfoLine1": "쿼리가 실행될 기간입니다.",
     "periodInfoLine2": "예: 10분은 쿼리가 실행될 때마다 마지막 10분의 데이터를 사용함을 의미합니다. 쿼리가 오후 4:00에 실행되면 오후 3:50부터 오후 4:00까지의 데이터를 사용합니다.",
     "periodShouldMatchFrequency": "참고: 기간은 빈도와 동일해야 합니다.",
-    "delayInfoLine1": "예정된 시간 이후 대기 시간으로, 지연 데이터가 도착할 수 있게 합니다.",
-    "delayInfoLine2": "예: 10분 지연이면 매시간 파이프라인이 10:10에 실행되어 9:00부터 10:00까지의 데이터를 읽습니다.",
+    "delayInfoLine1": "파이프라인이 실행되도록 예약된 지연 시간입니다.",
+    "delayInfoLine2": "예: 10분 지연은 파이프라인이 예약된 시간보다 10분 후에 실행됨을 의미합니다.",
     "closeDrawer": "패널 닫기",
     "conditionValueGuidelines": "조건 값 지침:",
     "customColumnGuideline": "사용자 지정 열을 추가하려면 열 이름을 입력하고 누르세요.",
@@ -6385,28 +6387,28 @@
     "confirmDeleteNode": "노드를 삭제하시겠습니까?",
     "errorFetchingUsedStreams": "사용된 스트림을 가져오는 중 오류가 발생했습니다.",
     "destinationNotes": {
-      "openobserveTitle": "OpenObserve 연결 정보",
+      "openobserveTitle": "OpenObserve 연결 세부 정보",
       "openobserveStep1": "OpenObserve 인스턴스에 로그인하세요.",
       "openobserveStep2": "기본 URL을 복사하세요 (예: https://your-instance.openobserve.ai)",
       "openobserveStep3": "엔드포인트 경로는 다음과 같이 미리 채워져 있습니다: /api/{'{'}org{'}'}/{'{'}stream{'}'}/_json",
       "openobserveStep4": "{'{'}org{'}'}을(를) 조직 식별자로 교체하세요.",
       "openobserveStep5": "{'{'}stream{'}'}을(를) 스트림 이름으로 교체하세요.",
       "openobserveStep6": "인증 헤더를 추가하세요: Authorization: Basic <OpenObserve_Token>",
-      "splunkTitle": "Splunk HEC 연결 정보",
+      "splunkTitle": "Splunk HEC 연결 세부 정보",
       "splunkStep1": "관리자로 Splunk 인스턴스에 로그인하세요.",
       "splunkStep2": "설정 → 데이터 입력 → HTTP 이벤트 수집기로 이동하세요.",
       "splunkStep3": "'New Token'을 클릭하여 새 HEC 토큰을 만드세요.",
       "splunkStep4": "토큰 설정을 구성하고 저장하세요.",
       "splunkStep5": "Splunk HEC 엔드포인트 URL을 사용하세요.",
       "splunkStep6": "헤더 섹션에 HEC 토큰을 추가하세요 (Authorization: Splunk <token>)",
-      "elasticsearchTitle": "Elasticsearch 연결 정보",
+      "elasticsearchTitle": "Elasticsearch 연결 세부 정보",
       "elasticsearchStep1": "Elasticsearch 클러스터 엔드포인트를 찾으세요.",
       "elasticsearchStep2": "이 네트워크에서 클러스터에 액세스할 수 있는지 확인하세요.",
       "elasticsearchStep3": "API 키를 생성하거나 기본 인증을 사용하세요.",
       "elasticsearchStep4": "클라우드: 클라우드 콘솔에서 엔드포인트를 가져오세요.",
       "elasticsearchStep5": "자체 호스팅: 포트가 포함된 클러스터 URL을 사용하세요 (일반적으로 9200)",
       "elasticsearchStep6": "헤더 섹션에 인증을 추가하세요.",
-      "datadogTitle": "Datadog 연결 정보",
+      "datadogTitle": "Datadog 연결 세부 정보",
       "datadogStep1": "Datadog 계정에 로그인하세요",
       "datadogStep2": "조직 설정 → API 키로 이동하세요",
       "datadogStep3": "새 API 키를 만들거나 기존 키를 복사하세요",
@@ -7135,7 +7137,7 @@
     "orgLevelExplanation": "조직 수준의 통합 토큰입니다.토큰은 개별 사용자에 국한되지 않으며 토큰을 생성한 사용자가 조직을 떠나도 계속 작동합니다.토큰은 통합 엔드포인트에서만 사용할 수 있습니다.",
     "orgLevelSummary": "통합 엔드포인트를 위한 조직 수준 토큰.",
     "tokenManagementTitle": "수집 토큰 관리",
-    "createTokenBtn": "새 토큰",
+    "createTokenBtn": "새 토큰 생성",
     "createTokenTitle": "토큰 생성",
     "searchToken": "토큰 검색",
     "tokenNameLabel": "이름",
@@ -11691,9 +11693,9 @@
       "lengthenEvaluationWindowDesc": "기간을 넓혀 짧은 급증이 더 이상 알림을 트리거하지 않도록 합니다.",
       "enableDeduplication": "반복 억제 켜기",
       "enableDeduplicationDesc": "매 평가가 아니라 상태 변경 시 한 번만 알림을 보냅니다.",
-      "reviewForDeletion": "알림 검토",
+      "reviewForDeletion": "삭제 검토",
       "reviewForDeletionDesc": "알림을 폐기하기 전에 쿼리가 여전히 실제 상황과 일치하는지 확인합니다.",
-      "fixAlertQuery": "알림 검토",
+      "fixAlertQuery": "알림 쿼리 수정",
       "fixAlertQueryDesc": "평가 자체가 실패하여 결과에 도달하지 못합니다.",
       "repairDestination": "대상 복구",
       "repairDestinationDesc": "알림이 사용하는 대상에서 전송이 실패합니다.",
@@ -11877,7 +11879,7 @@
       "scopeAll": "모든 실행",
       "scopeFindings": "발견 사항 있음",
       "scopeGaps": "커버리지 공백",
-      "searchPlaceholder": "알림 이름으로 검색",
+      "searchPlaceholder": "알림 이름으로 실행 검색",
       "colRun": "실행",
       "colFindings": "발견 사항",
       "colCoverage": "커버리지",
@@ -11905,8 +11907,8 @@
       "statFindings": "발견 사항",
       "statAlertsInScope": "범위 내 알림",
       "statDeclined": "판정 제외",
-      "statDeclinedSub": "미해제",
-      "statDeclinedTooltip": "규칙과 알림 쌍 중 규칙이 판정하지 않는 항목입니다. 해제가 아니라 게이트입니다. 충족되지 않은 하한은 집계만 되며, 실행할 수 없었거나 확인 후 판정하지 않은 규칙은 사유와 함께 아래에 나열됩니다.",
+      "statDeclinedSub": "판정 제외, 이상 없음이 아님",
+      "statDeclinedTooltip": "규칙이 판단하지 않은 규칙-알림 쌍입니다. 해당 알림의 이력이 너무 적거나 샘플이 너무 부족했기 때문입니다. 통과가 아닌 게이트이며, 알림별 사유는 스트림에 기록되지 않습니다.",
       "limitations": "증거의 한계",
       "declinedHeading": "이유와 함께 거절됨",
       "declinedDesc": "알림에 대해 실행할 수 없었거나 확인 후 거절한 규칙입니다. 통과 판정이 아닙니다.",
@@ -11933,7 +11935,10 @@
       "proposedActions": "제안된 작업",
       "qualityReasons": "이유: {reasons} | 이유: {reasons}",
       "openAlert": "알림 열기",
-      "advice": "확인할 사항"
+      "advice": "확인할 사항",
+      "viewInLogs": "로그에서 보기",
+      "viewInLogsHint": "이 실행의 레코드를 로그에서 엽니다",
+      "loadFailed": "다이제스트를 불러올 수 없습니다: {message}"
     },
     "dashboard": {
       "latestRunAgo": "최근 실행 {time}",
@@ -11991,7 +11996,8 @@
       "runNowHeading": "지금 실행",
       "findingsKept": "발견 항목은 이 조직의 자체 기록과 함께 보존 기간 동안 보관됩니다. 알림 캘리브레이션은 알림을 전송하지 않습니다.",
       "frequencyRange": "1시간에서 30일 사이의 주기를 선택하세요.",
-      "windowRange": "1분에서 90일 사이의 기간을 선택하세요."
+      "windowRange": "1분에서 90일 사이의 기간을 선택하세요.",
+      "loadFailed": "설정을 불러올 수 없습니다: {message}"
     },
     "visibility": {
       "allClear": "최근 실행에서 접근 가능한 알림에 대한 발견 항목이 없습니다.",
@@ -12182,8 +12188,8 @@
     "response": "응답",
     "lastError": "마지막 오류:",
     "errorSummary": "오류 요약",
-    "searchThisFolderTooltip": "이 폴더의 알림 표시",
-    "searchAllFoldersTooltip": "모든 폴더의 알림 표시",
+    "searchThisFolderTooltip": "이 폴더에서만 검색",
+    "searchAllFoldersTooltip": "모든 폴더에서 검색",
     "reloadAlertsTooltip": "알림 다시 로드",
     "triggerDetection": "트리거 감지",
     "retrain": "재학습",
@@ -13265,7 +13271,7 @@
           "refuted": "반박됨"
         },
         "openEvidence": "증거 {number} 열기",
-        "notVerifiedId": "검증되지 않음",
+        "notVerifiedId": "미확인",
         "hypotheses": "가설",
         "noHypotheses": "아직 기록된 가설이 없습니다.",
         "noEvidenceYet": "아직 증거가 없습니다",
@@ -14245,7 +14251,7 @@
       "addedUnread": "알림을 읽지 못해 AutoObserve가 이 알림이 이미 추가되었는지 확인할 수 없습니다. 아무것도 저장되지 않았으므로 다시 저장해 재시도하세요.",
       "alreadyAdded": "이미 {folder} 폴더에 {name} 이름으로 추가되어 있어 이 알림은 다시 저장되지 않았습니다.",
       "dialog": {
-        "title": "알림 추가",
+        "title": "알림 만들기",
         "continue": "알림으로 계속",
         "queryChoiceLabel": "알림 대상 쿼리",
         "queryChoiceOption": "{name}: {query}",
@@ -14268,19 +14274,19 @@
       },
       "sources": {
         "default": {
-          "label": "알림 추가",
+          "label": "알림 만들기",
           "toast": "쿼리가 알림 양식으로 가져와졌습니다."
         },
         "logs": {
-          "label": "알림 추가",
+          "label": "알림 만들기",
           "toast": "로그 검색에서 쿼리를 가져왔습니다."
         },
         "patterns": {
-          "label": "알림 추가",
+          "label": "알림 만들기",
           "toast": "선택한 패턴에서 쿼리를 가져왔습니다."
         },
         "panel": {
-          "label": "알림 추가",
+          "label": "알림 만들기",
           "toast": "대시보드 패널 \"{sourceLabel}\"에서 쿼리를 가져왔습니다."
         },
         "library": {
@@ -14288,7 +14294,7 @@
           "toast": "알림 라이브러리에서: {sourceLabel}"
         },
         "explorer": {
-          "label": "알림 추가",
+          "label": "알림 생성",
           "toast": "메트릭 탐색기에서 쿼리를 가져왔습니다"
         },
         "dbm": {
@@ -14304,7 +14310,7 @@
           "toast": "제품 분석에서 가져옴: \"{sourceLabel}\""
         },
         "traces": {
-          "label": "알림 추가",
+          "label": "알림 생성",
           "toast": "트레이스 검색에서 쿼리를 가져왔습니다",
           "noStream": "먼저 스트림을 선택하세요",
           "errorCount": "오류 수",
@@ -14508,7 +14514,7 @@
       "filterAll": "전체",
       "filterOnce": "일회성",
       "filterRecurring": "반복",
-      "search": "이름, 사유 또는 생성자로 검색",
+      "search": "이름, 차원 또는 생성자로 검색",
       "searchAcross": "모든 폴더 검색",
       "thisFolder": "이 폴더",
       "allFolders": "모든 폴더",
@@ -15047,7 +15053,7 @@
       "webhookOnly": "(웹훅 전용)",
       "emailOnly": "(이메일 전용)",
       "snsOnly": "(SNS 전용)",
-      "stale": "템플릿 {name}은(는) 이 종류에 사용할 수 없습니다. 다른 템플릿을 선택하거나 필드를 비우세요.",
+      "stale": "템플릿 {name}이(가) 더 이상 존재하지 않습니다. 다른 템플릿을 선택하거나 필드를 비우세요.",
       "clear": "지우기",
       "willUse": "사용 예정: {template}",
       "willUsePerDestination": "대상별 사용 예정:",
@@ -15261,7 +15267,7 @@
     "systemReadOnlyEdit": "사전 빌드된 템플릿 — 편집이 비활성화되었습니다. 복제하여 수정 가능한 사본을 만드세요.",
     "systemReadOnlyDelete": "사전 빌드된 템플릿 — 삭제가 비활성화되었습니다. 복제하여 수정 가능한 사본을 만드세요.",
     "prebuiltBadge": "사전 구축",
-    "prebuiltBadgeHint": "시스템에서 관리합니다. 편집하거나 삭제할 수 없습니다. 수정 가능한 복사본을 만들려면 복제하세요.",
+    "prebuiltBadgeHint": "시스템에 의해 관리됩니다.편집은 가능하지만 삭제는 불가능합니다.",
     "customBadge": "사용자 지정",
     "filterAll": "모두",
     "filterPrebuilt": "사전 구축",
@@ -15478,9 +15484,9 @@
   },
   "alert_destinations": {
     "chooseTypeTitle": "유형 선택",
-    "selectDestinationType": "대상 유형",
+    "selectDestinationType": "대상 유형 선택",
     "connectionStepTitle": "연결",
-    "connectionDetailsTitle": "연결 세부정보",
+    "connectionDetailsTitle": "연결 세부 정보",
     "urlHelpText": "후행 슬래시가 없는 기본 URL (예: https://your-domain.com)",
     "organizationHelpText": "OpenObserve 조직 식별자",
     "streamHelpText": "OpenObserve 스트림 이름",
@@ -15539,12 +15545,12 @@
     "urlOrRecipients": "URL / 수신자",
     "api_header": "헤더",
     "api_header_value": "값",
-    "skip_tls_verify": "TLS 검증 건너뛰기",
+    "skip_tls_verify": "TLS 확인 건너뛰기",
     "payloadFormat": "페이로드 형식",
     "payloadFormatAuto": "자동",
     "payloadFormatLegacy": "레거시 JSON",
     "payloadFormatRendered": "렌더링된 템플릿",
-    "payloadFormatHelp": "자동은 템플릿이 연결될 때까지 이상 탐지, Synthetics, 온콜 및 다운타임 메시지에 기존 JSON 본문을 전송합니다.",
+    "payloadFormatHelp": "자동은 템플릿이 연결될 때까지 이상 탐지, Synthetics 및 온콜 메시지에 기존 JSON 본문을 전송합니다. 메타데이터 키 payload_format으로 저장됩니다.",
     "output_format": "출력 형식",
     "readonly": "읽기 전용",
     "additional_settings": "추가 설정",
@@ -15683,16 +15689,16 @@
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
-    "tabLabel": "자체 버킷 사용",
-    "title": "자체 버킷 사용",
+    "tabLabel": "조직 스토리지",
+    "title": "조직 스토리지",
     "notEnabled": "{product}은(는) 이 조직에서 사용하도록 설정되지 않았습니다",
     "heroHeadline": "나만의 스토리지를 가지고 오세요",
-    "heroSub": "자체 클라우드 버킷을 연결하세요. 데이터는 인프라에 그대로 유지되며 완전한 제어와 락인 없이 사용할 수 있습니다.",
-    "configureStorage": "버킷 구성",
+    "heroSub": "자체 클라우드 버킷을 연결하면 데이터가 인프라에 그대로 유지됩니다. 완전한 제어가 가능하고 종속되지 않습니다.",
+    "configureStorage": "스토리지 구성",
     "supportedProviders": "지원되는 공급자",
     "perOrgIsolation": "조직별 격리",
     "appliesImmediately": "새 데이터에 즉시 적용",
-    "usesOrgCredentials": "조직 범위 자격 증명 사용",
+    "usesOrgCredentials": "조직 범위의 자격 증명 사용",
     "updateStorage": "버킷 업데이트",
     "active": "유효한",
     "bucketName": "버킷 이름",
@@ -15707,12 +15713,12 @@
     "featureOwnDataDesc": "수집된 데이터를 자체 버킷에 직접 저장하고 누가 데이터에 액세스할 수 있는지 완벽하게 제어할 수 있습니다.",
     "featureSecureTitle": "보안 및 규정 준수",
     "featureSecureDesc": "세밀한 액세스 키를 사용하면 중요한 데이터가 인프라에 그대로 유지됩니다.",
-    "newStorageConfiguration": "새 버킷 구성",
+    "newStorageConfiguration": "새 스토리지 구성",
     "selectProviderDesc": "이 조직의 데이터를 저장할 클라우드 저장소 공급자를 선택합니다.",
     "bucketNameRequired": "버킷 이름이 필요합니다",
     "accessKeyRequired": "액세스 키가 필요합니다",
     "secretKeyRequired": "비밀 키가 필요합니다",
-    "storageAccountRequired": "스토리지 계정 이름은 필수입니다",
+    "storageAccountRequired": "스토리지 계정 이름이 필요합니다",
     "regionRequired": "지역은 필수입니다.",
     "roleARNRequired": "역할 ARN이 필요합니다.",
     "externalIdRequired": "외부 ID가 필요합니다.",
@@ -15721,7 +15727,7 @@
     "save": "저장",
     "update": "업데이트",
     "awsStsCloudInfo": "이 설정은 AWS STS를 사용하여 역할을 수임합니다. AWS 콘솔에서 이 역할의 신뢰할 수 있는 엔터티로 {product} AWS 계정을 추가하세요. 계정 세부정보나 설정 도움이 필요하면 {product} 팀에 문의하세요.",
-    "awsStsSelfHostedInfo": "이 설정은 AWS STS를 사용하여 역할을 수임합니다. 설치 환경에 이 역할을 수임할 수 있는 AWS 자격 증명이 있는지 확인하세요."
+    "awsStsSelfHostedInfo": "이는 AWS sts를 사용하여 역할을 맡아 작업을 수행합니다.설치 환경에서 이 역할에 액세스할 수 있는 AWS 자격 증명을 구성했는지 확인하십시오."
   },
   "metrics": {
     "add": "추가",
@@ -16202,7 +16208,7 @@
     "cipherKeysDesc": "민감한 필드를 위한 암호화 키",
     "aiToolsetsDesc": "AI 어시스턴트가 사용할 수 있는 MCP 서버 및 CLI 도구",
     "regexPatternsDesc": "수정에 재사용 가능한 regex 패턴",
-    "domainManagementDesc": "도메인별 SSO 클레임 파싱 및 로그인 제한",
+    "domainManagementDesc": "허용된 SSO 도메인으로 로그인 제한",
     "passwordPolicy": "비밀번호 정책",
     "passwordPolicyDesc": "네이티브 이메일/비밀번호 계정에 대한 인증 정책으로, 인스턴스 전체에 적용됩니다.",
     "pipelineDestinationsDesc": "파이프라인 출력을 위한 외부 대상",
@@ -16225,13 +16231,13 @@
     "tracesHeading": "트레이스",
     "traceIdFieldName": "트레이스 ID 필드 이름",
     "spanIdFieldName": "스팬 ID 필드 이름",
-    "toggleIngestionLogsLabel": "수집 로그",
-    "usageStreamEnabledLabel": "사용량 스트림",
-    "redInsightsEnabledLabel": "트레이스에 대한 자동 RED 인사이트",
+    "toggleIngestionLogsLabel": "통합 로그 전환",
+    "usageStreamEnabledLabel": "사용 스트림 활성화",
+    "redInsightsEnabledLabel": "트레이스에 대한 자동 RED 인사이트 활성화",
     "redInsightsEnabledHelp": "가장 트래픽이 많은 서비스에 대해 요청률, 오류, p95 지연 시간 이상 감지기를 \"RED insights\" 알림 폴더에 생성합니다. 해당 폴더는 공유되기 전까지 관리자만 볼 수 있습니다.",
     "incidentsHeading": "인시던트",
-    "aiRcaThreadToolOutputLabel": "인시던트 스레드의 도구 데이터",
-    "aiRcaThreadToolOutputHelp": "인시던트를 읽을 수 있는 모든 사용자에게 원시 도구 입력 및 출력을 표시합니다.",
+    "aiRcaThreadToolOutputLabel": "인시던트 조사 스레드에서 도구 데이터 표시",
+    "aiRcaThreadToolOutputHelp": "인시던트를 열람할 수 있는 모든 사람에게 인시던트 조사 스레드의 원시 도구 입력 및 출력을 표시합니다",
     "claimParserFunction": "SSO 클레임 파서",
     "claimParserFunctionDescription": "SSO/LDAP 클레임을 구문 분석하고 조직 및 역할 할당으로 변환할 함수({product1} 또는 {product2})를 선택하세요.",
     "claimParserFunctionLabel": "VRL 함수 선택",
@@ -16357,10 +16363,10 @@
       "fieldAliasesSaveError": "필드 별칭 저장 실패",
       "fieldAliasesUnsavedConfirm": "저장되지 않은 필드 매핑 변경 사항이 있습니다. 삭제하고 나가시겠습니까?",
       "discoveredServicesTitle": "검색된 서비스",
-      "discoveredServicesDescription": "서비스는 텔레메트리에서 검색되며 서비스 이름으로 그룹화됩니다. 탐지 규칙이 서비스를 식별하는 방식을 결정합니다.",
+      "discoveredServicesDescription": "서비스는 텔레메트리 데이터에서 자동으로 검색되며 상관 관계를 위해 서비스 이름별로 그룹화됩니다. 동일한 서비스 이름을 공유하는 서비스는 로그, 트레이스 및 메트릭 전반에 걸쳐 함께 상관 관계가 있습니다.",
       "noServicesYet": "아직 검색된 서비스가 없습니다.",
       "noServicesDescription": "원격 측정 데이터가 서비스 식별 속성 (예: k8s-배포, 서비스 이름 등) 과 함께 수집되면 서비스가 여기에 표시됩니다.",
-      "searchServiceName": "서비스 또는 스트림 검색",
+      "searchServiceName": "서비스 이름 검색...",
       "telemetryCoverage": "텔레메트리 커버리지",
       "serviceName": "서비스 이름",
       "service": "서비스",
@@ -16394,15 +16400,15 @@
       "identityConfigSaved": "서비스 ID 구성이 성공적으로 저장되었습니다",
       "identityConfigSaveFailed": "서비스 ID 구성 저장 실패",
       "loadRecommendationsFailed": "추천 로드 실패",
-      "resetServices": "서비스 초기화",
+      "resetServices": "서비스 재설정",
       "resetServicesTooltip": "발견된 모든 서비스를 삭제합니다. 새 데이터가 도착하면 자동으로 다시 발견됩니다.",
-      "resetServicesConfirmTitle": "검색된 모든 서비스를 초기화하시겠습니까?",
+      "resetServicesConfirmTitle": "발견된 모든 서비스를 재설정하시겠습니까?",
       "resetServicesConfirmBody": "이 작업은 이 조직에서 검색된 모든 서비스를 삭제하며 되돌릴 수 없습니다. 새 텔레메트리가 도착하면 서비스가 다시 검색됩니다.",
       "resetServicesSuccess": "발견된 서비스 {count}개를 성공적으로 삭제했습니다. | 발견된 서비스 {count}개를 성공적으로 삭제했습니다.",
       "resetServicesFailed": "서비스 재설정 실패",
       "workload": "워크로드",
       "goToConfiguration": "구성으로 이동",
-      "filterBy": "필드로 필터링",
+      "filterBy": "필터 기준 :",
       "selectFieldPlaceholder": "필드 선택",
       "selectValuePlaceholder": "값 선택",
       "selectFieldFirst": "먼저 필드를 선택하세요",
@@ -16411,13 +16417,18 @@
       "noDimensions": "차원 없음",
       "defaultSetWarningTitle": "상관 분석이 신뢰할 수 없을 수 있습니다.",
       "defaultSetWarningBody": "이 인스턴스에는 명확성이 없습니다. 워크로드 일치 없이 검색되었습니다(클러스터, 네임스페이스 또는 환경 컨텍스트 없음). 로그와 트레이스는 동일한 서비스 이름의 서로 다른 배포에서 올 수 있습니다.",
-      "instanceIdentity": "인스턴스 식별자",
+      "instanceIdentity": "인스턴스 ID",
       "noDimensionsCatchAll": "차원 없음 — 모든 항목 포괄 인스턴스",
       "streamSources": "스트림 소스",
       "fieldNameMapping": "필드 이름 매핑",
       "logsWithCount": "로그 ({count})",
       "tracesWithCount": "트레이스 ({count})",
-      "metricsWithCount": "메트릭 ({count})"
+      "metricsWithCount": "메트릭 ({count})",
+      "resetServicesConfirmMessage": "이 작업은 이 조직에 대해 발견된 모든 서비스를 삭제합니다. 새 텔레메트리 데이터가 수집되면 서비스가 자동으로 다시 발견됩니다. 이 작업은 취소할 수 없습니다.",
+      "resetServicesConfirmWarning": "새 텔레메트리 데이터가 수집되면 서비스가 자동으로 다시 발견됩니다. 이 작업은 취소할 수 없습니다.",
+      "configureServicesHint": "서비스가 식별되고 그룹화되는 방식을 구성하려면.",
+      "serviceCountSingular": "{count} 서비스 | {count} 서비스",
+      "instancesCount": "(인스턴스 {count}개)"
     },
     "addRegexPattern": {
       "namePlaceholder": "예: 내부 비밀번호",
@@ -16496,7 +16507,8 @@
       "logoLightLabel": "사용자 지정 로고(라이트 모드)",
       "logoLightHelp": "라이트 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px.",
       "logoDarkLabel": "사용자 지정 로고(다크 모드)",
-      "logoDarkHelp": "다크 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px."
+      "logoDarkHelp": "다크 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px.",
+      "fileCounterLabel": "{constraint} {filesNumber}개 파일 {'|'} {totalSize}"
     },
     "modelPricingEditor": {
       "copySuffix": " (복사)"
@@ -16505,7 +16517,7 @@
       "subtitle": "LLM 모델 비용 구성"
     },
     "orgStorageSettings": {
-      "subtitle": "이 조직의 데이터를 소유한 버킷에 저장",
+      "subtitle": "조직별 스토리지 구성",
       "awsCredentials": "AWS 자격 증명",
       "azureCredentials": "Azure 자격 증명",
       "awsRoleArn": "AWS 역할 ARN"
@@ -16525,10 +16537,13 @@
       "daysValue": "{days}일",
       "forever": "영구 보존",
       "invalid": "0 또는 최소 3일을 사용하세요",
-      "invalidType": "최소 3일을 사용하거나 이 유형을 제거하세요"
+      "invalidType": "최소 3일을 사용하거나 이 유형을 제거하세요",
+      "streamType": "스트림 유형",
+      "days": "일",
+      "removeType": "이 스트림 유형 제거"
     },
     "organizationSettings": {
-      "fieldNameHelp": "문자, 숫자 및 + = , . {'@'} - _만 사용할 수 있습니다.",
+      "fieldNameHelp": "영숫자 및 '+=,.{'@'}-_' 문자만 사용하고 공백은 사용하지 마세요.",
       "sectionTitle": "데이터 처리",
       "sectionDescription": "로그가 트레이스와 연결되는 방식과 활성화된 자동 기능을 설명합니다.",
       "traceIdHelp": "로그 한 줄을 해당 트레이스에 연결하는 로그 필드입니다. 문자, 숫자, + = , . {'@'} - _만 사용할 수 있습니다.",
@@ -16542,7 +16557,7 @@
       "subtitle": "AI 도구 통합 구성"
     },
     "cipherKeysPage": {
-      "subtitle": "민감한 필드 값을 암호화하고 복호화하는 키",
+      "subtitle": "민감한 필드용 암호화 키",
       "delete": "삭제",
       "deleteCipherKeyTitle": "암호화 키 삭제",
       "deleteCipherKeyMessage": "{name} 암호화 키를 삭제하시겠습니까?",
@@ -16647,7 +16662,7 @@
       "contractRevokedSuccess": "외부 계약이 성공적으로 취소되었습니다.",
       "revokeContractError": "외부 계약 취소에 실패했습니다.",
       "enableByobTitle": "BYOB 활성화",
-      "enablingStorage": "스토리지 설정을 활성화하는 중...",
+      "enablingStorage": "스토리지 설정 활성화 중...",
       "storageEnabledSuccess": "스토리지 설정이 성공적으로 활성화되었습니다.",
       "enableStorageError": "스토리지 설정 활성화에 실패했습니다.",
       "processingTrialExtension": "평가판 기간 연장 요청을 처리하는 동안 기다려 주세요...",
@@ -16682,19 +16697,19 @@
       "failedToImport": "\"{name}\" 가져오기 실패: {error}"
     },
     "orgStorageEditor": {
-      "chooseTypeTitle": "공급자 선택",
-      "selectProviderDescCont": "구성이 완료되면 이 조직의 모든 새 데이터가 소유한 버킷에 기록됩니다.",
+      "chooseTypeTitle": "유형 선택",
+      "selectProviderDescCont": "구성되면 이 조직의 모든 새 데이터는 자체 스토리지 인프라에 기록됩니다.",
       "irreversibleWarnPre": "이 작업은 ",
       "irreversibleWarnEmphasis": "되돌릴 수 없습니다",
       "irreversibleWarnPost": ". 설정 후에는 다른 스토리지 공급자로 전환하거나 이 구성을 삭제할 수 없습니다. 다른 공급자를 사용하려면 새 조직을 만들어야 합니다.",
       "credentialsOnlyInfo": "구성되면 자격 증명 필드만 업데이트할 수 있습니다. 다른 모든 필드는 잠깁니다.",
-      "selectStorageProviderLabel": "스토리지 공급자",
+      "selectStorageProviderLabel": "스토리지 공급자 선택 ",
       "connectionTitle": "연결",
       "serverUrlLabel": "서버 URL",
       "regionLabel": "지역",
       "bucketNameLabel": "버킷 이름",
       "accessKeyLabel": "액세스 키",
-      "secretKeyLabel": "비밀 키",
+      "secretKeyLabel": "시크릿 키",
       "storageAccountNameLabel": "스토리지 계정 이름",
       "roleArnLabel": "역할 ARN",
       "externalIdLabel": "외부 ID",
@@ -16721,10 +16736,10 @@
       "serviceNameDetectedFrom": "서비스 이름이 다음에서 감지됨",
       "fieldAlias": "필드 별칭",
       "noFieldsConfiguredYet": "아직 구성된 필드가 없습니다.",
-      "workloadDetection": "워크로드 탐지",
+      "workloadDetection": "워크로드 감지",
       "workloadDetectedUsingFields": "워크로드가 필드를 사용하여 감지됨",
       "workloadTrackedHelp": "워크로드 감지 및 권장 사항에는 이러한 필드 별칭 그룹만 사용됩니다. 이 목록에 없는 필드는 서비스 검색 결과에 영향을 미치지 않습니다. 선택 사항 — ID 집합에 나열된 차원은 항상 추적됩니다.",
-      "goToFieldAliases": "필드 매핑으로 이동",
+      "goToFieldAliases": "필드 별칭으로 이동",
       "toConfigureFieldMappings": "개별 필드 매핑을 구성하려면.",
       "selectAliasGroup": "별칭 그룹 선택",
       "discoveredPatternsHelp": "스트림에서 이러한 배포 패턴을 발견했습니다. 이를 사용하여 서비스 상관 관계를 구성하세요.",
@@ -16759,7 +16774,8 @@
       "reasonIdealForDisambiguation": "{details} — 서비스 식별에 이상적",
       "trackedK8sWorkload": "K8s 워크로드",
       "trackedK8sPod": "K8s 파드",
-      "serviceCountFailed": "서비스 수를 불러오지 못했습니다"
+      "serviceCountFailed": "서비스 수를 불러오지 못했습니다",
+      "toSeeDiscoveredServices": "실제로 발견된 서비스를 보려면."
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "예: {example}",
@@ -16948,6 +16964,51 @@
       "requestApproved": "{domain} 연결됨",
       "requestRejected": "{domain}에 대한 요청이 거부되었습니다",
       "decisionFailed": "요청을 업데이트하지 못했습니다"
+    },
+    "groupDataAI": "데이터 및 AI",
+    "llmProvidersDesc": "온라인 평가를 위한 LLM 공급자",
+    "customLogoTitle": "맞춤 로고",
+    "customLogoTextDescription": "사용자 지정 로고 텍스트는 애플리케이션에 표시되는 기본 브랜딩 텍스트를 변경하는 데 사용됩니다.",
+    "dragDropUpload": "드래그 앤 드롭 또는 클릭하여 업로드",
+    "customLogoLightDescription": "라이트 모드 테마에 대한 사용자 정의 로고.사용자가 라이트 모드에 있을 때 표시됩니다.",
+    "customLogoDarkDescription": "다크 모드 테마에 대한 사용자 정의 로고.사용자가 다크 모드에 있을 때 표시됩니다.",
+    "textMaxCharacters": "텍스트는 100자 미만이어야 합니다.",
+    "genAiAgentMapping": {
+      "tabLabel": "젠아이 에이전트 매핑",
+      "title": "젠아이 에이전트 매핑",
+      "description": "LLM 트레이스 및 평가에서 에이전트 ID를 정규화하는 데 사용되는 대체 텔레메트리 속성을 구성합니다.",
+      "agentNameFields": "에이전트 이름 폴백 필드",
+      "agentNameHelp": "gen_ai.agent.name의 폴백으로 사용할 들어오는 속성입니다.",
+      "agentNameInfo": "표준 gen_ai.agent.name 속성이 없거나 비어 있는 경우에만 확인합니다.수신되는 텔레메트리 속성을 한 줄에 하나씩 추가합니다.",
+      "agentIdFields": "에이전트 ID 폴백 필드",
+      "agentIdHelp": "gen_ai.agent.id의 폴백으로 사용할 수신 속성입니다.",
+      "agentIdInfo": "표준 gen_ai.agent.id 속성이 없거나 비어 있는 경우에만 확인합니다.수신되는 텔레메트리 속성을 한 줄에 하나씩 추가합니다.",
+      "envFields": "환경 폴백 필드",
+      "envHelp": "에이전트 환경으로 사용할 수신 속성.",
+      "envInfo": "표준 deployment.environment.name 속성이 없거나 비어 있는 경우에만 확인됩니다. 줄마다 수신 텔레메트리 속성을 하나씩 추가하세요.",
+      "versionFields": "버전 폴백 필드",
+      "versionHelp": "에이전트 버전으로 사용할 수신 속성.",
+      "versionInfo": "표준 gen_ai.agent.version 속성이 없거나 비어 있는 경우에만 확인됩니다. 줄마다 수신 텔레메트리 속성을 하나씩 추가하세요.",
+      "alwaysAppliedStandard": "표준(먼저 확인됨):",
+      "applyDefaults": "기본값 적용",
+      "resetToEmpty": "빈 상태로 재설정",
+      "clearRegistry": "레지스트리 지우기",
+      "clearRegistryTitle": "에이전트 레지스트리를 지우시겠습니까?",
+      "clearRegistryDescription": "이 작업은 이 조직의 발견된 GenAI 에이전트 레지스트리 행을 모두 삭제합니다. 새로 일치하는 트레이스는 수집 중에 레지스트리를 다시 채웁니다.",
+      "clearRegistryConfirm": "레지스트리 지우기",
+      "saved": "GenAI 에이전트 매핑이 성공적으로 저장되었습니다.",
+      "clearRegistrySuccess": "GenAI 에이전트 레지스트리가 삭제되었습니다. {deletedCount} 개의 저장된 에이전트와 {bufferCount} 개의 대기 중인 관찰을 삭제했습니다.",
+      "loadFailed": "GenAI 에이전트 매핑을 로드하지 못했습니다.",
+      "saveFailed": "GenAI 에이전트 매핑을 저장하지 못했습니다.",
+      "clearRegistryFailed": "GenAI 에이전트 레지스트리를 지우지 못했습니다.",
+      "defaultsLoadFailed": "GenAI 에이전트 매핑 기본값을 로드하지 못했습니다.",
+      "defaultsFetchFailed": "기본값을 가져오지 못했습니다. ({status})"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "온라인 평가를 위한 LLM 공급자"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "GenAI 스팬을 에이전트 식별자에 매핑합니다"
     }
   },
   "reports": {
@@ -17178,7 +17239,7 @@
     },
     "selectOption": "옵션 선택",
     "runningQueries": "실행 중인 쿼리",
-    "search": "쿼리 검색",
+    "search": "검색",
     "queryList": "쿼리 세부 정보",
     "duration": "실행 시간",
     "files": "파일",
@@ -17189,9 +17250,9 @@
     "allQueries": "모든 쿼리",
     "allFields": "모든 필드",
     "queryType": "쿼리 유형",
-    "numOfQueries": "쿼리 수",
-    "totalDuration": "총 실행 시간",
-    "totalTimeRange": "총 쿼리 범위",
+    "numOfQueries": "쿼리 개수",
+    "totalDuration": "토탈 이그제큐티브기간",
+    "totalTimeRange": "전체 쿼리 범위",
     "searchType": "검색 유형",
     "querySource": "쿼리 소스",
     "traceId": "트레이스 ID",
@@ -17209,7 +17270,8 @@
     "cancelQueryFailed": "쿼리를 취소하지 못했습니다",
     "searchTypeDashboards": "대시보드",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "기타"
+    "searchTypeOthers": "기타",
+    "lastDataRefreshTime": "마지막 데이터 새로 고침 시간:"
   },
   "traces": {
     "nlNeedsSql": "이 질문에는 SQL이 필요합니다. 로그에서 여세요.",
@@ -17659,7 +17721,8 @@
         "count": "{count}개 인사이트 | {count}개 인사이트",
         "countHint": "이 시간 범위의 서비스 이상 {count}건 | 이 시간 범위의 서비스 이상 {count}건",
         "viewTraces": "트레이스",
-        "viewCharts": "차트"
+        "viewCharts": "차트",
+        "scoreAbove": "임계값 초과 점수 +{percent}%"
       }
     },
     "spansTab": "스팬",
@@ -17762,14 +17825,15 @@
       "failedToLoad": "인사이트 로드 실패",
       "retry": "재시도",
       "noAgentsInRange": "이 범위에 에이전트 없음",
-      "noAgentsDescription": "선택한 시간 범위에서 GenAI 에이전트가 감지되지 않았습니다. 더 넓은 범위를 시도하거나 스트림 탭으로 전환하거나 에이전트 매핑을 구성하세요.",
+      "noAgentsDescription": "선택한 시간 범위에서 GenAI 에이전트가 감지되지 않았습니다. 더 넓은 범위로 시도하거나, 스트림 탭으로 전환하거나, 설정에서 에이전트 매핑을 구성하세요.",
       "viewByStream": "스트림별 보기",
       "totalCost": "총 비용",
       "totalTokens": "총 토큰",
       "totalTraces": "총 트레이스",
       "p95Latency": "P95 지연 시간",
       "errorRate": "오류율",
-      "timeAxis": "시간"
+      "timeAxis": "시간",
+      "errorsSeries": "오류"
     },
     "searchBar": {
       "streamNotFound": "스트림을 찾을 수 없음"
@@ -17823,7 +17887,10 @@
       "metricsLoadFailed": "이 서비스의 상관 메트릭을 불러오지 못했습니다. {reason}",
       "noResourceRecorded": "이 시간 범위에서 이 서비스의 스팬에는 {resource}이(가) 기록되지 않습니다.",
       "resourceLoadFailed": "이 서비스의 {resource}을(를) 불러오지 못했습니다. {reason}",
-      "noVersionTraffic": "이 스트림에서 이 서비스의 스팬에는 버전이 기록되지 않으므로 버전별로 분할할 트래픽이 없습니다."
+      "noVersionTraffic": "이 스트림에서 이 서비스의 스팬에는 버전이 기록되지 않으므로 버전별로 분할할 트래픽이 없습니다.",
+      "noResourceDataFound": "{resource} 데이터를 찾을 수 없음",
+      "failedToLoadMetrics": "메트릭을 불러오지 못했습니다.",
+      "requests": "요청"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP 상태 코드",
@@ -18063,12 +18130,21 @@
       "loadingPage": "페이지 {page} 로드 중",
       "pageFailed": "페이지 {page}을(를) 로드할 수 없습니다",
       "pageEmpty": "페이지 {page}에 결과가 없습니다"
+    },
+    "lLMErrorTable": {
+      "noData": "데이터 없음",
+      "noErrorsInRange": "이 시간 범위에 오류가 없습니다",
+      "loadFailed": "최근 오류를 불러오지 못했습니다",
+      "time": "시간",
+      "service": "서비스",
+      "operation": "작업",
+      "traceId": "트레이스 ID"
     }
   },
   "aiToolset": {
     "header": "AI 툴셋",
-    "add": "새 도구 세트",
-    "search": "AI 도구 세트 검색",
+    "add": "새로운 AI 툴셋",
+    "search": "AI 툴셋 검색",
     "update": "AI 툴셋 업데이트",
     "name": "이름",
     "nameRequired": "이름은 필수",
@@ -18098,7 +18174,7 @@
     "headerKey": "헤더 이름",
     "headerValue": "헤더 값",
     "addHeader": "헤더 추가",
-    "cliConfig": "CLI 도구 구성",
+    "cliConfig": "CLI 툴 컨피그레이션",
     "presets": "퀵 필",
     "cliCommand": "커맨드",
     "cliCommandRequired": "명령이 필요합니다",
@@ -18128,7 +18204,7 @@
     "update": "암호 키 업데이트",
     "name": "이름",
     "type": "타입",
-    "step1WithType": "키 저장소 ({type})",
+    "step1WithType": "키 저장소 세부 정보 (유형: {type})",
     "step2": "암호화 메커니즘",
     "sectionKey": "키",
     "sectionSetup": "키 저장소 및 암호화",
@@ -18170,7 +18246,7 @@
     "staticSecretNameRequired": "정적 시크릿 이름이 필요합니다",
     "dfcNameRequired": "DFC 이름이 필요합니다",
     "dfcEncryptedDataRequired": "DFC 암호화 데이터가 필요합니다",
-    "storeType": "저장소 유형",
+    "storeType": "스토어 유형",
     "mechanismType": "메커니즘 유형",
     "actions": "액션"
   },
@@ -18213,11 +18289,11 @@
     "cpuusage": "CPU 사용량 (%)",
     "memoryusage": "메모리 사용량 (%)",
     "establishedLabel": "연결됨",
-    "closewaitLabel": "Close 대기",
-    "waittimeLabel": "Time 대기",
+    "closewaitLabel": "닫기 대기",
+    "waittimeLabel": "시간 대기",
     "applyFilter": "필터 적용",
     "searchCluster": "클러스터 검색",
-    "searchRegion": "리전 검색"
+    "searchRegion": "지역 검색"
   },
   "regex_patterns": {
     "title": "민감한 데이터 수정",
@@ -18225,16 +18301,16 @@
     "search": "패턴 검색",
     "name": "이름",
     "pattern": "패턴",
-    "created_at": "생성 일시",
-    "updated_at": "수정 일시",
+    "created_at": "만든 날짜",
+    "updated_at": "업데이트 날짜",
     "actions": "액션",
     "edit": "편집",
     "delete": "삭제",
     "create_regex_pattern": "새 패턴",
-    "create_close": "생성 후 닫기",
+    "create_close": "생성 및 닫기",
     "cancel": "취소",
     "edit_regex_pattern": "패턴 편집",
-    "update_close": "수정 후 닫기",
+    "update_close": "업데이트 및 닫기",
     "description": "설명",
     "unsupported_lookaround_note": "룩어헤드, 룩비하인드, 역참조 및 재귀는 지원되지 않습니다.일반 패턴으로 다시 작성하세요.",
     "unsupported_lookaround_example": "예:.",
@@ -19526,7 +19602,8 @@
         "promptTemperatureOverrideInherited": "프롬프트 매개변수를 사용 중입니다.",
         "taskTimeoutLabel": "제한 시간(초)",
         "taskConcurrencyLabel": "최대 동시성",
-        "taskOverrideHelp": "이 실행에 대해 태스크의 게시된 값을 재정의합니다."
+        "taskOverrideHelp": "이 실행에 대해 태스크의 게시된 값을 재정의합니다.",
+        "providerHelpSettingsLink": "설정"
       },
       "columns": {
         "name": "이름",
@@ -19864,7 +19941,7 @@
       "agentIdHint": "에이전트 ID: {ids}",
       "noAgentIdentity": "에이전트 ID를 찾을 수 없습니다",
       "noAgentIdentityDescription": "이 LLM 스팬에는 에이전트 이름이 없어 스트림별로 표시됩니다. 에이전트별로 보려면 에이전트 이름을 지정하는 속성을 매핑하세요.",
-      "noAgentIdentityAction": "에이전트 매핑 열기"
+      "noAgentIdentityAction": "GenAI 에이전트 매핑 열기"
     },
     "agentGraph": {
       "stream": "스트림",
@@ -19880,17 +19957,17 @@
       },
       "tokenTrend": {
         "title": "토큰 트렌드",
-        "subtitle": "입력 및 출력 토큰",
+        "subtitle": "모델별 토큰",
         "input": "입력",
         "output": "출력"
       },
       "latencyByModel": {
-        "title": "지연 시간 추세",
-        "subtitle": "모델별 p95"
+        "title": "모델별 지연 시간",
+        "subtitle": "p50/ p90/ p95/ p99"
       },
       "tracesOverTime": {
-        "title": "시간별 트레이스",
-        "subtitle": "정상 및 오류 트레이스",
+        "title": "시간 경과에 따른 요청",
+        "subtitle": "서비스별 요청 수",
         "ok": "정상",
         "errored": "오류"
       },
@@ -19919,6 +19996,26 @@
           "traces": "트레이스",
           "last": "마지막 실패"
         }
+      },
+      "spanTrend": {
+        "title": "스팬 추세",
+        "subtitle": "종류별 스팬 수"
+      },
+      "errorsOverTime": {
+        "title": "시간 경과에 따른 오류",
+        "subtitle": "오류 개수"
+      },
+      "spansByModel": {
+        "title": "모델별 스팬",
+        "subtitle": "모델당 콜 수"
+      },
+      "tokensByModel": {
+        "title": "모델별 토큰",
+        "subtitle": "모델당 총 토큰"
+      },
+      "recentErrors": {
+        "title": "최근 오류",
+        "subtitle": "최근 10개의 실패한 스팬"
       }
     },
     "behavior": {
@@ -19951,12 +20048,12 @@
       "colErrors": "오류",
       "detail": {
         "title": "신호 세부 정보",
-        "tracesTitle": "이 에이전트의 오류 트레이스",
+        "tracesTitle": "트레이스",
         "tracesHint": "트레이스를 클릭하여 엽니다.",
         "worstLoopTraces": "최악의 트레이스 (반복이 많은 순)",
         "topCostTraces": "가장 비용이 많이 드는 트레이스",
         "noTraces": "이 신호에 대한 트레이스를 찾을 수 없습니다.",
-        "errorsTitle": "이 에이전트의 모든 오류",
+        "errorsTitle": "오류가 나타내는 것",
         "noErrors": "캡처된 오류 메시지가 없습니다 — 트레이스를 열어 검사하세요.",
         "colTraceId": "트레이스",
         "colSpans": "스팬",
@@ -19970,7 +20067,7 @@
         "failHeadline": "{agent}가 {count}개의 “{cls}” 오류를 발생했습니다.",
         "costHeadline": "{agent}: ${cost} 사용 · {tokens} 토큰 · {errors} 오류.",
         "loopExplain": "높은 반복률은 일반적으로 에이전트가 결과를 캐시하지 않거나 재시도 중임을 의미합니다. 아래의 최악의 트레이스를 열어 반복된 호출을 확인하세요.",
-        "failExplain": "이 에이전트의 모든 오류 메시지입니다. 이 오류뿐 아니라 모든 실패 유형의 메시지가 포함됩니다. 해결 방법을 찾기 위해 읽어 보거나, 트레이스를 열어 발생 위치를 확인하세요.",
+        "failExplain": "이들은 이 실패 클래스의 실제 오류 메시지입니다. 이를 읽어 해결책을 찾거나 트레이스를 열어 어디서 발생했는지 확인하세요.",
         "costExplain": "이 트레이스들이 이 에이전트의 비용을 발생시켰습니다. 가장 비용이 높은 트레이스를 열어 무엇이 실행되었는지 확인하세요.",
         "explain": "O2 AI로 설명",
         "explainHelp": "O2 AI는 오류 메시지와 가장 나쁜 트레이스에서 이 신호를 조사하고, AI 스팬을 넘어 로그, 메트릭, 쿠버네티스, 배포까지 살펴보며 근거를 인용합니다."
@@ -20957,7 +21054,7 @@
       },
       "noProviders": {
         "title": "먼저 공급자를 추가하세요",
-        "description": "스코어러를 실행하려면 LLM 제공업체(OpenAI, Anthropic 등)가 필요합니다. 스코어러를 생성하기 전에 LLM 제공업체에서 먼저 추가하세요."
+        "description": "스코어러를 실행하려면 LLM 공급자(OpenAI, Anthropic 등)가 필요합니다. 스코어러를 생성하기 전에 설정에서 공급자를 추가하세요."
       },
       "import": {
         "title": "스코어러 가져오기",
@@ -21117,7 +21214,8 @@
         "resultReasoning": "추론",
         "resultRaw": "원시 응답",
         "valuePlaceholder": "{variable} 의 값"
-      }
+      },
+      "providerHelpSettingsLink": "설정"
     },
     "job": {
       "detail": {
@@ -21301,7 +21399,7 @@
         }
       },
       "inputMapping": {
-        "title": "스코어러 변수",
+        "title": "프롬프트 변수",
         "hint": {
           "span": "각 변수를 스팬 속성에 매핑하세요.",
           "trace": "각 변수를 시스템 제공 값 또는 스팬 속성에 매핑하세요.",
@@ -21460,7 +21558,7 @@
     "tabLabel": "LLM 공급자",
     "title": "LLM 공급자",
     "subtitle": "온라인 평가용 LLM 제공자",
-    "newButton": "새 제공업체",
+    "newButton": "새 공급자",
     "searchPlaceholder": "공급자 검색",
     "defaultBadge": "디폴트",
     "loadError": "LLM 공급자를 로드하지 못했습니다.",
@@ -21471,7 +21569,7 @@
       "defaultModel": "기본 모델"
     },
     "empty": {
-      "title": "아직 LLM 제공업체가 없습니다",
+      "title": "LLM 공급자가 아직 없습니다",
       "description": "LLM 공급자는 LLM 심사자 스코어러가 호출하는 언어 모델의 연결 정보(기본 URL + 자격 증명)를 저장합니다. 하나를 추가하여 LLM 심사자 기반 평가를 시작하세요."
     }
   },
@@ -22114,7 +22212,7 @@
       "explanation": "조직 수준의 o2syn_ 토큰은 비공개 에이전트가 작업을 가져올 때 인증하는 데 사용됩니다. 공용(Lambda) 위치는 기본 토큰을 자동으로 사용합니다. 명명된 토큰을 만들어 지역의 에이전트에 포함시켜 해당 지역의 피해 범위를 제한하세요.",
       "summary": "비공개 에이전트가 작업을 가져오는 데 사용하는 토큰입니다.",
       "rotateDefaultBtn": "기본 토큰 교체",
-      "createTokenBtn": "새 토큰",
+      "createTokenBtn": "토큰 생성",
       "searchPlaceholder": "토큰 검색",
       "default": "기본",
       "tokenNameLabel": "이름",
@@ -22715,17 +22813,17 @@
       "unknown": "알 수 없음"
     },
     "locations": {
-      "addLocation": "새 위치",
+      "addLocation": "위치 추가",
       "bulkDeleteConfirmMessage": "{count}개 위치를 삭제하시겠습니까?",
       "bulkDeleteConfirmTitle": "위치 삭제",
       "bulkDeleteFailed": "위치 삭제 실패",
       "bulkDeletePartial": "{total}개 중 {success}개 위치 삭제됨",
       "bulkDeleteSuccess": "{count}개 위치 삭제됨",
       "cancel": "취소",
-      "createClose": "생성 후 닫기",
+      "createClose": "만들기 및 닫기",
       "createFailed": "위치 생성 실패",
       "createSuccess": "위치가 성공적으로 생성되었습니다",
-      "createTitle": "새 위치",
+      "createTitle": "위치 추가",
       "customProviderLabel": "사용자 정의 공급자",
       "customProviderPlaceholder": "공급자 이름 입력",
       "customProviderRequired": "사용자 정의 공급자 이름이 필요합니다",
@@ -22733,7 +22831,7 @@
       "deleteConfirmTitle": "위치 삭제",
       "deleteFailed": "위치 삭제 실패",
       "deleteSuccess": "위치가 성공적으로 삭제되었습니다",
-      "description": "Synthetics 모니터링용 공용 프로브 위치",
+      "description": "합성 모니터링을 위한 공개 프로브 위치 관리",
       "disable": "비활성화",
       "disabledSuccess": "위치 비활성화됨",
       "disabling": "비활성화 중…",
@@ -22780,7 +22878,7 @@
       "region": "리전",
       "regionPlaceholder": "예: us-east-1",
       "regionRequired": "리전이 필요합니다",
-      "searchPlaceholder": "위치 검색",
+      "searchPlaceholder": "위치 검색…",
       "title": "위치",
       "publicTitle": "공개 위치",
       "privateTitle": "비공개 위치",
@@ -24767,9 +24865,9 @@
       "pipelinesExportedSuccessfully": "{count}개 파이프라인을 성공적으로 내보냈습니다 | {count}개 파이프라인을 성공적으로 내보냈습니다",
       "functionsNotBundled": "{count}개 함수를 내보내기 파일에 포함할 수 없습니다: {names} | {count}개 함수를 내보내기 파일에 포함할 수 없습니다: {names}",
       "pipelineDeletedSuccessfully": "파이프라인이 성공적으로 삭제되었습니다.",
-      "deletingPipeline": "파이프라인 삭제 중...",
+      "deletingPipeline": "파이프라인을 삭제하는 중...",
       "pipelineCreatedSuccessfully": "파이프라인이 성공적으로 생성되었습니다.",
-      "savingPipeline": "파이프라인 저장 중...",
+      "savingPipeline": "파이프라인을 저장하는 중...",
       "stateResumed": "{name} 상태가 성공적으로 재개되었습니다",
       "statePaused": "{name} 상태가 성공적으로 일시 중지되었습니다"
     },
@@ -25386,19 +25484,19 @@
     "unitAttempts": "회",
     "unitSeconds": "초",
     "minLength": "최소 길이",
-    "minLengthDesc": "허용되는 최소 비밀번호 길이입니다.",
+    "minLengthDesc": "허용되는 가장 짧은 비밀번호",
     "maxLength": "최대 길이",
-    "maxLengthDesc": "허용되는 최대 비밀번호 길이이며 최대 128자입니다.",
+    "maxLengthDesc": "허용되는 가장 긴 비밀번호, 최대 128",
     "requireUppercase": "대문자 필수",
-    "requireUppercaseDesc": "A–Z 중 하나 이상 포함.",
+    "requireUppercaseDesc": "A–Z 중 최소 하나",
     "requireLowercase": "소문자 필수",
-    "requireLowercaseDesc": "a–z 중 하나 이상 포함.",
+    "requireLowercaseDesc": "a–z 중 최소 하나",
     "requireDigit": "숫자 필수",
-    "requireDigitDesc": "0–9 중 하나 이상 포함.",
+    "requireDigitDesc": "0–9 중 최소 하나",
     "requireSpecial": "특수 문자 필수",
-    "requireSpecialDesc": "허용된 집합의 문자를 하나 이상 포함.",
+    "requireSpecialDesc": "허용된 집합 중 최소 하나",
     "specialCharSet": "허용되는 특수 문자",
-    "specialCharSetDesc": "비워 두면 영숫자가 아닌 모든 문자를 허용합니다.",
+    "specialCharSetDesc": "비워 두면 영숫자가 아닌 모든 문자를 허용합니다",
     "maxLengthTooSmall": "최대 길이는 최소 길이 이상 128 이하여야 합니다.",
     "maxLengthBelowMin": "최소 길이를 충족하려면 {min} 이상이어야 합니다.",
     "confirmTitle": "비밀번호 정책을 저장하시겠습니까?",
@@ -25412,9 +25510,9 @@
     "rotation": "교체",
     "rotationDays": "교체 주기",
     "rotationDesc": "비밀번호 만료 시점과 사용자가 받는 사전 알림 기간입니다.",
-    "rotationDaysDesc": "비밀번호가 만료되기까지의 일수입니다. 0이면 비밀번호가 만료되지 않습니다.",
+    "rotationDaysDesc": "비밀번호가 만료되기까지의 일수입니다. 0 = 만료되지 않음",
     "rotationWarningDays": "만료 전 경고",
-    "rotationWarningDaysDesc": "로그인 시 사전 알림 일수입니다. 0이면 경고가 표시되지 않습니다.",
+    "rotationWarningDaysDesc": "로그인 시 사전 알림 일수입니다. 0 = 경고 없음",
     "rotationWarningDaysOffDesc": "로그인 시 사전 알림 일수입니다. 비밀번호가 만료된 후에 사용됩니다.",
     "warningDaysTooLong": "경고 기간은 교체 주기보다 길 수 없습니다.",
     "rotationPreview": "오늘 설정한 비밀번호는 {expires}에 만료됩니다. 로그인 경고는 {warns}부터 시작됩니다.",
@@ -25422,33 +25520,33 @@
     "reuse": "재사용 방지",
     "historyCount": "기억되는 비밀번호 수",
     "reuseDesc": "사용자가 이전 비밀번호로 되돌아가지 못하게 합니다.",
-    "historyCountDesc": "새 비밀번호가 일치할 수 없는 이전 비밀번호 개수입니다. 0이면 검사를 끕니다.",
+    "historyCountDesc": "새 비밀번호는 이 개수만큼의 이전 비밀번호와 일치할 수 없습니다. 0 = 검사 안 함",
     "historyMaxRetained": "보관되는 이력",
-    "historyMaxRetainedDesc": "사용자당 보관되는 이전 비밀번호 수입니다.",
+    "historyMaxRetainedDesc": "사용자당 보관되는 이전 비밀번호 수",
     "historyRetainedTooSmall": "보관되는 이력은 기억되는 비밀번호 수 이상이어야 합니다.",
     "reuseExplainer": "현재 비밀번호는 기억되는 집합 중 하나로 간주됩니다. 이를 재사용하는 것은 별도의 검사가 아니라 이 규칙에 의해 거부됩니다.",
     "lockout": "계정 잠금",
     "lockoutThreshold": "잠금 전 실패 시도 횟수",
     "lockoutDesc": "반복된 로그인 실패 후 발생하는 동작입니다.",
-    "lockoutThresholdDesc": "0이면 계정 잠금이 꺼집니다.",
+    "lockoutThresholdDesc": "0 = 잠금 비활성화",
     "lockoutBucketSize": "추가 잠금마다 필요한 시도 횟수",
-    "lockoutBucketSizeDesc": "추가 실패가 몇 번 더 발생하면 다음 잠금이 시작되는지입니다. 0이면 첫 잠금과 동일한 횟수를 사용합니다.",
+    "lockoutBucketSizeDesc": "0 = 위 값 재사용",
     "lockoutStartSecs": "첫 잠금 지속 시간",
-    "lockoutStartSecsDesc": "첫 번째 잠금이 지속되는 시간입니다.",
+    "lockoutStartSecsDesc": "초",
     "lockoutMaxSecs": "최대 잠금 지속 시간",
-    "lockoutMaxSecsDesc": "에스컬레이션이 멈추는 상한입니다.",
+    "lockoutMaxSecsDesc": "초 — 에스컬레이션이 제한되는 상한",
     "lockoutStartTooLong": "첫 잠금은 최대 잠금보다 길 수 없습니다.",
     "lockoutBackoff": "에스컬레이션",
-    "lockoutBackoffDesc": "각 잠금 시간이 이전 잠금보다 얼마나 길어지는지입니다.",
+    "lockoutBackoffDesc": "각 잠금이 이전 잠금에서 얼마나 증가하는지",
     "backoffExponential": "지수",
     "backoffLinear": "선형",
     "lockoutPreview": "{threshold}회 실패 → {first} · {bucket}회 추가마다 → {rest} · 최대 {max}. 로그인에 성공하면 모두 초기화됩니다.",
     "sessionEnforcement": "세션 및 적용",
     "sessionEnforcementDesc": "로그인 세션 유지 기간과 root가 이 규칙을 따르는지 여부입니다.",
     "cookieMaxAge": "세션 수명",
-    "cookieMaxAgeDesc": "로그인 세션이 유효하게 유지되는 시간입니다. 0이면 {envVar}의 인스턴스 기본값을 사용합니다.",
+    "cookieMaxAgeDesc": "로그인된 세션이 유효하게 유지되는 시간(초). 0 = {envVar}의 인스턴스 기본값 사용",
     "applyToRoot": "루트 계정에 적용",
-    "applyToRootDesc": "이 옵션이 켜져 있지 않으면 Root는 위의 모든 규칙에서 제외됩니다.",
+    "applyToRootDesc": "이 옵션을 켜지 않으면 루트는 위의 모든 규칙에서 제외됩니다",
     "rootWarning": "루트를 잠그면 시스템이 복구할 수 없는 상태가 될 수 있습니다.",
     "rootDialogTitle": "루트에 정책을 적용할까요?",
     "rootDialogMessage": "루트는 다른 네이티브 계정과 마찬가지로 잠금, 순환 및 강제 재설정의 대상이 됩니다. 루트가 유일한 관리 계정인 경우, 잠금이나 충족할 수 없는 만료가 발생하면 이 인스턴스에 다시 접근할 방법이 없어집니다.",
@@ -29621,12 +29719,12 @@
       "chartBelow": "{metric}, 현재 {value}, 정상 범위 미만",
       "chartWithin": "{metric}, 현재 {value}, 정상 범위 내",
       "tipNormal": "정상 {low} – {high}",
-      "openTraces": "트레이스에서 열기",
+      "openTraces": "트레이스",
       "openCatalog": "서비스 카탈로그",
       "openLogs": "로그에서 열기",
       "rangeLabel": "시간 범위",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "커버리지 공백",
+      "badgeNotWatched": "감시되지 않음",
       "signalsWatched": "감시 중인 신호",
       "chipAria": "{signal}: {state}",
       "deltaUp": "범위 시작 이후 {change} 상승",
@@ -29722,7 +29820,10 @@
         "service": "서비스 기준",
         "place": "위치 기준",
         "none": "그룹 없음"
-      }
+      },
+      "fixNoLink": "service.name 레이블 추가",
+      "fixStopped": "컬렉터 확인",
+      "fixQueued": "모의 전용: {service}의 “{action}”이(가) 어디에도 전송되지 않았습니다"
     },
     "activity": {
       "before": "이전",
@@ -30471,15 +30572,15 @@
       "intro": "제가 하는 일을 다섯 단계로 소개합니다.",
       "gotIt": "확인",
       "s1Title": "서비스를 찾습니다",
-      "s1": "이미 전송 중인 데이터를 살펴보고 그 안에서 서비스를 찾습니다. 새 서비스는 다음 확인 후에 표시되며, 직접 추가할 필요가 없습니다.",
-      "s2Title": "정상 상태가 어떤 모습인지 학습합니다",
-      "s2": "각 스트림이 14일 분량의 이력을 바탕으로 평소 얼마나 많은 데이터를 보내는지 학습합니다. 스트림에 해당 이력이 쌓이기 전까지는 아직 학습 중이라고 안내하고 판단하지 않습니다.",
-      "s3Title": "스트림이 중단될 때만 호출합니다",
-      "s3": "스트림이 데이터 전송을 멈추면 인시던트를 열고, 호출이 켜져 있으면 해당 서비스를 담당하는 온콜 팀을 호출합니다. 급격한 하락과 상승은 발견 항목으로 표시되며 절대 호출하지 않습니다. 더 작은 사항은 일일 요약을 기다립니다.",
-      "s4Title": "무슨 일이 있었는지 알려줍니다",
-      "s4": "모든 인시던트는 무엇이 중단되었고 언제부터인지 알려줍니다. AI 분석이 켜져 있으면 이유에 대한 가장 유력한 해석도 함께 제공합니다.",
-      "s5Title": "변경할 항목은 직접 결정합니다",
-      "s5": "감시되지 않는 항목에 대한 알림과 발생할 수 없는 알림에 대한 수정을 제안합니다. 검토하고 적용하기 전까지는 아무것도 변경되지 않으며, 적용한 내용은 실행 취소할 수 있습니다."
+      "s1": "이미 전송 중인 데이터를 살펴보고 그 안의 모든 서비스를 찾습니다. 새로운 서비스가 나타나면 같은 날부터 모니터링을 시작하며, 별도로 요청할 필요가 없습니다.",
+      "s2Title": "서비스를 모니터링합니다",
+      "s2": "각 서비스의 정상 상태를 학습합니다. 시간대별 오류, 지연, 트래픽을 파악하고 주간 패턴은 시간이 지날수록 정교해집니다. 학습이 완료되기 전까지는 기본 안전 점검을 사용합니다.",
+      "s3Title": "실제 문제일 때만 알립니다",
+      "s3": "대부분의 이상 징후는 문제가 아닙니다. 고객에게 피해를 주는 문제가 발생하면 팀을 호출하고, 작은 문제는 아무도 깨우지 않는 메시지로 보내며, 사소한 문제는 금요일 요약에 남겨둡니다.",
+      "s4Title": "모든 호출을 설명합니다",
+      "s4": "모든 메시지는 무엇이 고장 났는지, 언제부터인지, 제가 판단한 가장 유력한 원인과 그 확신도를 알려줍니다.",
+      "s5Title": "허용한 범위 내에서 수정합니다",
+      "s5": "허용한 것만 수정합니다. 성공한 수정은 신뢰를 조금씩 쌓고, 도움이 되지 않은 수정은 불이익으로 계산됩니다. 동일한 수정이 계속 필요하면 이를 자동화된 습관으로 만들지 않고 팀에 보고할 버그로 간주합니다."
     },
     "outcome": {
       "active": "현재 발생 중",
@@ -30492,9 +30593,9 @@
     },
     "view": {
       "standard": "표준",
-      "nerd": "상세",
+      "nerd": "너드",
       "standardTooltip": "표준 보기는 간략한 정보를 제공합니다. 주의가 필요한 항목과 지난 7일간 발생한 일을 보여줍니다",
-      "nerdTooltip": "상세 보기에서는 모든 탐지기, 루프, 설정을 자세히 보여줍니다",
+      "nerdTooltip": "너드 보기는 모든 감지기, 루프, 설정을 전체적으로 보여줍니다",
       "label": "보기"
     },
     "suggestions": {
@@ -30617,7 +30718,8 @@
       "copyRequest": "요청 복사",
       "requestText": "Slack 워크스페이스 {team}의 _meta › 설정 › Slack › 조직에서 OpenObserve 조직 {name} ({org})을(를) 추가해 주세요.",
       "requestCopied": "요청이 복사되었습니다",
-      "setupAppOtherTeam": "{team}이 아닌 다른 Slack 워크스페이스용 · OpenObserve가 구성 토큰 하나로 사용자 전용 Slack 앱을 만듭니다"
+      "setupAppOtherTeam": "{team}이 아닌 다른 Slack 워크스페이스용 · OpenObserve가 구성 토큰 하나로 사용자 전용 Slack 앱을 만듭니다",
+      "title": "Slack 워크스페이스 연결"
     },
     "wizard": {
       "title": "Slack 앱 설정",
@@ -30837,7 +30939,9 @@
       "ownOrgOnlyHint": "인스턴스 워크스페이스에서는 채널을 자신의 조직에 매핑합니다",
       "claimableHint": "할당되지 않은 채널 및 {org} 소유 채널",
       "servedOrgsHint": "이 워크스페이스가 서비스하는 모든 조직",
-      "alertRoutes": "대상 {count}개 | 대상 {count}개"
+      "alertRoutes": "대상 {count}개 | 대상 {count}개",
+      "empty": "아직 기본 조직이 있는 채널이 없습니다",
+      "emptyDescription": "기본 조직이 설정되지 않은 채널의 질문은 각 사용자의 기본 조직으로 전달됩니다(/o2 org로 변경할 수 있습니다)."
     },
     "people": {
       "title": "연결된 사용자",
@@ -30856,7 +30960,8 @@
         "email": "이메일 일치",
         "admin_bulk": "모두 연결"
       },
-      "loadMore": "더 불러오기"
+      "loadMore": "더 불러오기",
+      "empty": "이 조직에서 아직 Slack을 연결한 사람이 없습니다"
     },
     "credentials": {
       "title": "자격 증명 업데이트",
@@ -31779,7 +31884,7 @@
           "label": "에이전트 식별 정보 누락",
           "detail": "{total}개 LLM 스팬 중 {affected}개({pct})에 gen_ai.agent.name이 없어 에이전트 뷰에서 누락됩니다.",
           "pass": "모든 LLM 스팬에는 에이전트 이름 또는 ID가 있습니다.",
-          "fix": "에이전트 매핑 열기"
+          "fix": "GenAI 에이전트 매핑 열기"
         },
         "zero_duration_spans": {
           "label": "지속 시간이 0인 스팬",
@@ -31794,6 +31899,13 @@
           "fix": "통합 가이드"
         }
       }
+    },
+    "chart": {
+      "costMissing": "이 차트에 없음: {models}. {tokens}개 토큰에 가격이 없습니다.",
+      "costMissingPricedSince": "이 차트에 없음: {models}. {tokens}개 토큰은 가격이 추가되기 전에 기록되었습니다.",
+      "unpricedModels": "가격 미책정: {models}",
+      "pricedSinceModels": "가격 추가 전에 기록됨: {models}",
+      "addPrice": "가격 추가"
     }
   },
   "onboarding": {

@@ -121,7 +121,7 @@
     "noGroups": {
       "title": "まだグループはありません",
       "description": "グループを使用すると、複数のユーザーの権限を一度に管理できます。1 つ作成して始めましょう。",
-      "action": "新規ユーザーグループ",
+      "action": "新しいグループ",
       "actionDesc": "ユーザーグループの作成"
     },
     "noRoles": {
@@ -197,7 +197,7 @@
     "noCipherKeys": {
       "title": "暗号鍵はまだありません",
       "description": "暗号鍵は、データストリームの機密フィールドを暗号化するために使用されます。",
-      "action": "新規暗号鍵",
+      "action": "新しいキー",
       "actionDesc": "暗号鍵を生成"
     },
     "noSlackChannelDefaults": {
@@ -225,7 +225,7 @@
     "noLlmProviders": {
       "title": "LLM プロバイダーは設定されていません",
       "description": "言語モデルプロバイダーに接続して AI を活用した機能を有効にします。",
-      "action": "新規プロバイダー",
+      "action": "プロバイダーを追加",
       "actionDesc": "LLM プロバイダーの設定"
     },
     "noDiscoveredServices": {
@@ -268,9 +268,9 @@
     },
     "noStorageConfig": {
       "title": "バケットが設定されていません",
-      "description": "自前のバケットを接続して、この組織のデータを他の組織やグローバルデフォルトとは分離し、所有するストレージに保持します。",
-      "action": "バケットを設定",
-      "actionDesc": "S3 または Azure バケットを接続"
+      "description": "この組織のデータは、他の組織やグローバルデフォルトとは無関係に、専用のバケットにルーティングします。",
+      "action": "ストレージの設定",
+      "actionDesc": "S3、GCS、または Azure バケットを接続する"
     },
     "noPhoneProvider": {
       "title": "電話プロバイダーが接続されていません",
@@ -435,7 +435,7 @@
     "noUsers": {
       "title": "まだユーザーはいません",
       "description": "チームメイトをこの組織で共同作業するよう招待してください。",
-      "action": "新規ユーザー",
+      "action": "ユーザーを追加",
       "actionDesc": "チームメイトをメールで招待する"
     },
     "noReports": {
@@ -457,7 +457,7 @@
     "noServiceAccounts": {
       "title": "サービスアカウントはまだありません",
       "description": "サービスアカウントでは、アプリケーションを API で認証できます。アカウントを作成して始めましょう。",
-      "action": "新規サービスアカウント",
+      "action": "サービスアカウントを追加",
       "actionDesc": "API サービスアカウントを作成する"
     },
     "noInvitations": {
@@ -3706,7 +3706,7 @@
     "agplFullName": "GNU Affero General Public License (AGPL)",
     "github": "GitHub",
     "website": "Webサイト",
-    "licenseAndUsage": "ライセンスと使用状況",
+    "licenseAndUsage": "ライセンスと利用",
     "copyLicenseId": "ライセンスIDをコピー",
     "editionLbl": "エディション",
     "gbPerDay": "GB / 日",
@@ -3727,7 +3727,7 @@
     "ent_lincese_detail_lbl": "エンタープライズライセンスの詳細",
     "lincese_id_lbl": "ライセンス ID",
     "status_lbl": "ステータス",
-    "create_at_lbl": "作成日時",
+    "create_at_lbl": "作成日",
     "expires_at_lbl": "有効期限",
     "usage_limits": "使用量の上限",
     "feature_comparison_lbl": "機能比較",
@@ -3787,17 +3787,17 @@
     "expired_lbl": "期限切れ",
     "no_license_found": "ライセンスが見つかりません",
     "installation_id": "インストール ID",
-    "contact_admin_license": "以下にライセンスキーを貼り付けるか、リクエストしてください。",
+    "contact_admin_license": "管理者に連絡してライセンスを取得し、ここにキーを貼り付けてください<strong>。または</strong>、",
     "get_license": "ライセンスを取得",
     "enter_license_key": "ライセンスキーを入力",
     "paste_license_placeholder": "ここにライセンスキーを貼り付けてください...",
-    "license_auto_filled": "URL からライセンスキーが自動入力されました。「ライセンスを更新」をクリックして適用してください。",
+    "license_auto_filled": "ライセンスキーは URL から自動入力されます。「ライセンスを更新」をクリックして適用します。",
     "update_license": "ライセンスを更新",
     "license_id": "ライセンス ID",
     "company": "会社",
     "license_key": "ライセンスキー",
-    "contact_name": "担当者名",
-    "contact_email": "担当者メールアドレス",
+    "contact_name": "連絡先名",
+    "contact_email": "連絡先電子メール",
     "environment_type": "環境タイプ",
     "features": "機能",
     "features_all_unlocked": "ライセンスですべての機能が利用可能です。",
@@ -3895,7 +3895,7 @@
     "expiry_online": "ライセンスは {date} に期限切れになります。「今すぐ更新」をクリックして、更新されたライセンスを確認してください。",
     "expiry_viewer": "ライセンスは {date} に期限切れになります。管理者にライセンスの更新を依頼してください。",
     "expiry_airgapped": "ライセンスは {date} に期限切れになります。更新されたキーについて OpenObserve にお問い合わせください。",
-    "refresh_license_limits": "ライセンスの上限を更新",
+    "refresh_license_limits": "ライセンス制限を更新",
     "banner_paused_usage": "検索は一時停止中です。今月は {exceeded} 日で日次上限を超過しました（{allowed} 日まで許可）。データの取り込みは継続中です。ライセンス ID {licenseId} を添えて OpenObserve にお問い合わせください。 | 検索は一時停止中です。今月は {exceeded} 日で日次上限を超過しました（{allowed} 日まで許可）。データの取り込みは継続中です。ライセンス ID {licenseId} を添えて OpenObserve にお問い合わせください。",
     "banner_paused_other": "検索はライセンスチェックにより一時停止されています。データの取り込みは継続中です。ライセンスID {licenseId} を添えてOpenObserveにお問い合わせください。",
     "banner_paused_no_id": "検索はライセンスチェックにより一時停止されています。データの取り込みは継続中です。",
@@ -3975,7 +3975,7 @@
     "paste_new_license_placeholder": "新しいライセンスキーをここに貼り付け...",
     "your_complete_license_key": "完全なライセンスキー:",
     "copy_key": "キーをコピー",
-    "usage_information": "使用状況情報",
+    "usage_information": "使用情報",
     "usage_chart_title": "今月の 1 日あたりの取り込み量",
     "no_license_ingestion_limit": "ライセンスがない場合、取り込みは 1 日あたり <strong>{limit} GB</strong> に制限されます。",
     "license_allows_ingestion": "現在のライセンスでは、1日あたり <strong>{limit} GB</strong> のデータ取り込みが許可されています。",
@@ -4732,7 +4732,7 @@
       "effectStillAllowed": "アクセスの変更はありません: より広い付与により引き続き許可されています。",
       "moduleGroupSecurity": "セキュリティ",
       "presetSocAnalystTitle": "SOC アナリスト",
-      "presetSocAnalystDescription": "セキュリティアラートとケースをトリアージし、検出、セキュリティのソースストリーム、脅威インテリジェンスリストへの読み取りアクセスを持ちます",
+      "presetSocAnalystDescription": "セキュリティのアラートとケースをトリアージし、検知、セキュリティソースのストリーム、脅威インテリジェンスリストへの読み取りアクセスを持つ",
       "presetDetectionEngineerTitle": "検出エンジニア",
       "presetDetectionEngineerDescription": "検出の作成・調整・有効化・実行、コンテンツのインストール、関数とパイプラインを伴うソースの接続、脅威インテリジェンスリストなどのエンリッチメントテーブルの管理を行い、セキュリティ、ケース、ストリームへの読み取りアクセスを持ちます",
       "presetSecurityAdminTitle": "セキュリティ管理者",
@@ -4843,7 +4843,7 @@
       "createFailed": "組織の作成に失敗しました。"
     },
     "listOrganizations": {
-      "subtitle": "アクセス可能なすべての組織。行の操作から切り替えたり、名前を変更したりできます。",
+      "subtitle": "アクセス可能な組織",
       "switch": "この組織に切り替え",
       "current": "現在",
       "cannotEditWhileDeleting": "削除中は編集できません",
@@ -4977,7 +4977,7 @@
       "uploadingRules": "ルールをアップロードしています。お待ちください...",
       "errorUploadingRules": "ルールのアップロード中にエラーが発生しました",
       "errorParsingJson": "ファイル {name} からJSONを解析中にエラーが発生しました",
-      "someValuesEmpty": "一部の値が空です。確認してください。",
+      "someValuesEmpty": "一部の値が空です。確認してください",
       "saveBeforeSwitchingTimeUnits": "時間単位を切り替える前に変更を保存またはキャンセルしてください"
     },
     "addRolePage": {
@@ -4996,7 +4996,9 @@
       "saved": "お知らせバナーが更新されました",
       "saveFailed": "お知らせバナーを保存できませんでした",
       "loadFailed": "お知らせバナーを読み込めませんでした",
-      "addBanner": "バナーを追加"
+      "addBanner": "バナーを追加",
+      "emptyTitle": "まだバナーはありません",
+      "emptyHint": "アプリの上部に通知を表示するには、1つ追加してください。"
     },
     "variants": {
       "info": "情報",
@@ -5115,9 +5117,9 @@
       "variantOption": "{name} — {help}",
       "variantHelp": {
         "info": "一般的なお知らせとリリース情報",
-        "warning": "サービスの劣化や今後のメンテナンス",
-        "critical": "障害。最初に表示され、プロモーションは非表示になります",
-        "promo": "イベントやオファー。最後に表示され、障害時は非表示になります"
+        "warning": "サービスの劣化または今後のメンテナンス",
+        "critical": "障害。最初に表示され、プロモーションを非表示にします",
+        "promo": "イベントや特典。最後に表示され、障害発生中は非表示になります"
       },
       "toolbar": {
         "bold": "太字",
@@ -6173,8 +6175,8 @@
     "periodInfoLine1": "クエリを実行する期間。",
     "periodInfoLine2": "例: 10分とは、クエリが実行されるたびに過去10分間のデータを使用することを意味します。クエリが午後4:00に実行される場合、午後3:50から午後4:00までのデータを使用します。",
     "periodShouldMatchFrequency": "注: 期間は頻度と同じである必要があります。",
-    "delayInfoLine1": "スケジュール時刻の後に待機する時間で、遅れて届くデータを受け取れるようにします。",
-    "delayInfoLine2": "例: 10 分の遅延を設定すると、毎時実行のパイプラインは 10:10 に実行され、9:00 から 10:00 までのデータを読み取ります。",
+    "delayInfoLine1": "パイプラインの実行がスケジュールされる遅延。",
+    "delayInfoLine2": "例: 10分の遅延は、パイプラインがスケジュールされた時刻の10分後に実行されることを意味します。",
     "closeDrawer": "ドロワーを閉じる",
     "conditionValueGuidelines": "条件値のガイドライン:",
     "customColumnGuideline": "カスタム列を追加するには、列名を入力して",
@@ -6406,7 +6408,7 @@
       "elasticsearchStep4": "Cloudの場合: クラウドコンソールからエンドポイントを取得します",
       "elasticsearchStep5": "セルフホステッドの場合: クラスターURLとポートを使用します（通常9200）",
       "elasticsearchStep6": "ヘッダーセクションで認証を追加します",
-      "datadogTitle": "Datadog 接続情報",
+      "datadogTitle": "Datadog接続詳細",
       "datadogStep1": "Datadogアカウントにログインします",
       "datadogStep2": "組織設定 → APIキーに移動します",
       "datadogStep3": "新しいAPIキーを作成するか、既存のキーをコピーします",
@@ -6414,14 +6416,14 @@
       "datadogStep5": "US: https://http-intake.logs.datadoghq.com",
       "datadogStep6": "EU: https://http-intake.logs.datadoghq.eu",
       "datadogStep7": "ヘッダーにAPIキーを追加: DD-API-KEY: <your-key>",
-      "dynatraceTitle": "Dynatrace 接続情報",
+      "dynatraceTitle": "Dynatrace接続詳細",
       "dynatraceStep1": "Dynatrace環境にログインします",
       "dynatraceStep2": "設定 → 統合 → Dynatrace APIに移動します",
       "dynatraceStep3": "logs.ingest権限を持つ新しいAPIトークンを作成します",
       "dynatraceStep4": "環境のURLを使用します",
       "dynatraceStep5": "形式: https://{'{'}your-environment-id{'}'}.live.dynatrace.com",
       "dynatraceStep6": "ヘッダーにトークンを追加: Authorization: Api-Token <token>",
-      "newrelicTitle": "New Relic 接続情報",
+      "newrelicTitle": "New Relic接続詳細",
       "newrelicStep1": "New Relicアカウントにログインします",
       "newrelicStep2": "APIキーセクションに移動します",
       "newrelicStep3": "ライセンスキー（インジェスト - ライセンス）を作成またはコピーします",
@@ -6435,7 +6437,7 @@
       "customStep4": "認証に必要なヘッダーを設定します",
       "customStep5": "出力形式（JSONまたはNDJSON）を選択します",
       "customStep6": "動作を確認するため接続をテストします",
-      "defaultTitle": "接続情報",
+      "defaultTitle": "接続詳細",
       "defaultStep1": "宛先タイプを選択すると、具体的な手順が表示されます"
     },
     "deleteFunctionAssociationConfirm": "関数の関連付けを削除してもよろしいですか？",
@@ -7135,7 +7137,7 @@
     "orgLevelExplanation": "これらは組織レベルの取り込みトークンです。これらは個々のユーザーに関連付けられることはなく、作成したユーザーが組織を離れても引き続き機能します。トークンは取り込みエンドポイントでのみ使用できます。",
     "orgLevelSummary": "インジェストエンドポイント用の組織レベルのトークン。",
     "tokenManagementTitle": "取り込みトークンの管理",
-    "createTokenBtn": "新規トークン",
+    "createTokenBtn": "新しいトークンを作成",
     "createTokenTitle": "トークンを作成",
     "searchToken": "トークンを検索",
     "tokenNameLabel": "名前",
@@ -11691,9 +11693,9 @@
       "lengthenEvaluationWindowDesc": "短時間のスパイクでアラートが作動しないよう、期間を広げます。",
       "enableDeduplication": "繰り返し通知の抑制をオンにする",
       "enableDeduplicationDesc": "評価ごとではなく、状態変化ごとに1回通知します。",
-      "reviewForDeletion": "アラートを確認",
+      "reviewForDeletion": "削除を検討",
       "reviewForDeletionDesc": "アラートを廃止する前に、クエリが現状と一致しているか確認します。",
-      "fixAlertQuery": "アラートを確認",
+      "fixAlertQuery": "アラートクエリを修正",
       "fixAlertQueryDesc": "評価自体が失敗し、判定に到達しません。",
       "repairDestination": "宛先を修復",
       "repairDestinationDesc": "アラートが使用する宛先で配信が失敗します。",
@@ -11877,7 +11879,7 @@
       "scopeAll": "すべての実行",
       "scopeFindings": "検出結果あり",
       "scopeGaps": "カバレッジギャップ",
-      "searchPlaceholder": "アラート名で検索",
+      "searchPlaceholder": "アラート名で実行を検索",
       "colRun": "実行",
       "colFindings": "検出結果",
       "colCoverage": "カバレッジ",
@@ -11905,8 +11907,8 @@
       "statFindings": "検出結果",
       "statAlertsInScope": "対象範囲のアラート",
       "statDeclined": "判断対象外",
-      "statDeclinedSub": "未クリア",
-      "statDeclinedTooltip": "ルールが判定しなかったルールとアラートのペアです。クリアではなくゲートです。下限に達しなかった場合はカウントされるだけです。実行できなかったルール、または確認して判定を見送ったルールは、理由とともに以下に表示されます。",
+      "statDeclinedSub": "判断対象外であり、問題なしではない",
+      "statDeclinedTooltip": "アラートの履歴が少なすぎる、またはサンプルが不足しているため、ルールが判定を行わなかったルールとアラートのペアです。これはゲートであり、問題なしの判定ではありません。アラートごとの理由はストリームには書き込まれません。",
       "limitations": "エビデンスの限界",
       "declinedHeading": "理由付きの判定見送り",
       "declinedDesc": "アラートに対して実行できなかったルール、または確認したうえで判定を見送ったルール。これはクリア判定ではありません。",
@@ -11933,7 +11935,10 @@
       "proposedActions": "提案されたアクション",
       "qualityReasons": "理由: {reasons} | 理由: {reasons}",
       "openAlert": "アラートを開く",
-      "advice": "確認すべきこと"
+      "advice": "確認すべきこと",
+      "viewInLogs": "ログで表示",
+      "viewInLogsHint": "この実行のレコードをログで開きます",
+      "loadFailed": "ダイジェストを読み込めませんでした: {message}"
     },
     "dashboard": {
       "latestRunAgo": "最新の実行 {time}",
@@ -11991,7 +11996,8 @@
       "runNowHeading": "今すぐ実行",
       "findingsKept": "検出結果は、この組織の独自のレコードとして保持期間中保持されます。アラートキャリブレーションは通知を送信しません。",
       "frequencyRange": "1 時間から 30 日の間で実行間隔を選択してください。",
-      "windowRange": "1 分から 90 日の間でウィンドウを選択してください。"
+      "windowRange": "1 分から 90 日の間でウィンドウを選択してください。",
+      "loadFailed": "設定を読み込めませんでした: {message}"
     },
     "visibility": {
       "allClear": "最新の実行で、アクセス可能なアラートに検出結果はありません。",
@@ -12182,8 +12188,8 @@
     "response": "応答",
     "lastError": "最後のエラー:",
     "errorSummary": "エラー概要",
-    "searchThisFolderTooltip": "このフォルダーのアラートを表示",
-    "searchAllFoldersTooltip": "すべてのフォルダーのアラートを表示",
+    "searchThisFolderTooltip": "このフォルダのみを検索",
+    "searchAllFoldersTooltip": "すべてのフォルダを検索",
     "reloadAlertsTooltip": "アラートを再読み込み",
     "triggerDetection": "トリガー検出",
     "retrain": "再トレーニング",
@@ -14245,7 +14251,7 @@
       "addedUnread": "アラートを読み取れなかったため、AutoObserve はこれが既に追加済みかどうかを判断できません。何も保存されていません。再試行するには再度保存してください。",
       "alreadyAdded": "フォルダ {folder} に {name} として既に追加されているため、このアラートは再度保存されませんでした。",
       "dialog": {
-        "title": "アラートを追加",
+        "title": "アラートを作成",
         "continue": "アラートに進む",
         "queryChoiceLabel": "クエリでアラート",
         "queryChoiceOption": "{name}: {query}",
@@ -14268,19 +14274,19 @@
       },
       "sources": {
         "default": {
-          "label": "アラートを追加",
+          "label": "アラートを作成",
           "toast": "クエリがアラートフォームにインポートされました"
         },
         "logs": {
-          "label": "アラートを追加",
+          "label": "アラートを作成",
           "toast": "ログ検索からクエリをインポートしました"
         },
         "patterns": {
-          "label": "アラートを追加",
+          "label": "アラートを作成",
           "toast": "選択したパターンからクエリをインポートしました"
         },
         "panel": {
-          "label": "アラートを追加",
+          "label": "アラートを作成",
           "toast": "ダッシュボードパネルからインポートされたクエリ: \"{sourceLabel}\""
         },
         "library": {
@@ -14288,7 +14294,7 @@
           "toast": "アラートライブラリから: {sourceLabel}"
         },
         "explorer": {
-          "label": "アラートを追加",
+          "label": "アラートを作成",
           "toast": "メトリクスエクスプローラーからクエリをインポートしました"
         },
         "dbm": {
@@ -14304,7 +14310,7 @@
           "toast": "プロダクトアナリティクスからインポートしました: 「{sourceLabel}」"
         },
         "traces": {
-          "label": "アラートを追加",
+          "label": "アラートを作成",
           "toast": "トレース検索からクエリをインポートしました",
           "noStream": "先にストリームを選択してください",
           "errorCount": "エラー数",
@@ -14508,7 +14514,7 @@
       "filterAll": "すべて",
       "filterOnce": "一回限り",
       "filterRecurring": "繰り返し",
-      "search": "名前、理由、作成者で検索",
+      "search": "名前、ディメンション、作成者で検索",
       "searchAcross": "すべてのフォルダを検索",
       "thisFolder": "このフォルダ",
       "allFolders": "すべてのフォルダ",
@@ -15047,7 +15053,7 @@
       "webhookOnly": "（Webhook のみ）",
       "emailOnly": "（メールのみ）",
       "snsOnly": "（SNS のみ）",
-      "stale": "テンプレート {name} はこの種類では使用できません。別のものを選択するか、フィールドをクリアしてください。",
+      "stale": "テンプレート {name} は存在しなくなりました。別のものを選択するか、フィールドをクリアしてください。",
       "clear": "クリア",
       "willUse": "使用予定: {template}",
       "willUsePerDestination": "宛先ごとの使用予定:",
@@ -15261,7 +15267,7 @@
     "systemReadOnlyEdit": "プリビルトテンプレート — 編集は無効です。変更可能なコピーを作成するにはクローンしてください。",
     "systemReadOnlyDelete": "プリビルトテンプレート — 削除は無効です。変更可能なコピーを作成するにはクローンしてください。",
     "prebuiltBadge": "構築済み",
-    "prebuiltBadgeHint": "システムによって管理されています。編集や削除はできません。複製して変更可能なコピーを作成してください。",
+    "prebuiltBadgeHint": "システムによって管理されます。編集はできますが、削除はできません。",
     "customBadge": "カスタム",
     "filterAll": "すべて",
     "filterPrebuilt": "構築済み",
@@ -15477,10 +15483,10 @@
     "destinationsLoadError": "宛先の読み込み中にエラーが発生しました"
   },
   "alert_destinations": {
-    "chooseTypeTitle": "種類を選択",
-    "selectDestinationType": "宛先の種類",
+    "chooseTypeTitle": "タイプを選択",
+    "selectDestinationType": "宛先タイプを選択",
     "connectionStepTitle": "接続",
-    "connectionDetailsTitle": "接続の詳細",
+    "connectionDetailsTitle": "接続詳細",
     "urlHelpText": "末尾スラッシュなしのベースURL（例: https://your-domain.com）",
     "organizationHelpText": "OpenObserve 組織識別子",
     "streamHelpText": "OpenObserve ストリーム名",
@@ -15539,13 +15545,13 @@
     "urlOrRecipients": "URL / 受信者",
     "api_header": "ヘッダー",
     "api_header_value": "値",
-    "skip_tls_verify": "TLS 検証をスキップ",
+    "skip_tls_verify": "TLS検証をスキップ",
     "payloadFormat": "ペイロード形式",
     "payloadFormatAuto": "自動",
     "payloadFormatLegacy": "レガシー JSON",
     "payloadFormatRendered": "レンダリング済みテンプレート",
-    "payloadFormatHelp": "「自動」を選択すると、テンプレートが添付されるまで、異常検知、合成モニタリング、オンコール、ダウンタイムのメッセージには従来の JSON ボディが送信されます。",
-    "output_format": "出力形式",
+    "payloadFormatHelp": "自動では、テンプレートが関連付けられるまで、異常検知、合成モニタリング、オンコールのメッセージに従来の JSON 本文を送信します。メタデータキー payload_format として保存されます。",
+    "output_format": "出力フォーマット",
     "readonly": "読み取り専用",
     "additional_settings": "その他の設定",
     "custom_headers": "カスタムヘッダー (オプション)",
@@ -15683,17 +15689,17 @@
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
-    "tabLabel": "独自のバケットを使用",
-    "title": "独自のバケットを使用",
+    "tabLabel": "組織ストレージ",
+    "title": "組織ストレージ",
     "notEnabled": "{product} はこの組織で有効になっていません",
     "heroHeadline": "自分のストレージを持参して",
-    "heroSub": "独自のクラウドバケットを接続します。データはお客様のインフラに保持され、完全な管理とロックインの回避が可能です。",
-    "configureStorage": "バケットを設定",
+    "heroSub": "独自のクラウドバケットを接続しても、データはインフラストラクチャに残り、完全に制御され、ロックインは発生しません。",
+    "configureStorage": "ストレージの設定",
     "supportedProviders": "サポート対象プロバイダー",
     "perOrgIsolation": "組織ごとの分離",
     "appliesImmediately": "新しいデータに直ちに適用",
-    "usesOrgCredentials": "組織スコープの認証情報を使用",
-    "updateStorage": "バケットを更新",
+    "usesOrgCredentials": "組織を対象とした認証情報を使用する",
+    "updateStorage": "ストレージを更新",
     "active": "アクティブ",
     "bucketName": "バケット名",
     "region": "領域",
@@ -15707,12 +15713,12 @@
     "featureOwnDataDesc": "取り込んだデータを自分のバケットに直接保存し、誰がアクセスできるかを完全に制御できます。",
     "featureSecureTitle": "安全で規制に準拠",
     "featureSecureDesc": "きめ細かなアクセスキーにより、機密データはインフラストラクチャに残ります。",
-    "newStorageConfiguration": "新しいバケット設定",
+    "newStorageConfiguration": "新しいストレージ構成",
     "selectProviderDesc": "この組織のデータを保存するクラウドストレージプロバイダーを選択してください。",
     "bucketNameRequired": "バケット名が必要です",
     "accessKeyRequired": "アクセスキーが必要です",
     "secretKeyRequired": "シークレットキーが必要です",
-    "storageAccountRequired": "ストレージアカウント名は必須です",
+    "storageAccountRequired": "ストレージアカウント名が必要です",
     "regionRequired": "地域が必要です",
     "roleARNRequired": "ロール ARN が必要です",
     "externalIdRequired": "外部 ID が必要です",
@@ -15721,7 +15727,7 @@
     "save": "保存",
     "update": "更新",
     "awsStsCloudInfo": "これは AWS STS を使用してロールを引き受けます。AWS コンソールで、このロールの信頼されたエンティティとして {product} の AWS アカウントを追加してください。アカウントの詳細や設定のサポートについては、{product} チームにお問い合わせください。",
-    "awsStsSelfHostedInfo": "これは AWS STS を使用してロールを引き受けます。インストール環境に、このロールを引き受け可能な AWS 認証情報があることを確認してください。"
+    "awsStsSelfHostedInfo": "これは AWS sts を使用してロールを引き受け、操作を実行します。インストール環境で、このロールにアクセスできる AWS 認証情報が設定されていることを確認してください。"
   },
   "metrics": {
     "add": "追加",
@@ -16202,7 +16208,7 @@
     "cipherKeysDesc": "機密フィールドの暗号化キー",
     "aiToolsetsDesc": "AI アシスタントが使用できる MCP サーバーと CLI ツール",
     "regexPatternsDesc": "墨消し用の再利用可能なregexパターン",
-    "domainManagementDesc": "SSO クレームの解析とドメインごとのサインイン制限",
+    "domainManagementDesc": "サインインを許可されたSSOドメインに制限",
     "passwordPolicy": "パスワードポリシー",
     "passwordPolicyDesc": "ネイティブのメールアドレス/パスワードアカウント向けの認証ポリシーです。インスタンス全体に適用されます。",
     "pipelineDestinationsDesc": "パイプライン出力の外部ターゲット",
@@ -16223,15 +16229,15 @@
     "orgLabel": "組織パラメーター",
     "logDetails": "ログ詳細",
     "tracesHeading": "トレース",
-    "traceIdFieldName": "トレース ID フィールド名",
-    "spanIdFieldName": "スパン ID フィールド名",
-    "toggleIngestionLogsLabel": "取り込みログ",
-    "usageStreamEnabledLabel": "使用状況ストリーム",
-    "redInsightsEnabledLabel": "トレースの RED インサイトを自動生成",
+    "traceIdFieldName": "トレースIDフィールド名",
+    "spanIdFieldName": "スパンIDフィールド名",
+    "toggleIngestionLogsLabel": "取り込みログの切り替え",
+    "usageStreamEnabledLabel": "使用ストリームを有効にする",
+    "redInsightsEnabledLabel": "トレースの RED インサイトを自動的に有効にする",
     "redInsightsEnabledHelp": "最も負荷の高いサービスに対して、レート、エラー、p95 レイテンシの異常検知を「RED インサイト」アラートフォルダー内に作成します。共有されるまで、そのフォルダーは管理者のみ表示できます。",
     "incidentsHeading": "インシデント",
-    "aiRcaThreadToolOutputLabel": "インシデントスレッドのツールデータ",
-    "aiRcaThreadToolOutputHelp": "インシデントを閲覧できるすべてのユーザーに、ツールの生の入力と出力を表示します。",
+    "aiRcaThreadToolOutputLabel": "インシデント調査スレッドでツールデータを表示する",
+    "aiRcaThreadToolOutputHelp": "インシデントを閲覧できるすべてのユーザーに、インシデント調査スレッドでツールの生の入力と出力を表示します",
     "claimParserFunction": "SSO クレームパーサー",
     "claimParserFunctionDescription": "{product1} または {product2} の関数を選択して、SSO/LDAP クレームを解析および変換し、組織とロールの割り当てを行います",
     "claimParserFunctionLabel": "関数を選択",
@@ -16316,7 +16322,7 @@
     "darkMode": "ダークモード",
     "pickCustomColor": "カスタムカラーを選択",
     "organizationSettingsUpdated": "組織設定が更新されました",
-    "dangerZone": "危険な操作",
+    "dangerZone": "危険ゾーン",
     "deleteOrganization": "組織を削除",
     "deleteOrganizationTitle": "この組織を削除",
     "deleteOrganizationDescription": "あなたを含む全員が、{name} へのアクセスを直ちに失います。回復ウィンドウの間は、OpenObserve サポートのみが復元できます。その後は、すべてのデータが完全に消去されます。",
@@ -16357,11 +16363,11 @@
       "fieldAliasesSaveError": "フィールドエイリアスの保存に失敗しました",
       "fieldAliasesUnsavedConfirm": "保存されていないフィールドマッピングの変更があります。破棄して移動しますか？",
       "discoveredServicesTitle": "検出されたサービス",
-      "discoveredServicesDescription": "サービスはテレメトリから検出され、サービス名ごとにグループ化されます。識別方法は検出ルールによって決まります。",
+      "discoveredServicesDescription": "サービスはテレメトリデータから自動的に検出され、相関付けのためにサービス名でグループ化されます。同じサービス名を共有するサービスは、ログ、トレース、メトリクス間で相互に関連付けられます。",
       "noServicesYet": "まだサービスが見つかりませんでした",
       "noServicesDescription": "テレメトリデータがサービス識別属性 (k8s-deployment、サービス名など) とともに取り込まれると、サービスがここに表示されます。",
-      "searchServiceName": "サービスまたはストリームを検索",
-      "telemetryCoverage": "テレメトリカバレッジ",
+      "searchServiceName": "サービスまたはストリーム名を検索...",
+      "telemetryCoverage": "テレメトリーカバレッジ",
       "serviceName": "サービス名",
       "service": "サービス",
       "logs": "ログ",
@@ -16380,7 +16386,7 @@
       "foundInTraces": "トレース内で検出",
       "foundInMetrics": "メトリクス内で発見",
       "foundInProfiles": "プロファイルで見つかりました",
-      "distinguishByLabel": "サービスを区別する基準",
+      "distinguishByLabel": "サービスの区別基準",
       "distinguishByHelp": "サービスが稼働する場所を定義するフィールドを選択します。たとえば、cluster + namespace + deployment を組み合わせると、各サービスに一意のアイデンティティが作成されます。最大5フィールド。",
       "serviceOptionalLabel": "サービス属性なしで相関付け",
       "serviceOptionalHelp": "以下の属性のみを使用してストリームを一致させ、サービス属性は無視します",
@@ -16401,8 +16407,8 @@
       "resetServicesSuccess": "検出されたサービスを {count} 件削除しました。 | 検出されたサービスを {count} 件削除しました。",
       "resetServicesFailed": "サービスのリセットに失敗しました",
       "workload": "ワークロード",
-      "goToConfiguration": "設定に移動",
-      "filterBy": "フィールドでフィルター",
+      "goToConfiguration": "設定へ移動",
+      "filterBy": "フィルター条件 :",
       "selectFieldPlaceholder": "フィールドを選択",
       "selectValuePlaceholder": "値を選択",
       "selectFieldFirst": "最初にフィールドを選択してください",
@@ -16411,13 +16417,18 @@
       "noDimensions": "ディメンションなし",
       "defaultSetWarningTitle": "相関が信頼できない可能性があります。",
       "defaultSetWarningBody": "このインスタンスには曖昧性解消がありません。ワークロードの一致なし（クラスター、ネームスペース、環境コンテキストなし）で検出されました。ログとトレースは、同じサービス名の異なるデプロイメントからのものである可能性があります。",
-      "instanceIdentity": "インスタンスの識別情報",
+      "instanceIdentity": "インスタンスアイデンティティ",
       "noDimensionsCatchAll": "ディメンションなし — キャッチオールインスタンス",
       "streamSources": "ストリームソース",
       "fieldNameMapping": "フィールド名マッピング",
       "logsWithCount": "ログ（{count}）",
       "tracesWithCount": "トレース ({count})",
-      "metricsWithCount": "メトリクス（{count}）"
+      "metricsWithCount": "メトリクス（{count}）",
+      "resetServicesConfirmMessage": "これにより、この組織で検出されたすべてのサービスが削除されます。新しいテレメトリデータが取り込まれると、サービスは自動的に再検出されます。この操作は取り消せません。",
+      "resetServicesConfirmWarning": "新しいテレメトリデータが取り込まれると、サービスは自動的に再検出されます。この操作は取り消せません。",
+      "configureServicesHint": "サービスの識別方法とグループ化方法を設定します。",
+      "serviceCountSingular": "{count} サービス | {count} サービス",
+      "instancesCount": "（{count}インスタンス）"
     },
     "addRegexPattern": {
       "namePlaceholder": "例: Internal Passwords",
@@ -16496,7 +16507,8 @@
       "logoLightLabel": "カスタムロゴ（ライトモード）",
       "logoLightHelp": "ライトモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。",
       "logoDarkLabel": "カスタムロゴ（ダークモード）",
-      "logoDarkHelp": "ダークモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。"
+      "logoDarkHelp": "ダークモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。",
+      "fileCounterLabel": "{constraint} {filesNumber} ファイル {'|'} {totalSize}"
     },
     "modelPricingEditor": {
       "copySuffix": " (コピー)"
@@ -16505,10 +16517,10 @@
       "subtitle": "LLMモデルコスト設定"
     },
     "orgStorageSettings": {
-      "subtitle": "この組織のデータを自分が所有するバケットに保存します",
-      "awsCredentials": "AWS 認証情報",
-      "azureCredentials": "Azure 認証情報",
-      "awsRoleArn": "AWS ロール ARN"
+      "subtitle": "組織別ストレージ設定",
+      "awsCredentials": "AWS認証情報",
+      "azureCredentials": "Azure認証情報",
+      "awsRoleArn": "AWSロールARN"
     },
     "dataRetentionDefaults": {
       "title": "データ保持のデフォルト",
@@ -16525,10 +16537,13 @@
       "daysValue": "{days} 日",
       "forever": "無期限に保持",
       "invalid": "0 または 3 日以上を指定してください",
-      "invalidType": "3 日以上を指定するか、このタイプを削除してください"
+      "invalidType": "3 日以上を指定するか、このタイプを削除してください",
+      "streamType": "ストリームタイプ",
+      "days": "日数",
+      "removeType": "このストリームタイプを削除"
     },
     "organizationSettings": {
-      "fieldNameHelp": "使用できるのは英数字と + = , . {'@'} - _ のみです。",
+      "fieldNameHelp": "英数字と'+=,.{'@'}-_'文字のみを使用し、スペースは使用しないでください。",
       "sectionTitle": "データの取り扱い",
       "sectionDescription": "ログがトレースにどのようにリンクされるかと、有効になっている自動機能。",
       "traceIdHelp": "ログ行をトレースにリンクするログフィールド。英字、数字、および + = , . {'@'} - _ のみを使用できます。",
@@ -16542,7 +16557,7 @@
       "subtitle": "AIツール連携を設定"
     },
     "cipherKeysPage": {
-      "subtitle": "機密フィールド値を暗号化および復号化するキー",
+      "subtitle": "機密フィールドの暗号化キー",
       "delete": "削除",
       "deleteCipherKeyTitle": "暗号化キーを削除",
       "deleteCipherKeyMessage": "{name} 暗号鍵を削除してもよろしいですか？",
@@ -16647,7 +16662,7 @@
       "contractRevokedSuccess": "外部契約が正常に取り消されました。",
       "revokeContractError": "外部契約の取り消しに失敗しました。",
       "enableByobTitle": "BYOBを有効にする",
-      "enablingStorage": "ストレージ設定を有効化しています...",
+      "enablingStorage": "ストレージ設定を有効化中...",
       "storageEnabledSuccess": "ストレージ設定が正常に有効化されました。",
       "enableStorageError": "ストレージ設定の有効化に失敗しました。",
       "processingTrialExtension": "トライアル期間延長リクエストを処理中です。お待ちください...",
@@ -16682,13 +16697,13 @@
       "failedToImport": "\"{name}\" のインポートに失敗しました: {error}"
     },
     "orgStorageEditor": {
-      "chooseTypeTitle": "プロバイダーを選択",
-      "selectProviderDescCont": "設定後、この組織のすべての新規データはご自身のバケットに書き込まれます。",
+      "chooseTypeTitle": "タイプを選択",
+      "selectProviderDescCont": "一度設定すると、この組織のすべての新しいデータはご自身のストレージインフラストラクチャに書き込まれます。",
       "irreversibleWarnPre": "この操作は",
       "irreversibleWarnEmphasis": "元に戻せません",
       "irreversibleWarnPost": "。一度設定すると、別のストレージプロバイダーに切り替えたり、この設定を削除したりすることはできません。別のプロバイダーを使用するには、新しい組織を作成する必要があります。",
       "credentialsOnlyInfo": "一度設定すると、認証情報フィールドのみ更新できます。他のフィールドはロックされます。",
-      "selectStorageProviderLabel": "ストレージプロバイダー",
+      "selectStorageProviderLabel": "ストレージプロバイダーを選択 ",
       "connectionTitle": "接続",
       "serverUrlLabel": "サーバーURL",
       "regionLabel": "リージョン",
@@ -16697,7 +16712,7 @@
       "secretKeyLabel": "シークレットキー",
       "storageAccountNameLabel": "ストレージアカウント名",
       "roleArnLabel": "ロールARN",
-      "externalIdLabel": "外部 ID",
+      "externalIdLabel": "外部ID",
       "pleaseWaitMessage": "お待ちください...",
       "credentialsUpdatedSuccess": "認証情報が正常に更新されました",
       "storageConfigCreatedSuccess": "ストレージ設定が正常に作成されました",
@@ -16724,12 +16739,12 @@
       "workloadDetection": "ワークロード検出",
       "workloadDetectedUsingFields": "フィールドを使用してワークロードを検出",
       "workloadTrackedHelp": "ワークロードの検出と推奨には、これらのフィールドエイリアスグループのみが使用されます。このリストにないフィールドはサービス検出結果に影響しません。オプション — アイデンティティセットにリストされているディメンションは常に追跡されます。",
-      "goToFieldAliases": "フィールドマッピングに移動",
+      "goToFieldAliases": "フィールドエイリアスへ",
       "toConfigureFieldMappings": "個々のフィールドマッピングを設定してください。",
       "selectAliasGroup": "エイリアスグループを選択",
       "discoveredPatternsHelp": "ストリーム内でこれらのデプロイメントパターンを検出しました。これらを使用してサービス相関を設定してください。",
       "envFieldsDetected": "{env} フィールドがテレメトリデータで検出されました。",
-      "goToServices": "サービスに移動",
+      "goToServices": "サービスへ",
       "fieldsConfigured": "{n} フィールド設定済み | {n} フィールド設定済み",
       "recommended": "推奨:",
       "recommendedUse": "使用",
@@ -16759,7 +16774,8 @@
       "reasonIdealForDisambiguation": "{details} — サービス識別に最適",
       "trackedK8sWorkload": "K8s ワークロード",
       "trackedK8sPod": "K8s Pod",
-      "serviceCountFailed": "サービスの件数を読み込めませんでした"
+      "serviceCountFailed": "サービスの件数を読み込めませんでした",
+      "toSeeDiscoveredServices": "実際に検出されたサービスを確認してください。"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "例: {example}",
@@ -16774,7 +16790,7 @@
     },
     "regexPatternList": {
       "subtitle": "編集のための再利用可能な正規表現パターン",
-      "exportTitle": "正規表現パターンをエクスポート",
+      "exportTitle": "Regexパターンをエクスポート",
       "delete": "削除",
       "bulkDeleteTitle": "Regexパターンを削除",
       "bulkDeleteMessage": "{n} 個の正規表現パターンを削除してもよろしいですか？ | {n} 個の正規表現パターンを削除してもよろしいですか？",
@@ -16948,6 +16964,51 @@
       "requestApproved": "{domain} をリンクしました",
       "requestRejected": "{domain} のリクエストを拒否しました",
       "decisionFailed": "リクエストの更新に失敗しました"
+    },
+    "groupDataAI": "データとAI",
+    "llmProvidersDesc": "オンライン評価用のLLMプロバイダー",
+    "customLogoTitle": "カスタムロゴ",
+    "customLogoTextDescription": "カスタムロゴテキストは、アプリケーションに表示されるデフォルトのブランドテキストを変更するために使用されます。",
+    "dragDropUpload": "ドラッグアンドドロップまたはクリックしてアップロード",
+    "customLogoLightDescription": "ライトモードテーマのカスタムロゴ。これはユーザーがライトモードのときに表示されます。",
+    "customLogoDarkDescription": "ダークモードテーマのカスタムロゴ。これはユーザーがダークモードのときに表示されます。",
+    "textMaxCharacters": "テキストは 100 文字未満でなければなりません。",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI エージェントマッピング",
+      "title": "GenAI エージェントマッピング",
+      "description": "LLMトレースと評価でエージェントの識別情報を正規化するために使用するフォールバックテレメトリ属性を構成します。",
+      "agentNameFields": "エージェント名フォールバックフィールド",
+      "agentNameHelp": "gen_ai.agent.name のフォールバックとして使用する受信アトリビュート。",
+      "agentNameInfo": "標準の gen_ai.agent.name 属性が欠落しているか、空の場合にのみチェックされます。1 行に 1 つの受信テレメトリ属性を追加します。",
+      "agentIdFields": "エージェント ID フォールバックフィールド",
+      "agentIdHelp": "gen_ai.agent.id のフォールバックとして使用する受信アトリビュート。",
+      "agentIdInfo": "標準の gen_ai.agent.id 属性が欠落しているか、空の場合にのみチェックされます。1 行に 1 つの受信テレメトリ属性を追加します。",
+      "envFields": "環境フォールバックフィールド",
+      "envHelp": "エージェントの環境として使用する受信属性。",
+      "envInfo": "標準の deployment.environment.name 属性が欠落しているか空の場合にのみチェックされます。1行に1つの受信テレメトリ属性を追加してください。",
+      "versionFields": "バージョンフォールバックフィールド",
+      "versionHelp": "エージェントのバージョンとして使用する受信属性。",
+      "versionInfo": "標準の gen_ai.agent.version 属性が欠落しているか空の場合にのみチェックされます。1行に1つの受信テレメトリ属性を追加してください。",
+      "alwaysAppliedStandard": "標準（最初にチェック）：",
+      "applyDefaults": "デフォルトを適用",
+      "resetToEmpty": "空にリセット",
+      "clearRegistry": "レジストリをクリア",
+      "clearRegistryTitle": "エージェントレジストリを消去しますか?",
+      "clearRegistryDescription": "これにより、この組織で検出されたGenAIエージェントレジストリの全行が削除されます。新しい一致するトレースは、取り込み中にレジストリを再生成します。",
+      "clearRegistryConfirm": "レジストリをクリア",
+      "saved": "GenAI エージェントマッピングが正常に保存されました",
+      "clearRegistrySuccess": "GenAI エージェントレジストリをクリアしました。保存されたエージェント {deletedCount} 件と、キューに入った観測 {bufferCount} 件を削除しました。",
+      "loadFailed": "GenAI エージェントマッピングを読み込めませんでした",
+      "saveFailed": "GenAI エージェントマッピングを保存できませんでした",
+      "clearRegistryFailed": "GenAI エージェントレジストリをクリアできませんでした",
+      "defaultsLoadFailed": "GenAI エージェントマッピングのデフォルトをロードできませんでした",
+      "defaultsFetchFailed": "デフォルトの取得に失敗しました ({status})"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "オンライン評価用のLLMプロバイダー"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "GenAIスパンをエージェント識別子にマッピング"
     }
   },
   "reports": {
@@ -17178,7 +17239,7 @@
     },
     "selectOption": "オプションを選択",
     "runningQueries": "実行中のクエリ",
-    "search": "クエリを検索",
+    "search": "検索",
     "queryList": "クエリ詳細",
     "duration": "実行時間",
     "files": "ファイル",
@@ -17200,7 +17261,7 @@
     "streamType": "ストリームタイプ",
     "startTime": "開始時刻",
     "endTime": "終了時刻",
-    "scanRecords": "スキャンしたレコード",
+    "scanRecords": "スキャンレコード",
     "originalSize": "元のサイズ",
     "compressedSize": "圧縮サイズ",
     "deleteRunningQueryTitle": "実行中クエリを削除",
@@ -17209,7 +17270,8 @@
     "cancelQueryFailed": "クエリのキャンセルに失敗しました",
     "searchTypeDashboards": "ダッシュボード",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "その他"
+    "searchTypeOthers": "その他",
+    "lastDataRefreshTime": "最終データ更新時刻:"
   },
   "traces": {
     "nlNeedsSql": "この質問にはSQLが必要です。ログで開いてください",
@@ -17659,7 +17721,8 @@
         "count": "{count} 件のインサイト | {count} 件のインサイト",
         "countHint": "この時間範囲のサービス異常 {count} 件 | この時間範囲のサービス異常 {count} 件",
         "viewTraces": "トレース",
-        "viewCharts": "チャート"
+        "viewCharts": "チャート",
+        "scoreAbove": "しきい値を {percent}% 上回るスコア"
       }
     },
     "spansTab": "スパン",
@@ -17762,14 +17825,15 @@
       "failedToLoad": "インサイトの読み込みに失敗しました",
       "retry": "再試行",
       "noAgentsInRange": "この範囲にエージェントはありません",
-      "noAgentsDescription": "選択した時間枠では GenAI エージェントが検出されませんでした。範囲を広げるか、ストリームタブに切り替えるか、エージェントマッピングを設定してください。",
+      "noAgentsDescription": "選択した時間範囲でGenAIエージェントは検出されませんでした。範囲を広げるか、ストリームタブに切り替えるか、設定でエージェントマッピングを構成してください。",
       "viewByStream": "ストリームで表示",
       "totalCost": "総コスト",
       "totalTokens": "総トークン数",
       "totalTraces": "トレース合計",
       "p95Latency": "P95レイテンシ",
       "errorRate": "エラー率",
-      "timeAxis": "時刻"
+      "timeAxis": "時刻",
+      "errorsSeries": "エラー"
     },
     "searchBar": {
       "streamNotFound": "ストリームが見つかりません"
@@ -17823,7 +17887,10 @@
       "metricsLoadFailed": "このサービスの相関メトリクスを読み込めませんでした。{reason}",
       "noResourceRecorded": "この時間範囲におけるこのサービスのスパンには {resource} が記録されていません。",
       "resourceLoadFailed": "このサービスの {resource} を読み込めませんでした。{reason}",
-      "noVersionTraffic": "このストリームにおけるこのサービスのスパンにはバージョンが記録されていないため、バージョン別に分割するトラフィックがありません。"
+      "noVersionTraffic": "このストリームにおけるこのサービスのスパンにはバージョンが記録されていないため、バージョン別に分割するトラフィックがありません。",
+      "noResourceDataFound": "{resource}のデータが見つかりません",
+      "failedToLoadMetrics": "メトリクスの読み込みに失敗しました。",
+      "requests": "リクエスト"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTPステータスコード",
@@ -18063,12 +18130,21 @@
       "loadingPage": "ページ {page} を読み込み中",
       "pageFailed": "ページ {page} を読み込めませんでした",
       "pageEmpty": "ページ {page} に結果がありません"
+    },
+    "lLMErrorTable": {
+      "noData": "データなし",
+      "noErrorsInRange": "この時間範囲にエラーはありません",
+      "loadFailed": "最近のエラーを読み込めませんでした",
+      "time": "時間",
+      "service": "サービス",
+      "operation": "操作",
+      "traceId": "トレース ID"
     }
   },
   "aiToolset": {
     "header": "AI ツールセット",
-    "add": "新しいツールセット",
-    "search": "AI ツールセットを検索",
+    "add": "新しい AI ツールセット",
+    "search": "AI ツールセットを検索する",
     "update": "AI ツールセットの更新",
     "name": "名前",
     "nameRequired": "名前が必要です",
@@ -18090,7 +18166,7 @@
     "createdSuccessfully": "AI ツールセットが正常に作成されました",
     "updatedSuccessfully": "AI ツールセットは正常に更新されました",
     "deletedSuccessfully": "AI ツールセットは正常に削除されました",
-    "mcpConfig": "MCP サーバー設定",
+    "mcpConfig": "MCP サーバ設定",
     "mcpUrl": "エンドポイント URL",
     "mcpUrlRequired": "エンドポイント URL が必要です",
     "timeoutSeconds": "タイムアウト (秒)",
@@ -18115,7 +18191,7 @@
     "credEnvVarHint": "例: {example}",
     "credContentHint": "未加工のファイルコンテンツ (例:kubeconfig YAML)",
     "addCredFile": "認証情報ファイルを追加",
-    "skillConfig": "スキル設定",
+    "skillConfig": "スキル構成",
     "skillContent": "スキル定義 (マークダウン)",
     "skillContentRequired": "スキルの内容が必要です"
   },
@@ -18124,12 +18200,12 @@
     "continue": "続行",
     "header": "暗号鍵",
     "add": "暗号鍵を追加",
-    "search": "暗号化キーを検索",
+    "search": "暗号鍵を検索",
     "update": "暗号鍵を更新",
     "name": "名前",
     "type": "タイプ",
-    "step1WithType": "キーストア ({type})",
-    "step2": "暗号化メカニズム",
+    "step1WithType": "キーストア詳細（タイプ: {type}）",
+    "step2": "暗号化方式",
     "sectionKey": "キー",
     "sectionSetup": "キーストアと暗号化",
     "secret": "シークレット",
@@ -18171,7 +18247,7 @@
     "dfcNameRequired": "DFC名が必要です",
     "dfcEncryptedDataRequired": "DFC暗号化データが必要です",
     "storeType": "ストアタイプ",
-    "mechanismType": "メカニズムタイプ",
+    "mechanismType": "方式タイプ",
     "actions": "操作"
   },
   "quota": {
@@ -18199,7 +18275,7 @@
     "version": "バージョン",
     "cpu": "CPU(%)",
     "memory": "メモリ(%)",
-    "tcp": "TCP 接続",
+    "tcp": "TCP",
     "filter_header": "フィルター",
     "clear_all": "すべてクリア",
     "region": "リージョン",
@@ -18210,13 +18286,13 @@
     "summaryOnline": "オンライン",
     "summaryTotal": "ノード",
     "status": "ステータス",
-    "cpuusage": "CPU 使用率 (%)",
-    "memoryusage": "メモリ使用率 (%)",
+    "cpuusage": "CPU使用率(%)",
+    "memoryusage": "メモリ使用率(%)",
     "establishedLabel": "確立",
-    "closewaitLabel": "CLOSE_WAIT",
-    "waittimeLabel": "TIME_WAIT",
+    "closewaitLabel": "クローズ待ち",
+    "waittimeLabel": "タイムウェイト",
     "applyFilter": "フィルターを適用",
-    "searchCluster": "クラスターを検索",
+    "searchCluster": "クラスタを検索",
     "searchRegion": "リージョンを検索"
   },
   "regex_patterns": {
@@ -18225,8 +18301,8 @@
     "search": "パターンを検索",
     "name": "名前",
     "pattern": "パターン",
-    "created_at": "作成日時",
-    "updated_at": "更新日時",
+    "created_at": "作成日",
+    "updated_at": "更新日",
     "actions": "アクション",
     "edit": "編集",
     "delete": "削除",
@@ -19526,7 +19602,8 @@
         "promptTemperatureOverrideInherited": "プロンプトのパラメータを使用しています。",
         "taskTimeoutLabel": "タイムアウト（秒）",
         "taskConcurrencyLabel": "最大同時実行数",
-        "taskOverrideHelp": "この実行では、タスクの公開値を上書きします。"
+        "taskOverrideHelp": "この実行では、タスクの公開値を上書きします。",
+        "providerHelpSettingsLink": "設定"
       },
       "columns": {
         "name": "名前",
@@ -19864,7 +19941,7 @@
       "agentIdHint": "エージェント ID: {ids}",
       "noAgentIdentity": "エージェント ID が見つかりません",
       "noAgentIdentityDescription": "これらの LLM スパンにはエージェント名がないため、ストリーム別に表示しています。エージェント名を指定する属性をマッピングすると、エージェント別に表示できます。",
-      "noAgentIdentityAction": "エージェントマッピングを開く"
+      "noAgentIdentityAction": "GenAI エージェントマッピングを開く"
     },
     "agentGraph": {
       "stream": "ストリーム",
@@ -19880,17 +19957,17 @@
       },
       "tokenTrend": {
         "title": "トークントレンド",
-        "subtitle": "入力トークンと出力トークン",
+        "subtitle": "モデル別トークン",
         "input": "入力",
         "output": "出力"
       },
       "latencyByModel": {
-        "title": "レイテンシの推移",
-        "subtitle": "モデル別 p95"
+        "title": "モデル別のレイテンシー",
+        "subtitle": "p50/p90/p95/p99"
       },
       "tracesOverTime": {
-        "title": "トレースの推移",
-        "subtitle": "OK とエラーのトレース",
+        "title": "時間の経過に伴うリクエスト",
+        "subtitle": "サービス別のリクエスト数",
         "ok": "OK",
         "errored": "エラー"
       },
@@ -19919,6 +19996,26 @@
           "traces": "トレース",
           "last": "最終失敗"
         }
+      },
+      "spanTrend": {
+        "title": "スパントレンド",
+        "subtitle": "種類別スパン数"
+      },
+      "errorsOverTime": {
+        "title": "時間の経過に伴うエラー",
+        "subtitle": "エラー数"
+      },
+      "spansByModel": {
+        "title": "モデル別スパン",
+        "subtitle": "モデルごとのコール数"
+      },
+      "tokensByModel": {
+        "title": "モデル別トークン",
+        "subtitle": "モデルごとの合計トークン"
+      },
+      "recentErrors": {
+        "title": "最近のエラー",
+        "subtitle": "直近10件の失敗したスパン"
       }
     },
     "behavior": {
@@ -19951,12 +20048,12 @@
       "colErrors": "エラー",
       "detail": {
         "title": "シグナルの詳細",
-        "tracesTitle": "このエージェントでエラーが発生したトレース",
+        "tracesTitle": "トレース",
         "tracesHint": "トレースをクリックして開きます",
         "worstLoopTraces": "最悪のトレース（繰り返しの多い順）",
         "topCostTraces": "最もコストの高いトレース",
         "noTraces": "このシグナルのトレースが見つかりません",
-        "errorsTitle": "このエージェントのすべてのエラー",
+        "errorsTitle": "エラーの内容",
         "noErrors": "エラーメッセージは取得されていません — トレースを開いて調査してください",
         "colTraceId": "トレース",
         "colSpans": "スパン",
@@ -19970,7 +20067,7 @@
         "failHeadline": "{agent} が {count} 件の “{cls}” エラーを発生。",
         "costHeadline": "{agent}: ${cost} 消費 · {tokens} トークン · {errors} エラー。",
         "loopExplain": "高い繰り返し率は、通常エージェントが結果をキャッシュしていないか、再試行していることを意味します。下の最悪のトレースを開いて、繰り返された呼び出しを確認してください。",
-        "failExplain": "これらはこのエージェントのすべてのエラーメッセージで、この1件だけでなく、あらゆる失敗分類が含まれます。修正方法を見つけるにはこれらを読み、どこで発生したかを確認するにはトレースを開いてください。",
+        "failExplain": "これらはこの障害クラスを引き起こしている実際のエラーメッセージです — それらを読んで修正を見つけるか、トレースを開いて発生場所を確認してください。",
         "costExplain": "これらのトレースがこのエージェントの支出を牽引しました。最もコストの高いトレースを開いて、何が実行されたかを確認してください。",
         "explain": "O2 AI で説明",
         "explainHelp": "O2 AI はエラーメッセージと最も深刻なトレースからこのシグナルを調査し、AI スパンを越えてログ、メトリクス、Kubernetes、デプロイまで参照し、根拠を提示します。"
@@ -20957,7 +21054,7 @@
       },
       "noProviders": {
         "title": "最初にプロバイダーを追加してください",
-        "description": "スコアラーを実行するには、LLM プロバイダー（OpenAI、Anthropic など）が必要です。スコアラーを作成する前に、LLM プロバイダーで1つ追加してください。"
+        "description": "スコアラーの実行にはLLMプロバイダー（OpenAI、Anthropic など）が必要です。スコアラーを作成する前に、設定でプロバイダーを追加してください。"
       },
       "import": {
         "title": "スコアラーをインポート",
@@ -21117,7 +21214,8 @@
         "resultReasoning": "推論",
         "resultRaw": "生のレスポンス",
         "valuePlaceholder": "{variable} の値"
-      }
+      },
+      "providerHelpSettingsLink": "設定"
     },
     "job": {
       "detail": {
@@ -21301,7 +21399,7 @@
         }
       },
       "inputMapping": {
-        "title": "スコアラー変数",
+        "title": "プロンプト変数",
         "hint": {
           "span": "各変数をスパン属性にマッピングします。",
           "trace": "各変数をシステム提供の値またはスパン属性にマッピングします。",
@@ -21460,7 +21558,7 @@
     "tabLabel": "LLM プロバイダー",
     "title": "LLM プロバイダー",
     "subtitle": "オンライン評価用の LLM プロバイダー",
-    "newButton": "新規プロバイダー",
+    "newButton": "新しいプロバイダー",
     "searchPlaceholder": "プロバイダーを検索",
     "defaultBadge": "デフォルト",
     "loadError": "LLM プロバイダーを読み込めませんでした",
@@ -22114,7 +22212,7 @@
       "explanation": "組織レベルの o2syn_ トークン。プライベートエージェントがジョブを取得する際の認証に使用します。パブリック（Lambda）ロケーションはデフォルトトークンを自動的に使用します。名前付きトークンを作成し、リージョンのエージェントに埋め込むことで、そのリージョンの影響範囲を限定できます。",
       "summary": "プライベートエージェントがジョブを取得するために使用するトークン。",
       "rotateDefaultBtn": "デフォルトをローテーション",
-      "createTokenBtn": "新規トークン",
+      "createTokenBtn": "トークンを作成",
       "searchPlaceholder": "トークンを検索",
       "default": "デフォルト",
       "tokenNameLabel": "名前",
@@ -22715,7 +22813,7 @@
       "unknown": "不明"
     },
     "locations": {
-      "addLocation": "新規ロケーション",
+      "addLocation": "ロケーションを追加",
       "bulkDeleteConfirmMessage": "{count} 件のロケーションを削除してもよろしいですか？",
       "bulkDeleteConfirmTitle": "ロケーションを削除",
       "bulkDeleteFailed": "ロケーションの削除に失敗しました",
@@ -22725,7 +22823,7 @@
       "createClose": "作成して閉じる",
       "createFailed": "ロケーションの作成に失敗しました",
       "createSuccess": "ロケーションが正常に作成されました",
-      "createTitle": "新規ロケーション",
+      "createTitle": "ロケーションを追加",
       "customProviderLabel": "カスタムプロバイダー",
       "customProviderPlaceholder": "プロバイダー名を入力してください",
       "customProviderRequired": "カスタムプロバイダー名は必須です",
@@ -22733,7 +22831,7 @@
       "deleteConfirmTitle": "ロケーションの削除",
       "deleteFailed": "ロケーションの削除に失敗しました",
       "deleteSuccess": "ロケーションが正常に削除されました",
-      "description": "合成モニタリング用のパブリックプローブロケーション",
+      "description": "合成監視のパブリックプローブロケーションを管理",
       "disable": "無効にする",
       "disabledSuccess": "ロケーションが無効になりました",
       "disabling": "無効化中…",
@@ -22780,7 +22878,7 @@
       "region": "リージョン",
       "regionPlaceholder": "例: us-east-1",
       "regionRequired": "リージョンが必要です",
-      "searchPlaceholder": "ロケーションを検索",
+      "searchPlaceholder": "ロケーションを検索…",
       "title": "ロケーション",
       "publicTitle": "パブリックロケーション",
       "privateTitle": "プライベートロケーション",
@@ -25386,19 +25484,19 @@
     "unitAttempts": "回",
     "unitSeconds": "秒",
     "minLength": "最小文字数",
-    "minLengthDesc": "受け付けるパスワードの最小文字数。",
+    "minLengthDesc": "受け付けるパスワードの最短文字数",
     "maxLength": "最大文字数",
-    "maxLengthDesc": "受け付けるパスワードの最大文字数（128 まで）。",
+    "maxLengthDesc": "許可される最長のパスワード（最大128）",
     "requireUppercase": "大文字を必須にする",
-    "requireUppercaseDesc": "A–Z を少なくとも 1 文字含む。",
+    "requireUppercaseDesc": "A–Z を少なくとも1文字",
     "requireLowercase": "小文字を必須にする",
-    "requireLowercaseDesc": "a–z を少なくとも 1 文字含む。",
+    "requireLowercaseDesc": "a–z を少なくとも1文字",
     "requireDigit": "数字を必須にする",
-    "requireDigitDesc": "0–9 を少なくとも 1 文字含む。",
+    "requireDigitDesc": "0–9 を少なくとも1文字",
     "requireSpecial": "特殊文字を必須にする",
-    "requireSpecialDesc": "許可されたセットから少なくとも 1 文字含む。",
+    "requireSpecialDesc": "許可された文字セットから少なくとも1文字",
     "specialCharSet": "許可する特殊文字",
-    "specialCharSetDesc": "空欄の場合、英数字以外の任意の文字を受け付けます。",
+    "specialCharSetDesc": "空欄にすると、英数字以外のすべての文字を許可します",
     "maxLengthTooSmall": "最大文字数は最小文字数以上128以下にする必要があります。",
     "maxLengthBelowMin": "最小文字数に合わせるため、{min} 以上にする必要があります。",
     "confirmTitle": "パスワードポリシーを保存しますか？",
@@ -25412,9 +25510,9 @@
     "rotation": "ローテーション",
     "rotationDays": "ローテーション期間",
     "rotationDesc": "パスワードの失効タイミングと、事前通知の期間。",
-    "rotationDaysDesc": "パスワードが期限切れになるまでの日数。0 はパスワードが期限切れにならないことを意味します。",
+    "rotationDaysDesc": "パスワードが有効期限切れになるまでの日数。0 = 無期限",
     "rotationWarningDays": "有効期限前の警告",
-    "rotationWarningDaysDesc": "サインイン時に事前通知する日数。0 の場合は警告しません。",
+    "rotationWarningDaysDesc": "サインイン時の通知日数。0 = 警告なし",
     "rotationWarningDaysOffDesc": "サインイン時の事前通知日数。パスワード失効後に使用されます。",
     "warningDaysTooLong": "警告期間はローテーション期間より長くできません。",
     "rotationPreview": "今日設定したパスワードは {expires} に有効期限が切れます。サインイン時の警告は {warns} から始まります。",
@@ -25422,33 +25520,33 @@
     "reuse": "再利用の防止",
     "historyCount": "記憶するパスワード数",
     "reuseDesc": "古いパスワードの再利用を防ぎます。",
-    "historyCountDesc": "新しいパスワードは、この件数の過去のパスワードと一致できません。0 でチェックを無効にします。",
+    "historyCountDesc": "新しいパスワードは、この数の過去のパスワードと一致してはいけません。0 = チェックなし",
     "historyMaxRetained": "保持する履歴",
-    "historyMaxRetainedDesc": "ユーザーごとに保持する過去のパスワード数。",
+    "historyMaxRetainedDesc": "ユーザーごとに保持される過去のパスワード数",
     "historyRetainedTooSmall": "保持する履歴は、記憶するパスワード数以上である必要があります。",
     "reuseExplainer": "現在のパスワードは記憶されるセットの1つとして数えられます。再利用が拒否されるのはこのルールによるもので、別のチェックによるものではありません。",
     "lockout": "アカウントのロックアウト",
     "lockoutThreshold": "ロックアウトまでの失敗回数",
     "lockoutDesc": "サインインの失敗が繰り返された後の動作。",
-    "lockoutThresholdDesc": "0 でロックアウトを無効にします。",
+    "lockoutThresholdDesc": "0 = ロックアウト無効",
     "lockoutBucketSize": "以降の各ロックアウトまでの試行回数",
-    "lockoutBucketSizeDesc": "あと何回失敗すると次が発生するか。0 の場合は最初と同じ回数を使用します。",
+    "lockoutBucketSizeDesc": "0 = 上記の値を使用",
     "lockoutStartSecs": "最初のロックアウト期間",
-    "lockoutStartSecsDesc": "最初のロックアウトの継続時間。",
+    "lockoutStartSecsDesc": "秒",
     "lockoutMaxSecs": "最大ロックアウト期間",
-    "lockoutMaxSecsDesc": "段階的な延長が止まる上限。",
+    "lockoutMaxSecsDesc": "秒 — エスカレーションが上限とする値",
     "lockoutStartTooLong": "最初のロックアウトは最大ロックアウトより長くできません。",
     "lockoutBackoff": "エスカレーション",
-    "lockoutBackoffDesc": "各ロックアウトが前回からどのように延長されるか。",
+    "lockoutBackoffDesc": "各ロックアウトが前回からどのように延びるか",
     "backoffExponential": "指数関数的",
     "backoffLinear": "線形",
     "lockoutPreview": "{threshold} 回失敗 → {first} · {bucket} 回ごとに → {rest} · 上限 {max}。サインインに成功するとすべてリセットされます。",
     "sessionEnforcement": "セッションと適用",
     "sessionEnforcementDesc": "サインインの有効期間と、root がこれらのルールに従うかどうか。",
     "cookieMaxAge": "セッションの有効期間",
-    "cookieMaxAgeDesc": "サインイン済みセッションが有効な期間。0 の場合は {envVar} のインスタンス既定値を使用します。",
+    "cookieMaxAgeDesc": "サインイン済みセッションが有効な秒数。0 = {envVar} のインスタンスデフォルトを使用",
     "applyToRoot": "root アカウントに適用",
-    "applyToRootDesc": "これがオンの場合を除き、Root は上記のすべてのルールの対象外です。",
+    "applyToRootDesc": "これがオンの場合を除き、root は上記すべてのルールから除外されます",
     "rootWarning": "root をロックすると、システムが復旧不能な状態になる可能性があります。",
     "rootDialogTitle": "ポリシーを root に適用しますか？",
     "rootDialogMessage": "root は他のネイティブアカウントと同様に、ロックアウト、ローテーション、強制リセットの対象になります。root が唯一の管理アカウントである場合、ロックアウトや満たすことのできない有効期限により、このインスタンスに戻る手段がなくなる可能性があります。",
@@ -29621,12 +29719,12 @@
       "chartBelow": "{metric}、現在 {value}、正常範囲を下回っています",
       "chartWithin": "{metric}、{value} 現在、正常範囲内",
       "tipNormal": "正常 {low} – {high}",
-      "openTraces": "トレースで開く",
+      "openTraces": "トレース",
       "openCatalog": "サービスカタログ",
       "openLogs": "ログで開く",
       "rangeLabel": "時間範囲",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "カバレッジギャップ",
+      "badgeNotWatched": "未監視",
       "signalsWatched": "監視中のシグナル",
       "chipAria": "{signal}: {state}",
       "deltaUp": "範囲の開始時点から {change} 増加",
@@ -29722,7 +29820,10 @@
         "service": "サービス別",
         "place": "場所別",
         "none": "グループ化なし"
-      }
+      },
+      "fixNoLink": "service.name ラベルを追加",
+      "fixStopped": "コレクターを確認",
+      "fixQueued": "モックのみ: {service} の「{action}」はどこにも送信されませんでした"
     },
     "activity": {
       "before": "変更前",
@@ -30471,15 +30572,15 @@
       "intro": "私が行うことを 5 つのステップで説明します。",
       "gotIt": "了解",
       "s1Title": "サービスを検出します",
-      "s1": "すでに送信しているデータを調べて、その中のサービスを見つけます。新しいサービスは次回のチェック後に表示されるので、追加する必要はありません。",
-      "s2Title": "正常な状態を学習します",
-      "s2": "各ストリームが通常どれくらいのデータを送信するかを、その 14 日間の履歴から学習します。ストリームにその履歴が揃うまでは、学習中と表示し、判定は行いません。",
-      "s3Title": "ストリームが停止したときだけ呼び出します",
-      "s3": "ストリームがデータの送信を停止すると、インシデントを作成し、呼び出しがオンの場合は、そのサービスを所有するオンコールチームを呼び出します。急激な減少や増加は検出結果として表示され、呼び出しは行いません。小さい変化は日次ダイジェストまで待機します。",
-      "s4Title": "何が起きたかを伝えます",
-      "s4": "各インシデントには、何が、いつから停止しているかを表示します。AI 分析がオンの場合は、原因に関する最も有力な見解も示します。",
-      "s5Title": "変更内容はあなたが決めます",
-      "s5": "何も監視していない対象にはアラートを、発火できないアラートには修正を提案します。確認して適用するまで何も変更されず、適用した内容は元に戻せます。"
+      "s1": "すでに送信されているデータを調べて、そこに含まれるすべてのサービスを検出します。新しいサービスが現れると、その日のうちに監視を開始します。依頼は不要です。",
+      "s2Title": "サービスを監視します",
+      "s2": "各サービスの正常な状態を学習します。1 日の各時間帯におけるエラー、遅延、トラフィックを把握し、週次のパターンは時間の経過とともに精度が上がります。学習が完了するまでは、基本的な安全チェックを使用します。",
+      "s3Title": "本当の問題でなければ黙っています",
+      "s3": "ほとんどの異常な瞬間は問題ではありません。顧客に影響する問題が発生した場合はチームに呼び出しを送り、より小さな問題には誰も起こさないメッセージを送り、軽微なものは金曜日のサマリーに残します。",
+      "s4Title": "すべての呼び出しを説明します",
+      "s4": "すべてのメッセージには、何が壊れたか、いつからか、原因についての最善の見解、およびその確信度が含まれます。",
+      "s5Title": "許可されたものだけを修正します",
+      "s5": "許可されたものだけを修正します。うまくいった修正は少し信頼を獲得し、役に立たなかった修正は信頼を損ないます。同じ修正が必要になり続ける場合は、習慣化するのではなく、チームに報告すべきバグです。"
     },
     "outcome": {
       "active": "現在発生中",
@@ -30492,9 +30593,9 @@
     },
     "view": {
       "standard": "標準",
-      "nerd": "詳細",
+      "nerd": "マニアック",
       "standardTooltip": "標準ビューでは要点を表示します。対応が必要なものと、過去 7 日間に発生したことです。",
-      "nerdTooltip": "詳細ビューでは、すべての検出器、ループ、設定を完全に表示します",
+      "nerdTooltip": "マニアックビューでは、すべての検出器、ループ、設定を完全に表示します",
       "label": "表示"
     },
     "suggestions": {
@@ -30617,7 +30718,8 @@
       "copyRequest": "リクエストをコピー",
       "requestText": "OpenObserve 組織 {name} ({org}) を Slack ワークスペース {team} に追加してください (_meta › Settings › Slack › Organizations)。",
       "requestCopied": "リクエストをコピーしました",
-      "setupAppOtherTeam": "{team} 以外の Slack ワークスペース用 · OpenObserve が 1 つの設定トークンから専用の Slack アプリを作成します"
+      "setupAppOtherTeam": "{team} 以外の Slack ワークスペース用 · OpenObserve が 1 つの設定トークンから専用の Slack アプリを作成します",
+      "title": "Slack ワークスペースを接続"
     },
     "wizard": {
       "title": "Slack アプリを設定",
@@ -30671,7 +30773,7 @@
         "signingSecretRequired": "HTTPモードには署名シークレットが必要です"
       },
       "install": {
-        "title": "ステップ 4 · インストール",
+        "title": "ステップ4 · インストール",
         "created": "アプリを作成しました · {appId}",
         "allowHint": "Slackのインストール画面が開きます。そこで「許可する」をクリックしてください。ボットトークンはSlackから自動的に返されるため、コピーする必要はありません。",
         "allow": "Slackで許可する",
@@ -30694,7 +30796,7 @@
         "appNotCreatedByO2": "このアプリはOpenObserveが作成したものではないため、Slackに残ります。不要になった場合はSlackで削除してください。"
       },
       "test": {
-        "title": "ステップ 5 · テストと連携",
+        "title": "ステップ5 · テストとリンク",
         "run": "チェックを実行",
         "signIn": "「Sign in with Slack」をテストする",
         "signInPassed": "「Sign in with Slack」は正常に動作します",
@@ -30837,7 +30939,9 @@
       "ownOrgOnlyHint": "インスタンスワークスペースでは、チャンネルを自身の組織にマッピングします",
       "claimableHint": "未割り当てのチャンネルと {org} が所有するチャンネル",
       "servedOrgsHint": "このワークスペースが対応する任意の組織",
-      "alertRoutes": "{count} 件の宛先 | {count} 件の宛先"
+      "alertRoutes": "{count} 件の宛先 | {count} 件の宛先",
+      "empty": "デフォルト組織が設定されたチャンネルはまだありません",
+      "emptyDescription": "デフォルトがないチャネルでの質問は、各人のデフォルト組織に送られます（/o2 org で変更できます）。"
     },
     "people": {
       "title": "リンク済みのユーザー",
@@ -30856,7 +30960,8 @@
         "email": "メール一致",
         "admin_bulk": "全員をリンク"
       },
-      "loadMore": "さらに読み込む"
+      "loadMore": "さらに読み込む",
+      "empty": "この組織ではまだ誰も Slack をリンクしていません"
     },
     "credentials": {
       "title": "認証情報を更新",
@@ -31779,7 +31884,7 @@
           "label": "エージェント識別子の欠落",
           "detail": "LLM スパン {total} 件中 {affected} 件（{pct}）に gen_ai.agent.name がないため、エージェントビューに表示されません。",
           "pass": "すべての LLM スパンにエージェント名または ID があります。",
-          "fix": "エージェントマッピングを開く"
+          "fix": "GenAI エージェントマッピングを開く"
         },
         "zero_duration_spans": {
           "label": "所要時間ゼロのスパン",
@@ -31794,6 +31899,13 @@
           "fix": "統合ガイド"
         }
       }
+    },
+    "chart": {
+      "costMissing": "このチャートには含まれません: {models}。{tokens} トークンに価格がありません。",
+      "costMissingPricedSince": "このチャートには含まれません: {models}。{tokens} トークンは価格追加前に記録されました。",
+      "unpricedModels": "価格未設定: {models}",
+      "pricedSinceModels": "価格追加前に記録: {models}",
+      "addPrice": "価格を追加"
     }
   },
   "onboarding": {

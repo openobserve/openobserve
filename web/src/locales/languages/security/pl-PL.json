@@ -302,7 +302,7 @@
       "source": "Źródło",
       "matchedRules": "Dopasowano {n} wykrycie | Dopasowano {n} wykryć",
       "openCase": "Otwórz sprawę",
-      "openCaseHint": "Otwórz sprawę dla tego zdarzenia z uzupełnionym tytułem, priorytetem i encjami",
+      "openCaseHint": "Otwórz sprawę dla tego zdarzenia z wypełnionym tytułem, priorytetem i encjami",
       "addToCase": "Dodaj do sprawy",
       "pickCase": "Dodaj do otwartej sprawy",
       "caseOpened": "Otwarto sprawę: {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Ustalany przez przedział czasu korelacji",
       "createForbidden": "Utworzenie detekcji wymaga uprawnienia Security",
       "preview": {
-        "run": "Podgląd na danych historycznych",
-        "hint": "Uruchamia regułę na wybranym zakresie w taki sam sposób jak harmonogram i pokazuje, co zostałoby wyzwolone",
+        "run": "Podgląd na historii",
+        "hint": "Uruchamia regułę w wybranym zakresie tak jak harmonogram i pokazuje, co by się wyzwoliło",
         "failed": "Zapytanie nie powiodło się: {reason}",
         "time": "Czas",
         "range": {
@@ -1093,7 +1093,7 @@
       "stat": {
         "ready": "Gotowe do instalacji",
         "installed": "Zainstalowane",
-        "applies": "Pasuje do Twoich źródeł",
+        "applies": "Pasują do Twoich źródeł",
         "readyHint": "Reguły, które działają na co najmniej jednym z Twoich strumieni i nie są jeszcze zainstalowane",
         "appliesHint": "Reguły dla posiadanego źródła logów, zainstalowane lub nie; obejmuje każdą regułę gotową do instalacji",
         "allRules": "Wszystkie reguły",
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Dziennik zmian",
-      "hint": "Kto zmieniał detekcje, źródła, sprawy i nadania ról w obszarze Security — przez cały okres przechowywania śladu audytu",
+      "hint": "Kto zmieniał detekcje, źródła, sprawy i przydziały ról Bezpieczeństwa, przez cały okres przechowywania dziennika audytu",
       "includeReads": "Uwzględnij odczyty",
       "when": "Kiedy",
       "who": "Zmienione przez",

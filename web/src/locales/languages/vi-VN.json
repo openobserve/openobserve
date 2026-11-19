@@ -121,7 +121,7 @@
     "noGroups": {
       "title": "Chưa có nhóm nào",
       "description": "Nhóm cho phép bạn quản lý quyền cho nhiều người dùng cùng một lúc. Hãy tạo một nhóm để bắt đầu.",
-      "action": "Tạo nhóm người dùng",
+      "action": "Nhóm mới",
       "actionDesc": "Tạo nhóm người dùng"
     },
     "noRoles": {
@@ -197,7 +197,7 @@
     "noCipherKeys": {
       "title": "Chưa có khóa mã hóa nào",
       "description": "Khóa mã hóa được sử dụng để mã hóa các trường nhạy cảm trong stream của bạn.",
-      "action": "Tạo khóa mã hóa",
+      "action": "Khóa mới",
       "actionDesc": "Tạo khóa mã hóa"
     },
     "noSlackChannelDefaults": {
@@ -225,7 +225,7 @@
     "noLlmProviders": {
       "title": "Chưa cấu hình nhà cung cấp LLM nào",
       "description": "Kết nối nhà cung cấp mô hình ngôn ngữ để kích hoạt các tính năng AI.",
-      "action": "Tạo nhà cung cấp",
+      "action": "Thêm nhà cung cấp",
       "actionDesc": "Cấu hình nhà cung cấp LLM"
     },
     "noDiscoveredServices": {
@@ -268,9 +268,9 @@
     },
     "noStorageConfig": {
       "title": "Chưa cấu hình bucket",
-      "description": "Sử dụng bucket của riêng bạn để giữ dữ liệu của tổ chức này trong vùng lưu trữ do bạn sở hữu, tách biệt với các tổ chức khác và mặc định toàn cục.",
-      "action": "Cấu hình bucket",
-      "actionDesc": "Kết nối bucket S3 hoặc Azure"
+      "description": "Định tuyến dữ liệu của tổ chức này đến một bucket chuyên dụng — độc lập với các tổ chức khác và mặc định toàn cục.",
+      "action": "Cấu hình lưu trữ",
+      "actionDesc": "Kết nối một bucket S3, GCS hoặc Azure"
     },
     "noPhoneProvider": {
       "title": "Chưa kết nối nhà cung cấp điện thoại",
@@ -435,7 +435,7 @@
     "noUsers": {
       "title": "Chưa có người dùng nào",
       "description": "Mời đồng nghiệp của bạn cộng tác trong tổ chức này.",
-      "action": "Tạo người dùng",
+      "action": "Thêm người dùng",
       "actionDesc": "Mời một đồng nghiệp qua email"
     },
     "noReports": {
@@ -457,7 +457,7 @@
     "noServiceAccounts": {
       "title": "Chưa có tài khoản dịch vụ nào",
       "description": "Tài khoản dịch vụ cho phép ứng dụng xác thực với API. Tạo một tài khoản để bắt đầu.",
-      "action": "Tạo tài khoản dịch vụ",
+      "action": "Thêm tài khoản dịch vụ",
       "actionDesc": "Tạo tài khoản dịch vụ API"
     },
     "noInvitations": {
@@ -3706,7 +3706,7 @@
     "agplFullName": "GNU Affero General Public License (AGPL)",
     "github": "GitHub",
     "website": "Trang web",
-    "licenseAndUsage": "Giấy phép & mức sử dụng",
+    "licenseAndUsage": "Giấy phép & Sử dụng",
     "copyLicenseId": "Sao chép ID giấy phép",
     "editionLbl": "Phiên bản",
     "gbPerDay": "GB / ngày",
@@ -3727,8 +3727,8 @@
     "ent_lincese_detail_lbl": "Chi tiết giấy phép Enterprise",
     "lincese_id_lbl": "ID giấy phép",
     "status_lbl": "Trạng thái",
-    "create_at_lbl": "Tạo lúc",
-    "expires_at_lbl": "Hết hạn lúc",
+    "create_at_lbl": "Ngày tạo",
+    "expires_at_lbl": "Ngày hết hạn",
     "usage_limits": "Giới hạn sử dụng",
     "feature_comparison_lbl": "So sánh tính năng",
     "feature_comparision_ent_msg": "Bạn đang sử dụng OpenObserve Enterprise Edition với quyền truy cập tất cả các tính năng nâng cao được liệt kê bên dưới.",
@@ -3787,11 +3787,11 @@
     "expired_lbl": "Hết hạn",
     "no_license_found": "Không tìm thấy giấy phép",
     "installation_id": "ID cài đặt",
-    "contact_admin_license": "Dán khóa giấy phép bên dưới hoặc yêu cầu một khóa.",
+    "contact_admin_license": "Liên hệ quản trị viên để lấy giấy phép và dán khóa vào đây, <strong>hoặc:</strong>",
     "get_license": "Lấy giấy phép",
     "enter_license_key": "Nhập khóa giấy phép",
     "paste_license_placeholder": "Dán khóa giấy phép của bạn vào đây...",
-    "license_auto_filled": "Khóa giấy phép được tự động điền từ URL. Nhấp \"Cập nhật giấy phép\" để áp dụng.",
+    "license_auto_filled": "Khóa giấy phép đã được tự động điền từ URL. Nhấp \"Cập nhật giấy phép\" để áp dụng.",
     "update_license": "Cập nhật giấy phép",
     "license_id": "ID giấy phép",
     "company": "Công ty",
@@ -4732,7 +4732,7 @@
       "effectStillAllowed": "Không thay đổi quyền truy cập: một quyền rộng hơn vẫn cho phép điều này.",
       "moduleGroupSecurity": "Bảo mật",
       "presetSocAnalystTitle": "Chuyên viên phân tích SOC",
-      "presetSocAnalystDescription": "Phân loại ưu tiên cảnh báo và vụ việc Bảo mật, với quyền đọc đối với các phát hiện, stream nguồn Bảo mật và danh sách tình báo mối đe dọa",
+      "presetSocAnalystDescription": "Phân loại cảnh báo và vụ việc Security, với quyền đọc phát hiện, stream nguồn Security và danh sách threat intel",
       "presetDetectionEngineerTitle": "Kỹ sư phát hiện",
       "presetDetectionEngineerDescription": "Tạo, tinh chỉnh, bật và chạy phát hiện, cài đặt nội dung, gắn nguồn cùng hàm và pipeline của chúng, và duy trì bảng làm giàu như danh sách tình báo mối đe dọa, với quyền đọc Bảo mật, vụ việc và luồng",
       "presetSecurityAdminTitle": "Quản trị viên bảo mật",
@@ -4843,7 +4843,7 @@
       "createFailed": "Tạo tổ chức thất bại."
     },
     "listOrganizations": {
-      "subtitle": "Mọi tổ chức bạn có thể truy cập. Chuyển sang một tổ chức hoặc đổi tên tổ chức đó từ các thao tác trên hàng.",
+      "subtitle": "Các tổ chức bạn có thể truy cập",
       "switch": "Chuyển sang tổ chức này",
       "current": "Hiện tại",
       "cannotEditWhileDeleting": "Không thể chỉnh sửa trong khi đang xóa",
@@ -4977,7 +4977,7 @@
       "uploadingRules": "Vui lòng chờ khi tải lên quy tắc...",
       "errorUploadingRules": "Lỗi khi tải lên quy tắc",
       "errorParsingJson": "Lỗi phân tích JSON từ tệp {name}",
-      "someValuesEmpty": "Một số giá trị đang trống. Vui lòng kiểm tra lại.",
+      "someValuesEmpty": "một số giá trị trống, vui lòng kiểm tra",
       "saveBeforeSwitchingTimeUnits": "Vui lòng lưu hoặc hủy thay đổi của bạn trước khi chuyển đơn vị thời gian"
     },
     "addRolePage": {
@@ -4996,7 +4996,9 @@
       "saved": "Banner thông báo đã được cập nhật",
       "saveFailed": "Không thể lưu các banner thông báo",
       "loadFailed": "Không thể tải các banner thông báo",
-      "addBanner": "Thêm banner"
+      "addBanner": "Thêm banner",
+      "emptyTitle": "Chưa có banner nào",
+      "emptyHint": "Thêm một banner để hiển thị thông báo ở đầu ứng dụng."
     },
     "variants": {
       "info": "Thông tin",
@@ -5114,10 +5116,10 @@
       "characters": "{count} / {max}",
       "variantOption": "{name} — {help}",
       "variantHelp": {
-        "info": "Thông báo chung và tin tức phát hành",
-        "warning": "Dịch vụ suy giảm hoặc bảo trì sắp tới",
-        "critical": "Gián đoạn dịch vụ; hiển thị đầu tiên và ẩn khuyến mãi",
-        "promo": "Sự kiện và ưu đãi; hiển thị cuối cùng, ẩn khi dịch vụ gián đoạn"
+        "info": "thông báo chung và tin tức phát hành",
+        "warning": "dịch vụ suy giảm hoặc bảo trì sắp tới",
+        "critical": "sự cố gián đoạn; hiển thị đầu tiên và ẩn khuyến mãi",
+        "promo": "sự kiện và ưu đãi; hiển thị cuối cùng, ẩn khi có sự cố"
       },
       "toolbar": {
         "bold": "In đậm",
@@ -6173,8 +6175,8 @@
     "periodInfoLine1": "Khoảng thời gian mà truy vấn sẽ chạy.",
     "periodInfoLine2": "Ví dụ: 10 phút nghĩa là khi truy vấn chạy, nó sẽ sử dụng dữ liệu của 10 phút gần nhất. Nếu truy vấn chạy lúc 4:00 chiều thì nó sẽ sử dụng dữ liệu từ 3:50 chiều đến 4:00 chiều.",
     "periodShouldMatchFrequency": "Lưu ý: Khoảng thời gian phải giống với tần suất.",
-    "delayInfoLine1": "Thời gian chờ sau thời điểm đã lên lịch, để dữ liệu đến muộn có thể tới.",
-    "delayInfoLine2": "ví dụ: với độ trễ 10 phút, pipeline chạy mỗi giờ sẽ chạy lúc 10:10 và đọc dữ liệu từ 9:00 đến 10:00.",
+    "delayInfoLine1": "Độ trễ mà pipeline được lên lịch chạy.",
+    "delayInfoLine2": "Ví dụ: độ trễ 10 phút nghĩa là pipeline sẽ chạy sau 10 phút so với thời gian đã lên lịch.",
     "closeDrawer": "Đóng ngăn kéo",
     "conditionValueGuidelines": "Hướng dẫn giá trị điều kiện:",
     "customColumnGuideline": "Để thêm cột tùy chỉnh, nhập tên cột và nhấn",
@@ -6385,28 +6387,28 @@
     "confirmDeleteNode": "Bạn có chắc chắn muốn xóa nút không?",
     "errorFetchingUsedStreams": "Lỗi khi tải các stream đã sử dụng",
     "destinationNotes": {
-      "openobserveTitle": "Thông tin kết nối OpenObserve",
+      "openobserveTitle": "Chi tiết kết nối OpenObserve",
       "openobserveStep1": "Đăng nhập vào instance OpenObserve của bạn",
       "openobserveStep2": "Sao chép URL cơ sở của bạn (ví dụ: https://your-instance.openobserve.ai)",
       "openobserveStep3": "Đường dẫn endpoint được điền sẵn là: /api/{'{'}org{'}'}/{'{'}stream{'}'}/_json",
       "openobserveStep4": "Thay thế {'{'}org{'}'} bằng mã định danh tổ chức của bạn",
       "openobserveStep5": "Thay thế {'{'}stream{'}'} bằng tên stream của bạn",
       "openobserveStep6": "Thêm header xác thực: Authorization: Basic <OpenObserve_Token>",
-      "splunkTitle": "Thông tin kết nối Splunk HEC",
+      "splunkTitle": "Chi tiết kết nối Splunk HEC",
       "splunkStep1": "Đăng nhập vào instance Splunk của bạn với tư cách quản trị viên",
       "splunkStep2": "Đi tới Cài đặt → Đầu vào Dữ liệu → HTTP Event Collector",
       "splunkStep3": "Nhấp vào 'New Token' để tạo mã HEC mới",
       "splunkStep4": "Cấu hình cài đặt mã và lưu",
       "splunkStep5": "Sử dụng URL điểm cuối HEC của Splunk",
       "splunkStep6": "Thêm mã HEC vào phần Headers (Authorization: Splunk <token>)",
-      "elasticsearchTitle": "Thông tin kết nối Elasticsearch",
+      "elasticsearchTitle": "Chi tiết kết nối Elasticsearch",
       "elasticsearchStep1": "Xác định điểm cuối cụm Elasticsearch của bạn",
       "elasticsearchStep2": "Đảm bảo cụm có thể truy cập từ mạng này",
       "elasticsearchStep3": "Tạo khóa API hoặc sử dụng xác thực cơ bản",
       "elasticsearchStep4": "Đối với Cloud: Lấy điểm cuối từ console đám mây của bạn",
       "elasticsearchStep5": "Đối với tự lưu trữ: Sử dụng URL cụm của bạn với cổng (thường là 9200)",
       "elasticsearchStep6": "Thêm xác thực trong phần Headers",
-      "datadogTitle": "Thông tin kết nối Datadog",
+      "datadogTitle": "Chi tiết kết nối Datadog",
       "datadogStep1": "Đăng nhập vào tài khoản Datadog của bạn",
       "datadogStep2": "Đi tới Cài đặt Tổ chức → Khóa API",
       "datadogStep3": "Tạo khóa API mới hoặc sao chép khóa hiện có",
@@ -6414,14 +6416,14 @@
       "datadogStep5": "US: https://http-intake.logs.datadoghq.com",
       "datadogStep6": "EU: https://http-intake.logs.datadoghq.eu",
       "datadogStep7": "Thêm khóa API trong Headers: DD-API-KEY: <your-key>",
-      "dynatraceTitle": "Thông tin kết nối Dynatrace",
+      "dynatraceTitle": "Chi tiết kết nối Dynatrace",
       "dynatraceStep1": "Đăng nhập vào môi trường Dynatrace của bạn",
       "dynatraceStep2": "Đi tới Cài đặt → Tích hợp → Dynatrace API",
       "dynatraceStep3": "Tạo mã API mới với quyền logs.ingest",
       "dynatraceStep4": "Sử dụng URL môi trường của bạn",
       "dynatraceStep5": "Định dạng: https://{'{'}your-environment-id{'}'}.live.dynatrace.com",
       "dynatraceStep6": "Thêm mã vào Headers: Authorization: Api-Token <token>",
-      "newrelicTitle": "Thông tin kết nối New Relic",
+      "newrelicTitle": "Chi tiết kết nối New Relic",
       "newrelicStep1": "Đăng nhập vào tài khoản New Relic của bạn",
       "newrelicStep2": "Đi tới mục Khóa API",
       "newrelicStep3": "Tạo hoặc sao chép Khóa giấy phép (Ingest - License)",
@@ -6435,7 +6437,7 @@
       "customStep4": "Cấu hình các header cần thiết để xác thực",
       "customStep5": "Chọn định dạng đầu ra (JSON hoặc NDJSON)",
       "customStep6": "Kiểm tra kết nối để xác minh rằng nó hoạt động",
-      "defaultTitle": "Thông tin kết nối",
+      "defaultTitle": "Chi tiết kết nối",
       "defaultStep1": "Chọn một loại đích để xem hướng dẫn cụ thể"
     },
     "deleteFunctionAssociationConfirm": "Bạn có chắc chắn muốn xóa liên kết hàm không?",
@@ -7135,7 +7137,7 @@
     "orgLevelExplanation": "Đây là các mã thông báo ingestion cấp tổ chức. Chúng không gắn với người dùng cụ thể và sẽ tiếp tục hoạt động ngay cả khi người dùng đã tạo chúng rời khỏi tổ chức. Mã thông báo chỉ có thể được sử dụng trên các điểm cuối ingestion.",
     "orgLevelSummary": "Mã thông báo cấp tổ chức cho các điểm cuối ingestion.",
     "tokenManagementTitle": "Quản lý mã thông báo ingestion",
-    "createTokenBtn": "Token mới",
+    "createTokenBtn": "Tạo mã thông báo mới",
     "createTokenTitle": "Tạo mã thông báo",
     "searchToken": "Tìm kiếm mã thông báo",
     "tokenNameLabel": "Tên",
@@ -10344,7 +10346,7 @@
       "dateEpochms": "Mili giây Epoch: {example}",
       "dateEpochus": "Micro giây Epoch: {example}"
     },
-    "add": "Thêm panel",
+    "add": "Thêm Panel",
     "save": "Lưu",
     "cancel": "Hủy",
     "name": "Tên Panel",
@@ -11691,9 +11693,9 @@
       "lengthenEvaluationWindowDesc": "Mở rộng khoảng thời gian để một đỉnh tăng ngắn không còn kích hoạt cảnh báo.",
       "enableDeduplication": "Bật chặn thông báo lặp lại",
       "enableDeduplicationDesc": "Chỉ thông báo một lần mỗi khi trạng thái thay đổi thay vì mỗi lần đánh giá.",
-      "reviewForDeletion": "Xem lại cảnh báo",
+      "reviewForDeletion": "Xem xét để xóa",
       "reviewForDeletionDesc": "Xác nhận truy vấn vẫn đúng với thực tế trước khi loại bỏ cảnh báo.",
-      "fixAlertQuery": "Xem lại cảnh báo",
+      "fixAlertQuery": "Sửa truy vấn cảnh báo",
       "fixAlertQueryDesc": "Bản thân việc đánh giá thất bại và không bao giờ đưa ra kết luận.",
       "repairDestination": "Khắc phục đích",
       "repairDestinationDesc": "Việc gửi thất bại ở một đích mà cảnh báo sử dụng.",
@@ -11877,7 +11879,7 @@
       "scopeAll": "Tất cả lần chạy",
       "scopeFindings": "Có phát hiện",
       "scopeGaps": "Lỗ hổng bao phủ",
-      "searchPlaceholder": "Tìm kiếm theo tên cảnh báo",
+      "searchPlaceholder": "Tìm kiếm lần chạy theo tên cảnh báo",
       "colRun": "Lần chạy",
       "colFindings": "Phát hiện",
       "colCoverage": "Bao phủ",
@@ -11905,8 +11907,8 @@
       "statFindings": "Phát hiện",
       "statAlertsInScope": "Cảnh báo trong phạm vi",
       "statDeclined": "Bị từ chối",
-      "statDeclinedSub": "Chưa đạt",
-      "statDeclinedTooltip": "Các cặp quy tắc và cảnh báo mà một quy tắc sẽ không đánh giá. Đây là một cổng kiểm soát, không phải sự chấp thuận. Ngưỡng tối thiểu không đạt chỉ được đếm; một quy tắc không thể chạy, hoặc đã xem xét và từ chối, được liệt kê bên dưới kèm lý do.",
+      "statDeclinedSub": "Bị từ chối, không phải đã sạch",
+      "statDeclinedTooltip": "Các cặp quy tắc và cảnh báo mà quy tắc không đánh giá, vì cảnh báo có quá ít lịch sử hoặc quá ít mẫu. Đây là một rào chắn, không phải sự thông qua; lý do cho từng cảnh báo không được ghi vào stream.",
       "limitations": "Giới hạn của bằng chứng",
       "declinedHeading": "Bị từ chối kèm lý do",
       "declinedDesc": "Các quy tắc không thể chạy cho một cảnh báo, hoặc đã xem xét và từ chối. Đây không phải là sự chấp thuận.",
@@ -11933,7 +11935,10 @@
       "proposedActions": "Hành động đề xuất",
       "qualityReasons": "Lý do: {reasons} | Lý do: {reasons}",
       "openAlert": "Mở cảnh báo",
-      "advice": "Cần kiểm tra gì"
+      "advice": "Cần kiểm tra gì",
+      "viewInLogs": "Xem trong Nhật ký",
+      "viewInLogsHint": "Mở bản ghi của lượt chạy này trong Nhật ký",
+      "loadFailed": "Không thể tải bản tổng hợp: {message}"
     },
     "dashboard": {
       "latestRunAgo": "Lượt chạy gần nhất {time}",
@@ -11991,7 +11996,8 @@
       "runNowHeading": "Chạy ngay",
       "findingsKept": "Các phát hiện được lưu cùng hồ sơ riêng của tổ chức này trong thời hạn lưu trữ của tổ chức. Hiệu chỉnh cảnh báo không gửi thông báo nào.",
       "frequencyRange": "Chọn tần suất từ 1 giờ đến 30 ngày.",
-      "windowRange": "Chọn cửa sổ từ 1 phút đến 90 ngày."
+      "windowRange": "Chọn cửa sổ từ 1 phút đến 90 ngày.",
+      "loadFailed": "Không thể tải cài đặt: {message}"
     },
     "visibility": {
       "allClear": "Không có phát hiện nào trên các cảnh báo bạn có thể truy cập trong lần chạy mới nhất.",
@@ -12182,8 +12188,8 @@
     "response": "Phản hồi",
     "lastError": "Lỗi cuối cùng:",
     "errorSummary": "Tóm tắt lỗi",
-    "searchThisFolderTooltip": "Hiển thị các cảnh báo trong thư mục này",
-    "searchAllFoldersTooltip": "Hiển thị các cảnh báo trong mọi thư mục",
+    "searchThisFolderTooltip": "Chỉ tìm kiếm trong thư mục này",
+    "searchAllFoldersTooltip": "Tìm kiếm trên tất cả các thư mục",
     "reloadAlertsTooltip": "Tải lại cảnh báo",
     "triggerDetection": "Phát hiện kích hoạt",
     "retrain": "Huấn luyện lại",
@@ -13265,7 +13271,7 @@
           "refuted": "Bị bác bỏ"
         },
         "openEvidence": "Mở bằng chứng {number}",
-        "notVerifiedId": "chưa được xác minh",
+        "notVerifiedId": "chưa xác minh",
         "hypotheses": "Giả thuyết",
         "noHypotheses": "Chưa ghi nhận giả thuyết nào.",
         "noEvidenceYet": "Chưa có bằng chứng",
@@ -14245,7 +14251,7 @@
       "addedUnread": "Không thể đọc các cảnh báo của bạn, nên AutoObserve không thể biết liệu cảnh báo này đã được thêm hay chưa. Không có gì được lưu; hãy lưu lại để thử lại.",
       "alreadyAdded": "Đã được thêm với tên {name} trong thư mục {folder}, nên cảnh báo này không được lưu lại.",
       "dialog": {
-        "title": "Thêm cảnh báo",
+        "title": "Tạo cảnh báo",
         "continue": "Tiếp tục đến cảnh báo",
         "queryChoiceLabel": "Cảnh báo theo truy vấn",
         "queryChoiceOption": "{name}: {query}",
@@ -14268,19 +14274,19 @@
       },
       "sources": {
         "default": {
-          "label": "Thêm cảnh báo",
+          "label": "Tạo cảnh báo",
           "toast": "Truy vấn đã được nhập vào biểu mẫu cảnh báo"
         },
         "logs": {
-          "label": "Thêm cảnh báo",
+          "label": "Tạo cảnh báo",
           "toast": "Truy vấn được nhập từ tìm kiếm nhật ký của bạn"
         },
         "patterns": {
-          "label": "Thêm cảnh báo",
+          "label": "Tạo cảnh báo",
           "toast": "Truy vấn được nhập từ các mẫu đã chọn"
         },
         "panel": {
-          "label": "Thêm cảnh báo",
+          "label": "Tạo cảnh báo",
           "toast": "Truy vấn được nhập từ panel bảng điều khiển: \"{sourceLabel}\""
         },
         "library": {
@@ -14288,7 +14294,7 @@
           "toast": "Từ Thư viện cảnh báo: {sourceLabel}"
         },
         "explorer": {
-          "label": "Thêm cảnh báo",
+          "label": "Tạo cảnh báo",
           "toast": "Truy vấn đã được nhập từ Trình khám phá chỉ số"
         },
         "dbm": {
@@ -14304,7 +14310,7 @@
           "toast": "Đã nhập từ Product Analytics: \"{sourceLabel}\""
         },
         "traces": {
-          "label": "Thêm cảnh báo",
+          "label": "Tạo cảnh báo",
           "toast": "Truy vấn được nhập từ tìm kiếm trace của bạn",
           "noStream": "Chọn một stream trước",
           "errorCount": "Số lỗi",
@@ -14508,7 +14514,7 @@
       "filterAll": "Tất cả",
       "filterOnce": "Một lần",
       "filterRecurring": "Định kỳ",
-      "search": "Tìm theo tên, lý do hoặc người tạo",
+      "search": "Tìm kiếm theo tên, thứ nguyên hoặc người tạo",
       "searchAcross": "Tìm kiếm tất cả thư mục",
       "thisFolder": "Thư mục này",
       "allFolders": "Tất cả thư mục",
@@ -15047,7 +15053,7 @@
       "webhookOnly": "(chỉ webhook)",
       "emailOnly": "(chỉ email)",
       "snsOnly": "(chỉ SNS)",
-      "stale": "Mẫu {name} không khả dụng cho loại này. Chọn mẫu khác hoặc xóa trường.",
+      "stale": "Template {name} không còn tồn tại. Hãy chọn template khác hoặc xóa trường này.",
       "clear": "Xóa",
       "willUse": "Sẽ dùng: {template}",
       "willUsePerDestination": "Sẽ dùng, theo từng đích:",
@@ -15261,7 +15267,7 @@
     "systemReadOnlyEdit": "Mẫu dựng sẵn — chỉnh sửa bị tắt. Nhân bản nó để tạo bản sao có thể sửa.",
     "systemReadOnlyDelete": "Mẫu dựng sẵn — xóa bị tắt. Nhân bản nó để tạo bản sao có thể sửa.",
     "prebuiltBadge": "Dựng sẵn",
-    "prebuiltBadgeHint": "Được hệ thống quản lý. Bạn không thể chỉnh sửa hoặc xóa. Nhân bản để tạo bản sao có thể chỉnh sửa.",
+    "prebuiltBadgeHint": "Do hệ thống quản lý. Bạn có thể chỉnh sửa, nhưng không thể xóa.",
     "customBadge": "Tùy chỉnh",
     "filterAll": "Tất cả",
     "filterPrebuilt": "Dựng sẵn",
@@ -15477,14 +15483,14 @@
     "destinationsLoadError": "Lỗi khi tải các đích"
   },
   "alert_destinations": {
-    "chooseTypeTitle": "Chọn loại",
-    "selectDestinationType": "Loại đích",
+    "chooseTypeTitle": "Chọn Loại",
+    "selectDestinationType": "Chọn Loại Đích",
     "connectionStepTitle": "Kết nối",
-    "connectionDetailsTitle": "Chi tiết kết nối",
+    "connectionDetailsTitle": "Chi tiết Kết nối",
     "urlHelpText": "URL gốc không có dấu gạch chéo ở cuối (ví dụ: https://your-domain.com)",
     "organizationHelpText": "Mã định danh tổ chức OpenObserve",
     "streamHelpText": "Tên stream OpenObserve",
-    "endpointPathLabel": "Đường dẫn endpoint",
+    "endpointPathLabel": "Đường dẫn Endpoint",
     "endpointPathHelpText": "Đường dẫn sẽ được nối vào URL gốc (phải bắt đầu bằng /)",
     "esBulkIndexHelpText": "Tên chỉ mục nơi dữ liệu sẽ được ghi trong Elasticsearch",
     "metadataConfigurationTitle": "Cấu hình Siêu dữ liệu",
@@ -15503,7 +15509,7 @@
     "deleteDestinationsTitle": "Xóa Các Đích",
     "organizationLabel": "Tổ chức",
     "defaultPlaceholder": "ví dụ: default",
-    "streamNameLabel": "Tên stream",
+    "streamNameLabel": "Tên Stream",
     "esBulkIndexNameLabel": "Tên Chỉ mục ESBulk",
     "esBulkIndexNamePlaceholder": "Nhập tên chỉ mục (ví dụ: logs, events)",
     "sourceLabel": "Nguồn",
@@ -15539,12 +15545,12 @@
     "urlOrRecipients": "URL / Người nhận",
     "api_header": "Tiêu đề",
     "api_header_value": "Giá trị",
-    "skip_tls_verify": "Bỏ qua xác minh TLS",
+    "skip_tls_verify": "Bỏ qua xác thực TLS",
     "payloadFormat": "Định dạng payload",
     "payloadFormatAuto": "Tự động",
     "payloadFormatLegacy": "JSON kiểu cũ",
     "payloadFormatRendered": "Template đã kết xuất",
-    "payloadFormatHelp": "Tự động gửi nội dung JSON cũ cho các tin nhắn bất thường, Synthetics, trực và thời gian bảo trì cho đến khi có mẫu được đính kèm.",
+    "payloadFormatHelp": "Tự động gửi nội dung JSON cũ cho tin nhắn bất thường, synthetics và trực cho đến khi có template được gắn. Được lưu dưới khóa metadata payload_format.",
     "output_format": "Định dạng đầu ra",
     "readonly": "Chỉ đọc",
     "additional_settings": "Cài đặt bổ sung",
@@ -15683,17 +15689,17 @@
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
-    "tabLabel": "Dùng bucket của riêng bạn",
-    "title": "Dùng bucket của riêng bạn",
+    "tabLabel": "BYOB",
+    "title": "Mang Bucket Của Bạn",
     "notEnabled": "{product} chưa được bật cho tổ chức này",
     "heroHeadline": "Mang bucket của bạn đến",
-    "heroSub": "Kết nối bucket đám mây của riêng bạn. Dữ liệu vẫn nằm trong hạ tầng của bạn, với toàn quyền kiểm soát và không bị ràng buộc.",
-    "configureStorage": "Cấu hình bucket",
+    "heroSub": "Kết nối bucket đám mây của riêng bạn, dữ liệu ở trong cơ sở hạ tầng của bạn — toàn quyền kiểm soát, không khóa cứng.",
+    "configureStorage": "Cấu hình lưu trữ",
     "supportedProviders": "Nhà cung cấp được hỗ trợ",
-    "perOrgIsolation": "Cách ly theo tổ chức",
+    "perOrgIsolation": "Cô lập theo tổ chức",
     "appliesImmediately": "Áp dụng cho dữ liệu mới ngay lập tức",
     "usesOrgCredentials": "Sử dụng thông tin xác thực theo phạm vi tổ chức",
-    "updateStorage": "Cập nhật bucket",
+    "updateStorage": "Cập nhật Bucket",
     "active": "đang hoạt động",
     "bucketName": "tên bucket",
     "region": "khu vực",
@@ -15707,12 +15713,12 @@
     "featureOwnDataDesc": "Lưu trữ dữ liệu đã nhập trực tiếp vào bucket của riêng bạn và kiểm soát hoàn toàn ai có thể truy cập nó.",
     "featureSecureTitle": "Bảo mật & tuân thủ",
     "featureSecureDesc": "Khóa truy cập chi tiết, dữ liệu nhạy cảm của bạn ở trong cơ sở hạ tầng của bạn.",
-    "newStorageConfiguration": "Cấu hình bucket mới",
+    "newStorageConfiguration": "Cấu hình Bucket Mới",
     "selectProviderDesc": "Chọn nhà cung cấp lưu trữ đám mây để lưu trữ dữ liệu của tổ chức này.",
     "bucketNameRequired": "Tên bucket là bắt buộc",
     "accessKeyRequired": "Khóa truy cập là bắt buộc",
     "secretKeyRequired": "Khóa bí mật là bắt buộc",
-    "storageAccountRequired": "Tên tài khoản lưu trữ là bắt buộc",
+    "storageAccountRequired": "Tên Tài khoản Lưu trữ là bắt buộc",
     "regionRequired": "Khu vực là bắt buộc",
     "roleARNRequired": "ARN vai trò là bắt buộc",
     "externalIdRequired": "ID bên ngoài là bắt buộc",
@@ -15721,7 +15727,7 @@
     "save": "Lưu",
     "update": "Cập nhật",
     "awsStsCloudInfo": "Thao tác này sử dụng AWS STS để đảm nhận vai trò. Thêm tài khoản AWS của {product} làm thực thể tin cậy cho vai trò này trong bảng điều khiển AWS. Liên hệ nhóm {product} để biết chi tiết tài khoản hoặc để được hỗ trợ thiết lập.",
-    "awsStsSelfHostedInfo": "Thao tác này sử dụng AWS STS để đảm nhận vai trò. Đảm bảo môi trường cài đặt có thông tin xác thực AWS có thể đảm nhận vai trò này."
+    "awsStsSelfHostedInfo": "Tính năng này sử dụng AWS sts để đảm nhận vai trò và thực hiện các thao tác. Đảm bảo bạn đã cấu hình thông tin xác thực aws trong môi trường cài đặt có quyền truy cập vào vai trò này."
   },
   "metrics": {
     "add": "Thêm",
@@ -16202,7 +16208,7 @@
     "cipherKeysDesc": "Khóa mã hóa cho trường nhạy cảm",
     "aiToolsetsDesc": "Máy chủ MCP và công cụ CLI mà Trợ lý AI có thể sử dụng",
     "regexPatternsDesc": "Mẫu regex tái sử dụng cho việc làm rõ",
-    "domainManagementDesc": "Phân tích claim SSO và giới hạn đăng nhập theo tên miền",
+    "domainManagementDesc": "Giới hạn đăng nhập vào tên miền SSO được phép",
     "passwordPolicy": "Chính sách mật khẩu",
     "passwordPolicyDesc": "Chính sách xác thực cho các tài khoản email/mật khẩu nội bộ, áp dụng trên toàn instance.",
     "pipelineDestinationsDesc": "Mục tiêu bên ngoài cho đầu ra pipeline",
@@ -16225,13 +16231,13 @@
     "tracesHeading": "Trace",
     "traceIdFieldName": "Tên trường Trace ID",
     "spanIdFieldName": "Tên trường Span ID",
-    "toggleIngestionLogsLabel": "Nhật ký tiếp nhận dữ liệu",
-    "usageStreamEnabledLabel": "Stream sử dụng",
-    "redInsightsEnabledLabel": "Thông tin chi tiết RED tự động cho trace",
+    "toggleIngestionLogsLabel": "Bật/tắt nhật ký nhập",
+    "usageStreamEnabledLabel": "Bật stream sử dụng",
+    "redInsightsEnabledLabel": "Bật thông tin chi tiết RED tự động cho trace",
     "redInsightsEnabledHelp": "Tạo bộ phát hiện bất thường về tốc độ yêu cầu, lỗi và độ trễ p95 cho các dịch vụ bận rộn nhất, trong thư mục cảnh báo \"RED insights\". Chỉ quản trị viên nhìn thấy thư mục đó cho đến khi nó được chia sẻ.",
     "incidentsHeading": "Sự cố",
-    "aiRcaThreadToolOutputLabel": "Dữ liệu công cụ trong chuỗi sự cố",
-    "aiRcaThreadToolOutputHelp": "Hiển thị đầu vào và đầu ra thô của công cụ cho mọi người có thể đọc sự cố.",
+    "aiRcaThreadToolOutputLabel": "Hiển thị dữ liệu công cụ trong các luồng điều tra sự cố",
+    "aiRcaThreadToolOutputHelp": "Hiển thị dữ liệu đầu vào và đầu ra thô của công cụ trong các luồng điều tra sự cố cho tất cả những người có thể đọc sự cố",
     "claimParserFunction": "Trình phân tích xác nhận SSO",
     "claimParserFunctionDescription": "Chọn một hàm ({product1} hoặc {product2}) để phân tích và chuyển đổi các claim SSO/LDAP thành các phân công tổ chức và vai trò",
     "claimParserFunctionLabel": "Chọn hàm",
@@ -16316,7 +16322,7 @@
     "darkMode": "Chế độ Tối",
     "pickCustomColor": "Chọn Màu Tùy chỉnh",
     "organizationSettingsUpdated": "Đã cập nhật cài đặt tổ chức",
-    "dangerZone": "Vùng nguy hiểm",
+    "dangerZone": "Khu vực Nguy hiểm",
     "deleteOrganization": "Xóa tổ chức",
     "deleteOrganizationTitle": "Xóa tổ chức này",
     "deleteOrganizationDescription": "Mọi người, kể cả bạn, mất quyền truy cập vào {name} ngay lập tức. Trong thời gian khôi phục, chỉ bộ phận hỗ trợ OpenObserve mới có thể khôi phục nó; sau đó, mọi dữ liệu sẽ bị xóa vĩnh viễn.",
@@ -16357,17 +16363,17 @@
       "fieldAliasesSaveError": "Không thể lưu bí danh trường",
       "fieldAliasesUnsavedConfirm": "Bạn có thay đổi ánh xạ trường chưa lưu. Hủy bỏ chúng và rời đi?",
       "discoveredServicesTitle": "Dịch vụ được phát hiện",
-      "discoveredServicesDescription": "Các dịch vụ được phát hiện từ dữ liệu telemetry của bạn và được nhóm theo tên dịch vụ. Quy tắc phát hiện quyết định cách chúng được nhận diện.",
+      "discoveredServicesDescription": "Các dịch vụ được tự động phát hiện từ dữ liệu telemetry của bạn và được nhóm theo Tên dịch vụ để tương quan. Các dịch vụ có cùng Tên dịch vụ được tương quan với nhau qua nhật ký, trace và chỉ số.",
       "noServicesYet": "Chưa có dịch vụ nào được phát hiện",
       "noServicesDescription": "Dịch vụ sẽ xuất hiện ở đây khi dữ liệu đo từ xa được nạp với các thuộc tính nhận dạng dịch vụ (như k8s-deployment, tên dịch vụ, v.v.)",
-      "searchServiceName": "Tìm kiếm dịch vụ hoặc stream",
-      "telemetryCoverage": "Phạm vi telemetry",
+      "searchServiceName": "Tìm kiếm tên dịch vụ hoặc stream...",
+      "telemetryCoverage": "Phạm vi đo từ xa",
       "serviceName": "Tên dịch vụ",
       "service": "Dịch vụ",
       "logs": "Nhật ký",
       "traces": "Trace",
       "metrics": "Chỉ số",
-      "lastSeen": "Lần cuối xuất hiện",
+      "lastSeen": "Lần cuối thấy",
       "retry": "Thử lại",
       "semanticFieldGroupsTitle": "Ánh xạ trường",
       "serviceNameNotDetected": "Chưa phát hiện trường tên dịch vụ nào trong dữ liệu của bạn",
@@ -16380,7 +16386,7 @@
       "foundInTraces": "Tìm thấy trong Trace",
       "foundInMetrics": "Tìm thấy trong Chỉ số",
       "foundInProfiles": "Tìm thấy trong Profiles",
-      "distinguishByLabel": "Phân biệt dịch vụ theo",
+      "distinguishByLabel": "Phân biệt Dịch vụ Theo",
       "distinguishByHelp": "Chọn các trường xác định nơi dịch vụ của bạn chạy. Ví dụ: cluster + namespace + deployment cùng tạo ra một định danh duy nhất cho mỗi dịch vụ. Tối đa 5 trường.",
       "serviceOptionalLabel": "Tương quan mà không có thuộc tính dịch vụ",
       "serviceOptionalHelp": "Khớp stream chỉ sử dụng các thuộc tính bên dưới, bỏ qua thuộc tính dịch vụ",
@@ -16394,15 +16400,15 @@
       "identityConfigSaved": "Đã lưu cấu hình nhận dạng dịch vụ thành công",
       "identityConfigSaveFailed": "Không thể lưu cấu hình nhận dạng dịch vụ",
       "loadRecommendationsFailed": "Không thể tải đề xuất",
-      "resetServices": "Đặt lại dịch vụ",
+      "resetServices": "Đặt lại Dịch vụ",
       "resetServicesTooltip": "Xóa tất cả dịch vụ đã được phát hiện. Chúng sẽ được phát hiện lại tự động khi có dữ liệu mới.",
-      "resetServicesConfirmTitle": "Đặt lại tất cả dịch vụ đã phát hiện?",
+      "resetServicesConfirmTitle": "Đặt lại tất cả Dịch vụ đã phát hiện?",
       "resetServicesConfirmBody": "Thao tác này xóa mọi dịch vụ đã phát hiện trong tổ chức này và không thể hoàn tác. Các dịch vụ sẽ được phát hiện lại khi có telemetry mới.",
       "resetServicesSuccess": "Đã xóa thành công {count} dịch vụ được phát hiện. | Đã xóa thành công {count} dịch vụ được phát hiện.",
       "resetServicesFailed": "Không thể đặt lại dịch vụ",
       "workload": "Khối lượng công việc",
-      "goToConfiguration": "Đi đến cấu hình",
-      "filterBy": "Lọc theo trường",
+      "goToConfiguration": "Đi đến Cấu hình",
+      "filterBy": "Lọc theo :",
       "selectFieldPlaceholder": "Chọn trường",
       "selectValuePlaceholder": "Chọn giá trị",
       "selectFieldFirst": "Chọn một trường trước",
@@ -16411,13 +16417,18 @@
       "noDimensions": "không có kích thước",
       "defaultSetWarningTitle": "Tương quan có thể không đáng tin cậy.",
       "defaultSetWarningBody": "Phiên bản này không có sự phân biệt — nó được phát hiện mà không có bất kỳ khớp khối lượng công việc nào (không có bối cảnh cụm, không gian tên hoặc môi trường). Nhật ký và trace có thể đến từ các triển khai khác nhau của cùng một tên dịch vụ.",
-      "instanceIdentity": "Danh tính phiên bản",
+      "instanceIdentity": "Định danh Phiên bản",
       "noDimensionsCatchAll": "Không có kích thước — phiên bản bắt tất cả",
       "streamSources": "Nguồn Stream",
       "fieldNameMapping": "Ánh xạ Tên Trường",
       "logsWithCount": "Nhật ký ({count})",
       "tracesWithCount": "Trace ({count})",
-      "metricsWithCount": "Chỉ số ({count})"
+      "metricsWithCount": "Chỉ số ({count})",
+      "resetServicesConfirmMessage": "Thao tác này sẽ xóa tất cả dịch vụ đã phát hiện cho tổ chức này. Các dịch vụ sẽ được tự động phát hiện lại khi dữ liệu đo từ xa mới được nhập. Hành động này không thể hoàn tác.",
+      "resetServicesConfirmWarning": "Các dịch vụ sẽ được tự động phát hiện lại khi dữ liệu đo từ xa mới được nhập. Hành động này không thể hoàn tác.",
+      "configureServicesHint": "để cấu hình cách nhận dạng và nhóm các dịch vụ.",
+      "serviceCountSingular": "{count} Dịch vụ | {count} Dịch vụ",
+      "instancesCount": "({count} phiên bản)"
     },
     "addRegexPattern": {
       "namePlaceholder": "Ví dụ: Mật khẩu nội bộ",
@@ -16496,7 +16507,8 @@
       "logoLightLabel": "Logo tùy chỉnh (chế độ sáng)",
       "logoLightHelp": "Hiển thị ở chế độ sáng. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
       "logoDarkLabel": "Logo tùy chỉnh (chế độ tối)",
-      "logoDarkHelp": "Hiển thị ở chế độ tối. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px."
+      "logoDarkHelp": "Hiển thị ở chế độ tối. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
+      "fileCounterLabel": "{constraint} {filesNumber} tệp {'|'} {totalSize}"
     },
     "modelPricingEditor": {
       "copySuffix": " (Sao chép)"
@@ -16505,7 +16517,7 @@
       "subtitle": "Cấu hình chi phí mô hình LLM"
     },
     "orgStorageSettings": {
-      "subtitle": "Lưu dữ liệu của tổ chức này trong bucket bạn sở hữu",
+      "subtitle": "Cấu hình lưu trữ theo tổ chức",
       "awsCredentials": "Thông tin xác thực AWS",
       "azureCredentials": "Thông tin xác thực Azure",
       "awsRoleArn": "ARN vai trò AWS"
@@ -16525,10 +16537,13 @@
       "daysValue": "{days} ngày",
       "forever": "lưu giữ vĩnh viễn",
       "invalid": "Dùng 0 hoặc tối thiểu 3 ngày",
-      "invalidType": "Dùng ít nhất 3 ngày, hoặc xóa loại này"
+      "invalidType": "Dùng ít nhất 3 ngày, hoặc xóa loại này",
+      "streamType": "Loại stream",
+      "days": "Ngày",
+      "removeType": "Xóa loại stream này"
     },
     "organizationSettings": {
-      "fieldNameHelp": "Chỉ dùng chữ cái, chữ số và + = , . {'@'} - _",
+      "fieldNameHelp": "Chỉ sử dụng ký tự chữ số và '+=,.{'@'}-_', không có khoảng trắng.",
       "sectionTitle": "Xử lý dữ liệu",
       "sectionDescription": "Cách nhật ký liên kết với trace và những tính năng tự động nào đang bật.",
       "traceIdHelp": "Trường log liên kết một dòng log với trace của nó. Chỉ dùng chữ cái, chữ số và + = , . {'@'} - _",
@@ -16542,7 +16557,7 @@
       "subtitle": "Cấu hình tích hợp công cụ AI"
     },
     "cipherKeysPage": {
-      "subtitle": "Các khóa mã hóa và giải mã giá trị của trường nhạy cảm",
+      "subtitle": "Khóa mã hóa cho các trường nhạy cảm",
       "delete": "Xóa",
       "deleteCipherKeyTitle": "Xóa Khóa Mã hóa",
       "deleteCipherKeyMessage": "Bạn có chắc chắn muốn xóa khóa mã hóa {name} không?",
@@ -16647,7 +16662,7 @@
       "contractRevokedSuccess": "Hủy hợp đồng bên ngoài thành công.",
       "revokeContractError": "Không thể hủy hợp đồng bên ngoài.",
       "enableByobTitle": "Bật BYOB",
-      "enablingStorage": "Đang bật cài đặt lưu trữ...",
+      "enablingStorage": "đang bật cài đặt lưu trữ...",
       "storageEnabledSuccess": "Bật cài đặt lưu trữ thành công.",
       "enableStorageError": "Không thể bật cài đặt lưu trữ.",
       "processingTrialExtension": "Vui lòng đợi trong khi xử lý yêu cầu gia hạn thời gian dùng thử...",
@@ -16682,19 +16697,19 @@
       "failedToImport": "Không thể nhập \"{name}\": {error}"
     },
     "orgStorageEditor": {
-      "chooseTypeTitle": "Chọn nhà cung cấp",
-      "selectProviderDescCont": "Sau khi cấu hình, mọi dữ liệu mới của tổ chức này sẽ được ghi vào bucket của bạn.",
+      "chooseTypeTitle": "Chọn loại",
+      "selectProviderDescCont": "sau khi cấu hình, tất cả dữ liệu mới cho tổ chức này sẽ được ghi vào cơ sở hạ tầng lưu trữ của riêng bạn.",
       "irreversibleWarnPre": "Hành động này là ",
       "irreversibleWarnEmphasis": "không thể đảo ngược",
       "irreversibleWarnPost": ". Sau khi thiết lập, bạn không thể chuyển sang nhà cung cấp lưu trữ khác hoặc xóa cấu hình này. Để sử dụng nhà cung cấp khác, bạn phải tạo một tổ chức mới.",
       "credentialsOnlyInfo": "Sau khi cấu hình, chỉ có các trường thông tin đăng nhập mới có thể được cập nhật. Tất cả các trường khác sẽ bị khóa.",
-      "selectStorageProviderLabel": "Nhà cung cấp lưu trữ",
+      "selectStorageProviderLabel": "Chọn nhà cung cấp lưu trữ ",
       "connectionTitle": "Kết nối",
       "serverUrlLabel": "URL máy chủ",
       "regionLabel": "Khu vực",
       "bucketNameLabel": "Tên bucket",
-      "accessKeyLabel": "Access key",
-      "secretKeyLabel": "Secret key",
+      "accessKeyLabel": "Khóa truy cập",
+      "secretKeyLabel": "Khóa bí mật",
       "storageAccountNameLabel": "Tên tài khoản lưu trữ",
       "roleArnLabel": "ARN vai trò",
       "externalIdLabel": "ID bên ngoài",
@@ -16721,15 +16736,15 @@
       "serviceNameDetectedFrom": "Tên dịch vụ được phát hiện từ",
       "fieldAlias": "bí danh trường",
       "noFieldsConfiguredYet": "Chưa có trường nào được cấu hình",
-      "workloadDetection": "Phát hiện workload",
+      "workloadDetection": "Phát hiện khối lượng công việc",
       "workloadDetectedUsingFields": "Khối lượng công việc được phát hiện bằng cách sử dụng các trường",
       "workloadTrackedHelp": "Chỉ các nhóm bí danh trường này được sử dụng để phát hiện khối lượng công việc và đưa ra khuyến nghị. Các trường không thuộc danh sách này sẽ không ảnh hưởng đến kết quả khám phá dịch vụ. Tùy chọn — các thứ nguyên được liệt kê trong bộ định danh luôn được theo dõi.",
-      "goToFieldAliases": "Chuyển đến ánh xạ trường",
+      "goToFieldAliases": "Đi tới Bí danh trường",
       "toConfigureFieldMappings": "để cấu hình ánh xạ trường riêng lẻ.",
       "selectAliasGroup": "Chọn nhóm bí danh",
       "discoveredPatternsHelp": "Chúng tôi đã phát hiện các mẫu triển khai này trong các stream của bạn. Sử dụng chúng để cấu hình tương quan dịch vụ.",
       "envFieldsDetected": "{env} trường được phát hiện trong dữ liệu đo từ xa của bạn.",
-      "goToServices": "Chuyển đến dịch vụ",
+      "goToServices": "Đi tới Dịch vụ",
       "fieldsConfigured": "{n} trường đã được cấu hình | {n} trường đã được cấu hình",
       "recommended": "Được đề xuất:",
       "recommendedUse": "Sử dụng",
@@ -16759,7 +16774,8 @@
       "reasonIdealForDisambiguation": "{details} — lý tưởng để phân định dịch vụ",
       "trackedK8sWorkload": "Workload K8s",
       "trackedK8sPod": "Pod K8s",
-      "serviceCountFailed": "Không thể tải số lượng dịch vụ"
+      "serviceCountFailed": "Không thể tải số lượng dịch vụ",
+      "toSeeDiscoveredServices": "để xem các dịch vụ được phát hiện thực tế."
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "ví dụ: {example}",
@@ -16774,7 +16790,7 @@
     },
     "regexPatternList": {
       "subtitle": "Mẫu regex có thể tái sử dụng để che giấu thông tin",
-      "exportTitle": "Xuất mẫu regex",
+      "exportTitle": "Xuất mẫu Regex",
       "delete": "Xóa",
       "bulkDeleteTitle": "Xóa các mẫu Regex",
       "bulkDeleteMessage": "Bạn có chắc chắn muốn xóa {n} mẫu regex? | Bạn có chắc chắn muốn xóa {n} mẫu regex?",
@@ -16948,6 +16964,51 @@
       "requestApproved": "{domain} đã được liên kết",
       "requestRejected": "Yêu cầu cho {domain} đã bị từ chối",
       "decisionFailed": "Không thể cập nhật yêu cầu"
+    },
+    "groupDataAI": "Dữ liệu & AI",
+    "llmProvidersDesc": "Nhà cung cấp LLM cho đánh giá trực tuyến",
+    "customLogoTitle": "Logo tùy chỉnh",
+    "customLogoTextDescription": "Văn bản logo tùy chỉnh được sử dụng để thay đổi văn bản thương hiệu mặc định hiển thị trong ứng dụng.",
+    "dragDropUpload": "Kéo & thả hoặc nhấp để tải lên",
+    "customLogoLightDescription": "Logo tùy chỉnh cho chủ đề chế độ sáng. Logo này sẽ hiển thị khi người dùng ở chế độ sáng.",
+    "customLogoDarkDescription": "Logo tùy chỉnh cho chủ đề chế độ tối. Logo này sẽ hiển thị khi người dùng ở chế độ tối.",
+    "textMaxCharacters": "Văn bản phải ít hơn 100 ký tự.",
+    "genAiAgentMapping": {
+      "tabLabel": "Ánh xạ Tác nhân GenAI",
+      "title": "Ánh xạ Tác nhân GenAI",
+      "description": "Định cấu hình các thuộc tính telemetry dự phòng được sử dụng để chuẩn hóa danh tính tác nhân cho các trace LLM và đánh giá.",
+      "agentNameFields": "Trường dự phòng tên tác nhân",
+      "agentNameHelp": "Các thuộc tính đến để sử dụng làm dự phòng cho gen_ai.agent.name.",
+      "agentNameInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.name tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến mỗi dòng.",
+      "agentIdFields": "Trường dự phòng ID tác nhân",
+      "agentIdHelp": "Các thuộc tính đến để sử dụng làm dự phòng cho gen_ai.agent.id.",
+      "agentIdInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.id tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến mỗi dòng.",
+      "envFields": "Các trường dự phòng môi trường",
+      "envHelp": "Các thuộc tính đến được sử dụng làm môi trường của agent.",
+      "envInfo": "Chỉ được kiểm tra khi thuộc tính deployment.environment.name tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
+      "versionFields": "Các trường dự phòng phiên bản",
+      "versionHelp": "Các thuộc tính đến được sử dụng làm phiên bản của agent.",
+      "versionInfo": "Chỉ được kiểm tra khi thuộc tính gen_ai.agent.version tiêu chuẩn bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
+      "alwaysAppliedStandard": "Tiêu chuẩn (được kiểm tra trước):",
+      "applyDefaults": "Áp dụng mặc định",
+      "resetToEmpty": "Đặt lại về trống",
+      "clearRegistry": "Xóa sổ đăng ký",
+      "clearRegistryTitle": "Xóa sổ đăng ký tác nhân?",
+      "clearRegistryDescription": "Thao tác này xóa tất cả các hàng đăng ký tác nhân GenAI đã được phát hiện cho tổ chức này. Các trace khớp mới sẽ điền lại sổ đăng ký trong quá trình tiếp nhận dữ liệu.",
+      "clearRegistryConfirm": "Xóa sổ đăng ký",
+      "saved": "Đã lưu ánh xạ tác nhân GenAI thành công",
+      "clearRegistrySuccess": "Đã xóa đăng ký tác nhân GenAI. Đã xóa {deletedCount} tác nhân được lưu trữ và {bufferCount} quan sát đang xếp hàng.",
+      "loadFailed": "Không thể tải ánh xạ tác nhân GenAI",
+      "saveFailed": "Không thể lưu ánh xạ tác nhân GenAI",
+      "clearRegistryFailed": "Không thể xóa sổ đăng ký tác nhân GenAI",
+      "defaultsLoadFailed": "Không thể tải mặc định ánh xạ tác nhân GenAI",
+      "defaultsFetchFailed": "Không lấy được mặc định ({status})"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "Nhà cung cấp LLM cho đánh giá trực tuyến"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "Ánh xạ các span GenAI sang mã định danh tác nhân"
     }
   },
   "reports": {
@@ -17178,7 +17239,7 @@
     },
     "selectOption": "Chọn tùy chọn",
     "runningQueries": "Truy vấn đang chạy",
-    "search": "Truy vấn tìm kiếm",
+    "search": "Tìm kiếm",
     "queryList": "Chi tiết truy vấn",
     "duration": "Thời gian thực thi",
     "files": "Tệp",
@@ -17200,7 +17261,7 @@
     "streamType": "Loại stream",
     "startTime": "Thời gian bắt đầu",
     "endTime": "Thời gian kết thúc",
-    "scanRecords": "Bản ghi quét",
+    "scanRecords": "Bản ghi đã quét",
     "originalSize": "Kích thước gốc",
     "compressedSize": "Kích thước nén",
     "deleteRunningQueryTitle": "Xóa truy vấn đang chạy",
@@ -17209,7 +17270,8 @@
     "cancelQueryFailed": "Không thể hủy truy vấn",
     "searchTypeDashboards": "Bảng điều khiển",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "Khác"
+    "searchTypeOthers": "Khác",
+    "lastDataRefreshTime": "Thời gian làm mới dữ liệu gần nhất:"
   },
   "traces": {
     "nlNeedsSql": "Câu hỏi này cần SQL; hãy mở trong Nhật ký",
@@ -17659,7 +17721,8 @@
         "count": "{count} thông tin chi tiết | {count} thông tin chi tiết",
         "countHint": "{count} bất thường dịch vụ trong khoảng thời gian này | {count} bất thường dịch vụ trong khoảng thời gian này",
         "viewTraces": "Trace",
-        "viewCharts": "Biểu đồ"
+        "viewCharts": "Biểu đồ",
+        "scoreAbove": "+{percent}% điểm số vượt ngưỡng"
       }
     },
     "spansTab": "Span",
@@ -17762,14 +17825,15 @@
       "failedToLoad": "Không tải được Insights",
       "retry": "Thử lại",
       "noAgentsInRange": "Không có tác nhân nào trong phạm vi này",
-      "noAgentsDescription": "Không phát hiện tác nhân GenAI nào trong cửa sổ thời gian đã chọn. Hãy thử phạm vi rộng hơn, chuyển sang tab Stream hoặc định cấu hình Ánh xạ tác nhân.",
+      "noAgentsDescription": "Không phát hiện tác nhân GenAI nào cho khung thời gian đã chọn. Hãy thử phạm vi rộng hơn, chuyển sang tab Stream hoặc cấu hình ánh xạ tác nhân trong cài đặt.",
       "viewByStream": "Xem theo stream",
       "totalCost": "Tổng chi phí",
       "totalTokens": "Tổng token",
       "totalTraces": "Tổng số Trace",
       "p95Latency": "Độ trễ P95",
       "errorRate": "Tỷ lệ lỗi",
-      "timeAxis": "Thời gian"
+      "timeAxis": "Thời gian",
+      "errorsSeries": "lỗi"
     },
     "searchBar": {
       "streamNotFound": "Không tìm thấy stream"
@@ -17823,7 +17887,10 @@
       "metricsLoadFailed": "Không thể tải các chỉ số tương quan của dịch vụ này. {reason}",
       "noResourceRecorded": "Các span của dịch vụ này trong khoảng thời gian này không ghi nhận {resource}.",
       "resourceLoadFailed": "Không thể tải {resource} cho dịch vụ này. {reason}",
-      "noVersionTraffic": "Các span của dịch vụ này trong stream này không ghi lại phiên bản, vì vậy không có lưu lượng để tách theo phiên bản."
+      "noVersionTraffic": "Các span của dịch vụ này trong stream này không ghi lại phiên bản, vì vậy không có lưu lượng để tách theo phiên bản.",
+      "noResourceDataFound": "Không tìm thấy dữ liệu {resource}",
+      "failedToLoadMetrics": "Không thể tải chỉ số.",
+      "requests": "Yêu cầu"
     },
     "traceErrorTab": {
       "httpStatusCode": "Mã trạng thái HTTP",
@@ -18063,11 +18130,20 @@
       "loadingPage": "Đang tải trang {page}",
       "pageFailed": "Không thể tải trang {page}",
       "pageEmpty": "Trang {page} không có kết quả"
+    },
+    "lLMErrorTable": {
+      "noData": "Không có dữ liệu",
+      "noErrorsInRange": "Không có lỗi trong khoảng thời gian này",
+      "loadFailed": "Không thể tải các lỗi gần đây",
+      "time": "Thời gian",
+      "service": "Dịch vụ",
+      "operation": "Thao tác",
+      "traceId": "Trace ID"
     }
   },
   "aiToolset": {
     "header": "Bộ công cụ AI",
-    "add": "Bộ công cụ mới",
+    "add": "Bộ công cụ AI mới",
     "search": "Tìm kiếm bộ công cụ AI",
     "update": "Cập nhật bộ công cụ AI",
     "name": "Tên",
@@ -18128,7 +18204,7 @@
     "update": "Cập nhật khóa mã hóa",
     "name": "Tên",
     "type": "Loại",
-    "step1WithType": "Kho khóa ({type})",
+    "step1WithType": "Chi tiết Key Store (Loại: {type})",
     "step2": "Cơ chế mã hóa",
     "sectionKey": "Khóa",
     "sectionSetup": "Kho khóa và mã hóa",
@@ -18170,7 +18246,7 @@
     "staticSecretNameRequired": "Tên bí mật tĩnh là bắt buộc",
     "dfcNameRequired": "Tên DFC là bắt buộc",
     "dfcEncryptedDataRequired": "Dữ liệu mã hóa DFC là bắt buộc",
-    "storeType": "Loại kho",
+    "storeType": "Loại lưu trữ",
     "mechanismType": "Loại cơ chế",
     "actions": "Hành động"
   },
@@ -18194,8 +18270,8 @@
     "tcpCloseWaitPrefix": ", C:",
     "tcpTimeWaitPrefix": ", T:",
     "header": "Tất cả các nút",
-    "search": "Tìm kiếm node",
-    "name": "Tên node",
+    "search": "Tìm kiếm nút",
+    "name": "Tên nút",
     "version": "Phiên bản",
     "cpu": "CPU %",
     "memory": "Bộ nhớ %",
@@ -18204,20 +18280,20 @@
     "clear_all": "Xóa tất cả",
     "region": "Khu vực",
     "cluster": "Cụm",
-    "nodetype": "Loại node",
+    "nodetype": "Loại nút",
     "summaryOffline": "Ngoại tuyến",
     "summaryStarting": "Đang khởi động",
     "summaryOnline": "Trực tuyến",
     "summaryTotal": "Nút",
     "status": "Trạng thái",
-    "cpuusage": "Mức sử dụng CPU (%)",
-    "memoryusage": "Mức sử dụng bộ nhớ (%)",
+    "cpuusage": "Sử dụng CPU(%)",
+    "memoryusage": "Sử dụng bộ nhớ(%)",
     "establishedLabel": "Đã thiết lập",
-    "closewaitLabel": "Close wait",
-    "waittimeLabel": "Time wait",
+    "closewaitLabel": "Chờ đóng",
+    "waittimeLabel": "Chờ thời gian",
     "applyFilter": "Áp dụng bộ lọc",
     "searchCluster": "Tìm kiếm cụm",
-    "searchRegion": "Tìm kiếm vùng"
+    "searchRegion": "Tìm kiếm khu vực"
   },
   "regex_patterns": {
     "title": "Che dữ liệu nhạy cảm",
@@ -18226,7 +18302,7 @@
     "name": "Tên",
     "pattern": "Mẫu",
     "created_at": "Được tạo lúc",
-    "updated_at": "Được cập nhật lúc",
+    "updated_at": "Cập nhật lúc",
     "actions": "Hành động",
     "edit": "Sửa",
     "delete": "Xóa",
@@ -18377,8 +18453,8 @@
     "semanticFieldGroupsCaption": "Ánh xạ tên trường đo từ xa của bạn thành các nhóm chung để OpenObserve có thể tương quan chúng qua các stream.",
     "exportToJson": "Xuất ra JSON",
     "importFromJson": "Nhập từ JSON",
-    "addCustomGroup": "Thêm nhóm tùy chỉnh",
-    "removeSemanticGroup": "Xóa nhóm ngữ nghĩa",
+    "addCustomGroup": "Thêm Nhóm Tùy chỉnh",
+    "removeSemanticGroup": "Xóa Nhóm Ngữ nghĩa",
     "serviceGroupProtected": "Nhóm dịch vụ không thể bị xóa. Bạn chỉ có thể sửa đổi các trường được ánh xạ.",
     "isWorkloadType": "Định danh dịch vụ",
     "isWorkloadTypeTooltip": "Khi được bật, nhóm này được dùng để xác định duy nhất một dịch vụ (ví dụ: cụm, không gian tên, triển khai). Tắt cho các nhóm mô tả hoạt động thông qua dịch vụ, chẳng hạn như phương thức HTTP hoặc tên cơ sở dữ liệu.",
@@ -19526,7 +19602,8 @@
         "promptTemperatureOverrideInherited": "Đang dùng các tham số của Prompt.",
         "taskTimeoutLabel": "Thời gian chờ (giây)",
         "taskConcurrencyLabel": "Đồng thời tối đa",
-        "taskOverrideHelp": "Ghi đè giá trị đã xuất bản của tác vụ cho lần chạy này."
+        "taskOverrideHelp": "Ghi đè giá trị đã xuất bản của tác vụ cho lần chạy này.",
+        "providerHelpSettingsLink": "Cài đặt"
       },
       "columns": {
         "name": "Tên",
@@ -19864,7 +19941,7 @@
       "agentIdHint": "Agent ID: {ids}",
       "noAgentIdentity": "Không tìm thấy danh tính agent",
       "noAgentIdentityDescription": "Các span LLM này không có tên agent, nên chúng được hiển thị theo stream. Hãy ánh xạ thuộc tính đặt tên agent của bạn để xem chúng theo agent.",
-      "noAgentIdentityAction": "Mở Ánh xạ Agent"
+      "noAgentIdentityAction": "Mở Ánh xạ Agent GenAI"
     },
     "agentGraph": {
       "stream": "Stream",
@@ -19880,17 +19957,17 @@
       },
       "tokenTrend": {
         "title": "Xu hướng token",
-        "subtitle": "token đầu vào và đầu ra",
+        "subtitle": "token theo mô hình",
         "input": "Đầu vào",
         "output": "Đầu ra"
       },
       "latencyByModel": {
-        "title": "Xu hướng độ trễ",
-        "subtitle": "p95 theo mô hình"
+        "title": "Độ trễ theo mô hình",
+        "subtitle": "p50 / p90 / p95 / p99"
       },
       "tracesOverTime": {
-        "title": "Trace theo thời gian",
-        "subtitle": "Trace thành công và trace lỗi",
+        "title": "Yêu cầu theo thời gian",
+        "subtitle": "số lượng yêu cầu theo dịch vụ",
         "ok": "OK",
         "errored": "Có lỗi"
       },
@@ -19919,6 +19996,26 @@
           "traces": "Trace",
           "last": "Lần thất bại cuối"
         }
+      },
+      "spanTrend": {
+        "title": "Xu hướng Span",
+        "subtitle": "số span theo loại"
+      },
+      "errorsOverTime": {
+        "title": "Lỗi theo thời gian",
+        "subtitle": "số lượng lỗi"
+      },
+      "spansByModel": {
+        "title": "Span theo mô hình",
+        "subtitle": "số lượng cuộc gọi trên mỗi mô hình"
+      },
+      "tokensByModel": {
+        "title": "Token theo mô hình",
+        "subtitle": "tổng token trên mỗi mô hình"
+      },
+      "recentErrors": {
+        "title": "Lỗi gần đây",
+        "subtitle": "10 span lỗi gần nhất"
       }
     },
     "behavior": {
@@ -19951,12 +20048,12 @@
       "colErrors": "Lỗi",
       "detail": {
         "title": "Chi tiết tín hiệu",
-        "tracesTitle": "Các trace có lỗi từ agent này",
+        "tracesTitle": "Trace",
         "tracesHint": "Nhấp vào một trace để mở",
         "worstLoopTraces": "Các trace tệ nhất (lặp nhiều nhất trước)",
         "topCostTraces": "Các trace đắt nhất",
         "noTraces": "Không tìm thấy trace nào cho tín hiệu này",
-        "errorsTitle": "Tất cả lỗi của agent này",
+        "errorsTitle": "Lỗi nói gì",
         "noErrors": "Không có thông báo lỗi nào được ghi lại — hãy mở một trace để kiểm tra",
         "colTraceId": "Trace",
         "colSpans": "Spans",
@@ -19970,7 +20067,7 @@
         "failHeadline": "{agent} gặp {count} lỗi “{cls}”.",
         "costHeadline": "{agent}: chi tiêu ${cost} · {tokens} token · {errors} lỗi.",
         "loopExplain": "Tỷ lệ lặp lại cao thường có nghĩa là agent không lưu cache kết quả hoặc đang thử lại. Mở các trace tệ nhất bên dưới để xem các lần gọi lặp lại.",
-        "failExplain": "Đây là toàn bộ thông báo lỗi của agent này, thuộc mọi nhóm lỗi, không chỉ nhóm này. Hãy đọc chúng để tìm cách khắc phục, hoặc mở một trace để xem lỗi xảy ra ở đâu.",
+        "failExplain": "Đây là những thông báo lỗi thực tế đằng sau lớp lỗi này — hãy đọc chúng để tìm cách khắc phục, hoặc mở một trace để xem nó xảy ra ở đâu.",
         "costExplain": "Các trace này đã làm tăng chi phí của agent. Mở những trace đắt nhất để xem thứ gì đã chạy.",
         "explain": "Giải thích bằng O2 AI",
         "explainHelp": "O2 AI điều tra tín hiệu này từ các thông báo lỗi và những trace tệ nhất, vượt qua các span AI để đến nhật ký, chỉ số, Kubernetes và các lần triển khai, đồng thời trích dẫn bằng chứng."
@@ -20957,7 +21054,7 @@
       },
       "noProviders": {
         "title": "Thêm Nhà cung cấp trước",
-        "description": "Bộ chấm điểm cần một Nhà cung cấp LLM (OpenAI, Anthropic, v.v.) để chạy. Hãy thêm một nhà cung cấp trong Nhà cung cấp LLM trước khi tạo bộ chấm điểm."
+        "description": "Các bộ chấm điểm cần một Nhà cung cấp LLM (OpenAI, Anthropic, v.v.) để chạy. Thêm nhà cung cấp trong Cài đặt trước khi tạo bộ chấm điểm."
       },
       "import": {
         "title": "Nhập bộ chấm điểm",
@@ -21117,7 +21214,8 @@
         "resultReasoning": "Lý luận",
         "resultRaw": "Phản hồi thô",
         "valuePlaceholder": "Giá trị cho {variable}"
-      }
+      },
+      "providerHelpSettingsLink": "Cài đặt"
     },
     "job": {
       "detail": {
@@ -21301,7 +21399,7 @@
         }
       },
       "inputMapping": {
-        "title": "Biến của bộ chấm điểm",
+        "title": "Biến prompt",
         "hint": {
           "span": "Ánh xạ từng biến tới một thuộc tính span.",
           "trace": "Ánh xạ từng biến tới giá trị do hệ thống cung cấp hoặc thuộc tính span.",
@@ -21471,7 +21569,7 @@
       "defaultModel": "Mô hình mặc định"
     },
     "empty": {
-      "title": "Chưa có nhà cung cấp LLM nào",
+      "title": "Chưa có nhà cung cấp LLM",
       "description": "Các nhà cung cấp LLM lưu trữ chi tiết kết nối (URL gốc + thông tin xác thực) cho các mô hình ngôn ngữ mà các bộ chấm điểm LLM Judge của bạn gọi đến. Thêm một nhà cung cấp để bắt đầu chạy các đánh giá dựa trên LLM Judge."
     }
   },
@@ -22114,7 +22212,7 @@
       "explanation": "Token o2syn_ cấp tổ chức mà các tác nhân riêng của bạn sử dụng để xác thực khi họ kéo các công việc. Các vị trí công khai (Lambda) tự động sử dụng token mặc định; tạo một token có tên và nhúng nó vào các tác nhân của một khu vực để giới hạn phạm vi ảnh hưởng của khu vực đó.",
       "summary": "Token mà các tác nhân riêng của bạn sử dụng để kéo công việc.",
       "rotateDefaultBtn": "Xoay vòng mặc định",
-      "createTokenBtn": "Token mới",
+      "createTokenBtn": "Tạo token",
       "searchPlaceholder": "Tìm kiếm token",
       "default": "Mặc định",
       "tokenNameLabel": "Tên",
@@ -22715,17 +22813,17 @@
       "unknown": "Không xác định"
     },
     "locations": {
-      "addLocation": "Vị trí mới",
+      "addLocation": "Thêm Vị trí",
       "bulkDeleteConfirmMessage": "Bạn có chắc chắn muốn xóa {count} vị trí?",
       "bulkDeleteConfirmTitle": "Xóa Vị trí",
       "bulkDeleteFailed": "Không thể xóa vị trí",
       "bulkDeletePartial": "{success} trên {total} vị trí đã xóa",
       "bulkDeleteSuccess": "{count} vị trí đã xóa",
       "cancel": "Hủy",
-      "createClose": "Tạo và đóng",
+      "createClose": "Tạo & Đóng",
       "createFailed": "Không thể tạo vị trí",
       "createSuccess": "Vị trí đã được tạo thành công",
-      "createTitle": "Vị trí mới",
+      "createTitle": "Thêm Vị trí",
       "customProviderLabel": "Nhà cung cấp Tùy chỉnh",
       "customProviderPlaceholder": "Nhập tên nhà cung cấp",
       "customProviderRequired": "Tên nhà cung cấp tùy chỉnh là bắt buộc",
@@ -22733,7 +22831,7 @@
       "deleteConfirmTitle": "Xóa vị trí",
       "deleteFailed": "Không thể xóa vị trí",
       "deleteSuccess": "Đã xóa vị trí thành công",
-      "description": "Các vị trí thăm dò công khai cho giám sát tổng hợp",
+      "description": "Quản lý các vị trí probe công cộng cho giám sát Synthetics",
       "disable": "Vô hiệu hóa",
       "disabledSuccess": "Vị trí đã bị vô hiệu hóa",
       "disabling": "Đang vô hiệu hóa…",
@@ -22780,7 +22878,7 @@
       "region": "Khu vực",
       "regionPlaceholder": "ví dụ: us-east-1",
       "regionRequired": "Khu vực là bắt buộc",
-      "searchPlaceholder": "Tìm kiếm vị trí",
+      "searchPlaceholder": "Tìm kiếm vị trí…",
       "title": "Vị trí",
       "publicTitle": "Vị trí công khai",
       "privateTitle": "Vị trí riêng tư",
@@ -24767,9 +24865,9 @@
       "pipelinesExportedSuccessfully": "Đã xuất {count} pipeline thành công | Đã xuất {count} pipeline thành công",
       "functionsNotBundled": "{count} hàm không thể được bao gồm trong tệp xuất: {names} | {count} hàm không thể được bao gồm trong tệp xuất: {names}",
       "pipelineDeletedSuccessfully": "Đã xóa pipeline thành công",
-      "deletingPipeline": "Đang xóa pipeline...",
+      "deletingPipeline": "đang xóa pipeline...",
       "pipelineCreatedSuccessfully": "Đã tạo pipeline thành công",
-      "savingPipeline": "Đang lưu pipeline...",
+      "savingPipeline": "đang lưu pipeline...",
       "stateResumed": "Đã tiếp tục trạng thái {name} thành công",
       "statePaused": "Đã tạm dừng trạng thái {name} thành công"
     },
@@ -25386,19 +25484,19 @@
     "unitAttempts": "lần thử",
     "unitSeconds": "giây",
     "minLength": "Độ dài tối thiểu",
-    "minLengthDesc": "Mật khẩu ngắn nhất được chấp nhận.",
+    "minLengthDesc": "Mật khẩu ngắn nhất được chấp nhận",
     "maxLength": "Độ dài tối đa",
-    "maxLengthDesc": "Mật khẩu dài nhất được chấp nhận, tối đa 128.",
+    "maxLengthDesc": "Mật khẩu dài nhất được chấp nhận, tối đa 128",
     "requireUppercase": "Yêu cầu chữ hoa",
-    "requireUppercaseDesc": "Ít nhất một chữ cái A–Z.",
+    "requireUppercaseDesc": "Ít nhất một ký tự A–Z",
     "requireLowercase": "Yêu cầu chữ thường",
-    "requireLowercaseDesc": "Ít nhất một chữ cái a–z.",
+    "requireLowercaseDesc": "Ít nhất một ký tự a–z",
     "requireDigit": "Yêu cầu chữ số",
-    "requireDigitDesc": "Ít nhất một chữ số 0–9.",
+    "requireDigitDesc": "Ít nhất một chữ số 0–9",
     "requireSpecial": "Yêu cầu ký tự đặc biệt",
-    "requireSpecialDesc": "Ít nhất một ký tự thuộc bộ ký tự được phép.",
+    "requireSpecialDesc": "Ít nhất một ký tự trong tập được phép",
     "specialCharSet": "Ký tự đặc biệt được phép",
-    "specialCharSetDesc": "Để trống sẽ chấp nhận mọi ký tự không phải chữ và số.",
+    "specialCharSetDesc": "Để trống để chấp nhận mọi ký tự không phải chữ và số",
     "maxLengthTooSmall": "Độ dài tối đa phải nằm trong khoảng từ độ dài tối thiểu đến 128.",
     "maxLengthBelowMin": "Phải từ {min} trở lên để khớp với độ dài tối thiểu.",
     "confirmTitle": "Lưu chính sách mật khẩu?",
@@ -25412,9 +25510,9 @@
     "rotation": "Luân chuyển",
     "rotationDays": "Chu kỳ luân chuyển",
     "rotationDesc": "Khi mật khẩu hết hạn và người dùng được thông báo trước bao lâu.",
-    "rotationDaysDesc": "Số ngày trước khi mật khẩu hết hạn. 0 nghĩa là mật khẩu không bao giờ hết hạn.",
+    "rotationDaysDesc": "Số ngày trước khi mật khẩu hết hạn. 0 = không bao giờ hết hạn",
     "rotationWarningDays": "Cảnh báo trước khi hết hạn",
-    "rotationWarningDaysDesc": "Số ngày thông báo tại lúc đăng nhập. 0 sẽ không có cảnh báo.",
+    "rotationWarningDaysDesc": "Số ngày cảnh báo khi đăng nhập. 0 = không cảnh báo",
     "rotationWarningDaysOffDesc": "Số ngày thông báo tại lúc đăng nhập. Chỉ dùng khi mật khẩu đã hết hạn.",
     "warningDaysTooLong": "Khoảng thời gian cảnh báo không thể dài hơn chu kỳ luân chuyển.",
     "rotationPreview": "Mật khẩu đặt hôm nay sẽ hết hạn vào {expires}. Cảnh báo đăng nhập bắt đầu từ {warns}.",
@@ -25422,33 +25520,33 @@
     "reuse": "Ngăn chặn tái sử dụng",
     "historyCount": "Số mật khẩu ghi nhớ",
     "reuseDesc": "Ngăn người dùng quay lại dùng mật khẩu cũ.",
-    "historyCountDesc": "Mật khẩu mới không được trùng với bấy nhiêu mật khẩu trước đó. 0 sẽ tắt kiểm tra.",
+    "historyCountDesc": "Mật khẩu mới không được trùng với số mật khẩu trước đó này. 0 = không kiểm tra",
     "historyMaxRetained": "Số mật khẩu lưu giữ",
-    "historyMaxRetainedDesc": "Số mật khẩu cũ được lưu cho mỗi người dùng.",
+    "historyMaxRetainedDesc": "Số mật khẩu cũ được lưu cho mỗi người dùng",
     "historyRetainedTooSmall": "Số mật khẩu lưu giữ phải ít nhất bằng số mật khẩu ghi nhớ.",
     "reuseExplainer": "Mật khẩu hiện tại được tính là một trong tập mật khẩu ghi nhớ — việc tái sử dụng nó bị từ chối bởi quy tắc này, chứ không phải bởi một kiểm tra riêng.",
     "lockout": "Khóa tài khoản",
     "lockoutThreshold": "Số lần thử thất bại trước khi khóa",
     "lockoutDesc": "Điều gì xảy ra sau nhiều lần đăng nhập thất bại liên tiếp.",
-    "lockoutThresholdDesc": "0 sẽ tắt tính năng khóa tài khoản.",
+    "lockoutThresholdDesc": "0 = tắt khóa tài khoản",
     "lockoutBucketSize": "Số lần thử trước mỗi lần khóa tiếp theo",
-    "lockoutBucketSizeDesc": "Số lần thất bại thêm để kích hoạt lần khóa tiếp theo. 0 dùng cùng số như lần đầu.",
+    "lockoutBucketSizeDesc": "0 = dùng lại giá trị ở trên",
     "lockoutStartSecs": "Thời gian khóa lần đầu",
-    "lockoutStartSecsDesc": "Lần khóa đầu tiên kéo dài bao lâu.",
+    "lockoutStartSecsDesc": "Giây",
     "lockoutMaxSecs": "Thời gian khóa tối đa",
-    "lockoutMaxSecsDesc": "Mức trần mà việc tăng thời gian khóa dừng lại.",
+    "lockoutMaxSecsDesc": "Giây — giới hạn tối đa mà mức tăng dừng lại",
     "lockoutStartTooLong": "Thời gian khóa lần đầu không được dài hơn thời gian khóa tối đa.",
     "lockoutBackoff": "Mức tăng dần",
-    "lockoutBackoffDesc": "Mỗi lần khóa tăng so với lần trước như thế nào.",
+    "lockoutBackoffDesc": "Cách mỗi lần khóa tăng lên so với lần trước",
     "backoffExponential": "Lũy thừa",
     "backoffLinear": "Tuyến tính",
     "lockoutPreview": "{threshold} lần thất bại → {first} · cứ thêm {bucket} lần → {rest} · tối đa {max}. Đăng nhập thành công sẽ đặt lại mọi thứ.",
-    "sessionEnforcement": "Phiên và thực thi",
+    "sessionEnforcement": "Phiên làm việc & thực thi",
     "sessionEnforcementDesc": "Thời hạn của một lần đăng nhập và liệu root có tuân theo các quy tắc này không.",
     "cookieMaxAge": "Thời hạn phiên",
-    "cookieMaxAgeDesc": "Thời gian một phiên đã đăng nhập còn hiệu lực. 0 dùng giá trị mặc định của instance từ {envVar}.",
+    "cookieMaxAgeDesc": "Số giây một phiên đăng nhập còn hiệu lực. 0 = dùng giá trị mặc định của instance từ {envVar}",
     "applyToRoot": "Áp dụng cho tài khoản root",
-    "applyToRootDesc": "Root được miễn trừ mọi quy tắc ở trên trừ khi bật tùy chọn này.",
+    "applyToRootDesc": "Tài khoản root được miễn mọi quy tắc ở trên trừ khi bật tùy chọn này",
     "rootWarning": "Khóa tài khoản root có thể khiến hệ thống rơi vào trạng thái không thể khôi phục.",
     "rootDialogTitle": "Áp dụng chính sách cho tài khoản root?",
     "rootDialogMessage": "Tài khoản root sẽ bị khóa, xoay mật khẩu và buộc đặt lại như mọi tài khoản native khác. Nếu root là tài khoản quản trị duy nhất của bạn, việc bị khóa hoặc hết hạn mà tài khoản không thể đáp ứng sẽ khiến bạn không còn cách nào truy cập lại instance này.",
@@ -29621,12 +29719,12 @@
       "chartBelow": "{metric}, hiện tại {value}, thấp hơn dải bình thường",
       "chartWithin": "{metric}, hiện tại {value}, trong phạm vi bình thường",
       "tipNormal": "Bình thường {low} – {high}",
-      "openTraces": "Mở trong Trace",
+      "openTraces": "Trace",
       "openCatalog": "Danh mục dịch vụ",
       "openLogs": "Mở trong Nhật ký",
       "rangeLabel": "Khoảng thời gian",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Lỗ hổng bao phủ",
+      "badgeNotWatched": "Chưa theo dõi",
       "signalsWatched": "Tín hiệu đang theo dõi",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Tăng {change} kể từ đầu khoảng thời gian",
@@ -29722,7 +29820,10 @@
         "service": "Theo dịch vụ",
         "place": "Theo vị trí",
         "none": "Không nhóm"
-      }
+      },
+      "fixNoLink": "Thêm nhãn service.name",
+      "fixStopped": "Kiểm tra collector",
+      "fixQueued": "Chỉ mô phỏng: “{action}” cho {service} chưa được gửi đi đâu cả"
     },
     "activity": {
       "before": "Trước",
@@ -30471,15 +30572,15 @@
       "intro": "Đây là những gì tôi làm, trong năm bước.",
       "gotIt": "Đã hiểu",
       "s1Title": "Tôi tìm dịch vụ của bạn",
-      "s1": "Tôi xem xét dữ liệu bạn đã gửi và tìm ra các dịch vụ trong đó. Một dịch vụ mới sẽ xuất hiện sau lần kiểm tra tiếp theo của tôi; bạn không cần thêm nó.",
-      "s2Title": "Tôi học thế nào là bình thường",
-      "s2": "Tôi học lượng dữ liệu mỗi stream thường gửi từ 14 ngày lịch sử của nó. Cho đến khi một stream có đủ lịch sử đó, tôi sẽ báo rằng nó vẫn đang học và không đánh giá nó.",
-      "s3Title": "Tôi chỉ gọi trực khi một stream ngừng gửi dữ liệu",
-      "s3": "Khi một stream ngừng gửi dữ liệu, tôi mở một sự cố và, nếu tính năng gọi trực đang bật, gọi trực cho nhóm trực phụ trách dịch vụ. Các đợt giảm và tăng mạnh sẽ hiển thị dưới dạng phát hiện và không bao giờ gọi trực. Những vấn đề nhỏ hơn sẽ chờ bản tóm tắt hằng ngày.",
-      "s4Title": "Tôi cho biết điều gì đã xảy ra",
-      "s4": "Mỗi sự cố cho biết thứ gì đã dừng và từ khi nào. Khi bật phân tích AI, sự cố cũng kèm theo nhận định tốt nhất về lý do.",
-      "s5Title": "Bạn quyết định những gì sẽ thay đổi",
-      "s5": "Tôi đề xuất cảnh báo cho những gì chưa được theo dõi và cách khắc phục cho những cảnh báo không thể kích hoạt. Không có gì thay đổi cho đến khi bạn xem xét và áp dụng, và bạn có thể hoàn tác những gì đã áp dụng."
+      "s1": "Tôi xem xét dữ liệu bạn đã gửi và tìm thấy mọi dịch vụ trong đó. Khi một dịch vụ mới xuất hiện, tôi bắt đầu theo dõi nó ngay trong ngày; bạn không cần phải yêu cầu.",
+      "s2Title": "Tôi theo dõi chúng",
+      "s2": "Tôi học cách nhận biết trạng thái bình thường của từng dịch vụ: lỗi, độ chậm và lưu lượng truy cập theo từng giờ trong ngày, với các mẫu hàng tuần ngày càng rõ nét hơn theo thời gian. Cho đến khi tôi biết, tôi sử dụng các kiểm tra an toàn cơ bản.",
+      "s3Title": "Tôi giữ im lặng trừ khi đó là vấn đề thực sự",
+      "s3": "Hầu hết những khoảnh khắc kỳ lạ không phải là vấn đề. Tôi thông báo cho đội của bạn khi có điều gì đó gây hại cho khách hàng, gửi tin nhắn không đánh thức ai cho các vấn đề nhỏ hơn, và giữ những việc nhỏ nhặt cho bản tóm tắt thứ Sáu.",
+      "s4Title": "Tôi giải thích mọi thông báo",
+      "s4": "Mọi tin nhắn đều nói rõ cái gì đã hỏng, từ khi nào, và đánh giá tốt nhất của tôi về lý do, cùng với độ chắc chắn của tôi.",
+      "s5Title": "Tôi sửa những gì bạn cho phép",
+      "s5": "Tôi chỉ sửa những thứ bạn nói tôi có thể. Một sửa chữa hiệu quả sẽ tạo được chút tin tưởng, còn một sửa chữa không giúp ích gì sẽ bị tính là điểm trừ. Nếu tôi cứ cần cùng một sửa chữa, đó là lỗi tôi báo cáo cho đội của bạn, không phải thói quen tôi tự động hóa."
     },
     "outcome": {
       "active": "Đang diễn ra",
@@ -30492,9 +30593,9 @@
     },
     "view": {
       "standard": "Tiêu chuẩn",
-      "nerd": "Chi tiết",
+      "nerd": "Detailed",
       "standardTooltip": "Chế độ xem Tiêu chuẩn cung cấp thông tin ngắn gọn: những gì cần bạn và những gì đã xảy ra trong 7 ngày qua",
-      "nerdTooltip": "Chế độ xem chi tiết hiển thị đầy đủ mọi bộ phát hiện, vòng lặp và cài đặt",
+      "nerdTooltip": "Chế độ xem Nerd hiển thị đầy đủ mọi detector, vòng lặp và cài đặt",
       "label": "Chế độ xem"
     },
     "suggestions": {
@@ -30617,7 +30718,8 @@
       "copyRequest": "Sao chép yêu cầu",
       "requestText": "Vui lòng thêm tổ chức OpenObserve {name} ({org}) vào không gian làm việc Slack {team}, trong _meta › Settings › Slack › Organizations.",
       "requestCopied": "Đã sao chép yêu cầu",
-      "setupAppOtherTeam": "Dành cho không gian làm việc Slack khác với {team} · OpenObserve tạo ứng dụng Slack riêng của bạn từ một token cấu hình"
+      "setupAppOtherTeam": "Dành cho không gian làm việc Slack khác với {team} · OpenObserve tạo ứng dụng Slack riêng của bạn từ một token cấu hình",
+      "title": "Kết nối không gian làm việc Slack"
     },
     "wizard": {
       "title": "Thiết lập ứng dụng Slack",
@@ -30837,7 +30939,9 @@
       "ownOrgOnlyHint": "Trên không gian làm việc instance, bạn gán kênh cho tổ chức của riêng bạn",
       "claimableHint": "Các kênh chưa được nhận và các kênh do {org} sở hữu",
       "servedOrgsHint": "Mọi tổ chức mà không gian làm việc này phục vụ",
-      "alertRoutes": "{count} đích | {count} đích"
+      "alertRoutes": "{count} đích | {count} đích",
+      "empty": "Chưa có kênh nào có tổ chức mặc định",
+      "emptyDescription": "Câu hỏi trong kênh không có mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng /o2 org)."
     },
     "people": {
       "title": "Người dùng đã liên kết",
@@ -30856,7 +30960,8 @@
         "email": "Khớp email",
         "admin_bulk": "Liên kết tất cả"
       },
-      "loadMore": "Tải thêm"
+      "loadMore": "Tải thêm",
+      "empty": "Chưa có ai trong tổ chức này liên kết Slack"
     },
     "credentials": {
       "title": "Cập nhật thông tin xác thực",
@@ -31779,7 +31884,7 @@
           "label": "Thiếu danh tính agent",
           "detail": "{affected} trên {total} span LLM ({pct}) không có gen_ai.agent.name, nên các chế độ xem agent bỏ sót chúng.",
           "pass": "Mọi span LLM đều có tên hoặc id agent.",
-          "fix": "Mở Ánh xạ agent"
+          "fix": "Mở Ánh xạ agent GenAI"
         },
         "zero_duration_spans": {
           "label": "Span có thời lượng bằng 0",
@@ -31794,6 +31899,13 @@
           "fix": "Hướng dẫn tích hợp"
         }
       }
+    },
+    "chart": {
+      "costMissing": "Không có trong biểu đồ này: {models}. {tokens} token chưa có giá.",
+      "costMissingPricedSince": "Không có trong biểu đồ này: {models}. {tokens} token được ghi nhận trước khi có giá.",
+      "unpricedModels": "Chưa có giá: {models}",
+      "pricedSinceModels": "Được ghi nhận trước khi có giá: {models}",
+      "addPrice": "Thêm giá"
     }
   },
   "onboarding": {

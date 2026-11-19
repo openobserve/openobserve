@@ -121,7 +121,7 @@
     "noGroups": {
       "title": "No groups yet",
       "description": "Groups let you manage permissions for multiple users at once. Create one to get started.",
-      "action": "สร้างกลุ่มผู้ใช้ใหม่",
+      "action": "New group",
       "actionDesc": "Create a user group"
     },
     "noRoles": {
@@ -197,7 +197,7 @@
     "noCipherKeys": {
       "title": "No cipher keys yet",
       "description": "Cipher keys are used to encrypt sensitive fields in your data streams.",
-      "action": "สร้างคีย์เข้ารหัสใหม่",
+      "action": "New key",
       "actionDesc": "Generate a cipher key"
     },
     "noSlackChannelDefaults": {
@@ -225,7 +225,7 @@
     "noLlmProviders": {
       "title": "No LLM providers configured",
       "description": "Connect a language model provider to enable AI-powered features.",
-      "action": "สร้างผู้ให้บริการใหม่",
+      "action": "Add provider",
       "actionDesc": "Configure an LLM provider"
     },
     "noDiscoveredServices": {
@@ -268,9 +268,9 @@
     },
     "noStorageConfig": {
       "title": "No bucket configured",
-      "description": "ใช้บัคเก็ตของคุณเองเพื่อเก็บข้อมูลขององค์กรนี้ไว้ในพื้นที่จัดเก็บที่คุณเป็นเจ้าของ แยกจากองค์กรอื่นและค่าเริ่มต้นส่วนกลาง.",
-      "action": "กำหนดค่าบัคเก็ต",
-      "actionDesc": "เชื่อมต่อบัคเก็ต S3 หรือ Azure"
+      "description": "Route this org's data to a dedicated bucket — independently of other orgs and global defaults.",
+      "action": "Configure storage",
+      "actionDesc": "Connect an S3, GCS, or Azure bucket"
     },
     "noPhoneProvider": {
       "title": "No phone provider connected",
@@ -435,7 +435,7 @@
     "noUsers": {
       "title": "No users yet",
       "description": "Invite your teammates to collaborate in this organization.",
-      "action": "สร้างผู้ใช้ใหม่",
+      "action": "Add user",
       "actionDesc": "Invite a teammate by email"
     },
     "noReports": {
@@ -457,7 +457,7 @@
     "noServiceAccounts": {
       "title": "No service accounts yet",
       "description": "Service accounts let applications authenticate with the API. Create one to get started.",
-      "action": "สร้างบัญชีบริการใหม่",
+      "action": "Add service account",
       "actionDesc": "Create an API service account"
     },
     "noInvitations": {
@@ -3706,7 +3706,7 @@
     "agplFullName": "GNU Affero General Public License (AGPL)",
     "github": "GitHub",
     "website": "Website",
-    "licenseAndUsage": "ใบอนุญาตและการใช้งาน",
+    "licenseAndUsage": "License & Usage",
     "copyLicenseId": "Copy license ID",
     "editionLbl": "Edition",
     "gbPerDay": "GB / day",
@@ -3720,15 +3720,15 @@
     "manage_license": "Manage License",
     "os_libraries": "Open Source Libraries",
     "os_libraries_msg": "Built on the shoulders of giants. OpenObserve depends on many amazing open source libraries.",
-    "license_info": "ข้อมูลใบอนุญาต",
+    "license_info": "License Information",
     "license_info_msg": "You are using the Enterprise version governed by the enterprise license agreement.",
     "license_info_os_msg": "You are using the open source version under the",
     "license_info_note": "By using OpenObserve, you agree to comply with the applicable license terms.",
     "ent_lincese_detail_lbl": "Enterprise License Details",
     "lincese_id_lbl": "License ID",
     "status_lbl": "สถานะ",
-    "create_at_lbl": "สร้างเมื่อ",
-    "expires_at_lbl": "หมดอายุเมื่อ",
+    "create_at_lbl": "Created At",
+    "expires_at_lbl": "Expires At",
     "usage_limits": "Usage Limits",
     "feature_comparison_lbl": "Feature Comparison",
     "feature_comparision_ent_msg": "You're using OpenObserve Enterprise Edition with access to all advanced features listed below.",
@@ -3785,20 +3785,20 @@
     "failed_to_load_license_info": "Failed to load license information",
     "installation_id_lbl": "Installation ID",
     "expired_lbl": "Expired",
-    "no_license_found": "ไม่พบใบอนุญาต",
+    "no_license_found": "No License Found",
     "installation_id": "Installation ID",
-    "contact_admin_license": "วางคีย์ใบอนุญาตด้านล่าง หรือส่งคำขอรับใบอนุญาต",
-    "get_license": "รับใบอนุญาต",
-    "enter_license_key": "ป้อนคีย์ใบอนุญาต",
+    "contact_admin_license": "Contact your administrator for getting a license and paste the key here, <strong>or:</strong>",
+    "get_license": "Get License",
+    "enter_license_key": "Enter License Key",
     "paste_license_placeholder": "Paste your license key here...",
-    "license_auto_filled": "คีย์ใบอนุญาตถูกเติมอัตโนมัติจาก URL คลิก \"อัปเดตใบอนุญาต\" เพื่อนำไปใช้",
-    "update_license": "อัปเดตใบอนุญาต",
+    "license_auto_filled": "License key auto-filled from URL. Click \"Update License\" to apply.",
+    "update_license": "Update License",
     "license_id": "License ID",
     "company": "Company",
-    "license_key": "คีย์ใบอนุญาต",
-    "contact_name": "ชื่อผู้ติดต่อ",
-    "contact_email": "อีเมลผู้ติดต่อ",
-    "environment_type": "ประเภทสภาพแวดล้อม",
+    "license_key": "License Key",
+    "contact_name": "Contact Name",
+    "contact_email": "Contact Email",
+    "environment_type": "Environment Type",
     "features": "ฟีเจอร์",
     "features_all_unlocked": "สิทธิ์การใช้งานของคุณปลดล็อกฟีเจอร์ทั้งหมด",
     "features_summary": "สิทธิ์การใช้งานของคุณปลดล็อก {ratio} โดยมีฟีเจอร์ฟรี {free} รายการรวมอยู่เสมอ | สิทธิ์การใช้งานของคุณปลดล็อก {ratio} โดยมีฟีเจอร์ฟรี {free} รายการรวมอยู่เสมอ",
@@ -3816,8 +3816,8 @@
     "features_free_not_included": "ฟรี ไม่อยู่ในไลเซนส์ของคุณ",
     "features_new": "ใหม่ภายหลังสิทธิ์การใช้งานของคุณ",
     "features_filter_new": "ใหม่",
-    "request_new_license": "ขอรับใบอนุญาตใหม่",
-    "add_new_license_key": "เพิ่มคีย์ใบอนุญาตใหม่",
+    "request_new_license": "Request new License",
+    "add_new_license_key": "Add New License Key",
     "online_error_unreachable": "ติดต่อเซิร์ฟเวอร์ไลเซนส์ไม่ได้{limits}",
     "online_error_timeout": "ติดต่อเซิร์ฟเวอร์ไลเซนส์ไม่ได้{limits}",
     "online_error_blocked": "การติดตั้งนี้ถูกบล็อกโดย OpenObserve โปรดติดต่อฝ่ายสนับสนุน",
@@ -3895,7 +3895,7 @@
     "expiry_online": "ใบอนุญาตของคุณจะหมดอายุในวันที่ {date} คลิก รีเฟรชตอนนี้ เพื่อตรวจสอบใบอนุญาตที่ต่ออายุแล้ว",
     "expiry_viewer": "ใบอนุญาตของคุณจะหมดอายุในวันที่ {date} โปรดขอให้ผู้ดูแลระบบรีเฟรชใบอนุญาต",
     "expiry_airgapped": "ใบอนุญาตของคุณจะหมดอายุในวันที่ {date} โปรดติดต่อ OpenObserve เพื่อขอคีย์ที่ต่ออายุแล้ว",
-    "refresh_license_limits": "รีเฟรชขีดจำกัดใบอนุญาต",
+    "refresh_license_limits": "Refresh License Limits",
     "banner_paused_usage": "การค้นหาถูกหยุดชั่วคราว การนำเข้าข้อมูลเกินขีดจำกัดรายวันใน {exceeded} วันของเดือนนี้ (อนุญาต {allowed} วัน) ข้อมูลยังคงถูกนำเข้าอยู่ โปรดติดต่อ OpenObserve พร้อม ID ใบอนุญาต {licenseId} | การค้นหาถูกหยุดชั่วคราว การนำเข้าข้อมูลเกินขีดจำกัดรายวันใน {exceeded} วันของเดือนนี้ (อนุญาต {allowed} วัน) ข้อมูลยังคงถูกนำเข้าอยู่ โปรดติดต่อ OpenObserve พร้อม ID ใบอนุญาต {licenseId}",
     "banner_paused_other": "Search is paused by the license check. Data is still being ingested. Contact OpenObserve with license ID {licenseId}.",
     "banner_paused_no_id": "Search is paused by the license check. Data is still being ingested.",
@@ -3971,11 +3971,11 @@
     "waiver_breach_ended": "สิทธิ์อนุญาตของ {month} สิ้นสุดเมื่อ {end} UTC",
     "waiver_window_until": "until {end}",
     "waiver_window_days": "usage days {start} through {end}",
-    "update_license_key": "อัปเดตคีย์ใบอนุญาต",
+    "update_license_key": "Update License Key",
     "paste_new_license_placeholder": "Paste new license key here...",
     "your_complete_license_key": "Your complete license key:",
-    "copy_key": "คัดลอกคีย์",
-    "usage_information": "ข้อมูลการใช้งาน",
+    "copy_key": "Copy Key",
+    "usage_information": "Usage Information",
     "usage_chart_title": "การนำเข้าข้อมูลรายวันในเดือนนี้",
     "no_license_ingestion_limit": "หากไม่มีใบอนุญาต การนำเข้าข้อมูลจะถูกจำกัดที่ <strong>{limit} GB</strong> ต่อวัน",
     "license_allows_ingestion": "The current license allows <strong>{limit} GB</strong> of data ingestion per day.",
@@ -4732,7 +4732,7 @@
       "effectStillAllowed": "ไม่มีการเปลี่ยนแปลงสิทธิ์การเข้าถึง: การให้สิทธิ์ที่กว้างกว่ายังอนุญาตให้ทำสิ่งนี้ได้",
       "moduleGroupSecurity": "ความปลอดภัย",
       "presetSocAnalystTitle": "นักวิเคราะห์ SOC",
-      "presetSocAnalystDescription": "คัดแยกการแจ้งเตือนและเคสด้านความปลอดภัย พร้อมสิทธิ์อ่านการตรวจจับ สตรีมต้นทางด้านความปลอดภัย และรายการข่าวกรองภัยคุกคาม",
+      "presetSocAnalystDescription": "คัดกรองการแจ้งเตือนและเคสของ Security พร้อมสิทธิ์อ่านการตรวจจับ สตรีมแหล่งข้อมูลของ Security และรายการข่าวกรองภัยคุกคาม",
       "presetDetectionEngineerTitle": "วิศวกรการตรวจจับ",
       "presetDetectionEngineerDescription": "สร้าง ปรับแต่ง เปิดใช้ และเรียกใช้การตรวจจับ ติดตั้งเนื้อหา เชื่อมต่อแหล่งข้อมูลพร้อมฟังก์ชันและไปป์ไลน์ และดูแลตารางเสริมข้อมูล เช่น รายการข่าวกรองภัยคุกคาม พร้อมสิทธิ์อ่านความปลอดภัย เคส และสตรีม",
       "presetSecurityAdminTitle": "ผู้ดูแลความปลอดภัย",
@@ -4843,7 +4843,7 @@
       "createFailed": "Organization creation failed."
     },
     "listOrganizations": {
-      "subtitle": "ทุกองค์กรที่คุณเข้าถึงได้ สลับไปยังองค์กรใดองค์กรหนึ่ง หรือเปลี่ยนชื่อได้จากตัวเลือกการดำเนินการของแถวนั้น.",
+      "subtitle": "Organizations you can access",
       "switch": "สลับไปยังองค์กรนี้",
       "current": "ปัจจุบัน",
       "cannotEditWhileDeleting": "Cannot edit while deletion is in progress",
@@ -4977,7 +4977,7 @@
       "uploadingRules": "Please wait while uploading rules...",
       "errorUploadingRules": "Error while uploading rules",
       "errorParsingJson": "Error parsing JSON from file {name}",
-      "someValuesEmpty": "ค่าบางรายการว่างเปล่า โปรดตรวจสอบ.",
+      "someValuesEmpty": "Some values are empty. Please check them.",
       "saveBeforeSwitchingTimeUnits": "Please save or cancel your changes before switching time units"
     },
     "addRolePage": {
@@ -4996,7 +4996,9 @@
       "saved": "Announcement banners updated",
       "saveFailed": "Could not save the announcement banners",
       "loadFailed": "Could not load the announcement banners",
-      "addBanner": "Add banner"
+      "addBanner": "Add banner",
+      "emptyTitle": "No banners yet",
+      "emptyHint": "Add one to show a notice at the top of the app."
     },
     "variants": {
       "info": "Info",
@@ -5114,10 +5116,10 @@
       "characters": "{count} / {max}",
       "variantOption": "{name} — {help}",
       "variantHelp": {
-        "info": "ประกาศทั่วไปและข่าวการอัปเดต",
-        "warning": "บริการเสื่อมประสิทธิภาพหรือมีกำหนดบำรุงรักษา",
-        "critical": "ระบบขัดข้อง; แสดงก่อนและซ่อนโปรโมชัน",
-        "promo": "กิจกรรมและข้อเสนอ; แสดงเป็นลำดับสุดท้ายและซ่อนเมื่อระบบขัดข้อง"
+        "info": "general notices and release news",
+        "warning": "degraded service or upcoming maintenance",
+        "critical": "outages; shown first and hides promos",
+        "promo": "events and offers; shown last, hidden during outages"
       },
       "toolbar": {
         "bold": "Bold",
@@ -6173,8 +6175,8 @@
     "periodInfoLine1": "Period for which the query should run.",
     "periodInfoLine2": "e.g. 10 minutes means that whenever the query will run it will use the last 10 minutes of data. If the query runs at 4:00 PM then it will use the data from 3:50 PM to 4:00 PM.",
     "periodShouldMatchFrequency": "Note: The period should be the same as frequency.",
-    "delayInfoLine1": "ระยะเวลาที่ต้องรอหลังเวลาที่กำหนด เพื่อให้ข้อมูลที่มาช้าสามารถมาถึงได้.",
-    "delayInfoLine2": "เช่น หากหน่วงเวลา 10 นาที ไปป์ไลน์รายชั่วโมงจะทำงานเวลา 10:10 และอ่านข้อมูลตั้งแต่ 9:00 ถึง 10:00.",
+    "delayInfoLine1": "Delay for which the pipeline is scheduled to run.",
+    "delayInfoLine2": "e.g. 10 minutes delay means that the pipeline will run 10 minutes after its scheduled time.",
     "closeDrawer": "Close drawer",
     "conditionValueGuidelines": "Condition value Guidelines:",
     "customColumnGuideline": "To add a custom column, type column name and press",
@@ -6385,28 +6387,28 @@
     "confirmDeleteNode": "Are you sure you want to delete node?",
     "errorFetchingUsedStreams": "Error fetching used streams",
     "destinationNotes": {
-      "openobserveTitle": "รายละเอียดการเชื่อมต่อ OpenObserve",
+      "openobserveTitle": "OpenObserve Connection Details",
       "openobserveStep1": "Log in to your OpenObserve instance",
       "openobserveStep2": "Copy your base URL (e.g., https://your-instance.openobserve.ai)",
       "openobserveStep3": "The endpoint path is prefilled as: /api/{'{'}org{'}'}/{'{'}stream{'}'}/_json",
       "openobserveStep4": "Replace {'{'}org{'}'} with your organization identifier",
       "openobserveStep5": "Replace {'{'}stream{'}'} with your stream name",
       "openobserveStep6": "Add authentication header: Authorization: Basic <OpenObserve_Token>",
-      "splunkTitle": "รายละเอียดการเชื่อมต่อ Splunk HEC",
+      "splunkTitle": "Splunk HEC Connection Details",
       "splunkStep1": "Log in to your Splunk instance as an admin",
       "splunkStep2": "Go to Settings → Data Inputs → HTTP Event Collector",
       "splunkStep3": "Click 'New Token' to create a new HEC token",
       "splunkStep4": "Configure the token settings and save",
       "splunkStep5": "Use your Splunk HEC endpoint URL",
       "splunkStep6": "Add the HEC token in the Headers section (Authorization: Splunk <token>)",
-      "elasticsearchTitle": "รายละเอียดการเชื่อมต่อ Elasticsearch",
+      "elasticsearchTitle": "Elasticsearch Connection Details",
       "elasticsearchStep1": "Locate your Elasticsearch cluster endpoint",
       "elasticsearchStep2": "Ensure the cluster is accessible from this network",
       "elasticsearchStep3": "Create an API key or use basic authentication",
       "elasticsearchStep4": "For Cloud: Get the endpoint from your cloud console",
       "elasticsearchStep5": "For self-hosted: Use your cluster URL with port (typically 9200)",
       "elasticsearchStep6": "Add authentication in the Headers section",
-      "datadogTitle": "รายละเอียดการเชื่อมต่อ Datadog",
+      "datadogTitle": "Datadog Connection Details",
       "datadogStep1": "Log in to your Datadog account",
       "datadogStep2": "Navigate to Organization Settings → API Keys",
       "datadogStep3": "Create a new API key or copy an existing one",
@@ -6414,14 +6416,14 @@
       "datadogStep5": "US: https://http-intake.logs.datadoghq.com",
       "datadogStep6": "EU: https://http-intake.logs.datadoghq.eu",
       "datadogStep7": "Add the API key in Headers: DD-API-KEY: <your-key>",
-      "dynatraceTitle": "รายละเอียดการเชื่อมต่อ Dynatrace",
+      "dynatraceTitle": "Dynatrace Connection Details",
       "dynatraceStep1": "Log in to your Dynatrace environment",
       "dynatraceStep2": "Navigate to Settings → Integration → Dynatrace API",
       "dynatraceStep3": "Create a new API token with logs.ingest permission",
       "dynatraceStep4": "Use your environment URL",
       "dynatraceStep5": "Format: https://{'{'}your-environment-id{'}'}.live.dynatrace.com",
       "dynatraceStep6": "Add the token in Headers: Authorization: Api-Token <token>",
-      "newrelicTitle": "รายละเอียดการเชื่อมต่อ New Relic",
+      "newrelicTitle": "New Relic Connection Details",
       "newrelicStep1": "Log in to your New Relic account",
       "newrelicStep2": "Navigate to API Keys section",
       "newrelicStep3": "Create or copy a License Key (Ingest - License)",
@@ -6435,7 +6437,7 @@
       "customStep4": "Configure any required headers for authentication",
       "customStep5": "Choose the output format (JSON or NDJSON)",
       "customStep6": "Test the connection to verify it works",
-      "defaultTitle": "รายละเอียดการเชื่อมต่อ",
+      "defaultTitle": "Connection Details",
       "defaultStep1": "Select a destination type to see specific instructions"
     },
     "deleteFunctionAssociationConfirm": "Are you sure you want to delete function association?",
@@ -7135,7 +7137,7 @@
     "orgLevelExplanation": "These are organization-level ingestion tokens. They are not tied to individual users and will continue working even if the user who created them leaves the organization. Tokens can only be used on ingestion endpoints.",
     "orgLevelSummary": "Organization-level tokens for ingestion endpoints.",
     "tokenManagementTitle": "Manage Ingestion Tokens",
-    "createTokenBtn": "สร้างโทเค็นใหม่",
+    "createTokenBtn": "Create New Token",
     "createTokenTitle": "Create Token",
     "searchToken": "Search tokens",
     "tokenNameLabel": "ชื่อ",
@@ -11470,7 +11472,7 @@
     "SearchStreamProtected": "ข้อผิดพลาด: สตรีมนี้เก็บระเบียนภายในและไม่สามารถค้นหาได้ในล็อก."
   },
   "alertCalibration": {
-    "title": "การปรับเทียบการแจ้งเตือน",
+    "title": "Alert calibration",
     "subtitle": "How your alerts behave, measured from their own run history",
     "configure": "Configure",
     "runNow": "Run now",
@@ -11689,9 +11691,9 @@
       "lengthenEvaluationWindowDesc": "Widen the period so a short spike no longer trips the alert.",
       "enableDeduplication": "Enable deduplication",
       "enableDeduplicationDesc": "Collapse repeat firings inside a deduplication window.",
-      "reviewForDeletion": "ตรวจสอบการแจ้งเตือน",
+      "reviewForDeletion": "Review for deletion",
       "reviewForDeletionDesc": "Confirm the query still matches reality before retiring the alert.",
-      "fixAlertQuery": "ตรวจสอบการแจ้งเตือน",
+      "fixAlertQuery": "Fix alert query",
       "fixAlertQueryDesc": "The evaluation itself fails and never reaches a verdict.",
       "repairDestination": "Repair destination",
       "repairDestinationDesc": "Delivery fails on a destination the alert uses.",
@@ -11875,7 +11877,7 @@
       "scopeAll": "All runs",
       "scopeFindings": "With findings",
       "scopeGaps": "Coverage gaps",
-      "searchPlaceholder": "ค้นหาด้วยชื่อการแจ้งเตือน",
+      "searchPlaceholder": "Search by alert name",
       "colRun": "Run",
       "colFindings": "Findings",
       "colCoverage": "Coverage",
@@ -11903,8 +11905,8 @@
       "statFindings": "Findings",
       "statAlertsInScope": "Alerts in scope",
       "statDeclined": "Declined",
-      "statDeclinedSub": "ยังไม่ผ่าน",
-      "statDeclinedTooltip": "คู่ของกฎและการแจ้งเตือนที่กฎไม่ยอมประเมิน เป็นด่านกั้น ไม่ใช่การยืนยันว่าผ่าน เกณฑ์ขั้นต่ำที่ไม่ถึงจะถูกนับเพียงอย่างเดียว ส่วนกฎที่ไม่สามารถทำงานได้ หรือตรวจดูแล้วปฏิเสธ จะแสดงอยู่ด้านล่างพร้อมเหตุผล",
+      "statDeclinedSub": "Not cleared",
+      "statDeclinedTooltip": "Rule and alert pairs a rule would not judge, because the alert had too little history or too few samples for it. A gate, not a clearance; the per-alert reasons are not written to the stream.",
       "limitations": "ข้อจำกัดของหลักฐาน",
       "declinedHeading": "ปฏิเสธพร้อมเหตุผล",
       "declinedDesc": "กฎที่ไม่สามารถทำงานกับการแจ้งเตือนได้ หรือตรวจดูแล้วปฏิเสธ นี่ไม่ใช่การยืนยันว่าผ่าน",
@@ -11931,7 +11933,10 @@
       "proposedActions": "Proposed actions",
       "qualityReasons": "เหตุผล: {reasons} | เหตุผล: {reasons}",
       "openAlert": "Open alert",
-      "advice": "สิ่งที่ควรตรวจสอบ"
+      "advice": "สิ่งที่ควรตรวจสอบ",
+      "viewInLogs": "View in Logs",
+      "viewInLogsHint": "Opens this run's records in Logs",
+      "loadFailed": "The digest could not be loaded: {message}"
     },
     "dashboard": {
       "latestRunAgo": "Latest run {time}",
@@ -11989,7 +11994,8 @@
       "runNowHeading": "Run now",
       "findingsKept": "ข้อค้นพบจะถูกเก็บไว้พร้อมข้อมูลขององค์กรนี้ตามระยะเวลาการเก็บรักษา การปรับเทียบการแจ้งเตือนไม่ส่งการแจ้งเตือนใด ๆ",
       "frequencyRange": "Choose a cadence between 1 hour and 30 days.",
-      "windowRange": "Choose a window between 1 minute and 90 days."
+      "windowRange": "Choose a window between 1 minute and 90 days.",
+      "loadFailed": "The settings could not be loaded: {message}"
     },
     "visibility": {
       "allClear": "ไม่มีข้อค้นพบจากการแจ้งเตือนที่คุณเข้าถึงได้ในรอบล่าสุด",
@@ -12180,8 +12186,8 @@
     "response": "Response",
     "lastError": "Last error:",
     "errorSummary": "Error Summary",
-    "searchThisFolderTooltip": "แสดงการแจ้งเตือนในโฟลเดอร์นี้",
-    "searchAllFoldersTooltip": "แสดงการแจ้งเตือนในทุกโฟลเดอร์",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
     "reloadAlertsTooltip": "Reload alerts",
     "triggerDetection": "Trigger Detection",
     "retrain": "Re-train",
@@ -13263,7 +13269,7 @@
           "refuted": "Refuted"
         },
         "openEvidence": "Open evidence {number}",
-        "notVerifiedId": "ยังไม่ได้ตรวจสอบ",
+        "notVerifiedId": "not verified",
         "hypotheses": "Hypotheses",
         "noHypotheses": "No hypotheses recorded yet.",
         "noEvidenceYet": "No evidence yet",
@@ -14243,7 +14249,7 @@
       "addedUnread": "ไม่สามารถอ่านการแจ้งเตือนของคุณได้ AutoObserve จึงไม่สามารถระบุได้ว่ามีการเพิ่มรายการนี้ไปแล้วหรือไม่ ยังไม่ได้บันทึกข้อมูล; บันทึกอีกครั้งเพื่อลองใหม่",
       "alreadyAdded": "เพิ่มเป็น {name} ในโฟลเดอร์ {folder} แล้ว จึงไม่ได้บันทึกการแจ้งเตือนนี้ซ้ำ",
       "dialog": {
-        "title": "เพิ่มการแจ้งเตือน",
+        "title": "Create alert",
         "continue": "Continue to alert",
         "queryChoiceLabel": "Alert on query",
         "queryChoiceOption": "{name}: {query}",
@@ -14266,19 +14272,19 @@
       },
       "sources": {
         "default": {
-          "label": "เพิ่มการแจ้งเตือน",
+          "label": "Create Alert",
           "toast": "Query imported into the alert form"
         },
         "logs": {
-          "label": "เพิ่มการแจ้งเตือน",
+          "label": "Create Alert",
           "toast": "Query imported from your logs search"
         },
         "patterns": {
-          "label": "เพิ่มการแจ้งเตือน",
+          "label": "Create alert",
           "toast": "Query imported from the selected patterns"
         },
         "panel": {
-          "label": "เพิ่มการแจ้งเตือน",
+          "label": "Create Alert",
           "toast": "Query imported from dashboard panel: \"{sourceLabel}\""
         },
         "library": {
@@ -14286,7 +14292,7 @@
           "toast": "From Alert Library: {sourceLabel}"
         },
         "explorer": {
-          "label": "เพิ่มการแจ้งเตือน",
+          "label": "Create alert",
           "toast": "Query imported from the Metrics Explorer"
         },
         "dbm": {
@@ -14302,7 +14308,7 @@
           "toast": "Imported from Product Analytics: \"{sourceLabel}\""
         },
         "traces": {
-          "label": "เพิ่มการแจ้งเตือน",
+          "label": "สร้างการแจ้งเตือน",
           "toast": "นำเข้าคิวรีจากการค้นหาเทรซของคุณ",
           "noStream": "เลือกสตรีมก่อน",
           "errorCount": "จำนวนข้อผิดพลาด",
@@ -14506,7 +14512,7 @@
       "filterAll": "ทั้งหมด",
       "filterOnce": "One-time",
       "filterRecurring": "Recurring",
-      "search": "ค้นหาตามชื่อ เหตุผล หรือผู้สร้าง",
+      "search": "Search by name, dimension or creator",
       "searchAcross": "Search all folders",
       "thisFolder": "This folder",
       "allFolders": "All folders",
@@ -15045,7 +15051,7 @@
       "webhookOnly": "(เฉพาะ webhook)",
       "emailOnly": "(เฉพาะอีเมล)",
       "snsOnly": "(เฉพาะ SNS)",
-      "stale": "เทมเพลต {name} ไม่พร้อมใช้งานสำหรับชนิดนี้ โปรดเลือกเทมเพลตอื่นหรือล้างข้อมูลในช่องนี้",
+      "stale": "ไม่พบเทมเพลต {name} อีกแล้ว โปรดเลือกเทมเพลตอื่นหรือล้างข้อมูลในช่องนี้",
       "clear": "ล้าง",
       "willUse": "จะใช้: {template}",
       "willUsePerDestination": "จะใช้ตามปลายทางแต่ละรายการ:",
@@ -15259,7 +15265,7 @@
     "systemReadOnlyEdit": "Prebuilt template — editing is disabled. Clone it to make a modifiable copy.",
     "systemReadOnlyDelete": "Prebuilt template — deleting is disabled. Clone it to make a modifiable copy.",
     "prebuiltBadge": "Prebuilt",
-    "prebuiltBadgeHint": "จัดการโดยระบบ ไม่สามารถแก้ไขหรือลบได้ โคลนเพื่อสร้างสำเนาที่แก้ไขได้",
+    "prebuiltBadgeHint": "Managed by the system. You can edit, but deletion is disabled.",
     "customBadge": "Custom",
     "filterAll": "ทั้งหมด",
     "filterPrebuilt": "Prebuilt",
@@ -15475,14 +15481,14 @@
     "destinationsLoadError": "Error loading destinations"
   },
   "alert_destinations": {
-    "chooseTypeTitle": "เลือกชนิด",
-    "selectDestinationType": "ชนิดปลายทาง",
+    "chooseTypeTitle": "Choose Type",
+    "selectDestinationType": "Select Destination Type",
     "connectionStepTitle": "Connection",
-    "connectionDetailsTitle": "รายละเอียดการเชื่อมต่อ",
+    "connectionDetailsTitle": "Connection Details",
     "urlHelpText": "Base URL without trailing slash (e.g., https://your-domain.com)",
     "organizationHelpText": "OpenObserve organization identifier",
     "streamHelpText": "OpenObserve stream name",
-    "endpointPathLabel": "พาธเอนด์พอยต์",
+    "endpointPathLabel": "Endpoint Path",
     "endpointPathHelpText": "Path will be appended to base URL (must start with /)",
     "esBulkIndexHelpText": "Index name where data will be written in Elasticsearch",
     "metadataConfigurationTitle": "Metadata Configuration",
@@ -15501,7 +15507,7 @@
     "deleteDestinationsTitle": "Delete Destinations",
     "organizationLabel": "Organization",
     "defaultPlaceholder": "e.g., default",
-    "streamNameLabel": "ชื่อสตรีม",
+    "streamNameLabel": "Stream Name",
     "esBulkIndexNameLabel": "ESBulk Index Name",
     "esBulkIndexNamePlaceholder": "Enter index name (e.g., logs, events)",
     "sourceLabel": "Source",
@@ -15529,21 +15535,21 @@
     "template": "Template",
     "actions": "การดำเนินการ",
     "addHeader": "เพิ่มเฮดเดอร์",
-    "addTitle": "ปลายทางใหม่",
-    "updateTitle": "อัปเดตปลายทาง",
+    "addTitle": "New Destination",
+    "updateTitle": "Update Destination",
     "delete": "ลบ",
     "method": "Method",
     "url": "URL",
     "urlOrRecipients": "URL / Recipients",
     "api_header": "Header",
     "api_header_value": "ค่า",
-    "skip_tls_verify": "ข้ามการตรวจสอบ TLS",
+    "skip_tls_verify": "Skip TLS Verify",
     "payloadFormat": "รูปแบบเพย์โหลด",
     "payloadFormatAuto": "อัตโนมัติ",
     "payloadFormatLegacy": "JSON แบบเดิม",
     "payloadFormatRendered": "เทมเพลตที่เรนเดอร์แล้ว",
-    "payloadFormatHelp": "โหมดอัตโนมัติจะส่งเนื้อหา JSON แบบเดิมสำหรับข้อความ anomaly, การตรวจสอบสังเคราะห์ (Synthetics), เวรประจำการ (On-Call) และช่วงเวลาปิดปรับปรุง จนกว่าจะแนบเทมเพลต",
-    "output_format": "รูปแบบเอาต์พุต",
+    "payloadFormatHelp": "โหมดอัตโนมัติจะส่งเนื้อหา JSON แบบเดิมสำหรับข้อความแจ้งความผิดปกติ ข้อความการตรวจสอบสังเคราะห์ (Synthetics) และข้อความเวรประจำการ (On-Call) จนกว่าจะแนบเทมเพลต ระบบจัดเก็บเป็นคีย์เมทาดาทา payload_format",
+    "output_format": "Output Format",
     "readonly": "Read-only",
     "additional_settings": "Additional Settings",
     "custom_headers": "Custom Headers (Optional)",
@@ -15681,17 +15687,17 @@
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
-    "tabLabel": "ใช้บัคเก็ตของคุณเอง",
-    "title": "ใช้บัคเก็ตของคุณเอง",
+    "tabLabel": "BYOB",
+    "title": "Bring Your Own Bucket",
     "notEnabled": "{product} is not enabled for this organization",
     "heroHeadline": "Bring your own bucket to",
-    "heroSub": "เชื่อมต่อบัคเก็ตคลาวด์ของคุณเอง ข้อมูลยังคงอยู่ในโครงสร้างพื้นฐานของคุณ ควบคุมได้เต็มที่และไม่ถูกผูกมัดกับผู้ให้บริการ",
-    "configureStorage": "กำหนดค่าบัคเก็ต",
+    "heroSub": "Connect your own cloud bucket, data stays in your infrastructure — full control, zero lock-in.",
+    "configureStorage": "Configure storage",
     "supportedProviders": "Supported providers",
-    "perOrgIsolation": "แยกข้อมูลตามองค์กร",
+    "perOrgIsolation": "Per-org isolation",
     "appliesImmediately": "Applies to new data immediately",
-    "usesOrgCredentials": "ใช้ข้อมูลรับรองระดับองค์กร",
-    "updateStorage": "อัปเดตบัคเก็ต",
+    "usesOrgCredentials": "Uses org-scoped credentials",
+    "updateStorage": "Update Bucket",
     "active": "active",
     "bucketName": "bucket name",
     "region": "region",
@@ -15705,12 +15711,12 @@
     "featureOwnDataDesc": "Store ingested data directly in your own bucket and stay in complete control of who can access it.",
     "featureSecureTitle": "Secure & compliant",
     "featureSecureDesc": "Fine grained access keys, your sensitive data stays in your infrastructure.",
-    "newStorageConfiguration": "การกำหนดค่าบัคเก็ตใหม่",
+    "newStorageConfiguration": "New Bucket Configuration",
     "selectProviderDesc": "Select a cloud storage provider to store this organization's data.",
     "bucketNameRequired": "Bucket name is required",
     "accessKeyRequired": "Access key is required",
     "secretKeyRequired": "Secret key is required",
-    "storageAccountRequired": "ต้องระบุชื่อบัญชีสตอเรจ",
+    "storageAccountRequired": "Storage Account name is required",
     "regionRequired": "Region is required",
     "roleARNRequired": "Role ARN is required",
     "externalIdRequired": "External ID is required",
@@ -15719,7 +15725,7 @@
     "save": "บันทึก",
     "update": "อัปเดต",
     "awsStsCloudInfo": "การดำเนินการนี้ใช้ AWS STS เพื่อสวมบทบาทนี้ โปรดเพิ่มบัญชี AWS ของ {product} เป็นเอนทิตีที่เชื่อถือได้สำหรับบทบาทนี้ในคอนโซล AWS ติดต่อทีม {product} เพื่อขอรายละเอียดบัญชีหรือขอความช่วยเหลือในการตั้งค่า",
-    "awsStsSelfHostedInfo": "การดำเนินการนี้ใช้ AWS STS เพื่อสวมบทบาทนี้ โปรดตรวจสอบให้แน่ใจว่าสภาพแวดล้อมการติดตั้งมีข้อมูลรับรอง AWS ที่สามารถสวมบทบาทนี้ได้"
+    "awsStsSelfHostedInfo": "This uses AWS sts to assume role and perform operations. Make sure you have configured aws credentials in the installation env that have access to this role."
   },
   "metrics": {
     "add": "เพิ่ม",
@@ -16200,7 +16206,7 @@
     "cipherKeysDesc": "Encryption keys for sensitive fields",
     "aiToolsetsDesc": "เซิร์ฟเวอร์ MCP และเครื่องมือ CLI ที่ผู้ช่วย AI สามารถใช้ได้",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
-    "domainManagementDesc": "การแยกวิเคราะห์ claim ของ SSO และข้อจำกัดการลงชื่อเข้าใช้ตามโดเมน",
+    "domainManagementDesc": "Restrict sign-in to allowed SSO domains",
     "passwordPolicy": "Password Policy",
     "passwordPolicyDesc": "Authentication policies for native email/password accounts, applied instance-wide.",
     "pipelineDestinationsDesc": "External targets for pipeline output",
@@ -16217,19 +16223,19 @@
     "logoLabel": "Drag & Drop Logo Image",
     "deleteLogoTitle": "Delete Logo",
     "deleteLogoMessage": "Are you sure you want to delete the {name} logo image? Click OK to delete.",
-    "customLogoText": "ข้อความโลโก้ที่กำหนดเอง",
+    "customLogoText": "Custom Logo Text",
     "orgLabel": "Organization Parameters",
     "logDetails": "Log Details",
     "tracesHeading": "Traces",
-    "traceIdFieldName": "ชื่อฟิลด์ Trace ID",
-    "spanIdFieldName": "ชื่อฟิลด์ Span ID",
-    "toggleIngestionLogsLabel": "ล็อกการนำเข้าข้อมูล",
-    "usageStreamEnabledLabel": "สตรีมการใช้งาน",
-    "redInsightsEnabledLabel": "ข้อมูลเชิงลึก RED อัตโนมัติสำหรับเทรซ",
+    "traceIdFieldName": "Trace ID Field Name",
+    "spanIdFieldName": "Span ID Field Name",
+    "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
+    "usageStreamEnabledLabel": "Enable Usage Stream",
+    "redInsightsEnabledLabel": "Enable automatic RED insights for traces",
     "redInsightsEnabledHelp": "Creates rate, error and p95 latency anomaly detectors for the busiest services, in the \"RED insights\" alert folder. Only admins see that folder until it is shared.",
     "incidentsHeading": "Incidents",
-    "aiRcaThreadToolOutputLabel": "ข้อมูลเครื่องมือในเธรดของเหตุการณ์ขัดข้อง",
-    "aiRcaThreadToolOutputHelp": "แสดงอินพุตและเอาต์พุตดิบของเครื่องมือให้ทุกคนที่สามารถอ่านเหตุการณ์ขัดข้องได้.",
+    "aiRcaThreadToolOutputLabel": "Show tool data in incident investigation threads",
+    "aiRcaThreadToolOutputHelp": "Show raw tool input and output in incident investigation threads to everyone who can read the incident",
     "claimParserFunction": "SSO Claim Parser",
     "claimParserFunctionDescription": "Select a function ({product1} or {product2}) to parse and transform SSO/LDAP claims into organization and role assignments",
     "claimParserFunctionLabel": "Select Function",
@@ -16314,7 +16320,7 @@
     "darkMode": "Dark Mode",
     "pickCustomColor": "Pick Custom Color",
     "organizationSettingsUpdated": "Organization settings updated",
-    "dangerZone": "โซนอันตราย",
+    "dangerZone": "Danger Zone",
     "deleteOrganization": "Delete organization",
     "deleteOrganizationTitle": "Delete this organization",
     "deleteOrganizationDescription": "Everyone, including you, loses access to {name} immediately. During the recovery window only OpenObserve support can restore it; after that, all data is permanently erased.",
@@ -16355,17 +16361,17 @@
       "fieldAliasesSaveError": "Failed to save field aliases",
       "fieldAliasesUnsavedConfirm": "You have unsaved field mapping changes. Discard them and leave?",
       "discoveredServicesTitle": "Discovered Services",
-      "discoveredServicesDescription": "บริการถูกค้นพบจากข้อมูลเทเลเมทรีของคุณและจัดกลุ่มตามชื่อบริการ กฎการตรวจจับเป็นตัวกำหนดวิธีการระบุบริการเหล่านั้น.",
+      "discoveredServicesDescription": "Services are automatically discovered from your telemetry data and grouped by their Service Name for correlation. Services sharing the same Service Name are correlated together across logs, traces, and metrics.",
       "noServicesYet": "No services discovered yet",
       "noServicesDescription": "Services will appear here as telemetry data is ingested with service identification attributes (like k8s-deployment, service name, etc.)",
-      "searchServiceName": "ค้นหาบริการหรือสตรีม",
-      "telemetryCoverage": "ความครอบคลุมของข้อมูลเทเลเมทรี",
-      "serviceName": "ชื่อบริการ",
+      "searchServiceName": "Search service or stream name...",
+      "telemetryCoverage": "Telemetry Coverage",
+      "serviceName": "Service Name",
       "service": "Service",
       "logs": "Logs",
       "traces": "Traces",
       "metrics": "Metrics",
-      "lastSeen": "พบล่าสุด",
+      "lastSeen": "Last Seen",
       "retry": "Retry",
       "semanticFieldGroupsTitle": "Field Mappings",
       "serviceNameNotDetected": "No service name field detected in your data yet",
@@ -16378,7 +16384,7 @@
       "foundInTraces": "Found in Traces",
       "foundInMetrics": "Found in Metrics",
       "foundInProfiles": "Found in Profiles",
-      "distinguishByLabel": "จำแนกบริการตาม",
+      "distinguishByLabel": "Distinguish Services By",
       "distinguishByHelp": "Choose fields that define where your services run. For example, cluster + namespace + deployment together create a unique identity for each service. Up to 5 fields.",
       "serviceOptionalLabel": "Correlate without service attribute",
       "serviceOptionalHelp": "Match streams using below attributes only, ignore service attributes",
@@ -16392,15 +16398,15 @@
       "identityConfigSaved": "Service identity configuration saved successfully",
       "identityConfigSaveFailed": "Failed to save service identity configuration",
       "loadRecommendationsFailed": "Failed to load recommendations",
-      "resetServices": "รีเซ็ตบริการ",
+      "resetServices": "Reset Services",
       "resetServicesTooltip": "Delete all discovered services. They will be re-discovered automatically as new data arrives.",
-      "resetServicesConfirmTitle": "รีเซ็ตบริการที่ค้นพบทั้งหมดหรือไม่",
+      "resetServicesConfirmTitle": "Reset All Discovered Services?",
       "resetServicesConfirmBody": "การดำเนินการนี้จะลบบริการที่ค้นพบทั้งหมดในองค์กรนี้และไม่สามารถย้อนกลับได้ บริการจะถูกค้นพบอีกครั้งเมื่อมีข้อมูลเทเลเมทรีใหม่เข้ามา.",
       "resetServicesSuccess": "Successfully deleted {count} discovered service. | Successfully deleted {count} discovered services.",
       "resetServicesFailed": "Failed to reset services",
       "workload": "Workload",
-      "goToConfiguration": "ไปที่การกำหนดค่า",
-      "filterBy": "กรองตามฟิลด์",
+      "goToConfiguration": "Go to Configuration",
+      "filterBy": "Filter by :",
       "selectFieldPlaceholder": "Select field",
       "selectValuePlaceholder": "Select value",
       "selectFieldFirst": "Select a field first",
@@ -16409,13 +16415,18 @@
       "noDimensions": "no dimensions",
       "defaultSetWarningTitle": "Correlation may be unreliable.",
       "defaultSetWarningBody": "This instance has no disambiguation — it was discovered without any workload matching (no cluster, namespace, or environment context). Logs and traces may come from different deployments of the same service name.",
-      "instanceIdentity": "อัตลักษณ์ของอินสแตนซ์",
+      "instanceIdentity": "Instance Identity",
       "noDimensionsCatchAll": "No dimensions — catch-all instance",
       "streamSources": "Stream Sources",
       "fieldNameMapping": "Field Name Mapping",
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
-      "metricsWithCount": "Metrics ({count})"
+      "metricsWithCount": "Metrics ({count})",
+      "resetServicesConfirmMessage": "This will delete all discovered services for this organization. Services will be automatically re-discovered as new telemetry data is ingested. This action cannot be undone.",
+      "resetServicesConfirmWarning": "Services will be automatically re-discovered as new telemetry data is ingested. This action cannot be undone.",
+      "configureServicesHint": "to configure how services are identified and grouped.",
+      "serviceCountSingular": "{count} Service | {count} Services",
+      "instancesCount": "({count} instances)"
     },
     "addRegexPattern": {
       "namePlaceholder": "Eg. Internal Passwords",
@@ -16494,7 +16505,8 @@
       "logoLightLabel": "โลโก้ที่กำหนดเอง (โหมดสว่าง)",
       "logoLightHelp": "แสดงในโหมดสว่าง รองรับ PNG, JPG, GIF หรือ BMP ขนาดสูงสุด 150 × 30 px",
       "logoDarkLabel": "โลโก้ที่กำหนดเอง (โหมดมืด)",
-      "logoDarkHelp": "แสดงในโหมดมืด รองรับ PNG, JPG, GIF หรือ BMP ขนาดสูงสุด 150 × 30 px"
+      "logoDarkHelp": "แสดงในโหมดมืด รองรับ PNG, JPG, GIF หรือ BMP ขนาดสูงสุด 150 × 30 px",
+      "fileCounterLabel": "{constraint} {filesNumber} file {'|'} {totalSize}"
     },
     "modelPricingEditor": {
       "copySuffix": " (Copy)"
@@ -16503,10 +16515,10 @@
       "subtitle": "LLM model cost configuration"
     },
     "orgStorageSettings": {
-      "subtitle": "จัดเก็บข้อมูลขององค์กรนี้ในบัคเก็ตที่คุณเป็นเจ้าของ",
-      "awsCredentials": "ข้อมูลรับรอง AWS",
-      "azureCredentials": "ข้อมูลรับรอง Azure",
-      "awsRoleArn": "ARN ของบทบาท AWS"
+      "subtitle": "Per-organization storage configuration",
+      "awsCredentials": "AWS Credentials",
+      "azureCredentials": "Azure Credentials",
+      "awsRoleArn": "AWS Role ARN"
     },
     "dataRetentionDefaults": {
       "title": "ค่าเริ่มต้นการเก็บข้อมูล",
@@ -16523,10 +16535,13 @@
       "daysValue": "{days} วัน",
       "forever": "เก็บไว้ตลอดไป",
       "invalid": "โปรดใช้ 0 หรืออย่างน้อย 3 วัน",
-      "invalidType": "ใช้อย่างน้อย 3 วัน หรือลบประเภทนี้ออก"
+      "invalidType": "ใช้อย่างน้อย 3 วัน หรือลบประเภทนี้ออก",
+      "streamType": "ประเภทสตรีม",
+      "days": "วัน",
+      "removeType": "ลบประเภทสตรีมนี้"
     },
     "organizationSettings": {
-      "fieldNameHelp": "ใช้ได้เฉพาะตัวอักษร ตัวเลข และ + = , . {'@'} - _ เท่านั้น",
+      "fieldNameHelp": "Use alphanumeric and '+=,.{'@'}-_' characters only, without spaces.",
       "sectionTitle": "การจัดการข้อมูล",
       "sectionDescription": "วิธีการเชื่อมโยงล็อกกับเทรซ และฟีเจอร์อัตโนมัติใดบ้างที่เปิดใช้งานอยู่",
       "traceIdHelp": "ฟิลด์ล็อกที่เชื่อมโยงบรรทัดล็อกกับเทรซ ใช้ได้เฉพาะตัวอักษร ตัวเลข และ + = , . {'@'} - _ เท่านั้น",
@@ -16540,7 +16555,7 @@
       "subtitle": "Configure AI tool integrations"
     },
     "cipherKeysPage": {
-      "subtitle": "คีย์สำหรับเข้ารหัสและถอดรหัสค่าฟิลด์ที่ละเอียดอ่อน",
+      "subtitle": "Encryption keys for sensitive fields",
       "delete": "ลบ",
       "deleteCipherKeyTitle": "Delete Cipher Key",
       "deleteCipherKeyMessage": "Are you sure you want to delete the {name} cipher key?",
@@ -16645,7 +16660,7 @@
       "contractRevokedSuccess": "External contract revoked successfully.",
       "revokeContractError": "Failed to revoke external contract.",
       "enableByobTitle": "Enable BYOB",
-      "enablingStorage": "กำลังเปิดใช้การตั้งค่าพื้นที่จัดเก็บ...",
+      "enablingStorage": "Enabling storage settings...",
       "storageEnabledSuccess": "Storage settings enabled successfully.",
       "enableStorageError": "Failed to enable storage settings.",
       "processingTrialExtension": "Please wait while processing trial period extension request...",
@@ -16680,22 +16695,22 @@
       "failedToImport": "Failed to import \"{name}\": {error}"
     },
     "orgStorageEditor": {
-      "chooseTypeTitle": "เลือกผู้ให้บริการ",
-      "selectProviderDescCont": "เมื่อกำหนดค่าแล้ว ข้อมูลใหม่ทั้งหมดขององค์กรนี้จะถูกเขียนลงในบัคเก็ตของคุณเอง",
+      "chooseTypeTitle": "Choose Type",
+      "selectProviderDescCont": "once configured, all new data for this org will be written to your own storage infrastructure.",
       "irreversibleWarnPre": "This action is ",
       "irreversibleWarnEmphasis": "irreversible",
       "irreversibleWarnPost": ". Once set, you cannot switch to a different storage provider or delete this configuration. To use a different provider, you must create a new organization.",
       "credentialsOnlyInfo": "Once configured, only credential fields can be updated. All other fields will be locked.",
-      "selectStorageProviderLabel": "ผู้ให้บริการพื้นที่จัดเก็บ",
+      "selectStorageProviderLabel": "Select Storage Provider ",
       "connectionTitle": "Connection",
       "serverUrlLabel": "Server URL",
       "regionLabel": "Region",
-      "bucketNameLabel": "ชื่อบัคเก็ต",
-      "accessKeyLabel": "คีย์การเข้าถึง",
-      "secretKeyLabel": "คีย์ลับ",
-      "storageAccountNameLabel": "ชื่อบัญชีพื้นที่จัดเก็บ",
+      "bucketNameLabel": "Bucket Name",
+      "accessKeyLabel": "Access Key",
+      "secretKeyLabel": "Secret Key",
+      "storageAccountNameLabel": "Storage Account Name",
       "roleArnLabel": "Role ARN",
-      "externalIdLabel": "ID ภายนอก",
+      "externalIdLabel": "External Id",
       "pleaseWaitMessage": "Please wait...",
       "credentialsUpdatedSuccess": "Credentials updated successfully",
       "storageConfigCreatedSuccess": "Storage config created successfully",
@@ -16719,15 +16734,15 @@
       "serviceNameDetectedFrom": "Service name detected from",
       "fieldAlias": "field alias",
       "noFieldsConfiguredYet": "No fields configured yet",
-      "workloadDetection": "การตรวจจับเวิร์กโหลด",
+      "workloadDetection": "Workload Detection",
       "workloadDetectedUsingFields": "Workload detected using fields",
       "workloadTrackedHelp": "Only these field alias groups are used for workload detection and recommendations. Fields not in this list will not influence service discovery results. Optional — dimensions listed in identity sets are always tracked.",
-      "goToFieldAliases": "ไปที่การแมปฟิลด์",
+      "goToFieldAliases": "Go to Field Aliases",
       "toConfigureFieldMappings": "to configure individual field mappings.",
       "selectAliasGroup": "Select alias group",
       "discoveredPatternsHelp": "We discovered these deployment patterns in your streams. Use them to configure service correlation.",
       "envFieldsDetected": "{env} fields detected in your telemetry data.",
-      "goToServices": "ไปที่บริการ",
+      "goToServices": "Go to Services",
       "fieldsConfigured": "{n} field configured | {n} fields configured",
       "recommended": "Recommended:",
       "recommendedUse": "Use",
@@ -16757,7 +16772,8 @@
       "reasonIdealForDisambiguation": "{details} — ideal for service disambiguation",
       "trackedK8sWorkload": "เวิร์กโหลด K8s",
       "trackedK8sPod": "Pod K8s",
-      "serviceCountFailed": "ไม่สามารถโหลดจำนวนบริการได้"
+      "serviceCountFailed": "ไม่สามารถโหลดจำนวนบริการได้",
+      "toSeeDiscoveredServices": "to see the actual discovered services."
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "e.g. {example}",
@@ -16772,7 +16788,7 @@
     },
     "regexPatternList": {
       "subtitle": "Reusable regex patterns for redaction",
-      "exportTitle": "ส่งออกรูปแบบ regex",
+      "exportTitle": "Export Regex Pattern",
       "delete": "ลบ",
       "bulkDeleteTitle": "Delete Regex Patterns",
       "bulkDeleteMessage": "Are you sure you want to delete {n} regex pattern? | Are you sure you want to delete {n} regex patterns?",
@@ -16946,6 +16962,51 @@
       "requestApproved": "เชื่อมโยง {domain} แล้ว",
       "requestRejected": "ปฏิเสธคำขอสำหรับ {domain} แล้ว",
       "decisionFailed": "ไม่สามารถอัปเดตคำขอได้"
+    },
+    "groupDataAI": "Data & AI",
+    "llmProvidersDesc": "LLM providers for online evaluations",
+    "customLogoTitle": "Custom Logo",
+    "customLogoTextDescription": "Custom logo text is used to change the default branding text displayed in the application.",
+    "dragDropUpload": "Drag & drop or click to upload",
+    "customLogoLightDescription": "Custom logo for light mode theme. This will be displayed when users are in light mode.",
+    "customLogoDarkDescription": "Custom logo for dark mode theme. This will be displayed when users are in dark mode.",
+    "textMaxCharacters": "Text should be less than 100 characters.",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI Agent Mapping",
+      "title": "GenAI Agent Mapping",
+      "description": "Configure fallback telemetry attributes used to normalize agent identity for LLM traces and evaluations.",
+      "agentNameFields": "Agent name fallback fields",
+      "agentNameHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.name.",
+      "agentNameInfo": "Checked only when the standard gen_ai.agent.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
+      "agentIdFields": "Agent ID fallback fields",
+      "agentIdHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.id.",
+      "agentIdInfo": "Checked only when the standard gen_ai.agent.id attribute is missing or empty. Add one incoming telemetry attribute per line.",
+      "envFields": "Environment fallback fields",
+      "envHelp": "Incoming attributes to use as the agent's environment.",
+      "envInfo": "Checked only when the standard deployment.environment.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
+      "versionFields": "Version fallback fields",
+      "versionHelp": "Incoming attributes to use as the agent's version.",
+      "versionInfo": "Checked only when the standard gen_ai.agent.version attribute is missing or empty. Add one incoming telemetry attribute per line.",
+      "alwaysAppliedStandard": "Standard (checked first):",
+      "applyDefaults": "Apply defaults",
+      "resetToEmpty": "Reset to empty",
+      "clearRegistry": "Clear registry",
+      "clearRegistryTitle": "Clear agent registry?",
+      "clearRegistryDescription": "This deletes all discovered GenAI agent registry rows for this organization. New matching traces will repopulate the registry during ingestion.",
+      "clearRegistryConfirm": "Clear registry",
+      "saved": "GenAI agent mapping saved successfully",
+      "clearRegistrySuccess": "GenAI agent registry cleared. Deleted {deletedCount} stored agents and {bufferCount} queued observations.",
+      "loadFailed": "Failed to load GenAI agent mapping",
+      "saveFailed": "Failed to save GenAI agent mapping",
+      "clearRegistryFailed": "Failed to clear GenAI agent registry",
+      "defaultsLoadFailed": "Failed to load GenAI agent mapping defaults",
+      "defaultsFetchFailed": "Failed to fetch defaults ({status})"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "LLM providers for online evaluations"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "Map GenAI spans to agent identifiers"
     }
   },
   "reports": {
@@ -17176,38 +17237,39 @@
     },
     "selectOption": "Select option",
     "runningQueries": "Running Queries",
-    "search": "ค้นหาคิวรี",
+    "search": "ค้นหา",
     "queryList": "Query Details",
-    "duration": "ระยะเวลาดำเนินการ",
+    "duration": "Exec. Duration",
     "files": "Files",
     "status": "สถานะ",
     "cancelQuery": "Cancel Query",
-    "queryRange": "ช่วงคิวรี",
-    "userSummary": "สรุปผู้ใช้",
-    "allQueries": "คิวรีทั้งหมด",
+    "queryRange": "Query Range",
+    "userSummary": "User Summary",
+    "allQueries": "All Queries",
     "allFields": "ฟิลด์ทั้งหมด",
-    "queryType": "ประเภทคิวรี",
-    "numOfQueries": "จำนวนคิวรี",
-    "totalDuration": "ระยะเวลาดำเนินการรวม",
-    "totalTimeRange": "ช่วงคิวรีรวม",
-    "searchType": "ประเภทการค้นหา",
-    "querySource": "แหล่งที่มาของคิวรี",
+    "queryType": "Query Type",
+    "numOfQueries": "Number of Queries",
+    "totalDuration": "Total Exec. Duration",
+    "totalTimeRange": "Total Query Range",
+    "searchType": "Search Type",
+    "querySource": "Query Source",
     "traceId": "Trace ID",
     "userId": "User ID",
     "orgId": "Org ID",
-    "streamType": "ประเภทสตรีม",
-    "startTime": "เวลาเริ่มต้น",
-    "endTime": "เวลาสิ้นสุด",
-    "scanRecords": "สแกนระเบียน",
-    "originalSize": "ขนาดต้นฉบับ",
-    "compressedSize": "ขนาดที่บีบอัด",
+    "streamType": "Stream Type",
+    "startTime": "Start Time",
+    "endTime": "End Time",
+    "scanRecords": "Scan Records",
+    "originalSize": "Original Size",
+    "compressedSize": "Compressed Size",
     "deleteRunningQueryTitle": "Delete Running Query",
     "deleteRunningQueryMessage": "Are you sure you want to delete this running query?",
     "fetchRunningQueriesFailed": "Failed to fetch running queries",
     "cancelQueryFailed": "Failed to cancel query",
     "searchTypeDashboards": "Dashboards",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "Others"
+    "searchTypeOthers": "Others",
+    "lastDataRefreshTime": "Last Data Refresh Time:"
   },
   "traces": {
     "nlNeedsSql": "คำถามนี้ต้องใช้ SQL โปรดเปิดในล็อก",
@@ -17657,7 +17719,8 @@
         "count": "{count} ข้อค้นพบ | {count} ข้อค้นพบ",
         "countHint": "ความผิดปกติของบริการ {count} รายการในช่วงเวลานี้ | ความผิดปกติของบริการ {count} รายการในช่วงเวลานี้",
         "viewTraces": "Traces",
-        "viewCharts": "Charts"
+        "viewCharts": "Charts",
+        "scoreAbove": "+{percent}% score above threshold"
       }
     },
     "spansTab": "Spans",
@@ -17760,14 +17823,15 @@
       "failedToLoad": "Failed to load Insights",
       "retry": "Retry",
       "noAgentsInRange": "No Agents In This Range",
-      "noAgentsDescription": "ไม่พบเอเจนต์ GenAI ในช่วงเวลาที่เลือก ลองขยายช่วงเวลาให้กว้างขึ้น สลับไปที่แท็บสตรีม หรือกำหนดค่าการแมปเอเจนต์",
+      "noAgentsDescription": "No GenAI agents were detected for the selected time window. Try a wider range, switch to the Stream tab, or configure agent mapping in settings.",
       "viewByStream": "View by Stream",
       "totalCost": "Total Cost",
       "totalTokens": "Total Tokens",
       "totalTraces": "Total Traces",
       "p95Latency": "P95 Latency",
       "errorRate": "Error Rate",
-      "timeAxis": "เวลา"
+      "timeAxis": "เวลา",
+      "errorsSeries": "errors"
     },
     "searchBar": {
       "streamNotFound": "Stream not found"
@@ -17821,7 +17885,10 @@
       "metricsLoadFailed": "ไม่สามารถโหลดเมทริกซ์ที่เชื่อมโยงของบริการนี้ได้ {reason}",
       "noResourceRecorded": "สแปนของบริการนี้ในช่วงเวลานี้ไม่ได้บันทึก {resource}",
       "resourceLoadFailed": "ไม่สามารถโหลด {resource} สำหรับบริการนี้ได้ {reason}",
-      "noVersionTraffic": "สแปนของบริการนี้ในสตรีมนี้ไม่ได้บันทึกเวอร์ชัน จึงไม่มีทราฟฟิกให้แยกตามเวอร์ชัน"
+      "noVersionTraffic": "สแปนของบริการนี้ในสตรีมนี้ไม่ได้บันทึกเวอร์ชัน จึงไม่มีทราฟฟิกให้แยกตามเวอร์ชัน",
+      "noResourceDataFound": "No {resource} data found",
+      "failedToLoadMetrics": "Failed to load metrics.",
+      "requests": "Requests"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP Status Code",
@@ -18061,12 +18128,21 @@
       "loadingPage": "Loading page {page}",
       "pageFailed": "Couldn't load page {page}",
       "pageEmpty": "Page {page} has no results"
+    },
+    "lLMErrorTable": {
+      "noData": "ไม่มีข้อมูล",
+      "noErrorsInRange": "No errors in this time range",
+      "loadFailed": "ไม่สามารถโหลดข้อผิดพลาดล่าสุด",
+      "time": "เวลา",
+      "service": "Service",
+      "operation": "Operation",
+      "traceId": "Trace ID"
     }
   },
   "aiToolset": {
     "header": "AI Toolsets",
-    "add": "ชุดเครื่องมือใหม่",
-    "search": "ค้นหาชุดเครื่องมือ AI",
+    "add": "New AI Toolset",
+    "search": "Search AI Toolsets",
     "update": "Update AI Toolset",
     "name": "ชื่อ",
     "nameRequired": "Name is required",
@@ -18088,15 +18164,15 @@
     "createdSuccessfully": "AI Toolset created successfully",
     "updatedSuccessfully": "AI Toolset updated successfully",
     "deletedSuccessfully": "AI Toolset deleted successfully",
-    "mcpConfig": "การกำหนดค่าเซิร์ฟเวอร์ MCP",
+    "mcpConfig": "MCP Server Configuration",
     "mcpUrl": "Endpoint URL",
     "mcpUrlRequired": "Endpoint URL is required",
     "timeoutSeconds": "Timeout (seconds)",
-    "headers": "ส่วนหัว HTTP",
+    "headers": "HTTP Headers",
     "headerKey": "Header name",
     "headerValue": "Header value",
     "addHeader": "Add header",
-    "cliConfig": "การกำหนดค่าเครื่องมือ CLI",
+    "cliConfig": "CLI Tool Configuration",
     "presets": "Quick fill",
     "cliCommand": "Command",
     "cliCommandRequired": "Command is required",
@@ -18104,16 +18180,16 @@
     "subcommandsHint": "Comma-separated list, e.g. get, describe, logs — leave empty to allow all",
     "maxOutputBytes": "Max output (bytes)",
     "requiresConfirmation": "Require confirmation before execution",
-    "envVars": "ตัวแปรสภาพแวดล้อม",
+    "envVars": "Environment Variables",
     "envKey": "Variable name",
     "envValue": "ค่า",
     "addEnvVar": "Add variable",
-    "credentialFiles": "ไฟล์ข้อมูลรับรอง",
+    "credentialFiles": "Credential Files",
     "credEnvVar": "Env var name",
     "credEnvVarHint": "e.g. {example}",
     "credContentHint": "Raw file content (e.g. kubeconfig YAML)",
     "addCredFile": "Add credential file",
-    "skillConfig": "การกำหนดค่าทักษะ",
+    "skillConfig": "Skill Configuration",
     "skillContent": "Skill definition (Markdown)",
     "skillContentRequired": "Skill content is required"
   },
@@ -18122,12 +18198,12 @@
     "continue": "Continue",
     "header": "Cipher Keys",
     "add": "New cipher key",
-    "search": "ค้นหาคีย์เข้ารหัส",
+    "search": "Search Cipher Key",
     "update": "Update Cipher Key",
     "name": "ชื่อ",
     "type": "ประเภท",
-    "step1WithType": "ที่จัดเก็บคีย์ ({type})",
-    "step2": "กลไกการเข้ารหัส",
+    "step1WithType": "Key Store Details (Type: {type})",
+    "step2": "Encryption Mechanism",
     "sectionKey": "คีย์",
     "sectionSetup": "ที่จัดเก็บคีย์และการเข้ารหัส",
     "secret": "Secret",
@@ -18168,8 +18244,8 @@
     "staticSecretNameRequired": "Static Secret Name is required",
     "dfcNameRequired": "DFC Name is required",
     "dfcEncryptedDataRequired": "DFC Encrypted Data is required",
-    "storeType": "ประเภทที่จัดเก็บ",
-    "mechanismType": "ประเภทกลไก",
+    "storeType": "Store Type",
+    "mechanismType": "Mechanism Type",
     "actions": "การดำเนินการ"
   },
   "quota": {
@@ -18192,47 +18268,47 @@
     "tcpCloseWaitPrefix": ", C:",
     "tcpTimeWaitPrefix": ", T:",
     "header": "All Nodes",
-    "search": "ค้นหาโหนด",
-    "name": "ชื่อโหนด",
+    "search": "Search Node",
+    "name": "Node Name",
     "version": "Version",
     "cpu": "CPU %",
     "memory": "Memory %",
-    "tcp": "การเชื่อมต่อ TCP",
+    "tcp": "TCP Connections",
     "filter_header": "Filters",
-    "clear_all": "ล้างทั้งหมด",
+    "clear_all": "Clear All",
     "region": "Region",
     "cluster": "Cluster",
-    "nodetype": "ประเภทโหนด",
+    "nodetype": "Node Type",
     "summaryOffline": "Offline",
     "summaryStarting": "Starting",
     "summaryOnline": "Online",
     "summaryTotal": "Nodes",
     "status": "สถานะ",
-    "cpuusage": "การใช้งาน CPU (%)",
-    "memoryusage": "การใช้งานหน่วยความจำ (%)",
+    "cpuusage": "CPU Usage(%)",
+    "memoryusage": "Memory Usage(%)",
     "establishedLabel": "Established",
-    "closewaitLabel": "Close wait",
-    "waittimeLabel": "Time wait",
-    "applyFilter": "นำตัวกรองไปใช้",
-    "searchCluster": "ค้นหาคลัสเตอร์",
-    "searchRegion": "ค้นหาภูมิภาค"
+    "closewaitLabel": "Close Wait",
+    "waittimeLabel": "Time Wait",
+    "applyFilter": "Apply Filters",
+    "searchCluster": "Search Cluster",
+    "searchRegion": "Search Region"
   },
   "regex_patterns": {
     "title": "Sensitive Data Redaction",
     "create_pattern": "New pattern",
-    "search": "ค้นหารูปแบบ",
+    "search": "Search Pattern",
     "name": "ชื่อ",
     "pattern": "Pattern",
-    "created_at": "สร้างเมื่อ",
-    "updated_at": "อัปเดตเมื่อ",
+    "created_at": "Created At",
+    "updated_at": "Updated At",
     "actions": "การดำเนินการ",
     "edit": "แก้ไข",
     "delete": "ลบ",
     "create_regex_pattern": "New pattern",
-    "create_close": "สร้างและปิด",
+    "create_close": "Create and Close",
     "cancel": "ยกเลิก",
     "edit_regex_pattern": "Edit Pattern",
-    "update_close": "อัปเดตและปิด",
+    "update_close": "Update and Close",
     "description": "คำอธิบาย",
     "unsupported_lookaround_note": "Lookahead, lookbehind, backreferences and recursion are not supported. Rewrite them as plain patterns.",
     "unsupported_lookaround_example": "Eg.",
@@ -18375,8 +18451,8 @@
     "semanticFieldGroupsCaption": "Map your telemetry field names to common groups so OpenObserve can correlate them across streams.",
     "exportToJson": "Export to JSON",
     "importFromJson": "Import from JSON",
-    "addCustomGroup": "เพิ่มกลุ่มกำหนดเอง",
-    "removeSemanticGroup": "ลบกลุ่มเชิงความหมาย",
+    "addCustomGroup": "Add Custom Group",
+    "removeSemanticGroup": "Remove Semantic Group",
     "serviceGroupProtected": "Service group cannot be removed. You can only modify the mapped fields.",
     "isWorkloadType": "Service identifier",
     "isWorkloadTypeTooltip": "When enabled, this group is used to uniquely identify a service (e.g. cluster, namespace, deployment). Disable for groups that describe operations through a service, such as HTTP method or database name.",
@@ -19524,7 +19600,8 @@
         "promptTemperatureOverrideInherited": "Using Prompt parameters.",
         "taskTimeoutLabel": "Timeout (seconds)",
         "taskConcurrencyLabel": "Max Concurrency",
-        "taskOverrideHelp": "Overrides the task's published value for this run."
+        "taskOverrideHelp": "Overrides the task's published value for this run.",
+        "providerHelpSettingsLink": "การตั้งค่า"
       },
       "columns": {
         "name": "ชื่อ",
@@ -19862,7 +19939,7 @@
       "agentIdHint": "รหัสเอเจนต์: {ids}",
       "noAgentIdentity": "ไม่พบข้อมูลระบุตัวตนของเอเจนต์",
       "noAgentIdentityDescription": "สแปน LLM เหล่านี้ไม่มีชื่อเอเจนต์ จึงแสดงผลตามสตรีม แมปแอตทริบิวต์ที่ระบุชื่อเอเจนต์ของคุณเพื่อดูข้อมูลแยกตามเอเจนต์",
-      "noAgentIdentityAction": "เปิดการแมปเอเจนต์"
+      "noAgentIdentityAction": "เปิดการแมปเอเจนต์ GenAI"
     },
     "agentGraph": {
       "stream": "Stream",
@@ -19878,17 +19955,17 @@
       },
       "tokenTrend": {
         "title": "Token trend",
-        "subtitle": "โทเค็นอินพุตและเอาต์พุต",
+        "subtitle": "tokens by model",
         "input": "อินพุต",
         "output": "เอาต์พุต"
       },
       "latencyByModel": {
-        "title": "แนวโน้มความหน่วง",
-        "subtitle": "p95 ตามโมเดล"
+        "title": "Latency by model",
+        "subtitle": "p50 / p90 / p95 / p99"
       },
       "tracesOverTime": {
-        "title": "เทรซตามช่วงเวลา",
-        "subtitle": "เทรซที่ OK และที่เกิดข้อผิดพลาด",
+        "title": "Requests over time",
+        "subtitle": "request count by service",
         "ok": "OK",
         "errored": "เกิดข้อผิดพลาด"
       },
@@ -19917,6 +19994,26 @@
           "traces": "เทรซ",
           "last": "ล้มเหลวล่าสุด"
         }
+      },
+      "spanTrend": {
+        "title": "Span trend",
+        "subtitle": "span count by kind"
+      },
+      "errorsOverTime": {
+        "title": "Errors over time",
+        "subtitle": "error count"
+      },
+      "spansByModel": {
+        "title": "Spans by model",
+        "subtitle": "call count per model"
+      },
+      "tokensByModel": {
+        "title": "Tokens by model",
+        "subtitle": "total tokens per model"
+      },
+      "recentErrors": {
+        "title": "Recent errors",
+        "subtitle": "last 10 failed spans"
       }
     },
     "behavior": {
@@ -19949,12 +20046,12 @@
       "colErrors": "Errors",
       "detail": {
         "title": "Signal details",
-        "tracesTitle": "เทรซที่มีข้อผิดพลาดจากเอเจนต์นี้",
+        "tracesTitle": "Traces",
         "tracesHint": "Click a trace to open it",
         "worstLoopTraces": "Worst traces (most repeats first)",
         "topCostTraces": "Most expensive traces",
         "noTraces": "No traces found for this signal",
-        "errorsTitle": "ข้อผิดพลาดทั้งหมดของเอเจนต์นี้",
+        "errorsTitle": "What the errors say",
         "noErrors": "No error messages captured — open a trace to inspect",
         "colTraceId": "Trace",
         "colSpans": "Spans",
@@ -19968,7 +20065,7 @@
         "failHeadline": "{agent} hit {count} “{cls}” errors.",
         "costHeadline": "{agent}: ${cost} spend · {tokens} tokens · {errors} errors.",
         "loopExplain": "A high repeat rate usually means the agent isn't caching results or is retrying. Open the worst traces below to see the repeated calls.",
-        "failExplain": "นี่คือข้อความข้อผิดพลาดทั้งหมดของเอเจนต์นี้ จากทุกประเภทความล้มเหลว ไม่ใช่แค่ประเภทนี้ อ่านข้อความเหล่านี้เพื่อหาแนวทางแก้ไข หรือเปิดเทรซเพื่อดูว่าเกิดที่ใด",
+        "failExplain": "These are the actual error messages behind this failure class — read them to find the fix, or open a trace to see where it happened.",
         "costExplain": "These traces drove this agent's spend. Open the most expensive ones to see what ran.",
         "explain": "อธิบายด้วย O2 AI",
         "explainHelp": "O2 AI ตรวจสอบสัญญาณนี้จากข้อความข้อผิดพลาดและเทรซที่แย่ที่สุด โดยเจาะลึกเกินกว่าสแปน AI ไปยังล็อก เมทริกซ์ Kubernetes และการดีพลอย พร้อมอ้างอิงหลักฐาน"
@@ -20955,7 +21052,7 @@
       },
       "noProviders": {
         "title": "Add a Provider First",
-        "description": "ตัวประเมินคะแนนต้องมีผู้ให้บริการ LLM (OpenAI, Anthropic ฯลฯ) เพื่อทำงาน เพิ่มผู้ให้บริการหนึ่งรายการภายใต้ผู้ให้บริการ LLM ก่อนสร้างตัวประเมินคะแนน"
+        "description": "Scorers need an LLM Provider (OpenAI, Anthropic, etc.) to run. Add a provider in Settings before creating scorers."
       },
       "import": {
         "title": "Import Scorer",
@@ -21115,7 +21212,8 @@
         "resultReasoning": "Reasoning",
         "resultRaw": "Raw response",
         "valuePlaceholder": "Value for {variable}"
-      }
+      },
+      "providerHelpSettingsLink": "การตั้งค่า"
     },
     "job": {
       "detail": {
@@ -21299,7 +21397,7 @@
         }
       },
       "inputMapping": {
-        "title": "ตัวแปรของตัวประเมินคะแนน",
+        "title": "Prompt variables",
         "hint": {
           "span": "Map each variable to a span attribute.",
           "trace": "Map each variable to a system-provided value or span attribute.",
@@ -21458,7 +21556,7 @@
     "tabLabel": "LLM Providers",
     "title": "LLM Providers",
     "subtitle": "ผู้ให้บริการ LLM สำหรับการประเมินแบบออนไลน์",
-    "newButton": "เพิ่มผู้ให้บริการ",
+    "newButton": "New Provider",
     "searchPlaceholder": "Search providers",
     "defaultBadge": "ค่าเริ่มต้น",
     "loadError": "Failed to load LLM providers",
@@ -21466,10 +21564,10 @@
       "name": "ชื่อ",
       "type": "ประเภท",
       "endpoint": "Endpoint",
-      "defaultModel": "โมเดลเริ่มต้น"
+      "defaultModel": "Default Model"
     },
     "empty": {
-      "title": "ยังไม่มีผู้ให้บริการ LLM",
+      "title": "No LLM Providers Yet",
       "description": "LLM Providers store the connection details (base URL + credentials) for the language models your LLM Judge scorers call. Add one to start running judge-based evaluations."
     }
   },
@@ -22112,7 +22210,7 @@
       "explanation": "Org-level o2syn_ tokens your private agents use to authenticate when they pull jobs. Public (Lambda) locations use the default token automatically; create a named token and embed it in a region's agents to scope that region's blast radius.",
       "summary": "Tokens your private agents use to pull jobs.",
       "rotateDefaultBtn": "Rotate default",
-      "createTokenBtn": "โทเค็นใหม่",
+      "createTokenBtn": "Create token",
       "searchPlaceholder": "Search tokens",
       "default": "ค่าเริ่มต้น",
       "tokenNameLabel": "ชื่อ",
@@ -22713,17 +22811,17 @@
       "unknown": "Unknown"
     },
     "locations": {
-      "addLocation": "ตำแหน่งใหม่",
+      "addLocation": "Add Location",
       "bulkDeleteConfirmMessage": "Are you sure you want to delete {count} locations?",
       "bulkDeleteConfirmTitle": "Delete Locations",
       "bulkDeleteFailed": "Failed to delete locations",
       "bulkDeletePartial": "{success} of {total} locations deleted",
       "bulkDeleteSuccess": "{count} locations deleted",
       "cancel": "ยกเลิก",
-      "createClose": "สร้างและปิด",
+      "createClose": "Create & Close",
       "createFailed": "Failed to create location",
       "createSuccess": "Location created successfully",
-      "createTitle": "ตำแหน่งใหม่",
+      "createTitle": "Add Location",
       "customProviderLabel": "Custom Provider",
       "customProviderPlaceholder": "Enter provider name",
       "customProviderRequired": "Custom provider name is required",
@@ -22731,7 +22829,7 @@
       "deleteConfirmTitle": "Delete Location",
       "deleteFailed": "Failed to delete location",
       "deleteSuccess": "Location deleted successfully",
-      "description": "ตำแหน่งโพรบสาธารณะสำหรับการตรวจสอบสังเคราะห์",
+      "description": "Manage public probe locations for synthetic monitoring",
       "disable": "Disable",
       "disabledSuccess": "Location disabled",
       "disabling": "Disabling…",
@@ -22778,7 +22876,7 @@
       "region": "Region",
       "regionPlaceholder": "e.g. us-east-1",
       "regionRequired": "Region is required",
-      "searchPlaceholder": "ค้นหาตำแหน่ง",
+      "searchPlaceholder": "Search locations…",
       "title": "Locations",
       "publicTitle": "Public locations",
       "privateTitle": "Private locations",
@@ -24765,9 +24863,9 @@
       "pipelinesExportedSuccessfully": "{count} pipeline exported successfully | {count} pipelines exported successfully",
       "functionsNotBundled": "{count} function could not be included in the export file: {names} | {count} functions could not be included in the export file: {names}",
       "pipelineDeletedSuccessfully": "Pipeline deleted successfully",
-      "deletingPipeline": "กำลังลบไปป์ไลน์...",
+      "deletingPipeline": "Deleting pipeline...",
       "pipelineCreatedSuccessfully": "Pipeline created successfully",
-      "savingPipeline": "กำลังบันทึกไปป์ไลน์...",
+      "savingPipeline": "Saving pipeline...",
       "stateResumed": "{name} state resumed successfully",
       "statePaused": "{name} state paused successfully"
     },
@@ -25384,19 +25482,19 @@
     "unitAttempts": "ครั้ง",
     "unitSeconds": "วินาที",
     "minLength": "Minimum length",
-    "minLengthDesc": "รหัสผ่านที่สั้นที่สุดที่ยอมรับได้",
+    "minLengthDesc": "Shortest password accepted",
     "maxLength": "Maximum length",
-    "maxLengthDesc": "รหัสผ่านที่ยาวที่สุดที่ยอมรับได้ สูงสุด 128",
+    "maxLengthDesc": "Longest password accepted, up to 128",
     "requireUppercase": "Require uppercase letter",
-    "requireUppercaseDesc": "อย่างน้อยหนึ่งตัวอักษร A–Z",
+    "requireUppercaseDesc": "At least one A–Z",
     "requireLowercase": "Require lowercase letter",
-    "requireLowercaseDesc": "อย่างน้อยหนึ่งตัวอักษร a–z",
+    "requireLowercaseDesc": "At least one a–z",
     "requireDigit": "Require digit",
-    "requireDigitDesc": "อย่างน้อยหนึ่งตัวเลข 0–9",
+    "requireDigitDesc": "At least one 0–9",
     "requireSpecial": "Require special character",
-    "requireSpecialDesc": "อย่างน้อยหนึ่งอักขระจากชุดที่อนุญาต",
+    "requireSpecialDesc": "At least one from the allowed set",
     "specialCharSet": "Allowed special characters",
-    "specialCharSetDesc": "หากเว้นว่างจะยอมรับอักขระใดก็ได้ที่ไม่ใช่ตัวอักษรหรือตัวเลข",
+    "specialCharSetDesc": "Leave empty to accept any non-alphanumeric character",
     "maxLengthTooSmall": "Maximum length must be between the minimum length and 128.",
     "maxLengthBelowMin": "ต้องมีค่า {min} ขึ้นไป เพื่อให้สอดคล้องกับความยาวขั้นต่ำ",
     "confirmTitle": "Save password policy?",
@@ -25410,9 +25508,9 @@
     "rotation": "Rotation",
     "rotationDays": "Rotation period",
     "rotationDesc": "เวลาที่รหัสผ่านหมดอายุ และระยะเวลาแจ้งเตือนล่วงหน้าที่ผู้ใช้จะได้รับ",
-    "rotationDaysDesc": "จำนวนวันก่อนรหัสผ่านหมดอายุ 0 หมายถึงรหัสผ่านไม่มีวันหมดอายุ",
+    "rotationDaysDesc": "Days before a password expires. 0 = never expires",
     "rotationWarningDays": "Warn before expiry",
-    "rotationWarningDaysDesc": "จำนวนวันแจ้งเตือนเมื่อเข้าสู่ระบบ 0 คือไม่แจ้งเตือน",
+    "rotationWarningDaysDesc": "Days of notice at sign-in. 0 = no warning",
     "rotationWarningDaysOffDesc": "จำนวนวันแจ้งเตือนเมื่อเข้าสู่ระบบ ใช้เมื่อรหัสผ่านหมดอายุแล้ว",
     "warningDaysTooLong": "The warning window cannot be longer than the rotation period.",
     "rotationPreview": "A password set today expires {expires}. The sign-in warning starts {warns}.",
@@ -25420,33 +25518,33 @@
     "reuse": "Reuse prevention",
     "historyCount": "Passwords remembered",
     "reuseDesc": "ป้องกันไม่ให้ผู้ใช้กลับไปใช้รหัสผ่านเก่า",
-    "historyCountDesc": "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านก่อนหน้าจำนวนนี้ 0 คือปิดการตรวจสอบ",
+    "historyCountDesc": "A new password may not match this many previous ones. 0 = no check",
     "historyMaxRetained": "History retained",
-    "historyMaxRetainedDesc": "จำนวนรหัสผ่านเก่าที่เก็บไว้ต่อผู้ใช้หนึ่งคน",
+    "historyMaxRetainedDesc": "How many past passwords are kept per user",
     "historyRetainedTooSmall": "History retained must be at least the number of passwords remembered.",
     "reuseExplainer": "The current password counts as one of the remembered set — reusing it is refused by this rule, not by a separate check.",
     "lockout": "Account lockout",
     "lockoutThreshold": "Failed attempts before lockout",
     "lockoutDesc": "สิ่งที่เกิดขึ้นหลังจากเข้าสู่ระบบล้มเหลวซ้ำหลายครั้ง",
-    "lockoutThresholdDesc": "0 คือปิดการล็อกบัญชี",
+    "lockoutThresholdDesc": "0 = lockout disabled",
     "lockoutBucketSize": "Attempts before each further lockout",
-    "lockoutBucketSizeDesc": "จำนวนครั้งที่ล้มเหลวเพิ่มขึ้นซึ่งจะทำให้เกิดการล็อกครั้งถัดไป 0 คือใช้จำนวนเดียวกับครั้งแรก",
+    "lockoutBucketSizeDesc": "0 = reuse the value above",
     "lockoutStartSecs": "First lockout duration",
-    "lockoutStartSecsDesc": "ระยะเวลาที่การล็อกครั้งแรกคงอยู่",
+    "lockoutStartSecsDesc": "Seconds",
     "lockoutMaxSecs": "Maximum lockout duration",
-    "lockoutMaxSecsDesc": "เพดานสูงสุดที่การยกระดับการแจ้งเตือนจะหยุดอยู่",
+    "lockoutMaxSecsDesc": "Seconds — the ceiling escalation clamps to",
     "lockoutStartTooLong": "The first lockout cannot be longer than the maximum lockout.",
     "lockoutBackoff": "Escalation",
-    "lockoutBackoffDesc": "การล็อกแต่ละครั้งเพิ่มขึ้นจากครั้งก่อนอย่างไร",
+    "lockoutBackoffDesc": "How each lockout grows from the one before",
     "backoffExponential": "Exponential",
     "backoffLinear": "Linear",
     "lockoutPreview": "{threshold} failures → {first} · every {bucket} more → {rest} · capped at {max}. A successful sign-in resets everything.",
-    "sessionEnforcement": "เซสชันและการบังคับใช้",
+    "sessionEnforcement": "Session & enforcement",
     "sessionEnforcementDesc": "ระยะเวลาที่การเข้าสู่ระบบคงอยู่ และผู้ใช้ root ต้องปฏิบัติตามกฎเหล่านี้หรือไม่",
     "cookieMaxAge": "Session lifetime",
-    "cookieMaxAgeDesc": "ระยะเวลาที่เซสชันที่เข้าสู่ระบบแล้วยังคงใช้งานได้ 0 คือใช้ค่าเริ่มต้นของอินสแตนซ์จาก {envVar}",
+    "cookieMaxAgeDesc": "Seconds a signed-in session stays valid. 0 = use the instance default from {envVar}",
     "applyToRoot": "Apply to the root account",
-    "applyToRootDesc": "ผู้ใช้ root ได้รับยกเว้นจากทุกกฎข้างต้น เว้นแต่จะเปิดใช้งานตัวเลือกนี้",
+    "applyToRootDesc": "Root is exempt from every rule above unless this is on",
     "rootWarning": "Locking root might cause the system to go into an unrecoverable state.",
     "rootDialogTitle": "Apply the policy to root?",
     "rootDialogMessage": "Root will be subject to lockout, rotation and forced resets like any other native account. If root is your only administrative account, a lockout or an expiry it cannot satisfy will leave no way back into this instance.",
@@ -29619,12 +29717,12 @@
       "chartBelow": "{metric}, {value} now, below normal range",
       "chartWithin": "{metric}, {value} now, within normal range",
       "tipNormal": "Normal {low} – {high}",
-      "openTraces": "เปิดในเทรซ",
+      "openTraces": "Traces",
       "openCatalog": "Service Catalog",
       "openLogs": "เปิดในล็อก",
       "rangeLabel": "Time range",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "ช่องว่างการครอบคลุม",
+      "badgeNotWatched": "Coverage gap",
       "signalsWatched": "Signals watched",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Up {change} since the start of the range",
@@ -29720,7 +29818,10 @@
         "service": "ตามบริการ",
         "place": "ตามสถานที่",
         "none": "ไม่ได้จัดกลุ่ม"
-      }
+      },
+      "fixNoLink": "Add service.name label",
+      "fixStopped": "Check the collector",
+      "fixQueued": "Mock only: “{action}” for {service} was not sent anywhere"
     },
     "activity": {
       "before": "Before",
@@ -30469,15 +30570,15 @@
       "intro": "Here's what I do, in five steps.",
       "gotIt": "Got it",
       "s1Title": "I find your services",
-      "s1": "ฉันตรวจดูข้อมูลที่คุณส่งอยู่แล้วและค้นหาบริการในข้อมูลนั้น บริการใหม่จะปรากฏหลังการตรวจสอบครั้งถัดไปของฉัน คุณไม่จำเป็นต้องเพิ่มบริการนั้น",
-      "s2Title": "ฉันเรียนรู้ว่าค่าปกติเป็นอย่างไร",
-      "s2": "ฉันเรียนรู้ว่าปกติแต่ละสตรีมส่งข้อมูลปริมาณเท่าใดจากประวัติ 14 วันของสตรีมนั้น จนกว่าสตรีมจะมีประวัติครบ ฉันจะแจ้งว่ายังอยู่ระหว่างการเรียนรู้และจะไม่ตัดสินสตรีมนั้น",
-      "s3Title": "ฉันแจ้งเตือนเรียกเวรเฉพาะเมื่อสตรีมหยุดส่งข้อมูล",
-      "s3": "เมื่อสตรีมหยุดส่งข้อมูล ฉันจะเปิดเหตุการณ์ขัดข้อง และหากการแจ้งเตือนเรียกเวรเปิดอยู่ จะแจ้งเตือนเรียกเวรทีมเวรประจำการที่ดูแลบริการนั้น การลดลงและเพิ่มขึ้นอย่างรวดเร็วจะแสดงเป็นข้อค้นพบและจะไม่แจ้งเตือนเรียกเวร เรื่องเล็กน้อยจะรออยู่ในสรุปรายวัน",
-      "s4Title": "ฉันบอกว่าเกิดอะไรขึ้น",
-      "s4": "ทุกเหตุการณ์ขัดข้องจะระบุว่าอะไรหยุดไปและตั้งแต่เมื่อใด เมื่อเปิดการวิเคราะห์ด้วย AI จะมีการประเมินสาเหตุที่ดีที่สุดด้วย",
-      "s5Title": "คุณเป็นผู้ตัดสินใจว่าจะเปลี่ยนแปลงอะไร",
-      "s5": "ฉันแนะนำการแจ้งเตือนสำหรับสิ่งที่ยังไม่มีใครเฝ้าระวัง และแนะนำการแก้ไขสำหรับการแจ้งเตือนที่ไม่สามารถทริกเกอร์ได้ จะไม่มีการเปลี่ยนแปลงใด ๆ จนกว่าคุณจะตรวจสอบและนำไปใช้ และคุณสามารถยกเลิกสิ่งที่นำไปใช้แล้วได้"
+      "s1": "I look through the data you already send and find the services in it. A new service shows up after my next check; you don't need to add it.",
+      "s2Title": "I learn what normal looks like",
+      "s2": "I learn how much data each stream normally sends from 14 days of its history. Until a stream has that history, I say it is still learning and don't judge it.",
+      "s3Title": "I page only when a stream stops",
+      "s3": "When a stream stops sending data, I open an incident and, if paging is on, page the on-call team that owns the service. Sharp drops and rises show as findings and never page. Smaller things wait for the daily digest.",
+      "s4Title": "I say what happened",
+      "s4": "Every incident says what stopped and since when. With AI analysis on, it also carries a best read on why.",
+      "s5Title": "You decide what changes",
+      "s5": "I suggest alerts for what nothing watches and fixes for alerts that can't fire. Nothing changes until you review and apply it, and you can undo what you applied."
     },
     "outcome": {
       "active": "Happening now",
@@ -30490,9 +30591,9 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "ละเอียด",
+      "nerd": "Detailed",
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
-      "nerdTooltip": "มุมมองแบบละเอียดจะแสดงตัวตรวจจับ ลูป และการตั้งค่าทั้งหมดอย่างครบถ้วน",
+      "nerdTooltip": "The detailed view shows every detector, loop and setting in full",
       "label": "ดู"
     },
     "suggestions": {
@@ -30557,7 +30658,7 @@
   },
   "slackApp": {
     "prereq": {
-      "title": "ขั้นตอนที่ 1 · ข้อกำหนดเบื้องต้นของเซิร์ฟเวอร์",
+      "title": "Step 1 · Server prerequisites",
       "subtitle": "Checked on this server before any Slack work",
       "columnSetting": "Setting",
       "columnResult": "Result",
@@ -30615,7 +30716,8 @@
       "copyRequest": "Copy request",
       "requestText": "Please add the OpenObserve organization {name} ({org}) to the Slack workspace {team}, in _meta › Settings › Slack › Organizations.",
       "requestCopied": "Request copied",
-      "setupAppOtherTeam": "For a different Slack workspace than {team} · OpenObserve creates your own Slack app from one configuration token"
+      "setupAppOtherTeam": "For a different Slack workspace than {team} · OpenObserve creates your own Slack app from one configuration token",
+      "title": "Connect a Slack workspace"
     },
     "wizard": {
       "title": "Set up the Slack app",
@@ -30631,7 +30733,7 @@
       "back": "ย้อนกลับ",
       "finish": "Finish",
       "connection": {
-        "title": "ขั้นตอนที่ 2 · การเชื่อมต่อ",
+        "title": "Step 2 · Connection",
         "description": "The check reaches Slack from this server through the same code path production uses.",
         "allPassed": "Slack is reachable from this server",
         "someFailed": "Slack is not reachable from this server. Allow *.slack.com through your proxy or firewall, then Re-check.",
@@ -30640,7 +30742,7 @@
         "socketHost": "WebSocket host {host}"
       },
       "create": {
-        "title": "ขั้นตอนที่ 3 · สร้างแอป",
+        "title": "Step 3 · Create the app",
         "modeLabel": "Connection mode",
         "socket": "Socket Mode",
         "socketDescription": "Recommended. OpenObserve opens the connection, so Slack needs no public URL",
@@ -30669,7 +30771,7 @@
         "signingSecretRequired": "HTTP mode needs the signing secret"
       },
       "install": {
-        "title": "ขั้นตอนที่ 4 · ติดตั้ง",
+        "title": "Step 4 · Install",
         "created": "App created · {appId}",
         "allowHint": "Opens Slack's install screen: click Allow there. The bot token comes back from Slack by itself; nothing to copy.",
         "allow": "Allow in Slack",
@@ -30692,7 +30794,7 @@
         "appNotCreatedByO2": "OpenObserve did not create this app, so it stays in Slack. Delete it there if you no longer need it."
       },
       "test": {
-        "title": "ขั้นตอนที่ 5 · ทดสอบและเชื่อมโยง",
+        "title": "Step 5 · Test and linking",
         "run": "Run checks",
         "signIn": "Test Sign in with Slack",
         "signInPassed": "Sign in with Slack works",
@@ -30835,7 +30937,9 @@
       "ownOrgOnlyHint": "On an instance workspace you map channels to your own org",
       "claimableHint": "Unclaimed channels and channels {org} owns",
       "servedOrgsHint": "Any organization this workspace serves",
-      "alertRoutes": "{count} destination | {count} destinations"
+      "alertRoutes": "{count} destination | {count} destinations",
+      "empty": "No channel has a default org yet",
+      "emptyDescription": "Questions in a channel without a default go to each person's default org (they can change it with /o2 org)."
     },
     "people": {
       "title": "Linked people",
@@ -30854,7 +30958,8 @@
         "email": "Email match",
         "admin_bulk": "Link all"
       },
-      "loadMore": "Load more"
+      "loadMore": "Load more",
+      "empty": "Nobody in this org has linked Slack yet"
     },
     "credentials": {
       "title": "Update credentials",
@@ -31777,7 +31882,7 @@
           "label": "ไม่มีข้อมูลระบุตัวตนของเอเจนต์",
           "detail": "{affected} จาก {total} สแปน LLM ({pct}) ไม่มี gen_ai.agent.name ทำให้มุมมองเอเจนต์ไม่แสดงสแปนเหล่านี้.",
           "pass": "ทุกสแปน LLM มีชื่อหรือ ID ของเอเจนต์.",
-          "fix": "เปิดการแมปเอเจนต์"
+          "fix": "เปิด GenAI Agent Mapping"
         },
         "zero_duration_spans": {
           "label": "สแปนที่มีระยะเวลาเป็นศูนย์",
@@ -31792,6 +31897,13 @@
           "fix": "คู่มือการเชื่อมต่อ"
         }
       }
+    },
+    "chart": {
+      "costMissing": "ไม่อยู่ในแผนภูมินี้: {models}. โทเค็น {tokens} รายการไม่มีราคา.",
+      "costMissingPricedSince": "ไม่อยู่ในแผนภูมินี้: {models}. โทเค็น {tokens} รายการถูกบันทึกก่อนมีการเพิ่มราคา.",
+      "unpricedModels": "ยังไม่กำหนดราคา: {models}",
+      "pricedSinceModels": "บันทึกก่อนมีการเพิ่มราคา: {models}",
+      "addPrice": "เพิ่มราคา"
     }
   },
   "onboarding": {

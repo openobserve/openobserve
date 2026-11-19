@@ -121,7 +121,7 @@
     "noGroups": {
       "title": "Nog geen groepen",
       "description": "Met groepen kun je machtigingen voor meerdere gebruikers tegelijk beheren. Maak er een om aan de slag te gaan.",
-      "action": "Nieuwe gebruikersgroep",
+      "action": "Nieuwe groep",
       "actionDesc": "Een gebruikersgroep aanmaken"
     },
     "noRoles": {
@@ -197,7 +197,7 @@
     "noCipherKeys": {
       "title": "Nog geen cipher keys",
       "description": "Cipher keys worden gebruikt om gevoelige velden in uw datastreams te versleutelen.",
-      "action": "Nieuwe encryptiesleutel",
+      "action": "Nieuwe sleutel",
       "actionDesc": "Genereer een cipher key"
     },
     "noSlackChannelDefaults": {
@@ -225,7 +225,7 @@
     "noLlmProviders": {
       "title": "Geen LLM-providers geconfigureerd",
       "description": "Verbind een taalmodelprovider om AI-functies mogelijk te maken.",
-      "action": "Nieuwe provider",
+      "action": "Provider toevoegen",
       "actionDesc": "Configureer een LLM-provider"
     },
     "noDiscoveredServices": {
@@ -268,9 +268,9 @@
     },
     "noStorageConfig": {
       "title": "Geen bucket geconfigureerd",
-      "description": "Gebruik je eigen bucket om de gegevens van deze organisatie op te slaan in opslag die je zelf beheert, gescheiden van andere organisaties en de globale standaardwaarden.",
-      "action": "Bucket configureren",
-      "actionDesc": "Verbind een S3- of Azure-bucket"
+      "description": "Routeer de gegevens van deze organisatie naar een speciale bucket — onafhankelijk van andere organisaties en globale standaardinstellingen.",
+      "action": "Opslag configureren",
+      "actionDesc": "Een S3-, GCS- of Azure-bucket aansluiten"
     },
     "noPhoneProvider": {
       "title": "Geen telefonieprovider verbonden",
@@ -435,7 +435,7 @@
     "noUsers": {
       "title": "Nog geen gebruikers",
       "description": "Nodig je teamgenoten uit om samen te werken in deze organisatie.",
-      "action": "Nieuwe gebruiker",
+      "action": "Gebruiker toevoegen",
       "actionDesc": "Nodig een teamgenoot uit via e-mail"
     },
     "noReports": {
@@ -457,7 +457,7 @@
     "noServiceAccounts": {
       "title": "Nog geen serviceaccounts",
       "description": "Met serviceaccounts kunnen toepassingen worden geverifieerd met de API. Maak er een om aan de slag te gaan.",
-      "action": "Nieuw serviceaccount",
+      "action": "Serviceaccount toevoegen",
       "actionDesc": "Een API-serviceaccount aanmaken"
     },
     "noInvitations": {
@@ -3727,8 +3727,8 @@
     "ent_lincese_detail_lbl": "Informatie over de Enterprise-licentie",
     "lincese_id_lbl": "Licentie-ID",
     "status_lbl": "Status",
-    "create_at_lbl": "Aangemaakt op",
-    "expires_at_lbl": "Verloopt op",
+    "create_at_lbl": "Gemaakt op",
+    "expires_at_lbl": "Vervalt op",
     "usage_limits": "Gebruikslimieten",
     "feature_comparison_lbl": "Vergelijking van functies",
     "feature_comparision_ent_msg": "U gebruikt OpenObserve Enterprise Edition met toegang tot alle geavanceerde functies die hieronder worden vermeld.",
@@ -3787,18 +3787,18 @@
     "expired_lbl": "Vervallen",
     "no_license_found": "Geen licentie gevonden",
     "installation_id": "Installatie-ID",
-    "contact_admin_license": "Plak hieronder een licentiesleutel of vraag er een aan.",
-    "get_license": "Licentie ophalen",
-    "enter_license_key": "Licentiesleutel invoeren",
+    "contact_admin_license": "Neem contact op met je beheerder voor een licentie en plak de sleutel hier, <strong>of:</strong>",
+    "get_license": "Licentie verkrijgen",
+    "enter_license_key": "Licentiecode invoeren",
     "paste_license_placeholder": "Plak hier je licentiecode...",
-    "license_auto_filled": "Licentiesleutel automatisch ingevuld vanuit URL. Klik op \"Licentie bijwerken\" om toe te passen.",
+    "license_auto_filled": "Licentiesleutel automatisch ingevuld via URL. Klik op „Licentie bijwerken” om een aanvraag in te dienen.",
     "update_license": "Licentie bijwerken",
     "license_id": "Licentie-ID",
     "company": "Bedrijf",
     "license_key": "Licentiesleutel",
-    "contact_name": "Contactnaam",
-    "contact_email": "Contact-e-mail",
-    "environment_type": "Type omgeving",
+    "contact_name": "Naam van de contactpersoon",
+    "contact_email": "E-mailadres voor contact",
+    "environment_type": "Omgevingstype",
     "features": "Functies",
     "features_all_unlocked": "Je licentie ontgrendelt alle functies.",
     "features_summary": "Je licentie ontgrendelt {ratio}. {free} gratis functie is altijd inbegrepen. | Je licentie ontgrendelt {ratio}. {free} gratis functies zijn altijd inbegrepen.",
@@ -3817,7 +3817,7 @@
     "features_new": "Nieuw na je licentie",
     "features_filter_new": "Nieuw",
     "request_new_license": "Nieuwe licentie aanvragen",
-    "add_new_license_key": "Nieuwe licentiesleutel toevoegen",
+    "add_new_license_key": "Nieuwe licentiecode toevoegen",
     "online_error_unreachable": "Kon de licentieserver niet bereiken.{limits}",
     "online_error_timeout": "Kon de licentieserver niet bereiken.{limits}",
     "online_error_blocked": "Deze installatie is geblokkeerd door OpenObserve. Neem contact op met support.",
@@ -3971,11 +3971,11 @@
     "waiver_breach_ended": "Toeslag voor {month} is geëindigd op {end} UTC.",
     "waiver_window_until": "tot {end}",
     "waiver_window_days": "gebruiksdagen {start} t/m {end}",
-    "update_license_key": "Licentiesleutel bijwerken",
+    "update_license_key": "Licentiecode bijwerken",
     "paste_new_license_placeholder": "Plak hier de nieuwe licentiecode...",
     "your_complete_license_key": "Uw volledige licentiesleutel:",
     "copy_key": "Sleutel kopiëren",
-    "usage_information": "Gebruiksinformatie",
+    "usage_information": "Informatie over het gebruik",
     "usage_chart_title": "Dagelijkse ingestie deze maand",
     "no_license_ingestion_limit": "Zonder licentie is de ingestie beperkt tot <strong>{limit} GB</strong> per dag.",
     "license_allows_ingestion": "De huidige licentie staat <strong>{limit} GB</strong> aan data-ingestie per dag toe.",
@@ -4732,7 +4732,7 @@
       "effectStillAllowed": "Geen wijziging in toegang: een ruimere toekenning staat dit nog steeds toe.",
       "moduleGroupSecurity": "Beveiliging",
       "presetSocAnalystTitle": "SOC-analist",
-      "presetSocAnalystDescription": "Security-alarmen en -cases triëren, met leestoegang tot detecties, Security-bronstreams en threat-intel-lijsten",
+      "presetSocAnalystDescription": "Beveiligingsmeldingen en -cases beoordelen, met leestoegang tot detecties, Security-bronstreams en threat-intellijsten",
       "presetDetectionEngineerTitle": "Detectie-engineer",
       "presetDetectionEngineerDescription": "Detecties maken, afstemmen, inschakelen en uitvoeren, content installeren, bronnen koppelen met hun functies en pipelines, en verrijkingstabellen zoals threat-intellijsten onderhouden, met leestoegang tot Beveiliging, cases en streams",
       "presetSecurityAdminTitle": "Beveiligingsbeheerder",
@@ -4843,7 +4843,7 @@
       "createFailed": "Organisatie aanmaken mislukt."
     },
     "listOrganizations": {
-      "subtitle": "Elke organisatie waartoe je toegang hebt. Schakel over naar een organisatie of wijzig de naam via de rijacties.",
+      "subtitle": "Organisaties waartoe u toegang hebt",
       "switch": "Naar deze organisatie overschakelen",
       "current": "Huidige",
       "cannotEditWhileDeleting": "Kan niet bewerken terwijl verwijdering bezig is",
@@ -4977,7 +4977,7 @@
       "uploadingRules": "Even wachten, regels worden geüpload...",
       "errorUploadingRules": "Fout bij het uploaden van regels",
       "errorParsingJson": "Fout bij het parseren van JSON uit bestand {name}",
-      "someValuesEmpty": "Sommige waarden zijn leeg. Controleer ze.",
+      "someValuesEmpty": "sommige waarden zijn leeg, controleer",
       "saveBeforeSwitchingTimeUnits": "Sla uw wijzigingen op of annuleer ze voordat u van tijdseenheden wisselt"
     },
     "addRolePage": {
@@ -4996,7 +4996,9 @@
       "saved": "Aankondigingsbanners bijgewerkt",
       "saveFailed": "Kan de aankondigingsbanners niet opslaan",
       "loadFailed": "Kan de aankondigingsbanners niet laden",
-      "addBanner": "Banner toevoegen"
+      "addBanner": "Banner toevoegen",
+      "emptyTitle": "Nog geen banners",
+      "emptyHint": "Voeg er een toe om een bericht bovenaan de app weer te geven."
     },
     "variants": {
       "info": "Info",
@@ -5114,10 +5116,10 @@
       "characters": "{count} / {max}",
       "variantOption": "{name} — {help}",
       "variantHelp": {
-        "info": "Algemene mededelingen en release-nieuws",
-        "warning": "Verminderde service of aankomend onderhoud",
-        "critical": "Storingen; worden eerst getoond en verbergen promo's",
-        "promo": "Gebeurtenissen en aanbiedingen; worden als laatste getoond en verborgen tijdens storingen"
+        "info": "algemene meldingen en release-nieuws",
+        "warning": "verminderde service of aankomend onderhoud",
+        "critical": "storingen; wordt eerst getoond en verbergt promo's",
+        "promo": "evenementen en aanbiedingen; wordt laatst getoond, verborgen tijdens storingen"
       },
       "toolbar": {
         "bold": "Vet",
@@ -6173,8 +6175,8 @@
     "periodInfoLine1": "Periode waarvoor de query moet worden uitgevoerd.",
     "periodInfoLine2": "bijv. 10 minuten betekent dat telkens wanneer de query wordt uitgevoerd, de laatste 10 minuten aan gegevens worden gebruikt. Als de query om 16:00 uur wordt uitgevoerd, worden de gegevens van 15:50 tot 16:00 uur gebruikt.",
     "periodShouldMatchFrequency": "Opmerking: De periode moet hetzelfde zijn als de frequentie.",
-    "delayInfoLine1": "Wachttijd na het geplande tijdstip, zodat late gegevens kunnen binnenkomen.",
-    "delayInfoLine2": "bijv. met een vertraging van 10 minuten draait een pipeline per uur om 10:10 en leest de gegevens van 9:00 tot 10:00.",
+    "delayInfoLine1": "Vertraging waarmee de pipeline is gepland om te worden uitgevoerd.",
+    "delayInfoLine2": "bijv. een vertraging van 10 minuten betekent dat de pipeline 10 minuten na de geplande tijd wordt uitgevoerd.",
     "closeDrawer": "Sluit lade",
     "conditionValueGuidelines": "Richtlijnen voor voorwaardes:",
     "customColumnGuideline": "Om een aangepaste kolom toe te voegen, typt u de kolomnaam en druk op",
@@ -6385,28 +6387,28 @@
     "confirmDeleteNode": "Weet u zeker dat u het knooppunt wilt verwijderen?",
     "errorFetchingUsedStreams": "Fout bij het ophalen van gebruikte streams",
     "destinationNotes": {
-      "openobserveTitle": "Verbindingsgegevens voor OpenObserve",
+      "openobserveTitle": "OpenObserve-verbindingsgegevens",
       "openobserveStep1": "Log in op uw OpenObserve-instantie",
       "openobserveStep2": "Kopieer uw basis-URL (bijv. https://your-instance.openobserve.ai)",
       "openobserveStep3": "Het endpointpad is vooraf ingevuld als: /api/{'{'}org{'}'}/{'{'}stream{'}'}/_json",
       "openobserveStep4": "Vervang {'{'}org{'}'} door uw organisatie-id",
       "openobserveStep5": "Vervang {'{'}stream{'}'} door uw streamnaam",
       "openobserveStep6": "Voeg authenticatieheader toe: Authorization: Basic <OpenObserve_Token>",
-      "splunkTitle": "Verbindingsgegevens voor Splunk HEC",
+      "splunkTitle": "Splunk HEC-verbindingsgegevens",
       "splunkStep1": "Log in op uw Splunk-instantie als beheerder",
       "splunkStep2": "Ga naar Instellingen → Gegevensinvoer → HTTP Event Collector",
       "splunkStep3": "Klik op 'New Token' om een nieuw HEC-token te maken",
       "splunkStep4": "Configureer de tokeninstellingen en sla op",
       "splunkStep5": "Gebruik uw Splunk HEC-endpoint-URL",
       "splunkStep6": "Voeg het HEC-token toe in het gedeelte Headers (Authorization: Splunk <token>)",
-      "elasticsearchTitle": "Verbindingsgegevens voor Elasticsearch",
+      "elasticsearchTitle": "Elasticsearch-verbindingsgegevens",
       "elasticsearchStep1": "Zoek het eindpunt van uw Elasticsearch-cluster",
       "elasticsearchStep2": "Zorg ervoor dat het cluster toegankelijk is vanuit dit netwerk",
       "elasticsearchStep3": "Maak een API-sleutel aan of gebruik basisauthenticatie",
       "elasticsearchStep4": "Voor Cloud: Haal het eindpunt op uit uw cloudconsole",
       "elasticsearchStep5": "Voor self-hosted: Gebruik uw cluster-URL met poort (meestal 9200)",
       "elasticsearchStep6": "Voeg authenticatie toe in de sectie Headers",
-      "datadogTitle": "Verbindingsgegevens voor Datadog",
+      "datadogTitle": "Datadog-verbindingsgegevens",
       "datadogStep1": "Log in op uw Datadog-account",
       "datadogStep2": "Ga naar Organisatie-instellingen → API-sleutels",
       "datadogStep3": "Maak een nieuwe API-sleutel aan of kopieer een bestaande",
@@ -6414,14 +6416,14 @@
       "datadogStep5": "US: https://http-intake.logs.datadoghq.com",
       "datadogStep6": "EU: https://http-intake.logs.datadoghq.eu",
       "datadogStep7": "Voeg de API-sleutel toe in Headers: DD-API-KEY: <your-key>",
-      "dynatraceTitle": "Verbindingsgegevens voor Dynatrace",
+      "dynatraceTitle": "Dynatrace-verbindingsgegevens",
       "dynatraceStep1": "Log in op uw Dynatrace-omgeving",
       "dynatraceStep2": "Ga naar Instellingen → Integratie → Dynatrace API",
       "dynatraceStep3": "Maak een nieuw API-token met de machtiging logs.ingest",
       "dynatraceStep4": "Gebruik uw omgevings-URL",
       "dynatraceStep5": "Formaat: https://{'{'}your-environment-id{'}'}.live.dynatrace.com",
       "dynatraceStep6": "Voeg het token toe in Headers: Authorization: Api-Token <token>",
-      "newrelicTitle": "Verbindingsgegevens voor New Relic",
+      "newrelicTitle": "New Relic-verbindingsgegevens",
       "newrelicStep1": "Log in op uw New Relic-account",
       "newrelicStep2": "Ga naar het gedeelte API-sleutels",
       "newrelicStep3": "Maak een licentiesleutel aan of kopieer er een (Ingest - Licentie)",
@@ -7135,7 +7137,7 @@
     "orgLevelExplanation": "Dit zijn ingestietokens op organisatieniveau. Ze zijn niet gebonden aan individuele gebruikers en blijven werken, zelfs als de gebruiker die ze heeft aangemaakt de organisatie verlaat. Tokens kunnen alleen worden gebruikt op ingestie-eindpunten.",
     "orgLevelSummary": "Tokens op organisatieniveau voor ingestie-eindpunten.",
     "tokenManagementTitle": "Ingestietokens beheren",
-    "createTokenBtn": "Nieuw token",
+    "createTokenBtn": "Maak een nieuw token",
     "createTokenTitle": "Token aanmaken",
     "searchToken": "Tokens zoeken",
     "tokenNameLabel": "Naam",
@@ -11691,9 +11693,9 @@
       "lengthenEvaluationWindowDesc": "Verbreed de periode zodat een korte piek het alarm niet meer activeert.",
       "enableDeduplication": "Herhalingen onderdrukken inschakelen",
       "enableDeduplicationDesc": "Meld één keer per statuswijziging in plaats van bij elke evaluatie.",
-      "reviewForDeletion": "Alarm beoordelen",
+      "reviewForDeletion": "Beoordelen voor verwijdering",
       "reviewForDeletionDesc": "Controleer of de query nog steeds overeenkomt met de werkelijkheid voordat je het alarm buiten gebruik stelt.",
-      "fixAlertQuery": "Alarm beoordelen",
+      "fixAlertQuery": "Alarmquery herstellen",
       "fixAlertQueryDesc": "De evaluatie zelf mislukt en komt nooit tot een uitspraak.",
       "repairDestination": "Bestemming repareren",
       "repairDestinationDesc": "De aflevering mislukt bij een bestemming die het alarm gebruikt.",
@@ -11877,7 +11879,7 @@
       "scopeAll": "Alle runs",
       "scopeFindings": "Met bevindingen",
       "scopeGaps": "Dekkingsgaten",
-      "searchPlaceholder": "Zoeken op alarmnaam",
+      "searchPlaceholder": "Zoek runs op alarmnaam",
       "colRun": "Run",
       "colFindings": "Bevindingen",
       "colCoverage": "Dekking",
@@ -11905,8 +11907,8 @@
       "statFindings": "Bevindingen",
       "statAlertsInScope": "Alarmen binnen bereik",
       "statDeclined": "Afgewezen",
-      "statDeclinedSub": "Niet goedgekeurd",
-      "statDeclinedTooltip": "Combinaties van regel en alarm die een regel niet zou beoordelen. Een poort, geen goedkeuring. Een niet-gehaalde ondergrens wordt alleen geteld; een regel die niet kon worden uitgevoerd, of die wel keek maar afwees, wordt hieronder met de reden vermeld.",
+      "statDeclinedSub": "Afgewezen, niet vrijgegeven",
+      "statDeclinedTooltip": "Regel- en alarmparen die een regel niet zou beoordelen, omdat het alarm te weinig geschiedenis of te weinig samples had. Een poort, geen vrijgave; de redenen per alarm worden niet naar de stream geschreven.",
       "limitations": "Beperkingen van het bewijs",
       "declinedHeading": "Afgewezen met een reden",
       "declinedDesc": "Regels die niet konden worden uitgevoerd voor een alarm, of die wel keken maar afwezen. Dit is geen goedkeuring.",
@@ -11933,7 +11935,10 @@
       "proposedActions": "Voorgestelde acties",
       "qualityReasons": "Reden: {reasons} | Redenen: {reasons}",
       "openAlert": "Alarm openen",
-      "advice": "Wat te controleren"
+      "advice": "Wat te controleren",
+      "viewInLogs": "Bekijk in Logs",
+      "viewInLogsHint": "Opent de records van deze run in Logs",
+      "loadFailed": "De samenvatting kon niet worden geladen: {message}"
     },
     "dashboard": {
       "latestRunAgo": "Laatste uitvoering {time}",
@@ -11991,7 +11996,8 @@
       "runNowHeading": "Nu uitvoeren",
       "findingsKept": "Bevindingen worden gedurende de bewaartermijn bij de eigen records van deze organisatie bewaard. Alarmkalibratie verstuurt geen meldingen.",
       "frequencyRange": "Kies een cadans tussen 1 uur en 30 dagen.",
-      "windowRange": "Kies een venster tussen 1 minuut en 90 dagen."
+      "windowRange": "Kies een venster tussen 1 minuut en 90 dagen.",
+      "loadFailed": "De instellingen konden niet worden geladen: {message}"
     },
     "visibility": {
       "allClear": "Geen bevindingen op de alarmen waartoe je toegang hebt in de laatste uitvoering.",
@@ -12182,8 +12188,8 @@
     "response": "Reactie",
     "lastError": "Laatste fout:",
     "errorSummary": "Foutsamenvatting",
-    "searchThisFolderTooltip": "Toon de alarmen in deze map",
-    "searchAllFoldersTooltip": "Toon de alarmen in alle mappen",
+    "searchThisFolderTooltip": "Alleen in deze map zoeken",
+    "searchAllFoldersTooltip": "Zoeken in alle mappen",
     "reloadAlertsTooltip": "Alarmen opnieuw laden",
     "triggerDetection": "Triggerdetectie",
     "retrain": "Opnieuw trainen",
@@ -14245,7 +14251,7 @@
       "addedUnread": "Je alarmen konden niet worden gelezen, dus AutoObserve kan niet zien of dit alarm al is toegevoegd. Er is niets opgeslagen; sla opnieuw op om het te proberen.",
       "alreadyAdded": "Al toegevoegd als {name} in map {folder}, dus dit alarm is niet opnieuw opgeslagen.",
       "dialog": {
-        "title": "Alarm toevoegen",
+        "title": "Alarm maken",
         "continue": "Doorgaan naar alarm",
         "queryChoiceLabel": "Alarm op query",
         "queryChoiceOption": "{name}: {query}",
@@ -14268,19 +14274,19 @@
       },
       "sources": {
         "default": {
-          "label": "Alarm toevoegen",
+          "label": "Alarm maken",
           "toast": "Query geïmporteerd in het alertformulier"
         },
         "logs": {
-          "label": "Alarm toevoegen",
+          "label": "Alarm maken",
           "toast": "Query geïmporteerd uit je logs-zoekopdracht"
         },
         "patterns": {
-          "label": "Alarm toevoegen",
+          "label": "Alarm maken",
           "toast": "Query geïmporteerd uit de geselecteerde patronen"
         },
         "panel": {
-          "label": "Alarm toevoegen",
+          "label": "Alarm maken",
           "toast": "Query geïmporteerd uit dashboardpaneel: \"{sourceLabel}\""
         },
         "library": {
@@ -14288,7 +14294,7 @@
           "toast": "Uit de meldingenbibliotheek: {sourceLabel}"
         },
         "explorer": {
-          "label": "Alarm toevoegen",
+          "label": "Alarm aanmaken",
           "toast": "Query geïmporteerd uit de Metrieken Explorer"
         },
         "dbm": {
@@ -14304,7 +14310,7 @@
           "toast": "Geïmporteerd uit Product Analytics: \"{sourceLabel}\""
         },
         "traces": {
-          "label": "Alarm toevoegen",
+          "label": "Alarm aanmaken",
           "toast": "Query geïmporteerd uit je trace-zoekopdracht",
           "noStream": "Kies eerst een stream",
           "errorCount": "Aantal fouten",
@@ -14508,7 +14514,7 @@
       "filterAll": "Alle",
       "filterOnce": "Eenmalig",
       "filterRecurring": "Terugkerend",
-      "search": "Zoeken op naam, reden of aanmaker",
+      "search": "Zoeken op naam, dimensie of maker",
       "searchAcross": "Alle mappen doorzoeken",
       "thisFolder": "Deze map",
       "allFolders": "Alle mappen",
@@ -15047,7 +15053,7 @@
       "webhookOnly": "(alleen webhook)",
       "emailOnly": "(alleen e-mail)",
       "snsOnly": "(alleen SNS)",
-      "stale": "Sjabloon {name} is niet beschikbaar voor dit type. Kies een ander sjabloon of wis het veld.",
+      "stale": "Sjabloon {name} bestaat niet meer. Kies een ander of maak het veld leeg.",
       "clear": "Wissen",
       "willUse": "Zal gebruiken: {template}",
       "willUsePerDestination": "Zal gebruiken, per bestemming:",
@@ -15261,7 +15267,7 @@
     "systemReadOnlyEdit": "Vooraf gebouwde sjabloon — bewerken is uitgeschakeld. Kloon het om een bewerkbare kopie te maken.",
     "systemReadOnlyDelete": "Vooraf gebouwde sjabloon — verwijderen is uitgeschakeld. Kloon het om een bewerkbare kopie te maken.",
     "prebuiltBadge": "Voorgebouwd",
-    "prebuiltBadgeHint": "Beheerd door het systeem. Je kunt het niet bewerken of verwijderen. Kloon het om een aanpasbare kopie te maken.",
+    "prebuiltBadgeHint": "Beheerd door het systeem. Je kunt bewerken, maar verwijderen is uitgeschakeld.",
     "customBadge": "Op maat",
     "filterAll": "Alles",
     "filterPrebuilt": "Voorgebouwd",
@@ -15478,13 +15484,13 @@
   },
   "alert_destinations": {
     "chooseTypeTitle": "Kies type",
-    "selectDestinationType": "Bestemmingstype",
+    "selectDestinationType": "Selecteer bestemmingstype",
     "connectionStepTitle": "Verbinding",
-    "connectionDetailsTitle": "Verbindingsgegevens",
+    "connectionDetailsTitle": "Verbindingsdetails",
     "urlHelpText": "Basis-URL zonder slash aan het einde (bijv. https://your-domain.com)",
     "organizationHelpText": "OpenObserve organisatie-ID",
     "streamHelpText": "OpenObserve streamnaam",
-    "endpointPathLabel": "Endpointpad",
+    "endpointPathLabel": "Endpoint-pad",
     "endpointPathHelpText": "Het pad wordt aan de basis-URL toegevoegd (moet met / beginnen)",
     "esBulkIndexHelpText": "Indexnaam waar gegevens in Elasticsearch worden geschreven",
     "metadataConfigurationTitle": "Metadata-configuratie",
@@ -15544,7 +15550,7 @@
     "payloadFormatAuto": "Automatisch",
     "payloadFormatLegacy": "Verouderde JSON",
     "payloadFormatRendered": "Gerenderd sjabloon",
-    "payloadFormatHelp": "Automatisch verzendt de oude JSON-body voor berichten over anomalieën, Synthetics, Piket en onderhoudsperiode totdat een sjabloon is gekoppeld.",
+    "payloadFormatHelp": "Automatisch verzendt de oude JSON-body voor berichten over anomalieën, synthetics en piket totdat een sjabloon is gekoppeld. Opgeslagen als de metagegevenssleutel payload_format.",
     "output_format": "Uitvoerformaat",
     "readonly": "Alleen lezen",
     "additional_settings": "Aanvullende instellingen",
@@ -15683,17 +15689,17 @@
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
-    "tabLabel": "Eigen bucket gebruiken",
-    "title": "Eigen bucket gebruiken",
+    "tabLabel": "Opslag van de organisatie",
+    "title": "Opslag van de organisatie",
     "notEnabled": "{product} is niet ingeschakeld voor deze organisatie",
     "heroHeadline": "Breng je eigen opslagruimte mee naar",
-    "heroSub": "Verbind je eigen cloudbucket. Gegevens blijven in je infrastructuur, met volledige controle en zonder lock-in.",
-    "configureStorage": "Bucket configureren",
+    "heroSub": "Verbind je eigen cloud bucket, data blijft in je infrastructuur — volledige controle, geen lock-in.",
+    "configureStorage": "Opslag configureren",
     "supportedProviders": "Ondersteunde providers",
     "perOrgIsolation": "Isolatie per organisatie",
     "appliesImmediately": "Is onmiddellijk van toepassing op nieuwe gegevens",
-    "usesOrgCredentials": "Gebruikt organisatiegebonden inloggegevens",
-    "updateStorage": "Bucket bijwerken",
+    "usesOrgCredentials": "Maakt gebruik van inloggegevens met een organisatiebereik",
+    "updateStorage": "Opslag bijwerken",
     "active": "actief",
     "bucketName": "naam van de bucket",
     "region": "regio",
@@ -15707,12 +15713,12 @@
     "featureOwnDataDesc": "Sla opgenomen gegevens rechtstreeks op in je eigen bucket en houd volledige controle over wie er toegang toe heeft.",
     "featureSecureTitle": "Veilig en compatibel",
     "featureSecureDesc": "Met fijnmazige toegangssleutels blijven uw gevoelige gegevens in uw infrastructuur.",
-    "newStorageConfiguration": "Nieuwe bucketconfiguratie",
+    "newStorageConfiguration": "Nieuwe opslagconfiguratie",
     "selectProviderDesc": "selecteer een cloudopslagprovider om de gegevens van deze organisatie op te slaan.",
     "bucketNameRequired": "De naam van de bucket is vereist",
     "accessKeyRequired": "Toegangssleutel is vereist",
     "secretKeyRequired": "Geheime sleutel is vereist",
-    "storageAccountRequired": "Naam van het opslagaccount is vereist",
+    "storageAccountRequired": "De naam van het opslagaccount is vereist",
     "regionRequired": "Regio is vereist",
     "roleARNRequired": "Rol ARN is vereist",
     "externalIdRequired": "Externe ID is vereist",
@@ -15721,7 +15727,7 @@
     "save": "Opslaan",
     "update": "Bijwerken",
     "awsStsCloudInfo": "Hiervoor wordt AWS STS gebruikt om de rol aan te nemen. Voeg het AWS-account van {product} als vertrouwde entiteit toe voor deze rol in de AWS-console. Neem contact op met het team van {product} voor de accountgegevens of voor hulp bij het instellen.",
-    "awsStsSelfHostedInfo": "Hiervoor wordt AWS STS gebruikt om de rol aan te nemen. Zorg ervoor dat de installatieomgeving AWS-referenties heeft die deze rol kunnen aannemen."
+    "awsStsSelfHostedInfo": "Dit maakt gebruik van AWS sts om de rol op zich te nemen en operaties uit te voeren. Zorg ervoor dat u aws-inloggegevens hebt geconfigureerd in de installatie-env die toegang hebben tot deze rol."
   },
   "metrics": {
     "add": "Toevoegen",
@@ -16202,7 +16208,7 @@
     "cipherKeysDesc": "Versleutelingssleutels voor gevoelige velden",
     "aiToolsetsDesc": "MCP-servers en CLI-tools die de AI-assistent kan gebruiken",
     "regexPatternsDesc": "Herbruikbare regex-patronen voor redactie",
-    "domainManagementDesc": "Parseren van SSO-claims en aanmeldingsbeperkingen per domein",
+    "domainManagementDesc": "Aanmelden beperken tot toegestane SSO-domeinen",
     "passwordPolicy": "Wachtwoordbeleid",
     "passwordPolicyDesc": "Authenticatiebeleid voor native e-mail-/wachtwoordaccounts, toegepast op de hele instantie.",
     "pipelineDestinationsDesc": "Externe doelen voor pipeline-uitvoer",
@@ -16225,13 +16231,13 @@
     "tracesHeading": "Traces",
     "traceIdFieldName": "Veldnaam trace-ID",
     "spanIdFieldName": "Veldnaam span-ID",
-    "toggleIngestionLogsLabel": "Ingestielogs",
-    "usageStreamEnabledLabel": "Gebruiksstream",
-    "redInsightsEnabledLabel": "Automatische RED-inzichten voor traces",
+    "toggleIngestionLogsLabel": "Ingestielogs in- en uitschakelen",
+    "usageStreamEnabledLabel": "Usage Stream inschakelen",
+    "redInsightsEnabledLabel": "Automatische RED-inzichten voor traces inschakelen",
     "redInsightsEnabledHelp": "Maakt anomaliedetectoren voor frequentie, fouten en p95-latentie aan voor de drukste services, in de alarmmap \"RED insights\". Alleen beheerders zien die map totdat deze wordt gedeeld.",
     "incidentsHeading": "Incidenten",
-    "aiRcaThreadToolOutputLabel": "Toolgegevens in incidentthreads",
-    "aiRcaThreadToolOutputHelp": "Toont ruwe invoer en uitvoer van tools aan iedereen die het incident kan lezen.",
+    "aiRcaThreadToolOutputLabel": "Toolgegevens tonen in threads voor incidentonderzoek",
+    "aiRcaThreadToolOutputHelp": "Ruwe toolinvoer en -uitvoer tonen in threads voor incidentonderzoek aan iedereen die het incident kan lezen",
     "claimParserFunction": "SSO-claimparser",
     "claimParserFunctionDescription": "Selecteer een functie ({product1} of {product2}) om SSO/LDAP-claims te parseren en te transformeren naar organisatie- en roltoewijzingen",
     "claimParserFunctionLabel": "Selecteer de VRL-functie",
@@ -16357,12 +16363,12 @@
       "fieldAliasesSaveError": "Opslaan van veldaliassen mislukt",
       "fieldAliasesUnsavedConfirm": "Je hebt niet-opgeslagen wijzigingen in veldtoewijzingen. Wil je deze verwijderen en vertrekken?",
       "discoveredServicesTitle": "Ontdekte services",
-      "discoveredServicesDescription": "Services worden ontdekt uit je telemetrie en gegroepeerd op servicenaam. Detectieregels bepalen hoe ze worden geïdentificeerd.",
+      "discoveredServicesDescription": "Services worden automatisch gedetecteerd uit uw telemetriegegevens en gegroepeerd op hun servicenaam voor correlatie. Services met dezelfde servicenaam worden met elkaar gecorreleerd via logs, traces en metrieken.",
       "noServicesYet": "Nog geen services ontdekt",
       "noServicesDescription": "Services worden hier weergegeven wanneer telemetriegegevens worden opgenomen met service-identificatiekenmerken (zoals k8s-deployment, servicenaam, enz.)",
-      "searchServiceName": "Zoek services of streams",
-      "telemetryCoverage": "Telemetriedekking",
-      "serviceName": "Servicenaam",
+      "searchServiceName": "Zoek op service- of streamnaam...",
+      "telemetryCoverage": "Dekking van telemetrie",
+      "serviceName": "Naam van de service",
       "service": "Service",
       "logs": "Logs",
       "traces": "Traces",
@@ -16402,7 +16408,7 @@
       "resetServicesFailed": "Resetten van services mislukt",
       "workload": "Workload",
       "goToConfiguration": "Ga naar configuratie",
-      "filterBy": "Filteren op veld",
+      "filterBy": "Filteren op :",
       "selectFieldPlaceholder": "Veld selecteren",
       "selectValuePlaceholder": "Waarde selecteren",
       "selectFieldFirst": "Selecteer eerst een veld",
@@ -16417,7 +16423,12 @@
       "fieldNameMapping": "Toewijzing veldnamen",
       "logsWithCount": "Logs ({count})",
       "tracesWithCount": "Traces ({count})",
-      "metricsWithCount": "Metrieken ({count})"
+      "metricsWithCount": "Metrieken ({count})",
+      "resetServicesConfirmMessage": "Hiermee worden alle ontdekte services voor deze organisatie verwijderd. Services worden automatisch opnieuw ontdekt zodra er nieuwe telemetriegegevens worden ingelezen. Deze actie kan niet ongedaan worden gemaakt.",
+      "resetServicesConfirmWarning": "Services worden automatisch opnieuw ontdekt zodra er nieuwe telemetriegegevens worden ingelezen. Deze actie kan niet ongedaan worden gemaakt.",
+      "configureServicesHint": "om te configureren hoe services worden geïdentificeerd en gegroepeerd.",
+      "serviceCountSingular": "{count} service | {count} services",
+      "instancesCount": "({count} instanties)"
     },
     "addRegexPattern": {
       "namePlaceholder": "Bijv. Interne Wachtwoorden",
@@ -16496,7 +16507,8 @@
       "logoLightLabel": "Aangepast logo (lichte modus)",
       "logoLightHelp": "Getoond in de lichte modus. PNG, JPG, GIF of BMP, tot 150 × 30 px.",
       "logoDarkLabel": "Aangepast logo (donkere modus)",
-      "logoDarkHelp": "Getoond in de donkere modus. PNG, JPG, GIF of BMP, tot 150 × 30 px."
+      "logoDarkHelp": "Getoond in de donkere modus. PNG, JPG, GIF of BMP, tot 150 × 30 px.",
+      "fileCounterLabel": "{constraint} {filesNumber} bestand {'|'} {totalSize}"
     },
     "modelPricingEditor": {
       "copySuffix": " (Kopiëren)"
@@ -16505,10 +16517,10 @@
       "subtitle": "LLM-modelkostenconfiguratie"
     },
     "orgStorageSettings": {
-      "subtitle": "Sla de gegevens van deze organisatie op in een bucket die je bezit",
-      "awsCredentials": "AWS-inloggegevens",
-      "azureCredentials": "Azure-inloggegevens",
-      "awsRoleArn": "AWS-rol-ARN"
+      "subtitle": "Opslagconfiguratie per organisatie",
+      "awsCredentials": "AWS-referenties",
+      "azureCredentials": "Azure-referenties",
+      "awsRoleArn": "AWS Role ARN"
     },
     "dataRetentionDefaults": {
       "title": "Standaardwaarden voor gegevensretentie",
@@ -16525,10 +16537,13 @@
       "daysValue": "{days} dagen",
       "forever": "voor altijd bewaren",
       "invalid": "Gebruik 0 of minimaal 3 dagen",
-      "invalidType": "Gebruik minimaal 3 dagen, of verwijder dit type"
+      "invalidType": "Gebruik minimaal 3 dagen, of verwijder dit type",
+      "streamType": "Streamtype",
+      "days": "Dagen",
+      "removeType": "Dit streamtype verwijderen"
     },
     "organizationSettings": {
-      "fieldNameHelp": "Alleen letters, cijfers en + = , . {'@'} - _.",
+      "fieldNameHelp": "Gebruik alleen alfanumerieke tekens en '+=,.{'@'}-_' tekens, zonder spaties.",
       "sectionTitle": "Gegevensverwerking",
       "sectionDescription": "Hoe logs aan traces worden gekoppeld en welke automatische functies zijn ingeschakeld.",
       "traceIdHelp": "Het logveld dat een logregel aan de bijbehorende trace koppelt. Alleen letters, cijfers en + = , . {'@'} - _.",
@@ -16542,7 +16557,7 @@
       "subtitle": "AI-toolintegraties configureren"
     },
     "cipherKeysPage": {
-      "subtitle": "Sleutels die gevoelige veldwaarden versleutelen en ontsleutelen",
+      "subtitle": "Versleutelingssleutels voor gevoelige velden",
       "delete": "Verwijderen",
       "deleteCipherKeyTitle": "Cipher key verwijderen",
       "deleteCipherKeyMessage": "Weet je zeker dat je de versleutelingssleutel {name} wilt verwijderen?",
@@ -16647,7 +16662,7 @@
       "contractRevokedSuccess": "Extern contract succesvol ingetrokken.",
       "revokeContractError": "Kan extern contract niet intrekken.",
       "enableByobTitle": "BYOB inschakelen",
-      "enablingStorage": "Opslaginstellingen inschakelen...",
+      "enablingStorage": "opslaginstellingen inschakelen...",
       "storageEnabledSuccess": "Opslaginstellingen succesvol ingeschakeld.",
       "enableStorageError": "Kan opslaginstellingen niet inschakelen.",
       "processingTrialExtension": "Even geduld terwijl de proefperiodeverlenging wordt verwerkt...",
@@ -16682,20 +16697,20 @@
       "failedToImport": "Kan \"{name}\" niet importeren: {error}"
     },
     "orgStorageEditor": {
-      "chooseTypeTitle": "Kies provider",
-      "selectProviderDescCont": "Zodra dit is geconfigureerd, worden alle nieuwe gegevens voor deze organisatie naar je eigen bucket geschreven.",
+      "chooseTypeTitle": "Type kiezen",
+      "selectProviderDescCont": "eenmaal geconfigureerd, worden alle nieuwe gegevens voor deze org naar uw eigen opslaginfrastructuur geschreven.",
       "irreversibleWarnPre": "Deze actie is ",
       "irreversibleWarnEmphasis": "onomkeerbaar",
       "irreversibleWarnPost": ". Eenmaal ingesteld, kunt u niet overschakelen naar een andere opslagprovider of deze configuratie verwijderen. Om een andere provider te gebruiken, moet u een nieuwe organisatie aanmaken.",
       "credentialsOnlyInfo": "Eenmaal geconfigureerd, kunnen alleen velden met inloggegevens worden bijgewerkt. Alle andere velden worden vergrendeld.",
-      "selectStorageProviderLabel": "Opslagprovider",
+      "selectStorageProviderLabel": "Opslagprovider selecteren ",
       "connectionTitle": "Verbinding",
       "serverUrlLabel": "Server-URL",
       "regionLabel": "Regio",
       "bucketNameLabel": "Bucketnaam",
       "accessKeyLabel": "Toegangssleutel",
       "secretKeyLabel": "Geheime sleutel",
-      "storageAccountNameLabel": "Naam opslagaccount",
+      "storageAccountNameLabel": "Opslagaccountnaam",
       "roleArnLabel": "Rol ARN",
       "externalIdLabel": "Externe ID",
       "pleaseWaitMessage": "Even geduld...",
@@ -16721,15 +16736,15 @@
       "serviceNameDetectedFrom": "Servicenaam gedetecteerd uit",
       "fieldAlias": "veldalias",
       "noFieldsConfiguredYet": "Nog geen velden geconfigureerd",
-      "workloadDetection": "Workloaddetectie",
+      "workloadDetection": "Workload-detectie",
       "workloadDetectedUsingFields": "Workload gedetecteerd met behulp van velden",
       "workloadTrackedHelp": "Alleen deze veldaliasgroepen worden gebruikt voor workloaddetectie en aanbevelingen. Velden die niet in deze lijst staan, beïnvloeden de servicedetectieresultaten niet. Optioneel — dimensies in identiteitssets worden altijd bijgehouden.",
-      "goToFieldAliases": "Ga naar veldtoewijzingen",
+      "goToFieldAliases": "Ga naar Veldalias",
       "toConfigureFieldMappings": "om individuele veldtoewijzingen te configureren.",
       "selectAliasGroup": "Aliasgroep selecteren",
       "discoveredPatternsHelp": "We hebben deze implementatiepatronen in uw streams ontdekt. Gebruik ze om servicecorrelatie te configureren.",
       "envFieldsDetected": "{env} velden gedetecteerd in je telemetriegegevens.",
-      "goToServices": "Ga naar services",
+      "goToServices": "Ga naar Services",
       "fieldsConfigured": "{n} veld geconfigureerd | {n} velden geconfigureerd",
       "recommended": "Aanbevolen:",
       "recommendedUse": "Gebruik",
@@ -16759,7 +16774,8 @@
       "reasonIdealForDisambiguation": "{details} — ideaal om services te onderscheiden",
       "trackedK8sWorkload": "K8s Workload",
       "trackedK8sPod": "K8s Pod",
-      "serviceCountFailed": "Kan het aantal services niet laden"
+      "serviceCountFailed": "Kan het aantal services niet laden",
+      "toSeeDiscoveredServices": "om de daadwerkelijk ontdekte services te zien."
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "bijv. {example}",
@@ -16948,6 +16964,51 @@
       "requestApproved": "{domain} gekoppeld",
       "requestRejected": "Verzoek voor {domain} afgewezen",
       "decisionFailed": "Kan het verzoek niet bijwerken"
+    },
+    "groupDataAI": "Data en AI",
+    "llmProvidersDesc": "LLM-providers voor online evaluaties",
+    "customLogoTitle": "Logo op maat",
+    "customLogoTextDescription": "Aangepaste logotekst wordt gebruikt om de standaardmerktekst te wijzigen die in de toepassing wordt weergegeven.",
+    "dragDropUpload": "Drag & drop of klik om te uploaden",
+    "customLogoLightDescription": "Aangepast logo voor thema in de lichtmodus. Dit wordt weergegeven wanneer gebruikers zich in de lichtmodus bevinden.",
+    "customLogoDarkDescription": "Aangepast logo voor thema in de donkere modus. Dit wordt weergegeven wanneer gebruikers zich in de donkere modus bevinden.",
+    "textMaxCharacters": "De tekst moet minder dan 100 tekens lang zijn.",
+    "genAiAgentMapping": {
+      "tabLabel": "In kaart brengen van GenAI-agenten",
+      "title": "In kaart brengen van GenAI-agenten",
+      "description": "Configureer fallback-telemetrie-attributen die worden gebruikt om de agentidentiteit te normaliseren voor LLM-traces en -evaluaties.",
+      "agentNameFields": "Terugvalvelden voor de naam van de agent",
+      "agentNameHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.name.",
+      "agentNameInfo": "Alleen aangevinkt als het standaardattribuut gen_ai.agent.name ontbreekt of leeg is. Voeg één inkomend telemetriekenmerk per regel toe.",
+      "agentIdFields": "Terugvalvelden voor Agent-ID",
+      "agentIdHelp": "Inkomende attributen om te gebruiken als noodoplossing voor gen_ai.agent.id.",
+      "agentIdInfo": "Alleen aangevinkt als het standaardkenmerk gen_ai.agent.id ontbreekt of leeg is. Voeg één inkomend telemetriekenmerk per regel toe.",
+      "envFields": "Terugvalvelden voor omgeving",
+      "envHelp": "Inkomende attributen die als omgeving van de agent worden gebruikt.",
+      "envInfo": "Wordt alleen gecontroleerd wanneer het standaardattribuut deployment.environment.name ontbreekt of leeg is. Voeg één inkomend telemetrie-attribuut per regel toe.",
+      "versionFields": "Terugvalvelden voor versie",
+      "versionHelp": "Inkomende attributen die als versie van de agent worden gebruikt.",
+      "versionInfo": "Wordt alleen gecontroleerd wanneer het standaardattribuut gen_ai.agent.version ontbreekt of leeg is. Voeg één inkomend telemetrie-attribuut per regel toe.",
+      "alwaysAppliedStandard": "Standaard (eerst gecontroleerd):",
+      "applyDefaults": "Standaardwaarden toepassen",
+      "resetToEmpty": "Terugzetten naar leeg",
+      "clearRegistry": "Register wissen",
+      "clearRegistryTitle": "Register van agenten wissen?",
+      "clearRegistryDescription": "Dit verwijdert alle gedetecteerde GenAI-agentregisterrijen voor deze organisatie. Nieuwe overeenkomende traces vullen het register tijdens de ingestie opnieuw.",
+      "clearRegistryConfirm": "Register wissen",
+      "saved": "De toewijzing van GenAI-agenten is met succes opgeslagen",
+      "clearRegistrySuccess": "GenAI-agentregister gewist. {deletedCount} opgeslagen agents en {bufferCount} gebufferde observaties verwijderd.",
+      "loadFailed": "Het laden van de GenAI-agenttoewijzing is mislukt",
+      "saveFailed": "Kon de toewijzing van de GenAI-agent niet opslaan",
+      "clearRegistryFailed": "Kon het register van de GenAI-agent niet wissen",
+      "defaultsLoadFailed": "Het laden van de standaardinstellingen voor GenAI-agenttoewijzing is mislukt",
+      "defaultsFetchFailed": "Kan standaardwaarden niet ophalen ({status})"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "LLM-providers voor online evaluaties"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "GenAI-spans toewijzen aan agent-id's"
     }
   },
   "reports": {
@@ -17178,30 +17239,30 @@
     },
     "selectOption": "Selecteer optie",
     "runningQueries": "Zoekopdrachten uitvoeren",
-    "search": "Zoekquery's",
+    "search": "Zoek",
     "queryList": "Details van de zoekopdracht",
-    "duration": "Uitvoeringsduur",
+    "duration": "Exec. Duur",
     "files": "Bestanden",
     "status": "Status",
     "cancelQuery": "Zoekopdracht annuleren",
-    "queryRange": "Querybereik",
+    "queryRange": "Vraagbereik",
     "userSummary": "Gebruikerssamenvatting",
     "allQueries": "Alle query's",
     "allFields": "Alle velden",
-    "queryType": "Querytype",
-    "numOfQueries": "Aantal query's",
-    "totalDuration": "Totale uitvoeringsduur",
-    "totalTimeRange": "Totaal querybereik",
-    "searchType": "Zoektype",
-    "querySource": "Querybron",
+    "queryType": "Soort zoekopdracht",
+    "numOfQueries": "Aantal zoekopdrachten",
+    "totalDuration": "Total Exec. Duur",
+    "totalTimeRange": "Totaal aantal zoekopdrachten",
+    "searchType": "Soort zoekopdracht",
+    "querySource": "Bron van de zoekopdracht",
     "traceId": "Trace ID",
     "userId": "Gebruikers-ID",
     "orgId": "Organisatie-ID",
     "streamType": "Streamtype",
     "startTime": "Starttijd",
     "endTime": "Eindtijd",
-    "scanRecords": "Gescande records",
-    "originalSize": "Oorspronkelijke grootte",
+    "scanRecords": "Scanrecords",
+    "originalSize": "Originele grootte",
     "compressedSize": "Gecomprimeerde grootte",
     "deleteRunningQueryTitle": "Lopende query verwijderen",
     "deleteRunningQueryMessage": "Weet je zeker dat je deze lopende query wilt verwijderen?",
@@ -17209,7 +17270,8 @@
     "cancelQueryFailed": "Kan de query niet annuleren.",
     "searchTypeDashboards": "Dashboards",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "Overige"
+    "searchTypeOthers": "Overige",
+    "lastDataRefreshTime": "Laatste dataverversingstijd:"
   },
   "traces": {
     "nlNeedsSql": "Deze vraag vereist SQL; open deze in logs",
@@ -17659,7 +17721,8 @@
         "count": "{count} inzicht | {count} inzichten",
         "countHint": "{count} service-anomalie in dit tijdsbereik | {count} service-anomalieën in dit tijdsbereik",
         "viewTraces": "Traces",
-        "viewCharts": "Grafieken"
+        "viewCharts": "Grafieken",
+        "scoreAbove": "+{percent}% score boven drempelwaarde"
       }
     },
     "spansTab": "Spans",
@@ -17762,14 +17825,15 @@
       "failedToLoad": "Inzichten laden mislukt",
       "retry": "Opnieuw proberen",
       "noAgentsInRange": "Geen agenten in dit bereik",
-      "noAgentsDescription": "Er zijn geen GenAI-agents gedetecteerd voor het geselecteerde tijdsvenster. Probeer een breder bereik, schakel over naar het tabblad Stream of configureer Agent Mapping.",
+      "noAgentsDescription": "Er zijn geen GenAI-agenten gedetecteerd voor het geselecteerde tijdvenster. Probeer een breder bereik, schakel over naar het Stream-tabblad of configureer agenttoewijzing in de instellingen.",
       "viewByStream": "Bekijk op stream",
       "totalCost": "Totale kosten",
       "totalTokens": "Totaal aantal tokens",
       "totalTraces": "Totaal traces",
       "p95Latency": "P95-latentie",
       "errorRate": "Foutpercentage",
-      "timeAxis": "Tijd"
+      "timeAxis": "Tijd",
+      "errorsSeries": "fouten"
     },
     "searchBar": {
       "streamNotFound": "Stream niet gevonden"
@@ -17823,7 +17887,10 @@
       "metricsLoadFailed": "Kan de gecorreleerde metrieken van deze service niet laden. {reason}",
       "noResourceRecorded": "De spans van deze service in dit tijdsbereik registreren {resource} niet.",
       "resourceLoadFailed": "Kan {resource} voor deze service niet laden. {reason}",
-      "noVersionTraffic": "De spans van deze service in deze stream registreren geen versie, dus er is geen verkeer om op versie te splitsen."
+      "noVersionTraffic": "De spans van deze service in deze stream registreren geen versie, dus er is geen verkeer om op versie te splitsen.",
+      "noResourceDataFound": "Geen {resource}-gegevens gevonden",
+      "failedToLoadMetrics": "Kan metrieken niet laden.",
+      "requests": "Verzoeken"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP-statuscode",
@@ -18063,11 +18130,20 @@
       "loadingPage": "Pagina {page} laden",
       "pageFailed": "Kan pagina {page} niet laden",
       "pageEmpty": "Pagina {page} heeft geen resultaten"
+    },
+    "lLMErrorTable": {
+      "noData": "Geen gegevens",
+      "noErrorsInRange": "Geen fouten in dit tijdsbereik",
+      "loadFailed": "Kan recente fouten niet laden",
+      "time": "Tijd",
+      "service": "Service",
+      "operation": "Operatie",
+      "traceId": "Trace ID"
     }
   },
   "aiToolset": {
     "header": "AI-toolsets",
-    "add": "Nieuwe toolset",
+    "add": "Nieuwe AI-toolset",
     "search": "AI-toolsets zoeken",
     "update": "AI-toolset bijwerken",
     "name": "Naam",
@@ -18098,7 +18174,7 @@
     "headerKey": "Naam van de koptekst",
     "headerValue": "Headerwaarde",
     "addHeader": "Koptekst toevoegen",
-    "cliConfig": "CLI-toolconfiguratie",
+    "cliConfig": "Configuratie van de CLI-tool",
     "presets": "Snel vullen",
     "cliCommand": "Commando",
     "cliCommandRequired": "Commando is vereist",
@@ -18115,7 +18191,7 @@
     "credEnvVarHint": "bijv. {example}",
     "credContentHint": "Inhoud van onbewerkte bestanden (bijvoorbeeld kubeconfig YAML)",
     "addCredFile": "Referentiebestand toevoegen",
-    "skillConfig": "Skillconfiguratie",
+    "skillConfig": "Configuratie van vaardigheden",
     "skillContent": "Definitie van vaardigheden (Markdown)",
     "skillContentRequired": "Vaardigheidsinhoud is vereist"
   },
@@ -18124,12 +18200,12 @@
     "continue": "Doorgaan",
     "header": "Cipher keys",
     "add": "Nieuwe cipher key",
-    "search": "Cipher-sleutels zoeken",
+    "search": "Cipher key zoeken",
     "update": "Cipher key bijwerken",
     "name": "Naam",
     "type": "Typ",
-    "step1WithType": "Sleutelopslag ({type})",
-    "step2": "Versleutelingsmechanisme",
+    "step1WithType": "Keystore-details (Type: {type})",
+    "step2": "Encryptiemechanisme",
     "sectionKey": "Sleutel",
     "sectionSetup": "Sleutelopslag en versleuteling",
     "secret": "Geheim",
@@ -18170,8 +18246,8 @@
     "staticSecretNameRequired": "Naam van statisch geheim is vereist",
     "dfcNameRequired": "DFC-naam is vereist",
     "dfcEncryptedDataRequired": "DFC-gecodeerde gegevens zijn vereist",
-    "storeType": "Opslagtype",
-    "mechanismType": "Mechanismetype",
+    "storeType": "Soort winkel",
+    "mechanismType": "Soort mechanisme",
     "actions": "Acties"
   },
   "quota": {
@@ -18194,8 +18270,8 @@
     "tcpCloseWaitPrefix": ", C:",
     "tcpTimeWaitPrefix": ", T:",
     "header": "Alle knooppunten",
-    "search": "Node zoeken",
-    "name": "Nodenaam",
+    "search": "Knooppunt zoeken",
+    "name": "Naam van het knooppunt",
     "version": "Versie",
     "cpu": "CPU%",
     "memory": "Geheugen%",
@@ -18204,7 +18280,7 @@
     "clear_all": "Alles wissen",
     "region": "regio",
     "cluster": "Cluster",
-    "nodetype": "Nodetype",
+    "nodetype": "Knooppunttype",
     "summaryOffline": "Offline",
     "summaryStarting": "Starten",
     "summaryOnline": "Online",
@@ -18213,8 +18289,8 @@
     "cpuusage": "CPU-gebruik (%)",
     "memoryusage": "Geheugengebruik (%)",
     "establishedLabel": "Opgericht",
-    "closewaitLabel": "Close wait",
-    "waittimeLabel": "Time wait",
+    "closewaitLabel": "Sluiten, wachten",
+    "waittimeLabel": "Tijd, wacht.",
     "applyFilter": "Filters toepassen",
     "searchCluster": "Cluster zoeken",
     "searchRegion": "Regio zoeken"
@@ -18225,7 +18301,7 @@
     "search": "Patroon zoeken",
     "name": "Naam",
     "pattern": "Patroon",
-    "created_at": "Aangemaakt op",
+    "created_at": "Gemaakt op",
     "updated_at": "Bijgewerkt op",
     "actions": "Acties",
     "edit": "Bewerken",
@@ -18378,7 +18454,7 @@
     "exportToJson": "Exporteren naar JSON",
     "importFromJson": "Importeren vanuit JSON",
     "addCustomGroup": "Aangepaste groep toevoegen",
-    "removeSemanticGroup": "Semantische groep verwijderen",
+    "removeSemanticGroup": "Semantic Group verwijderen",
     "serviceGroupProtected": "De servicegroep kan niet worden verwijderd. U kunt alleen de toegewezen velden wijzigen.",
     "isWorkloadType": "Service-ID",
     "isWorkloadTypeTooltip": "Indien ingeschakeld, wordt deze groep gebruikt om een service op unieke wijze te identificeren (bijvoorbeeld cluster, naamruimte, implementatie). Uitschakelen voor groepen die bewerkingen via een service beschrijven, zoals de HTTP-methode of de databasenaam.",
@@ -19526,7 +19602,8 @@
         "promptTemperatureOverrideInherited": "Gebruikt promptparameters.",
         "taskTimeoutLabel": "Timeout (seconden)",
         "taskConcurrencyLabel": "Maximale gelijktijdigheid",
-        "taskOverrideHelp": "Overschrijft de gepubliceerde waarde van de taak voor deze run."
+        "taskOverrideHelp": "Overschrijft de gepubliceerde waarde van de taak voor deze run.",
+        "providerHelpSettingsLink": "Instellingen"
       },
       "columns": {
         "name": "Naam",
@@ -19864,7 +19941,7 @@
       "agentIdHint": "Agent-ID: {ids}",
       "noAgentIdentity": "Geen agentidentiteit gevonden",
       "noAgentIdentityDescription": "Deze LLM-spans bevatten geen agentnaam, dus ze worden per stream getoond. Koppel het attribuut dat de naam van je agent bevat om ze per agent te bekijken.",
-      "noAgentIdentityAction": "Agenttoewijzing openen"
+      "noAgentIdentityAction": "GenAI Agent Mapping openen"
     },
     "agentGraph": {
       "stream": "Stream",
@@ -19880,17 +19957,17 @@
       },
       "tokenTrend": {
         "title": "Een symbolische trend",
-        "subtitle": "invoer- en uitvoertokens",
+        "subtitle": "tokens per model",
         "input": "Invoer",
         "output": "Uitvoer"
       },
       "latencyByModel": {
-        "title": "Latentietrend",
-        "subtitle": "p95 per model"
+        "title": "Latentie per model",
+        "subtitle": "p50/p90/p95/p99"
       },
       "tracesOverTime": {
-        "title": "Traces in de tijd",
-        "subtitle": "OK- en foutieve traces",
+        "title": "Verzoeken na verloop van tijd",
+        "subtitle": "aantal aanvragen per service",
         "ok": "OK",
         "errored": "Met fouten"
       },
@@ -19919,6 +19996,26 @@
           "traces": "Traces",
           "last": "Laatste fout"
         }
+      },
+      "spanTrend": {
+        "title": "Span-trend",
+        "subtitle": "aantal spans per soort"
+      },
+      "errorsOverTime": {
+        "title": "Fouten in de loop van de tijd",
+        "subtitle": "aantal fouten"
+      },
+      "spansByModel": {
+        "title": "Spans per model",
+        "subtitle": "aantal gesprekken per model"
+      },
+      "tokensByModel": {
+        "title": "Tokens per model",
+        "subtitle": "totaal aantal tokens per model"
+      },
+      "recentErrors": {
+        "title": "Recente fouten",
+        "subtitle": "laatste 10 mislukte spans"
       }
     },
     "behavior": {
@@ -19951,12 +20048,12 @@
       "colErrors": "Fouten",
       "detail": {
         "title": "Signaaldetails",
-        "tracesTitle": "Traces met fouten van deze agent",
+        "tracesTitle": "Traces",
         "tracesHint": "Klik op een trace om deze te openen",
         "worstLoopTraces": "Slechtste traces (meeste herhalingen eerst)",
         "topCostTraces": "Duurste traces",
         "noTraces": "Geen traces gevonden voor dit signaal",
-        "errorsTitle": "Alle fouten van deze agent",
+        "errorsTitle": "Wat de fouten zeggen",
         "noErrors": "Geen foutmeldingen vastgelegd — open een trace om te inspecteren",
         "colTraceId": "Trace",
         "colSpans": "Spans",
@@ -19970,7 +20067,7 @@
         "failHeadline": "{agent} stuitte op {count} “{cls}” fouten.",
         "costHeadline": "{agent}: ${cost} uitgave · {tokens} tokens · {errors} fouten.",
         "loopExplain": "Een hoog herhalingspercentage betekent meestal dat de agent resultaten niet cachet of opnieuw probeert. Open de slechtste traces hieronder om de herhaalde aanroepen te zien.",
-        "failExplain": "Dit zijn alle foutmeldingen van deze agent, uit elke foutklasse, niet alleen deze. Lees ze om de oplossing te vinden, of open een trace om te zien waar het is gebeurd.",
+        "failExplain": "Dit zijn de daadwerkelijke foutmeldingen achter deze foutklasse — lees ze om de oplossing te vinden, of open een trace om te zien waar het gebeurde.",
         "costExplain": "Deze traces zorgden voor de uitgaven van deze agent. Open de duurste om te zien wat er draaide.",
         "explain": "Uitleggen met O2 AI",
         "explainHelp": "O2 AI onderzoekt dit signaal op basis van de foutmeldingen en de slechtste traces, kijkt verder dan de AI-spans naar logs, metrieken, Kubernetes en deployments, en citeert het bewijs."
@@ -20957,7 +21054,7 @@
       },
       "noProviders": {
         "title": "Voeg eerst een provider toe",
-        "description": "Scorers hebben een LLM-provider (OpenAI, Anthropic, enz.) nodig om te draaien. Voeg er een toe onder LLM-providers voordat je scorers aanmaakt."
+        "description": "Scorers hebben een LLM-provider (OpenAI, Anthropic, enz.) nodig om te draaien. Voeg een provider toe in Instellingen voordat je scorers aanmaakt."
       },
       "import": {
         "title": "Scorer importeren",
@@ -21117,7 +21214,8 @@
         "resultReasoning": "Redenering",
         "resultRaw": "Onbewerkt antwoord",
         "valuePlaceholder": "Waarde voor {variable}"
-      }
+      },
+      "providerHelpSettingsLink": "Instellingen"
     },
     "job": {
       "detail": {
@@ -21301,7 +21399,7 @@
         }
       },
       "inputMapping": {
-        "title": "Scorervariabelen",
+        "title": "Promptvariabelen",
         "hint": {
           "span": "Wijs elke variabele toe aan een span-attribuut.",
           "trace": "Wijs elke variabele toe aan een door het systeem geleverde waarde of span-attribuut.",
@@ -21471,7 +21569,7 @@
       "defaultModel": "Standaardmodel"
     },
     "empty": {
-      "title": "Nog geen LLM-providers",
+      "title": "Nog geen LLM-aanbieders",
       "description": "LLM-providers slaan de verbindingsgegevens (basis-URL en credentials) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om evaluaties met een judge uit te voeren."
     }
   },
@@ -22114,7 +22212,7 @@
       "explanation": "Organisatieniveau o2syn_-tokens die uw privé-agents gebruiken om te authenticeren wanneer ze jobs ophalen. Openbare (Lambda)-locaties gebruiken automatisch het standaardtoken; maak een benoemd token en embed het in de agents van een regio om de blast radius van die regio te beperken.",
       "summary": "Tokens die uw privé-agents gebruiken om jobs op te halen.",
       "rotateDefaultBtn": "Roteer standaard",
-      "createTokenBtn": "Nieuw token",
+      "createTokenBtn": "Token maken",
       "searchPlaceholder": "Zoek tokens",
       "default": "Standaard",
       "tokenNameLabel": "Naam",
@@ -22715,7 +22813,7 @@
       "unknown": "Onbekend"
     },
     "locations": {
-      "addLocation": "Nieuwe locatie",
+      "addLocation": "Locatie toevoegen",
       "bulkDeleteConfirmMessage": "Weet u zeker dat u {count} locaties wilt verwijderen?",
       "bulkDeleteConfirmTitle": "Locaties verwijderen",
       "bulkDeleteFailed": "Locaties verwijderen mislukt",
@@ -22725,7 +22823,7 @@
       "createClose": "Aanmaken en sluiten",
       "createFailed": "Locatie aanmaken mislukt",
       "createSuccess": "Locatie succesvol aangemaakt",
-      "createTitle": "Nieuwe locatie",
+      "createTitle": "Locatie toevoegen",
       "customProviderLabel": "Aangepaste provider",
       "customProviderPlaceholder": "Voer providernaam in",
       "customProviderRequired": "Aangepaste providernaam is vereist",
@@ -22733,7 +22831,7 @@
       "deleteConfirmTitle": "Locatie verwijderen",
       "deleteFailed": "Locatie verwijderen mislukt",
       "deleteSuccess": "Locatie succesvol verwijderd",
-      "description": "Openbare probelocaties voor synthetische monitoring",
+      "description": "Openbare proeflocaties beheren voor synthetische monitoring",
       "disable": "Uitschakelen",
       "disabledSuccess": "Locatie uitgeschakeld",
       "disabling": "Uitschakelen…",
@@ -22780,7 +22878,7 @@
       "region": "Regio",
       "regionPlaceholder": "bijv. us-east-1",
       "regionRequired": "Regio is vereist",
-      "searchPlaceholder": "Locaties zoeken",
+      "searchPlaceholder": "Locaties zoeken…",
       "title": "Locaties",
       "publicTitle": "Openbare locaties",
       "privateTitle": "Privélocaties",
@@ -24767,9 +24865,9 @@
       "pipelinesExportedSuccessfully": "{count} pipeline succesvol geëxporteerd | {count} pipelines succesvol geëxporteerd",
       "functionsNotBundled": "{count} functie kon niet in het exportbestand worden opgenomen: {names} | {count} functies konden niet in het exportbestand worden opgenomen: {names}",
       "pipelineDeletedSuccessfully": "Pipeline succesvol verwijderd",
-      "deletingPipeline": "Pipeline verwijderen...",
+      "deletingPipeline": "pipeline verwijderen...",
       "pipelineCreatedSuccessfully": "Pipeline succesvol aangemaakt",
-      "savingPipeline": "Pipeline opslaan...",
+      "savingPipeline": "pipeline opslaan...",
       "stateResumed": "{name} status hervat succesvol",
       "statePaused": "{name} status gepauzeerd succesvol"
     },
@@ -25386,19 +25484,19 @@
     "unitAttempts": "pogingen",
     "unitSeconds": "seconden",
     "minLength": "Minimumlengte",
-    "minLengthDesc": "Kortste wachtwoord dat wordt geaccepteerd.",
+    "minLengthDesc": "Kortste geaccepteerde wachtwoord",
     "maxLength": "Maximumlengte",
-    "maxLengthDesc": "Langste wachtwoord dat wordt geaccepteerd, tot 128.",
+    "maxLengthDesc": "Langste toegestane wachtwoord, tot 128",
     "requireUppercase": "Hoofdletter vereisen",
-    "requireUppercaseDesc": "Minstens één A–Z.",
+    "requireUppercaseDesc": "Ten minste één A–Z",
     "requireLowercase": "Kleine letter vereisen",
-    "requireLowercaseDesc": "Minstens één a–z.",
+    "requireLowercaseDesc": "Ten minste één a–z",
     "requireDigit": "Cijfer vereisen",
-    "requireDigitDesc": "Minstens één 0–9.",
+    "requireDigitDesc": "Ten minste één 0–9",
     "requireSpecial": "Speciaal teken vereisen",
-    "requireSpecialDesc": "Minstens één teken uit de toegestane set.",
+    "requireSpecialDesc": "Ten minste één uit de toegestane set",
     "specialCharSet": "Toegestane speciale tekens",
-    "specialCharSetDesc": "Leeg accepteert elk niet-alfanumeriek teken.",
+    "specialCharSetDesc": "Laat leeg om elk niet-alfanumeriek teken te accepteren",
     "maxLengthTooSmall": "Maximumlengte moet tussen de minimumlengte en 128 liggen.",
     "maxLengthBelowMin": "Moet {min} of meer zijn, om overeen te komen met de minimale lengte.",
     "confirmTitle": "Wachtwoordbeleid opslaan?",
@@ -25412,9 +25510,9 @@
     "rotation": "Rotatie",
     "rotationDays": "Rotatieperiode",
     "rotationDesc": "Wanneer een wachtwoord verloopt en hoeveel waarschuwing vooraf mensen krijgen.",
-    "rotationDaysDesc": "Dagen voordat een wachtwoord verloopt. 0 betekent dat wachtwoorden nooit verlopen.",
+    "rotationDaysDesc": "Dagen voordat een wachtwoord verloopt. 0 = verloopt nooit",
     "rotationWarningDays": "Waarschuwen voor afloop",
-    "rotationWarningDaysDesc": "Dagen vooraf waarschuwing bij inloggen. 0 geeft geen waarschuwing.",
+    "rotationWarningDaysDesc": "Dagen van kennisgeving bij aanmelding. 0 = geen waarschuwing",
     "rotationWarningDaysOffDesc": "Dagen waarschuwing vooraf bij aanmelden. Wordt gebruikt zodra wachtwoorden verlopen.",
     "warningDaysTooLong": "Het waarschuwingsvenster kan niet langer zijn dan de rotatieperiode.",
     "rotationPreview": "Een vandaag ingesteld wachtwoord verloopt op {expires}. De aanmeldwaarschuwing begint op {warns}.",
@@ -25422,33 +25520,33 @@
     "reuse": "Hergebruikpreventie",
     "historyCount": "Onthouden wachtwoorden",
     "reuseDesc": "Voorkomt dat mensen teruggaan naar een oud wachtwoord.",
-    "historyCountDesc": "Een nieuw wachtwoord mag niet overeenkomen met dit aantal eerdere wachtwoorden. 0 schakelt de controle uit.",
+    "historyCountDesc": "Een nieuw wachtwoord mag niet overeenkomen met dit aantal eerdere wachtwoorden. 0 = geen controle",
     "historyMaxRetained": "Bewaarde geschiedenis",
-    "historyMaxRetainedDesc": "Hoeveel eerdere wachtwoorden per gebruiker worden bewaard.",
+    "historyMaxRetainedDesc": "Hoeveel eerdere wachtwoorden per gebruiker worden bewaard",
     "historyRetainedTooSmall": "Bewaarde geschiedenis moet ten minste gelijk zijn aan het aantal onthouden wachtwoorden.",
     "reuseExplainer": "Het huidige wachtwoord telt als een van de onthouden wachtwoorden — hergebruik ervan wordt door deze regel geweigerd, niet door een aparte controle.",
     "lockout": "Accountvergrendeling",
     "lockoutThreshold": "Mislukte pogingen voor vergrendeling",
     "lockoutDesc": "Wat er gebeurt na herhaalde mislukte aanmeldingen.",
-    "lockoutThresholdDesc": "0 schakelt vergrendeling uit.",
+    "lockoutThresholdDesc": "0 = vergrendeling uitgeschakeld",
     "lockoutBucketSize": "Pogingen voor elke volgende vergrendeling",
-    "lockoutBucketSizeDesc": "Hoeveel extra mislukte pogingen de volgende vergrendeling activeren. 0 gebruikt hetzelfde aantal als de eerste.",
+    "lockoutBucketSizeDesc": "0 = hergebruik de waarde hierboven",
     "lockoutStartSecs": "Duur van eerste vergrendeling",
-    "lockoutStartSecsDesc": "Hoe lang de eerste vergrendeling duurt.",
+    "lockoutStartSecsDesc": "Seconden",
     "lockoutMaxSecs": "Maximale vergrendelingsduur",
-    "lockoutMaxSecsDesc": "Het maximum waarop de escalatie stopt.",
+    "lockoutMaxSecsDesc": "Seconden — het plafond waarnaar escalatie wordt afgekapt",
     "lockoutStartTooLong": "De eerste vergrendeling kan niet langer zijn dan de maximale vergrendeling.",
     "lockoutBackoff": "Escalatie",
-    "lockoutBackoffDesc": "Hoe elke vergrendeling groeit ten opzichte van de vorige.",
+    "lockoutBackoffDesc": "Hoe elke vergrendeling groeit ten opzichte van de vorige",
     "backoffExponential": "Exponentieel",
     "backoffLinear": "Lineair",
     "lockoutPreview": "{threshold} fouten → {first} · elke {bucket} meer → {rest} · gemaximeerd op {max}. Een succesvolle aanmelding reset alles.",
     "sessionEnforcement": "Sessie en handhaving",
     "sessionEnforcementDesc": "Hoe lang een aanmelding geldig blijft, en of root deze regels volgt.",
     "cookieMaxAge": "Sessielevensduur",
-    "cookieMaxAgeDesc": "Hoe lang een ingelogde sessie geldig blijft. 0 gebruikt de standaardwaarde van de instantie uit {envVar}.",
+    "cookieMaxAgeDesc": "Seconden dat een aangemelde sessie geldig blijft. 0 = gebruik de standaardwaarde van de instantie uit {envVar}",
     "applyToRoot": "Toepassen op het rootaccount",
-    "applyToRootDesc": "Root is vrijgesteld van alle bovenstaande regels tenzij dit aan staat.",
+    "applyToRootDesc": "Root is vrijgesteld van alle bovenstaande regels tenzij dit is ingeschakeld",
     "rootWarning": "Het vergrendelen van root kan ertoe leiden dat het systeem in een onherstelbare staat terechtkomt.",
     "rootDialogTitle": "Het beleid toepassen op root?",
     "rootDialogMessage": "Root zal net als elk ander systeemeigen account onderhevig zijn aan vergrendeling, rotatie en gedwongen resets. Als root uw enige beheerdersaccount is, kan een vergrendeling of een vervaldatum waaraan niet kan worden voldaan, ervoor zorgen dat er geen weg terug is naar deze instantie.",
@@ -29621,12 +29719,12 @@
       "chartBelow": "{metric}, nu {value}, onder normaalbereik",
       "chartWithin": "{metric}, {value} nu, binnen normaal bereik",
       "tipNormal": "Normaal {low} – {high}",
-      "openTraces": "Openen in Traces",
+      "openTraces": "Traces",
       "openCatalog": "Servicecatalogus",
       "openLogs": "Openen in Logs",
       "rangeLabel": "Tijdsbereik",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Dekkingsgat",
+      "badgeNotWatched": "Niet bewaakt",
       "signalsWatched": "Signalen bewaakt",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Omhoog {change} sinds het begin van het bereik",
@@ -29722,7 +29820,10 @@
         "service": "Op service",
         "place": "Op locatie",
         "none": "Niet gegroepeerd"
-      }
+      },
+      "fixNoLink": "Label service.name toevoegen",
+      "fixStopped": "Controleer de collector",
+      "fixQueued": "Alleen mock: “{action}” voor {service} is nergens naartoe verzonden"
     },
     "activity": {
       "before": "Voor",
@@ -30471,15 +30572,15 @@
       "intro": "Dit is wat ik doe, in vijf stappen.",
       "gotIt": "Begrepen",
       "s1Title": "Ik vind je services",
-      "s1": "Ik kijk door de gegevens die je al verstuurt en vind de services daarin. Een nieuwe service verschijnt na mijn volgende controle; je hoeft die niet toe te voegen.",
-      "s2Title": "Ik leer hoe normaal eruitziet",
-      "s2": "Ik leer hoeveel gegevens elke stream normaal verstuurt op basis van 14 dagen geschiedenis. Tot een stream die geschiedenis heeft, zeg ik dat ik nog aan het leren ben en vel ik geen oordeel.",
-      "s3Title": "Ik roep alleen op wanneer een stream stopt",
-      "s3": "Wanneer een stream stopt met het versturen van gegevens, open ik een incident en, als oproepen aan staat, roep ik het piketteam op dat de service beheert. Scherpe dalingen en stijgingen verschijnen als bevindingen en roepen nooit op. Kleinere zaken wachten op de dagelijkse samenvatting.",
-      "s4Title": "Ik zeg wat er is gebeurd",
-      "s4": "Elk incident vermeldt wat er is gestopt en sinds wanneer. Met AI-analyse aan bevat het ook een beste inschatting van waarom.",
-      "s5Title": "Jij beslist wat er verandert",
-      "s5": "Ik stel alarmen voor voor wat niets in de gaten houdt en oplossingen voor alarmen die niet kunnen afgaan. Er verandert niets tot je het beoordeelt en toepast, en je kunt ongedaan maken wat je hebt toegepast."
+      "s1": "Ik kijk door de gegevens die je al verstuurt en vind elke service daarin. Wanneer er een nieuwe verschijnt, begin ik die dezelfde dag in de gaten te houden; je hoeft het niet te vragen.",
+      "s2Title": "Ik houd ze in de gaten",
+      "s2": "Ik leer hoe normaal eruitziet voor elke service: de fouten, traagheid en het verkeer voor elk uur van de dag, waarbij wekelijkse patronen na verloop van tijd scherper worden. Tot ik het weet, gebruik ik basale veiligheidscontroles.",
+      "s3Title": "Ik blijf stil tenzij het echt is",
+      "s3": "De meeste rare momenten zijn geen problemen. Ik roep je team op wanneer iets klanten pijn doet, stuur een bericht dat niemand wakker maakt voor kleinere kwesties, en bewaar kleine dingen voor de samenvatting van vrijdag.",
+      "s4Title": "Ik leg elke oproep uit",
+      "s4": "Elk bericht zegt wat er kapotging, sinds wanneer, en mijn beste inschatting waarom, met hoe zeker ik ervan ben.",
+      "s5Title": "Ik repareer wat je hebt toegestaan",
+      "s5": "Ik repareer alleen dingen waarvan je hebt gezegd dat het mag. Een oplossing die werkt levert een beetje vertrouwen op, en een die niet helpt telt tegen me. Als ik steeds dezelfde oplossing nodig heb, is dat een bug die ik aan je team meld, geen gewoonte die ik automatiseer."
     },
     "outcome": {
       "active": "Gebeurt nu",
@@ -30492,9 +30593,9 @@
     },
     "view": {
       "standard": "Standaard",
-      "nerd": "Gedetailleerd",
+      "nerd": "Detailed",
       "standardTooltip": "Standaardweergave geeft de korte versie: wat jou nodig heeft en wat er de afgelopen 7 dagen is gebeurd",
-      "nerdTooltip": "De gedetailleerde weergave toont elke detector, lus en instelling volledig",
+      "nerdTooltip": "Nerdweergave toont elke detector, lus en instelling volledig",
       "label": "Weergave"
     },
     "suggestions": {
@@ -30617,7 +30718,8 @@
       "copyRequest": "Verzoek kopiëren",
       "requestText": "Voeg de OpenObserve-organisatie {name} ({org}) toe aan de Slack-workspace {team}, in _meta › Instellingen › Slack › Organisaties.",
       "requestCopied": "Verzoek gekopieerd",
-      "setupAppOtherTeam": "Voor een andere Slack-workspace dan {team} · OpenObserve maakt je eigen Slack-app aan met één configuratietoken"
+      "setupAppOtherTeam": "Voor een andere Slack-workspace dan {team} · OpenObserve maakt je eigen Slack-app aan met één configuratietoken",
+      "title": "Een Slack-workspace koppelen"
     },
     "wizard": {
       "title": "De Slack-app instellen",
@@ -30642,7 +30744,7 @@
         "socketHost": "WebSocket-host {host}"
       },
       "create": {
-        "title": "Stap 3 · De app maken",
+        "title": "Stap 3 · De app aanmaken",
         "modeLabel": "Verbindingsmodus",
         "socket": "Socket-modus",
         "socketDescription": "Aanbevolen. OpenObserve opent de verbinding, dus Slack heeft geen openbare URL nodig",
@@ -30837,7 +30939,9 @@
       "ownOrgOnlyHint": "Op een instantiewerkruimte koppel je kanalen aan je eigen organisatie",
       "claimableHint": "Niet-geclaimde kanalen en kanalen die {org} bezit",
       "servedOrgsHint": "Elke organisatie die deze werkruimte bedient",
-      "alertRoutes": "{count} bestemming | {count} bestemmingen"
+      "alertRoutes": "{count} bestemming | {count} bestemmingen",
+      "empty": "Nog geen kanaal heeft een standaardorganisatie",
+      "emptyDescription": "Vragen in een kanaal zonder standaardorganisatie gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org)."
     },
     "people": {
       "title": "Gekoppelde personen",
@@ -30856,7 +30960,8 @@
         "email": "E-mailmatch",
         "admin_bulk": "Alles koppelen"
       },
-      "loadMore": "Meer laden"
+      "loadMore": "Meer laden",
+      "empty": "Nog niemand in deze organisatie heeft Slack gekoppeld"
     },
     "credentials": {
       "title": "Inloggegevens bijwerken",
@@ -31779,7 +31884,7 @@
           "label": "Ontbrekende agentidentiteit",
           "detail": "{affected} van {total} LLM-spans ({pct}) hebben geen gen_ai.agent.name, waardoor agentweergaven ze missen.",
           "pass": "Elke LLM-span heeft een agentnaam of -id.",
-          "fix": "Agenttoewijzing openen"
+          "fix": "GenAI-agentmapping openen"
         },
         "zero_duration_spans": {
           "label": "Spans met duur nul",
@@ -31794,6 +31899,13 @@
           "fix": "Integratiehandleiding"
         }
       }
+    },
+    "chart": {
+      "costMissing": "Niet in deze grafiek: {models}. {tokens} tokens hebben geen prijs.",
+      "costMissingPricedSince": "Niet in deze grafiek: {models}. {tokens} tokens zijn geregistreerd voordat een prijs werd toegevoegd.",
+      "unpricedModels": "Zonder prijs: {models}",
+      "pricedSinceModels": "Geregistreerd voordat een prijs werd toegevoegd: {models}",
+      "addPrice": "Prijs toevoegen"
     }
   },
   "onboarding": {

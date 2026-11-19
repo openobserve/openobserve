@@ -121,7 +121,7 @@
     "noGroups": {
       "title": "尚無群組",
       "description": "群組讓您可以一次管理多位使用者的權限。建立一個以開始使用。",
-      "action": "新增使用者群組",
+      "action": "新增群組",
       "actionDesc": "建立使用者群組"
     },
     "noRoles": {
@@ -197,7 +197,7 @@
     "noCipherKeys": {
       "title": "尚無加密金鑰",
       "description": "加密金鑰用於加密資料串流中的敏感欄位。",
-      "action": "新增加密金鑰",
+      "action": "新增金鑰",
       "actionDesc": "產生加密金鑰"
     },
     "noSlackChannelDefaults": {
@@ -225,7 +225,7 @@
     "noLlmProviders": {
       "title": "尚未設定 LLM 供應商",
       "description": "連接語言模型供應商以啟用 AI 驅動的功能。",
-      "action": "新增提供者",
+      "action": "新增供應商",
       "actionDesc": "設定 LLM 供應商"
     },
     "noDiscoveredServices": {
@@ -268,9 +268,9 @@
     },
     "noStorageConfig": {
       "title": "未設定儲存桶",
-      "description": "自備儲存桶，將此組織的資料保存在您擁有的儲存空間中，與其他組織及全域預設值分開。",
-      "action": "設定儲存桶",
-      "actionDesc": "連接 S3 或 Azure 儲存桶"
+      "description": "將此組織的資料路由到專用儲存桶 — 獨立於其他組織和全域預設值。",
+      "action": "設定儲存",
+      "actionDesc": "連接 S3、GCS 或 Azure 儲存桶"
     },
     "noPhoneProvider": {
       "title": "尚未連接電話供應商",
@@ -3706,7 +3706,7 @@
     "agplFullName": "GNU Affero General Public License (AGPL)",
     "github": "GitHub",
     "website": "網站",
-    "licenseAndUsage": "授權與用量",
+    "licenseAndUsage": "授權與使用",
     "copyLicenseId": "複製授權 ID",
     "editionLbl": "版本",
     "gbPerDay": "GB / 天",
@@ -3727,8 +3727,8 @@
     "ent_lincese_detail_lbl": "企業版授權詳細資訊",
     "lincese_id_lbl": "授權 ID",
     "status_lbl": "狀態",
-    "create_at_lbl": "建立時間",
-    "expires_at_lbl": "到期時間",
+    "create_at_lbl": "建立於",
+    "expires_at_lbl": "到期於",
     "usage_limits": "使用量限制",
     "feature_comparison_lbl": "功能比較",
     "feature_comparision_ent_msg": "目前使用的是 OpenObserve 企業版，可存取下列所有進階功能。",
@@ -3787,11 +3787,11 @@
     "expired_lbl": "已過期",
     "no_license_found": "找不到授權",
     "installation_id": "安裝 ID",
-    "contact_admin_license": "在下方貼上授權金鑰，或申請一組。",
+    "contact_admin_license": "請聯絡管理員取得授權並在此貼上金鑰，<strong>或:</strong>",
     "get_license": "取得授權",
     "enter_license_key": "輸入授權金鑰",
     "paste_license_placeholder": "在此貼上授權金鑰...",
-    "license_auto_filled": "授權金鑰已從 URL 自動填入。按一下「更新授權」以套用。",
+    "license_auto_filled": "授權金鑰已從 URL 自動填入。按一下 [更新授權] 以套用。",
     "update_license": "更新授權",
     "license_id": "授權 ID",
     "company": "公司",
@@ -3975,7 +3975,7 @@
     "paste_new_license_placeholder": "在此貼上新授權金鑰...",
     "your_complete_license_key": "完整授權金鑰：",
     "copy_key": "複製金鑰",
-    "usage_information": "用量資訊",
+    "usage_information": "使用量資訊",
     "usage_chart_title": "本月每日擷取量",
     "no_license_ingestion_limit": "沒有授權時，每日擷取量限制為 <strong>{limit} GB</strong>。",
     "license_allows_ingestion": "目前授權允許每天 <strong>{limit} GB</strong> 的資料攝取量。",
@@ -4732,7 +4732,7 @@
       "effectStillAllowed": "存取權限沒有變更：更廣泛的授權仍允許此操作。",
       "moduleGroupSecurity": "安全",
       "presetSocAnalystTitle": "SOC 分析師",
-      "presetSocAnalystDescription": "分流安全性警示與案例，並具備偵測項目、安全性來源串流與威脅情報清單的讀取權限",
+      "presetSocAnalystDescription": "分診安全警示與案件，並具有偵測、安全來源串流與威脅情資清單的讀取權限",
       "presetDetectionEngineerTitle": "偵測工程師",
       "presetDetectionEngineerDescription": "建立、調整、啟用與執行偵測，安裝內容，連同函式與管線一起接入資料來源，並維護威脅情報清單等擴充表，可讀取安全模組、案例與串流",
       "presetSecurityAdminTitle": "安全管理員",
@@ -4843,7 +4843,7 @@
       "createFailed": "組織建立失敗。"
     },
     "listOrganizations": {
-      "subtitle": "您可以存取的所有組織。可切換至任一組織，或從其列動作重新命名。",
+      "subtitle": "您可以存取的組織",
       "switch": "切換至此組織",
       "current": "目前",
       "cannotEditWhileDeleting": "刪除進行中無法編輯",
@@ -4977,7 +4977,7 @@
       "uploadingRules": "上傳規則中，請稍候...",
       "errorUploadingRules": "上傳規則時發生錯誤",
       "errorParsingJson": "從檔案 {name} 解析JSON時發生錯誤",
-      "someValuesEmpty": "部分值為空。請檢查。",
+      "someValuesEmpty": "部分數值為空，請檢查",
       "saveBeforeSwitchingTimeUnits": "切換時間單位前請先儲存或取消變更"
     },
     "addRolePage": {
@@ -4996,7 +4996,9 @@
       "saved": "公告橫幅已更新",
       "saveFailed": "無法儲存公告橫幅",
       "loadFailed": "無法載入公告橫幅",
-      "addBanner": "新增橫幅"
+      "addBanner": "新增橫幅",
+      "emptyTitle": "尚無橫幅",
+      "emptyHint": "新增一個橫幅以在應用程式頂端顯示通知。"
     },
     "variants": {
       "info": "資訊",
@@ -5114,10 +5116,10 @@
       "characters": "{count} / {max}",
       "variantOption": "{name} — {help}",
       "variantHelp": {
-        "info": "一般公告與發佈消息",
+        "info": "一般通知與版本消息",
         "warning": "服務降級或即將進行的維護",
-        "critical": "服務中斷；優先顯示並隱藏促銷訊息",
-        "promo": "活動與優惠；最後顯示，中斷期間隱藏"
+        "critical": "服務中斷；優先顯示並隱藏推廣訊息",
+        "promo": "活動與優惠；最後顯示，服務中斷時隱藏"
       },
       "toolbar": {
         "bold": "粗體",
@@ -6173,8 +6175,8 @@
     "periodInfoLine1": "查詢應執行的時間範圍。",
     "periodInfoLine2": "例如：10 分鐘表示每當查詢執行時，它會使用最近 10 分鐘的資料。如果查詢在下午 4:00 執行，則會使用下午 3:50 到 4:00 的資料。",
     "periodShouldMatchFrequency": "注意：時間範圍應與頻率相同。",
-    "delayInfoLine1": "排程時間之後等待的時間，讓延遲資料能夠送達。",
-    "delayInfoLine2": "例如：延遲 10 分鐘時，每小時執行的管線會在 10:10 執行，並讀取 9:00 到 10:00 的資料。",
+    "delayInfoLine1": "管線排定執行的延遲時間。",
+    "delayInfoLine2": "例如：延遲 10 分鐘表示管線將在排定時間後 10 分鐘執行。",
     "closeDrawer": "關閉抽屜",
     "conditionValueGuidelines": "條件值指南：",
     "customColumnGuideline": "若要新增自訂欄位，請輸入欄位名稱並按下",
@@ -6385,28 +6387,28 @@
     "confirmDeleteNode": "確定要刪除節點嗎？",
     "errorFetchingUsedStreams": "取得使用中的串流時發生錯誤",
     "destinationNotes": {
-      "openobserveTitle": "OpenObserve 連線資訊",
+      "openobserveTitle": "OpenObserve 連線詳細資料",
       "openobserveStep1": "登入您的 OpenObserve 執行個體",
       "openobserveStep2": "複製您的基礎 URL（例如：https://your-instance.openobserve.ai）",
       "openobserveStep3": "端點路徑已預填為：/api/{'{'}org{'}'}/{'{'}stream{'}'}/_json",
       "openobserveStep4": "將 {'{'}org{'}'} 取代為您的組織識別碼",
       "openobserveStep5": "將 {'{'}stream{'}'} 取代為您的串流名稱",
       "openobserveStep6": "新增驗證標頭：Authorization: Basic <OpenObserve_Token>",
-      "splunkTitle": "Splunk HEC 連線資訊",
+      "splunkTitle": "Splunk HEC 連線詳細資料",
       "splunkStep1": "以管理員身分登入您的 Splunk 執行個體",
       "splunkStep2": "前往 設定 → 資料輸入 → HTTP Event Collector",
       "splunkStep3": "按一下「New Token」以建立新的 HEC token",
       "splunkStep4": "設定 token 設定並儲存",
       "splunkStep5": "使用您的 Splunk HEC 端點 URL",
       "splunkStep6": "在 Headers 區段中新增 HEC token (Authorization: Splunk <token>)",
-      "elasticsearchTitle": "Elasticsearch 連線資訊",
+      "elasticsearchTitle": "Elasticsearch 連線詳細資料",
       "elasticsearchStep1": "找到您的 Elasticsearch 叢集端點",
       "elasticsearchStep2": "確保可從此網路存取該叢集",
       "elasticsearchStep3": "建立 API 金鑰或使用基本驗證",
       "elasticsearchStep4": "若為雲端：從您的雲端主控台取得端點",
       "elasticsearchStep5": "若為自架：使用您的叢集 URL 和連接埠（通常為 9200）",
       "elasticsearchStep6": "在 Headers 區段中新增驗證",
-      "datadogTitle": "Datadog 連線資訊",
+      "datadogTitle": "Datadog 連線詳細資料",
       "datadogStep1": "登入您的 Datadog 帳戶",
       "datadogStep2": "前往 組織設定 → API 金鑰",
       "datadogStep3": "建立新的 API 金鑰，或複製現有金鑰",
@@ -6414,14 +6416,14 @@
       "datadogStep5": "美國：https://http-intake.logs.datadoghq.com",
       "datadogStep6": "歐洲：https://http-intake.logs.datadoghq.eu",
       "datadogStep7": "在 Headers 中新增 API 金鑰：DD-API-KEY: <your-key>",
-      "dynatraceTitle": "Dynatrace 連線資訊",
+      "dynatraceTitle": "Dynatrace 連線詳細資料",
       "dynatraceStep1": "登入您的 Dynatrace 環境",
       "dynatraceStep2": "前往 設定 → 整合 → Dynatrace API",
       "dynatraceStep3": "建立具有 logs.ingest 權限的新 API token",
       "dynatraceStep4": "使用您的環境 URL",
       "dynatraceStep5": "格式：https://{'{'}your-environment-id{'}'}.live.dynatrace.com",
       "dynatraceStep6": "在 Headers 中新增 token：Authorization: Api-Token <token>",
-      "newrelicTitle": "New Relic 連線資訊",
+      "newrelicTitle": "New Relic 連線詳細資料",
       "newrelicStep1": "登入您的 New Relic 帳戶",
       "newrelicStep2": "前往 API Keys 區段",
       "newrelicStep3": "建立或複製 License Key（Ingest - License）",
@@ -6435,7 +6437,7 @@
       "customStep4": "設定驗證所需的任何 Headers",
       "customStep5": "選擇輸出格式（JSON 或 NDJSON）",
       "customStep6": "測試連線以確認是否正常運作",
-      "defaultTitle": "連線資訊",
+      "defaultTitle": "連線詳細資料",
       "defaultStep1": "選擇目標類型以查看具體說明"
     },
     "deleteFunctionAssociationConfirm": "您確定要刪除函式關聯嗎？",
@@ -7135,7 +7137,7 @@
     "orgLevelExplanation": "這些是組織層級的擷取權杖。它們不與個別使用者綁定，即使建立它們的使用者離開組織後仍可繼續運作。權杖僅可用於擷取端點。",
     "orgLevelSummary": "用於擷取端點的組織層級權杖。",
     "tokenManagementTitle": "管理擷取權杖",
-    "createTokenBtn": "新增權杖",
+    "createTokenBtn": "建立新權杖",
     "createTokenTitle": "建立權杖",
     "searchToken": "搜尋權杖",
     "tokenNameLabel": "名稱",
@@ -11686,9 +11688,9 @@
       "lengthenEvaluationWindowDesc": "擴大時間範圍，讓短暫的尖峰不再觸發警示。",
       "enableDeduplication": "開啟抑制重複通知",
       "enableDeduplicationDesc": "每次狀態變更時通知一次，而非每次評估都通知。",
-      "reviewForDeletion": "檢視警示",
+      "reviewForDeletion": "審查是否刪除",
       "reviewForDeletionDesc": "在淘汰警示前，先確認查詢仍符合實際情況。",
-      "fixAlertQuery": "檢視警示",
+      "fixAlertQuery": "修正警示查詢",
       "fixAlertQueryDesc": "評估本身失敗，永遠無法得出結論。",
       "repairDestination": "修復目標",
       "repairDestinationDesc": "警示使用的目標發生遞送失敗。",
@@ -11872,7 +11874,7 @@
       "scopeAll": "所有執行",
       "scopeFindings": "有發現",
       "scopeGaps": "覆蓋缺口",
-      "searchPlaceholder": "依警示名稱搜尋",
+      "searchPlaceholder": "依警示名稱搜尋執行",
       "colRun": "執行",
       "colFindings": "發現",
       "colCoverage": "覆蓋",
@@ -11900,8 +11902,8 @@
       "statFindings": "發現項目",
       "statAlertsInScope": "範圍內的警示",
       "statDeclined": "已拒絕",
-      "statDeclinedSub": "未通過",
-      "statDeclinedTooltip": "規則不會評判的規則與警示配對。這是關卡，不是放行。未達下限只會計數；無法執行，或經檢視後拒絕的規則，會連同原因列在下方。",
+      "statDeclinedSub": "已拒絕，並非已排除",
+      "statDeclinedTooltip": "規則未進行判斷的規則與警示組合，因為該警示的歷史紀錄過少或樣本數不足。這是一道關卡，而非放行；各警示的原因不會寫入串流。",
       "limitations": "證據的限制",
       "declinedHeading": "拒絕並附原因",
       "declinedDesc": "無法為某個警示執行，或檢視後拒絕的規則。這不是放行。",
@@ -11928,7 +11930,10 @@
       "proposedActions": "建議動作",
       "qualityReasons": "原因：{reasons} | 原因：{reasons}",
       "openAlert": "開啟警示",
-      "advice": "應檢查什麼"
+      "advice": "應檢查什麼",
+      "viewInLogs": "在日誌中檢視",
+      "viewInLogsHint": "在日誌中開啟此執行記錄的紀錄",
+      "loadFailed": "無法載入摘要：{message}"
     },
     "dashboard": {
       "latestRunAgo": "最近一次執行 {time}",
@@ -11986,7 +11991,8 @@
       "runNowHeading": "立即執行",
       "findingsKept": "發現結果會依此組織自有記錄的保留期間保存。警示校準不會傳送任何通知。",
       "frequencyRange": "請選擇介於 1 小時到 30 天之間的執行頻率。",
-      "windowRange": "請選擇介於 1 分鐘到 90 天之間的時間範圍。"
+      "windowRange": "請選擇介於 1 分鐘到 90 天之間的時間範圍。",
+      "loadFailed": "無法載入設定：{message}"
     },
     "visibility": {
       "allClear": "在最近一次執行中，您可存取的警示沒有任何發現。",
@@ -12177,8 +12183,8 @@
     "response": "回應",
     "lastError": "最後錯誤：",
     "errorSummary": "錯誤摘要",
-    "searchThisFolderTooltip": "顯示此資料夾中的警示",
-    "searchAllFoldersTooltip": "顯示所有資料夾中的警示",
+    "searchThisFolderTooltip": "僅搜尋此資料夾",
+    "searchAllFoldersTooltip": "搜尋所有資料夾",
     "reloadAlertsTooltip": "重新載入警示",
     "triggerDetection": "觸發偵測",
     "retrain": "重新訓練",
@@ -14240,7 +14246,7 @@
       "addedUnread": "無法讀取您的警示，因此 AutoObserve 無法判斷此警示是否已新增。未儲存任何內容；請再次儲存以重試。",
       "alreadyAdded": "已以 {name} 新增至資料夾 {folder}，因此未再次儲存此警示。",
       "dialog": {
-        "title": "新增警示",
+        "title": "建立警示",
         "continue": "繼續前往警示",
         "queryChoiceLabel": "對查詢發出警示",
         "queryChoiceOption": "{name}: {query}",
@@ -14263,19 +14269,19 @@
       },
       "sources": {
         "default": {
-          "label": "新增警示",
+          "label": "建立警示",
           "toast": "查詢已匯入警示表單"
         },
         "logs": {
-          "label": "新增警示",
+          "label": "建立警示",
           "toast": "查詢已從您的日誌搜尋匯入"
         },
         "patterns": {
-          "label": "新增警示",
+          "label": "建立警示",
           "toast": "查詢已從選取的模式匯入"
         },
         "panel": {
-          "label": "新增警示",
+          "label": "建立警示",
           "toast": "已從儀表板面板匯入查詢：「{sourceLabel}」"
         },
         "library": {
@@ -14283,7 +14289,7 @@
           "toast": "來自警示庫：{sourceLabel}"
         },
         "explorer": {
-          "label": "新增警示",
+          "label": "建立警示",
           "toast": "已從指標探索器匯入查詢"
         },
         "dbm": {
@@ -14299,7 +14305,7 @@
           "toast": "已從產品分析匯入:「{sourceLabel}」"
         },
         "traces": {
-          "label": "新增警示",
+          "label": "建立警示",
           "toast": "已從您的追蹤搜尋匯入查詢",
           "noStream": "請先選擇串流",
           "errorCount": "錯誤計數",
@@ -14503,7 +14509,7 @@
       "filterAll": "全部",
       "filterOnce": "單次",
       "filterRecurring": "週期性",
-      "search": "依名稱、原因或建立者搜尋",
+      "search": "依名稱、維度或建立者搜尋",
       "searchAcross": "搜尋所有資料夾",
       "thisFolder": "此資料夾",
       "allFolders": "所有資料夾",
@@ -15042,7 +15048,7 @@
       "webhookOnly": "（僅限 Webhook）",
       "emailOnly": "（僅限電子郵件）",
       "snsOnly": "（僅限 SNS）",
-      "stale": "範本 {name} 不適用於此類型。請選擇其他範本或清除欄位。",
+      "stale": "範本 {name} 已不存在。請選擇其他範本，或清除此欄位。",
       "clear": "清除",
       "willUse": "將使用：{template}",
       "willUsePerDestination": "各目標將使用：",
@@ -15256,7 +15262,7 @@
     "systemReadOnlyEdit": "預建範本 — 已停用編輯。請複製它來建立可修改的副本。",
     "systemReadOnlyDelete": "預建範本 — 已停用刪除。請複製它來建立可修改的副本。",
     "prebuiltBadge": "預先建置",
-    "prebuiltBadgeHint": "由系統管理。您無法編輯或刪除。請複製以建立可修改的副本。",
+    "prebuiltBadgeHint": "由系統管理。您可以編輯，但已停用刪除功能。",
     "customBadge": "自訂",
     "filterAll": "全部",
     "filterPrebuilt": "預先建置",
@@ -15473,9 +15479,9 @@
   },
   "alert_destinations": {
     "chooseTypeTitle": "選擇類型",
-    "selectDestinationType": "目標類型",
+    "selectDestinationType": "選擇目標類型",
     "connectionStepTitle": "連線",
-    "connectionDetailsTitle": "連線詳細資訊",
+    "connectionDetailsTitle": "連線詳細資料",
     "urlHelpText": "Base URL 不含結尾斜線（例如：https://your-domain.com）",
     "organizationHelpText": "OpenObserve 組織識別碼",
     "streamHelpText": "OpenObserve 串流名稱",
@@ -15526,7 +15532,7 @@
     "template": "範本",
     "actions": "操作",
     "addHeader": "新增標頭",
-    "addTitle": "新增目標",
+    "addTitle": "新目標",
     "updateTitle": "更新目標",
     "delete": "刪除",
     "method": "方法",
@@ -15539,7 +15545,7 @@
     "payloadFormatAuto": "自動",
     "payloadFormatLegacy": "舊版 JSON",
     "payloadFormatRendered": "轉譯後的範本",
-    "payloadFormatHelp": "在附加範本之前，「自動」會針對異常、合成監控、值班與停機時段訊息傳送舊版 JSON 內文。",
+    "payloadFormatHelp": "在附加範本之前，自動模式會為異常、合成監控與值班訊息傳送舊版 JSON 內文。此設定會儲存為中繼資料鍵 payload_format。",
     "output_format": "輸出格式",
     "readonly": "唯讀",
     "additional_settings": "額外設定",
@@ -15678,17 +15684,17 @@
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
-    "tabLabel": "自備儲存桶",
-    "title": "自備儲存桶",
+    "tabLabel": "儲存設定",
+    "title": "儲存設定",
     "notEnabled": "{product} 未在此組織中啟用",
     "heroHeadline": "自帶儲存空間給",
-    "heroSub": "連接您自己的雲端儲存桶。數據會留在您的基礎設施中，讓您完全掌控，且不受鎖定。",
-    "configureStorage": "設定儲存桶",
+    "heroSub": "連接自有的雲端儲存桶，資料保留在自己的基礎架構中 — 完全掌控，零鎖定。",
+    "configureStorage": "設定儲存",
     "supportedProviders": "支援的供應商",
-    "perOrgIsolation": "各組織隔離",
+    "perOrgIsolation": "每個組織獨立隔離",
     "appliesImmediately": "立即套用至新資料",
-    "usesOrgCredentials": "使用組織範圍的憑證",
-    "updateStorage": "更新儲存桶",
+    "usesOrgCredentials": "使用組織範圍的認證資訊",
+    "updateStorage": "更新儲存",
     "active": "啟用中",
     "bucketName": "儲存桶名稱",
     "region": "區域",
@@ -15702,12 +15708,12 @@
     "featureOwnDataDesc": "將攝取的資料直接儲存在自有的儲存桶中，完全掌控誰可以存取。",
     "featureSecureTitle": "安全且合規",
     "featureSecureDesc": "精細的存取金鑰，敏感資料保留在自己的基礎架構中。",
-    "newStorageConfiguration": "新增儲存桶設定",
+    "newStorageConfiguration": "新增儲存組態",
     "selectProviderDesc": "選擇雲端儲存供應商以儲存此組織的資料。",
     "bucketNameRequired": "儲存桶名稱為必填",
     "accessKeyRequired": "存取金鑰為必填",
     "secretKeyRequired": "秘密金鑰為必填",
-    "storageAccountRequired": "必須填寫儲存帳戶名稱",
+    "storageAccountRequired": "儲存帳戶名稱為必填",
     "regionRequired": "區域為必填",
     "roleARNRequired": "角色 ARN 為必填",
     "externalIdRequired": "外部 ID 為必填",
@@ -15716,7 +15722,7 @@
     "save": "儲存",
     "update": "更新",
     "awsStsCloudInfo": "這會使用 AWS STS 來擔任該角色。請在 AWS 主控台中，將 {product} AWS 帳戶新增為此角色的信任實體。如需帳戶詳細資料或設定協助，請聯絡 {product} 團隊。",
-    "awsStsSelfHostedInfo": "這會使用 AWS STS 來擔任該角色。請確認安裝環境具有可擔任此角色的 AWS 憑證。"
+    "awsStsSelfHostedInfo": "使用 AWS STS 擔任角色並執行操作。請確保安裝環境中已設定具有此角色存取權限的 AWS 認證資訊。"
   },
   "metrics": {
     "add": "新增",
@@ -16197,7 +16203,7 @@
     "cipherKeysDesc": "用於敏感欄位的加密金鑰",
     "aiToolsetsDesc": "AI 助手可使用的 MCP 伺服器與 CLI 工具",
     "regexPatternsDesc": "用於遮蔽的可重複使用 regex 模式",
-    "domainManagementDesc": "SSO 宣告解析與依網域的登入限制",
+    "domainManagementDesc": "限制僅允許的 SSO 網域登入",
     "passwordPolicy": "密碼原則",
     "passwordPolicyDesc": "適用於原生電子郵件/密碼帳號並套用至整個執行個體的驗證原則。",
     "pipelineDestinationsDesc": "管線輸出的外部目標",
@@ -16214,19 +16220,19 @@
     "logoLabel": "拖放 Logo 圖片",
     "deleteLogoTitle": "刪除 Logo",
     "deleteLogoMessage": "您確定要刪除標誌圖片 {name} 嗎？按一下確定即可刪除。",
-    "customLogoText": "自訂標誌文字",
+    "customLogoText": "自訂 Logo 文字",
     "orgLabel": "組織參數",
     "logDetails": "日誌詳細資訊",
     "tracesHeading": "追蹤",
-    "traceIdFieldName": "追蹤 ID 欄位名稱",
+    "traceIdFieldName": "Trace ID 欄位名稱",
     "spanIdFieldName": "Span ID 欄位名稱",
-    "toggleIngestionLogsLabel": "資料擷取日誌",
-    "usageStreamEnabledLabel": "用量串流",
-    "redInsightsEnabledLabel": "追蹤的自動 RED 洞察",
+    "toggleIngestionLogsLabel": "切換攝取日誌",
+    "usageStreamEnabledLabel": "啟用使用量串流",
+    "redInsightsEnabledLabel": "為追蹤啟用自動 RED 洞察",
     "redInsightsEnabledHelp": "為最繁忙的服務建立速率、錯誤與 p95 延遲異常偵測器，並置於「RED insights」警示資料夾中。在共用之前，只有管理員能看到該資料夾。",
     "incidentsHeading": "事件",
-    "aiRcaThreadToolOutputLabel": "事件討論串中的工具資料",
-    "aiRcaThreadToolOutputHelp": "向所有可讀取該事件的人顯示原始工具輸入與輸出。",
+    "aiRcaThreadToolOutputLabel": "在事件調查討論串中顯示工具資料",
+    "aiRcaThreadToolOutputHelp": "向所有可讀取該事件的人，在事件調查討論串中顯示原始工具輸入與輸出",
     "claimParserFunction": "SSO Claim 解析器",
     "claimParserFunctionDescription": "選擇一個函式（{product1} 或 {product2}）來解析並轉換 SSO/LDAP 宣告為組織和角色指派",
     "claimParserFunctionLabel": "選擇函式",
@@ -16352,17 +16358,17 @@
       "fieldAliasesSaveError": "儲存欄位別名失敗",
       "fieldAliasesUnsavedConfirm": "有未儲存的欄位對應變更。確定要捨棄並離開嗎？",
       "discoveredServicesTitle": "已發現的服務",
-      "discoveredServicesDescription": "服務會從您的遙測資料中探索出來，並依服務名稱分組。偵測規則決定如何識別這些服務。",
+      "discoveredServicesDescription": "服務會從遙測資料中自動發現，並依服務名稱分組以進行關聯。共用相同服務名稱的服務會跨日誌、追蹤和指標進行關聯。",
       "noServicesYet": "尚未發現任何服務",
       "noServicesDescription": "當攝取含有服務識別屬性 (如 k8s-deployment、service name 等) 的遙測資料時，服務將顯示於此",
-      "searchServiceName": "搜尋服務或串流",
-      "telemetryCoverage": "遙測涵蓋範圍",
+      "searchServiceName": "搜尋服務或串流名稱...",
+      "telemetryCoverage": "遙測覆蓋率",
       "serviceName": "服務名稱",
       "service": "服務",
       "logs": "日誌",
       "traces": "追蹤",
       "metrics": "指標",
-      "lastSeen": "最後出現時間",
+      "lastSeen": "最近出現",
       "retry": "重試",
       "semanticFieldGroupsTitle": "欄位對應",
       "serviceNameNotDetected": "資料中尚未偵測到服務名稱欄位",
@@ -16375,7 +16381,7 @@
       "foundInTraces": "在追蹤中發現",
       "foundInMetrics": "在指標中發現",
       "foundInProfiles": "在效能剖析中找到",
-      "distinguishByLabel": "區分服務的方式",
+      "distinguishByLabel": "服務區分依據",
       "distinguishByHelp": "選擇定義服務執行位置的欄位。例如，叢集 + 命名空間 + 部署一起為每個服務建立唯一識別。最多 5 個欄位。",
       "serviceOptionalLabel": "不使用服務屬性進行關聯",
       "serviceOptionalHelp": "僅使用以下屬性符合串流，忽略服務屬性",
@@ -16391,13 +16397,13 @@
       "loadRecommendationsFailed": "載入建議失敗",
       "resetServices": "重設服務",
       "resetServicesTooltip": "刪除所有已發現的服務。當新資料到達時會自動重新發現。",
-      "resetServicesConfirmTitle": "重設所有已探索的服務？",
+      "resetServicesConfirmTitle": "重設所有已發現的服務？",
       "resetServicesConfirmBody": "這會刪除此組織中所有已探索的服務，且無法復原。當新的遙測資料送達時，服務會再次被探索。",
       "resetServicesSuccess": "已刪除 {count} 個探索到的服務. | 已刪除 {count} 個探索到的服務",
       "resetServicesFailed": "重設服務失敗",
       "workload": "工作負載",
-      "goToConfiguration": "前往設定",
-      "filterBy": "依欄位篩選",
+      "goToConfiguration": "前往組態",
+      "filterBy": "篩選依據：",
       "selectFieldPlaceholder": "選擇欄位",
       "selectValuePlaceholder": "選擇值",
       "selectFieldFirst": "請先選擇欄位",
@@ -16406,13 +16412,18 @@
       "noDimensions": "無維度",
       "defaultSetWarningTitle": "關聯可能不可靠。",
       "defaultSetWarningBody": "此執行個體沒有消歧 — 在沒有任何工作負載符合 (無叢集、命名空間或環境上下文) 的情況下被發現。日誌和追蹤可能來自相同服務名稱的不同部署。",
-      "instanceIdentity": "執行個體身分",
+      "instanceIdentity": "執行個體識別",
       "noDimensionsCatchAll": "無維度 — 全捕獲執行個體",
       "streamSources": "串流來源",
       "fieldNameMapping": "欄位名稱對應",
       "logsWithCount": "日誌 ({count})",
       "tracesWithCount": "追蹤 ({count})",
-      "metricsWithCount": "指標 ({count})"
+      "metricsWithCount": "指標 ({count})",
+      "resetServicesConfirmMessage": "此操作將刪除此組織的所有已發現服務。當攝取新的遙測資料時，服務會自動重新發現。此操作無法復原。",
+      "resetServicesConfirmWarning": "當攝取新的遙測資料時，服務會自動重新發現。此操作無法復原。",
+      "configureServicesHint": "以設定服務的識別和分組方式。",
+      "serviceCountSingular": "{count} 個服務 | {count} 個服務",
+      "instancesCount": "({count} 個執行個體)"
     },
     "addRegexPattern": {
       "namePlaceholder": "例如：內部密碼",
@@ -16491,7 +16502,8 @@
       "logoLightLabel": "自訂標誌（淺色模式）",
       "logoLightHelp": "於淺色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。",
       "logoDarkLabel": "自訂標誌（深色模式）",
-      "logoDarkHelp": "於深色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。"
+      "logoDarkHelp": "於深色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。",
+      "fileCounterLabel": "{constraint} {filesNumber} 個檔案 {'|'} {totalSize}"
     },
     "modelPricingEditor": {
       "copySuffix": " (副本)"
@@ -16500,7 +16512,7 @@
       "subtitle": "LLM 模型成本配置"
     },
     "orgStorageSettings": {
-      "subtitle": "將此組織的資料儲存在您擁有的儲存桶中",
+      "subtitle": "各組織儲存配置",
       "awsCredentials": "AWS 憑證",
       "azureCredentials": "Azure 憑證",
       "awsRoleArn": "AWS 角色 ARN"
@@ -16520,10 +16532,13 @@
       "daysValue": "{days} 天",
       "forever": "永久保留",
       "invalid": "使用 0 或至少 3 天",
-      "invalidType": "請至少使用 3 天，或移除此類型"
+      "invalidType": "請至少使用 3 天，或移除此類型",
+      "streamType": "串流類型",
+      "days": "天",
+      "removeType": "移除此串流類型"
     },
     "organizationSettings": {
-      "fieldNameHelp": "僅限字母、數字及 + = , . {'@'} - _。",
+      "fieldNameHelp": "僅使用字母數字和 '+=,.{'@'}-_' 字元，不要包含空格。",
       "sectionTitle": "資料處理",
       "sectionDescription": "日誌如何連結至追蹤，以及哪些自動功能已開啟。",
       "traceIdHelp": "將日誌行連結至其追蹤的日誌欄位。僅限字母、數字與 + = , . {'@'} - _。",
@@ -16537,7 +16552,7 @@
       "subtitle": "配置 AI 工具整合"
     },
     "cipherKeysPage": {
-      "subtitle": "用於加密與解密敏感欄位值的金鑰",
+      "subtitle": "敏感欄位的加密金鑰",
       "delete": "刪除",
       "deleteCipherKeyTitle": "刪除加密金鑰",
       "deleteCipherKeyMessage": "您確定要刪除加密金鑰 {name} 嗎？",
@@ -16677,13 +16692,13 @@
       "failedToImport": "匯入 \"{name}\" 失敗：{error}"
     },
     "orgStorageEditor": {
-      "chooseTypeTitle": "選擇供應商",
-      "selectProviderDescCont": "設定完成後，此組織的所有新資料都會寫入您自己的儲存桶。",
+      "chooseTypeTitle": "選擇類型",
+      "selectProviderDescCont": "一旦設定完成，此組織的所有新資料將寫入您自己的儲存基礎設施。",
       "irreversibleWarnPre": "此操作是 ",
       "irreversibleWarnEmphasis": "不可逆的",
       "irreversibleWarnPost": "。一旦設定，您無法切換到其他儲存提供者或刪除此設定。若要使用不同的提供者，您必須建立一個新的組織。",
       "credentialsOnlyInfo": "一旦設定完成，僅能更新憑證欄位。所有其他欄位將被鎖定。",
-      "selectStorageProviderLabel": "儲存供應商",
+      "selectStorageProviderLabel": "選擇儲存提供者 ",
       "connectionTitle": "連線",
       "serverUrlLabel": "伺服器 URL",
       "regionLabel": "區域",
@@ -16719,7 +16734,7 @@
       "workloadDetection": "工作負載偵測",
       "workloadDetectedUsingFields": "使用欄位偵測的工作負載",
       "workloadTrackedHelp": "僅這些欄位別名群組用於工作負載偵測和建議。未在此清單中的欄位不會影響服務探索結果。選用 — 身分集合中列出的維度一律會追蹤。",
-      "goToFieldAliases": "前往欄位對應",
+      "goToFieldAliases": "前往欄位別名",
       "toConfigureFieldMappings": "以設定個別欄位對應。",
       "selectAliasGroup": "選擇別名群組",
       "discoveredPatternsHelp": "我們在您的串流中發現了這些部署模式。請使用它們來設定服務關聯。",
@@ -16754,7 +16769,8 @@
       "reasonIdealForDisambiguation": "{details} — 適合服務消歧",
       "trackedK8sWorkload": "K8s 工作負載",
       "trackedK8sPod": "K8s Pod",
-      "serviceCountFailed": "無法載入服務數量"
+      "serviceCountFailed": "無法載入服務數量",
+      "toSeeDiscoveredServices": "以查看實際發現的服務。"
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "例如：{example}",
@@ -16769,7 +16785,7 @@
     },
     "regexPatternList": {
       "subtitle": "用於遮罩的可重複使用正則表達式模式",
-      "exportTitle": "匯出正規表示式模式",
+      "exportTitle": "匯出正則表達式模式",
       "delete": "刪除",
       "bulkDeleteTitle": "刪除正則表達式模式",
       "bulkDeleteMessage": "您確定要刪除 {n} 個 regex 模式嗎？ | 您確定要刪除 {n} 個 regex 模式嗎？",
@@ -16943,6 +16959,51 @@
       "requestApproved": "{domain} 已連結",
       "requestRejected": "{domain} 的請求已遭拒絕",
       "decisionFailed": "更新請求失敗"
+    },
+    "groupDataAI": "資料與 AI",
+    "llmProvidersDesc": "用於線上評估的 LLM 供應商",
+    "customLogoTitle": "自訂 Logo",
+    "customLogoTextDescription": "自訂 Logo 文字用於變更應用程式中顯示的預設品牌文字。",
+    "dragDropUpload": "拖放或按一下以上傳",
+    "customLogoLightDescription": "淺色模式佈景主題的自訂 Logo。在淺色模式下使用時顯示。",
+    "customLogoDarkDescription": "深色模式佈景主題的自訂 Logo。在深色模式下使用時顯示。",
+    "textMaxCharacters": "文字不得超過 100 個字元。",
+    "genAiAgentMapping": {
+      "tabLabel": "GenAI 代理映射",
+      "title": "GenAI 代理映射",
+      "description": "配置用於標準化 LLM 追蹤和評估中代理身份的回退遙測屬性。",
+      "agentNameFields": "代理名稱回退欄位",
+      "agentNameHelp": "用作 gen_ai.agent.name 回退的傳入屬性。",
+      "agentNameInfo": "僅在標準 gen_ai.agent.name 屬性缺失或為空時檢查。每行新增一個傳入遙測屬性。",
+      "agentIdFields": "代理 ID 回退欄位",
+      "agentIdHelp": "用作 gen_ai.agent.id 回退的傳入屬性。",
+      "agentIdInfo": "僅在標準 gen_ai.agent.id 屬性缺失或為空時檢查。每行新增一個傳入遙測屬性。",
+      "envFields": "環境後備欄位",
+      "envHelp": "要用作代理程式環境的傳入屬性。",
+      "envInfo": "僅在標準 deployment.environment.name 屬性遺失或空白時才會檢查。每行新增一個傳入遙測屬性。",
+      "versionFields": "版本後備欄位",
+      "versionHelp": "要用作代理程式版本的傳入屬性。",
+      "versionInfo": "僅在標準 gen_ai.agent.version 屬性遺失或空白時才會檢查。每行新增一個傳入遙測屬性。",
+      "alwaysAppliedStandard": "標準（優先檢查）：",
+      "applyDefaults": "套用預設值",
+      "resetToEmpty": "重設為空",
+      "clearRegistry": "清除註冊表",
+      "clearRegistryTitle": "清除代理註冊表？",
+      "clearRegistryDescription": "這將刪除此組織所有已發現的 GenAI 代理註冊表行。新的匹配追蹤將在攝入期間重新填充註冊表。",
+      "clearRegistryConfirm": "清除註冊表",
+      "saved": "GenAI 代理映射已成功儲存",
+      "clearRegistrySuccess": "GenAI 代理登錄已清除。已刪除 {deletedCount} 個儲存的代理和 {bufferCount} 個佇列中的觀測。",
+      "loadFailed": "無法載入 GenAI 代理映射",
+      "saveFailed": "無法儲存 GenAI 代理映射",
+      "clearRegistryFailed": "無法清除 GenAI 代理註冊表",
+      "defaultsLoadFailed": "無法載入 GenAI 代理映射預設值",
+      "defaultsFetchFailed": "取得預設值失敗（{status}）"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "線上評估的 LLM 提供者"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "將 GenAI Span 對應至代理程式識別碼"
     }
   },
   "reports": {
@@ -17173,9 +17234,9 @@
     },
     "selectOption": "選擇選項",
     "runningQueries": "執行中的查詢",
-    "search": "搜尋查詢",
+    "search": "搜尋",
     "queryList": "查詢詳細資訊",
-    "duration": "執行耗時",
+    "duration": "執行時間",
     "files": "檔案",
     "status": "狀態",
     "cancelQuery": "取消查詢",
@@ -17185,7 +17246,7 @@
     "allFields": "所有欄位",
     "queryType": "查詢類型",
     "numOfQueries": "查詢數量",
-    "totalDuration": "總執行耗時",
+    "totalDuration": "總執行時間",
     "totalTimeRange": "總查詢範圍",
     "searchType": "搜尋類型",
     "querySource": "查詢來源",
@@ -17204,7 +17265,8 @@
     "cancelQueryFailed": "取消查詢失敗",
     "searchTypeDashboards": "儀表板",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "其他"
+    "searchTypeOthers": "其他",
+    "lastDataRefreshTime": "上次資料重新整理時間："
   },
   "traces": {
     "nlNeedsSql": "此問題需要 SQL；請在日誌中開啟",
@@ -17654,7 +17716,8 @@
         "count": "{count} 個洞察 | {count} 個洞察",
         "countHint": "此時間範圍內有 {count} 個服務異常 | 此時間範圍內有 {count} 個服務異常",
         "viewTraces": "追蹤",
-        "viewCharts": "圖表"
+        "viewCharts": "圖表",
+        "scoreAbove": "分數高於閾值 +{percent}%"
       }
     },
     "spansTab": "Span",
@@ -17757,14 +17820,15 @@
       "failedToLoad": "載入深入解析失敗",
       "retry": "重試",
       "noAgentsInRange": "此範圍內無代理",
-      "noAgentsDescription": "在所選時間範圍內未偵測到任何 GenAI 代理程式。請嘗試擴大範圍、切換至「串流」分頁，或設定 Agent Mapping。",
+      "noAgentsDescription": "在選取的時間視窗中未偵測到任何 GenAI 代理。請嘗試更寬的範圍、切換至串流標籤，或在設定中設定代理對應。",
       "viewByStream": "依串流檢視",
       "totalCost": "總成本",
       "totalTokens": "總 Token 數",
       "totalTraces": "總追蹤數",
       "p95Latency": "P95 延遲",
       "errorRate": "錯誤率",
-      "timeAxis": "時間"
+      "timeAxis": "時間",
+      "errorsSeries": "錯誤"
     },
     "searchBar": {
       "streamNotFound": "找不到串流"
@@ -17818,7 +17882,10 @@
       "metricsLoadFailed": "無法載入此服務的關聯指標。{reason}",
       "noResourceRecorded": "此服務在此時間範圍內的 Span 未記錄 {resource}。",
       "resourceLoadFailed": "無法為此服務載入 {resource}。{reason}",
-      "noVersionTraffic": "此服務在此串流中的 Span 未記錄版本，因此沒有可依版本拆分的流量。"
+      "noVersionTraffic": "此服務在此串流中的 Span 未記錄版本，因此沒有可依版本拆分的流量。",
+      "noResourceDataFound": "找不到 {resource} 資料",
+      "failedToLoadMetrics": "載入指標失敗。",
+      "requests": "請求"
     },
     "traceErrorTab": {
       "httpStatusCode": "HTTP 狀態碼",
@@ -18058,11 +18125,20 @@
       "loadingPage": "正在載入第 {page} 頁",
       "pageFailed": "無法載入第 {page} 頁",
       "pageEmpty": "第 {page} 頁沒有結果"
+    },
+    "lLMErrorTable": {
+      "noData": "無資料",
+      "noErrorsInRange": "此時間範圍內沒有錯誤",
+      "loadFailed": "無法載入最近的錯誤",
+      "time": "時間",
+      "service": "服務",
+      "operation": "操作",
+      "traceId": "追蹤 ID"
     }
   },
   "aiToolset": {
     "header": "AI 工具集",
-    "add": "新增工具集",
+    "add": "新增 AI 工具集",
     "search": "搜尋 AI 工具集",
     "update": "更新 AI 工具集",
     "name": "名稱",
@@ -18085,7 +18161,7 @@
     "createdSuccessfully": "AI 工具集建立成功",
     "updatedSuccessfully": "AI 工具集更新成功",
     "deletedSuccessfully": "AI 工具集刪除成功",
-    "mcpConfig": "MCP 伺服器設定",
+    "mcpConfig": "MCP 伺服器組態",
     "mcpUrl": "端點 URL",
     "mcpUrlRequired": "端點 URL 為必填",
     "timeoutSeconds": "逾時 (秒)",
@@ -18093,7 +18169,7 @@
     "headerKey": "標頭名稱",
     "headerValue": "標頭值",
     "addHeader": "新增標頭",
-    "cliConfig": "CLI 工具設定",
+    "cliConfig": "CLI 工具組態",
     "presets": "快速填入",
     "cliCommand": "指令",
     "cliCommandRequired": "指令為必填",
@@ -18105,12 +18181,12 @@
     "envKey": "變數名稱",
     "envValue": "值",
     "addEnvVar": "新增變數",
-    "credentialFiles": "憑證檔案",
+    "credentialFiles": "認證檔案",
     "credEnvVar": "環境變數名稱",
     "credEnvVarHint": "例如：{example}",
     "credContentHint": "原始檔案內容 (例如 kubeconfig YAML)",
     "addCredFile": "新增認證檔案",
-    "skillConfig": "技能設定",
+    "skillConfig": "技能組態",
     "skillContent": "技能定義 (Markdown)",
     "skillContentRequired": "技能內容為必填"
   },
@@ -18123,7 +18199,7 @@
     "update": "更新加密金鑰",
     "name": "名稱",
     "type": "類型",
-    "step1WithType": "金鑰儲存庫 ({type})",
+    "step1WithType": "金鑰儲存庫詳細資料（類型：{type}）",
     "step2": "加密機制",
     "sectionKey": "金鑰",
     "sectionSetup": "金鑰儲存庫與加密",
@@ -18165,7 +18241,7 @@
     "staticSecretNameRequired": "靜態密碼名稱為必填",
     "dfcNameRequired": "DFC 名稱為必填",
     "dfcEncryptedDataRequired": "DFC 加密資料為必填",
-    "storeType": "儲存庫類型",
+    "storeType": "儲存類型",
     "mechanismType": "機制類型",
     "actions": "操作"
   },
@@ -18196,7 +18272,7 @@
     "memory": "記憶體 %",
     "tcp": "TCP 連線",
     "filter_header": "篩選條件",
-    "clear_all": "清除全部",
+    "clear_all": "全部清除",
     "region": "區域",
     "cluster": "叢集",
     "nodetype": "節點類型",
@@ -18208,8 +18284,8 @@
     "cpuusage": "CPU 使用率 (%)",
     "memoryusage": "記憶體使用率 (%)",
     "establishedLabel": "已建立",
-    "closewaitLabel": "關閉等待",
-    "waittimeLabel": "時間等待",
+    "closewaitLabel": "等待關閉",
+    "waittimeLabel": "等待逾時",
     "applyFilter": "套用篩選條件",
     "searchCluster": "搜尋叢集",
     "searchRegion": "搜尋區域"
@@ -18220,8 +18296,8 @@
     "search": "搜尋模式",
     "name": "名稱",
     "pattern": "模式",
-    "created_at": "建立時間",
-    "updated_at": "更新時間",
+    "created_at": "建立於",
+    "updated_at": "更新於",
     "actions": "操作",
     "edit": "編輯",
     "delete": "刪除",
@@ -19521,7 +19597,8 @@
         "promptTemperatureOverrideInherited": "使用提示詞參數。",
         "taskTimeoutLabel": "逾時（秒）",
         "taskConcurrencyLabel": "最大並行數",
-        "taskOverrideHelp": "覆寫此執行中任務的已發佈值。"
+        "taskOverrideHelp": "覆寫此執行中任務的已發佈值。",
+        "providerHelpSettingsLink": "設定"
       },
       "columns": {
         "name": "名稱",
@@ -19859,7 +19936,7 @@
       "agentIdHint": "Agent ID：{ids}",
       "noAgentIdentity": "找不到 Agent 身分",
       "noAgentIdentityDescription": "這些 LLM Span 沒有 Agent 名稱，因此依串流呈現。請對應可指出 Agent 名稱的屬性，即可依 Agent 檢視。",
-      "noAgentIdentityAction": "開啟 Agent 對應"
+      "noAgentIdentityAction": "開啟 GenAI Agent 對應"
     },
     "agentGraph": {
       "stream": "串流",
@@ -19875,17 +19952,17 @@
       },
       "tokenTrend": {
         "title": "Token 趨勢",
-        "subtitle": "輸入與輸出 token",
+        "subtitle": "依模型計的 token 數",
         "input": "輸入",
         "output": "輸出"
       },
       "latencyByModel": {
-        "title": "延遲趨勢",
-        "subtitle": "各模型 p95"
+        "title": "按模型延遲",
+        "subtitle": "p50 / p90 / p95 / p99"
       },
       "tracesOverTime": {
         "title": "追蹤隨時間變化",
-        "subtitle": "成功與錯誤的追蹤",
+        "subtitle": "依服務計的追蹤數",
         "ok": "正常",
         "errored": "錯誤"
       },
@@ -19914,6 +19991,26 @@
           "traces": "追蹤數",
           "last": "上次失敗"
         }
+      },
+      "spanTrend": {
+        "title": "Span 趨勢",
+        "subtitle": "依類型計的 span 數"
+      },
+      "errorsOverTime": {
+        "title": "錯誤隨時間變化",
+        "subtitle": "錯誤數"
+      },
+      "spansByModel": {
+        "title": "依模型計的 span",
+        "subtitle": "每個模型的呼叫次數"
+      },
+      "tokensByModel": {
+        "title": "依模型計的 token",
+        "subtitle": "每個模型的總 token 數"
+      },
+      "recentErrors": {
+        "title": "近期錯誤",
+        "subtitle": "最近 10 個失敗的 span"
       }
     },
     "behavior": {
@@ -19946,12 +20043,12 @@
       "colErrors": "錯誤",
       "detail": {
         "title": "訊號詳細資料",
-        "tracesTitle": "此 Agent 含有錯誤的追蹤",
+        "tracesTitle": "追蹤",
         "tracesHint": "按一下追蹤以開啟",
         "worstLoopTraces": "最差追蹤（重複次數最多的優先）",
         "topCostTraces": "最昂貴的追蹤",
         "noTraces": "此訊號找不到任何追蹤",
-        "errorsTitle": "此 Agent 的所有錯誤",
+        "errorsTitle": "錯誤訊息說明",
         "noErrors": "未擷取到錯誤訊息 — 請開啟追蹤進行檢查",
         "colTraceId": "追蹤",
         "colSpans": "Span",
@@ -19965,7 +20062,7 @@
         "failHeadline": "{agent} 遇到 {count} 個「{cls}」錯誤。",
         "costHeadline": "{agent}：花費 ${cost} · {tokens} 個令牌 · {errors} 個錯誤。",
         "loopExplain": "高重複率通常表示代理程式未快取結果或正在重試。請開啟下方最差的追蹤以查看重複的呼叫。",
-        "failExplain": "以下是此 Agent 的完整錯誤訊息，涵蓋所有失敗類別，而不只是這一類。請閱讀這些訊息以找出修正方式，或開啟追蹤查看發生位置。",
+        "failExplain": "這些是此失敗類別背後的實際錯誤訊息 — 請閱讀以尋找解決方案，或開啟追蹤以查看發生位置。",
         "costExplain": "這些追蹤驅動了此代理程式的花費。請開啟最昂貴的追蹤以查看執行了哪些內容。",
         "explain": "使用 O2 AI 說明",
         "explainHelp": "O2 AI 會從此訊號的錯誤訊息與最嚴重的追蹤著手調查，跨越 AI Span 深入日誌、指標、Kubernetes 與部署，並引用其證據。"
@@ -20952,7 +21049,7 @@
       },
       "noProviders": {
         "title": "請先新增供應商",
-        "description": "評分器需要 LLM 供應商（OpenAI、Anthropic 等）才能執行。請先於 LLM 供應商中新增一個，再建立評分器。"
+        "description": "評分器需要 LLM 供應商（OpenAI、Anthropic 等）才能執行。請在建立評分器前先於「設定」中新增供應商。"
       },
       "import": {
         "title": "匯入評分器",
@@ -21112,7 +21209,8 @@
         "resultReasoning": "推理",
         "resultRaw": "原始回應",
         "valuePlaceholder": "{variable} 的值"
-      }
+      },
+      "providerHelpSettingsLink": "設定"
     },
     "job": {
       "detail": {
@@ -21296,7 +21394,7 @@
         }
       },
       "inputMapping": {
-        "title": "評分器變數",
+        "title": "提示變數",
         "hint": {
           "span": "將每個變數對應至一個 span 屬性。",
           "trace": "將每個變數對應至系統提供的值或 span 屬性。",
@@ -22109,7 +22207,7 @@
       "explanation": "組織層級的 o2syn_ 權杖，您的私人代理會用它們在擷取作業時進行驗證。公開 (Lambda) 位置會自動使用預設權杖；建立具名權杖並將其嵌入某區域的代理中，以限定該區域的影響範圍。",
       "summary": "您的私人代理用於擷取作業的權杖。",
       "rotateDefaultBtn": "輪換預設",
-      "createTokenBtn": "新增 token",
+      "createTokenBtn": "建立權杖",
       "searchPlaceholder": "搜尋權杖",
       "default": "預設",
       "tokenNameLabel": "名稱",
@@ -22728,7 +22826,7 @@
       "deleteConfirmTitle": "刪除位置",
       "deleteFailed": "刪除位置失敗",
       "deleteSuccess": "位置已成功刪除",
-      "description": "合成監控的公開探測位置",
+      "description": "管理用於綜合監控的公共探測位置",
       "disable": "停用",
       "disabledSuccess": "位置已停用",
       "disabling": "正在停用…",
@@ -22775,7 +22873,7 @@
       "region": "區域",
       "regionPlaceholder": "例如：us-east-1",
       "regionRequired": "需要區域",
-      "searchPlaceholder": "搜尋位置",
+      "searchPlaceholder": "搜尋位置…",
       "title": "位置",
       "publicTitle": "公開位置",
       "privateTitle": "私人位置",
@@ -25381,19 +25479,19 @@
     "unitAttempts": "次嘗試",
     "unitSeconds": "秒",
     "minLength": "最小長度",
-    "minLengthDesc": "可接受的最短密碼。",
+    "minLengthDesc": "可接受的最短密碼",
     "maxLength": "最大長度",
-    "maxLengthDesc": "可接受的最長密碼，最多 128。",
+    "maxLengthDesc": "允許的最長密碼，最多 128",
     "requireUppercase": "要求大寫字母",
-    "requireUppercaseDesc": "至少一個 A–Z。",
+    "requireUppercaseDesc": "至少一個 A–Z",
     "requireLowercase": "要求小寫字母",
-    "requireLowercaseDesc": "至少一個 a–z。",
+    "requireLowercaseDesc": "至少一個 a–z",
     "requireDigit": "要求數字",
-    "requireDigitDesc": "至少一個 0–9。",
+    "requireDigitDesc": "至少一個 0–9",
     "requireSpecial": "要求特殊字元",
-    "requireSpecialDesc": "至少一個來自允許集合的字元。",
+    "requireSpecialDesc": "至少一個來自允許集合的字元",
     "specialCharSet": "允許的特殊字元",
-    "specialCharSetDesc": "留空則接受任何非英數字元。",
+    "specialCharSetDesc": "留空以接受任何非英數字元",
     "maxLengthTooSmall": "最大長度必須介於最小長度和 128 之間。",
     "maxLengthBelowMin": "必須為 {min} 或以上，才能符合最小長度。",
     "confirmTitle": "儲存密碼原則？",
@@ -25407,9 +25505,9 @@
     "rotation": "輪換",
     "rotationDays": "輪換期間",
     "rotationDesc": "密碼何時到期，以及使用者可提前多久收到通知。",
-    "rotationDaysDesc": "密碼到期前的天數。0 表示密碼永不到期。",
+    "rotationDaysDesc": "密碼到期前的天數。0 = 永不到期",
     "rotationWarningDays": "到期前警告",
-    "rotationWarningDaysDesc": "登入時提前通知的天數。0 表示不發出警告。",
+    "rotationWarningDaysDesc": "登入時提前通知的天數。0 = 不顯示警告",
     "rotationWarningDaysOffDesc": "登入時提前通知的天數。密碼到期後使用。",
     "warningDaysTooLong": "警告期間不能長於輪換期間。",
     "rotationPreview": "今天設定的密碼將於 {expires} 到期。登入警告會從 {warns} 開始。",
@@ -25417,33 +25515,33 @@
     "reuse": "防止重複使用",
     "historyCount": "記住的密碼數",
     "reuseDesc": "防止使用者改回舊密碼。",
-    "historyCountDesc": "新密碼不得與這麼多個先前的密碼相同。0 表示關閉此檢查。",
+    "historyCountDesc": "新密碼不得與先前這麼多個密碼相同。0 = 不檢查",
     "historyMaxRetained": "保留歷史筆數",
-    "historyMaxRetainedDesc": "每位使用者保留的過去密碼數量。",
+    "historyMaxRetainedDesc": "每位使用者保留多少個過去密碼",
     "historyRetainedTooSmall": "保留歷史筆數必須至少等於記住的密碼數。",
     "reuseExplainer": "目前密碼會計入已記住的密碼集合之一——重複使用目前密碼會遭到此規則拒絕，而非由另一項檢查拒絕。",
     "lockout": "帳戶鎖定",
     "lockoutThreshold": "鎖定前的失敗嘗試次數",
     "lockoutDesc": "連續登入失敗後的處理方式。",
-    "lockoutThresholdDesc": "0 表示關閉鎖定。",
+    "lockoutThresholdDesc": "0 = 停用鎖定",
     "lockoutBucketSize": "每次進一步鎖定前的嘗試次數",
-    "lockoutBucketSizeDesc": "再發生多少次失敗會觸發下一次。0 表示與第一次的次數相同。",
+    "lockoutBucketSizeDesc": "0 = 沿用上方的值",
     "lockoutStartSecs": "首次鎖定持續時間",
-    "lockoutStartSecsDesc": "第一次鎖定持續多久。",
+    "lockoutStartSecsDesc": "秒",
     "lockoutMaxSecs": "最長鎖定持續時間",
-    "lockoutMaxSecsDesc": "升級停止的上限。",
+    "lockoutMaxSecsDesc": "秒 — 遞增鎖定所封頂的上限",
     "lockoutStartTooLong": "首次鎖定不得長於最長鎖定時間。",
     "lockoutBackoff": "遞增",
-    "lockoutBackoffDesc": "每次鎖定相較於前一次如何增長。",
+    "lockoutBackoffDesc": "每次鎖定相較前一次如何遞增",
     "backoffExponential": "指數",
     "backoffLinear": "線性",
     "lockoutPreview": "{threshold} 次失敗 → {first} · 每再 {bucket} 次 → {rest} · 上限為 {max}。成功登入會重設所有設定。",
     "sessionEnforcement": "工作階段與強制執行",
     "sessionEnforcementDesc": "登入工作階段持續多久，以及 root 是否遵循這些規則。",
     "cookieMaxAge": "工作階段存續時間",
-    "cookieMaxAgeDesc": "已登入工作階段保持有效的時間。0 使用來自 {envVar} 的執行個體預設值。",
+    "cookieMaxAgeDesc": "已登入工作階段保持有效的秒數。0 = 使用 {envVar} 中的執行個體預設值",
     "applyToRoot": "套用至 root 帳戶",
-    "applyToRootDesc": "除非開啟此項，否則 Root 不受上述任何規則限制。",
+    "applyToRootDesc": "除非開啟此選項，否則 root 不受上述所有規則限制",
     "rootWarning": "鎖定 root 可能導致系統進入無法復原的狀態。",
     "rootDialogTitle": "要將原則套用至 root 嗎？",
     "rootDialogMessage": "root 將與其他原生帳戶一樣受到鎖定、輪替和強制重設的約束。如果 root 是您唯一的管理帳戶，一旦遭到鎖定或發生其無法符合的到期情形，將再也無法進入此執行個體。",
@@ -29616,12 +29714,12 @@
       "chartBelow": "{metric}，目前 {value}，低於正常範圍",
       "chartWithin": "{metric}，目前 {value}，在正常範圍內",
       "tipNormal": "正常 {low} – {high}",
-      "openTraces": "在追蹤中開啟",
+      "openTraces": "追蹤",
       "openCatalog": "服務目錄",
       "openLogs": "在日誌中開啟",
       "rangeLabel": "時間範圍",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "覆蓋缺口",
+      "badgeNotWatched": "未監看",
       "signalsWatched": "已監看的訊號",
       "chipAria": "{signal}：{state}",
       "deltaUp": "自範圍開始以來上升 {change}",
@@ -29717,7 +29815,10 @@
         "service": "依服務",
         "place": "依地點",
         "none": "未分組"
-      }
+      },
+      "fixNoLink": "新增 service.name 標籤",
+      "fixStopped": "檢查收集器",
+      "fixQueued": "僅模擬：「{action}」針對 {service} 未傳送至任何位置"
     },
     "activity": {
       "before": "之前",
@@ -30466,15 +30567,15 @@
       "intro": "以下是我做的事，共五個步驟。",
       "gotIt": "知道了",
       "s1Title": "我找出你的服務",
-      "s1": "我會檢視您已傳送的資料，從中找出服務。新服務會在我下次檢查後出現；您不需要手動新增。",
-      "s2Title": "我學習正常的樣貌",
-      "s2": "我會從 14 天的歷史記錄學習每個串流通常傳送多少資料。在串流累積該歷史記錄之前，我會表示仍在學習中，不會對其做出判斷。",
-      "s3Title": "我只在串流停止時發出呼叫",
-      "s3": "當串流停止傳送資料時，我會建立事件；若已開啟呼叫，則呼叫負責該服務的值班團隊。劇烈下降與上升會顯示為發現項目，絕不發出呼叫。較小的事項則留待每日摘要。",
-      "s4Title": "我說明發生了什麼事",
-      "s4": "每個事件都會說明什麼停止了以及從何時開始。開啟 AI 分析後，還會附上對原因的最佳研判。",
-      "s5Title": "由您決定要變更什麼",
-      "s5": "我會針對無人監控的項目建議警示，並為無法觸發的警示建議修正。在您檢閱並套用之前不會有任何變更，且您可復原已套用的內容。"
+      "s1": "我會查看你已傳送的數據，並找出其中所有服務。當有新服務出現時，我會在同一天開始監控；你不需要特別要求。",
+      "s2Title": "我監控它們",
+      "s2": "我會學習每個服務的正常樣貌：一天中每個小時的錯誤、緩慢與流量，並隨著時間讓每週模式越來越精準。在我了解之前，我會使用基本的安全檢查。",
+      "s3Title": "除非問題是真的，否則我會保持安靜",
+      "s3": "大多數異常時刻並不是問題。當有事情影響客戶時，我會呼叫你的團隊；較小的問題會發送不會吵醒任何人的訊息；更微小的事情則留到星期五摘要。",
+      "s4Title": "我會解釋每一次呼叫",
+      "s4": "每則訊息都會說明什麼故障、從何時開始、我對原因的最佳判斷，以及我有多確定。",
+      "s5Title": "我只修復你允許的項目",
+      "s5": "我只修復你允許我修復的事項。有效的修復會為我贏得一點信任，而沒有幫助的修復則會讓我扣分。如果我持續需要相同的修復，那是我向你的團隊回報的錯誤，而不是我會自動化的習慣。"
     },
     "outcome": {
       "active": "正在發生",
@@ -30487,9 +30588,9 @@
     },
     "view": {
       "standard": "標準",
-      "nerd": "詳細",
+      "nerd": "進階",
       "standardTooltip": "標準檢視提供簡短摘要：哪些事情需要你，以及過去 7 天發生了什麼",
-      "nerdTooltip": "詳細檢視會完整顯示每個偵測器、迴圈與設定",
+      "nerdTooltip": "進階檢視會完整顯示每個偵測器、迴圈與設定",
       "label": "檢視"
     },
     "suggestions": {
@@ -30612,7 +30713,8 @@
       "copyRequest": "複製請求",
       "requestText": "請在 _meta › Settings › Slack › Organizations 中，將 OpenObserve 組織 {name}（{org}）新增至 Slack 工作區 {team}。",
       "requestCopied": "已複製請求",
-      "setupAppOtherTeam": "適用於 {team} 以外的 Slack 工作區 · OpenObserve 會使用單一設定權杖為您建立專屬的 Slack 應用程式"
+      "setupAppOtherTeam": "適用於 {team} 以外的 Slack 工作區 · OpenObserve 會使用單一設定權杖為您建立專屬的 Slack 應用程式",
+      "title": "連結 Slack 工作區"
     },
     "wizard": {
       "title": "設定 Slack 應用程式",
@@ -30832,7 +30934,9 @@
       "ownOrgOnlyHint": "在執行個體工作區中，您可以將頻道對應到自己的組織",
       "claimableHint": "未認領的頻道，以及 {org} 擁有的頻道",
       "servedOrgsHint": "此工作區所服務的任何組織",
-      "alertRoutes": "{count} 個目標 | {count} 個目標"
+      "alertRoutes": "{count} 個目標 | {count} 個目標",
+      "empty": "尚無頻道設定預設組織",
+      "emptyDescription": "沒有預設組織的頻道中的問題會傳送到每個人的預設組織（他們可以用 /o2 org 變更）。"
     },
     "people": {
       "title": "已連結的人員",
@@ -30851,7 +30955,8 @@
         "email": "電子郵件比對",
         "admin_bulk": "全部連結"
       },
-      "loadMore": "載入更多"
+      "loadMore": "載入更多",
+      "empty": "此組織尚無人連結 Slack"
     },
     "credentials": {
       "title": "更新憑證",
@@ -31774,7 +31879,7 @@
           "label": "缺少代理身分",
           "detail": "{total} 個 LLM Span 中有 {affected} 個（{pct}）沒有 gen_ai.agent.name，因此代理檢視會遺漏它們。",
           "pass": "每個 LLM Span 都帶有代理名稱或 ID。",
-          "fix": "開啟代理程式對應"
+          "fix": "開啟 GenAI 代理對應"
         },
         "zero_duration_spans": {
           "label": "零時長 Span",
@@ -31789,6 +31894,13 @@
           "fix": "整合指南"
         }
       }
+    },
+    "chart": {
+      "costMissing": "未顯示於此圖表：{models}。{tokens} 個 token 沒有價格。",
+      "costMissingPricedSince": "未顯示於此圖表：{models}。{tokens} 個 token 是在新增價格之前記錄的。",
+      "unpricedModels": "未定價：{models}",
+      "pricedSinceModels": "新增價格前記錄：{models}",
+      "addPrice": "新增價格"
     }
   },
   "onboarding": {

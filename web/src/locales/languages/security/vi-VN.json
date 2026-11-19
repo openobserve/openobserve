@@ -302,7 +302,7 @@
       "source": "Nguồn",
       "matchedRules": "{n} phát hiện khớp | {n} phát hiện khớp",
       "openCase": "Mở vụ việc",
-      "openCaseHint": "Mở một vụ việc cho sự kiện này, với tiêu đề, mức độ ưu tiên và các thực thể đã được điền sẵn",
+      "openCaseHint": "Mở vụ việc cho sự kiện này, với tiêu đề, mức ưu tiên và thực thể đã được điền sẵn",
       "addToCase": "Thêm vào vụ việc",
       "pickCase": "Thêm vào vụ việc đang mở",
       "caseOpened": "Đã mở vụ việc: {title}",
@@ -921,7 +921,7 @@
       "createForbidden": "Tạo phát hiện cần quyền Bảo mật",
       "preview": {
         "run": "Xem trước trên lịch sử",
-        "hint": "Chạy quy tắc trên phạm vi đã chọn theo cách bộ lập lịch thực hiện và cho biết những gì lẽ ra đã kích hoạt",
+        "hint": "Chạy quy tắc trên khoảng đã chọn theo cách bộ lập lịch thực hiện và cho biết những gì sẽ được kích hoạt",
         "failed": "Truy vấn thất bại: {reason}",
         "time": "Thời gian",
         "range": {
@@ -1093,7 +1093,7 @@
       "stat": {
         "ready": "Sẵn sàng cài đặt",
         "installed": "Đã cài đặt",
-        "applies": "Khớp với các nguồn của bạn",
+        "applies": "Khớp với nguồn của bạn",
         "readyHint": "Các quy tắc chạy trên ít nhất một luồng của bạn và chưa được cài đặt",
         "appliesHint": "Các quy tắc cho một nguồn log bạn có, đã cài đặt hay chưa; bao gồm mọi quy tắc sẵn sàng cài đặt",
         "allRules": "Tất cả quy tắc",
@@ -1690,7 +1690,7 @@
     },
     "audit": {
       "title": "Nhật ký thay đổi",
-      "hint": "Ai đã thay đổi các phát hiện, nguồn, vụ việc và quyền cấp vai trò Bảo mật, trong suốt thời gian lưu nhật ký kiểm toán.",
+      "hint": "Ai đã thay đổi phát hiện, nguồn, vụ việc và quyền vai trò Security, trong suốt thời gian nhật ký kiểm tra được lưu giữ",
       "includeReads": "Bao gồm lượt đọc",
       "when": "Thời gian",
       "who": "Người thay đổi",

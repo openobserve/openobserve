@@ -121,7 +121,7 @@
     "noGroups": {
       "title": "Brak grup",
       "description": "Grupy pozwalają zarządzać uprawnieniami dla wielu użytkowników jednocześnie. Utwórz jedną, aby rozpocząć.",
-      "action": "Nowa grupa użytkowników",
+      "action": "Nowa grupa",
       "actionDesc": "Utwórz grupę użytkowników"
     },
     "noRoles": {
@@ -197,7 +197,7 @@
     "noCipherKeys": {
       "title": "Brak kluczy szyfrowania",
       "description": "Klucze szyfrowania są używane do szyfrowania poufnych pól w strumieniach danych.",
-      "action": "Nowy klucz szyfrowania",
+      "action": "Nowy klucz",
       "actionDesc": "Wygeneruj klucz szyfrowania"
     },
     "noSlackChannelDefaults": {
@@ -225,7 +225,7 @@
     "noLlmProviders": {
       "title": "Brak skonfigurowanych dostawców LLM",
       "description": "Połącz dostawcę modelu językowego, aby włączyć funkcje oparte na AI.",
-      "action": "Nowy dostawca",
+      "action": "Dodaj dostawcę",
       "actionDesc": "Skonfiguruj dostawcę LLM"
     },
     "noDiscoveredServices": {
@@ -268,9 +268,9 @@
     },
     "noStorageConfig": {
       "title": "Nie skonfigurowano zasobnika",
-      "description": "Użyj własnego zasobnika, aby przechowywać dane tej organizacji w należącej do Ciebie pamięci masowej, oddzielnie od innych organizacji i ustawień globalnych.",
-      "action": "Skonfiguruj zasobnik",
-      "actionDesc": "Połącz zasobnik S3 lub Azure"
+      "description": "Kieruj dane tej organizacji do dedykowanego zasobnika — niezależnie od innych organizacji i globalnych domyślnych ustawień.",
+      "action": "Skonfiguruj przechowywanie",
+      "actionDesc": "Połącz zasobnik S3, GCS lub Azure"
     },
     "noPhoneProvider": {
       "title": "Nie podłączono dostawcy telefonii",
@@ -435,7 +435,7 @@
     "noUsers": {
       "title": "Brak użytkowników",
       "description": "Zaproś swoich współpracowników do współpracy w tej organizacji.",
-      "action": "Nowy użytkownik",
+      "action": "Dodaj użytkownika",
       "actionDesc": "Zaproś współpracownika przez e-mail"
     },
     "noReports": {
@@ -457,7 +457,7 @@
     "noServiceAccounts": {
       "title": "Brak kont usługi",
       "description": "Konta usługi umożliwiają aplikacjom uwierzytelnianie za pomocą API. Utwórz jedno, aby rozpocząć.",
-      "action": "Nowe konto usługi",
+      "action": "Dodaj konto usługi",
       "actionDesc": "Utwórz konto usługi API"
     },
     "noInvitations": {
@@ -3727,8 +3727,8 @@
     "ent_lincese_detail_lbl": "Szczegóły licencji Enterprise",
     "lincese_id_lbl": "ID licencji",
     "status_lbl": "Status",
-    "create_at_lbl": "Data utworzenia",
-    "expires_at_lbl": "Data wygaśnięcia",
+    "create_at_lbl": "Utworzono",
+    "expires_at_lbl": "Wygasa",
     "usage_limits": "Limity użycia",
     "feature_comparison_lbl": "Porównanie funkcji",
     "feature_comparision_ent_msg": "Korzystasz z OpenObserve Enterprise Edition z dostępem do wszystkich zaawansowanych funkcji wymienionych poniżej.",
@@ -3787,17 +3787,17 @@
     "expired_lbl": "Wygasła",
     "no_license_found": "Nie znaleziono licencji",
     "installation_id": "Identyfikator instalacji",
-    "contact_admin_license": "Wklej poniżej klucz licencji lub poproś o niego.",
-    "get_license": "Uzyskaj licencję",
-    "enter_license_key": "Wprowadź klucz licencji",
+    "contact_admin_license": "Skontaktuj się z administratorem, aby uzyskać licencję, a następnie wklej klucz tutaj, <strong>lub:</strong>",
+    "get_license": "Pobierz licencję",
+    "enter_license_key": "Wprowadź klucz licencyjny",
     "paste_license_placeholder": "Wklej swój klucz licencyjny tutaj...",
-    "license_auto_filled": "Klucz licencji został automatycznie uzupełniony z adresu URL. Kliknij „Zaktualizuj licencję”, aby zastosować.",
-    "update_license": "Zaktualizuj licencję",
+    "license_auto_filled": "Klucz licencyjny został automatycznie wypełniony z adresu URL. Kliknij \"Aktualizuj licencję\", aby zastosować.",
+    "update_license": "Aktualizuj licencję",
     "license_id": "Identyfikator licencji",
     "company": "Firma",
-    "license_key": "Klucz licencji",
-    "contact_name": "Imię i nazwisko osoby kontaktowej",
-    "contact_email": "E-mail kontaktowy",
+    "license_key": "Klucz licencyjny",
+    "contact_name": "Imię i nazwisko kontaktowe",
+    "contact_email": "Adres e-mail kontaktowy",
     "environment_type": "Typ środowiska",
     "features": "Funkcje",
     "features_all_unlocked": "Twoja licencja odblokowuje wszystkie funkcje.",
@@ -3817,7 +3817,7 @@
     "features_new": "Nowe po wydaniu licencji",
     "features_filter_new": "Nowe",
     "request_new_license": "Poproś o nową licencję",
-    "add_new_license_key": "Dodaj nowy klucz licencji",
+    "add_new_license_key": "Dodaj nowy klucz licencyjny",
     "online_error_unreachable": "Nie można połączyć się z serwerem licencji.{limits}",
     "online_error_timeout": "Nie można połączyć się z serwerem licencji.{limits}",
     "online_error_blocked": "Ta instalacja została zablokowana przez OpenObserve. Skontaktuj się z pomocą techniczną.",
@@ -3971,11 +3971,11 @@
     "waiver_breach_ended": "Limit dla {month} zakończył się o {end} UTC.",
     "waiver_window_until": "do {end}",
     "waiver_window_days": "dni użycia od {start} do {end}",
-    "update_license_key": "Zaktualizuj klucz licencji",
+    "update_license_key": "Aktualizuj klucz licencyjny",
     "paste_new_license_placeholder": "Wklej nowy klucz licencyjny tutaj...",
     "your_complete_license_key": "Twój pełny klucz licencyjny:",
     "copy_key": "Kopiuj klucz",
-    "usage_information": "Informacje o wykorzystaniu",
+    "usage_information": "Informacje o użyciu",
     "usage_chart_title": "Dzienne pozyskiwanie danych w tym miesiącu",
     "no_license_ingestion_limit": "Bez licencji pozyskiwanie danych jest ograniczone do <strong>{limit} GB</strong> dziennie.",
     "license_allows_ingestion": "Aktualna licencja pozwala na przesyłanie <strong>{limit} GB</strong> danych dziennie.",
@@ -4732,7 +4732,7 @@
       "effectStillAllowed": "Brak zmiany dostępu: szersze uprawnienie nadal na to pozwala.",
       "moduleGroupSecurity": "Bezpieczeństwo",
       "presetSocAnalystTitle": "Analityk SOC",
-      "presetSocAnalystDescription": "Przeprowadzaj wstępną ocenę alertów i przypadków bezpieczeństwa, z dostępem tylko do odczytu do wykryć, źródłowych strumieni bezpieczeństwa i list informacji o zagrożeniach.",
+      "presetSocAnalystDescription": "Obsługa alertów i spraw Bezpieczeństwa, z dostępem do odczytu wykryć, strumieni źródeł Bezpieczeństwa i list analizy zagrożeń",
       "presetDetectionEngineerTitle": "Inżynier wykryć",
       "presetDetectionEngineerDescription": "Tworzenie, dostrajanie, włączanie i uruchamianie wykryć, instalowanie treści, podłączanie źródeł wraz z ich funkcjami i potokami oraz utrzymywanie tabel wzbogacania, takich jak listy analizy zagrożeń, z dostępem do odczytu Bezpieczeństwa, spraw i strumieni",
       "presetSecurityAdminTitle": "Administrator bezpieczeństwa",
@@ -4843,7 +4843,7 @@
       "createFailed": "Tworzenie organizacji nie powiodło się."
     },
     "listOrganizations": {
-      "subtitle": "Wszystkie organizacje, do których masz dostęp. Przełącz się na jedną z nich lub zmień jej nazwę w akcjach wiersza.",
+      "subtitle": "Organizacje, do których masz dostęp",
       "switch": "Przełącz na tę organizację",
       "current": "Bieżąca",
       "cannotEditWhileDeleting": "Nie można edytować podczas trwania usuwania",
@@ -4977,7 +4977,7 @@
       "uploadingRules": "Proszę czekać podczas przesyłania reguł...",
       "errorUploadingRules": "Błąd podczas przesyłania reguł",
       "errorParsingJson": "Błąd parsowania JSON z pliku {name}",
-      "someValuesEmpty": "Niektóre wartości są puste. Sprawdź je.",
+      "someValuesEmpty": "niektóre wartości są puste, sprawdź",
       "saveBeforeSwitchingTimeUnits": "Zapisz lub anuluj zmiany przed przełączeniem jednostek czasu"
     },
     "addRolePage": {
@@ -4996,7 +4996,9 @@
       "saved": "Zaktualizowano banery ogłoszeń",
       "saveFailed": "Nie udało się zapisać banerów ogłoszeń.",
       "loadFailed": "Nie udało się załadować banerów ogłoszeń.",
-      "addBanner": "Dodaj baner"
+      "addBanner": "Dodaj baner",
+      "emptyTitle": "Brak banerów",
+      "emptyHint": "Dodaj jeden, aby wyświetlić ogłoszenie u góry aplikacji."
     },
     "variants": {
       "info": "Informacja",
@@ -5114,10 +5116,10 @@
       "characters": "{count} / {max}",
       "variantOption": "{name} — {help}",
       "variantHelp": {
-        "info": "Ogólne komunikaty i informacje o wydaniach",
-        "warning": "Pogorszony stan usługi lub nadchodząca konserwacja",
-        "critical": "Awarie; wyświetlane jako pierwsze i ukrywają promocje",
-        "promo": "Zdarzenia i oferty; wyświetlane jako ostatnie, ukrywane podczas awarii"
+        "info": "ogólne komunikaty i informacje o wydaniach",
+        "warning": "degradacja usługi lub zbliżająca się konserwacja",
+        "critical": "awarie; wyświetlany jako pierwszy i ukrywa promocje",
+        "promo": "wydarzenia i oferty; wyświetlany jako ostatni, ukrywany podczas awarii"
       },
       "toolbar": {
         "bold": "Pogrubienie",
@@ -6173,8 +6175,8 @@
     "periodInfoLine1": "Okres, dla którego zapytanie powinno działać.",
     "periodInfoLine2": "np. 10 minut oznacza, że za każdym razem, gdy zapytanie zostanie uruchomione, użyje ostatnich 10 minut danych. Jeśli zapytanie uruchomi się o 16:00, użyje danych od 15:50 do 16:00.",
     "periodShouldMatchFrequency": "Uwaga: Okres powinien być taki sam jak częstotliwość.",
-    "delayInfoLine1": "Czas oczekiwania po zaplanowanym czasie, aby mogły dotrzeć spóźnione dane.",
-    "delayInfoLine2": "np. przy 10-minutowym opóźnieniu potok uruchamiany co godzinę startuje o 10:10 i odczytuje dane od 9:00 do 10:00.",
+    "delayInfoLine1": "Opóźnienie, z jakim potok ma zostać uruchomiony.",
+    "delayInfoLine2": "np. 10 minut opóźnienia oznacza, że potok uruchomi się 10 minut po zaplanowanym czasie.",
     "closeDrawer": "Zamknij panel",
     "conditionValueGuidelines": "Wytyczne dotyczące wartości warunku:",
     "customColumnGuideline": "Aby dodać kolumnę niestandardową, wpisz nazwę kolumny i naciśnij",
@@ -6385,28 +6387,28 @@
     "confirmDeleteNode": "Czy na pewno chcesz usunąć węzeł?",
     "errorFetchingUsedStreams": "Błąd podczas pobierania używanych strumieni",
     "destinationNotes": {
-      "openobserveTitle": "Szczegóły połączenia z OpenObserve",
+      "openobserveTitle": "Szczegóły połączenia OpenObserve",
       "openobserveStep1": "Zaloguj się do swojej instancji OpenObserve",
       "openobserveStep2": "Skopiuj swój podstawowy adres URL (np. https://your-instance.openobserve.ai)",
       "openobserveStep3": "Ścieżka punktu końcowego jest wstępnie wypełniona jako: /api/{'{'}org{'}'}/{'{'}stream{'}'}/_json",
       "openobserveStep4": "Zamień {'{'}org{'}'} na swój identyfikator organizacji",
       "openobserveStep5": "Zamień {'{'}stream{'}'} na swoją nazwę strumienia",
       "openobserveStep6": "Dodaj nagłówek autoryzacji: Authorization: Basic <OpenObserve_Token>",
-      "splunkTitle": "Szczegóły połączenia z Splunk HEC",
+      "splunkTitle": "Szczegóły połączenia Splunk HEC",
       "splunkStep1": "Zaloguj się do swojej instancji Splunk jako administrator",
       "splunkStep2": "Przejdź do Ustawień → Dane wejściowe → HTTP Event Collector",
       "splunkStep3": "Kliknij „Nowy token”, aby utworzyć nowy token HEC",
       "splunkStep4": "Skonfiguruj ustawienia tokena i zapisz",
       "splunkStep5": "Użyj adresu URL punktu końcowego HEC Splunk",
       "splunkStep6": "Dodaj token HEC w sekcji Nagłówki (Authorization: Splunk <token>)",
-      "elasticsearchTitle": "Szczegóły połączenia z Elasticsearch",
+      "elasticsearchTitle": "Szczegóły połączenia Elasticsearch",
       "elasticsearchStep1": "Znajdź punkt końcowy klastra Elasticsearch",
       "elasticsearchStep2": "Upewnij się, że klaster jest dostępny z tej sieci",
       "elasticsearchStep3": "Utwórz klucz API lub użyj uwierzytelniania podstawowego",
       "elasticsearchStep4": "Dla chmury: pobierz punkt końcowy z konsoli chmury",
       "elasticsearchStep5": "Dla własnej instalacji: użyj adresu URL klastra z portem (zazwyczaj 9200)",
       "elasticsearchStep6": "Dodaj uwierzytelnianie w sekcji Nagłówki",
-      "datadogTitle": "Szczegóły połączenia z Datadog",
+      "datadogTitle": "Szczegóły połączenia Datadog",
       "datadogStep1": "Zaloguj się do swojego konta Datadog",
       "datadogStep2": "Przejdź do Ustawień organizacji → Klucze API",
       "datadogStep3": "Utwórz nowy klucz API lub skopiuj istniejący",
@@ -6414,14 +6416,14 @@
       "datadogStep5": "US: https://http-intake.logs.datadoghq.com",
       "datadogStep6": "UE: https://http-intake.logs.datadoghq.eu",
       "datadogStep7": "Dodaj klucz API w nagłówkach: DD-API-KEY: <your-key>",
-      "dynatraceTitle": "Szczegóły połączenia z Dynatrace",
+      "dynatraceTitle": "Szczegóły połączenia Dynatrace",
       "dynatraceStep1": "Zaloguj się do swojego środowiska Dynatrace",
       "dynatraceStep2": "Przejdź do Ustawień → Integracja → Dynatrace API",
       "dynatraceStep3": "Utwórz nowy token API z uprawnieniem logs.ingest",
       "dynatraceStep4": "Użyj adresu URL swojego środowiska",
       "dynatraceStep5": "Format: https://{'{'}your-environment-id{'}'}.live.dynatrace.com",
       "dynatraceStep6": "Dodaj token w nagłówkach: Authorization: Api-Token <token>",
-      "newrelicTitle": "Szczegóły połączenia z New Relic",
+      "newrelicTitle": "Szczegóły połączenia New Relic",
       "newrelicStep1": "Zaloguj się do swojego konta New Relic",
       "newrelicStep2": "Przejdź do sekcji Klucze API",
       "newrelicStep3": "Utwórz lub skopiuj klucz licencyjny (Ingest - License)",
@@ -7135,7 +7137,7 @@
     "orgLevelExplanation": "Są to tokeny pozyskiwania danych na poziomie organizacji. Nie są powiązane z indywidualnymi użytkownikami i będą działać nawet jeśli użytkownik, który je utworzył, opuści organizację. Tokeny mogą być używane tylko w punktach końcowych pozyskiwania danych.",
     "orgLevelSummary": "Tokeny na poziomie organizacji dla punktów końcowych pozyskiwania danych.",
     "tokenManagementTitle": "Zarządzaj tokenami pozyskiwania danych",
-    "createTokenBtn": "Nowy token",
+    "createTokenBtn": "Utwórz nowy token",
     "createTokenTitle": "Utwórz token",
     "searchToken": "Szukaj tokenów",
     "tokenNameLabel": "Nazwa",
@@ -11691,9 +11693,9 @@
       "lengthenEvaluationWindowDesc": "Poszerz okres, aby krótki skok nie wyzwalał alertu.",
       "enableDeduplication": "Włącz pomijanie powtórzeń",
       "enableDeduplicationDesc": "Powiadamiaj raz na zmianę stanu zamiast przy każdej ocenie.",
-      "reviewForDeletion": "Przejrzyj alert",
+      "reviewForDeletion": "Przejrzyj do usunięcia",
       "reviewForDeletionDesc": "Potwierdź, że zapytanie wciąż odpowiada rzeczywistości, zanim wycofasz alert.",
-      "fixAlertQuery": "Przejrzyj alert",
+      "fixAlertQuery": "Napraw zapytanie alertu",
       "fixAlertQueryDesc": "Sama ewaluacja kończy się niepowodzeniem i nigdy nie osiąga werdyktu.",
       "repairDestination": "Napraw miejsce docelowe",
       "repairDestinationDesc": "Dostarczanie zawodzi w przypadku miejsca docelowego używanego przez alert.",
@@ -11877,7 +11879,7 @@
       "scopeAll": "Wszystkie uruchomienia",
       "scopeFindings": "Z ustaleniami",
       "scopeGaps": "Luki w pokryciu",
-      "searchPlaceholder": "Szukaj po nazwie alertu",
+      "searchPlaceholder": "Szukaj uruchomień według nazwy alertu",
       "colRun": "Uruchomienie",
       "colFindings": "Ustalenia",
       "colCoverage": "Pokrycie",
@@ -11905,8 +11907,8 @@
       "statFindings": "Ustalenia",
       "statAlertsInScope": "Alerty w zakresie",
       "statDeclined": "Odrzucone",
-      "statDeclinedSub": "Niepotwierdzone",
-      "statDeclinedTooltip": "Pary reguła–alert, których reguła nie oceniła. To brama, a nie oczyszczenie. Niespełniony próg jest tylko zliczany; reguła, która nie mogła się uruchomić lub sprawdziła i odmówiła, jest wymieniona poniżej wraz z powodem.",
+      "statDeclinedSub": "Odrzucone, nie rozstrzygnięte",
+      "statDeclinedTooltip": "Pary reguła–alert, których reguła nie oceni, ponieważ alert miał zbyt mało historii lub zbyt mało próbek. To warunek odsiewający, a nie oczyszczenie z zarzutów; powody dla poszczególnych alertów nie są zapisywane w strumieniu.",
       "limitations": "Ograniczenia dowodów",
       "declinedHeading": "Odrzucone z podaniem powodu",
       "declinedDesc": "Reguły, które nie mogły się uruchomić dla alertu lub sprawdziły i odmówiły. To nie jest oczyszczenie.",
@@ -11933,7 +11935,10 @@
       "proposedActions": "Proponowane działania",
       "qualityReasons": "Powód: {reasons} | Powody: {reasons}",
       "openAlert": "Otwórz alert",
-      "advice": "Co sprawdzić"
+      "advice": "Co sprawdzić",
+      "viewInLogs": "Wyświetl w Logach",
+      "viewInLogsHint": "Otwiera rekordy tego uruchomienia w Logach",
+      "loadFailed": "Nie udało się wczytać podsumowania: {message}"
     },
     "dashboard": {
       "latestRunAgo": "Ostatnie uruchomienie {time}",
@@ -11991,7 +11996,8 @@
       "runNowHeading": "Uruchom teraz",
       "findingsKept": "Ustalenia są przechowywane wraz z rekordami tej organizacji przez okres jej retencji. Kalibracja alertów nie wysyła żadnych powiadomień.",
       "frequencyRange": "Wybierz częstotliwość od 1 godziny do 30 dni.",
-      "windowRange": "Wybierz okno od 1 minuty do 90 dni."
+      "windowRange": "Wybierz okno od 1 minuty do 90 dni.",
+      "loadFailed": "Nie udało się wczytać ustawień: {message}"
     },
     "visibility": {
       "allClear": "Brak ustaleń dotyczących alertów, do których masz dostęp, w ostatnim uruchomieniu.",
@@ -12182,8 +12188,8 @@
     "response": "Odpowiedź",
     "lastError": "Ostatni błąd:",
     "errorSummary": "Podsumowanie błędu",
-    "searchThisFolderTooltip": "Pokaż alerty w tym folderze",
-    "searchAllFoldersTooltip": "Pokaż alerty we wszystkich folderach",
+    "searchThisFolderTooltip": "Szukaj tylko w tym folderze",
+    "searchAllFoldersTooltip": "Szukaj we wszystkich folderach",
     "reloadAlertsTooltip": "Odśwież alerty",
     "triggerDetection": "Wykrywanie wyzwalaczy",
     "retrain": "Przeszkol ponownie",
@@ -14245,7 +14251,7 @@
       "addedUnread": "Nie udało się odczytać Twoich alertów, więc AutoObserve nie może stwierdzić, czy ten został już dodany. Nic nie zostało zapisane; zapisz ponownie, aby spróbować jeszcze raz.",
       "alreadyAdded": "Już dodany jako {name} w folderze {folder}, więc ten alert nie został zapisany ponownie.",
       "dialog": {
-        "title": "Dodaj alert",
+        "title": "Utwórz alert",
         "continue": "Przejdź do alertu",
         "queryChoiceLabel": "Alert dla zapytania",
         "queryChoiceOption": "{name}: {query}",
@@ -14268,19 +14274,19 @@
       },
       "sources": {
         "default": {
-          "label": "Dodaj alert",
+          "label": "Utwórz alert",
           "toast": "Zapytanie zaimportowane do formularza alertu"
         },
         "logs": {
-          "label": "Dodaj alert",
+          "label": "Utwórz alert",
           "toast": "Zapytanie zaimportowane z wyszukiwania logów"
         },
         "patterns": {
-          "label": "Dodaj alert",
+          "label": "Utwórz alert",
           "toast": "Zapytanie zaimportowane z wybranych wzorców"
         },
         "panel": {
-          "label": "Dodaj alert",
+          "label": "Utwórz alert",
           "toast": "Zapytanie zaimportowane z panelu pulpitu: \"{sourceLabel}\""
         },
         "library": {
@@ -14288,7 +14294,7 @@
           "toast": "Z biblioteki alertów: {sourceLabel}"
         },
         "explorer": {
-          "label": "Dodaj alert",
+          "label": "Utwórz alert",
           "toast": "Zapytanie zaimportowane z Eksploratora metryk"
         },
         "dbm": {
@@ -14304,7 +14310,7 @@
           "toast": "Zaimportowano z Product Analytics: \"{sourceLabel}\""
         },
         "traces": {
-          "label": "Dodaj alert",
+          "label": "Utwórz alert",
           "toast": "Zapytanie zaimportowane z wyszukiwania trace",
           "noStream": "Najpierw wybierz strumień",
           "errorCount": "Liczba błędów",
@@ -14508,7 +14514,7 @@
       "filterAll": "Wszystkie",
       "filterOnce": "Jednorazowe",
       "filterRecurring": "Cykliczne",
-      "search": "Szukaj według nazwy, powodu lub twórcy",
+      "search": "Szukaj po nazwie, wymiarze lub autorze",
       "searchAcross": "Przeszukaj wszystkie foldery",
       "thisFolder": "Ten folder",
       "allFolders": "Wszystkie foldery",
@@ -15047,7 +15053,7 @@
       "webhookOnly": "(tylko webhook)",
       "emailOnly": "(tylko e-mail)",
       "snsOnly": "(tylko SNS)",
-      "stale": "Szablon {name} nie jest dostępny dla tego rodzaju. Wybierz inny lub wyczyść pole.",
+      "stale": "Szablon {name} już nie istnieje. Wybierz inny lub wyczyść pole.",
       "clear": "Wyczyść",
       "willUse": "Zostanie użyty: {template}",
       "willUsePerDestination": "Zostanie użyty dla poszczególnych miejsc docelowych:",
@@ -15261,7 +15267,7 @@
     "systemReadOnlyEdit": "Wbudowany szablon — edycja jest wyłączona. Sklonuj go, aby utworzyć modyfikowalną kopię.",
     "systemReadOnlyDelete": "Wbudowany szablon — usuwanie jest wyłączone. Sklonuj go, aby utworzyć modyfikowalną kopię.",
     "prebuiltBadge": "Wbudowany",
-    "prebuiltBadgeHint": "Zarządzany przez system. Nie można go edytować ani usunąć. Sklonuj go, aby utworzyć edytowalną kopię.",
+    "prebuiltBadgeHint": "Zarządzany przez system. Możesz edytować, ale usuwanie jest wyłączone.",
     "customBadge": "Niestandardowy",
     "filterAll": "Wszystkie",
     "filterPrebuilt": "Wbudowany",
@@ -15478,7 +15484,7 @@
   },
   "alert_destinations": {
     "chooseTypeTitle": "Wybierz typ",
-    "selectDestinationType": "Typ miejsca docelowego",
+    "selectDestinationType": "Wybierz typ miejsca docelowego",
     "connectionStepTitle": "Połączenie",
     "connectionDetailsTitle": "Szczegóły połączenia",
     "urlHelpText": "Podstawowy URL bez końcowego ukośnika (np. https://your-domain.com)",
@@ -15532,7 +15538,7 @@
     "actions": "Akcje",
     "addHeader": "Dodaj nagłówek",
     "addTitle": "Nowe miejsce docelowe",
-    "updateTitle": "Zaktualizuj miejsce docelowe",
+    "updateTitle": "Aktualizuj miejsce docelowe",
     "delete": "Usuń",
     "method": "Metoda",
     "url": "URL",
@@ -15544,7 +15550,7 @@
     "payloadFormatAuto": "Automatyczny",
     "payloadFormatLegacy": "Starszy JSON",
     "payloadFormatRendered": "Wyrenderowany szablon",
-    "payloadFormatHelp": "Opcja automatyczna wysyła poprzednią treść JSON dla wiadomości o anomaliach, syntetykach, dyżurach i oknach serwisowych, dopóki nie zostanie dołączony szablon.",
+    "payloadFormatHelp": "W trybie automatycznym wysyłany jest stary ładunek JSON dla wiadomości o anomaliach, syntetykach i dyżurach, dopóki nie zostanie dołączony szablon. Zapisywane jako klucz metadanych payload_format.",
     "output_format": "Format wyjściowy",
     "readonly": "Tylko do odczytu",
     "additional_settings": "Dodatkowe ustawienia",
@@ -15683,17 +15689,17 @@
   },
   "storage_settings": {
     "heroBrand": "OpenObserve.",
-    "tabLabel": "Własny zasobnik",
-    "title": "Własny zasobnik",
+    "tabLabel": "BYOB",
+    "title": "Przynieś własny bucket",
     "notEnabled": "{product} nie jest włączony dla tej organizacji",
     "heroHeadline": "Przynieś swój własny bucket do",
-    "heroSub": "Podłącz własny zasobnik chmurowy. Dane pozostają w Twojej infrastrukturze, z pełną kontrolą i bez uzależnienia od dostawcy.",
-    "configureStorage": "Skonfiguruj zasobnik",
+    "heroSub": "Połącz swój własny bucket w chmurze, dane pozostają w Twojej infrastrukturze — pełna kontrola, brak blokady.",
+    "configureStorage": "Skonfiguruj przechowywanie",
     "supportedProviders": "Obsługiwani dostawcy",
-    "perOrgIsolation": "Izolacja dla każdej organizacji",
+    "perOrgIsolation": "Izolacja na organizację",
     "appliesImmediately": "Dotyczy natychmiast nowych danych",
     "usesOrgCredentials": "Używa poświadczeń w zakresie organizacji",
-    "updateStorage": "Zaktualizuj zasobnik",
+    "updateStorage": "Aktualizuj bucket",
     "active": "aktywny",
     "bucketName": "nazwa bucketa",
     "region": "region",
@@ -15707,12 +15713,12 @@
     "featureOwnDataDesc": "Przechowuj przetwarzane dane bezpośrednio we własnym buckecie i zachowaj pełną kontrolę nad tym, kto ma do nich dostęp.",
     "featureSecureTitle": "Bezpieczne i zgodne z przepisami",
     "featureSecureDesc": "Szczegółowe klucze dostępu, Twoje wrażliwe dane pozostają w Twojej infrastrukturze.",
-    "newStorageConfiguration": "Nowa konfiguracja zasobnika",
+    "newStorageConfiguration": "Nowa konfiguracja bucketa",
     "selectProviderDesc": "Wybierz dostawcę przechowywania w chmurze, aby przechowywać dane tej organizacji.",
     "bucketNameRequired": "Nazwa bucketa jest wymagana",
     "accessKeyRequired": "Klucz dostępu jest wymagany",
     "secretKeyRequired": "Tajny klucz jest wymagany",
-    "storageAccountRequired": "Nazwa konta magazynu jest wymagana",
+    "storageAccountRequired": "Nazwa konta przechowywania jest wymagana",
     "regionRequired": "Region jest wymagany",
     "roleARNRequired": "Role ARN jest wymagane",
     "externalIdRequired": "Zewnętrzne ID jest wymagane",
@@ -15721,7 +15727,7 @@
     "save": "Zapisz",
     "update": "Aktualizuj",
     "awsStsCloudInfo": "Wykorzystuje AWS STS do przyjęcia roli. Dodaj konto AWS {product} jako zaufany podmiot dla tej roli w konsoli AWS. Skontaktuj się z zespołem {product}, aby uzyskać szczegóły konta lub pomoc w konfiguracji.",
-    "awsStsSelfHostedInfo": "Wykorzystuje AWS STS do przyjęcia roli. Upewnij się, że środowisko instalacji ma poświadczenia AWS, które mogą przyjąć tę rolę."
+    "awsStsSelfHostedInfo": "To używa AWS STS do przyjęcia roli i wykonania operacji. Upewnij się, że skonfigurowałeś poświadczenia AWS w środowisku instalacyjnym, które mają dostęp do tej roli."
   },
   "metrics": {
     "add": "Dodaj",
@@ -16202,7 +16208,7 @@
     "cipherKeysDesc": "Klucze szyfrowania dla poufnych pól",
     "aiToolsetsDesc": "Serwery MCP i narzędzia CLI, których może używać Asystent AI",
     "regexPatternsDesc": "Wielokrotnego użytku wzorce regex do maskowania",
-    "domainManagementDesc": "Przetwarzanie oświadczeń SSO i ograniczenia logowania według domeny",
+    "domainManagementDesc": "Ogranicz logowanie do dozwolonych domen SSO",
     "passwordPolicy": "Zasady haseł",
     "passwordPolicyDesc": "Zasady uwierzytelniania dla natywnych kont e-mail/hasło, stosowane w całej instancji.",
     "pipelineDestinationsDesc": "Zewnętrzne cele dla wyjścia potoku",
@@ -16219,19 +16225,19 @@
     "logoLabel": "Przeciągnij i upuść obraz logo",
     "deleteLogoTitle": "Usuń logo",
     "deleteLogoMessage": "Czy na pewno chcesz usunąć obraz logo {name}? Kliknij OK, aby usunąć.",
-    "customLogoText": "Niestandardowy tekst logo",
+    "customLogoText": "Tekst niestandardowego logo",
     "orgLabel": "Parametry organizacji",
     "logDetails": "Szczegóły logów",
     "tracesHeading": "Trace",
-    "traceIdFieldName": "Nazwa pola Trace ID",
-    "spanIdFieldName": "Nazwa pola Span ID",
-    "toggleIngestionLogsLabel": "Logi pozyskiwania danych",
-    "usageStreamEnabledLabel": "Strumień użycia",
-    "redInsightsEnabledLabel": "Automatyczne analizy RED dla trace'ów",
+    "traceIdFieldName": "Nazwa pola ID trace",
+    "spanIdFieldName": "Nazwa pola ID span",
+    "toggleIngestionLogsLabel": "Przełącz logi pozyskiwania",
+    "usageStreamEnabledLabel": "Włącz strumień użycia",
+    "redInsightsEnabledLabel": "Włącz automatyczne spostrzeżenia RED dla trace'ów",
     "redInsightsEnabledHelp": "Tworzy detektory anomalii tempa, błędów i opóźnienia p95 dla najbardziej obciążonych usług, w folderze alertów „RED insights”. Ten folder widzą tylko administratorzy, dopóki nie zostanie udostępniony.",
     "incidentsHeading": "Incydenty",
-    "aiRcaThreadToolOutputLabel": "Dane narzędzi w wątkach incydentów",
-    "aiRcaThreadToolOutputHelp": "Pokazuje surowe dane wejściowe i wyjściowe narzędzi wszystkim, którzy mogą czytać incydent.",
+    "aiRcaThreadToolOutputLabel": "Pokaż dane narzędzi w wątkach badania incydentów",
+    "aiRcaThreadToolOutputHelp": "Pokaż surowe dane wejściowe i wyjściowe narzędzi w wątkach badania incydentów wszystkim, którzy mogą odczytać incydent",
     "claimParserFunction": "Parser deklaracji SSO",
     "claimParserFunctionDescription": "Wybierz funkcję ({product1} lub {product2}), aby przetwarzać i przekształcać deklaracje SSO/LDAP w przypisania organizacji i ról",
     "claimParserFunctionLabel": "Wybierz funkcję",
@@ -16357,17 +16363,17 @@
       "fieldAliasesSaveError": "Nie udało się zapisać aliasów pól",
       "fieldAliasesUnsavedConfirm": "Masz niezapisane zmiany w mapowaniu pól. Odrzucić je i wyjść?",
       "discoveredServicesTitle": "Odkryte usługi",
-      "discoveredServicesDescription": "Usługi są wykrywane na podstawie Twojej telemetrii i grupowane według nazwy usługi. Reguły wykrywania decydują, jak są identyfikowane.",
+      "discoveredServicesDescription": "Usługi są automatycznie wykrywane z danych telemetrycznych i grupowane według ich nazwy usługi w celu korelacji. Usługi o tej samej nazwie usługi są ze sobą korelowane w logach, trace i metrykach.",
       "noServicesYet": "Nie odkryto jeszcze żadnych usług",
       "noServicesDescription": "Usługi pojawią się tutaj, gdy dane telemetryczne zostaną załadowane z atrybutami identyfikacji usług (np. k8s-deployment, nazwa usługi itp.)",
-      "searchServiceName": "Szukaj usług lub strumieni",
+      "searchServiceName": "Szukaj nazwy usługi lub strumienia...",
       "telemetryCoverage": "Pokrycie telemetrii",
       "serviceName": "Nazwa usługi",
       "service": "Usługa",
       "logs": "Logi",
       "traces": "Trace",
       "metrics": "Metryki",
-      "lastSeen": "Ostatnio widziano",
+      "lastSeen": "Ostatnio widziane",
       "retry": "Ponów",
       "semanticFieldGroupsTitle": "Mapowania pól",
       "serviceNameNotDetected": "Nie wykryto jeszcze pola nazwy usługi w danych",
@@ -16402,7 +16408,7 @@
       "resetServicesFailed": "Nie udało się zresetować usług",
       "workload": "Obciążenie",
       "goToConfiguration": "Przejdź do konfiguracji",
-      "filterBy": "Filtruj według pola",
+      "filterBy": "Filtruj według:",
       "selectFieldPlaceholder": "Wybierz pole",
       "selectValuePlaceholder": "Wybierz wartość",
       "selectFieldFirst": "Najpierw wybierz pole",
@@ -16417,7 +16423,12 @@
       "fieldNameMapping": "Mapowanie nazw pól",
       "logsWithCount": "Logi ({count})",
       "tracesWithCount": "Trace ({count})",
-      "metricsWithCount": "Metryki ({count})"
+      "metricsWithCount": "Metryki ({count})",
+      "resetServicesConfirmMessage": "Spowoduje to usunięcie wszystkich wykrytych usług dla tej organizacji. Usługi zostaną automatycznie ponownie wykryte po wprowadzeniu nowych danych telemetrycznych. Tej czynności nie można cofnąć.",
+      "resetServicesConfirmWarning": "Usługi zostaną automatycznie ponownie wykryte po wprowadzeniu nowych danych telemetrycznych. Tej czynności nie można cofnąć.",
+      "configureServicesHint": "aby skonfigurować, jak usługi są identyfikowane i grupowane.",
+      "serviceCountSingular": "{count} usługa | Usługi: {count}",
+      "instancesCount": "(instancje: {count})"
     },
     "addRegexPattern": {
       "namePlaceholder": "Np. Hasła wewnętrzne",
@@ -16496,7 +16507,8 @@
       "logoLightLabel": "Niestandardowe logo (tryb jasny)",
       "logoLightHelp": "Wyświetlane w trybie jasnym. PNG, JPG, GIF lub BMP, do 150 × 30 px.",
       "logoDarkLabel": "Niestandardowe logo (tryb ciemny)",
-      "logoDarkHelp": "Wyświetlane w trybie ciemnym. PNG, JPG, GIF lub BMP, do 150 × 30 px."
+      "logoDarkHelp": "Wyświetlane w trybie ciemnym. PNG, JPG, GIF lub BMP, do 150 × 30 px.",
+      "fileCounterLabel": "{constraint} pliki: {filesNumber} {'|'} {totalSize}"
     },
     "modelPricingEditor": {
       "copySuffix": " (Kopia)"
@@ -16505,7 +16517,7 @@
       "subtitle": "Konfiguracja kosztów modeli LLM"
     },
     "orgStorageSettings": {
-      "subtitle": "Przechowuj dane tej organizacji w należącym do Ciebie zasobniku",
+      "subtitle": "Konfiguracja przechowywania dla organizacji",
       "awsCredentials": "Poświadczenia AWS",
       "azureCredentials": "Poświadczenia Azure",
       "awsRoleArn": "ARN roli AWS"
@@ -16525,10 +16537,13 @@
       "daysValue": "{days} dni",
       "forever": "przechowuj bezterminowo",
       "invalid": "Użyj 0 lub co najmniej 3 dni",
-      "invalidType": "Użyj co najmniej 3 dni lub usuń ten typ"
+      "invalidType": "Użyj co najmniej 3 dni lub usuń ten typ",
+      "streamType": "Typ strumienia",
+      "days": "Dni",
+      "removeType": "Usuń ten typ strumienia"
     },
     "organizationSettings": {
-      "fieldNameHelp": "Tylko litery, cyfry oraz + = , . {'@'} - _.",
+      "fieldNameHelp": "Używaj tylko znaków alfanumerycznych oraz '+=,.{'@'}-_', bez spacji.",
       "sectionTitle": "Obsługa danych",
       "sectionDescription": "Jak logi są powiązane z danymi trace i które funkcje automatyczne są włączone.",
       "traceIdHelp": "Pole logu, które łączy wiersz logu z jego trace. Tylko litery, cyfry oraz + = , . {'@'} - _.",
@@ -16542,7 +16557,7 @@
       "subtitle": "Skonfiguruj integracje narzędzi AI"
     },
     "cipherKeysPage": {
-      "subtitle": "Klucze szyfrujące i odszyfrowujące poufne wartości pól",
+      "subtitle": "Klucze szyfrowania dla pól wrażliwych",
       "delete": "Usuń",
       "deleteCipherKeyTitle": "Usuń klucz szyfrowania",
       "deleteCipherKeyMessage": "Czy na pewno chcesz usunąć klucz szyfrowania {name}?",
@@ -16647,7 +16662,7 @@
       "contractRevokedSuccess": "Zewnętrzna umowa została pomyślnie odwołana.",
       "revokeContractError": "Nie udało się odwołać zewnętrznej umowy.",
       "enableByobTitle": "Włącz BYOB",
-      "enablingStorage": "Włączanie ustawień przechowywania...",
+      "enablingStorage": "włączanie ustawień pamięci masowej...",
       "storageEnabledSuccess": "Ustawienia pamięci masowej włączone pomyślnie.",
       "enableStorageError": "Nie udało się włączyć ustawień pamięci masowej.",
       "processingTrialExtension": "Proszę czekać podczas przetwarzania żądania przedłużenia okresu próbnego...",
@@ -16682,20 +16697,20 @@
       "failedToImport": "Nie udało się zaimportować \"{name}\": {error}"
     },
     "orgStorageEditor": {
-      "chooseTypeTitle": "Wybierz dostawcę",
-      "selectProviderDescCont": "Po skonfigurowaniu wszystkie nowe dane tej organizacji będą zapisywane w Twoim własnym zasobniku.",
+      "chooseTypeTitle": "Wybierz typ",
+      "selectProviderDescCont": "po skonfigurowaniu wszystkie nowe dane dla tej org będą zapisywane we własnej infrastrukturze pamięci masowej.",
       "irreversibleWarnPre": "Ta czynność jest ",
       "irreversibleWarnEmphasis": "nieodwracalna",
       "irreversibleWarnPost": ". Po ustawieniu nie można przełączyć się na innego dostawcę pamięci masowej ani usunąć tej konfiguracji. Aby użyć innego dostawcy, musisz utworzyć nową organizację.",
       "credentialsOnlyInfo": "Po skonfigurowaniu można aktualizować tylko pola poświadczeń. Wszystkie inne pola zostaną zablokowane.",
-      "selectStorageProviderLabel": "Dostawca przechowywania",
+      "selectStorageProviderLabel": "Wybierz dostawcę pamięci masowej ",
       "connectionTitle": "Połączenie",
       "serverUrlLabel": "URL serwera",
       "regionLabel": "Region",
-      "bucketNameLabel": "Nazwa zasobnika",
+      "bucketNameLabel": "Nazwa bucketa",
       "accessKeyLabel": "Klucz dostępu",
-      "secretKeyLabel": "Klucz tajny",
-      "storageAccountNameLabel": "Nazwa konta przechowywania",
+      "secretKeyLabel": "Tajny klucz",
+      "storageAccountNameLabel": "Nazwa konta pamięci masowej",
       "roleArnLabel": "ARN roli",
       "externalIdLabel": "Zewnętrzne ID",
       "pleaseWaitMessage": "Proszę czekać...",
@@ -16721,10 +16736,10 @@
       "serviceNameDetectedFrom": "Nazwa usługi wykryta na podstawie",
       "fieldAlias": "alias pola",
       "noFieldsConfiguredYet": "Brak skonfigurowanych pól",
-      "workloadDetection": "Wykrywanie obciążeń",
+      "workloadDetection": "Wykrywanie obciążenia",
       "workloadDetectedUsingFields": "Obciążenie wykryte przy użyciu pól",
       "workloadTrackedHelp": "Tylko te grupy aliasów pól są używane do wykrywania obciążeń i zaleceń. Pola spoza tej listy nie będą wpływać na wyniki wykrywania usług. Opcjonalnie — wymiary wymienione w zestawach tożsamości są zawsze śledzone.",
-      "goToFieldAliases": "Przejdź do mapowań pól",
+      "goToFieldAliases": "Przejdź do aliasów pól",
       "toConfigureFieldMappings": "aby skonfigurować indywidualne mapowania pól.",
       "selectAliasGroup": "Wybierz grupę aliasów",
       "discoveredPatternsHelp": "Odkryliśmy te wzorce wdrożeń w twoich strumieniach. Użyj ich, aby skonfigurować korelację usług.",
@@ -16759,7 +16774,8 @@
       "reasonIdealForDisambiguation": "{details} — idealne do ujednoznacznienia usług",
       "trackedK8sWorkload": "Obciążenie K8s",
       "trackedK8sPod": "Pod K8s",
-      "serviceCountFailed": "Nie udało się wczytać liczby usług"
+      "serviceCountFailed": "Nie udało się wczytać liczby usług",
+      "toSeeDiscoveredServices": "aby zobaczyć faktycznie odkryte usługi."
     },
     "testModelMatchDialog": {
       "modelNamePlaceholder": "np. {example}",
@@ -16948,6 +16964,51 @@
       "requestApproved": "Powiązano {domain}",
       "requestRejected": "Odrzucono prośbę dotyczącą {domain}",
       "decisionFailed": "Nie udało się zaktualizować prośby"
+    },
+    "groupDataAI": "Dane i AI",
+    "llmProvidersDesc": "Dostawcy LLM do ocen online",
+    "customLogoTitle": "Niestandardowe logo",
+    "customLogoTextDescription": "Niestandardowy tekst logo służy do zmiany domyślnego tekstu marki wyświetlanego w aplikacji.",
+    "dragDropUpload": "Przeciągnij i upuść lub kliknij, aby przesłać",
+    "customLogoLightDescription": "Niestandardowe logo dla motywu trybu jasnego. Będzie wyświetlane, gdy użytkownicy są w trybie jasnym.",
+    "customLogoDarkDescription": "Niestandardowe logo dla motywu trybu ciemnego. Będzie wyświetlane, gdy użytkownicy są w trybie ciemnym.",
+    "textMaxCharacters": "Tekst powinien zawierać mniej niż 100 znaków.",
+    "genAiAgentMapping": {
+      "tabLabel": "Mapowanie agenta GenAI",
+      "title": "Mapowanie agenta GenAI",
+      "description": "Skonfiguruj zastępcze atrybuty telemetrii używane do normalizacji tożsamości agenta dla trace LLM i ewaluacji.",
+      "agentNameFields": "Zastępcze pola nazwy agenta",
+      "agentNameHelp": "Atrybuty przychodzące do użycia jako zastępcze dla gen_ai.agent.name.",
+      "agentNameInfo": "Sprawdzane tylko wtedy, gdy standardowy atrybut gen_ai.agent.name jest brakujący lub pusty. Dodaj jeden przychodzący atrybut telemetrii na linię.",
+      "agentIdFields": "Zastępcze pola ID agenta",
+      "agentIdHelp": "Atrybuty przychodzące do użycia jako zastępcze dla gen_ai.agent.id.",
+      "agentIdInfo": "Sprawdzane tylko wtedy, gdy standardowy atrybut gen_ai.agent.id jest brakujący lub pusty. Dodaj jeden przychodzący atrybut telemetrii na linię.",
+      "envFields": "Pola rezerwowe środowiska",
+      "envHelp": "Przychodzące atrybuty do użycia jako środowisko agenta.",
+      "envInfo": "Sprawdzane tylko wtedy, gdy standardowy atrybut deployment.environment.name jest brakujący lub pusty. Dodaj jeden przychodzący atrybut telemetrii na linię.",
+      "versionFields": "Pola rezerwowe wersji",
+      "versionHelp": "Przychodzące atrybuty do użycia jako wersja agenta.",
+      "versionInfo": "Sprawdzane tylko wtedy, gdy standardowy atrybut gen_ai.agent.version jest brakujący lub pusty. Dodaj jeden przychodzący atrybut telemetrii na linię.",
+      "alwaysAppliedStandard": "Standardowe (sprawdzane najpierw):",
+      "applyDefaults": "Zastosuj domyślne",
+      "resetToEmpty": "Resetuj do pustego",
+      "clearRegistry": "Wyczyść rejestr",
+      "clearRegistryTitle": "Wyczyścić rejestr agentów?",
+      "clearRegistryDescription": "Spowoduje to usunięcie wszystkich odkrytych wierszy rejestru agentów GenAI dla tej organizacji. Nowe pasujące trace ponownie wypełnią rejestr podczas pozyskiwania danych.",
+      "clearRegistryConfirm": "Wyczyść rejestr",
+      "saved": "Mapowanie agenta GenAI zapisane pomyślnie",
+      "clearRegistrySuccess": "Rejestr agentów GenAI został wyczyszczony. Usunięci przechowywani agenci: {deletedCount}; usunięte obserwacje w kolejce: {bufferCount}.",
+      "loadFailed": "Nie udało się załadować mapowania agenta GenAI",
+      "saveFailed": "Nie udało się zapisać mapowania agenta GenAI",
+      "clearRegistryFailed": "Nie udało się wyczyścić rejestru agentów GenAI",
+      "defaultsLoadFailed": "Nie udało się załadować domyślnych ustawień mapowania agenta GenAI",
+      "defaultsFetchFailed": "Nie udało się pobrać wartości domyślnych ({status})"
+    },
+    "llmProvidersSettings": {
+      "subtitle": "Dostawcy LLM do ocen online"
+    },
+    "index": {
+      "genAiAgentMappingDesc": "Mapuj spany GenAI na identyfikatory agentów"
     }
   },
   "reports": {
@@ -17178,9 +17239,9 @@
     },
     "selectOption": "Wybierz opcję",
     "runningQueries": "Uruchomione zapytania",
-    "search": "Zapytania wyszukiwania",
+    "search": "Szukaj",
     "queryList": "Szczegóły zapytania",
-    "duration": "Czas wykon.",
+    "duration": "Czas wykonania",
     "files": "Pliki",
     "status": "Status",
     "cancelQuery": "Anuluj zapytanie",
@@ -17190,7 +17251,7 @@
     "allFields": "Wszystkie pola",
     "queryType": "Typ zapytania",
     "numOfQueries": "Liczba zapytań",
-    "totalDuration": "Łączny czas wykon.",
+    "totalDuration": "Łączny czas wykonania",
     "totalTimeRange": "Łączny zakres zapytania",
     "searchType": "Typ wyszukiwania",
     "querySource": "Źródło zapytania",
@@ -17201,7 +17262,7 @@
     "startTime": "Czas rozpoczęcia",
     "endTime": "Czas zakończenia",
     "scanRecords": "Przeskanowane rekordy",
-    "originalSize": "Rozmiar oryginalny",
+    "originalSize": "Oryginalny rozmiar",
     "compressedSize": "Rozmiar skompresowany",
     "deleteRunningQueryTitle": "Usuń działające zapytanie",
     "deleteRunningQueryMessage": "Czy na pewno chcesz usunąć to działające zapytanie?",
@@ -17209,7 +17270,8 @@
     "cancelQueryFailed": "Nie udało się anulować zapytania",
     "searchTypeDashboards": "Pulpity",
     "searchTypeUi": "UI",
-    "searchTypeOthers": "Inne"
+    "searchTypeOthers": "Inne",
+    "lastDataRefreshTime": "Ostatni czas odświeżenia danych:"
   },
   "traces": {
     "nlNeedsSql": "To pytanie wymaga SQL; otwórz je w Logach",
@@ -17659,7 +17721,8 @@
         "count": "{count} spostrzeżenie | {count} spostrzeżeń",
         "countHint": "{count} anomalia usługi w tym zakresie czasu | {count} anomalii usług w tym zakresie czasu",
         "viewTraces": "Trace",
-        "viewCharts": "Wykresy"
+        "viewCharts": "Wykresy",
+        "scoreAbove": "+{percent}% wyniku powyżej progu"
       }
     },
     "spansTab": "Spany",
@@ -17762,14 +17825,15 @@
       "failedToLoad": "Nie udało się załadować Insights",
       "retry": "Ponów",
       "noAgentsInRange": "Brak agentów w tym zakresie",
-      "noAgentsDescription": "Nie wykryto żadnych agentów GenAI w wybranym oknie czasu. Spróbuj szerszego zakresu, przełącz się na kartę Strumień lub skonfiguruj mapowanie agentów.",
+      "noAgentsDescription": "Nie wykryto agentów GenAI w wybranym przedziale czasu. Spróbuj szerszego zakresu, przełącz na zakładkę Strumień lub skonfiguruj mapowanie agentów w ustawieniach.",
       "viewByStream": "Widok według strumienia",
       "totalCost": "Całkowity koszt",
       "totalTokens": "Łączna liczba tokenów",
       "totalTraces": "Łączna liczba trace",
       "p95Latency": "Opóźnienie P95",
       "errorRate": "Wskaźnik błędów",
-      "timeAxis": "Czas"
+      "timeAxis": "Czas",
+      "errorsSeries": "błędy"
     },
     "searchBar": {
       "streamNotFound": "Nie znaleziono strumienia"
@@ -17823,7 +17887,10 @@
       "metricsLoadFailed": "Nie udało się wczytać skorelowanych metryk tej usługi. {reason}",
       "noResourceRecorded": "Spany tej usługi w tym zakresie czasu nie zapisują {resource}.",
       "resourceLoadFailed": "Nie udało się wczytać {resource} dla tej usługi. {reason}",
-      "noVersionTraffic": "Spany tej usługi w tym strumieniu nie zawierają informacji o wersji, więc nie ma ruchu, który można podzielić według wersji."
+      "noVersionTraffic": "Spany tej usługi w tym strumieniu nie zawierają informacji o wersji, więc nie ma ruchu, który można podzielić według wersji.",
+      "noResourceDataFound": "Nie znaleziono danych {resource}",
+      "failedToLoadMetrics": "Nie udało się załadować metryk.",
+      "requests": "Żądania"
     },
     "traceErrorTab": {
       "httpStatusCode": "Kod statusu HTTP",
@@ -18063,11 +18130,20 @@
       "loadingPage": "Wczytywanie strony {page}",
       "pageFailed": "Nie udało się wczytać strony {page}",
       "pageEmpty": "Strona {page} nie zawiera wyników"
+    },
+    "lLMErrorTable": {
+      "noData": "Brak danych",
+      "noErrorsInRange": "Brak błędów w tym zakresie czasowym",
+      "loadFailed": "Nie udało się załadować ostatnich błędów",
+      "time": "Czas",
+      "service": "Usługa",
+      "operation": "Operacja",
+      "traceId": "ID trace"
     }
   },
   "aiToolset": {
     "header": "Zestawy narzędzi AI",
-    "add": "Nowy zestaw narzędzi",
+    "add": "Nowy zestaw narzędzi AI",
     "search": "Szukaj zestawów narzędzi AI",
     "update": "Aktualizuj zestaw narzędzi AI",
     "name": "Nazwa",
@@ -18110,7 +18186,7 @@
     "envKey": "Nazwa zmiennej",
     "envValue": "Wartość",
     "addEnvVar": "Dodaj zmienną",
-    "credentialFiles": "Pliki poświadczeń",
+    "credentialFiles": "Pliki uwierzytelniające",
     "credEnvVar": "Nazwa zmiennej środowiskowej",
     "credEnvVarHint": "np. {example}",
     "credContentHint": "Surowa zawartość pliku (np. kubeconfig YAML)",
@@ -18124,11 +18200,11 @@
     "continue": "Kontynuuj",
     "header": "Klucze szyfrowania",
     "add": "Nowy klucz szyfrowania",
-    "search": "Szukaj kluczy szyfrowania",
+    "search": "Szukaj klucza szyfrowania",
     "update": "Aktualizuj klucz szyfrowania",
     "name": "Nazwa",
     "type": "Typ",
-    "step1WithType": "Magazyn kluczy ({type})",
+    "step1WithType": "Szczegóły magazynu kluczy (Typ: {type})",
     "step2": "Mechanizm szyfrowania",
     "sectionKey": "Klucz",
     "sectionSetup": "Magazyn kluczy i szyfrowanie",
@@ -18194,7 +18270,7 @@
     "tcpCloseWaitPrefix": ", C:",
     "tcpTimeWaitPrefix": ", T:",
     "header": "Wszystkie węzły",
-    "search": "Szukaj węzła",
+    "search": "Szukaj węzłów",
     "name": "Nazwa węzła",
     "version": "Wersja",
     "cpu": "CPU %",
@@ -18210,11 +18286,11 @@
     "summaryOnline": "Online",
     "summaryTotal": "Węzły",
     "status": "Status",
-    "cpuusage": "Użycie CPU (%)",
-    "memoryusage": "Użycie pamięci (%)",
+    "cpuusage": "Użycie CPU(%)",
+    "memoryusage": "Użycie pamięci(%)",
     "establishedLabel": "Ustanowione",
-    "closewaitLabel": "CLOSE_WAIT",
-    "waittimeLabel": "TIME_WAIT",
+    "closewaitLabel": "Close Wait",
+    "waittimeLabel": "Time Wait",
     "applyFilter": "Zastosuj filtry",
     "searchCluster": "Szukaj klastra",
     "searchRegion": "Szukaj regionu"
@@ -18234,7 +18310,7 @@
     "create_close": "Utwórz i zamknij",
     "cancel": "Anuluj",
     "edit_regex_pattern": "Edytuj wzorzec",
-    "update_close": "Zaktualizuj i zamknij",
+    "update_close": "Aktualizuj i zamknij",
     "description": "Opis",
     "unsupported_lookaround_note": "Lookahead, lookbehind, odwołania wsteczne i rekurencja nie są obsługiwane. Przepisz je jako zwykłe wzorce.",
     "unsupported_lookaround_example": "Np.",
@@ -19526,7 +19602,8 @@
         "promptTemperatureOverrideInherited": "Używane są parametry promptu.",
         "taskTimeoutLabel": "Limit czasu (sekundy)",
         "taskConcurrencyLabel": "Maksymalna współbieżność",
-        "taskOverrideHelp": "Zastępuje opublikowaną wartość zadania dla tego uruchomienia."
+        "taskOverrideHelp": "Zastępuje opublikowaną wartość zadania dla tego uruchomienia.",
+        "providerHelpSettingsLink": "Ustawienia"
       },
       "columns": {
         "name": "Nazwa",
@@ -19864,7 +19941,7 @@
       "agentIdHint": "ID agenta: {ids}",
       "noAgentIdentity": "Nie znaleziono tożsamości agenta",
       "noAgentIdentityDescription": "Te spany LLM nie zawierają nazwy agenta, więc są wyświetlane według strumienia. Zmapuj atrybut określający nazwę agenta, aby wyświetlać je według agenta.",
-      "noAgentIdentityAction": "Otwórz mapowanie agentów"
+      "noAgentIdentityAction": "Otwórz mapowanie agentów GenAI"
     },
     "agentGraph": {
       "stream": "Strumień",
@@ -19880,17 +19957,17 @@
       },
       "tokenTrend": {
         "title": "Trend tokenów",
-        "subtitle": "tokeny wejściowe i wyjściowe",
+        "subtitle": "tokeny według modelu",
         "input": "Wejście",
         "output": "Wyjście"
       },
       "latencyByModel": {
-        "title": "Trend opóźnień",
-        "subtitle": "p95 według modelu"
+        "title": "Opóźnienie według modelu",
+        "subtitle": "p50 / p90 / p95 / p99"
       },
       "tracesOverTime": {
-        "title": "Trace w czasie",
-        "subtitle": "Trace OK i z błędami",
+        "title": "Żądania w czasie",
+        "subtitle": "liczba żądań według usługi",
         "ok": "OK",
         "errored": "Z błędem"
       },
@@ -19919,6 +19996,26 @@
           "traces": "Trace",
           "last": "Ostatnie niepowodzenie"
         }
+      },
+      "spanTrend": {
+        "title": "Trend spanów",
+        "subtitle": "liczba spanów według rodzaju"
+      },
+      "errorsOverTime": {
+        "title": "Błędy w czasie",
+        "subtitle": "liczba błędów"
+      },
+      "spansByModel": {
+        "title": "Spany według modelu",
+        "subtitle": "liczba wywołań na model"
+      },
+      "tokensByModel": {
+        "title": "Tokeny według modelu",
+        "subtitle": "łączna liczba tokenów na model"
+      },
+      "recentErrors": {
+        "title": "Ostatnie błędy",
+        "subtitle": "ostatnie 10 nieudanych spanów"
       }
     },
     "behavior": {
@@ -19951,12 +20048,12 @@
       "colErrors": "Błędy",
       "detail": {
         "title": "Szczegóły sygnału",
-        "tracesTitle": "Trace z błędami od tego agenta",
+        "tracesTitle": "Trace",
         "tracesHint": "Kliknij trace, aby go otworzyć",
         "worstLoopTraces": "Najgorsze trace'y (od największej liczby powtórzeń)",
         "topCostTraces": "Najdroższe trace'y",
         "noTraces": "Brak trace'y dla tego sygnału",
-        "errorsTitle": "Wszystkie błędy tego agenta",
+        "errorsTitle": "Co mówią błędy",
         "noErrors": "Nie przechwycono żadnych komunikatów o błędach — otwórz trace, aby sprawdzić",
         "colTraceId": "Trace",
         "colSpans": "Spany",
@@ -19970,7 +20067,7 @@
         "failHeadline": "{agent} napotkał błędy „{cls}”: {count}.",
         "costHeadline": "{agent}: wydatki: ${cost} · tokeny: {tokens} · błędy: {errors}.",
         "loopExplain": "Wysoki wskaźnik powtórzeń zwykle oznacza, że agent nie buforuje wyników lub ponawia próby. Otwórz najgorsze trace'y poniżej, aby zobaczyć powtórzone wywołania.",
-        "failExplain": "To wszystkie komunikaty błędów tego agenta ze wszystkich klas niepowodzeń, nie tylko tej. Przeczytaj je, aby znaleźć rozwiązanie, albo otwórz trace, aby zobaczyć, gdzie wystąpił problem.",
+        "failExplain": "To są rzeczywiste komunikaty o błędach stojące za tą klasą awarii — przeczytaj je, aby znaleźć poprawkę, lub otwórz trace, aby zobaczyć, gdzie to nastąpiło.",
         "costExplain": "Te trace'y generowały koszty tego agenta. Otwórz najdroższe, aby zobaczyć, co się wykonało.",
         "explain": "Wyjaśnij za pomocą O2 AI",
         "explainHelp": "O2 AI analizuje ten sygnał na podstawie jego komunikatów błędów i najgorszych trace, wykracza poza spany AI, sięgając do logów, metryk, Kubernetes i wdrożeń, oraz cytuje dowody."
@@ -20957,7 +21054,7 @@
       },
       "noProviders": {
         "title": "Najpierw dodaj dostawcę",
-        "description": "Ewaluatory wymagają dostawcy LLM (OpenAI, Anthropic itp.), aby działać. Dodaj go w sekcji Dostawcy LLM przed utworzeniem ewaluatorów."
+        "description": "Ewaluatory potrzebują dostawcy LLM (OpenAI, Anthropic itp.), aby działać. Dodaj dostawcę w Ustawieniach przed utworzeniem ewaluatorów."
       },
       "import": {
         "title": "Importuj ewaluator",
@@ -21117,7 +21214,8 @@
         "resultReasoning": "Uzasadnienie",
         "resultRaw": "Surowe odpowiedź",
         "valuePlaceholder": "Wartość dla {variable}"
-      }
+      },
+      "providerHelpSettingsLink": "Ustawienia"
     },
     "job": {
       "detail": {
@@ -21301,7 +21399,7 @@
         }
       },
       "inputMapping": {
-        "title": "Zmienne ewaluatora",
+        "title": "Zmienne promptu",
         "hint": {
           "span": "Przypisz każdą zmienną do atrybutu spanu.",
           "trace": "Przypisz każdą zmienną do wartości dostarczonej przez system lub atrybutu spanu.",
@@ -21471,7 +21569,7 @@
       "defaultModel": "Model domyślny"
     },
     "empty": {
-      "title": "Brak dostawców LLM",
+      "title": "Brak jeszcze dostawców LLM",
       "description": "Dostawcy LLM przechowują dane połączenia (bazowy adres URL + poświadczenia) dla modeli językowych, z których korzystają Twoje ewaluatory typu sędzia LLM. Dodaj dostawcę, aby rozpocząć oceny oparte na sędzi LLM."
     }
   },
@@ -22114,7 +22212,7 @@
       "explanation": "Tokeny o2syn_ na poziomie organizacji, których używają Twoi prywatni agenci do uwierzytelniania podczas pobierania zadań. Lokalizacje publiczne (Lambda) używają automatycznie tokena domyślnego; utwórz nazwany token i umieść go w agentach regionu, aby ograniczyć promień rażenia tego regionu.",
       "summary": "Tokeny, których używają Twoi prywatni agenci do pobierania zadań.",
       "rotateDefaultBtn": "Zmień domyślny",
-      "createTokenBtn": "Nowy token",
+      "createTokenBtn": "Utwórz token",
       "searchPlaceholder": "Szukaj tokenów",
       "default": "Domyślny",
       "tokenNameLabel": "Nazwa",
@@ -22715,7 +22813,7 @@
       "unknown": "Nieznany"
     },
     "locations": {
-      "addLocation": "Nowa lokalizacja",
+      "addLocation": "Dodaj lokalizację",
       "bulkDeleteConfirmMessage": "Czy na pewno chcesz usunąć wybrane lokalizacje ({count})?",
       "bulkDeleteConfirmTitle": "Usuń lokalizacje",
       "bulkDeleteFailed": "Nie udało się usunąć lokalizacji",
@@ -22725,7 +22823,7 @@
       "createClose": "Utwórz i zamknij",
       "createFailed": "Nie udało się utworzyć lokalizacji",
       "createSuccess": "Lokalizacja utworzona pomyślnie",
-      "createTitle": "Nowa lokalizacja",
+      "createTitle": "Dodaj lokalizację",
       "customProviderLabel": "Niestandardowy dostawca",
       "customProviderPlaceholder": "Wpisz nazwę dostawcy",
       "customProviderRequired": "Niestandardowa nazwa dostawcy jest wymagana",
@@ -22733,7 +22831,7 @@
       "deleteConfirmTitle": "Usuń lokalizację",
       "deleteFailed": "Nie udało się usunąć lokalizacji",
       "deleteSuccess": "Lokalizacja została pomyślnie usunięta",
-      "description": "Publiczne lokalizacje sond do monitorowania syntetycznego",
+      "description": "Zarządzaj publicznymi lokalizacjami sond do monitorowania syntetycznego",
       "disable": "Wyłącz",
       "disabledSuccess": "Lokalizacja wyłączona",
       "disabling": "Wyłączanie…",
@@ -22780,7 +22878,7 @@
       "region": "Region",
       "regionPlaceholder": "np. us-east-1",
       "regionRequired": "Region jest wymagany",
-      "searchPlaceholder": "Szukaj lokalizacji",
+      "searchPlaceholder": "Szukaj lokalizacji…",
       "title": "Lokalizacje",
       "publicTitle": "Lokalizacje publiczne",
       "privateTitle": "Lokalizacje prywatne",
@@ -24767,9 +24865,9 @@
       "pipelinesExportedSuccessfully": "Wyeksportowano {count} potok | Wyeksportowano potoki: {count}",
       "functionsNotBundled": "{count} funkcja nie mogła zostać dołączona do pliku eksportu: {names} | Nie udało się dołączyć funkcji do pliku eksportu ({count}): {names}",
       "pipelineDeletedSuccessfully": "Potok został usunięty pomyślnie",
-      "deletingPipeline": "Usuwanie potoku...",
+      "deletingPipeline": "usuwanie potoku...",
       "pipelineCreatedSuccessfully": "Potok został utworzony pomyślnie",
-      "savingPipeline": "Zapisywanie potoku...",
+      "savingPipeline": "zapisywanie potoku...",
       "stateResumed": "Stan {name} został wznowiony pomyślnie",
       "statePaused": "Stan {name} został wstrzymany pomyślnie"
     },
@@ -25386,19 +25484,19 @@
     "unitAttempts": "prób",
     "unitSeconds": "sekund",
     "minLength": "Minimalna długość",
-    "minLengthDesc": "Najkrótsze akceptowane hasło.",
+    "minLengthDesc": "Najkrótsze akceptowane hasło",
     "maxLength": "Maksymalna długość",
-    "maxLengthDesc": "Najdłuższe akceptowane hasło, maksymalnie 128.",
+    "maxLengthDesc": "Najdłuższe akceptowane hasło, do 128",
     "requireUppercase": "Wymagaj wielkiej litery",
-    "requireUppercaseDesc": "Co najmniej jedna litera A–Z.",
+    "requireUppercaseDesc": "Co najmniej jedna litera A–Z",
     "requireLowercase": "Wymagaj małej litery",
-    "requireLowercaseDesc": "Co najmniej jedna litera a–z.",
+    "requireLowercaseDesc": "Co najmniej jedna litera a–z",
     "requireDigit": "Wymagaj cyfry",
-    "requireDigitDesc": "Co najmniej jedna cyfra 0–9.",
+    "requireDigitDesc": "Co najmniej jedna cyfra 0–9",
     "requireSpecial": "Wymagaj znaku specjalnego",
-    "requireSpecialDesc": "Co najmniej jeden znak z dozwolonego zestawu.",
+    "requireSpecialDesc": "Co najmniej jeden z dozwolonego zestawu",
     "specialCharSet": "Dozwolone znaki specjalne",
-    "specialCharSetDesc": "Puste pole akceptuje dowolny znak niealfanumeryczny.",
+    "specialCharSetDesc": "Pozostaw puste, aby akceptować dowolny znak niealfanumeryczny",
     "maxLengthTooSmall": "Maksymalna długość musi mieścić się między minimalną długością a 128.",
     "maxLengthBelowMin": "Musi wynosić co najmniej {min}, aby odpowiadać minimalnej długości.",
     "confirmTitle": "Zapisać zasady haseł?",
@@ -25412,9 +25510,9 @@
     "rotation": "Rotacja",
     "rotationDays": "Okres rotacji",
     "rotationDesc": "Kiedy hasło wygasa i z jakim wyprzedzeniem użytkownicy otrzymują powiadomienie.",
-    "rotationDaysDesc": "Liczba dni do wygaśnięcia hasła. 0 oznacza, że hasła nigdy nie wygasają.",
+    "rotationDaysDesc": "Liczba dni do wygaśnięcia hasła. 0 = nigdy nie wygasa",
     "rotationWarningDays": "Ostrzegaj przed wygaśnięciem",
-    "rotationWarningDaysDesc": "Liczba dni wyprzedzenia przy logowaniu. 0 oznacza brak ostrzeżenia.",
+    "rotationWarningDaysDesc": "Liczba dni powiadomienia przy logowaniu. 0 = brak ostrzeżenia",
     "rotationWarningDaysOffDesc": "Liczba dni wyprzedzenia przy logowaniu. Stosowana po wygaśnięciu haseł.",
     "warningDaysTooLong": "Okno ostrzeżenia nie może być dłuższe niż okres rotacji.",
     "rotationPreview": "Hasło ustawione dzisiaj wygasa {expires}. Ostrzeżenie przy logowaniu rozpoczyna się {warns}.",
@@ -25422,33 +25520,33 @@
     "reuse": "Zapobieganie ponownemu użyciu",
     "historyCount": "Zapamiętane hasła",
     "reuseDesc": "Uniemożliwia powrót do starego hasła.",
-    "historyCountDesc": "Nowe hasło nie może pokrywać się z tyloma poprzednimi hasłami. 0 wyłącza tę kontrolę.",
+    "historyCountDesc": "Nowe hasło nie może być takie samo jak ta liczba poprzednich. 0 = brak sprawdzania",
     "historyMaxRetained": "Zachowana historia",
-    "historyMaxRetainedDesc": "Ile poprzednich haseł jest przechowywanych na użytkownika.",
+    "historyMaxRetainedDesc": "Ile poprzednich haseł jest zachowywanych na użytkownika",
     "historyRetainedTooSmall": "Zachowana historia musi wynosić co najmniej tyle, ile liczba zapamiętanych haseł.",
     "reuseExplainer": "Bieżące hasło liczy się jako jedno z zapamiętanego zestawu — jego ponowne użycie jest odrzucane przez tę regułę, a nie przez osobne sprawdzenie.",
     "lockout": "Blokada konta",
     "lockoutThreshold": "Nieudane próby przed blokadą",
     "lockoutDesc": "Co się dzieje po wielokrotnych nieudanych logowaniach.",
-    "lockoutThresholdDesc": "0 wyłącza blokadę.",
+    "lockoutThresholdDesc": "0 = blokada wyłączona",
     "lockoutBucketSize": "Próby przed każdą kolejną blokadą",
-    "lockoutBucketSizeDesc": "Ile dodatkowych niepowodzeń wyzwala następną blokadę. 0 używa tej samej liczby co pierwsza.",
+    "lockoutBucketSizeDesc": "0 = użyj wartości powyżej",
     "lockoutStartSecs": "Czas trwania pierwszej blokady",
-    "lockoutStartSecsDesc": "Jak długo trwa pierwsza blokada.",
+    "lockoutStartSecsDesc": "Sekundy",
     "lockoutMaxSecs": "Maksymalny czas trwania blokady",
-    "lockoutMaxSecsDesc": "Górny limit, na którym zatrzymuje się eskalacja.",
+    "lockoutMaxSecsDesc": "Sekundy — pułap, do którego ograniczana jest eskalacja",
     "lockoutStartTooLong": "Pierwsza blokada nie może trwać dłużej niż maksymalna blokada.",
     "lockoutBackoff": "Eskalacja",
-    "lockoutBackoffDesc": "Jak każda blokada wydłuża się względem poprzedniej.",
+    "lockoutBackoffDesc": "Jak każda blokada rośnie względem poprzedniej",
     "backoffExponential": "Wykładnicza",
     "backoffLinear": "Liniowa",
     "lockoutPreview": "Nieudane próby: {threshold} → {first} · co kolejne {bucket} → {rest} · ograniczone do {max}. Udane logowanie resetuje wszystko.",
-    "sessionEnforcement": "Sesja i egzekwowanie zasad",
+    "sessionEnforcement": "Sesja i egzekwowanie",
     "sessionEnforcementDesc": "Jak długo trwa sesja logowania i czy root podlega tym regułom.",
     "cookieMaxAge": "Czas życia sesji",
-    "cookieMaxAgeDesc": "Jak długo sesja logowania pozostaje ważna. 0 używa domyślnej wartości instancji z {envVar}.",
+    "cookieMaxAgeDesc": "Liczba sekund, przez jaką zalogowana sesja pozostaje ważna. 0 = użyj domyślnej wartości instancji z {envVar}",
     "applyToRoot": "Zastosuj do konta root",
-    "applyToRootDesc": "Root jest zwolniony ze wszystkich powyższych reguł, chyba że ta opcja jest włączona.",
+    "applyToRootDesc": "Konto root jest zwolnione ze wszystkich powyższych reguł, chyba że ta opcja jest włączona.",
     "rootWarning": "Zablokowanie konta root może wprowadzić system w stan nie do odzyskania.",
     "rootDialogTitle": "Zastosować politykę do konta root?",
     "rootDialogMessage": "Konto root będzie podlegać blokadzie, rotacji i wymuszonym resetom tak jak każde inne konto natywne. Jeśli root jest Twoim jedynym kontem administracyjnym, blokada lub wygaśnięcie, którego nie da się spełnić, sprawi, że nie będzie już drogi powrotnej do tej instancji.",
@@ -29621,12 +29719,12 @@
       "chartBelow": "{metric}, teraz {value}, poniżej zakresu normalnego",
       "chartWithin": "{metric}, teraz {value}, w normalnym zakresie",
       "tipNormal": "Normalny {low} – {high}",
-      "openTraces": "Otwórz w Trace",
+      "openTraces": "Trace",
       "openCatalog": "Katalog usług",
       "openLogs": "Otwórz w Logach",
       "rangeLabel": "Zakres czasu",
       "drawerSubtitle": "{stream} · {detectors} · {library}",
-      "badgeNotWatched": "Luka w pokryciu",
+      "badgeNotWatched": "Nieobserwowany",
       "signalsWatched": "Obserwowane sygnały",
       "chipAria": "{signal}: {state}",
       "deltaUp": "Wzrost o {change} od początku zakresu",
@@ -29722,7 +29820,10 @@
         "service": "Według usługi",
         "place": "Według miejsca",
         "none": "Nie pogrupowano"
-      }
+      },
+      "fixNoLink": "Dodaj etykietę service.name",
+      "fixStopped": "Sprawdź kolektor",
+      "fixQueued": "Tylko próbne: „{action}” dla {service} nie zostało nigdzie wysłane"
     },
     "activity": {
       "before": "Przed",
@@ -30471,15 +30572,15 @@
       "intro": "Oto co robię, w pięciu krokach.",
       "gotIt": "Rozumiem",
       "s1Title": "Znajduję Twoje usługi",
-      "s1": "Przeglądam dane, które już wysyłasz, i odnajduję w nich usługi. Nowa usługa pojawi się po moim następnym sprawdzeniu; nie musisz jej dodawać.",
-      "s2Title": "Uczę się, jak wygląda norma",
-      "s2": "Uczę się, ile danych każdy strumień zwykle wysyła, na podstawie 14 dni jego historii. Dopóki strumień nie ma tej historii, mówię, że wciąż się uczy, i go nie oceniam.",
-      "s3Title": "Wzywam tylko wtedy, gdy strumień przestanie wysyłać dane",
-      "s3": "Gdy strumień przestaje wysyłać dane, otwieram incydent i, jeśli wzywanie jest włączone, wzywam zespół dyżurny odpowiedzialny za usługę. Gwałtowne spadki i wzrosty pojawiają się jako ustalenia i nigdy nie powodują wezwania. Mniejsze sprawy czekają na dzienny skrót.",
-      "s4Title": "Mówię, co się stało",
-      "s4": "Każdy incydent mówi, co się zatrzymało i od kiedy. Przy włączonej analizie AI zawiera też najlepszą interpretację przyczyny.",
-      "s5Title": "Ty decydujesz, co zmienić",
-      "s5": "Sugeruję alerty dla tego, czego nic nie obserwuje, oraz poprawki dla alertów, które nie mogą się wyzwolić. Nic się nie zmienia, dopóki tego nie przejrzysz i nie zastosujesz, a zastosowane zmiany możesz cofnąć."
+      "s1": "Przeglądam dane, które już wysyłasz, i znajduję w nich każdą usługę. Gdy pojawi się nowa, zaczynam ją obserwować tego samego dnia; nie musisz o to prosić.",
+      "s2Title": "Obserwuję je",
+      "s2": "Uczę się, jak wygląda normalny stan każdej usługi: jej błędy, spowolnienia i ruch w każdej godzinie dnia, a z czasem wzorce tygodniowe stają się coraz wyraźniejsze. Dopóki nie wiem, używam podstawowych kontroli bezpieczeństwa.",
+      "s3Title": "Milczę, chyba że problem jest prawdziwy.",
+      "s3": "Większość nietypowych momentów to nie problemy. Wzywam Twój zespół, gdy coś szkodzi klientom, w przypadku mniejszych problemów wysyłam wiadomość, która nikogo nie obudzi, a drobne sprawy zostawiam do piątkowego podsumowania.",
+      "s4Title": "Wyjaśniam każde wezwanie",
+      "s4": "Każda wiadomość mówi, co się zepsuło, od kiedy i jaka jest moja najlepsza interpretacja przyczyny, wraz z poziomem mojej pewności.",
+      "s5Title": "Naprawiam to, na co pozwoliłeś",
+      "s5": "Naprawiam tylko to, na co mi pozwoliłeś. Naprawa, która działa, przynosi mi trochę zaufania, a ta, która nie pomaga, działa na moją niekorzyść. Jeśli wciąż potrzebuję tej samej naprawy, to błąd, który zgłaszam Twojemu zespołowi, a nie nawyk, który automatyzuję."
     },
     "outcome": {
       "active": "Dzieje się teraz",
@@ -30492,9 +30593,9 @@
     },
     "view": {
       "standard": "Standard",
-      "nerd": "Szczegółowy",
+      "nerd": "Detailed",
       "standardTooltip": "Widok standardowy daje krótki przegląd: co wymaga Twojej uwagi i co wydarzyło się w ciągu ostatnich 7 dni",
-      "nerdTooltip": "Widok szczegółowy pokazuje w pełni każdy detektor, pętlę i ustawienie",
+      "nerdTooltip": "Widok nerd pokazuje w pełni każdy detektor, pętlę i ustawienie",
       "label": "Widok"
     },
     "suggestions": {
@@ -30617,7 +30718,8 @@
       "copyRequest": "Kopiuj prośbę",
       "requestText": "Dodaj organizację OpenObserve {name} ({org}) do przestrzeni roboczej Slack {team}, w _meta › Ustawienia › Slack › Organizacje.",
       "requestCopied": "Prośba skopiowana",
-      "setupAppOtherTeam": "Dla przestrzeni roboczej Slack innej niż {team} · OpenObserve tworzy Twoją własną aplikację Slack na podstawie jednego tokenu konfiguracyjnego"
+      "setupAppOtherTeam": "Dla przestrzeni roboczej Slack innej niż {team} · OpenObserve tworzy Twoją własną aplikację Slack na podstawie jednego tokenu konfiguracyjnego",
+      "title": "Połącz obszar roboczy Slack"
     },
     "wizard": {
       "title": "Skonfiguruj aplikację Slack",
@@ -30642,7 +30744,7 @@
         "socketHost": "Host WebSocket {host}"
       },
       "create": {
-        "title": "Krok 3 · Utwórz aplikację",
+        "title": "Krok 3 · Tworzenie aplikacji",
         "modeLabel": "Tryb połączenia",
         "socket": "Tryb Socket",
         "socketDescription": "Zalecany. OpenObserve otwiera połączenie, więc Slack nie potrzebuje publicznego adresu URL",
@@ -30671,7 +30773,7 @@
         "signingSecretRequired": "Tryb HTTP wymaga sekretu podpisywania"
       },
       "install": {
-        "title": "Krok 4 · Zainstaluj",
+        "title": "Krok 4 · Instalacja",
         "created": "Aplikacja utworzona · {appId}",
         "allowHint": "Otwiera ekran instalacji w Slacku: kliknij tam Zezwól. Token bota wraca z Slacka automatycznie; nic nie trzeba kopiować.",
         "allow": "Zezwól w Slacku",
@@ -30694,7 +30796,7 @@
         "appNotCreatedByO2": "OpenObserve nie utworzyło tej aplikacji, więc pozostaje ona w Slacku. Usuń ją tam, jeśli nie jest już potrzebna."
       },
       "test": {
-        "title": "Krok 5 · Test i powiązanie",
+        "title": "Krok 5 · Test i łączenie",
         "run": "Uruchom sprawdzenia",
         "signIn": "Przetestuj Sign in with Slack",
         "signInPassed": "Sign in with Slack działa",
@@ -30837,7 +30939,9 @@
       "ownOrgOnlyHint": "W obszarze roboczym instancji mapujesz kanały na własną organizację",
       "claimableHint": "Nieprzypisane kanały i kanały należące do {org}",
       "servedOrgsHint": "Każda organizacja obsługiwana przez ten obszar roboczy",
-      "alertRoutes": "{count} miejsce docelowe | {count} miejsc docelowych"
+      "alertRoutes": "{count} miejsce docelowe | {count} miejsc docelowych",
+      "empty": "Żaden kanał nie ma jeszcze domyślnej organizacji",
+      "emptyDescription": "Pytania w kanale bez domyślnej organizacji trafiają do domyślnej organizacji każdej osoby (można ją zmienić za pomocą /o2 org)."
     },
     "people": {
       "title": "Powiązani użytkownicy",
@@ -30856,7 +30960,8 @@
         "email": "Dopasowanie e-mail",
         "admin_bulk": "Połącz wszystkich"
       },
-      "loadMore": "Wczytaj więcej"
+      "loadMore": "Wczytaj więcej",
+      "empty": "Nikt w tej organizacji nie połączył jeszcze Slacka"
     },
     "credentials": {
       "title": "Zaktualizuj dane uwierzytelniające",
@@ -31779,7 +31884,7 @@
           "label": "Brak tożsamości agenta",
           "detail": "{affected} z {total} spanów LLM ({pct}) nie ma atrybutu gen_ai.agent.name, więc widoki agentów ich nie obejmują.",
           "pass": "Każdy span LLM ma nazwę lub identyfikator agenta.",
-          "fix": "Otwórz mapowanie agentów"
+          "fix": "Otwórz GenAI Agent Mapping"
         },
         "zero_duration_spans": {
           "label": "Spany o zerowym czasie trwania",
@@ -31794,6 +31899,13 @@
           "fix": "Przewodnik integracji"
         }
       }
+    },
+    "chart": {
+      "costMissing": "Poza tym wykresem: {models}. {tokens} tokenów nie ma ceny.",
+      "costMissingPricedSince": "Poza tym wykresem: {models}. {tokens} tokenów zarejestrowano przed dodaniem ceny.",
+      "unpricedModels": "Bez ceny: {models}",
+      "pricedSinceModels": "Zarejestrowane przed dodaniem ceny: {models}",
+      "addPrice": "Dodaj cenę"
     }
   },
   "onboarding": {

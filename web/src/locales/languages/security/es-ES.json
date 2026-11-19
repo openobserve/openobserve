@@ -302,7 +302,7 @@
       "source": "Fuente",
       "matchedRules": "{n} detección coincidente | {n} detecciones coincidentes",
       "openCase": "Abrir caso",
-      "openCaseHint": "Abre un caso sobre este evento, con su título, prioridad y entidades ya rellenados",
+      "openCaseHint": "Abrir un caso sobre este evento, con su título, prioridad y entidades ya rellenados",
       "addToCase": "Añadir al caso",
       "pickCase": "Añadir a un caso abierto",
       "caseOpened": "Caso abierto: {title}",
@@ -920,8 +920,8 @@
       "correlationWindow": "Lo define el intervalo de tiempo de la correlación",
       "createForbidden": "Crear una detección requiere el permiso de Seguridad",
       "preview": {
-        "run": "Previsualizar sobre el historial",
-        "hint": "Ejecuta la regla sobre el rango elegido tal como lo hace el programador y muestra qué se habría disparado",
+        "run": "Vista previa sobre el historial",
+        "hint": "Ejecuta la regla sobre el rango elegido igual que lo hace el programador e indica qué se habría disparado",
         "failed": "La consulta falló: {reason}",
         "time": "Hora",
         "range": {
@@ -1093,7 +1093,7 @@
       "stat": {
         "ready": "Listas para instalar",
         "installed": "Instaladas",
-        "applies": "Se aplica a tus fuentes",
+        "applies": "Coincidencias con tus fuentes",
         "readyHint": "Reglas que se ejecutan en al menos uno de tus streams y aún no están instaladas",
         "appliesHint": "Reglas para una fuente de logs que tienes, instaladas o no; incluye todas las reglas listas para instalar",
         "allRules": "Todas las reglas",

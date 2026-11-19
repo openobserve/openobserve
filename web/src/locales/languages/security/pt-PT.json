@@ -302,7 +302,7 @@
       "source": "Origem",
       "matchedRules": "{n} deteção correspondeu | {n} deteções corresponderam",
       "openCase": "Abrir caso",
-      "openCaseHint": "Abrir um caso sobre este evento, com o título, a prioridade e as entidades preenchidos",
+      "openCaseHint": "Abrir um caso sobre este evento, com o título, a prioridade e as entidades já preenchidos",
       "addToCase": "Adicionar ao caso",
       "pickCase": "Adicionar a um caso aberto",
       "caseOpened": "Caso aberto: {title}",
@@ -921,7 +921,7 @@
       "createForbidden": "Criar uma deteção requer a permissão de Segurança",
       "preview": {
         "run": "Pré-visualizar no histórico",
-        "hint": "Executa a regra sobre o intervalo escolhido tal como o agendador e indica o que teria disparado",
+        "hint": "Executa a regra no intervalo escolhido tal como o agendador e indica o que teria disparado",
         "failed": "A consulta falhou: {reason}",
         "time": "Hora",
         "range": {
