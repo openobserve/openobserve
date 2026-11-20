@@ -2156,9 +2156,7 @@ async fn stop_route(
             return Err(error::internal("Could not read the conversation"));
         }
     };
-    let running_here =
-        !o2_enterprise::enterprise::ai::chat::registry::turns(org_id, session_id).is_empty();
-    if direct_stop(row.is_some(), running_here) {
+    if direct_stop(row.is_some()) {
         return Ok(false);
     }
     check_chat_owner(headers, org_id, session_id)
@@ -2166,10 +2164,10 @@ async fn stop_route(
         .map(|()| true)
 }
 
-/// A Stop of a session with no row goes to this node's turns; the caller still stops only its own.
+/// A Stop of a session with no row is direct: this node's turns, else o2-ai routes it to its node.
 #[cfg(feature = "enterprise")]
-fn direct_stop(row_exists: bool, running_here: bool) -> bool {
-    !row_exists && running_here
+fn direct_stop(row_exists: bool) -> bool {
+    !row_exists
 }
 
 /// Asks o2-ai to abort first so the partial reply is still stored, else stops the turn on its node.
@@ -6627,9 +6625,13 @@ mod tests {
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_stop_without_a_saved_chat_reaches_the_turn_streaming_here() {
-        assert!(direct_stop(false, true));
-        assert!(!direct_stop(true, true));
-        assert!(!direct_stop(false, false));
+        assert!(direct_stop(false));
+        assert!(!direct_stop(true));
+        // A rowless turn on another node is forwarded, never refused as an unknown chat.
+        assert!(matches!(
+            direct_stop_target(None, &[], "alice"),
+            Ok(StopTarget::Elsewhere)
+        ));
         let session = uuid::Uuid::now_v7().to_string();
         let _turn = register_ephemeral_turn("eph-org", Some(&session), "t1", "alice", None)
             .await

@@ -1530,7 +1530,7 @@ pub async fn stream_turn(
     let Some(turn_id) = normalize_uuid(&turn_id) else {
         return error::not_found("Unknown turn");
     };
-    let record = match ai_chat_turns::get(&org_id, &row.session_id, &turn_id).await {
+    let mut record = match ai_chat_turns::get(&org_id, &row.session_id, &turn_id).await {
         Ok(Some(record)) => record,
         Ok(None) => return error::not_found("Unknown turn"),
         Err(e) => {
@@ -1557,7 +1557,7 @@ pub async fn stream_turn(
     let feed = registry::subscribe(&org_id, &row.session_id, &turn_id);
     let mut tail = TurnTail::new(&record, from_seq);
     tail.end_seq = turn_end_seq(&record).await;
-    if let Err(resp) = catch_up(&mut tail, &org_id, &row.session_id).await {
+    if let Err(resp) = catch_up(&mut tail, &mut record).await {
         return resp;
     }
     let (tx, rx) = tokio::sync::mpsc::channel::<Bytes>(TAIL_CHANNEL);
@@ -2411,8 +2411,17 @@ fn failed_turn_message(code: Option<&str>) -> String {
 }
 
 /// Reads the turn's events committed past what the tail holds; a 503 when they cannot be read.
-async fn catch_up(tail: &mut TurnTail, org_id: &str, session_id: &str) -> Result<(), Response> {
-    let row = match ai_chat_sessions::get(org_id, session_id).await {
+async fn catch_up(tail: &mut TurnTail, record: &mut TurnRecord) -> Result<(), Response> {
+    let (org_id, session_id) = (record.org_id.clone(), record.session_id.clone());
+    let row = ai_chat_sessions::get(&org_id, &session_id).await;
+    // Re-read after the row: a turn still running then owns every seq the row had committed.
+    if ended_as(record).is_none() {
+        refresh_record(record).await;
+        if tail.end_seq.is_none() && ended_as(record).is_some() {
+            tail.end_seq = turn_end_seq(record).await;
+        }
+    }
+    let row = match row {
         Ok(Some(row)) => row,
         Ok(None) => return Ok(()),
         Err(e) => {
@@ -2465,11 +2474,11 @@ async fn follow(
             }
             next_flush = tokio::time::Instant::now() + flush;
         }
-        if let Some(status) = ended_as(&record) {
+        if let Some(status) = ended_as(&record).map(str::to_string) {
             tail.end_seq = turn_end_seq(&record).await;
-            let last = match catch_up(&mut tail, &record.org_id, &record.session_id).await {
+            let last = match catch_up(&mut tail, &mut record).await {
                 Ok(()) => {
-                    let terminal = terminal_frame(&record, status, tail.last_seq());
+                    let terminal = terminal_frame(&record, &status, tail.last_seq());
                     end_messages(&mut tail, &terminal)
                 }
                 Err(_) => vec![stream_dropped(&tail.turn_id)],
@@ -2511,12 +2520,9 @@ async fn on_feed(
     record: &mut TurnRecord,
     tx: &tokio::sync::mpsc::Sender<Bytes>,
 ) -> bool {
-    let (org_id, session_id) = (record.org_id.clone(), record.session_id.clone());
     match item {
         FeedRecv::Item(FeedItem::Event(event)) => {
-            if !tail.push([event.as_ref().clone()])
-                && catch_up(tail, &org_id, &session_id).await.is_err()
-            {
+            if !tail.push([event.as_ref().clone()]) && catch_up(tail, record).await.is_err() {
                 send_all(tx, vec![stream_dropped(&tail.turn_id)]).await;
                 return false;
             }
@@ -2527,7 +2533,7 @@ async fn on_feed(
             let committed = frame.get("last_committed_seq").and_then(Value::as_i64);
             let caught_up = match committed {
                 Some(committed) if committed <= tail.last_seq() => Ok(()),
-                _ => catch_up(tail, &org_id, &session_id).await,
+                _ => catch_up(tail, record).await,
             };
             let last = match caught_up {
                 Ok(()) => end_messages(tail, &frame),
@@ -2554,13 +2560,8 @@ async fn on_poll(
     record: &mut TurnRecord,
     tx: &tokio::sync::mpsc::Sender<Bytes>,
 ) -> bool {
-    // A turn that ended is read up to its own end by the caller, never into the next turn.
-    refresh_record(record).await;
-    if ended_as(record).is_none()
-        && catch_up(tail, &record.org_id, &record.session_id)
-            .await
-            .is_err()
-    {
+    // The record is re-read inside, so a turn that ended is read only up to its own end.
+    if catch_up(tail, record).await.is_err() {
         send_all(tx, vec![stream_dropped(&tail.turn_id)]).await;
         return false;
     }

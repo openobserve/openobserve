@@ -243,12 +243,12 @@ pub(crate) async fn refuse_if_off(org_id: &str) -> Result<(), Response> {
 
 /// Whether the org lets a chat be shared with `public` (or in-org) visibility.
 pub(crate) async fn sharing_allowed(org_id: &str, public: bool) -> bool {
-    let view = SettingsView::new(&org_ai(org_id).await, Deployment::from_config(), false);
-    if public {
-        view.public_sharing
-    } else {
-        view.org_sharing
-    }
+    sharing_of(
+        org_id,
+        openobserve_core::ai_policy::org_settings(org_id).await,
+        Deployment::from_config(),
+        public,
+    )
 }
 
 /// The policy a turn of `user_id` in `chat_id` carries to o2-ai; it replaces any client one.
@@ -288,6 +288,29 @@ fn admission(
             )
             .into_response())
         }
+    }
+}
+
+/// Sharing as the org allows it; see [`sharing_allowed`].
+fn sharing_of(
+    org_id: &str,
+    settings: Result<OrgAiSettings, infra::errors::Error>,
+    deployment: Deployment,
+    public: bool,
+) -> bool {
+    let settings = match settings {
+        Ok(settings) => settings,
+        // Unset sharing defaults to on, so the defaults would undo an admin's sharing-off.
+        Err(e) => {
+            log::error!("[org_id:{org_id}] assistant settings unreadable, sharing refused: {e}");
+            return false;
+        }
+    };
+    let view = SettingsView::new(&settings, deployment, false);
+    if public {
+        view.public_sharing
+    } else {
+        view.org_sharing
     }
 }
 
@@ -577,5 +600,20 @@ mod tests {
             unreadable.unwrap_err().status(),
             StatusCode::SERVICE_UNAVAILABLE
         );
+    }
+
+    #[test]
+    fn unreadable_settings_never_allow_sharing() {
+        assert!(sharing_of("o", Ok(OrgAiSettings::default()), OPEN, true));
+        assert!(sharing_of("o", Ok(OrgAiSettings::default()), OPEN, false));
+        let down = || Err(infra::errors::Error::Message("down".into()));
+        assert!(!sharing_of("o", down(), OPEN, true));
+        assert!(!sharing_of("o", down(), OPEN, false));
+        let off = OrgAiSettings {
+            public_sharing: Some(false),
+            ..Default::default()
+        };
+        assert!(!sharing_of("o", Ok(off.clone()), OPEN, true));
+        assert!(sharing_of("o", Ok(off), OPEN, false));
     }
 }
