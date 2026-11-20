@@ -1689,6 +1689,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move {
             o2_enterprise::enterprise::re_patterns::get_pattern_manager().await
         });
+        tokio::task::spawn(db::re_pattern::warn_unenforceable_search_associations());
     }
 
     // Initialize the remaining cloud tasks. AI quota state and synchronization

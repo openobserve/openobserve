@@ -5354,6 +5354,8 @@
     "addToInterestingFields": "Add to interesting fields",
     "viewPatternsCount": "View {count} Pattern | View {count} Patterns",
     "addPattern": "Add Pattern",
+    "sdrNonStringFieldWarning": "Search-time patterns apply to string fields only, so this one is not enforced. Use an ingestion-time pattern instead.",
+    "sdrPartitionKeyWarning": "A partition key carries its raw value in the file path, so its search-time pattern is not enforced. Remove the pattern or the partition key.",
     "editStream": "Edit Stream",
     "createNewStream": "Create new Stream",
     "errorWhileDeletingStreams": "Error while deleting streams.",
