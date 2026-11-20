@@ -15474,7 +15474,9 @@
       "perGroupFiresCount": "Would fire for {count} {groups} now.",
       "perGroupQuiet": "Would not fire now for any {groups}.",
       "labelGroups": "{labels} group | {labels} groups",
-      "groups": "group | groups"
+      "groups": "group | groups",
+      "histogramAvg": "average of {metric}",
+      "ofRate": "{fn} of {metric} per second"
     },
     "readBack": {
       "sentence": "{who} when {what}{hold}, {schedule}{cooldown}.",
@@ -16099,7 +16101,8 @@
         "pickField": "Pick a field",
         "pickLabel": "Pick a label",
         "thresholdWaits": "Pick what is missing above first",
-        "aggOfMeasure": "{agg} of {measure}"
+        "aggOfMeasure": "{agg} of {measure}",
+        "aggOfRate": "{agg} of {metric} per second"
       },
       "scratch": {
         "label": "Build it myself"
@@ -16121,6 +16124,14 @@
         "change": "Unusual change in {subject}",
         "promql": "PromQL over {subject}",
         "per": "{what} per {groups}"
+      },
+      "functionRate": "per-second rate",
+      "suggested": "Suggested",
+      "suggestedWhy": {
+        "histogram": "A percentile is what a histogram's buckets are made to measure",
+        "counter": "A counter only grows, so its per-second rate is what changes",
+        "spread": "Most values stay under the p95, so rare outliers alone do not fire it",
+        "average": "The average over the window smooths out single spikes"
       }
     },
     "librarySuggest": {
