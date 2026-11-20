@@ -484,6 +484,26 @@ describe("DateTime typed range bar review fixes", () => {
     expect(barState()).toBe("blocked");
   });
 
+  it("moves focus to the next control when a resize hides the trigger", async () => {
+    create({ autoApply: true });
+    const next = document.createElement("button");
+    document.body.appendChild(next);
+    // jsdom lays nothing out, so only the control after the picker counts as rendered.
+    vi.spyOn(HTMLElement.prototype, "getClientRects").mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return (this === next ? [{}] : []) as unknown as DOMRectList;
+    });
+    await openMenu(wrapper!);
+    expect(document.activeElement).toBe(barInput());
+
+    window.dispatchEvent(new Event("resize"));
+    await flushPromises();
+
+    expect(wrapper!.vm.menuOpen).toBe(false);
+    expect(document.activeElement).toBe(next);
+  });
+
   it("shows the range a host set through setSavedDate as applied", async () => {
     create({ autoApply: true, defaultRelativeTime: "15m" });
     await flushPromises();

@@ -159,14 +159,11 @@ const capFix = computed<CapFix | null>(() => {
     res.state === "valid" ? [res.reading] : res.state === "ambiguous" ? res.readings : [];
   const fixes = readings.length && readings.every((r) => capsOf(r)) ? capsOf(readings[0]) : null;
   if (fixes) return { reading: readings[0], fixes, overCap: true };
-  if (res.state !== "blocked" || res.reason !== "max-span" || !res.fix || !capsOf(res.fix))
-    return null;
+  if (res.state !== "blocked" || res.reason !== "max-span" || !res.fix) return null;
+  // The stream-limit fix may still be over the cap, so the capped reading wins when it fits.
   const own = capsOf(res.reading);
-  return {
-    reading: res.reading,
-    fixes: own && withinSpan(own) ? own : capsOf(res.fix)!,
-    overCap: false,
-  };
+  const capped = own && withinSpan(own) ? own : capsOf(res.fix);
+  return capped ? { reading: res.reading, fixes: capped, overCap: false } : null;
 });
 
 const result = computed<TimeRangeParseResult>(() => {
@@ -205,6 +202,17 @@ const durationOf = (startUs: number, endUs: number) =>
 const instantText = (us: number) =>
   formatInstant(us, props.zone, props.intlLocale, bar.nowUs.value, true);
 
+const typedText = (us: number) =>
+  formatInstant(
+    us,
+    props.zone,
+    props.intlLocale,
+    bar.nowUs.value,
+    true,
+    undefined,
+    us % 1000 !== 0,
+  );
+
 // A window cut short at now no longer reaches the same distance on both sides of the stamp.
 const instantWindowText = (
   note: Extract<ZoneNote, { kind: "instant-window" }>,
@@ -220,6 +228,15 @@ const instantWindowText = (
       text: t("timeRangeInput.instantWindow", {
         duration: formatSpan(note.halfWidthUs, props.intlLocale),
         time,
+      }),
+      warn: true,
+    };
+  // A window cut at the latest allowed date ends there, not now.
+  if (after < 0 && reading.endUs === props.limits.maxEndUs)
+    return {
+      text: t("timeRangeInput.instantWindowBefore", {
+        duration: formatSpan(reading.endUs - reading.startUs, props.intlLocale),
+        time: instantText(reading.endUs),
       }),
       warn: true,
     };
@@ -369,9 +386,22 @@ const toRow = (
   };
 };
 
+// An over-cap reading among valid ones offers its capped range in its place.
+const ambiguousRows = (readings: TimeRangeReading[]): ReadingRow[] =>
+  readings.flatMap((r, i) => {
+    const caps = capsOf(r);
+    if (!caps) return [toRow(r, i, readings)];
+    return caps.map((c, j) => {
+      const row = toRow(c, i, readings, t("timeRangeInput.longestAllowed"));
+      return caps.length < 2
+        ? row
+        : { ...row, label: capLabel(c, j), range: rangeOf(c.startUs, c.endUs) };
+    });
+  });
+
 const rows = computed<ReadingRow[]>(() => {
   const res = result.value;
-  if (res.state === "ambiguous") return res.readings.map((r, i) => toRow(r, i, res.readings));
+  if (res.state === "ambiguous") return ambiguousRows(res.readings);
   if (res.state === "incomplete")
     return res.completions.map((r, i) => toRow(r, i, res.completions));
   if (res.state !== "blocked") return [];
@@ -392,7 +422,7 @@ const blockedMessage = (res: Extract<TimeRangeParseResult, { state: "blocked" }>
   if (res.reason === "max-span") return t("timeRangeInput.blockedSpan", { limit: props.spanLimit });
   if (res.reason === "future")
     return t("timeRangeInput.blockedFuture", {
-      date: instantText(
+      date: typedText(
         typedInstant(reading) ??
           (reading.endUs > bar.nowUs.value ? reading.endUs : reading.startUs),
       ),
@@ -804,7 +834,9 @@ defineExpose({
         <span
           class="text-text-heading text-compact font-medium"
           :class="
-            row.range ? 'shrink-0 max-sm:min-w-0 max-sm:shrink max-sm:truncate' : 'min-w-0 truncate'
+            row.range
+              ? 'shrink-0 max-sm:min-w-0 max-sm:shrink max-sm:truncate'
+              : 'min-w-0 truncate max-sm:basis-full max-sm:whitespace-normal'
           "
           >{{ row.label }}</span
         >

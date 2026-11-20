@@ -24,10 +24,13 @@ import {
   type TimeRangeReading,
 } from "@/utils/timeRangeInput";
 import { MAX_RANGE_TEXT_UNITS } from "@/utils/date";
+import { addMonths } from "@/utils/timeRangeInput/civil";
+import { offsetAtInstant, offsetLabel, resolveCivil, wallAt } from "@/utils/timeRangeInput/zone";
 import { barInput, el, press, typeInBar } from "@/test/unit/helpers/dateTimePicker";
 
 const NOW = new Date("2026-10-08T03:00:00Z");
 const NOW_US = NOW.getTime() * 1000;
+const NY = "America/New_York";
 
 type Bar = VueWrapper<InstanceType<typeof DateTimeRangeInput>>;
 
@@ -404,8 +407,14 @@ describe("DateTimeRangeInput polish fixes", () => {
       return null;
     if (reading.startOffset === "+00:00")
       return [capped(reading, reading.endUs - 3653 * 86_400_000_000, "+00:00")];
-    const fold = Date.UTC(2016, 10, 6, 5, 30) * 1000;
-    return [capped(reading, fold, "-04:00"), capped(reading, fold + 3_600_000_000, "-05:00")];
+    // The same wall time ten years back, as DateTime resolves it, in the New York zone the tests use.
+    const at = resolveCivil(addMonths(wallAt(NY, reading.endUs), -120), NY)!;
+    const offset = (us: number) => offsetLabel(offsetAtInstant(NY, us));
+    if (at.kind !== "fold") return [capped(reading, at.us, offset(at.us))];
+    return [
+      capped(reading, at.earlier, offset(at.earlier)),
+      capped(reading, at.later, offset(at.later)),
+    ];
   };
 
   const create = (props: Record<string, unknown> = {}) => {
@@ -519,7 +528,8 @@ describe("DateTimeRangeInput polish fixes", () => {
   });
 
   it("offers a capped fix for an over-cap range read in a repeated hour", async () => {
-    vi.setSystemTime(new Date("2026-11-01T05:30:00Z"));
+    // 01:30 on Nov 6, 2026 lands ten years back in the repeated hour of Nov 6, 2016.
+    vi.setSystemTime(new Date("2026-11-06T06:30:00Z"));
     create({ zone: "America/New_York" });
     await typeInBar("last 11 years");
 
@@ -575,6 +585,59 @@ describe("DateTimeRangeInput polish fixes", () => {
     expect(el("date-time-range-message")!.textContent).toBe(
       "01:30 happens twice on Sun, Nov 1. Pick one",
     );
+  });
+
+  it("offers the capped rolling range when the stream limit alone would allow over ten years", async () => {
+    create({ limits: { allowFuture: false, maxSpanUs: 90_000 * 3_600_000_000 } });
+    await typeInBar("last 11 years");
+
+    expect(state()).toBe("blocked");
+    expect(el("date-time-range-reading-0")!.textContent).toContain("Last 10 years");
+    expect(el("date-time-range-reading-1")).toBeNull();
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
+    expect(applied()[0]).toMatchObject({ kind: "rolling", rolling: { unit: "M", value: 120 } });
+  });
+
+  it("offers the capped range for an over-cap reading of an ambiguous unit", async () => {
+    create();
+    await typeInBar("200M");
+
+    expect(state()).toBe("ambiguous");
+    expect(el("date-time-range-reading-0")!.textContent).toContain("Last 200 minutes");
+    const capped = el("date-time-range-reading-1")!;
+    expect(capped.textContent).toContain("Last 120 months");
+    expect(capped.getAttribute("aria-disabled")).toBeNull();
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
+    expect(applied()[0].rolling).toEqual({ unit: "M", value: 120 });
+  });
+
+  it("names the end of a stamp's window cut by the latest allowed date, not now", async () => {
+    vi.setSystemTime(new Date("2026-10-09T12:00:00Z"));
+    create({ limits: { allowFuture: false, maxEndUs: Date.UTC(2026, 9, 8) * 1000 } });
+    await typeInBar("2026-10-08T00:02Z");
+
+    expect(el("date-time-range-note")!.textContent).toBe("3 min before Thu, Oct 8, 00:00");
+  });
+
+  it("keeps the typed microseconds in the future message", async () => {
+    create();
+    await typeInBar("2026-10-08T12:06:00.000021Z");
+
+    expect(el("date-time-range-message")!.textContent).toBe(
+      "Thu, Oct 8, 12:06:00.000021 is in the future.",
+    );
+  });
+
+  it("wraps a fix row whose label is its range on a narrow screen", async () => {
+    create({ limits: { allowFuture: false, maxSpanUs: 3_600_000_000 } });
+    await typeInBar("2026-10-07 00:00 to 2026-10-07 05:00");
+
+    const label = el("date-time-range-reading-0")!.querySelector("span")!;
+    expect(label.className).toContain("max-sm:whitespace-normal");
+    expect(label.className).toContain("max-sm:basis-full");
   });
 
   it("shows no duration for an empty applied range", async () => {
