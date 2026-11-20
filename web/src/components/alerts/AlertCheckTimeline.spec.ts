@@ -53,13 +53,15 @@ describe("AlertCheckTimeline", () => {
     expect(text.text()).toBe(t(key, { period: "5 minutes", ...params }));
   });
 
-  it("draws the read window back from now, stopping at the edge of the line", async () => {
-    const band = async (period: number) => {
-      const wrapper = mountTimeline(10, period);
-      await wrapper.get('[data-test="add-alert-check-timeline-toggle"]').trigger("click");
-      return wrapper.get('[data-test="add-alert-check-timeline-band"]');
-    };
-    expect(Number((await band(10)).attributes("width"))).toBe(120);
-    expect(Number((await band(1000)).attributes("x"))).toBe(0);
+  it("keeps one drawing height whether checks overlap or leave gaps", async () => {
+    const wrapper = mountTimeline(10, 30);
+    await wrapper.get('[data-test="add-alert-check-timeline-toggle"]').trigger("click");
+    const height = () =>
+      wrapper.get('[data-test="add-alert-check-timeline-drawing"]').attributes("height");
+    const overlap = height();
+    expect(wrapper.find('[data-test="add-alert-check-timeline-overlap"]').exists()).toBe(true);
+    await wrapper.setProps({ period: 5 });
+    expect(wrapper.find('[data-test="add-alert-check-timeline-gaps"]').exists()).toBe(true);
+    expect(height()).toBe(overlap);
   });
 });
