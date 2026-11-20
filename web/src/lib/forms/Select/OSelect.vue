@@ -2145,6 +2145,14 @@ const fieldWidthClass = computed(() => {
           v-bind="controlAttrs"
           :aria-describedby="mergeDescribedBy(errorDescribedBy, controlAttrs)"
           :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
+          :data-test-selected-value="
+            multiple
+              ? selectedValues.map((v) => String(v)).join(',')
+              : selectedValues[0] !== undefined
+                ? String(selectedValues[0])
+                : ''
+          "
+          :data-test-selected-label="triggerDisplayLabel"
           :class="
             isInlineAppearance
               ? inlineTriggerClasses

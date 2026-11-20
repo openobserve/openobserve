@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 
 
-import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
+import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, clickFieldRowAction } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
@@ -1190,11 +1190,8 @@ export class TracesPage {
    * @returns {boolean} True if added successfully
    */
   async selectFieldValue(fieldName) {
-    const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).first();
-
     try {
-      await expect(addBtn).toBeVisible({ timeout: 3000 });
-      await addBtn.click();
+      await clickFieldRowAction(this.page, fieldName, `[data-test="log-search-index-list-add-${fieldName}-field-btn"]`, { timeout: 3000 });
       await this.page.waitForTimeout(1000);
       return true;
     } catch {

@@ -144,6 +144,22 @@ export async function selectLogsViewMode(page, mode, timeout = 20000) {
     await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click();
 }
 
+// A field row's actions stay hidden and unclickable until the row is hovered, so reveal them the way a user does.
+export async function revealFieldRowAction(page, field, buttonSelector, { scope = '', last = false, timeout = 10000 } = {}) {
+    const rows = page.locator(`${scope} [data-test="o-field-list-row-${field}"]`.trim());
+    const row = last ? rows.last() : rows.first();
+    await row.scrollIntoViewIfNeeded({ timeout });
+    await row.hover({ timeout });
+    const button = row.locator(buttonSelector).first();
+    await button.waitFor({ state: 'visible', timeout });
+    return button;
+}
+
+export async function clickFieldRowAction(page, field, buttonSelector, options = {}) {
+    const button = await revealFieldRowAction(page, field, buttonSelector, options);
+    await button.click({ timeout: options.timeout ?? 10000 });
+}
+
 /** Opens the Metrics Explorer in Visualize mode, where the panel editor lives. */
 export async function gotoMetricsVisualize(page) {
     // Carry the org the page is CURRENTLY on, rather than pinning the default.

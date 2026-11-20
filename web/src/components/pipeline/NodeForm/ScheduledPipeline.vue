@@ -81,6 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :capabilities="fieldPanelCapabilities"
                         :source="fieldSource"
                         test-id-prefix="scheduled-pipeline"
+                        stream-test-id="scheduled-pipeline-stream-name-select"
+                        stream-type-test-id="scheduled-pipeline-stream-type-select"
                         class="min-h-0 flex-1 max-md:h-[70vh] max-md:flex-none"
                       />
                     </div>

@@ -4,7 +4,7 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
-import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode } from '../commonActions.js';
+import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode, revealFieldRowAction, clickFieldRowAction } from '../commonActions.js';
 import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -2274,12 +2274,9 @@ export class LogsPage {
         return usable.slice(0, count);
     }
 
-    /** Click a sidebar field's "=" icon; it only renders while its row is hovered. */
+    /** Click a sidebar field's "=" icon; it only shows while its row is hovered. */
     async addEqualsFilterForField(field) {
-        await this.page.locator(this.fieldListItem(field)).first().hover();
-        const button = this.page.locator(this.fieldEqualsButton(field)).first();
-        await button.waitFor({ state: 'visible', timeout: 10000 });
-        await button.click();
+        await clickFieldRowAction(this.page, field, this.fieldEqualsButton(field));
     }
 
     async expandFirstResultRow() {
@@ -2464,13 +2461,13 @@ export class LogsPage {
         const fieldItem = this.page.locator('[data-test^="log-search-index-list-interesting-"]').first();
         await this.ensureQuickModeState(true);
         try {
-            await fieldItem.waitFor({ state: 'visible', timeout: 20000 });
+            await fieldItem.waitFor({ state: 'attached', timeout: 20000 });
         } catch {
             // Fallback: a stray earlier toggle may have flipped quick mode off —
             // re-assert and wait once more before giving up.
             testLogger.warn('Interesting-field buttons not visible after 20s — re-asserting quick mode and waiting');
             await this.ensureQuickModeState(true);
-            await fieldItem.waitFor({ state: 'visible', timeout: 15000 });
+            await fieldItem.waitFor({ state: 'attached', timeout: 15000 });
         }
 
         await this.fillIndexFieldSearchInput(field);
@@ -5011,14 +5008,13 @@ export class LogsPage {
 
 
     async clickInterestingFieldButton(field) {
-        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
         const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
 
         for (let attempt = 0; attempt < 5; attempt++) {
-            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
-                .then(() => true).catch(() => false);
-            if (visible) {
-                await btnLocator.click({ force: true });
+            const btnLocator = await revealFieldRowAction(this.page, field, this.interestingFieldBtn(field), { timeout: 8000 })
+                .catch(() => null);
+            if (btnLocator) {
+                await btnLocator.click();
                 return;
             }
             // Button not visible — re-apply filter to ensure field is in the list.
@@ -5028,8 +5024,7 @@ export class LogsPage {
             // Wait deterministically for the debounced filter to reflect the typed value
             await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
-        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
-        await btnLocator.click({ force: true });
+        await clickFieldRowAction(this.page, field, this.interestingFieldBtn(field), { timeout: 8000 });
     }
 
     /**
@@ -5038,31 +5033,29 @@ export class LogsPage {
      * action buttons, then click the interesting-field (ⓘ) toggle on that row.
      */
     async hoverAndClickInterestingFieldLast(field) {
-        await this.page.locator(this.fieldListItem(field)).last().hover();
-        await this.page.locator(this.interestingFieldBtn(field)).last().click({ force: true });
+        await clickFieldRowAction(this.page, field, this.interestingFieldBtn(field), { last: true });
     }
 
     /**
      * Idempotent version of clickInterestingFieldButton: only clicks if the field is
      * NOT already marked as interesting.  Use this when the goal is to guarantee the
-     * field is in interestingFieldList, not to toggle it.  If the button's title
+     * field is in interestingFieldList, not to toggle it.  If the button's aria-label
      * already says "Remove from interesting fields" the field is already starred and
      * we skip the click so we don't accidentally remove it.
      */
     async ensureFieldIsInteresting(field) {
-        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
         const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
 
         for (let attempt = 0; attempt < 5; attempt++) {
-            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
-                .then(() => true).catch(() => false);
-            if (visible) {
-                const title = await btnLocator.getAttribute('title').catch(() => '');
-                if (title && title.toLowerCase().includes('remove')) {
+            const btnLocator = await revealFieldRowAction(this.page, field, this.interestingFieldBtn(field), { timeout: 8000 })
+                .catch(() => null);
+            if (btnLocator) {
+                const label = await btnLocator.getAttribute('aria-label').catch(() => '');
+                if (label && label.toLowerCase().includes('remove')) {
                     // Already interesting — nothing to do.
                     return;
                 }
-                await btnLocator.click({ force: true });
+                await btnLocator.click();
                 return;
             }
             await inputLocator.fill('');
@@ -5070,12 +5063,12 @@ export class LogsPage {
             await inputLocator.pressSequentially(field, { delay: 30 });
             await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
-        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
-        const title = await btnLocator.getAttribute('title').catch(() => '');
-        if (title && title.toLowerCase().includes('remove')) {
+        const btnLocator = await revealFieldRowAction(this.page, field, this.interestingFieldBtn(field), { timeout: 8000 });
+        const label = await btnLocator.getAttribute('aria-label').catch(() => '');
+        if (label && label.toLowerCase().includes('remove')) {
             return;
         }
-        await btnLocator.click({ force: true });
+        await btnLocator.click();
     }
 
     async expectInterestingFieldInEditor(field) {
@@ -5838,7 +5831,7 @@ export class LogsPage {
             // default state; nothing to click.
         }
         // Wait for interesting field items to populate (cloud may load slowly)
-        await this.page.locator('[data-test^="log-search-index-list-interesting-"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        await this.page.locator('[data-test^="log-search-index-list-interesting-"]').first().waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
     }
 
     async enableQuickModeIfDisabled() {
@@ -5915,7 +5908,7 @@ export class LogsPage {
         await this.page
             .locator('[data-test^="log-search-index-list-interesting-"]')
             .first()
-            .waitFor({ state: 'visible', timeout: 8000 })
+            .waitFor({ state: 'attached', timeout: 8000 })
             .catch(() => {});
     }
 
@@ -6016,17 +6009,7 @@ export class LogsPage {
     }
 
     async clickAddFieldToTableButton(fieldName) {
-        const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
-        try {
-            await addBtn.waitFor({ state: 'visible', timeout: 5000 });
-        } catch {
-            // The add button is only revealed while the field row is hovered. Under CI load
-            // the hover state can be lost (or never settled) before the click — re-hover the
-            // field row and wait again before giving up.
-            await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover().catch(() => {});
-            await addBtn.waitFor({ state: 'visible', timeout: 10000 });
-        }
-        await addBtn.click();
+        await clickFieldRowAction(this.page, fieldName, `[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
         // The add operation commits when both (a) the toggle inverts to a remove
         // button in the sidebar, and (b) the field column header appears in the
         // logs table. Wait for either signal — both fire on success.
@@ -6037,9 +6020,7 @@ export class LogsPage {
     }
 
     async clickRemoveFieldFromTableButton(fieldName) {
-        const removeBtn = this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`);
-        await removeBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await removeBtn.click();
+        await clickFieldRowAction(this.page, fieldName, `[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`);
         // Symmetric to add: the field column header disappears AND/OR the toggle
         // reverts to an add button. Wait on either DOM convergence.
         await Promise.any([
