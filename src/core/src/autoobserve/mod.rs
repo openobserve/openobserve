@@ -42,6 +42,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     {
         log::info!("[autoobserve] created this region's engine row");
     }
+    autoobserve::listener::start();
     Ok(())
 }
 

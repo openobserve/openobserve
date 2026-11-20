@@ -38,8 +38,10 @@ use crate::{
 };
 
 pub mod ai_sessions;
+mod home_region;
 mod scheduler;
 
+pub use home_region::{HomeRegion, HomeRegionResolver, home_region, set_home_region_resolver};
 pub use scheduler::select_best_node;
 
 const CONSISTENT_HASH_PRIME: u32 = 16777619;
