@@ -141,6 +141,8 @@ export interface ClockMod {
   from: number;
   to: number;
   shift: number;
+  /** A meridiem takes only hours 1-12, where a day part also takes its own 24-hour hours. */
+  ap?: true;
 }
 
 export interface ClockValue {

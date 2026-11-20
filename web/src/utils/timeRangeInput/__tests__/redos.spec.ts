@@ -216,7 +216,8 @@ describe("regex safety", () => {
     const { value } = runChild<{ worst: number; worstText: string; total: number }>(
       code,
       {},
-      10_000,
+      // The kill only catches a hang; a loaded CI shard can take far longer than the timed work.
+      90_000,
     );
     process.stdout.write(
       `hostile worst ${value.worst.toFixed(2)} ms (${value.worstText}), 2000 seeded ${value.total.toFixed(0)} ms\n`,

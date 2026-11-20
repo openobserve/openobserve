@@ -41,7 +41,7 @@ import {
   zoneStart,
 } from "./machine";
 import type { Elem, Slot, Words } from "./packs/schema";
-import type { Alt, ClockValue, Draft, Outcome, Point, UnitKey } from "./types";
+import type { Alt, ClockMod, ClockValue, Draft, Outcome, Point, UnitKey } from "./types";
 
 export interface DateVal {
   y: number;
@@ -465,6 +465,11 @@ function plainDayHits(sc: Scan, pos: number): Hit<Alt<DateVal>[]>[] {
       }
     }
     out.push(...baseDateHits(sc, pos));
+    // An ISO date is a day like any other, so it takes the same clocks (`2026-11-20 9am`).
+    for (const s of scanIso(sc.text, pos)) {
+      const v = s.alts[0].v;
+      if (v.p === "day" && !v.days) out.push([s.end, [{ v: civilDate(v) }]]);
+    }
     return out;
   });
 }
@@ -518,14 +523,11 @@ function affixedClockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
   return out;
 }
 
-function withMod(
-  alts: Alt<ClockValue>[],
-  mod: { from: number; to: number; shift: number },
-): Alt<ClockValue>[] {
+function withMod(alts: Alt<ClockValue>[], mod: ClockMod): Alt<ClockValue>[] {
   const out: Alt<ClockValue>[] = [];
   for (const a of alts) {
     const h = hourIn(a.v.h, mod.from, mod.to);
-    if (h !== null && (a.v.h <= 12 || h === a.v.h))
+    if (h !== null && (mod.ap ? a.v.h > 0 && a.v.h < 13 : a.v.h <= 12 || h === a.v.h))
       out.push({ v: { ...a.v, h, mod, bare: false } });
   }
   return out;

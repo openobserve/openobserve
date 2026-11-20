@@ -1467,3 +1467,61 @@ describe("perf review fixes", () => {
     expect(seen.size).toBeGreaterThan(1);
   });
 });
+
+describe("typed-clock review fixes", () => {
+  const LATER = "2026-11-21T12:00:00Z";
+  const spans = (text: string, zone = "America/New_York") => {
+    const r = parseTimeRangeInput(baseContext(EN_US_TIME_RANGE_PACK, text, LATER, zone));
+    if (r.state === "valid")
+      return { state: r.state, spans: [[r.reading.startUs, r.reading.endUs]] };
+    if (r.state === "ambiguous")
+      return {
+        state: r.state,
+        reason: r.reason,
+        spans: r.readings.map((x) => [x.startUs, x.endUs]),
+      };
+    return { state: r.state };
+  };
+
+  it.each([
+    ["2026-11-20 9am", "Nov 20 9am"],
+    ["2026-11-20 9:30pm", "Nov 20 9:30pm"],
+    ["2026/11/20 9am", "Nov 20 9am"],
+    ["2026-11-20 9 am", "Nov 20 9 am"],
+    ["2026-11-20 at 9am", "Nov 20 at 9am"],
+    ["2026-11-20 9am-5pm", "Nov 20 9am-5pm"],
+    ["2026-11-20 9am to 2026-11-20 5pm", "Nov 20 9am to Nov 20 5pm"],
+    ["2026-11-01 1:30am", "Nov 1 1:30am"],
+    ["2026-03-08 2:30am", "2026-03-08 02:30"],
+  ])("C1: an ISO date takes a 12-hour clock: %s reads like %s", (iso, phrase) => {
+    const got = spans(iso);
+    expect(got.state).not.toBe("invalid");
+    expect(got).toEqual(spans(phrase));
+  });
+
+  it("C1: a 12-hour clock in a repeated hour after an ISO date asks which pass", () => {
+    expect(spans("2026-11-01 1:30am")).toEqual({
+      state: "ambiguous",
+      reason: "repeated-hour",
+      spans: [
+        [isoUs("2026-11-01T01:25:00-04:00"), isoUs("2026-11-01T01:35:00-04:00")],
+        [isoUs("2026-11-01T01:25:00-05:00"), isoUs("2026-11-01T01:35:00-05:00")],
+      ],
+    });
+    expect(spans("2026-11-20 9am to 2026-11-20 5pm")).toEqual({
+      state: "valid",
+      spans: [[isoUs("2026-11-20T09:00:00-05:00"), isoUs("2026-11-20T17:00:00-05:00")]],
+    });
+  });
+
+  it.each(["13:30pm", "13pm", "0am", "00:30am", "0:30 pm", "Nov 20 13:30pm", "2026-11-20 13pm"])(
+    "C4: an hour above 12 or 0 with am/pm is invalid: %s",
+    (text) => {
+      expect(spans(text).state).toBe("invalid");
+    },
+  );
+
+  it.each(["12am", "12:30am", "1pm", "13:30 in the afternoon"])("C4: keeps %s readable", (text) => {
+    expect(spans(text).state).not.toBe("invalid");
+  });
+});

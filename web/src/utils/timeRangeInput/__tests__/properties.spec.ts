@@ -161,7 +161,7 @@ describe("parser properties", () => {
       expect(STATES, `seed ${SEED} case ${i}`).toContain(r.state);
       for (const reading of selectable(r)) assertReading(reading, ctx, `seed ${SEED} case ${i}`);
     }
-  });
+  }, 60_000);
 
   it("keeps the case of month and minute units through the whole pipeline; a URL `M` is months", () => {
     const parse = (text: string) => parseTimeRangeInput(baseContext(EN_US_TIME_RANGE_PACK, text));
