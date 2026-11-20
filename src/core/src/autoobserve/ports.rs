@@ -28,6 +28,7 @@ use config::{
     ider,
     meta::{
         search::{Query, Request},
+        self_reporting::protected_streams::{ProtectedReader, as_reader},
         stream::{
             PartitionTimeLevel, StreamParams, StreamPartition, StreamSettings, StreamStats,
             StreamType,
@@ -43,13 +44,15 @@ use o2_enterprise::enterprise::autoobserve::{
     job::MODULE_KEY,
     names::streams::STREAM_PRESENCE,
     ports::{
-        AiPermit, AiUsagePort, ContextReadPort, HourRecords, KvWritePort, OssSource, Ports,
-        QueryRejected, SearchPage, SearchPort, StreamHistory, StreamSinkPort, StreamStat,
-        StreamStatsPort, TriggerPort, stats_refresh_us,
+        AiPermit, AiUsagePort, ContextReadPort, DbmColumns, DbmPort, HourRecords, KvWritePort,
+        OssSource, Ports, QueryRejected, SearchPage, SearchPort, StreamHistory, StreamSinkPort,
+        StreamStat, StreamStatsPort, TriggerPort, stats_refresh_us,
     },
     stream_silence::PRESENCE_RETENTION_DAYS,
 };
 use serde_json::Value;
+
+use crate::db_monitoring::{server_vantage, views};
 
 /// The stream types the engine reads; the rest are internal bookkeeping.
 const STREAM_TYPES: [StreamType; 6] = [
@@ -113,22 +116,20 @@ impl SearchPort for SearchAdapter {
         size: i64,
         timeout: Duration,
     ) -> anyhow::Result<SearchPage> {
-        let trace_id = ider::generate_trace_id();
-        let mut guard = CancelOnDrop {
-            org: org.to_string(),
-            trace_id: trace_id.clone(),
-            armed: true,
-        };
-        let read = search_streamed(&trace_id, org, sql, range, size, timeout);
-        let read = tokio::time::timeout(timeout, read).await;
-        guard.armed = read.is_err();
-        match read {
-            Err(_) => anyhow::bail!("streamed search timed out after {timeout:?}"),
-            Ok(Err(InfraError::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)))) => {
-                Ok(SearchPage::default())
-            }
-            Ok(other) => other.map_err(rejected_or_failed),
-        }
+        streamed(org, StreamType::Logs, sql, range, size, timeout).await
+    }
+
+    async fn sql_streamed_on(
+        &self,
+        org: &str,
+        stream_type: &str,
+        sql: &str,
+        range: (i64, i64),
+        size: i64,
+        timeout: Duration,
+    ) -> anyhow::Result<SearchPage> {
+        let stream_type = streamed_type_of(stream_type)?;
+        streamed(org, stream_type, sql, range, size, timeout).await
     }
 
     async fn sql_on(
@@ -542,6 +543,59 @@ impl Drop for CancelOnDrop {
     }
 }
 
+/// The DBM views' own builders and schema gates, so AO's reads match the pages.
+pub struct DbmViews;
+
+#[async_trait]
+impl DbmPort for DbmViews {
+    async fn columns(&self, org: &str, stream: &str) -> anyhow::Result<DbmColumns> {
+        let schema = infra::schema::get(org, stream, StreamType::Logs).await?;
+        let settings = infra::schema::get_settings(org, stream, StreamType::Logs).await;
+        let uds = infra::schema::get_stream_setting_defined_schema_fields(&settings);
+        Ok(DbmColumns {
+            canonical: views::present_dbm_columns(org, stream).await?,
+            raw_deadlock: views::queryable_columns(
+                &server_vantage::RAW_DEADLOCK_FIELDS,
+                &schema,
+                &uds,
+            ),
+            raw_blocking: views::queryable_columns(
+                &server_vantage::RAW_BLOCKING_FIELDS,
+                &schema,
+                &uds,
+            ),
+        })
+    }
+
+    fn instances_sql(&self, stream: &str, cols: &DbmColumns, anchor_us: i64) -> Option<String> {
+        views::build_dbm_instances_sql_at(stream, None, &cols.canonical, anchor_us)
+    }
+
+    fn deadlock_sql(&self, stream: &str, cols: &DbmColumns) -> Vec<String> {
+        let raw = views::RawDeadlockFallback {
+            present: cols.raw_deadlock.clone(),
+        };
+        canonical_probe(stream, cols, server_vantage::KIND_DEADLOCK)
+            .into_iter()
+            .chain(views::build_raw_deadlock_minutes_sql(stream, &raw))
+            .collect()
+    }
+
+    fn blocking_sql(&self, stream: &str, cols: &DbmColumns) -> Vec<String> {
+        let raw = views::RawBlockingFallback {
+            present: cols.raw_blocking.clone(),
+        };
+        canonical_probe(stream, cols, server_vantage::KIND_BLOCKING)
+            .into_iter()
+            .chain(views::build_raw_blocking_minutes_sql(stream, &raw))
+            .collect()
+    }
+
+    fn table_health_sql(&self, stream: &str, cols: &DbmColumns, limit: usize) -> Option<String> {
+        views::build_dbm_table_health_sql(stream, "", limit, &cols.canonical)
+    }
+}
+
 pub fn ports() -> Ports {
     Ports {
         search: Arc::new(SearchAdapter),
@@ -577,10 +631,43 @@ async fn search(
     })
 }
 
+/// A read cut by the deadline or dropped by its caller has its scans cancelled in the background.
+async fn streamed(
+    org: &str,
+    stream_type: StreamType,
+    sql: &str,
+    range: (i64, i64),
+    size: i64,
+    timeout: Duration,
+) -> anyhow::Result<SearchPage> {
+    let trace_id = ider::generate_trace_id();
+    let mut guard = CancelOnDrop {
+        org: org.to_string(),
+        trace_id: trace_id.clone(),
+        armed: true,
+    };
+    let reader = engine_reader(sql)?;
+    let read = search_streamed(&trace_id, org, stream_type, sql, range, size, timeout);
+    let read = tokio::time::timeout(timeout, read);
+    let read = match reader {
+        Some(reader) => as_reader(reader, read).await,
+        None => read.await,
+    };
+    guard.armed = read.is_err();
+    match read {
+        Err(_) => anyhow::bail!("streamed search timed out after {timeout:?}"),
+        Ok(Err(InfraError::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)))) => {
+            Ok(SearchPage::default())
+        }
+        Ok(other) => other.map_err(rejected_or_failed),
+    }
+}
+
 /// The partitioned streaming search folded into one answer; a clamped range or cut answer fails.
 async fn search_streamed(
     trace_id: &str,
     org: &str,
+    stream_type: StreamType,
     sql: &str,
     range: (i64, i64),
     size: i64,
@@ -595,7 +682,7 @@ async fn search_streamed(
         org,
         "",
         &mut req,
-        StreamType::Logs,
+        stream_type,
         streams,
         None,
         String::new(),
@@ -645,11 +732,39 @@ fn rejected_or_failed(e: InfraError) -> anyhow::Error {
     }
 }
 
+/// AutoObserve reads the calibration digests as their backend reader, masking by its own alert
+/// grants as the findings rail does; chat history it never reads.
+fn engine_reader(sql: &str) -> anyhow::Result<Option<ProtectedReader>> {
+    let names = config::meta::sql::resolve_stream_names(sql)
+        .map_err(|e| QueryRejected(format!("unparsable SQL: {e}")))?;
+    match names.iter().find_map(|n| ProtectedReader::of(n)) {
+        Some(ProtectedReader::ChatHistory) => {
+            Err(QueryRejected("chat history is not an engine read".to_string()).into())
+        }
+        reader => Ok(reader),
+    }
+}
+
+/// The engine's types plus the service-graph type derived streams such as `_agent_signals` use.
+fn streamed_type_of(s: &str) -> anyhow::Result<StreamType> {
+    if s == StreamType::ServiceGraph.as_str() {
+        return Ok(StreamType::ServiceGraph);
+    }
+    stream_type_of(s)
+}
+
 fn stream_type_of(s: &str) -> anyhow::Result<StreamType> {
     STREAM_TYPES
         .into_iter()
         .find(|t| t.as_str() == s)
         .ok_or_else(|| QueryRejected(format!("unknown stream type {s}")).into())
+}
+
+/// The kind column is canonical, so a stream written before canonicalization cannot name it.
+fn canonical_probe(stream: &str, cols: &DbmColumns, kind: &str) -> Option<String> {
+    cols.canonical
+        .contains(server_vantage::O2_DBM_KIND)
+        .then(|| views::build_canonical_minutes_sql(stream, kind))
 }
 
 /// Leaves an operator's explicit retention and partitions alone; returns whether it changed any.
@@ -1086,6 +1201,54 @@ mod tests {
         );
         let unknown = stream_type_of("file_list").unwrap_err();
         assert!(unknown.downcast_ref::<QueryRejected>().is_some());
+        assert_eq!(
+            streamed_type_of("service_graph").unwrap(),
+            StreamType::ServiceGraph
+        );
+        assert!(stream_type_of("service_graph").is_err());
+        assert_eq!(streamed_type_of("logs").unwrap(), StreamType::Logs);
+    }
+
+    #[tokio::test]
+    async fn the_engine_plans_the_digest_stream_as_its_reader_and_never_chat_history() {
+        let digests = format!(
+            "SELECT * FROM \"{}\"",
+            config::meta::alerts::alert_calibration::DIGEST_STREAM
+        );
+        let chat = format!(
+            "SELECT * FROM \"{}\"",
+            config::meta::self_reporting::ai_chat::AI_CHAT_EVENTS_STREAM
+        );
+        assert_eq!(
+            engine_reader(&digests).unwrap(),
+            Some(ProtectedReader::AlertCalibration)
+        );
+        assert!(
+            engine_reader(&chat)
+                .unwrap_err()
+                .downcast_ref::<QueryRejected>()
+                .is_some()
+        );
+        assert_eq!(engine_reader("SELECT * FROM \"app\"").unwrap(), None);
+        let req = engine_request(&digests, (0, DAY_US), (0, 1), MAX_HOOK_TIMEOUT);
+        let plan = |query: Query| async move {
+            ::search::sql::Sql::new(&query.try_into().unwrap(), "acme", StreamType::Logs, None)
+                .await
+        };
+        assert!(
+            plan(req.query.clone()).await.is_err(),
+            "outside the scope it is refused"
+        );
+        let scoped = as_reader(ProtectedReader::AlertCalibration, plan(req.query)).await;
+        assert!(
+            !matches!(
+                scoped,
+                Err(InfraError::ErrorCode(
+                    infra::errors::ErrorCodes::SearchStreamProtected(_)
+                ))
+            ),
+            "{scoped:?}"
+        );
     }
 
     #[tokio::test]

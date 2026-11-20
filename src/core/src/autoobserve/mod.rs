@@ -29,6 +29,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         return Ok(());
     }
     let ports = ports::ports();
+    autoobserve::ports::set_dbm_port(std::sync::Arc::new(ports::DbmViews));
     let triggers = ports.triggers.clone();
     autoobserve::init(ports).await?;
     // Made at start-up so the first tick finds it cached; each append looks it up again.
