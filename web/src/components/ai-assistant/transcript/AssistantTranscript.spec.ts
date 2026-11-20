@@ -408,6 +408,24 @@ describe("AssistantTranscript", () => {
     );
   });
 
+  it("counts the steps of a reloaded stopped answer, as the live one did (TA1-02)", () => {
+    const reloaded: ChatMessage = {
+      role: "assistant",
+      content: raw("so far"),
+      contentBlocks: [
+        { type: "tool_call", tool: "StreamList", stepState: "done" },
+        { type: "tool_call", tool: "SearchSQL", stepState: "done" },
+        { type: "tool_call", tool: "SearchSQL", stepState: "interrupted" },
+        { type: "text", text: "so far" },
+        { type: "status", turnStatus: "stopped" },
+      ],
+    };
+    const { wrapper } = mountLive(liveSession([prompt("q", "t1"), reloaded]));
+    expect(wrapper.get('[data-test="assistant-turn-outcome-title"]').text()).toBe(
+      "Stopped after 3 steps, incomplete",
+    );
+  });
+
   it("says when the running turn gains an outcome, never for a chat that opens with one (U12)", async () => {
     const outcome = {
       type: "turn_outcome" as const,

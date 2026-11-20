@@ -508,6 +508,20 @@ describe("AssistantMessage", () => {
     expect(wrapper.findAll('[data-test="assistant-query-block"]')).toHaveLength(2);
   });
 
+  it("never shows the raw link a stopped answer was cut in, but keeps a complete answer as sent (TA1-02)", () => {
+    const text = "Streams:\n- [_o2_x](/web/logs?stream=_o2_x_";
+    const stopped = mountMessage(
+      answer([
+        { type: "text", text },
+        { type: "status", turnStatus: "stopped" },
+      ] as never),
+    );
+    expect(stopped.text()).not.toContain("](");
+    expect(stopped.find("em").exists()).toBe(false);
+    const complete = mountMessage(answer([{ type: "text", text }] as never));
+    expect(complete.text()).toContain("](");
+  });
+
   it("keeps two queries that differ only inside a quoted literal", () => {
     const wrapper = mountMessage(
       answer([

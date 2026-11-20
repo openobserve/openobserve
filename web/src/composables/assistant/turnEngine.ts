@@ -99,6 +99,8 @@ export const SILENCE_MS = 20_000;
 
 /** A `done` turn whose stream stays open this long after `complete` is closed by the client. */
 const LINGER_MS = 3_000;
+// The agent settles a stop for up to 2 s, then the server commits the cancelled frame.
+const TAIL_AFTER_STOP_MS = 5_000;
 
 /** A turn id goes on the wire at most twice: the send and one reuse (constraint 16). */
 const MAX_ID_SENDS = 2;
@@ -222,6 +224,8 @@ interface TurnRecord {
   sinceSeq: AssistantFrame[];
   cancelConfirmed?: boolean;
   cancelMs: number | null;
+  /** A confirmed stop is reading the saved frames, which the stopping turn applies like a live one. */
+  catchingUp?: boolean;
   silenceTimer?: ReturnType<typeof setTimeout>;
   /** An approval's TTL; apart from `expiryTimer`, which the stop timeout and the linger use. */
   approvalTimer?: ReturnType<typeof setTimeout>;
@@ -367,7 +371,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       session.turnMeta.lastByteAt = session.turnMeta.lastFrameAt;
       // A delete batch is proposed once the answer is complete, so its card still lands on that answer.
       const lateCard = frame.type === "confirmation_required" && session.turn.state === "done";
-      if (acceptsFrames(session.turn) || lateCard) {
+      const catchUp = rec.catchingUp && session.turn.state === "stopping";
+      if (acceptsFrames(session.turn) || lateCard || catchUp) {
         rec.stream.messages = session.messages;
         const live = { ...liveCtx(t), pendingApprovalId: session.pendingApproval?.id ?? null };
         for (const effect of reduce(rec.stream, frame, live)) {
@@ -731,7 +736,42 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     entry.expiryTimer = undefined;
     rec.cancelConfirmed = confirmed;
     rec.cancelMs = confirmed ? deps.now() - started : null;
+    if (confirmed && hasTail(rec) && (await caughtUpAfterStop(rec, session))) return;
     dispatch(rec, { type: "cancel_acked" });
+  };
+
+  // The server keeps what was generated until its abort landed; reading it back makes the answer equal the saved one.
+  const caughtUpAfterStop = async (rec: TurnRecord, session: AssistantSession) => {
+    const entry = runtime.get(rec.sid);
+    if (!entry || entry.tailLock || rec.settled) return rec.settled;
+    const controller = runtime.renew(rec.sid);
+    if (!controller) return false;
+    const timer = setTimeout(() => controller.abort(), TAIL_AFTER_STOP_MS);
+    rec.catchingUp = true;
+    const tail = deps.client.tail(
+      rec.org,
+      rec.sid,
+      session.turnMeta.serverTurnId ?? rec.turnId,
+      session.turnMeta.lastSeq ?? -1,
+      sinkFor(rec, true),
+      controller.signal,
+    );
+    entry.tailLock = tail;
+    await tail
+      .catch(() => null)
+      .finally(() => {
+        clearTimeout(timer);
+        entry.tailLock = undefined;
+        rec.catchingUp = false;
+      });
+    if (rec.settled) return true;
+    // The fallback ends on the frames applied so far; steps a cut tail left running read as interrupted.
+    runtime.abort(rec.sid);
+    runner.flush(rec.sid, () => {
+      interruptSteps(rec.stream);
+      return { stream: [], turn: [] };
+    });
+    return false;
   };
 
   const restore = async (rec: TurnRecord) => {

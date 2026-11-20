@@ -88,6 +88,8 @@ const MAX_NESTING = 8;
 
 // Marked's fence: a run of three or more, and a backtick fence's info string holds no backtick (```x``` is inline code).
 const FENCE_OPEN = /^([ \t]*)(`{3,}|~{3,})(.*)$/;
+const OPEN_LINK_TARGET = /!?\[([^\]\n]*)\]\([^)\n]*$/;
+const OPEN_LINK_TEXT = /!?\[([^\]\n]*)$/;
 
 const LIST_ITEM = /^([ \t]*)([-*+]|\d{1,9}[.)])([ \t]+)/;
 
@@ -368,11 +370,14 @@ interface OpenTag {
   close?: string;
 }
 
+export type ParseState = "open" | "closed" | "cut";
+
 /** One block to parse, with what the renderer needs from the page. */
 export interface ParseRequest {
   blockId: string;
   text: string;
-  state: "open" | "closed";
+  /** `cut`: the last text of an answer that stopped or failed mid-stream; its text is final but may end mid-construct. */
+  state: ParseState;
   origin: string;
   /** `assistant.message.imageRemoved`, translated on the main thread. */
   imageRemoved: string;
@@ -515,8 +520,8 @@ export function parseBlock(request: ParseRequest): ParseResult {
     const open = request.state === "open";
     // The model's own slot characters go before lexing, so no code span or alt text can forge a slot.
     const source = withoutFootnotes(request.text.replace(SLOT_CHARS, ""));
-    // Only a streaming block closes its own unterminated fence; a completed one is lexed exactly as sent (X11).
-    const repaired = open ? repairFence(source) : { text: source, open: false };
+    // Only a streaming or cut block is repaired; a completed one is lexed exactly as sent (X11).
+    const repaired = request.state === "closed" ? { text: source, open: false } : repairEnd(source);
     const tokens = instance().lexer(repaired.text);
     // Markers come out of prose only; code keeps `[^0-9]` and every other bracket as written.
     stripClaims(tokens, claims, open);
@@ -1067,6 +1072,23 @@ function repairFence(text: string): { text: string; open: boolean } {
   const marker = scanFences(text.split("\n")).open;
   if (marker === null) return { text, open: false };
   return { text: `${text}\n${marker}`, open: true };
+}
+
+function repairEnd(text: string): { text: string; open: boolean } {
+  const fenced = repairFence(text);
+  return fenced.open ? fenced : { text: repairTail(text), open: false };
+}
+
+// A link cut before its `)` or `]` would show raw, and `_` in its target as emphasis; its text alone is kept.
+function repairTail(text: string): string {
+  const at = text.lastIndexOf("\n") + 1;
+  const line = text.slice(at);
+  const repaired = line
+    .replace(OPEN_LINK_TARGET, "$1")
+    .replace(OPEN_LINK_TEXT, (match, label: string, offset: number) =>
+      (line.slice(0, offset).match(/`/g)?.length ?? 0) % 2 ? match : label,
+    );
+  return repaired === line ? text : text.slice(0, at) + repaired;
 }
 
 // Which lines are code fences (opener, body, closer), by marked's rules, including fences nested in list items.

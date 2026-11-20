@@ -1097,6 +1097,83 @@ const sse = (id: number, frame?: AssistantFrame) =>
 
 const delta = (content: string): AssistantFrame => ({ type: "message_delta", content });
 
+describe("turnEngine: a stopped answer catches up to what was saved (TA1-02)", () => {
+  const stopMidAnswer = async (h: ReturnType<typeof setup>) => {
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    wire(
+      h.last().sink,
+      [
+        sse(-1, { type: "tool_call", tool: "StreamList", call_id: "a" }),
+        sse(0),
+        sse(0, { type: "tool_result", tool: "StreamList", call_id: "a" }),
+        sse(1),
+        sse(1, delta("A")),
+      ].join(""),
+    );
+    return { run };
+  };
+
+  it("shows the text the server kept after the stop, and counts the tail's steps", async () => {
+    const h = setup({ tail: true });
+    const { run } = await stopMidAnswer(h);
+    vi.mocked(h.client.tail).mockImplementationOnce(async (_o, _s, _t, fromSeq, sink) => {
+      expect(fromSeq).toBe(1);
+      wire(
+        sink,
+        [
+          sse(1, delta("A B")),
+          sse(2),
+          sse(2, { type: "tool_call", tool: "SearchSQL", call_id: "b" }),
+          sse(3),
+          sse(3, { type: "cancelled" }),
+          sse(4),
+        ].join(""),
+      );
+      return OK;
+    });
+    void h.store.stop(h.current.sid);
+    await expect(run).resolves.toEqual({ state: "stopped", steps: 2, partial: true });
+    expect(String(h.session().messages[1].content)).toBe("A B");
+    expect(h.client.tail).toHaveBeenCalledTimes(1);
+  });
+
+  it("ends stopped with the live text when the catch-up fails or hangs", async () => {
+    const failed = setup({ tail: true });
+    const { run } = await stopMidAnswer(failed);
+    failed.tailResults.push(refusal(404, {}));
+    void failed.store.stop(failed.current.sid);
+    await expect(run).resolves.toMatchObject({ state: "stopped" });
+    expect(String(failed.session().messages[1].content)).toBe("A");
+
+    const hung = setup({ tail: true });
+    const { run: hungRun } = await stopMidAnswer(hung);
+    vi.mocked(hung.client.tail).mockImplementationOnce(
+      (_o, _s, _t, _f, _sink, signal) =>
+        new Promise((resolve) =>
+          signal.addEventListener("abort", () =>
+            resolve({ ok: false, aborted: true } as unknown as SendResult),
+          ),
+        ),
+    );
+    void hung.store.stop(hung.current.sid);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(hung.session().turn).toEqual({ state: "stopping" });
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(hungRun).resolves.toMatchObject({ state: "stopped" });
+    expect(String(hung.session().messages[1].content)).toBe("A");
+  });
+
+  it("makes no catch-up call without server history", async () => {
+    const h = setup({ tail: false });
+    const { run } = await stopMidAnswer(h);
+    void h.store.stop(h.current.sid);
+    await expect(run).resolves.toMatchObject({ state: "stopped" });
+    expect(h.client.tail).not.toHaveBeenCalled();
+  });
+});
+
 describe("turnEngine: the SSE id rule (WP-18, D2)", () => {
   it("applies every frame of a live stream whose ids repeat: -1 for turn_started and status, one id per seq", async () => {
     const h = setup({ tail: true });

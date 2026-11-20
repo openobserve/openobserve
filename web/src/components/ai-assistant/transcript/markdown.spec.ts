@@ -1044,6 +1044,48 @@ describe("markdown.ts strict profile", () => {
     expect(html.match(/<wbr>/g)?.length ?? 0).toBeGreaterThanOrEqual(visible / MAX_RUN_CHARS - 2);
   });
 
+  describe("a cut or streaming answer's unterminated link (TA1-02)", () => {
+    const parseAs = (text: string, state: "open" | "closed" | "cut") =>
+      htmlOf(
+        parseBlock({ blockId: "c", text, state, origin: "http://localhost", imageRemoved: "x" })
+          .parts,
+      );
+    const shown = (markup: string) =>
+      new DOMParser().parseFromString(markup, "text/html").body.textContent ?? "";
+
+    it("keeps the link text and drops the open target of a cut answer", () => {
+      const html = parseAs("see [_o2_x](/web/logs?stream=_o2_x_", "cut");
+      expect(shown(html).trim()).toBe("see _o2_x");
+      expect(html).not.toContain("<em>");
+    });
+
+    it("leaves a closed answer as sent (X11)", () => {
+      expect(shown(parseAs("see [a](/b", "closed"))).toContain("[a](/b");
+    });
+
+    it("drops an unclosed bracket while streaming, but not inside inline code", () => {
+      expect(shown(parseAs("a [b", "open")).trim()).toBe("a b");
+      expect(shown(parseAs("run `x[0", "open"))).toContain("x[0");
+    });
+
+    it("never touches a closed link, and keeps an open fence's repair", () => {
+      const closed = parseAs("see [a](/web/logs)", "closed");
+      expect(parseAs("see [a](/web/logs)", "cut")).toBe(closed);
+      expect(parseAs("see [a](/web/logs)", "open")).toBe(closed);
+      expect(
+        codeOf(
+          parseBlock({
+            blockId: "f",
+            text: "```\nx [y",
+            state: "open",
+            origin: "http://localhost",
+            imageRemoved: "x",
+          }).parts,
+        ),
+      ).toEqual(["x [y"]);
+    });
+  });
+
   it("adds no newline to the code of a completed block with an unclosed fence (X11)", () => {
     expect(codeOf(render("```\nlast line").parts)).toEqual(["last line"]);
   });

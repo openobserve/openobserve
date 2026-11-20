@@ -49,6 +49,7 @@ import {
   type EntityKind,
   type MarkdownPart,
   type ParseRequest,
+  type ParseState,
   type ParseResult,
 } from "./markdownCore";
 
@@ -290,7 +291,7 @@ interface CrashMarker {
 interface Job {
   blockId: string;
   text: string;
-  state: "open" | "closed";
+  state: ParseState;
   key: string;
 }
 
@@ -311,18 +312,14 @@ export function useRenderedMarkdown(): typeof renderMarkdown {
 }
 
 /** One text block of an answer: the last render (or the text) at once, upgraded when the worker answers. */
-export function renderMarkdown(
-  blockId: string,
-  text: string,
-  state: "open" | "closed",
-): RenderedBlock {
+export function renderMarkdown(blockId: string, text: string, state: ParseState): RenderedBlock {
   void versionOf(blockId).value;
   // The hash guards a reused block id: a restored stream or another chat may reach the same length with other text.
   const key = `${blockId}\u0000${plainKey(text)}\u0000${state}`;
   const done = lookup(blockId, key, state);
   if (done) return done;
   const job = { blockId, text, state, key };
-  if (state === "closed" && isKnownBad(text))
+  if (state !== "open" && isKnownBad(text))
     return store(job, plainResult(blockId, text), { final: true });
   if (!allowed(blockId, state)) return store(job, plainResult(blockId, text), { final: false });
   rendering = true;
@@ -674,7 +671,7 @@ function release(blockId: string): void {
   versions.delete(blockId);
 }
 
-function lookup(blockId: string, key: string, state: "open" | "closed"): RenderedBlock | undefined {
+function lookup(blockId: string, key: string, state: ParseState): RenderedBlock | undefined {
   // A streamed prefix is never asked for again, so only the latest one is kept, in `latest`.
   if (state === "open") return latestKeys.get(blockId) === key ? latest.get(blockId) : undefined;
   const hit = memo.get(key);
@@ -685,7 +682,7 @@ function lookup(blockId: string, key: string, state: "open" | "closed"): Rendere
   return hit;
 }
 
-function allowed(blockId: string, state: "open" | "closed"): boolean {
+function allowed(blockId: string, state: ParseState): boolean {
   const count = failures.get(blockId) ?? 0;
   return state === "open" ? count === 0 : count < 2;
 }
@@ -788,7 +785,7 @@ function expire(mine: { jobs: Job[]; next: number }, index: number): void {
   unmarkParsing(job);
   const count = (failures.get(job.blockId) ?? 0) + 1;
   failures.set(job.blockId, count);
-  const final = job.state === "closed" && count >= 2;
+  const final = job.state !== "open" && count >= 2;
   if (final) rememberBad(job.text);
   store(job, plainResult(job.blockId, job.text), { final });
   if (!rendering) bump(job);
@@ -802,8 +799,8 @@ function requeue(jobs: Job[]): void {
 
 function land(job: Job, result: ParseResult): void {
   unmarkParsing(job);
-  if (job.state === "closed" && !result.rejected) failures.delete(job.blockId);
-  store(job, result, { final: !!result.rejected && job.state === "closed", parsed: true });
+  if (job.state !== "open" && !result.rejected) failures.delete(job.blockId);
+  store(job, result, { final: !!result.rejected && job.state !== "open", parsed: true });
   if (!rendering) bump(job);
 }
 
@@ -865,7 +862,7 @@ function store(
     latestKeys.delete(oldest);
   }
   // A completed block is memoised once it parsed or is plain for good; a first timeout leaves room for its retry.
-  if (job.state === "closed" && (opts.parsed || opts.final)) {
+  if (job.state !== "open" && (opts.parsed || opts.final)) {
     memo.set(job.key, rendered);
     if (memo.size > MEMO_LIMIT) memo.delete(memo.keys().next().value as string);
   }

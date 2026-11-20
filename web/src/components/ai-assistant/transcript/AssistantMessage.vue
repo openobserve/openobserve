@@ -384,6 +384,8 @@ const SQL_KEYWORDS: ReadonlySet<string> = new Set(
   ),
 );
 
+const CUT_KINDS: ReadonlySet<string> = new Set(["stopped", "failed", "cancelledElsewhere"]);
+
 // A block counts once per page load, so a re-render never repeats the event.
 const reported = new Set<string>();
 
@@ -558,6 +560,19 @@ const rerunRange = computed(() => {
   return window ? raw(formatOrgRange(window.from, window.to)) : raw("");
 });
 
+// A stopped or failed answer can end mid-link; its last text is repaired like a streaming one.
+const cutShort = computed(
+  () =>
+    props.turn?.outcome === "stopped" ||
+    props.turn?.outcome === "failed" ||
+    (props.message.contentBlocks ?? []).some(
+      (block) =>
+        block.type === "error" ||
+        (block.type === "status" && block.turnStatus === "stopped") ||
+        (block.type === "turn_outcome" && CUT_KINDS.has(block.outcome?.kind ?? "")),
+    ),
+);
+
 const lastTextIndex = computed(() => {
   for (let i = blocks.value.length - 1; i >= 0; i--) if (blocks.value[i].type === "text") return i;
   return -1;
@@ -717,7 +732,8 @@ function renderBlock(block: ContentBlock, index: number, links: Set<string>): Re
   if (block.type === "text") {
     if (!block.text?.trim()) return [];
     const open = props.live && index === lastTextIndex.value;
-    const result = renderMarkdown(key, block.text, open ? "open" : "closed");
+    const cut = !props.live && index === lastTextIndex.value && cutShort.value;
+    const result = renderMarkdown(key, block.text, open ? "open" : cut ? "cut" : "closed");
     const out: Rendered[] = [
       { kind: "markdown", key, parts: result.parts, live: open, claims: result.claims },
     ];

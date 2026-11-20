@@ -323,7 +323,9 @@ export function answerOf(answers: ChatMessage[]): ChatMessage | null {
 export function outcomeRecordsOf(blocks: ContentBlock[]): TurnOutcomeRecord[] {
   return blocks.flatMap<TurnOutcomeRecord>((block) => {
     if (block.type === "turn_outcome" && block.outcome) return [block.outcome];
-    if (block.type === "status" && block.turnStatus === "stopped") return [{ kind: "stopped" }];
+    // The live count is the answer's step blocks, so a reload reads the same "after N steps".
+    if (block.type === "status" && block.turnStatus === "stopped")
+      return [{ kind: "stopped", steps: blocks.filter((b) => b.stepState).length }];
     if (block.type === "error" && block.errorType) {
       const kind = block.errorType === "cancelled_elsewhere" ? "cancelledElsewhere" : "failed";
       return [{ kind, code: block.errorType }];
