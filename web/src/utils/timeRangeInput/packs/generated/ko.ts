@@ -24,6 +24,7 @@ const tables: GeneratedTables = {
   ],
   weekdays: [["일요일"], ["월요일"], ["화요일"], ["수요일"], ["목요일"], ["금요일"], ["토요일"]],
   meridiem: [["오전"], ["오후"]],
+  h11: false,
   ago: {
     s: ["{n}초 전"],
     m: ["{n}분 전"],

@@ -141,8 +141,8 @@ export interface ClockMod {
   from: number;
   to: number;
   shift: number;
-  /** A meridiem takes only hours 1-12, where a day part also takes its own 24-hour hours. */
-  ap?: true;
+  /** A meridiem's lowest hour (0 in h11 locales); it takes no hour above 12, unlike a day part. */
+  ap?: number;
 }
 
 export interface ClockValue {

@@ -527,7 +527,8 @@ function withMod(alts: Alt<ClockValue>[], mod: ClockMod): Alt<ClockValue>[] {
   const out: Alt<ClockValue>[] = [];
   for (const a of alts) {
     const h = hourIn(a.v.h, mod.from, mod.to);
-    if (h !== null && (mod.ap ? a.v.h > 0 && a.v.h < 13 : a.v.h <= 12 || h === a.v.h))
+    const ap = mod.ap;
+    if (h !== null && (ap === undefined ? a.v.h <= 12 || h === a.v.h : a.v.h >= ap && a.v.h < 13))
       out.push({ v: { ...a.v, h, mod, bare: false } });
   }
   return out;
@@ -541,7 +542,7 @@ function clockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
     const out: Hit<Alt<ClockValue>[]>[] = [];
     for (const [end, alts] of bases(pos)) {
       out.push([end, alts.flatMap((a) => wordHours(a.v))]);
-      for (const at of sc.fold[end] === " " ? [end, end + 1] : [end]) {
+      for (const at of spaced(sc, end)) {
         for (const [e2, mod] of words(sc, at, mods)) {
           const m = withMod(alts, mod);
           if (m.length > 0) out.push([e2, m]);
@@ -549,10 +550,13 @@ function clockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
       }
     }
     for (const [end, mod] of words(sc, pos, mods)) {
-      for (const at of sc.fold[end] === " " ? [end, end + 1] : [end]) {
+      for (const at of spaced(sc, end)) {
+        const was = sc.partial;
         for (const [e2, alts] of bases(at)) {
           const m = withMod(alts, mod);
           if (m.length > 0) out.push([e2, m]);
+          // A clock its mark refuses stays refused however it goes on (`PM 13:30 o'clock`).
+          else sc.partial = was;
         }
       }
     }
@@ -601,7 +605,8 @@ export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
   return memo(sc, sc.memo.point, pos, () => {
     const env = sc.env;
     const out: Hit<Alt<Point>[]>[] = [];
-    for (const s of scanStamp(sc.text, pos, env.nowUs, env.zone)) out.push([s.end, s.alts]);
+    const stamps = scanStamp(sc.text, pos, env.nowUs, env.zone);
+    for (const s of stamps) out.push([s.end, s.alts]);
     for (const s of scanEpoch(sc.text, pos)) out.push([s.end, s.alts]);
     const math = scanDateMath(sc.text, pos, env.nowUs, env.zone);
     if (math && math.offsets.length + (math.snapped ? 1 : 0) > 0) {
@@ -619,7 +624,9 @@ export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
       for (const at of spaced(sc, end)) {
         for (const [e2, clocks] of clockHits(sc, at)) {
           for (const [e3, zc] of zoned(sc, e2, clocks)) {
-            out.push([e3, cross(days, zc, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
+            // The stamp scanner owns an ISO span it reads; a second wall reading would only conflict.
+            if (!stamps.some((s) => s.end === e3) || !isoOnly(sc, pos, end))
+              out.push([e3, cross(days, zc, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
           }
         }
       }
@@ -752,6 +759,8 @@ export function rangeOutcome(sc: Scan): Outcome {
     for (const prefixed of [elems, [DAY_PREFIX, ...elems]]) {
       for (const c of whole(sc, prefixed)) {
         if (!c.start || !c.end) continue;
+        // A day before a range lands on its clocks; with no clock to land on it would be dropped text.
+        if (c.day && ![...c.start, ...c.end].some((a) => a.v.p === "clock")) continue;
         const r = rangeDrafts(onDay(c.start, c.day), onDay(c.end, c.day), sc.env);
         zero.hit = zero.hit || r.zero;
         zero.reversed = zero.reversed || r.reversed;

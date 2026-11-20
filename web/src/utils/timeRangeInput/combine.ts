@@ -22,12 +22,10 @@ import {
   wallUs,
   weekdayOf,
   weekStartOf,
-  US_PER_H,
-  US_PER_MIN,
   US_PER_S,
   type Civil,
 } from "./civil";
-import { firstInstant, WINDOW_US } from "./machine";
+import { firstInstant, UNIT_US, WINDOW_US } from "./machine";
 import type { CompiledPack } from "./packs/schema";
 import type {
   Alt,
@@ -60,7 +58,6 @@ interface Inst {
   date?: { y: number; mo: number; d: number };
 }
 
-const UNIT_US: Partial<Record<UnitKey, number>> = { s: US_PER_S, m: US_PER_MIN, h: US_PER_H };
 const UNIT_NAMES: Record<UnitKey, string> = {
   s: "second",
   m: "minute",
@@ -108,10 +105,12 @@ function wallInstants(y: number, mo: number, d: number, clock: ClockValue, env: 
     };
     return [{ ...base, us: r.us, notes: [note] }];
   }
-  return [
-    { ...base, us: r.earlier, notes: [], why: "repeated-hour" },
-    { ...base, us: r.later, notes: [], why: "repeated-hour" },
-  ];
+  return [r.earlier, r.later].map((us) => ({
+    ...base,
+    us,
+    notes: [],
+    why: "repeated-hour" as const,
+  }));
 }
 
 function dayInstant(y: number, mo: number, d: number, env: Env): number {
@@ -250,8 +249,7 @@ function singleRaw(alts: Alt<Point>[], env: Env): Draft[] {
 function inheritMod(end: Point, start: Point): Point {
   const sc = clockOf(start);
   const ec = clockOf(end);
-  const shared = end.p === "clock" || (end.p === "wall" && end.shared === true);
-  if (!shared || !sc?.mod || !ec?.hourOnly || ec.padded || ec.mod || ec.h < 1 || ec.h > 11)
+  if (!shared(end) || !sc?.mod || !ec?.hourOnly || ec.padded || ec.mod || ec.h < 1 || ec.h > 11)
     return end;
   const h = hourIn(ec.h, sc.mod.from, sc.mod.to);
   const begin = sc.h * 60 + sc.mi;
@@ -265,13 +263,16 @@ function inheritMod(end: Point, start: Point): Point {
   return { ...end, clock };
 }
 
+function shared(p: Point): p is Extract<Point, { p: "clock" | "wall" }> {
+  return p.p === "clock" || (p.p === "wall" && p.shared === true);
+}
+
 // After a start with a day part, a word hour 1-11 reads like its digit, so its pm twin is dropped.
 function pmTwin(end: Alt<Point>, start: Point): boolean {
   const ec = clockOf(end.v);
-  const shared = end.v.p === "clock" || (end.v.p === "wall" && end.v.shared === true);
   return (
     !!end.tag?.split(" ").includes("pm") &&
-    shared &&
+    shared(end.v) &&
     !!clockOf(start)?.mod &&
     !!ec?.word &&
     !!ec.hourOnly &&
@@ -500,11 +501,8 @@ export function spanDrafts(unit: SpanUnit, offset: number, env: Env): Draft[] {
     // Typed week words read as the rail's `calendar:week` token, which starts on Monday.
     start = addDays(weekStartOf(day, 1), 7 * offset);
     next = addDays(start, 7);
-  } else if (unit === "y") {
-    start = dayStart(now.y + offset, 1, 1);
-    next = dayStart(now.y + offset + 1, 1, 1);
   } else {
-    const months = unit === "q" ? 3 : 1;
+    const months = unit === "q" ? 3 : unit === "y" ? 12 : 1;
     start = addMonths(dayStart(now.y, now.mo - ((now.mo - 1) % months), 1), offset * months);
     next = addMonths(start, months);
   }

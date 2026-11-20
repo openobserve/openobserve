@@ -53,10 +53,8 @@ function copyPayload(text: string): Outcome {
   const start: unknown = Reflect.get(value, "start_date");
   const end: unknown = Reflect.get(value, "end_date");
   const exact = keys.length === 2 && keys.includes("start_date") && keys.includes("end_date");
-  if (!exact || !Number.isSafeInteger(start) || !Number.isSafeInteger(end))
-    return { t: "invalid", reason: "unreadable" };
-  if (typeof start !== "number" || typeof end !== "number")
-    return { t: "invalid", reason: "unreadable" };
+  const safe = (v: unknown): v is number => Number.isSafeInteger(v);
+  if (!exact || !safe(start) || !safe(end)) return { t: "invalid", reason: "unreadable" };
   if (start >= end) return { t: "invalid", reason: start === end ? "zero-length" : "reversed" };
   const draft: Draft = { startUs: start, endUs: end, softEnd: false, kind: "absolute", notes: [] };
   return { t: "drafts", drafts: [draft], form: "copy-payload" };
@@ -124,7 +122,8 @@ function logLine(norm: Normalized, env: Env): Outcome {
   const more = best.end === line.length ? norm.text.length > line.length : line[best.end] === " ";
   // The first line is a prefix of `text`, and `fold` indexes `text`, so the joins compare folded.
   const tail = (t: string): string => t.slice(best.end + 1, line.length);
-  if (!more || rangeTail(tail(norm.fold), tail(norm.text), env)) return { t: "none" };
+  const rest = tail(norm.fold);
+  if (!more || marked(rest, env) || rangeTail(rest, tail(norm.text), env)) return { t: "none" };
   const second = scanStamp(line, best.end + 1, env.nowUs, env.zone)
     .filter(timed)
     .sort((a, b) => b.end - a.end)[0];
@@ -156,9 +155,17 @@ function rangeTail(rest: string, raw: string, env: Env): boolean {
       (n > 0 && n < 3 && (t[n] === ":" || n === t.length)) ||
       (n === 4 && (t.length === 4 || t[4] === "-"));
     const stamp = /^[\d:+.tz -]*$/.test(zoneless(t, raw.slice(rest.length - t.length)));
-    if (LOG_SEPARATORS.includes(j)) return shaped && stamp;
+    const hour = n > 0 && n < 3 && marked(t.slice(n).trimStart(), env);
+    if (LOG_SEPARATORS.includes(j)) return hour || (shaped && stamp);
     return j === "/" ? stamp : t === "" || !/^\D*$/.test(t);
   });
+}
+
+// A clock mark (`pm`, `午後`) after a stamp or an hour belongs to that clock, so it is never log text.
+function marked(t: string, env: Env): boolean {
+  return (env.pack.mods.get(t[0]) ?? []).some(
+    (w) => t.startsWith(w.s) && !wordy(t.charCodeAt(w.s.length)),
+  );
 }
 
 // A stamp's zone suffix (`Europe/Berlin`, `UTC`) is cut off, so it cannot hide a broken range.

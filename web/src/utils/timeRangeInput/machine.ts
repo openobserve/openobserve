@@ -86,7 +86,11 @@ const ZONE_ABBREVIATIONS: Record<string, number[] | string> = {
   NZDT: [780],
   ART: [-180],
 };
-const UNIT_US: Partial<Record<UnitKey, number>> = { s: US_PER_S, m: US_PER_MIN, h: US_PER_H };
+export const UNIT_US: Partial<Record<UnitKey, number>> = {
+  s: US_PER_S,
+  m: US_PER_MIN,
+  h: US_PER_H,
+};
 export const WINDOW_US = 5 * US_PER_MIN;
 // A year-less Feb 29 can lie up to eight years back (2096 to 2104).
 export const YEARS_BACK = 8;
@@ -118,7 +122,7 @@ export function fixedDigits(text: string, pos: number, n: number): number {
 
 export function digitRun(text: string, pos: number): number {
   let i = pos;
-  while (i < text.length && isDigit(text, i)) i++;
+  while (isDigit(text, i)) i++;
   return i - pos;
 }
 
@@ -193,7 +197,7 @@ export function scanZone(text: string, pos: number): Scanned<ZoneAlt>[] {
       out.push({ end: tail.end, alts: [{ v: { offsetSec: tail.sec } }] });
   }
   let i = pos;
-  while (i < text.length && isUpper(text, i)) i++;
+  while (isUpper(text, i)) i++;
   const abbr = ZONE_ABBREVIATIONS[text.slice(pos, i)];
   if (i - pos >= 2 && abbr !== undefined && bounded(i)) {
     const why: AmbiguityReason | undefined =
@@ -206,7 +210,7 @@ export function scanZone(text: string, pos: number): Scanned<ZoneAlt>[] {
   if (isAlpha(text, pos)) {
     let j = pos;
     let slash = false;
-    while (j < text.length && (isAlpha(text, j) || isDigit(text, j) || "_/+-".includes(text[j]))) {
+    while (isAlpha(text, j) || isDigit(text, j) || "_/+-".includes(text[j])) {
       slash = slash || text[j] === "/";
       j++;
     }

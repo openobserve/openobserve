@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { US_PER_DAY, US_PER_H, US_PER_MIN, US_PER_S } from "./civil";
 import { blockReasons, clampSkew, fixRange, floorOf } from "./check";
 import { previousDayStart, rollingDrafts, type Env } from "./combine";
+import { ELAPSED_US } from "./shorthand";
 import type {
   AmbiguityReason,
   BlockReason,
@@ -34,13 +34,7 @@ interface Checked {
   reasons: BlockReason[];
 }
 
-const FIX_UNITS: [RelativeUnit, number][] = [
-  ["w", 7 * US_PER_DAY],
-  ["d", US_PER_DAY],
-  ["h", US_PER_H],
-  ["m", US_PER_MIN],
-  ["s", US_PER_S],
-];
+const FIX_UNITS = Object.entries(ELAPSED_US) as [RelativeUnit, number][];
 const KEPT_NOTES = new Set(["dst-gap", "converted", "elapsed-chain", "instant-window", "log-line"]);
 
 /** Clips soft ends, clamps ends within skew, then runs every check independently. */
