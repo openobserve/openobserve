@@ -44,6 +44,7 @@ import {
   DEFAULT_ROWS_PER_PAGE,
   VIEW_STATE_PARAMS,
   bindLogsUrlRouter,
+  currentLogsQuery,
   encodeColumns,
   shownEntryFor,
   shownSearch,
@@ -678,14 +679,14 @@ export const logsUtils = () => {
     if (!isLogsRoute()) return;
     const query = generateURLQuery(false, dashboardPanelData, buildPanelData);
     dropTransientType(query);
-    const writeMode = mode === "auto" ? urlWriteMode(router.currentRoute.value.query, query) : mode;
+    const writeMode = mode === "auto" ? urlWriteMode(currentLogsQuery(), query) : mode;
     return writeLogsUrl(writeMode, query);
   };
 
   const patchUrlViewState = (dashboardPanelData: any = null, buildPanelData: any = null) => {
     if (!isLogsRoute()) return;
     const next = generateURLQuery(false, dashboardPanelData, buildPanelData);
-    const query: any = { ...router.currentRoute.value.query };
+    const query: any = { ...currentLogsQuery() };
     dropTransientType(query);
     for (const key of VIEW_STATE_PARAMS) {
       if (key in next) query[key] = next[key];

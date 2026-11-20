@@ -336,6 +336,35 @@ describe("logsUtils URL registry (4c C7, C7b)", () => {
       expect(route.value.query.timezone).toBeUndefined();
     });
 
+    it("a view-state patch issued while a search push is still pending keeps the pushed window", async () => {
+      route.value = { name: "logs", query: { stream: "app", period: "1m" } };
+      let commit: () => void = () => {};
+      let superseded = false;
+      router.push.mockImplementationOnce(
+        (to: any) =>
+          new Promise<void>((resolve) => {
+            commit = () => {
+              if (!superseded) route.value = { name: "logs", query: to.query };
+              resolve();
+            };
+          }),
+      );
+      router.replace.mockImplementationOnce(async (to: any) => {
+        superseded = true;
+        route.value = { name: "logs", query: to.query };
+      });
+      searchObj.data.datetime = { type: "absolute", startTime: 5000, endTime: 9000 };
+      recordGrid(1, { time: { type: "absolute", startUs: 5000, endUs: 9000 } });
+      const pushed = utils.updateUrlQueryParams();
+      searchObj.data.stream.selectedFields = ["level"];
+      const patched = utils.patchUrlViewState();
+      commit();
+      await Promise.all([pushed, patched]);
+      expect(route.value.query.period).toBeUndefined();
+      expect(route.value.query.from).toBe(5000);
+      expect(route.value.query.to).toBe(9000);
+    });
+
     it("drops the RCA evidence handoff type so a later reload does not re-run the handoff", async () => {
       route.value = { name: "logs", query: { stream: "app", type: "rca_evidence_query" } };
       await utils.patchUrlViewState();
