@@ -15,6 +15,7 @@
 
 import { onScopeDispose, ref, watch, type Ref } from "vue";
 
+import { epochMsOf } from "@/composables/assistant/pure";
 import type { SharedChat } from "@/services/ai_chat_share";
 
 /** How the shared page follows its source chat. */
@@ -67,6 +68,8 @@ export function usePollShared(
   let stopped = false;
   let disposed = false;
   let inFlight = false;
+  // Bumped per share, so a read of the previous share that lands late is dropped.
+  let generation = 0;
   let lastRequestAt = 0;
   // A 429 or an error back-off holds across a hidden tab, so coming back can't jump the queue.
   let notBefore = 0;
@@ -94,13 +97,14 @@ export function usePollShared(
     if (inFlight || disposed) return;
     inFlight = true;
     lastRequestAt = now();
+    const asked = generation;
     try {
       const result = await deps.refetch();
-      if (disposed || stopped) return;
+      if (disposed || stopped || asked !== generation) return;
       if (result.error) onError(result.error);
       else if (result.data) onData(result.data, true);
     } finally {
-      inFlight = false;
+      if (asked === generation) inFlight = false;
     }
   };
 
@@ -162,6 +166,8 @@ export function usePollShared(
     watch(deps.key, () => {
       clearTimeout(timer);
       timer = undefined;
+      generation += 1;
+      inFlight = false;
       stopped = false;
       version = null;
       quiet = 0;
@@ -197,12 +203,13 @@ export function usePollShared(
   return { state, pollNow };
 }
 
-/** `created` of the newest turn that finished, in epoch ms; turns carry microseconds. */
+/** `created` of the newest turn that finished, in epoch ms. */
 export function lastCommitted(chat: SharedChat): number | null {
   const turns = chat.turns ?? [];
   for (let i = turns.length - 1; i >= 0; i--) {
     const turn = turns[i];
-    if (turn.status !== "running" && typeof turn.created === "number") return turn.created / 1000;
+    if (turn.status !== "running" && typeof turn.created === "number")
+      return epochMsOf(turn.created);
   }
   return null;
 }
@@ -234,7 +241,7 @@ function statusFor(chat: SharedChat, quiet: number): PollState["status"] {
 function runningSince(chat: SharedChat): number | null {
   const turn = chat.turns?.[chat.turns.length - 1];
   return turn?.status === "running" && typeof turn.created === "number"
-    ? turn.created / 1000
+    ? epochMsOf(turn.created)
     : null;
 }
 

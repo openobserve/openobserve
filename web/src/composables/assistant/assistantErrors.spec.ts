@@ -264,6 +264,19 @@ describe("toAssistantError: status beats body", () => {
     expect(refusal({}).code).toBe("turn_limit");
   });
 
+  it("reads a busy admission lock as a calm retry, not a full cap", () => {
+    const busy = toAssistantError({
+      status: 429,
+      body: {
+        code: "turn_limit",
+        error_code: "turn_limit",
+        scope: "admission",
+        retry_after_ms: 1000,
+      },
+    });
+    expect(busy).toMatchObject({ code: "admission_busy", retryAfterMs: 1000, action: "retry" });
+  });
+
   it("takes a server that names the run-limit code itself, with the same fallback", () => {
     const named = (error_code: string, body: Record<string, unknown> = {}) =>
       toAssistantError({ status: 429, body: { error_code, ...body } }).code;

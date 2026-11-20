@@ -815,12 +815,21 @@ const action = computed<{
     };
   if (state === "approved" || state === "done" || state === "editing" || state === "standing") {
     const href = targetHref();
-    return href
+    if (href)
+      return {
+        id: "open",
+        label: t("assistant.approval.open"),
+        name: t("assistant.approval.result.open", { name: raw(targetName()) }),
+        href,
+      };
+    // A create whose result names no id or link is found by its name in the list.
+    const listed = madeWithoutId() ? listHref() : null;
+    return listed
       ? {
-          id: "open",
-          label: t("assistant.approval.open"),
-          name: t("assistant.approval.result.open", { name: raw(targetName()) }),
-          href,
+          id: "check-list",
+          label: t("assistant.approval.result.checkList"),
+          name: t("assistant.approval.result.checkListName"),
+          href: listed,
         }
       : null;
   }
@@ -888,6 +897,11 @@ function createdHref(): string | null {
   return item.id && type
     ? approvalTargetHref(router, org.value, { type, id: item.id, name: item.name })
     : null;
+}
+
+function madeWithoutId(): boolean {
+  const items = view.value?.result?.items ?? [];
+  return items.length === 1 && items[0].status === "done" && !items[0].id && !items[0].link;
 }
 
 function targetName(): string {

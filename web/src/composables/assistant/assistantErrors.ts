@@ -48,6 +48,7 @@ export const ASSISTANT_ERROR_CODES = [
   "run_limit_member",
   "run_limit_org",
   "turn_limit",
+  "admission_busy",
   "rate_limited",
   "turn_busy",
   "already_submitted",
@@ -95,6 +96,7 @@ export const ERROR_LEDGER: Record<AssistantErrorCode, ErrorLedgerRow> = {
   run_limit_member: { phase: "pre_admission", retryable: false, action: "show_running" },
   run_limit_org: { phase: "pre_admission", retryable: true, action: "retry" },
   turn_limit: { phase: "pre_admission", retryable: true, action: "retry" },
+  admission_busy: { phase: "pre_admission", retryable: true, action: "retry" },
   rate_limited: { phase: "pre_admission", retryable: true, action: "retry" },
   turn_busy: { phase: "pre_admission", retryable: false, action: "stop_it" },
   already_submitted: { phase: "pre_admission", retryable: false, action: "reload_chat" },
@@ -287,6 +289,7 @@ function build(
   if (code === "rate_limited" && typeof body.retry_after === "number")
     error.retryAfterMs = body.retry_after * 1000;
   if (code === "run_limit_member" || code === "run_limit_org") readRunLimit(error, body);
+  if (code === "admission_busy") readRunLimit(error, body);
   const reason = code === "provider_error" ? providerReason(body) : null;
   if (reason) error.reason = reason;
   if (code === "rca_disabled" && (body.reason === "rca_off" || body.reason === "priority_off"))
@@ -353,6 +356,8 @@ function namedCode(body: WireBody): AssistantErrorCode | null {
 
 // The copy follows the typed code or `scope`, never the message; `scope:"node"` and a member refusal without `limit` keep the fallback row (`80` §1.3).
 function runLimitCode(named: AssistantErrorCode, body: WireBody): AssistantErrorCode {
+  // Another turn holds the org's start lock for a moment; nothing is full.
+  if (body.scope === "admission") return "admission_busy";
   if (named === "run_limit_org" || body.scope === "org") return "run_limit_org";
   const member = named === "run_limit_member" || body.scope === "user";
   return member && typeof body.limit === "number" ? "run_limit_member" : "turn_limit";

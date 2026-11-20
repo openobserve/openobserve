@@ -1080,15 +1080,43 @@ function repairEnd(text: string): { text: string; open: boolean } {
 }
 
 // A link cut before its `)` or `]` would show raw, and `_` in its target as emphasis; its text alone is kept.
+// A cut code span is closed and a cut `*`/`**` opener dropped; code lines are left as sent.
 function repairTail(text: string): string {
+  if (codeLines(text.split("\n")).at(-1)) return text;
   const at = text.lastIndexOf("\n") + 1;
   const line = text.slice(at);
-  const repaired = line
-    .replace(OPEN_LINK_TARGET, "$1")
-    .replace(OPEN_LINK_TEXT, (match, label: string, offset: number) =>
-      (line.slice(0, offset).match(/`/g)?.length ?? 0) % 2 ? match : label,
-    );
+  const keepInCode = (from: string) => (match: string, label: string, offset: number) =>
+    oddTicks(from.slice(0, offset)) ? match : label;
+  const unlinked = line.replace(OPEN_LINK_TARGET, keepInCode(line));
+  const linked = unlinked.replace(OPEN_LINK_TEXT, keepInCode(unlinked));
+  const repaired = withoutOpenStars(oddTicks(linked) ? `${linked}\`` : linked);
   return repaired === line ? text : text.slice(0, at) + repaired;
+}
+
+function oddTicks(text: string): boolean {
+  return (text.match(/`/g)?.length ?? 0) % 2 === 1;
+}
+
+// Only a run before a letter or digit opens and only one after text closes, so `2*3`, `count(*)` and `_o2_*` stay.
+function withoutOpenStars(line: string): string {
+  const prose = outsideCodespans(
+    line,
+    (part) => part,
+    (span) => span.replace(/./g, " "),
+  );
+  const open: { index: number; length: number }[] = [];
+  for (const run of prose.matchAll(/\*+/g)) {
+    const before = prose[run.index - 1] ?? " ";
+    const after = prose[run.index + run[0].length] ?? " ";
+    const closes = !/\s/.test(before) && !/[\p{L}\p{N}]/u.test(after);
+    if (closes && open.length) open.pop();
+    else if (!/[\p{L}\p{N}]/u.test(before) && /[\p{L}\p{N}]/u.test(after))
+      open.push({ index: run.index, length: run[0].length });
+  }
+  return open.reduceRight(
+    (out, run) => out.slice(0, run.index) + out.slice(run.index + run.length),
+    line,
+  );
 }
 
 // Which lines are code fences (opener, body, closer), by marked's rules, including fences nested in list items.

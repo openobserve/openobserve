@@ -1068,6 +1068,35 @@ describe("markdown.ts strict profile", () => {
       expect(shown(parseAs("run `x[0", "open"))).toContain("x[0");
     });
 
+    it("drops a cut bold or italic opener and closes a cut code span (TA2-03)", () => {
+      const bold = parseAs("Summary: **Ingestion is", "cut");
+      expect(shown(bold).trim()).toBe("Summary: Ingestion is");
+      expect(shown(parseAs("a **b** and *c", "cut")).trim()).toBe("a b and c");
+      expect(parseAs("a **b** and *c", "cut")).toMatch(/<strong[^>]*>b<\/strong>/);
+      const code = parseAs("run `SELECT * FROM", "cut");
+      expect(code).toContain("<code");
+      expect(shown(code)).toContain("SELECT * FROM");
+    });
+
+    it("keeps stars that are no emphasis, and closed answers as sent", () => {
+      for (const text of ["2*3 is", "count(*) of", "internal _o2_* streams"])
+        expect(parseAs(text, "cut")).toBe(parseAs(text, "closed"));
+      expect(shown(parseAs("Summary: **Ingestion is", "closed"))).toContain("**Ingestion");
+    });
+
+    it("never turns a code span into a link, nor edits an indented code line", () => {
+      const html = parseAs("`[safe](https://example.com) [x](unfinished", "cut");
+      expect(html).not.toContain("<a");
+      expect(shown(html)).toContain("[safe](https://example.com) [x](unfinished");
+      const codeAs = (text: string, state: "open" | "cut") =>
+        codeOf(
+          parseBlock({ blockId: "i", text, state, origin: "http://localhost", imageRemoved: "x" })
+            .parts,
+        );
+      expect(codeAs("intro\n\n    arr[0", "cut")).toEqual(["arr[0"]);
+      expect(codeAs("    arr[0", "open")).toEqual(["arr[0"]);
+    });
+
     it("never touches a closed link, and keeps an open fence's repair", () => {
       const closed = parseAs("see [a](/web/logs)", "closed");
       expect(parseAs("see [a](/web/logs)", "cut")).toBe(closed);

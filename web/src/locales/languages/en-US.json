@@ -11657,6 +11657,10 @@
       "account_changed": {
         "title": "Another account signed in. Your message wasn't sent; reload to continue with that account."
       },
+      "admission_busy": {
+        "action": "Retry",
+        "title": "@:{'brand.autobot'} is busy starting another answer. Your message wasn't sent."
+      },
       "agent_unavailable": {
         "action": "Retry",
         "body": "Findings so far are kept above.",

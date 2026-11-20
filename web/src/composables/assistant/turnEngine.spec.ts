@@ -1119,10 +1119,14 @@ describe("turnEngine: a stopped answer catches up to what was saved (TA1-02)", (
     const h = setup({ tail: true });
     const { run } = await stopMidAnswer(h);
     vi.mocked(h.client.tail).mockImplementationOnce(async (_o, _s, _t, fromSeq, sink) => {
-      expect(fromSeq).toBe(1);
+      expect(fromSeq).toBe(-1);
       wire(
         sink,
         [
+          sse(-1, { type: "tool_call", tool: "StreamList", call_id: "a" }),
+          sse(0),
+          sse(0, { type: "tool_result", tool: "StreamList", call_id: "a" }),
+          sse(1),
           sse(1, delta("A B")),
           sse(2),
           sse(2, { type: "tool_call", tool: "SearchSQL", call_id: "b" }),
@@ -1171,6 +1175,66 @@ describe("turnEngine: a stopped answer catches up to what was saved (TA1-02)", (
     void h.store.stop(h.current.sid);
     await expect(run).resolves.toMatchObject({ state: "stopped" });
     expect(h.client.tail).not.toHaveBeenCalled();
+  });
+
+  it("applies frames that arrive after the tail's headers resolved (TA2-01)", async () => {
+    const h = setup({ tail: true });
+    const { run } = await stopMidAnswer(h);
+    void h.store.stop(h.current.sid);
+    await settle();
+    expect(h.tails).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(h.session().turn).toEqual({ state: "stopping" });
+    expect(h.tails[0].signal.aborted).toBe(false);
+    wire(
+      h.tails[0].sink,
+      [sse(-1, delta("A B C")), sse(0), sse(0, { type: "cancelled" })].join(""),
+    );
+    await expect(run).resolves.toMatchObject({ state: "stopped" });
+    expect(String(h.session().messages[1].content)).toBe("A B C");
+  });
+
+  it("ends the catch-up on the body's end when no cancelled frame comes", async () => {
+    const h = setup({ tail: true });
+    const { run } = await stopMidAnswer(h);
+    void h.store.stop(h.current.sid);
+    await settle();
+    wire(h.tails[0].sink, [sse(-1, delta("A B")), sse(0)].join(""));
+    h.tails[0].sink.onEnd("eof");
+    await settle();
+    await expect(run).resolves.toMatchObject({ state: "stopped" });
+    expect(String(h.session().messages[1].content)).toBe("A B");
+  });
+
+  it("stops within the deadline when the tail never settles, even ignoring its signal", async () => {
+    const h = setup({ tail: true });
+    const { run } = await stopMidAnswer(h);
+    vi.mocked(h.client.tail).mockImplementationOnce(() => new Promise<SendResult>(() => {}));
+    void h.store.stop(h.current.sid);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(h.session().turn).toEqual({ state: "stopping" });
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(run).resolves.toMatchObject({ state: "stopped" });
+  });
+
+  it("raises no approval card for a confirmation the catch-up replays", async () => {
+    const approvals = { onConfirmationRequired: vi.fn(), onResolved: vi.fn() };
+    const h = setup({ tail: true, approvals });
+    const { run } = await stopMidAnswer(h);
+    vi.mocked(h.client.tail).mockImplementationOnce(async (_o, _s, _t, _f, sink) => {
+      wire(
+        sink,
+        [
+          sse(1, { type: "confirmation_required", tool: "o2_delete", call_id: "c9" }),
+          sse(2),
+          sse(2, { type: "cancelled" }),
+        ].join(""),
+      );
+      return OK;
+    });
+    void h.store.stop(h.current.sid);
+    await expect(run).resolves.toMatchObject({ state: "stopped" });
+    expect(approvals.onConfirmationRequired).not.toHaveBeenCalled();
   });
 });
 

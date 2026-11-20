@@ -156,7 +156,6 @@ export function mergeLocalRecord(
   };
 }
 
-/** Legacy messages carry no ids, so a turn is keyed by its id, its send time, else its prompt text. */
 /** The row a record lands in: its own id, or the next one not held by another chat. */
 export async function rowIdFor(
   record: LocalRecord,
@@ -170,6 +169,7 @@ export async function rowIdFor(
   }
 }
 
+/** Legacy messages carry no ids, so a turn is keyed by its id, its send time, else its prompt text. */
 export function messageGroups(messages: ChatMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
   for (const message of messages) {

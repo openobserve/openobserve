@@ -64,6 +64,7 @@ export { answerTextOf, lastAnswerOf, markdownMessage } from "./answers";
 export { useAssistantName } from "./useAssistantName";
 export { useViewedChat, viewedChatSids } from "./viewedChats";
 export {
+  epochMsOf,
   foldTurns,
   hidesAttachments,
   mergeIncremental,

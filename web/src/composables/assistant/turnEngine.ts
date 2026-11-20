@@ -377,6 +377,8 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         const live = { ...liveCtx(t), pendingApprovalId: session.pendingApproval?.id ?? null };
         for (const effect of reduce(rec.stream, frame, live)) {
           if (effect.kind === "approval") {
+            // A stopped turn asks nothing more; a card replayed by the catch-up would wait on a dead turn.
+            if (catchUp) continue;
             deps.approvals?.().onConfirmationRequired(rec.sid, effect.frame);
             // The stream pauses on the card, so no later save would keep it for a reload to restore.
             out.turn.push({ kind: "save" });
@@ -746,24 +748,23 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     if (!entry || entry.tailLock || rec.settled) return rec.settled;
     const controller = runtime.renew(rec.sid);
     if (!controller) return false;
-    const timer = setTimeout(() => controller.abort(), TAIL_AFTER_STOP_MS);
     rec.catchingUp = true;
-    const tail = deps.client.tail(
-      rec.org,
-      rec.sid,
-      session.turnMeta.serverTurnId ?? rec.turnId,
-      session.turnMeta.lastSeq ?? -1,
-      sinkFor(rec, true),
-      controller.signal,
-    );
-    entry.tailLock = tail;
-    await tail
-      .catch(() => null)
-      .finally(() => {
-        clearTimeout(timer);
-        entry.tailLock = undefined;
-        rec.catchingUp = false;
-      });
+    // A cursor inside the answer gets its whole text part again, so the turn is read from its start.
+    rec.sinceSeq = [...rec.throughSeq, ...rec.sinceSeq];
+    rec.throughSeq = [];
+    session.turnMeta.lastSeq = -1;
+    const ended = tailToEnd(rec, session, controller.signal);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, TAIL_AFTER_STOP_MS);
+    });
+    // A 401 refresh inside `tail()` takes no signal, so the deadline must bound the whole wait.
+    const caughtUp = Promise.race([ended, deadline]);
+    entry.tailLock = caughtUp;
+    await caughtUp;
+    clearTimeout(timer);
+    entry.tailLock = undefined;
+    rec.catchingUp = false;
     if (rec.settled) return true;
     // The fallback ends on the frames applied so far; steps a cut tail left running read as interrupted.
     runtime.abort(rec.sid);
@@ -773,6 +774,31 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     });
     return false;
   };
+
+  // `tail()` resolves on the headers and reads the body after, so only the body's end means caught up.
+  const tailToEnd = (rec: TurnRecord, session: AssistantSession, signal: AbortSignal) =>
+    new Promise<void>((resolve) => {
+      const sink = sinkFor(rec, true);
+      const watched: FrameSink = {
+        ...sink,
+        onFrame(frame, id) {
+          sink.onFrame(frame, id);
+          if (frame.type === "cancelled" || frame.type === "complete" || frame.type === "error")
+            resolve();
+        },
+        onEnd(reason) {
+          sink.onEnd(reason);
+          resolve();
+        },
+      };
+      const turnId = session.turnMeta.serverTurnId ?? rec.turnId;
+      void deps.client.tail(rec.org, rec.sid, turnId, -1, watched, signal).then(
+        (result) => {
+          if (!result.ok) resolve();
+        },
+        () => resolve(),
+      );
+    });
 
   const restore = async (rec: TurnRecord) => {
     rec.restoreUsed = true;

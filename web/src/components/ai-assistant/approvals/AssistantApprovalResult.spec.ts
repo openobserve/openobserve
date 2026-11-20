@@ -53,6 +53,7 @@ const BATCH = approvalOf({
 const block: ContentBlock = { type: "approval", approval: BATCH };
 
 const routes = [
+  { path: "/dashboards", name: "dashboards", component: { render: () => null } },
   { path: "/dashboards/view", name: "viewDashboard", component: { render: () => null } },
   { path: "/alerts", name: "alertList", component: { render: () => null } },
   { path: "/alerts/:alert_id", name: "alertDetail", component: { render: () => null } },
@@ -401,6 +402,32 @@ describe("AssistantApprovalResult", () => {
     expect(made({ link: "/alerts/a8" }).attributes("href")).toBe("/alerts/a8");
     expect(made({ link: "https://evil.example/x" }).exists()).toBe(false);
     expect(made({}).exists()).toBe(false);
+  });
+
+  it("points a create saved without an id or link at its list, never a dead Open (TA2-05)", () => {
+    const create = approvalOf({
+      type: "confirmation_required",
+      id: "c9",
+      tool: "CreateDashboard",
+      kind: "create",
+      targets: [{ type: "dashboard", name: "TA2 approval dash" }],
+      args: { request_body: { title: "TA2 approval dash" } },
+    });
+    const { wrapper } = mountRecord(
+      {
+        outcome: { state: "done", at: 1 },
+        result: {
+          status: "done",
+          items: [{ id: "", type: "dashboard", name: "TA2 approval dash", status: "done" }],
+          resolvedBy: "ada@example.com",
+          resolvedAt: 1,
+        },
+      },
+      { blocks: [{ type: "approval", approval: create }] },
+    );
+    expect(wrapper.find('[data-test="assistant-approval-result-open"]').exists()).toBe(false);
+    const list = wrapper.get('[data-test="assistant-approval-result-check-list"]');
+    expect(list.attributes("href")).toContain("dashboards");
   });
 
   it("never turns a same-origin link into a protocol-relative href", () => {

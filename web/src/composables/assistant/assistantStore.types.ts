@@ -635,6 +635,7 @@ export type AssistantErrorCode =
   | "run_limit_member"
   | "run_limit_org"
   | "turn_limit"
+  | "admission_busy"
   | "rate_limited"
   | "turn_busy"
   | "already_submitted"

@@ -295,7 +295,7 @@ function replayedPrompt(turn: StoredTurn, images: ImageAttachment[]): ChatMessag
   return {
     role: "user",
     content: raw(text),
-    ...(created !== null && { sentAt: created > 1e14 ? Math.floor(created / 1000) : created }),
+    ...(created !== null && { sentAt: epochMsOf(created) }),
     ...(turn.turn_id && { turnId: turn.turn_id }),
     ...(asked &&
       asked.to > asked.from && {
@@ -350,6 +350,11 @@ function storedErrorCode(turn: StoredTurn): string {
     .find((f) => f?.type === "error" && f.code !== "persistence_failed");
   if (frame) return toAssistantError(frame).code;
   return toAssistantError({ type: "error", error_code: turn.error_code ?? undefined }).code;
+}
+
+/** A turn's `created` in epoch ms; the server sends ms, an import may have kept micros. */
+export function epochMsOf(created: number): number {
+  return created > 1e14 ? Math.floor(created / 1000) : created;
 }
 
 /** Fold stored turns with the live reducer so they render like a live chat, marking unfinished or failed turns. */

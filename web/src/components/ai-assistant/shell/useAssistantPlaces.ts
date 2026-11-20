@@ -14,7 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, watch, type ComputedRef } from "vue";
-import { useRoute, useRouter, type RouteLocationNormalizedLoaded, type Router } from "vue-router";
+import {
+  isNavigationFailure,
+  NavigationFailureType,
+  useRoute,
+  useRouter,
+  type RouteLocationNormalizedLoaded,
+  type Router,
+} from "vue-router";
 
 import {
   MAX_FLOATING_CHATS,
@@ -203,7 +210,7 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
 
   // The page under the full view mounts its own composer and takes focus; the moved chat asks again once it has.
   function focusAfterLeaving(): void {
-    const stop = watch(
+    const stopWatch = watch(
       () => isFullThreadRoute(route),
       (full) => {
         if (full) return;
@@ -212,6 +219,16 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
           store.open({ kind: "sidebar" }, { focus: "composer" });
       },
     );
+    // An aborted leave keeps the full view, so a later, unrelated navigation must not take focus.
+    // A leave superseded by a newer navigation ends wherever that one lands.
+    const stopHook = router.afterEach((_to, _from, failure) => {
+      if (isNavigationFailure(failure, NavigationFailureType.cancelled)) return;
+      if (isFullThreadRoute(router.currentRoute.value)) stop();
+    });
+    function stop(): void {
+      stopWatch();
+      stopHook();
+    }
   }
 
   function ensureChat(): Sid {

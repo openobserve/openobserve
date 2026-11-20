@@ -20,6 +20,9 @@ import type { SharedChat } from "@/services/ai_chat_share";
 
 import { lastCommitted, usePollShared, type PollResult } from "./usePollShared";
 
+// A real server value: `created` is epoch ms.
+const CREATED_MS = 1_795_212_462_708;
+
 const chat = (over: Partial<SharedChat> = {}): SharedChat => ({
   title: "t",
   mode: "live",
@@ -28,7 +31,7 @@ const chat = (over: Partial<SharedChat> = {}): SharedChat => ({
   created_at: 1_000,
   shared_at: 1_000,
   not_modified: false,
-  turns: [{ created: 5_000_000, status: "completed", user: { text: "q" }, frames: [] }],
+  turns: [{ created: CREATED_MS, status: "completed", user: { text: "q" }, frames: [] }],
   ...over,
 });
 
@@ -89,7 +92,7 @@ describe("usePollShared", () => {
     const before = poll.state.value.lastChangeAt;
     await vi.advanceTimersByTimeAsync(30_000);
     expect(poll.state.value.lastChangeAt).toBe(before);
-    expect(before).toBe(5_000);
+    expect(before).toBe(CREATED_MS);
     scope.stop();
   });
 
@@ -111,6 +114,31 @@ describe("usePollShared", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(poll.state.value.status).toBe("live");
     expect(poll.state.value.changes).toBe(0);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refetch).toHaveBeenCalledTimes(2);
+    scope.stop();
+  });
+
+  it("keeps polling the next share when the last share's poll fails late", async () => {
+    const data = ref<SharedChat | undefined>(chat());
+    const token = ref("a");
+    let failA!: (result: PollResult) => void;
+    const answers: (() => Promise<PollResult> | PollResult)[] = [
+      () => new Promise<PollResult>((resolve) => (failA = resolve)),
+    ];
+    const refetch = vi.fn(async () => answers.shift()?.() ?? { data: data.value });
+    const scope = effectScope();
+    const poll = scope.run(() =>
+      usePollShared(data, { refetch, hidden: () => false, key: () => token.value }),
+    )!;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refetch).toHaveBeenCalledTimes(1);
+    token.value = "b";
+    data.value = chat({ state_version: "b1" });
+    await vi.advanceTimersByTimeAsync(0);
+    failA({ error: { response: { status: 404 } } });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(poll.state.value.status).toBe("live");
     await vi.advanceTimersByTimeAsync(30_000);
     expect(refetch).toHaveBeenCalledTimes(2);
     scope.stop();
@@ -218,8 +246,12 @@ describe("usePollShared", () => {
     scope.stop();
   });
 
-  it("reads the newest finished turn's time in ms", () => {
-    expect(lastCommitted(chat())).toBe(5_000);
+  it("reads the newest finished turn's time in ms, as the server sends it (TA2-04)", () => {
+    expect(lastCommitted(chat())).toBe(CREATED_MS);
+    const micros = chat({
+      turns: [{ created: CREATED_MS * 1000, status: "completed", user: { text: "q" }, frames: [] }],
+    });
+    expect(lastCommitted(micros)).toBe(CREATED_MS);
     expect(lastCommitted(chat({ turns: [] }))).toBeNull();
   });
 });

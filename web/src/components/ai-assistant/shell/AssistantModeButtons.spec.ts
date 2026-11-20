@@ -422,6 +422,22 @@ describe("Open as", () => {
     expect(store.focusRequest.value?.seq).toBeGreaterThan(asked);
   });
 
+  it("asks for no focus later when leaving the full view was cancelled", async () => {
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    const { router } = await setup({ placement: "full", sid });
+    await router.push({ name: "home", query: { thread: sid } });
+    await flushPromises();
+    const removeGuard = router.beforeEach(() => false);
+    item("sidebar")!.click();
+    await flushPromises();
+    removeGuard();
+    const asked = store.focusRequest.value?.seq ?? 0;
+    await router.push("/logs");
+    await flushPromises();
+    expect(store.focusRequest.value?.seq ?? 0).toBe(asked);
+  });
+
   it("pins a window's chat from Side panel", async () => {
     const { store } = fake.current;
     const sid = store.state.shell.activeSid;
