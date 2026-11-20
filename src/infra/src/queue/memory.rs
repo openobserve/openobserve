@@ -42,7 +42,7 @@ use tokio::{
     time::Instant,
 };
 
-use super::{DeliverPolicy, QueueConfig, StorageType, format_key};
+use super::{DeliverPolicy, QueueConfig, SequenceRange, StorageType, format_key};
 use crate::errors::{QueueError, Result};
 
 pub async fn init() -> Result<()> {
@@ -131,6 +131,7 @@ struct Inner {
 
 struct Topic {
     config: QueueConfig,
+    created_us: i64,
     next_sequence: u64,
     next_generation: u64,
     pending: VecDeque<Entry>,
@@ -329,7 +330,7 @@ impl MemoryPullConsumer {
             token,
             acked: AtomicBool::new(false),
         };
-        Ok(Some(super::Message::from_memory(payload, handle)))
+        Ok(Some(super::Message::from_memory(payload, sequence, handle)))
     }
 }
 
@@ -367,6 +368,7 @@ impl super::Queue for MemoryQueue {
             topic_key,
             Topic {
                 config,
+                created_us: config::utils::time::now_micros(),
                 next_sequence: 0,
                 next_generation: 0,
                 pending: VecDeque::new(),
@@ -555,6 +557,22 @@ impl super::Queue for MemoryQueue {
         // semantics require a separate specification
         Ok(())
     }
+
+    async fn sequence_range(&self, topic: &str) -> Result<SequenceRange> {
+        let topic_key = format_key(topic);
+        let inner = self.shared.lock_inner();
+        let Some(topic_state) = inner.topics.get(&topic_key) else {
+            return Err(QueueError::TopicNotFound(topic_key).into());
+        };
+        let last = topic_state.next_sequence;
+        let kept = topic_state.pending.iter().map(|entry| entry.sequence);
+        let first = kept.chain(topic_state.in_flight.keys().copied()).min();
+        Ok(SequenceRange {
+            first: first.unwrap_or(last + 1),
+            last,
+            created_us: topic_state.created_us,
+        })
+    }
 }
 
 // the step value is transient, so the size difference between variants is fine
@@ -647,7 +665,7 @@ fn next_delivery(
         token,
         acked: AtomicBool::new(false),
     };
-    DispatchStep::Deliver(super::Message::from_memory(payload, handle))
+    DispatchStep::Deliver(super::Message::from_memory(payload, sequence, handle))
 }
 
 /// Discard historical backlog according to the deliver policy and return the
@@ -1263,5 +1281,31 @@ mod tests {
         drop(consumer);
         let consumer = q.pull_consume(TOPIC, "group", None).await.unwrap();
         drop(consumer);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_sequences_keep_counting_past_acked_messages() {
+        let q = MemoryQueue::new(1024 * 1024);
+        q.create(TOPIC).await.unwrap();
+        let range = q.sequence_range(TOPIC).await.unwrap();
+        assert_eq!((range.first, range.last), (1, 0));
+        assert!(range.created_us > 0);
+        for payload in [b"a", b"b", b"c"] {
+            q.publish(TOPIC, Bytes::from_static(payload)).await.unwrap();
+        }
+        let mut rx = take_receiver(q.consume(TOPIC, None).await.unwrap());
+        for want in 1..=2 {
+            let msg = recv_one(&mut rx).await;
+            assert_eq!(msg.sequence(), Some(want));
+            msg.ack().await.unwrap();
+        }
+        let acked = q.sequence_range(TOPIC).await.unwrap();
+        assert_eq!((acked.first, acked.last), (3, 3));
+        assert_eq!(acked.created_us, range.created_us);
+        drop(rx);
+        q.publish(TOPIC, Bytes::from_static(b"d")).await.unwrap();
+        let mut rx = take_receiver(q.consume(TOPIC, None).await.unwrap());
+        let seqs = [recv_one(&mut rx).await, recv_one(&mut rx).await].map(|m| m.sequence());
+        assert_eq!(seqs, [Some(3), Some(4)]);
     }
 }
