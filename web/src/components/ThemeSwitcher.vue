@@ -15,7 +15,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Menu row, like Language: label left, current value right; selecting flips the theme and keeps the menu open. -->
+  <ODropdownItem
+    v-if="menuItem"
+    data-test="navbar-theme-toggle-btn"
+    :aria-label="raw(tooltipText)"
+    @select="onMenuSelect"
+  >
+    <template #icon-left>
+      <OIcon size="xs" :name="darkMode ? 'dark-mode' : 'light-mode'" class="padding-none" />
+    </template>
+    <span class="flex-1 whitespace-nowrap">{{ t("dashboard.kiosk.theme") }}</span>
+    <span
+      class="bg-toggle-track-bg rounded-default inline-flex items-center gap-0.5 p-0.5"
+      aria-hidden="true"
+    >
+      <span
+        v-for="mode in ['light', 'dark']"
+        :key="mode"
+        class="rounded-default inline-flex size-5 items-center justify-center"
+        :class="
+          (mode === 'dark') === darkMode
+            ? 'bg-toggle-item-active-bg text-selected-fg'
+            : 'text-text-secondary'
+        "
+      >
+        <OIcon size="xs" :name="mode === 'dark' ? 'dark-mode' : 'light-mode'" />
+      </span>
+    </span>
+  </ODropdownItem>
   <OButton
+    v-else
     :variant="bordered ? 'outline' : 'ghost'"
     :size="bordered ? 'icon-sm' : 'icon-toolbar'"
     data-test="navbar-theme-toggle-btn"
@@ -40,21 +70,25 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { switchThemeMode } from "@/utils/theme";
 
 export default defineComponent({
-  components: { OButton, OIcon, OTooltip },
+  components: { OButton, OIcon, OTooltip, ODropdownItem },
   props: {
     // Outlined 32px square, for headers whose other controls are outlined buttons.
     bordered: { type: Boolean, default: false },
+    // A row in a menu (the profile menu): mounts on open, so it reads the current theme instead of re-applying it.
+    menuItem: { type: Boolean, default: false },
   },
-  setup() {
+  setup(props) {
     const store = useStore();
     const { t } = useI18nTyped();
     // eslint-disable-next-line no-restricted-syntax -- this component IS the theme seam's UI: darkMode is the toggle's own bound state, not a private copy of the app theme it should be reading from useTheme().
-    const darkMode = ref(false);
+    const darkMode = ref(props.menuItem ? store.state.theme === "dark" : false);
 
     onMounted(() => {
+      if (props.menuItem) return;
       try {
         const savedTheme = localStorage.getItem("theme");
         if (savedTheme !== null) {
@@ -117,6 +151,10 @@ export default defineComponent({
     const toggleDarkMode = () => {
       darkMode.value = !darkMode.value;
     };
+    const onMenuSelect = (event: Event) => {
+      event.preventDefault();
+      toggleDarkMode();
+    };
 
     return {
       raw,
@@ -124,6 +162,8 @@ export default defineComponent({
       darkMode,
       tooltipText,
       toggleDarkMode,
+      onMenuSelect,
+      t,
     };
   },
 });
