@@ -1,0 +1,175 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { defineComponent, effectScope, h, KeepAlive, nextTick, ref } from "vue";
+import { mount } from "@vue/test-utils";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { localeFileMap } from "@/locales";
+import {
+  formatRangeText,
+  formatSpan,
+  readPickerText,
+  timeRangeLocaleOf,
+  useTimeRangeInput,
+} from "@/composables/useTimeRangeInput";
+import { MAX_RANGE_TEXT_UNITS } from "@/utils/date";
+import { loadTimeRangeLocale, type RelativeUnit } from "@/utils/timeRangeInput";
+
+const NOW_US = Date.parse("2026-11-18T13:32:00Z") * 1000;
+const MIN_US = 60_000_000;
+
+describe("useTimeRangeInput helpers", () => {
+  it("maps every app locale to its own parser pack and anything else to English", () => {
+    for (const key of Object.keys(localeFileMap)) expect(timeRangeLocaleOf(key)).toBe(key);
+    expect(timeRangeLocaleOf("xx")).toBe("en-us");
+    expect(timeRangeLocaleOf("constructor")).toBe("en-us");
+    expect(timeRangeLocaleOf("toString")).toBe("en-us");
+  });
+
+  it("has a parser pack for every app locale, so none silently reads typed text as English", async () => {
+    for (const key of Object.keys(localeFileMap)) {
+      const pack = await loadTimeRangeLocale(timeRangeLocaleOf(key));
+      expect(pack.locale).toBe(key);
+    }
+  });
+
+  it.each([
+    [15 * MIN_US, "15 min"],
+    [90 * MIN_US, "1 hr 30 min"],
+    [7 * 1440 * MIN_US, "7 days"],
+    [30_000_000, "30 sec"],
+  ])("formats a span of %i µs as %s", (span, text) => {
+    expect(formatSpan(span, "en-US")).toBe(text);
+  });
+
+  it("names the day only for a range off today and repeats it only when the end differs", () => {
+    const today = formatRangeText(NOW_US - 15 * MIN_US, NOW_US, "Europe/Berlin", "en-US", NOW_US);
+    expect(today).toBe("14:17 → 14:32");
+    const earlier = formatRangeText(
+      Date.parse("2026-11-03T13:00:00Z") * 1000,
+      Date.parse("2026-11-05T08:30:00Z") * 1000,
+      "Europe/Berlin",
+      "en-US",
+      NOW_US,
+    );
+    expect(earlier).toBe("Tue, Nov 3, 14:00 → Thu, Nov 5, 09:30");
+  });
+
+  it("reads pasted text with the picker's limits", async () => {
+    const res = await readPickerText("200h", {
+      locale: "en-us",
+      zone: "UTC",
+      units: ["s", "m", "h", "d", "w", "M"],
+      kinds: { relative: true, calendar: true, absolute: true },
+      limits: { allowFuture: false, maxSpanUs: 72 * 60 * MIN_US },
+    });
+    expect(res.state).toBe("blocked");
+  });
+});
+
+describe("useTimeRangeInput review fixes", () => {
+  const context = (locale: string) => () => ({
+    locale,
+    zone: "UTC",
+    units: ["s", "m", "h", "d", "w", "M"] as RelativeUnit[],
+    kinds: { relative: true, calendar: true, absolute: true },
+    limits: { allowFuture: false },
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is ready only once the locale's own pack has loaded", async () => {
+    const scope = effectScope();
+    const fr = scope.run(() => useTimeRangeInput({ context: context("fr") }))!;
+    const en = scope.run(() => useTimeRangeInput({ context: context("en-us") }))!;
+
+    expect(en.ready.value).toBe(true);
+    expect(fr.ready.value).toBe(false);
+    await vi.waitFor(() => expect(fr.ready.value).toBe(true));
+    expect(fr.pack.value.locale).toBe("fr");
+    scope.stop();
+  });
+
+  it("lets a future verdict expire once the clock passes the end", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
+    const scope = effectScope();
+    const bar = scope.run(() => useTimeRangeInput({ context: context("en-us") }))!;
+    bar.setText("2026-10-08T02:00:00+00:00 - 2026-10-08T03:00:20+00:00");
+    expect(bar.result.value.state).toBe("blocked");
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(bar.result.value.state).toBe("valid");
+    scope.stop();
+  });
+  it("reuses its Intl formatters when the same rows are formatted again", () => {
+    const format = () => {
+      formatRangeText(NOW_US - 90 * MIN_US, NOW_US, "Asia/Tokyo", "de-DE", NOW_US);
+      formatSpan(90 * MIN_US, "de-DE");
+    };
+    format();
+    const dates = vi.spyOn(Intl, "DateTimeFormat");
+    const numbers = vi.spyOn(Intl, "NumberFormat");
+    format();
+
+    expect(dates).not.toHaveBeenCalled();
+    expect(numbers).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  it("refuses text over the parser's cap as too long without keeping it", () => {
+    const scope = effectScope();
+    const bar = scope.run(() => useTimeRangeInput({ context: context("en-us") }))!;
+    bar.setText("15m");
+    bar.setText("1".repeat(MAX_RANGE_TEXT_UNITS + 1), "paste");
+
+    expect(bar.text.value).toBe("15m");
+    expect(bar.result.value).toMatchObject({ state: "invalid", reason: "too-long" });
+    bar.setText("2h");
+    expect(bar.result.value.state).toBe("valid");
+    scope.stop();
+  });
+
+  it("stops the future clock while its view is kept alive and resumes it on return", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+    vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
+    let bar: ReturnType<typeof useTimeRangeInput> | null = null;
+    const Child = defineComponent({
+      setup() {
+        bar = useTimeRangeInput({ context: context("en-us") });
+        return () => h("div");
+      },
+    });
+    const shown = ref(true);
+    const host = mount(
+      defineComponent({ setup: () => () => h(KeepAlive, null, shown.value ? h(Child) : null) }),
+    );
+    bar!.setText("2026-10-08T02:00:00+00:00 - 2026-10-08T03:05:00+00:00");
+    await nextTick();
+    expect(vi.getTimerCount()).toBe(1);
+
+    shown.value = false;
+    await nextTick();
+    expect(vi.getTimerCount()).toBe(0);
+
+    shown.value = true;
+    await nextTick();
+    expect(vi.getTimerCount()).toBe(1);
+    host.unmount();
+  });
+});

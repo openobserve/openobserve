@@ -4,6 +4,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { inject } from "vue";
 import { describe, expect, it } from "vitest";
 
+import DateTime from "@/components/DateTime.vue";
 import OnCallAwayDialog from "@/components/oncall/OnCallAwayDialog.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import i18n from "@/locales";
@@ -68,5 +69,29 @@ describe("OnCallAwayDialog", () => {
     expect(wrapper.find('[data-test="oncall-members-away-preset-next-week"]').text()).toBe(
       "Next week, Mon–Sun",
     );
+  });
+
+  // The window runs forward, so the real picker must let an edit after a preset through its gate.
+  it("applies an edit made in the picker after the next-7-days preset", async () => {
+    const { OFormDateTimeRange: _real, ...rest } = stubs;
+    const wrapper = mount(OnCallAwayDialog, {
+      props: { open: true, email: "ana@o2.ai", timezone: "UTC" },
+      global: { plugins: [i18n, store], stubs: rest },
+    });
+    await wrapper.find('[data-test="oncall-members-away-preset-next-7-days"]').trigger("click");
+    await flushPromises();
+    const picker = wrapper.findComponent(DateTime);
+    const edited = { ...picker.vm.selectedTime, startTime: "23:00:00" };
+
+    picker.vm.selectedTime = edited;
+    await flushPromises();
+
+    const payload = (picker.emitted("on:date-change") ?? []).at(-1)?.[0] as {
+      selectedTime: { startTime: string };
+      userChangedValue: boolean;
+    };
+    expect(payload.selectedTime.startTime).toBe("23:00:00");
+    expect(payload.userChangedValue).toBe(true);
+    wrapper.unmount();
   });
 });

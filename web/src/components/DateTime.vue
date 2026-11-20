@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
+    ref="root"
     icon="info"
+    :data-date-time-shortcut="shortcutTarget || undefined"
     class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
     :class="{
       'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
@@ -31,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-button-outline-border h-auto! rounded-e-none! border-e!"
         icon-left="chevron-left"
         :aria-label="t('common.previous')"
-        :disabled="disable || disablePrevShift"
+        :disabled="disable || disablePrevShift || isPrevShiftDisabled()"
         @click.prevent.stop="shiftTimeRange('prev')"
       />
     </OTooltip>
@@ -66,9 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
           @mouseenter="refreshTooltipNow"
+          @pointerenter="prefetchRangeInput"
+          @focus="prefetchRangeInput"
         >
           <template #icon-left>
-            <OTooltip v-if="triggerTooltip" :content="triggerTooltip" />
+            <OTooltip
+              :content="triggerTooltip ?? t('common.selectDateRange')"
+              :shortcut-id="shortcutEligible ? 'timeRangeOpen' : undefined"
+            />
             <OIcon name="schedule" size="sm" />
           </template>
           <OTruncatedText
@@ -91,6 +98,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @keydown.capture="onPickerKeydown"
         @paste="onPickerPaste"
       >
+        <DateTimeRangeInput
+          v-if="showRangeInput"
+          ref="rangeInput"
+          :zone="zone"
+          :locale="String(locale)"
+          :intl-locale="intlLocale"
+          :applied="appliedRange"
+          :limits="rangeLimits"
+          :kinds="rangeKinds"
+          :units="rangeUnits"
+          :can-copy="gateReason === null"
+          :span-limit="spanLimitText"
+          @apply="commitTypedReading"
+          @dirty="rangeInputBlocksApply = $event"
+          @valid="rangeInputValid = $event"
+          @copy="copyRange"
+          @paste="pasteRange"
+        />
         <div
           class="grid min-h-0 flex-1 max-sm:flex max-sm:flex-col max-sm:overflow-y-auto"
           :class="
@@ -98,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <div
-            v-if="!(hideClipboard && disableRelative)"
+            v-if="!disableRelative || (!hideClipboard && !showRangeInput)"
             class="border-border-default row-start-1 flex min-w-0 items-center gap-1 border-b px-3 py-2"
             :class="showRail ? 'col-start-2 max-sm:order-2' : 'col-start-1'"
           >
@@ -128,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroupItem>
             </OToggleGroup>
             <div v-else class="flex-1" />
-            <OTooltip v-if="!hideClipboard" :content="t('common.copyRange')">
+            <OTooltip v-if="!hideClipboard && !showRangeInput" :content="t('common.copyRange')">
               <OButton
                 data-test="date-time-copy-btn"
                 variant="ghost"
@@ -138,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="copyRange"
               />
             </OTooltip>
-            <OTooltip v-if="!hideClipboard" :content="t('common.pasteRange')">
+            <OTooltip v-if="!hideClipboard && !showRangeInput" :content="t('common.pasteRange')">
               <OButton
                 data-test="date-time-paste-btn"
                 variant="ghost"
@@ -191,10 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
                       <OButton
-                        :disabled="
-                          relativeDatesInHour[period.value][item_index] >
-                            queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
-                        "
+                        :disabled="blockedChips.has(`${item}${period.value}`)"
                         :data-test="`date-time-relative-${item}-${period.value}-btn`"
                         class="h-8! w-8! font-bold! disabled:opacity-35"
                         :class="
@@ -212,10 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ item }}
                         <OTooltip
-                          v-if="
-                            relativeDatesInHour[period.value][item_index] >
-                              queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
-                          "
+                          v-if="blockedChips.has(`${item}${period.value}`)"
                           side="right"
                           align="center"
                           max-width="18.75rem"
@@ -227,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
+                    @focusout="onCustomRowFocusout"
                   >
                     <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
                     <OTooltip
@@ -240,7 +260,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex min-w-0 flex-1 gap-2">
                       <div class="flex w-20 flex-col">
                         <OInput
-                          v-model.number="relativeValue"
+                          :model-value="customDraft"
+                          :error="customBlocked"
+                          data-test="date-time-custom-value"
                           :aria-label="t('common.timeAmount')"
                           type="number"
                           :min="1"
@@ -250,9 +272,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               ? relativePeriodsMaxValue[relativePeriod]
                               : undefined
                           "
-                          @update:model-value="onCustomPeriodSelect"
+                          @update:model-value="editCustomDraft"
                           @focus="onCustomValueFocus"
                           @blur="onCustomValueBlur"
+                          @keydown.enter.prevent="commitCustom(true)"
                         />
                       </div>
                       <div class="flex min-w-0 flex-1 flex-col">
@@ -260,7 +283,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="relativePeriod"
                           :aria-label="t('common.timeUnit')"
                           :options="relativePeriodsSelect"
-                          @update:model-value="onCustomPeriodSelect"
+                          data-test="date-time-custom-unit"
+                          @update:model-value="commitCustom(false)"
                         >
                           <template v-slot:selected-item>
                             <div>{{ getPeriodLabel }}</div>
@@ -345,6 +369,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
+              v-if="gateMessage"
+              class="text-input-error-text flex shrink-0 items-center gap-1.5 px-3 pt-2 text-xs font-medium"
+              data-test="date-time-gate-message"
+              role="alert"
+            >
+              <OIcon name="error-outline" size="sm" class="shrink-0" />
+              <span class="min-w-0">{{ gateMessage }}</span>
+            </div>
+            <div
               v-if="!hideRelativeTimezone || !autoApply"
               class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-[0.4rem] py-2"
             >
@@ -369,7 +402,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="primary"
                 size="sm"
                 class="justify-self-end px-6!"
-                @click="applyAndClose"
+                :disabled="!rangeInputValid && (gateReason !== null || rangeInputBlocksApply)"
+                @click="onApplyClick"
               >
                 {{ t("common.apply") }}
               </OButton>
@@ -383,13 +417,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-next-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border h-auto! rounded-s-none! border-s!"
+        class="border-button-outline-border h-auto! border-s!"
+        :class="showRangeZoom ? 'max-md:rounded-e-default! rounded-none!' : 'rounded-s-none!'"
         icon-left="chevron-right"
         :aria-label="t('common.next')"
         :disabled="disable || isNextShiftDisabled()"
         @click.prevent.stop="shiftTimeRange('next')"
       />
     </OTooltip>
+    <OTooltip v-if="showRangeZoom" :content="zoomOutTooltip">
+      <OButton
+        data-test="date-time-zoom-out-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border h-auto! rounded-s-none! border-s! max-md:hidden"
+        icon-left="zoom-out"
+        :aria-label="zoomOutTooltip"
+        :disabled="disable || zoomOutBlocked !== null"
+        @click.prevent.stop="zoomOut"
+      />
+    </OTooltip>
+    <span class="sr-only" aria-live="polite" data-test="date-time-range-live">{{ liveLabel }}</span>
   </div>
 </template>
 
@@ -409,6 +457,7 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import DateTimeRail from "@/components/DateTimeRail.vue";
 import {
   ref,
+  defineAsyncComponent,
   defineComponent,
   computed,
   onActivated,
@@ -417,6 +466,7 @@ import {
   onMounted,
   watch,
   nextTick,
+  shallowRef,
   type PropType,
 } from "vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
@@ -426,7 +476,7 @@ import {
   convertToUtcTimestamp,
   timestampToTimezoneDate,
 } from "../utils/zincutils";
-import { subtractRelativeTime } from "@/utils/date";
+import { MAX_RANGE_TEXT_UNITS, matchRelativePeriod, subtractRelativeTime } from "@/utils/date";
 import {
   formatCalendarLabel,
   formatCalendarTooltip,
@@ -440,6 +490,7 @@ import {
   CALENDAR_RAIL_ITEMS,
   exceedsRangeRestriction,
   formatAbsoluteInstant,
+  formatSpanLimit,
   formatRecentRange,
   formatCalendarRailHint,
   formatRecentDuration,
@@ -448,20 +499,21 @@ import {
 } from "@/utils/timeRangeRail";
 import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
 import { localeFileMap } from "@/locales";
-import {
-  parseDateRangeString,
-  parseSingleDateTime,
-  type ParsedSingleDateTime,
-} from "@/utils/dateTimeRangeParse";
+import { checkTimeRange } from "@/utils/timeRangeInput/check";
+import { addDays, addMonths } from "@/utils/timeRangeInput/civil";
+import { resolveCivil, wallAt } from "@/utils/timeRangeInput/zone";
+import { formatTimeRangeInput, type FormattableRange } from "@/utils/timeRangeInput/format";
+import type { RangeLimits, RelativeUnit, TimeRangeReading } from "@/utils/timeRangeInput/types";
+import { registerTimeRangePicker } from "@/utils/timeRangeShortcut";
 import { copyToClipboard } from "@/utils/clipboard";
 import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { fromZonedTime } from "date-fns-tz";
 
 const MICROS_PER_SECOND = 1_000_000;
+const DAY_END_TIME = "23:59:59";
 const POPOVER_COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
 // Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
 const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
@@ -471,6 +523,16 @@ const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
   d: 3_650,
   w: 520,
   M: 120,
+};
+
+// Nominal unit lengths, only a first guess that the gate then checks against the real span.
+const UNIT_SECONDS: Record<string, number> = {
+  s: 1,
+  m: 60,
+  h: 3600,
+  d: 86_400,
+  w: 604_800,
+  M: 2_592_000,
 };
 
 interface CalendarPresetState {
@@ -490,6 +552,77 @@ interface ConsumableDateTime {
 
 // One offset lookup per zone for the whole app, not per picker instance.
 const zoneOffsets = new Map<string, string>();
+// Above the ~420 supported zones the select lists, so only unknown host spellings are ever evicted.
+const ZONE_OFFSET_CACHE_LIMIT = 600;
+
+type GateReason = "out-of-range" | "order" | "max-span" | "future" | "after-max" | "before-min";
+
+interface ExactRange {
+  zone: string;
+  from: string;
+  to: string;
+  startTime: string;
+  endTime: string;
+  startUs: number;
+  endUs: number;
+}
+
+type RollingFold = "earlier" | "later";
+
+// Everything that names a range; the applied copy is what refresh, close and the trigger fall back to.
+interface PickerSelection {
+  selectedType: string;
+  calendarToken: string | null;
+  relativePeriod: string;
+  relativeValue: number;
+  rollingFold: RollingFold | null;
+  selectedDate: { from: string; to: string };
+  selectedTime: { startTime: string; endTime: string };
+  seededEnd: { date: string; time: string } | null;
+  exactRange: ExactRange | null;
+}
+
+type ZoomTarget =
+  | { kind: "rolling"; value: number; spanUs: number }
+  | { kind: "fixed"; startUs: number; endUs: number; spanUs: number };
+
+interface StepOrigin {
+  period: string;
+  value: number;
+  steps: number;
+  at: string | null;
+}
+
+// The bar pulls in the parser and its word packs, so it loads on first open, not with the picker.
+const loadRangeInput = () => import("@/components/DateTimeRangeInput.vue");
+const DateTimeRangeInput = defineAsyncComponent(loadRangeInput);
+
+// endUs is the end the gate passed: one a few seconds past now reads as now.
+const gateCheck = (
+  startUs: number,
+  endUs: number,
+  limits: RangeLimits,
+): { reason: GateReason | null; endUs: number } => {
+  const res = checkTimeRange({ startUs, endUs, nowUs: Math.floor(Date.now()) * 1000, ...limits });
+  if (res.ok) return { reason: null, endUs: res.endUs };
+  if (res.reason === "reversed" || res.reason === "zero-length") return { reason: "order", endUs };
+  const reason =
+    res.reason === "out-of-range" || res.reason === "retention" ? "out-of-range" : res.reason;
+  return { reason, endUs };
+};
+
+const gateOf = (startUs: number, endUs: number, limits: RangeLimits): GateReason | null =>
+  gateCheck(startUs, endUs, limits).reason;
+
+// A whole-day end after now means "until now"; any other end after now is a chosen time the gate refuses.
+// A future start is left alone, so the gate reports "future" rather than an order the user never typed.
+const clipDayEnd = (
+  startUs: number,
+  endTime: string,
+  endUs: number,
+  nowUs: number,
+  allowFuture: boolean,
+) => (!allowFuture && endTime === DAY_END_TIME && endUs > nowUs && startUs < nowUs ? nowUs : endUs);
 
 export default defineComponent({
   components: {
@@ -506,6 +639,7 @@ export default defineComponent({
     ODateRangeCalendar,
     OPopover,
     DateTimeRail,
+    DateTimeRangeInput,
   },
   props: {
     defaultType: {
@@ -568,6 +702,11 @@ export default defineComponent({
     },
     /** Drops the copy and paste range buttons; a date-only picker then loses its whole top row. */
     hideClipboard: {
+      type: Boolean,
+      default: false,
+    },
+    /** Hides the typed range bar; `hideClipboard` and a date-only picker hide it too. */
+    hideRangeInput: {
       type: Boolean,
       default: false,
     },
@@ -636,7 +775,7 @@ export default defineComponent({
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00:00",
-      endTime: "23:59:59",
+      endTime: DAY_END_TIME,
     });
     const selectedDate = ref({
       from: "",
@@ -647,12 +786,19 @@ export default defineComponent({
     // A selected calendar period overrides relativePeriod/relativeValue while the type is relative.
     const calendarToken = ref<string | null>(null);
     const appliedCalendarToken = ref<string | null>(null);
-    // Type and relative selection last applied; closing without Apply restores these, not the absolute fields.
-    let appliedSelection = {
+    // A rolling day, week or month that starts in a repeated hour keeps the reading the user chose.
+    const rollingFold = ref<RollingFold | null>(null);
+    // The selection last applied; closing without Apply puts all of it back.
+    let appliedSelection: PickerSelection = {
       selectedType: "relative",
-      calendarToken: null as string | null,
+      calendarToken: null,
       relativePeriod: "m",
       relativeValue: 15,
+      rollingFold: null,
+      selectedDate: { from: "", to: "" },
+      selectedTime: { startTime: "00:00:00", endTime: DAY_END_TIME },
+      seededEnd: null,
+      exactRange: null,
     };
     // Offset-0 tooltips end at now, so they read a clock refreshed on hover rather than a stale render time.
     const tooltipNow = ref(Date.now());
@@ -662,6 +808,16 @@ export default defineComponent({
     // Fields written by the picker itself (seeding the Absolute tab, a Recent pick) are not user edits for auto-apply.
     let isSeedingAbsolute = false;
     let seededEnd: { date: string; time: string } | null = null;
+    // A typed or pasted range keeps its exact µs (fractions, a repeated hour) until a field is edited.
+    const exactRange = shallowRef<ExactRange | null>(null);
+    // Bumped on every selection change and on open or close, so a paste that resolves later is dropped.
+    let selectionSeq = 0;
+    // What the live region reads: only a range the user applied, never a label that follows the clock.
+    const liveLabel = ref("");
+    // Set when a host setter changes the fields; the field watcher takes it once, so its save skips the gate.
+    let hostFieldWrite = false;
+    // Ticks while the open panel refuses a future end or holds a whole-day end, so both follow now.
+    const gateNow = ref(Date.now());
     // Date-only pickers cannot show the times a recent range carries.
     const showRail = computed(() => !props.disableRelative);
     const lastValidCustomValue = ref(15);
@@ -693,11 +849,20 @@ export default defineComponent({
       }
       await nextTick();
       if (props.autoApply) {
-        if (selectedType.value == "absolute") saveDate("absolute");
+        if (selectedType.value == "absolute") saveZoneChange();
         else saveDate("relative");
       }
 
       emit("on:timezone-change", selectedTimezone);
+    };
+
+    // Fields read in a zone west of the old one can land after now; the applied instants then stay in force.
+    const saveZoneChange = () => {
+      const { startTime, endTime } = datePayload.value as Partial<ConsumableDateTime>;
+      if (gateReason.value === null || typeof startTime !== "number" || typeof endTime !== "number")
+        return saveDate("absolute");
+      stageAbsolute(startTime, endTime);
+      saveDate("absolute", "host");
     };
 
     // if initial timezone is provided
@@ -731,6 +896,8 @@ export default defineComponent({
       } catch {
         offset = "";
       }
+      if (zoneOffsets.size >= ZONE_OFFSET_CACHE_LIMIT)
+        zoneOffsets.delete(zoneOffsets.keys().next().value as string);
       zoneOffsets.set(zone, offset);
       return offset;
     };
@@ -772,15 +939,6 @@ export default defineComponent({
       d: [1, 2, 3, 4, 5, 6],
       w: [1, 2, 3, 4, 5, 6],
       M: [1, 2, 3, 4, 5, 6],
-    };
-
-    const relativeDatesInHour: Record<string, number[]> = {
-      s: [1, 1, 1, 1, 1, 1],
-      m: [1, 1, 1, 1, 1, 1],
-      h: [1, 2, 3, 6, 8, 12],
-      d: [24, 48, 72, 96, 120, 144],
-      w: [168, 336, 504, 672, 840, 1008],
-      M: [744, 1488, 2232, 2976, 3720, 4464],
     };
 
     let relativePeriodsMaxValue = ref<Record<string, number>>({
@@ -879,29 +1037,41 @@ export default defineComponent({
       });
     });
 
-    const recentRailItems = computed<TimeRangeRailItem[]>(() => {
-      const current = selectedType.value === "absolute" ? getUTCTimeStamp() : null;
+    // The gate clock ticks every second while a range waits on now, but Recent text changes at most by the minute.
+    const gateMinute = computed(() => Math.floor(gateNow.value / 60_000));
+    const recentRows = computed(() => {
+      void gateMinute.value;
       return timeRangeHistory.entries.value.map((entry, index) => ({
-        id: String(index),
-        label: formatRecentRange(entry.startUs, entry.endUs, zone.value),
-        compact: {
-          label: formatRecentRangeLabel(
+        entry,
+        item: {
+          id: String(index),
+          label: formatRecentRange(entry.startUs, entry.endUs, zone.value),
+          compact: {
+            label: formatRecentRangeLabel(
+              entry.startUs,
+              entry.endUs,
+              zone.value,
+              Date.now(),
+              intlLocale.value,
+            ),
+            duration: formatRecentDuration(entry.startUs, entry.endUs),
+          },
+          tooltip: formatRangeTooltip(entry.startUs, entry.endUs, zone.value),
+          disabled: exceedsRangeRestriction(
             entry.startUs,
             entry.endUs,
-            zone.value,
-            Date.now(),
-            intlLocale.value,
+            props.queryRangeRestrictionInHour,
           ),
-          duration: formatRecentDuration(entry.startUs, entry.endUs),
         },
-        tooltip: formatRangeTooltip(entry.startUs, entry.endUs, zone.value),
+      }));
+    });
+
+    const recentRailItems = computed<TimeRangeRailItem[]>(() => {
+      const current = selectedType.value === "absolute" ? getUTCTimeStamp(gateNow.value) : null;
+      return recentRows.value.map(({ entry, item }) => ({
+        ...item,
         selected:
           current !== null && current.startUTC === entry.startUs && current.endUTC === entry.endUs,
-        disabled: exceedsRangeRestriction(
-          entry.startUs,
-          entry.endUs,
-          props.queryRangeRestrictionInHour,
-        ),
       }));
     });
 
@@ -971,7 +1141,7 @@ export default defineComponent({
         // above calls `markProgrammaticDateChange()`, and its nextTick reset has
         // not run yet. Consumers must therefore treat `userChangedValue === false`
         // as "do not fetch": the parent's own `onMounted` covers the first load.
-        saveDate(selectedType.value);
+        saveDate(selectedType.value, "host");
       } catch (e) {
         console.log(e);
       }
@@ -986,6 +1156,9 @@ export default defineComponent({
         pendingDay.value;
       },
       () => {
+        const source = hostFieldWrite ? "host" : "user";
+        hostFieldWrite = false;
+        if (!isSeedingAbsolute) rangeInput.value?.clear();
         if (
           props.autoApply &&
           selectedType.value === "absolute" &&
@@ -993,7 +1166,7 @@ export default defineComponent({
           pendingDay.value === null &&
           store.state.savedViewFlag == false
         ) {
-          saveDate("absolute");
+          saveDate("absolute", source);
         }
       },
       { deep: true },
@@ -1008,15 +1181,21 @@ export default defineComponent({
       },
     );
 
-    const setRelativeDate = (period: string, value: number) => {
+    const stageRelative = (period: string, value: number) => {
       selectedType.value = "relative";
       calendarToken.value = null;
+      rollingFold.value = null;
       relativePeriod.value = period;
       relativeValue.value = value;
+    };
+
+    const setRelativeDate = (period: string, value: number) => {
+      stageRelative(period, value);
       if (props.autoApply || props.applyPresets) saveDate("relative");
     };
 
     const pickRelativeChip = (period: string, value: number) => {
+      rangeInput.value?.clear();
       setRelativeDate(period, value);
       if (props.autoApply || props.applyPresets) closeMenu();
     };
@@ -1024,35 +1203,63 @@ export default defineComponent({
     const isValidCustomValue = (value: unknown) =>
       value !== "" && value !== null && Number.isFinite(Number(value));
 
-    const onCustomPeriodSelect = () => {
-      // An emptied or non-numeric field is mid-edit: apply nothing until a number is typed.
-      if (!isValidCustomValue(relativeValue.value)) return;
+    const customDraft = ref<number | string>(relativeValue.value);
+    // Only a typed draft commits when focus leaves the row; passing through it changes nothing.
+    const customEdited = ref(false);
+    watch(relativeValue, (value) => {
+      customDraft.value = value;
+      customEdited.value = false;
+    });
+    const editCustomDraft = (value: number | string) => {
+      customDraft.value = value;
+      customEdited.value = true;
+    };
 
-      let value = Math.max(1, Math.trunc(Number(relativeValue.value)));
-      const restrictedMax = relativePeriodsMaxValue.value[relativePeriod.value];
-      if (
-        selectedType.value == "relative" &&
-        props.queryRangeRestrictionInHour > 0 &&
-        value > restrictedMax
-      ) {
-        value = restrictedMax > -1 ? restrictedMax : 15;
+    const isAppliedRolling = () =>
+      appliedSelection.selectedType === "relative" &&
+      appliedSelection.calendarToken === null &&
+      appliedSelection.relativePeriod === relativePeriod.value &&
+      appliedSelection.relativeValue === relativeValue.value;
+
+    // Typing only edits the draft; Enter, a unit pick or leaving the row turns it into the selection.
+    const commitCustom = (close: boolean) => {
+      customEdited.value = false;
+      if (!isValidCustomValue(customDraft.value)) {
+        customDraft.value = relativeValue.value;
+        return;
       }
-      relativeValue.value = Math.min(
-        value,
-        MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value,
+      const value = Math.max(1, Math.trunc(Number(customDraft.value)));
+      stageRelative(
+        relativePeriod.value,
+        Math.min(value, MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? value),
       );
+      customDraft.value = relativeValue.value;
       lastValidCustomValue.value = relativeValue.value;
-      calendarToken.value = null;
+      rangeInput.value?.clear();
+      // A second commit of the applied value (Enter, then leaving the row) must not emit again.
+      if (props.autoApply && !isAppliedRolling()) saveDate("relative-custom");
+      if (!close) return;
+      if (!props.autoApply) applyAndClose();
+      else if (gateReason.value === null) closeMenu();
+    };
 
-      if (props.autoApply) saveDate("relative-custom");
+    // The unit list is portalled, so moving into it leaves the row's DOM without leaving the edit.
+    const onCustomRowFocusout = (event: FocusEvent) => {
+      const row = event.currentTarget as HTMLElement | null;
+      const next = event.relatedTarget as HTMLElement | null;
+      if (
+        next &&
+        (row?.contains(next) || next.closest("[data-test='date-time-custom-unit-popover']"))
+      )
+        return;
+      if (customEdited.value) commitCustom(false);
     };
 
     const onCustomValueFocus = () => {
       lastValidCustomValue.value = relativeValue.value;
     };
     const onCustomValueBlur = () => {
-      if (!isValidCustomValue(relativeValue.value))
-        relativeValue.value = lastValidCustomValue.value;
+      if (!isValidCustomValue(customDraft.value)) customDraft.value = lastValidCustomValue.value;
     };
 
     // A finished calendar period ends at the next one's start; second-precision fields show its last second, as its tooltip does.
@@ -1086,10 +1293,11 @@ export default defineComponent({
         return;
       }
 
-      const periodString = period?.match(/(\d+)([smhdwM])/);
+      const periodString = matchRelativePeriod(period);
 
       if (periodString) {
         calendarToken.value = null;
+        rollingFold.value = null;
         const periodValue = periodString[1];
         const periodUnit = periodString[2];
 
@@ -1119,7 +1327,7 @@ export default defineComponent({
           // If the selected date is today, set the end time to the current time
           if (selectedDate.value.to === endDateTime.date) {
             selectedTime.value.endTime = endDateTime.time;
-          } else selectedTime.value.endTime = "23:59:59";
+          } else selectedTime.value.endTime = DAY_END_TIME;
         }
 
         return;
@@ -1127,11 +1335,26 @@ export default defineComponent({
       return;
     };
 
-    const setAbsoluteTime = (startTime: number, endTime: number) => {
-      // Parent-invoked setter — the resulting auto-apply emit is programmatic.
-      markProgrammaticDateChange();
+    const absoluteFieldsKey = () =>
+      JSON.stringify([selectedDate.value, selectedTime.value, pendingDay.value]);
+
+    // The flag is set only on a real change, because only a change runs the watcher that clears it.
+    const writeAsHost = (write: () => void) => {
+      const before = absoluteFieldsKey();
+      write();
+      hostFieldWrite ||= absoluteFieldsKey() !== before;
+    };
+
+    const isInstant = (value: unknown) =>
+      value !== null && value !== "" && Number.isFinite(Number(value));
+
+    const writeAbsoluteFields = (startTime: number, endTime: number) => {
       seededEnd = null;
-      if (!startTime || !endTime) {
+      // A host echoing the range back must not drop the fraction the fields cannot hold.
+      const exact = exactRange.value;
+      if (exact?.zone !== zone.value || exact.startUs !== startTime || exact.endUs !== endTime)
+        exactRange.value = null;
+      if (!isInstant(startTime) || !isInstant(endTime)) {
         var dateString = new Date().toLocaleDateString("en-ZA");
         selectedDate.value.from = dateString;
         selectedDate.value.to = dateString;
@@ -1148,6 +1371,12 @@ export default defineComponent({
       selectedTime.value.endTime = endDateTime.time;
     };
 
+    const setAbsoluteTime = (startTime: number, endTime: number) => {
+      // Parent-invoked setter — the resulting auto-apply emit is programmatic.
+      markProgrammaticDateChange();
+      writeAsHost(() => writeAbsoluteFields(startTime, endTime));
+    };
+
     function convertUnixTime(unixTimeMicros: number) {
       return formatAbsoluteInstant(unixTimeMicros, zone.value);
     }
@@ -1155,7 +1384,13 @@ export default defineComponent({
     const refresh = () => {
       // Parent-invoked (e.g. on tab re-activation / auto-refresh) — programmatic.
       markProgrammaticDateChange();
-      saveDate();
+      // An open panel may hold a draft the user has not applied, so the applied range is re-sent.
+      if (menuOpen.value) {
+        const date = getConsumableDateTime(Date.now(), appliedSelection);
+        emitDate(date, appliedSelection.selectedType);
+        return;
+      }
+      saveDate(null, "host");
     };
 
     // Distinguishes genuine user-driven date changes from programmatic ones
@@ -1177,41 +1412,178 @@ export default defineComponent({
      * Promote the pending selection to the applied one, so the trigger button
      * starts advertising it. Called from every path that actually puts a range
      * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
-     * NOT called from `onCustomPeriodSelect` / the popup's absolute inputs when
+     * NOT called from `commitCustom` / the popup's absolute inputs when
      * `autoApply` is off: those stay pending until Apply. `setRelativeDate` also
      * applies under `applyPresets`.
      */
-    const markApplied = () => {
+    const liveSelection = (): PickerSelection => ({
+      selectedType: selectedType.value,
+      calendarToken: calendarToken.value,
+      relativePeriod: relativePeriod.value,
+      relativeValue: relativeValue.value,
+      rollingFold: rollingFold.value,
+      selectedDate: selectedDate.value,
+      selectedTime: selectedTime.value,
+      seededEnd,
+      exactRange: exactRange.value,
+    });
+
+    const copySelection = (sel: PickerSelection): PickerSelection => ({
+      ...sel,
+      selectedDate: { ...sel.selectedDate },
+      selectedTime: { ...sel.selectedTime },
+      seededEnd: sel.seededEnd && { ...sel.seededEnd },
+      exactRange: sel.exactRange && { ...sel.exactRange },
+    });
+
+    const markApplied = (resolved?: ConsumableDateTime) => {
       appliedDisplayValue.value = getDisplayValue.value;
       appliedCalendarToken.value = selectedType.value === "relative" ? calendarToken.value : null;
-      appliedSelection = {
-        selectedType: selectedType.value,
-        calendarToken: calendarToken.value,
-        relativePeriod: relativePeriod.value,
-        relativeValue: relativeValue.value,
+      appliedSelection = copySelection(liveSelection());
+      // The bar's "Applied" summary reads this, and host setters apply without a save.
+      datePayload.value = resolved ?? getConsumableDateTime(gateNow.value, appliedSelection);
+    };
+
+    const selectionKey = (sel: PickerSelection) =>
+      JSON.stringify([sel.selectedType, sel.calendarToken, sel.relativePeriod, sel.relativeValue]) +
+      (sel.selectedType === "absolute"
+        ? JSON.stringify([sel.selectedDate, sel.selectedTime, sel.exactRange])
+        : "");
+
+    watch(
+      () => selectionKey(liveSelection()),
+      () => {
+        selectionSeq++;
+      },
+      { flush: "sync" },
+    );
+
+    // Closing without Apply, or while refused, puts back every applied field, so no reader sees a draft.
+    const restoreAppliedSelection = () => {
+      const applied = copySelection(appliedSelection);
+      isSeedingAbsolute = true;
+      selectedType.value = applied.selectedType;
+      calendarToken.value = applied.calendarToken;
+      relativePeriod.value = applied.relativePeriod;
+      relativeValue.value = applied.relativeValue;
+      rollingFold.value = applied.rollingFold;
+      selectedDate.value = applied.selectedDate;
+      selectedTime.value = applied.selectedTime;
+      seededEnd = applied.seededEnd;
+      exactRange.value = applied.exactRange;
+      nextTick(() => {
+        isSeedingAbsolute = false;
+      });
+    };
+
+    // One rule for the panel, the bar and paste; only a host's future maxDate lets a range end after now.
+    const maxDateEndUs = computed(() =>
+      props.maxDate
+        ? convertToUtcTimestamp(`${props.maxDate} ${DAY_END_TIME}`, zone.value)
+        : undefined,
+    );
+
+    const rangeLimits = computed<RangeLimits>(() => {
+      const hours = props.queryRangeRestrictionInHour;
+      // The parser's day ends are exclusive, so the gate's ceiling is the midnight after maxDate.
+      const maxEndUs =
+        maxDateEndUs.value === undefined ? undefined : maxDateEndUs.value + MICROS_PER_SECOND;
+      const minStartUs =
+        props.disableRelative && props.minDate
+          ? convertToUtcTimestamp(`${props.minDate} 00:00:00`, zone.value)
+          : undefined;
+      return {
+        allowFuture: maxEndUs !== undefined && maxEndUs > gateNow.value * 1000,
+        ...(maxEndUs !== undefined ? { maxEndUs } : {}),
+        ...(minStartUs !== undefined ? { minStartUs } : {}),
+        ...(hours > 0 ? { maxSpanUs: Math.round(hours * 3_600_000_000) } : {}),
+      };
+    });
+
+    // The gate, the label and Apply all read an absolute end through this one rule.
+    const consumableEndUs = (startUs: number, endTime: string, endUs: number, nowMs: number) =>
+      clipDayEnd(startUs, endTime, endUs, nowMs * 1000, rangeLimits.value.allowFuture);
+
+    // A clicked day still waiting for its pair is what Apply will use, so the gate checks that day.
+    const gateRange = (): { startTime: number; endTime: number } => {
+      const day = selectedType.value === "absolute" ? pendingDay.value : null;
+      if (day === null) return getConsumableDateTime(gateNow.value);
+      const { startTime, endTime } = selectedTime.value;
+      const startUs = convertToUtcTimestamp(`${day} ${startTime}`, zone.value);
+      const endUs = convertToUtcTimestamp(`${day} ${endTime}`, zone.value);
+      return {
+        startTime: startUs,
+        endTime: consumableEndUs(startUs, endTime, endUs, gateNow.value),
       };
     };
 
-    const restoreAppliedSelection = () => {
-      selectedType.value = appliedSelection.selectedType;
-      calendarToken.value = appliedSelection.calendarToken;
-      relativePeriod.value = appliedSelection.relativePeriod;
-      relativeValue.value = appliedSelection.relativeValue;
+    const gateReason = computed<GateReason | null>(() => {
+      void gateNow.value;
+      const { startTime, endTime } = gateRange();
+      return gateOf(startTime, endTime, rangeLimits.value);
+    });
+
+    const spanLimitText = computed(() =>
+      formatSpanLimit(props.queryRangeRestrictionInHour, intlLocale.value),
+    );
+
+    const instantText = (us: number) => {
+      const { date, time } = convertUnixTime(us);
+      return raw(`${date} ${time}`);
     };
 
-    const saveDate = (dateType?: string | null) => {
-      markApplied();
-      const date = getConsumableDateTime();
-      // if (isNaN(date.endTime) || isNaN(date.startTime)) {
-      //   // return false;
-      // }
+    const gateText = (
+      reason: GateReason | null,
+      range?: { startTime: number; endTime: number },
+    ) => {
+      if (reason === "order") return t("timeRangeInput.gateOrder");
+      if (reason === "max-span")
+        return t("timeRangeInput.blockedSpan", { limit: spanLimitText.value });
+      if (!reason) return null;
+      if (!range || reason === "out-of-range") return t("timeRangeInput.gateInvalid");
+      const { startTime, endTime } = range;
+      if (reason === "before-min")
+        return t("timeRangeInput.blockedBeforeMin", { date: instantText(startTime) });
+      if (reason === "after-max")
+        return t("timeRangeInput.blockedAfterMax", { date: instantText(endTime) });
+      // A whole-day end means "until now", so with a future start the start is what to change.
+      const dayEnd = selectedTime.value.endTime === DAY_END_TIME;
+      const future = endTime > gateNow.value * 1000 && !dayEnd ? endTime : startTime;
+      return t("timeRangeInput.blockedFuture", { date: instantText(future) });
+    };
+
+    const gateMessage = computed(() => gateText(gateReason.value, gateRange()));
+
+    const customBlocked = computed(
+      () =>
+        selectedType.value === "relative" &&
+        calendarToken.value === null &&
+        gateReason.value === "max-span",
+    );
+
+    // A user change that fails the gate is never applied; a range the host sets is its own call.
+    const emitDate = (date: ConsumableDateTime, dateType: string) => {
       datePayload.value = date;
-      date["valueType"] = dateType || selectedType.value;
+      date["valueType"] = dateType;
       date["userChangedValue"] = isUserInitiated;
-      // date["relativeTimePeriod"] = "";
       if (store.state.savedViewFlag == false) {
         emit("on:date-change", date);
       }
+    };
+
+    const saveDate = (dateType?: string | null, source: "user" | "host" = "user") => {
+      // The label stored below must show the now this apply clips a whole-day end to.
+      gateNow.value = Date.now();
+      const date = getConsumableDateTime(gateNow.value);
+      // The cached verdict can be older than the clock, so the bounds about to be sent are checked.
+      if (source === "user") {
+        const gate = gateCheck(date.startTime, date.endTime, rangeLimits.value);
+        if (gate.reason !== null) return;
+        date.endTime = gate.endUs;
+      }
+      markApplied(date);
+      if (source === "user") liveLabel.value = appliedDisplayValue.value;
+      emitDate(date, dateType || selectedType.value);
     };
 
     function formatDate(d: Date) {
@@ -1235,10 +1607,12 @@ export default defineComponent({
       var end_date = new Date(Math.floor(dateobj.end));
       const endObj = formatDate(end_date);
 
-      selectedDate.value.from = startObj.date;
-      selectedDate.value.to = endObj.date;
-      selectedTime.value.startTime = startObj.time;
-      selectedTime.value.endTime = endObj.time;
+      writeAsHost(() => {
+        selectedDate.value.from = startObj.date;
+        selectedDate.value.to = endObj.date;
+        selectedTime.value.startTime = startObj.time;
+        selectedTime.value.endTime = endObj.time;
+      });
 
       selectedType.value = dateType;
       markProgrammaticDateChange();
@@ -1299,106 +1673,102 @@ export default defineComponent({
       return keys[relativePeriod.value];
     });
 
-    function isValidDateTimeString(dateStr: string, timeStr: string): boolean {
-      return !isNaN(Date.parse(`${dateStr} ${timeStr}`));
-    }
+    const ROLLING_UNIT_US: Record<string, number> = {
+      s: MICROS_PER_SECOND,
+      m: 60 * MICROS_PER_SECOND,
+      h: 3600 * MICROS_PER_SECOND,
+    };
 
-    const getConsumableDateTime = (): ConsumableDateTime => {
-      const calendarRange =
-        selectedType.value === "relative"
-          ? resolveCalendarPeriod(calendarToken.value, zone.value)
-          : null;
-      if (calendarRange) {
-        return { ...calendarRange, relativeTimePeriod: calendarToken.value };
-      }
-      if (selectedType.value == "relative") {
-        let period = PERIOD_ARITHMETIC_UNIT[relativePeriod.value];
-        let periodValue = relativeValue.value;
-
-        // arithmetic on weeks is not supported; convert to days.
-        if (relativePeriod.value === "w") {
-          period = "days";
-          periodValue = periodValue * 7;
-        }
-
-        const subtractObject: Record<string, number> = {};
-
-        if (period && periodValue) subtractObject[period] = periodValue;
-        else {
-          console.error("getConsumableDateTime: Invalid relative period");
-          subtractObject["Minutes"] = 15;
-        }
-
-        const endTimeStamp = new Date();
-
-        const startTimeStamp = subtractRelativeTime(endTimeStamp, subtractObject);
-
-        return {
-          startTime: new Date(startTimeStamp).getTime() * 1000,
-          endTime: new Date(endTimeStamp).getTime() * 1000,
-          relativeTimePeriod: relativeValue.value + relativePeriod.value,
-        };
-      } else {
-        if (typeof selectedDate.value === "string") {
-          selectedDate.value = {
-            from: selectedDate.value,
-            to: selectedDate.value,
-          };
-        }
-
-        const startDateStr = selectedDate.value.from + " " + selectedTime.value.startTime;
-        if (!isValidDateTimeString(selectedDate.value.from, selectedTime.value.startTime)) {
-          // console.warn(`Invalid start date/time: ${startDateStr}`);
-          // return new Date();
-        }
-
-        const endDateStr = selectedDate.value.to + " " + selectedTime.value.endTime;
-        if (!isValidDateTimeString(selectedDate.value.to, selectedTime.value.endTime)) {
-          // console.error(`Invalid end date/time: ${endDateStr}`);
-          // return new Date();
-        }
-
-        let start, end;
-        if (!selectedDate.value?.from && !selectedTime.value?.startTime) {
-          start = new Date();
-        } else {
-          start = new Date(startDateStr);
-        }
-
-        if (selectedDate.value?.to == "" && selectedTime.value?.endTime == "") {
-          end = new Date();
-        } else {
-          end = new Date(endDateStr);
-        }
-
-        if (start.toString() === "Invalid Date" && end.toString() === "Invalid Date") {
-          start = selectedDate.value + " " + selectedTime.value.startTime;
-          end = selectedDate.value + " " + selectedTime.value.endTime;
-        }
-        const absoluteUTCTimestamp = getUTCTimeStamp();
-        const rVal = {
-          startTime: absoluteUTCTimestamp.startUTC,
-          endTime: absoluteUTCTimestamp.endUTC,
-          relativeTimePeriod: null,
-          selectedDate: JSON.parse(JSON.stringify(selectedDate.value)),
-          selectedTime: JSON.parse(JSON.stringify(selectedTime.value)),
-        };
-        return rVal;
+    // Days, weeks and months step the picker zone's calendar, so a DST day is 23 or 25 hours long.
+    const rollingStartUs = (
+      value: number,
+      unit: string,
+      nowUs: number,
+      fold: RollingFold | null = null,
+    ): number => {
+      const fixed = ROLLING_UNIT_US[unit];
+      if (fixed) return nowUs - value * fixed;
+      try {
+        const wall = wallAt(zone.value, nowUs);
+        const back =
+          unit === "M" ? addMonths(wall, -value) : addDays(wall, -(unit === "w" ? 7 : 1) * value);
+        const at = resolveCivil(back, zone.value);
+        if (at === null) return NaN;
+        if (at.kind === "fold") return fold === "later" ? at.later : at.earlier;
+        return at.us;
+      } catch {
+        const amount: Record<string, number> =
+          unit === "w" ? { days: value * 7 } : { [PERIOD_ARITHMETIC_UNIT[unit]]: value };
+        const now = new Date(Math.floor(nowUs / 1000));
+        return new Date(subtractRelativeTime(now, amount)).getTime() * 1000;
       }
     };
 
-    const getUTCTimeStamp = () => {
-      let startTime = selectedDate.value.from + " " + selectedTime.value.startTime;
-      let endTime = selectedDate.value.to + " " + selectedTime.value.endTime;
-      const startUTC = convertToUtcTimestamp(startTime, zone.value);
+    // nowMs is the clock a whole-day end on today is clipped to.
+    const getConsumableDateTime = (
+      nowMs = Date.now(),
+      sel: PickerSelection = liveSelection(),
+    ): ConsumableDateTime => {
+      const calendarRange =
+        sel.selectedType === "relative"
+          ? resolveCalendarPeriod(sel.calendarToken, zone.value)
+          : null;
+      if (calendarRange) {
+        return { ...calendarRange, relativeTimePeriod: sel.calendarToken };
+      }
+      if (sel.selectedType == "relative") {
+        let value = Number(sel.relativeValue);
+        let unit = sel.relativePeriod;
+        if (!PERIOD_ARITHMETIC_UNIT[unit] || !(value > 0)) {
+          console.error("getConsumableDateTime: Invalid relative period");
+          value = 15;
+          unit = "m";
+        }
+        const endTime = Math.floor(Date.now()) * 1000;
+        return {
+          startTime: rollingStartUs(value, unit, endTime, sel.rollingFold),
+          endTime,
+          relativeTimePeriod: sel.relativeValue + sel.relativePeriod,
+        };
+      }
+      if (typeof sel.selectedDate === "string") {
+        selectedDate.value = { from: sel.selectedDate, to: sel.selectedDate };
+        sel = liveSelection();
+      }
+      const absoluteUTCTimestamp = getUTCTimeStamp(nowMs, sel);
+      return {
+        startTime: absoluteUTCTimestamp.startUTC,
+        endTime: absoluteUTCTimestamp.endUTC,
+        relativeTimePeriod: null,
+        selectedDate: JSON.parse(JSON.stringify(sel.selectedDate)),
+        selectedTime: JSON.parse(JSON.stringify(sel.selectedTime)),
+      };
+    };
+
+    const getUTCTimeStamp = (nowMs: number, sel: PickerSelection = liveSelection()) => {
+      const { selectedDate: date, selectedTime: time, exactRange: exact, seededEnd: seeded } = sel;
+      if (
+        exact !== null &&
+        exact.zone === zone.value &&
+        exact.from === date.from &&
+        exact.to === date.to &&
+        exact.startTime === time.startTime &&
+        exact.endTime === time.endTime
+      ) {
+        const endUTC = consumableEndUs(exact.startUs, exact.endTime, exact.endUs, nowMs);
+        return { startUTC: exact.startUs, endUTC };
+      }
+      const startUTC = convertToUtcTimestamp(`${date.from} ${time.startTime}`, zone.value);
       const untouchedSeededEnd =
-        seededEnd !== null &&
-        seededEnd.date === selectedDate.value.to &&
-        seededEnd.time === selectedTime.value.endTime;
+        seeded !== null && seeded.date === date.to && seeded.time === time.endTime;
       // The shown last second stands for the exclusive end one second later, in whatever zone is now selected.
       const endUTC =
-        convertToUtcTimestamp(endTime, zone.value) + (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
-      return { startUTC, endUTC };
+        convertToUtcTimestamp(`${date.to} ${time.endTime}`, zone.value) +
+        (untouchedSeededEnd ? MICROS_PER_SECOND : 0);
+      return {
+        startUTC,
+        endUTC: consumableEndUs(startUTC, time.endTime, endUTC, nowMs),
+      };
     };
 
     const setSavedDate = (dateobj: any) => {
@@ -1417,8 +1787,12 @@ export default defineComponent({
           Object.prototype.hasOwnProperty.call(dateobj.selectedTime, "startTime") &&
           Object.prototype.hasOwnProperty.call(dateobj.selectedTime, "endTime")
         ) {
-          selectedDate.value = dateobj.selectedDate;
-          selectedTime.value = dateobj.selectedTime;
+          writeAsHost(() => {
+            selectedDate.value.from = dateobj.selectedDate.from;
+            selectedDate.value.to = dateobj.selectedDate.to;
+            selectedTime.value.startTime = dateobj.selectedTime.startTime;
+            selectedTime.value.endTime = dateobj.selectedTime.endTime;
+          });
         } else {
           applyCustomDate(dateobj.type, {
             start: dateobj.startTime / 1000,
@@ -1466,7 +1840,7 @@ export default defineComponent({
      */
     const triggerLabel = computed(() => {
       if (props.triggerText) return props.triggerText;
-      const showsApplied = !props.autoApply && !menuOpen.value;
+      const showsApplied = (!props.autoApply && !menuOpen.value) || gateReason.value !== null;
       // A calendar label is re-derived so an older period keeps naming the right day after midnight.
       const appliedCalendarLabel =
         showsApplied && appliedCalendarToken.value !== null
@@ -1489,6 +1863,16 @@ export default defineComponent({
       if (!props.autoApply && !menuOpen.value) return calendarTooltip(appliedCalendarToken.value);
       return selectedType.value === "relative" ? calendarTooltip(calendarToken.value) : undefined;
     });
+
+    const shownEnd = (from: string, to: string) => {
+      const time = selectedTime.value.endTime;
+      const startUs = convertToUtcTimestamp(`${from} ${selectedTime.value.startTime}`, zone.value);
+      const endUs = convertToUtcTimestamp(`${to} ${time}`, zone.value);
+      const clipped = consumableEndUs(startUs, time, endUs, gateNow.value);
+      if (clipped === endUs) return `${to} ${time}`;
+      const now = convertUnixTime(clipped);
+      return `${now.date} ${now.time}`;
+    };
 
     const getDisplayValue = computed(() => {
       const calendarLabel =
@@ -1517,7 +1901,7 @@ export default defineComponent({
             const pending = menuOpen.value ? pendingDay.value : null;
             const from = pending ?? selectedDate.value.from;
             const to = pending ?? selectedDate.value.to;
-            return `${from} ${selectedTime.value.startTime} - ${to} ${selectedTime.value.endTime}`;
+            return `${from} ${selectedTime.value.startTime} - ${shownEnd(from, to)}`;
           } else if (selectedDate.value?.from && selectedDate.value?.to && props.disableRelative) {
             return `${selectedDate.value.from} - ${selectedDate.value.to}`;
           } else {
@@ -1530,100 +1914,165 @@ export default defineComponent({
       }
     });
 
-    // ----- Copy / paste of the selected range ---------------------------------
-    // Copy always resolves the selection (relative OR absolute) to a concrete
-    // absolute window, so the copied value is unambiguous. Paste accepts that
-    // format plus `Past N <Period>` and raw epoch timestamp pairs.
-    const copyRange = () => {
-      // Epoch microseconds side-step timezone ambiguity: pasting this into a
-      // tab with a different selected timezone still lands on the same
-      // instant, unlike a "yyyy/MM/dd HH:mm:ss" string (which paste would
-      // reinterpret using the pasting tab's own timezone).
+    const rangeInput = ref<{
+      setText: (text: string, source: "typed" | "paste") => void;
+      clear: () => void;
+      focus: () => void;
+      submit: () => boolean;
+    } | null>(null);
+    // Set while the bar holds text that is not a valid reading, so Apply cannot skip past it.
+    const rangeInputBlocksApply = ref(false);
+    // Set while the bar holds a valid reading, which Apply submits instead of the panel's draft.
+    const rangeInputValid = ref(false);
+
+    const showRangeInput = computed(
+      () =>
+        !props.hideRangeInput &&
+        !props.hideClipboard &&
+        !(props.disableRelative && props.hideRelativeTime),
+    );
+
+    const rangeUnits = computed(() => relativePeriods.map((p) => p.value as RelativeUnit));
+
+    const rangeKinds = computed(() => ({
+      relative: !props.disableRelative,
+      calendar: props.calendarPresets,
+      absolute: true,
+    }));
+
+    const rangeContext = () => ({
+      locale: String(locale.value),
+      zone: zone.value,
+      units: rangeUnits.value,
+      kinds: rangeKinds.value,
+      limits: rangeLimits.value,
+    });
+
+    const appliedRange = computed(() => {
+      const { startTime, endTime } = datePayload.value as Partial<ConsumableDateTime>;
+      return typeof startTime === "number" && typeof endTime === "number"
+        ? { startUs: startTime, endUs: endTime }
+        : null;
+    });
+
+    const prefetchRangeInput = () => {
+      if (showRangeInput.value) loadRangeInput().catch(() => undefined);
+    };
+
+    // The open tab decides the form: a rolling or calendar selection stays one when pasted back.
+    const clipboardRange = (): FormattableRange => {
       const { startTime, endTime } = getConsumableDateTime();
-      const payload = JSON.stringify({ start_date: startTime, end_date: endTime });
-      copyToClipboard(payload, t, { successMessage: t("common.dateRangeCopied") });
+      if (props.disableRelative || selectedType.value !== "relative") {
+        // A pending clicked day is what the trigger shows and Apply uses, so Copy takes it too.
+        const range = gateRange();
+        return { kind: "absolute", startUs: range.startTime, endUs: range.endTime };
+      }
+      if (calendarToken.value !== null) {
+        return {
+          kind: "calendar",
+          startUs: startTime,
+          endUs: endTime,
+          calendarToken: calendarToken.value,
+        };
+      }
+      return {
+        kind: "rolling",
+        startUs: startTime,
+        endUs: endTime,
+        rolling: { value: relativeValue.value, unit: relativePeriod.value as RelativeUnit },
+      };
     };
 
-    // Converts a parsed absolute date[+time] string, interpreted as wall-clock
-    // time in the currently selected timezone, to epoch microseconds — the
-    // inverse of convertUnixTime.
-    const absoluteToMicros = (date: string, time: string): number => {
-      const iso = `${date.replace(/\//g, "-")}T${time}`;
-      return fromZonedTime(iso, zone.value).getTime() * 1000;
+    const copyRange = () => {
+      const range = clipboardRange();
+      const text = formatTimeRangeInput(range, { zone: zone.value });
+      if (!text) return;
+      const offset = range.kind === "absolute" ? text.match(/([+-]\d{2}:\d{2}) - /)?.[1] : null;
+      const successMessage = offset
+        ? t("common.dateRangeCopiedWithOffset", { offset })
+        : t("common.dateRangeCopiedAs", { text });
+      copyToClipboard(text, t, { successMessage });
     };
 
-    const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
+    // shownEndUs is the instant the end fields show, when that differs from the exclusive end.
+    const stageAbsolute = (startUs: number, endUs: number, shownEndUs = endUs) => {
       selectedType.value = "absolute";
       calendarToken.value = null;
       // A day clicked before the paste would otherwise overwrite the pasted range when the panel closes.
       pendingDay.value = null;
-      // Saved once below, so the auto-apply date watcher must not save it a second time.
+      // Saved once by the caller, so the auto-apply date watcher must not save it a second time.
       isSeedingAbsolute = true;
-      setAbsoluteTime(startMicros, endMicros);
+      writeAbsoluteFields(startUs, shownEndUs);
       nextTick(() => {
         isSeedingAbsolute = false;
       });
-      // A paste is the user's own change; setAbsoluteTime stamps it programmatic, which pages gating refetch on it ignore.
-      isUserInitiated = true;
-      if (props.autoApply) {
-        saveDate(null);
-        recordAbsoluteRange();
-      }
+      const start = convertUnixTime(startUs);
+      const end = convertUnixTime(shownEndUs);
+      exactRange.value = {
+        zone: zone.value,
+        from: start.date,
+        to: end.date,
+        startTime: start.time,
+        endTime: end.time,
+        startUs,
+        endUs,
+      };
     };
 
-    const applyParsedRange = (text: string): boolean => {
-      const parsed = parseDateRangeString(text);
-      if (!parsed) return false;
-      if (parsed.type === "timestamp") {
-        finalizeAbsoluteRange(parsed.startMicros, parsed.endMicros);
+    const stageCalendar = (token: string) => {
+      selectedType.value = "relative";
+      calendarToken.value = token;
+    };
+
+    const stageReading = (reading: TimeRangeReading) => {
+      if (reading.kind === "rolling" && reading.rolling) {
+        const { unit, value } = reading.rolling;
+        stageRelative(unit, Math.min(value, MAX_CUSTOM_RELATIVE_VALUE[unit] ?? value));
+        // The parser's rolling end is its now, so the later reading of a repeated hour is recognisable.
+        const later = rollingStartUs(value, unit, reading.endUs, "later");
+        if (later === reading.startUs && later !== rollingStartUs(value, unit, reading.endUs))
+          rollingFold.value = "later";
+      } else if (reading.kind === "calendar" && reading.calendarToken) {
+        stageCalendar(reading.calendarToken);
       } else {
-        finalizeAbsoluteRange(
-          absoluteToMicros(parsed.startDate, parsed.startTime),
-          absoluteToMicros(parsed.endDate, parsed.endTime),
-        );
+        stageAbsolute(reading.startUs, reading.endUs);
       }
-      return true;
     };
 
-    // Applies a single pasted date-time value to whichever side of the current
-    // range it sits closer to — e.g. a range of 5:00-10:00 pasted with 7:00
-    // becomes 7:00-10:00 (closer to start), while 13:00 becomes 5:00-13:00
-    // (closer to end). There's no cursor/selection to anchor a side to
-    // without a text field, so proximity is the next best signal of intent.
-    const applySingleDateTime = (parsed: ParsedSingleDateTime) => {
-      const micros =
-        parsed.type === "timestamp"
-          ? parsed.micros
-          : absoluteToMicros(parsed.date, parsed.time ?? "00:00:00");
-
-      const { startTime: baseStart, endTime: baseEnd } = getConsumableDateTime();
-      const isCloserToStart = Math.abs(micros - baseStart) <= Math.abs(micros - baseEnd);
-      finalizeAbsoluteRange(
-        isCloserToStart ? micros : baseStart,
-        isCloserToStart ? baseEnd : micros,
-      );
+    const commitTypedReading = (reading: TimeRangeReading) => {
+      stageReading(reading);
+      applyAndClose();
     };
 
-    // Tries a full range first, then a single value applied to both sides.
-    const applyPastedText = (text: string): boolean => {
-      if (applyParsedRange(text)) return true;
-
-      const single = parseSingleDateTime(text);
-      if (!single) return false;
-
-      applySingleDateTime(single);
-      return true;
-    };
-
-    const applyPastedTextWithToast = (text: string) => {
-      if (applyPastedText(text)) {
+    // A full range applies at once; a lone stamp or a text that needs a choice goes to the bar instead.
+    const pasteText = async (text: string, seq = selectionSeq) => {
+      if (text.length > MAX_RANGE_TEXT_UNITS) {
+        if (showRangeInput.value && rangeInput.value) rangeInput.value.setText(text, "paste");
+        else toast({ variant: "error", message: t("common.dateRangePasteError") });
+        return;
+      }
+      const { readPickerText } = await import("@/composables/useTimeRangeInput");
+      const res = await readPickerText(text, rangeContext());
+      if (seq !== selectionSeq) return;
+      const reading =
+        res.state === "valid" && !res.reading.notes.some((n) => n.kind === "instant-window")
+          ? res.reading
+          : null;
+      if (reading) {
+        stageReading(reading);
+        // The bar's older text would otherwise win when Apply submits it first.
+        rangeInput.value?.clear();
+        if (props.autoApply) applyAndClose();
         toast({ variant: "success", message: t("common.dateRangePasted") });
+      } else if (showRangeInput.value && rangeInput.value) {
+        rangeInput.value.setText(text, "paste");
       } else {
         toast({ variant: "error", message: t("common.dateRangePasteError") });
       }
     };
 
     const pasteRange = async () => {
+      const seq = selectionSeq;
       let text = "";
       try {
         text = await navigator.clipboard.readText();
@@ -1636,20 +2085,21 @@ export default defineComponent({
         });
         return;
       }
-      if (!text.trim()) {
+      // The length check comes first, so an oversize clipboard is never walked by trim().
+      if (text.length <= MAX_RANGE_TEXT_UNITS && !text.trim()) {
         toast({ variant: "info", message: t("common.dateRangePasteEmpty") });
         return;
       }
-      applyPastedTextWithToast(text);
+      await pasteText(text, seq);
     };
 
     // A native paste event carries the clipboard text without the read permission pasteRange needs.
     const onPickerPaste = (event: ClipboardEvent) => {
       if (isInputFocused(event.target)) return;
       const text = event.clipboardData?.getData("text") ?? "";
-      if (!text.trim()) return;
+      if (text.length <= MAX_RANGE_TEXT_UNITS && !text.trim()) return;
       event.preventDefault();
-      applyPastedTextWithToast(text);
+      return pasteText(text);
     };
 
     const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
@@ -1707,10 +2157,12 @@ export default defineComponent({
       if (value === "relative" || value === "absolute") selectTab(value);
     };
 
+    // A host switch puts its own range in force, so the gate that guards user edits does not apply.
     const setDateType = (type: string) => {
       selectedType.value = type;
-      // displayValue.value = getDisplayValue();
-      if (props.autoApply) saveDate(type === "absolute" ? "absolute" : "relative-custom");
+      if (!props.autoApply) return;
+      markProgrammaticDateChange();
+      saveDate(type === "absolute" ? "absolute" : "relative-custom", "host");
     };
 
     /**
@@ -1723,9 +2175,8 @@ export default defineComponent({
      *
      * Deliberately does NOT call `markProgrammaticDateChange()`: the change is
      * user-driven, so `userChangedValue` stays `true` and consumers (e.g.
-     * traces live-mode) re-run their query just like a manual Apply. With
-     * `autoApply` the deep `selectedDate`/`selectedTime` watcher saves the new
-     * range; otherwise we save and emit directly.
+     * traces live-mode) re-run their query just like a manual Apply. The step
+     * is staged with its exact µs and saved directly in every host mode.
      */
     const shiftTimeRange = (direction: "prev" | "next") => {
       if (selectedType.value === "relative" && calendarToken.value !== null) {
@@ -1744,6 +2195,19 @@ export default defineComponent({
         saveDate("relative");
         return;
       }
+      // Stepping forward onto the window a rolling range started from makes it roll again.
+      if (direction === "next" && liveStepOrigin()?.steps === -1) {
+        const origin = stepOrigin!;
+        stepOrigin = null;
+        stageRelative(origin.period, origin.value);
+        menuOpen.value = false;
+        saveDate("relative");
+        return;
+      }
+      const fromRolling = isRolling();
+      const origin = fromRolling
+        ? { period: relativePeriod.value, value: relativeValue.value, steps: 0 }
+        : liveStepOrigin();
       const { startTime, endTime } = getConsumableDateTime();
       const duration = endTime - startTime;
       if (!(duration > 0)) return;
@@ -1754,29 +2218,136 @@ export default defineComponent({
         delta = Math.min(delta, forwardCeilingMicros() - endTime);
         if (delta < MICROS_PER_SECOND) return;
       }
-      const startDateTime = convertUnixTime(startTime + delta);
-      const endDateTime = convertUnixTime(endTime + delta);
+      // A step past the host's oldest day stops at it; one that cannot move or fails the gate changes nothing.
+      const minStartUs = rangeLimits.value.minStartUs ?? -Infinity;
+      const startUs = Math.max(startTime + delta, minStartUs);
+      const endUs = endTime + delta;
+      if (gateOf(startUs, endUs, rangeLimits.value) !== null) return;
 
-      selectedDate.value.from = startDateTime.date;
-      selectedDate.value.to = endDateTime.date;
-      selectedTime.value.startTime = startDateTime.time;
-      selectedTime.value.endTime = endDateTime.time;
-      selectedType.value = "absolute";
+      stageAbsolute(startUs, endUs);
+      stepOrigin = origin && {
+        ...origin,
+        steps: origin.steps + (direction === "prev" ? -1 : 1),
+        at: absoluteRangeKey(),
+      };
 
       menuOpen.value = false;
-      if (!props.autoApply) saveDate("absolute");
+      saveDate("absolute");
     };
 
-    const forwardCeilingMicros = () =>
-      props.maxDate
-        ? convertToUtcTimestamp(`${props.maxDate} 23:59:59`, zone.value)
-        : Date.now() * 1000;
+    // Set when ‹ leaves a rolling range; any other change of the window makes it stale.
+    let stepOrigin: StepOrigin | null = null;
+    const liveStepOrigin = () =>
+      stepOrigin !== null && stepOrigin.at === absoluteRangeKey() ? stepOrigin : null;
+
+    const isRolling = () =>
+      !props.disableRelative && selectedType.value === "relative" && calendarToken.value === null;
+
+    const rollingSpanMicros = (value: number, unit: string) => {
+      const nowUs = Math.floor(Date.now()) * 1000;
+      return nowUs - rollingStartUs(value, unit, nowUs);
+    };
+
+    // The real span of a rolling range ending now, as the gate measures it once applied.
+    const rollingGate = (value: number, unit: string) => {
+      const endUs = Math.floor(Date.now()) * 1000;
+      return gateOf(endUs - rollingSpanMicros(value, unit), endUs, rangeLimits.value);
+    };
+
+    // A DST day is longer or shorter, so the set is rebuilt when the picker's day changes.
+    const blockedChips = computed(() => {
+      void pickerDay.value;
+      const blocked = new Set<string>();
+      if (!(props.queryRangeRestrictionInHour > 0)) return blocked;
+      for (const period of relativePeriods) {
+        for (const value of relativeDates[period.value]) {
+          if (rollingGate(value, period.value) !== null) blocked.add(`${value}${period.value}`);
+        }
+      }
+      return blocked;
+    });
+
+    // The largest value of a unit whose rolling range passes the gate now; -1 when even one is refused.
+    const maxPassingValue = (unit: string) => {
+      const hours = props.queryRangeRestrictionInHour;
+      // A nominal 30-day month floors a 28-day limit to 0, though February's month fits it.
+      const first = Math.max(1, Math.ceil((hours * 3600) / UNIT_SECONDS[unit]));
+      for (let value = first; value >= 1; value--) {
+        const reason = rollingGate(value, unit);
+        if (reason === null) return value;
+        if (reason !== "max-span") break;
+      }
+      return -1;
+    };
+
+    // A tighter host limit moves the selection to the largest range it allows; the host caused it, so no gate.
+    const clampToRestriction = (period: string, value: number) => {
+      stageRelative(period, value);
+      if (props.autoApply || props.applyPresets) saveDate("relative", "host");
+    };
+
+    const zoomOutTarget = (): ZoomTarget => {
+      if (isRolling()) {
+        const value = Number(relativeValue.value) * 2;
+        return { kind: "rolling", value, spanUs: rollingSpanMicros(value, relativePeriod.value) };
+      }
+      const { startTime, endTime } = getConsumableDateTime();
+      const span = endTime - startTime;
+      // The half that would pass now is added to the start, so the window still doubles.
+      const endUs = Math.min(endTime + Math.round(span / 2), forwardCeilingMicros());
+      return { kind: "fixed", startUs: endUs - span * 2, endUs, spanUs: span * 2 };
+    };
+
+    const zoomOutBlocked = computed<GateReason | null>(() => {
+      const target = zoomOutTarget();
+      if (
+        target.kind === "rolling" &&
+        target.value > (MAX_CUSTOM_RELATIVE_VALUE[relativePeriod.value] ?? Infinity)
+      )
+        return "out-of-range";
+      if (!(target.spanUs > 0)) return "order";
+      return target.kind === "rolling"
+        ? rollingGate(target.value, relativePeriod.value)
+        : gateOf(target.startUs, target.endUs, rangeLimits.value);
+    });
+
+    const zoomOutTooltip = computed(
+      () => gateText(zoomOutBlocked.value) ?? t("common.zoomOutRange"),
+    );
+
+    const showRangeZoom = computed(
+      () => !props.hideRangeShift && !props.disableRelative && !props.fieldAppearance,
+    );
+
+    const zoomOut = () => {
+      if (zoomOutBlocked.value !== null) return;
+      const target = zoomOutTarget();
+      stepOrigin = null;
+      menuOpen.value = false;
+      if (target.kind === "rolling") {
+        relativeValue.value = target.value;
+        rollingFold.value = null;
+        saveDate("relative");
+        return;
+      }
+      stageAbsolute(target.startUs, target.endUs);
+      saveDate("absolute");
+    };
+
+    const forwardCeilingMicros = () => maxDateEndUs.value ?? Date.now() * 1000;
+
+    const isPrevShiftDisabled = () => {
+      const minStartUs = rangeLimits.value.minStartUs;
+      if (minStartUs === undefined) return false;
+      return getConsumableDateTime().startTime <= minStartUs;
+    };
 
     const isNextShiftDisabled = () => {
+      if (liveStepOrigin()?.steps === -1) return false;
       if (selectedType.value === "relative") {
         return (parseCalendarToken(calendarToken.value)?.offset ?? 0) === 0;
       }
-      const { endUTC } = getUTCTimeStamp();
+      const { endUTC } = getUTCTimeStamp(Date.now());
       return !(endUTC + MICROS_PER_SECOND <= forwardCeilingMicros());
     };
 
@@ -1797,6 +2368,8 @@ export default defineComponent({
       const panel = event.currentTarget as HTMLElement;
       const target = event.target as HTMLElement;
       if (!panel || !target) return;
+      // The bar's arrows move through its own readings, never the preset grid.
+      if (target.closest("[data-test='date-time-range-bar']")) return;
 
       const railItem = target.closest<HTMLButtonElement>("[data-date-time-rail-item]");
       if (railItem) {
@@ -1894,41 +2467,8 @@ export default defineComponent({
     const computeRelativePeriod = () => {
       if (selectedType.value === "relative") {
         if (props.queryRangeRestrictionInHour > 0) {
-          for (let period of relativePeriods) {
-            if (period.value == "s") {
-              relativePeriodsMaxValue.value[period.value] = 60;
-            }
-
-            if (period.value == "m") {
-              relativePeriodsMaxValue.value[period.value] = 60;
-            }
-
-            if (period.value == "h" && props.queryRangeRestrictionInHour > 0) {
-              relativePeriodsMaxValue.value[period.value] = props.queryRangeRestrictionInHour;
-            } else if (period.value == "h") {
-              relativePeriodsMaxValue.value[period.value] = -1;
-            }
-
-            if (period.value == "d" && props.queryRangeRestrictionInHour > 24) {
-              relativePeriodsMaxValue.value[period.value] =
-                Math.round(props.queryRangeRestrictionInHour / 24) || 31;
-            } else if (period.value == "d") {
-              relativePeriodsMaxValue.value[period.value] = -1;
-            }
-
-            if (period.value == "w" && props.queryRangeRestrictionInHour > 24 * 7) {
-              relativePeriodsMaxValue.value[period.value] =
-                Math.round(props.queryRangeRestrictionInHour / (24 * 7)) || 100;
-            } else if (period.value == "w") {
-              relativePeriodsMaxValue.value[period.value] = -1;
-            }
-
-            if (period.value == "M" && props.queryRangeRestrictionInHour > 24 * 30) {
-              relativePeriodsMaxValue.value[period.value] =
-                Math.round(props.queryRangeRestrictionInHour / (24 * 30)) || 100;
-            } else if (period.value == "M") {
-              relativePeriodsMaxValue.value[period.value] = -1;
-            }
+          for (const period of relativePeriods) {
+            relativePeriodsMaxValue.value[period.value] = maxPassingValue(period.value);
           }
         } else {
           relativePeriodsMaxValue.value = {
@@ -1952,10 +2492,10 @@ export default defineComponent({
           // Clamped like a too-long rolling range: to the largest window the page allows.
           const unit = [...periodUnits].reverse().find((u) => relativePeriodsMaxValue.value[u] > 0);
           if (unit) {
-            setRelativeDate(unit, relativePeriodsMaxValue.value[unit]);
+            clampToRestriction(unit, relativePeriodsMaxValue.value[unit]);
           } else {
             calendarToken.value = null;
-            if (props.autoApply) saveDate("relative");
+            if (props.autoApply) saveDate("relative", "host");
           }
         }
 
@@ -1963,13 +2503,13 @@ export default defineComponent({
           const maxRelativeValue = relativePeriodsMaxValue.value[relativePeriod.value];
 
           try {
-            if (maxRelativeValue !== -1 && relativeValue.value > maxRelativeValue) {
-              setRelativeDate(relativePeriod.value, maxRelativeValue);
+            if (maxRelativeValue > 0 && relativeValue.value > maxRelativeValue) {
+              clampToRestriction(relativePeriod.value, maxRelativeValue);
             } else if (maxRelativeValue === -1) {
               const periodIndex = periodUnits.indexOf(relativePeriod.value);
               for (let i = periodIndex; i >= 0; i--) {
                 if (relativePeriodsMaxValue.value[periodUnits[i]] > -1) {
-                  setRelativeDate(
+                  clampToRestriction(
                     periodUnits[i],
                     relativeDates[periodUnits[i]]?.[0] ?? relativeDates["m"][0], // fallback to 15 minutes,
                   );
@@ -2000,13 +2540,14 @@ export default defineComponent({
 
     const absoluteRangeKey = () => {
       if (selectedType.value !== "absolute") return null;
-      const { startUTC, endUTC } = getUTCTimeStamp();
+      // The key names the selection, not the clock, so a whole-day end on today is not clipped here.
+      const { startUTC, endUTC } = getUTCTimeStamp(Infinity);
       return `${startUTC}-${endUTC}`;
     };
 
     const recordAbsoluteRange = () => {
       if (!showRail.value || selectedType.value !== "absolute") return;
-      const { startUTC, endUTC } = getUTCTimeStamp();
+      const { startUTC, endUTC } = getUTCTimeStamp(Date.now());
       timeRangeHistory.add(startUTC, endUTC);
     };
 
@@ -2032,23 +2573,71 @@ export default defineComponent({
       clockTick = setInterval(refreshTooltipNow, 60_000);
     };
     watch(needsClock, syncClock, { immediate: true });
-    onActivated(syncClock);
-    onDeactivated(stopClock);
+    // A picker in a view kept alive behind another route must not keep its clocks running.
+    const viewActive = ref(true);
+    onActivated(() => {
+      viewActive.value = true;
+      syncClock();
+    });
+    onDeactivated(() => {
+      viewActive.value = false;
+      stopClock();
+    });
     onBeforeUnmount(stopClock);
+    // True while the open selection's whole-day end is clipped to now, so the label must follow the clock.
+    const clipsToNow = computed(() => {
+      if (selectedType.value !== "absolute" || selectedTime.value.endTime !== DAY_END_TIME)
+        return false;
+      const day = pendingDay.value ?? selectedDate.value.to;
+      const endUs = convertToUtcTimestamp(`${day} ${DAY_END_TIME}`, zone.value);
+      return !rangeLimits.value.allowFuture && endUs > gateNow.value * 1000;
+    });
+    let gateTick: ReturnType<typeof setInterval> | null = null;
+    const stopGateTick = () => {
+      if (gateTick !== null) clearInterval(gateTick);
+      gateTick = null;
+    };
+    watch(
+      () =>
+        viewActive.value && menuOpen.value && (gateReason.value === "future" || clipsToNow.value),
+      (waiting) => {
+        stopGateTick();
+        if (!waiting) return;
+        gateNow.value = Date.now();
+        gateTick = setInterval(() => (gateNow.value = Date.now()), 1000);
+      },
+    );
+    onBeforeUnmount(stopGateTick);
+
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
+        selectionSeq++;
+        gateNow.value = Date.now();
         refreshTooltipNow();
         pendingDay.value = null;
         rangeKeyAtOpen = absoluteRangeKey();
         onBeforeShow();
         onShow();
       } else {
+        rangeInputBlocksApply.value = false;
+        rangeInputValid.value = false;
+        selectionSeq++;
+        if (gateReason.value !== null) {
+          pendingDay.value = null;
+          restoreAppliedSelection();
+          onBeforeHide();
+          onHide();
+          return;
+        }
         if (props.autoApply && commitPendingDay()) saveDate("absolute");
         pendingDay.value = null;
         if (!props.autoApply || selectedType.value !== appliedSelection.selectedType) {
           restoreAppliedSelection();
-        } else if (absoluteRangeKey() !== rangeKeyAtOpen) {
-          recordAbsoluteRange();
+        } else {
+          // A refused edit that the clock has since made valid was never sent; closing sends it.
+          if (selectionKey(liveSelection()) !== selectionKey(appliedSelection))
+            saveDate(selectedType.value);
+          if (absoluteRangeKey() !== rangeKeyAtOpen) recordAbsoluteRange();
         }
         onBeforeHide();
         onHide();
@@ -2057,6 +2646,12 @@ export default defineComponent({
 
     // The rail sits after the header band in DOM order, so reka's default autofocus would land on a tab button.
     const onPopoverOpenAutoFocus = (event: Event) => {
+      // The bar focuses its own input on mount, which may come after this event while its chunk loads.
+      if (showRangeInput.value) {
+        event.preventDefault();
+        rangeInput.value?.focus();
+        return;
+      }
       if (!showRail.value) return;
       const firstItem = document.querySelector<HTMLElement>(
         "#date-time-menu [data-date-time-rail-item]:not([disabled])",
@@ -2089,17 +2684,26 @@ export default defineComponent({
     };
 
     const applyAndClose = () => {
+      if (gateReason.value !== null) return;
       commitPendingDay();
       saveDate(null);
       recordAbsoluteRange();
-      menuOpen.value = false;
+      // Already recorded above, so the close below must not add the same range to Recent again.
+      rangeKeyAtOpen = absoluteRangeKey();
+      closeMenu();
+    };
+
+    // A valid reading in the bar is what Apply applies; with an empty bar it applies the panels.
+    const onApplyClick = () => {
+      if (rangeInput.value?.submit()) return;
+      applyAndClose();
     };
 
     const applyCalendarItem = (id: string) => {
       const preset = CALENDAR_RAIL_ITEMS.find((item) => item.id === id);
       if (!preset) return;
-      selectedType.value = "relative";
-      calendarToken.value = preset.token;
+      rangeInput.value?.clear();
+      stageCalendar(preset.token);
       saveDate("relative");
       closeMenu();
     };
@@ -2107,26 +2711,14 @@ export default defineComponent({
     const applyRecentRange = (id: string) => {
       const entry = timeRangeHistory.entries.value[Number(id)];
       if (!entry) return;
-      const start = convertUnixTime(entry.startUs);
+      rangeInput.value?.clear();
       // An exclusive midnight end shows as the previous day's last second, as the rail label does.
       const endsAtMidnight =
         entry.endUs > entry.startUs &&
         entry.endUs % MICROS_PER_SECOND === 0 &&
         convertUnixTime(entry.endUs).time === "00:00:00";
-      const end = convertUnixTime(endsAtMidnight ? entry.endUs - 1 : entry.endUs);
+      stageAbsolute(entry.startUs, entry.endUs, endsAtMidnight ? entry.endUs - 1 : entry.endUs);
       if (endsAtMidnight) rememberShownEnd(entry.endUs);
-      else seededEnd = null;
-      // Saved once below, so the auto-apply date watcher must not save it a second time.
-      isSeedingAbsolute = true;
-      selectedDate.value.from = start.date;
-      selectedDate.value.to = end.date;
-      selectedTime.value.startTime = start.time;
-      selectedTime.value.endTime = end.time;
-      nextTick(() => {
-        isSeedingAbsolute = false;
-      });
-      selectedType.value = "absolute";
-      calendarToken.value = null;
       saveDate("absolute");
       timeRangeHistory.add(entry.startUs, entry.endUs);
       rangeKeyAtOpen = absoluteRangeKey();
@@ -2137,6 +2729,29 @@ export default defineComponent({
       const entry = timeRangeHistory.entries.value[Number(id)];
       if (entry) timeRangeHistory.remove(entry);
     };
+
+    const root = ref<HTMLElement | null>(null);
+    let unregisterShortcut: (() => void) | null = null;
+    const shortcutTarget = computed(
+      () => showRangeInput.value && !props.disable && !props.fieldAppearance,
+    );
+    // The `t` shortcut skips pickers inside a dialog, so their tooltip must not offer it.
+    const inDialog = ref(false);
+    const shortcutEligible = computed(() => shortcutTarget.value && !inDialog.value);
+
+    const openFromShortcut = async () => {
+      await loadRangeInput().catch(() => undefined);
+      if (menuOpen.value || props.disable) return;
+      menuOpen.value = true;
+      onMenuOpenChange(true);
+    };
+
+    onMounted(() => {
+      if (!root.value) return;
+      inDialog.value = !!root.value.closest('[role="dialog"], [role="alertdialog"]');
+      unregisterShortcut = registerTimeRangePicker(root.value, openFromShortcut);
+    });
+    onBeforeUnmount(() => unregisterShortcut?.());
 
     onMounted(() => {
       if (!props.defaultOpen) return;
@@ -2156,7 +2771,38 @@ export default defineComponent({
       onPopoverOpenAutoFocus,
       datetimeBtn,
       getImageURL,
-      onCustomPeriodSelect,
+      root,
+      shortcutTarget,
+      rangeInput,
+      rangeInputBlocksApply,
+      rangeInputValid,
+      liveLabel,
+      shortcutEligible,
+      isPrevShiftDisabled,
+      showRangeInput,
+      rangeUnits,
+      rangeKinds,
+      rangeLimits,
+      appliedRange,
+      prefetchRangeInput,
+      commitTypedReading,
+      onApplyClick,
+      openFromShortcut,
+      zone,
+      locale,
+      intlLocale,
+      customDraft,
+      commitCustom,
+      onCustomRowFocusout,
+      customBlocked,
+      gateReason,
+      gateNow,
+      gateMessage,
+      spanLimitText,
+      zoomOut,
+      zoomOutBlocked,
+      zoomOutTooltip,
+      showRangeZoom,
       onCustomValueFocus,
       onCustomValueBlur,
       setRelativeDate,
@@ -2205,7 +2851,8 @@ export default defineComponent({
       isNextShiftDisabled,
       onPickerKeydown,
       getConsumableDateTime,
-      relativeDatesInHour,
+      blockedChips,
+      editCustomDraft,
       setAbsoluteTime,
       setRelativeTime,
       getDisplayValue,

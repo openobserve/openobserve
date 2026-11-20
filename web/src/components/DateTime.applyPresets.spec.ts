@@ -74,8 +74,8 @@ describe("DateTime applyPresets", () => {
     create({ applyPresets: true });
     await flushPromises();
     const before = changes();
-    wrapper!.vm.relativeValue = 7;
-    wrapper!.vm.onCustomPeriodSelect();
+    wrapper!.vm.customDraft = 7;
+    wrapper!.vm.commitCustom(false);
     await flushPromises();
     expect(changes()).toBe(before);
     wrapper!.vm.applyAndClose();
