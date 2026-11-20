@@ -244,6 +244,7 @@ import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboar
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { useStore } from "vuex";
+import type { TableExport, TableExportColumn } from "@/composables/dashboard/usePanelActions";
 
 type TableRow = Record<string, unknown>;
 
@@ -255,6 +256,12 @@ interface TableColumn {
   pinned?: string;
   size?: number;
   format?: (value: unknown, row: TableRow) => unknown;
+}
+
+interface SortColumn {
+  field?: string | ((row: TableRow) => unknown);
+  name?: string;
+  sort?: (va: unknown, vb: unknown, a: TableRow, b: TableRow) => number;
 }
 
 const PINNED_WIDTH_MIN = 60;
@@ -690,17 +697,16 @@ export default defineComponent({
     const localSortBy = ref<string>("");
     const localSortOrder = ref<"asc" | "desc">("asc");
 
-    const sortedRows = computed(() => {
-      const rows = (props.data.rows as any[]) || [];
+    const sortRows = (rows: TableRow[], columns: SortColumn[]): TableRow[] => {
       if (!localSortBy.value) return rows;
-      const col = (props.data.columns as any[])?.find(
+      const col = columns?.find(
         // sort-change now emits col.field (unique data key) as the id, so match on field.
         // Fall back to name comparison for any legacy or non-field column definitions.
-        (c: any) => (c.field ?? c.name) === localSortBy.value,
+        (c) => (c.field ?? c.name) === localSortBy.value,
       );
       // col.field is the actual row data key; localSortBy is the column field id emitted by sort-change
       const dataKey = col?.field ?? localSortBy.value;
-      return [...rows].sort((a: any, b: any) => {
+      return [...rows].sort((a, b) => {
         const va = typeof dataKey === "function" ? dataKey(a) : a[dataKey];
         const vb = typeof dataKey === "function" ? dataKey(b) : b[dataKey];
         let result: number;
@@ -713,7 +719,11 @@ export default defineComponent({
         }
         return localSortOrder.value === "desc" ? -result : result;
       });
-    });
+    };
+
+    const sortedRows = computed(() =>
+      sortRows((props.data.rows as TableRow[]) || [], props.data.columns as SortColumn[]),
+    );
 
     const handleSortChange = (by: string, order: "asc" | "desc") => {
       localSortBy.value = by;
@@ -729,15 +739,23 @@ export default defineComponent({
       },
     );
 
-    const getTableCsvString = (): string => {
-      const rows = tableRef.value?.getRows() ?? [];
-      const cols: any[] = props.data?.columns || [];
-      const headers = cols.map((c: any) => c.label ?? c.name);
+    // The whole result is exported, not just the page on screen, filtered and sorted the way the panel shows it.
+    const exportSource = (
+      table?: TableExport,
+    ): { columns: TableExportColumn[]; rows: TableRow[] } => {
+      const columns = table?.columns ?? ((props.data?.columns as TableExportColumn[]) || []);
+      const rows = table?.rows ?? ((props.data?.rows as TableRow[]) || []);
+      const sorted = sortRows(rows, columns);
+      return { columns, rows: tableRef.value?.filterRows(sorted) ?? sorted };
+    };
+
+    const toCsv = (cols: TableExportColumn[], rows: TableRow[]): string => {
+      const headers = cols.map((c) => c.label ?? c.name);
       const lines = [
         headers.join(","),
-        ...rows.map((row: any) =>
+        ...rows.map((row) =>
           cols
-            .map((c: any) => {
+            .map((c) => {
               const val = row[c.field ?? c.name];
               return `"${String(val ?? "").replace(/"/g, '""')}"`;
             })
@@ -747,33 +765,40 @@ export default defineComponent({
       return lines.join("\n");
     };
 
-    const downloadTableAsCSV = (title?: string) => {
-      const csv = getTableCsvString();
-      if (!csv) return;
-      const blob = new Blob([csv], { type: "text/csv" });
+    const getTableCsvString = (): string => {
+      const { columns, rows } = exportSource();
+      return toCsv(columns, rows);
+    };
+
+    const saveBlob = (content: string, type: string, fileName: string) => {
+      const blob = new Blob([content], { type });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${title || "table"}.csv`;
+      a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
     };
 
-    const downloadTableAsJSON = (title?: string) => {
+    const downloadTableAsCSV = (title?: string, table?: TableExport): number => {
+      const { columns, rows } = exportSource(table);
+      const csv = toCsv(columns, rows);
+      if (!csv) return 0;
+      saveBlob(csv, "text/csv", `${title || "table"}.csv`);
+      return rows.length;
+    };
+
+    const downloadTableAsJSON = (title?: string, table?: TableExport): number => {
+      const { columns, rows: source } = exportSource(table);
       // Strip the internal per-query marker (`__q`) so it never leaks into exports.
-      const rows = (tableRef.value?.getRows() ?? []).map((row: any) => {
+      const rows = source.map((row) => {
         const copy = { ...row };
         delete copy.__q;
         return copy;
       });
-      const content = JSON.stringify({ columns: props.data?.columns, rows }, null, 2);
-      const blob = new Blob([content], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title || "table"}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const content = JSON.stringify({ columns, rows }, null, 2);
+      saveBlob(content, "application/json", `${title || "table"}.json`);
+      return rows.length;
     };
 
     // Adapt the 3-state server-sort payload (clear = empty column) to local state.
