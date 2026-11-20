@@ -26,7 +26,7 @@ use config::{
     },
     utils::time::now_micros,
 };
-use infra::table::entity::oncall_responses;
+use infra::table::{entity::oncall_responses, incident_membership};
 use o2_enterprise::enterprise::{
     alert_calibration_service::applied::{Fence, Patched},
     autoobserve::{
@@ -45,7 +45,7 @@ use openobserve_core::alerts::{
     destinations,
     mute::{self, MuteError},
 };
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use svix_ksuid::Ksuid;
 
 use super::LiveDigest;
@@ -202,37 +202,13 @@ impl FixPort for LiveFixPort {
         since_us: i64,
         alert_id: Option<&str>,
     ) -> anyhow::Result<Vec<PageRow>> {
-        use oncall_responses::{Column, Entity};
-        let mut query = Entity::find()
-            .filter(Column::OrgId.eq(org))
-            .filter(Column::SubjectType.eq(SubjectType::Alert.to_i32()))
-            .filter(Column::OpenedAt.gte(since_us));
-        if let Some(id) = alert_id {
-            query = query.filter(Column::SubjectId.starts_with(format!("{id}#")));
-        }
-        let rows = query
-            .order_by_desc(Column::OpenedAt)
-            .limit(MAX_PAGES + 1)
-            .all(infra::db::get_orm_client_rw().await)
-            .await?;
-        // A cut list could hide an acknowledgement or a page, so it is refused, not used.
-        anyhow::ensure!(
-            rows.len() as u64 <= MAX_PAGES,
-            "more than {MAX_PAGES} pages since {since_us}; the read is refused as incomplete"
-        );
-        Ok(rows
-            .into_iter()
-            .map(|r| PageRow {
-                alert_id: r
-                    .subject_id
-                    .rsplit_once('#')
-                    .map_or(r.subject_id.as_str(), |(source, _)| source)
-                    .to_string(),
-                opened_at: r.opened_at,
-                acked: r.acked_at.is_some(),
-                team_id: r.team_id,
-            })
-            .collect())
+        pages_with(
+            infra::db::get_orm_client_rw().await,
+            org,
+            since_us,
+            alert_id,
+        )
+        .await
     }
 
     async fn destinations(&self, org: &str) -> anyhow::Result<Vec<DestinationRow>> {
@@ -282,6 +258,84 @@ pub async fn security_permission(org_id: &str, user_id: &str, alert_id: &str) ->
     match security::guard_siem(org_id, user_id, "POST", detection).await {
         Ok(()) => Permission::Allowed,
         Err(_) => Permission::Denied(RefusalReason::Security),
+    }
+}
+
+/// An alert's own pages, and the pages of the incidents its firing opened, newest first.
+async fn pages_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    since_us: i64,
+    alert_id: Option<&str>,
+) -> anyhow::Result<Vec<PageRow>> {
+    use oncall_responses::Column;
+    let alert = Column::SubjectType.eq(SubjectType::Alert.to_i32());
+    let own = alert_id.map(|id| Column::SubjectId.starts_with(format!("{id}#")));
+    let mut out: Vec<PageRow> = pages_of(conn, org, since_us, alert.clone(), own)
+        .await?
+        .into_iter()
+        .map(|r| page_row(source_of(&r.subject_id).to_string(), r))
+        .collect();
+    let incident = Column::SubjectType.eq(SubjectType::Incident.to_i32());
+    let incident_pages = pages_of(conn, org, since_us, incident, None).await?;
+    let ids: Vec<String> = incident_pages
+        .iter()
+        .map(|r| source_of(&r.subject_id).to_string())
+        .collect();
+    let openers = incident_membership::openers_with(conn, &ids).await?;
+    for r in incident_pages {
+        let Some(opener) = openers.get(source_of(&r.subject_id)) else {
+            continue;
+        };
+        if alert_id.is_none_or(|id| id == opener) {
+            out.push(page_row(opener.clone(), r));
+        }
+    }
+    out.sort_by_key(|p| std::cmp::Reverse(p.opened_at));
+    Ok(out)
+}
+
+async fn pages_of<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    since_us: i64,
+    subject: sea_orm::sea_query::SimpleExpr,
+    narrow: Option<sea_orm::sea_query::SimpleExpr>,
+) -> anyhow::Result<Vec<oncall_responses::Model>> {
+    use oncall_responses::{Column, Entity};
+    let mut query = Entity::find()
+        .filter(Column::OrgId.eq(org))
+        .filter(subject)
+        .filter(Column::OpenedAt.gte(since_us));
+    if let Some(narrow) = narrow {
+        query = query.filter(narrow);
+    }
+    let rows = query
+        .order_by_desc(Column::OpenedAt)
+        .limit(MAX_PAGES + 1)
+        .all(conn)
+        .await?;
+    // A cut list could hide an acknowledgement or a page, so it is refused, not used.
+    anyhow::ensure!(
+        rows.len() as u64 <= MAX_PAGES,
+        "more than {MAX_PAGES} pages since {since_us}; the read is refused as incomplete"
+    );
+    Ok(rows)
+}
+
+/// `<source>#<firing>`: the alert or incident a page stands for.
+fn source_of(subject_id: &str) -> &str {
+    subject_id
+        .rsplit_once('#')
+        .map_or(subject_id, |(source, _)| source)
+}
+
+fn page_row(alert_id: String, r: oncall_responses::Model) -> PageRow {
+    PageRow {
+        alert_id,
+        opened_at: r.opened_at,
+        acked: r.acked_at.is_some(),
+        team_id: r.team_id,
     }
 }
 
@@ -346,5 +400,118 @@ fn kind_of(t: &DestinationType) -> &'static str {
         DestinationType::Email(_) => "email",
         DestinationType::Sns(_) => "sns",
         DestinationType::SlackApp(_) => "slack_app",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use infra::table::entity::alert_incident_alerts;
+    use sea_orm::{ActiveModelTrait, Database, IntoActiveModel, Schema};
+
+    use super::*;
+
+    fn page(
+        subject_type: SubjectType,
+        subject_id: &str,
+        opened_at: i64,
+    ) -> oncall_responses::Model {
+        oncall_responses::Model {
+            id: format!("p-{subject_id}"),
+            org_id: "o".into(),
+            subject_type: subject_type.to_i32(),
+            subject_id: subject_id.into(),
+            team_id: None,
+            title: None,
+            cause: None,
+            cause_note: None,
+            snoozed_until: None,
+            ladder_anchor: None,
+            ladder_run: Some(1),
+            responder_role: 0,
+            origin_response_id: None,
+            priority: 2,
+            state: 0,
+            opened_at,
+            acked_by: None,
+            acked_at: (opened_at == 600).then_some(601),
+            closed_at: None,
+            incident_id: None,
+            runbook_url: None,
+            exhausted_at: None,
+            updated_at: opened_at,
+        }
+    }
+
+    fn firing(incident: &str, alert: &str, kind: &str, at: i64) -> alert_incident_alerts::Model {
+        alert_incident_alerts::Model {
+            incident_id: incident.into(),
+            alert_id: alert.into(),
+            alert_fired_at: at,
+            alert_name: alert.into(),
+            alert_kind: kind.into(),
+            correlation_reason: None,
+            created_at: at,
+            resolved_at: None,
+            labels: None,
+            severity: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn an_alert_that_pages_through_incidents_has_those_pages() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        // The membership rows' incidents are not what this reads, so their foreign key is off.
+        db.execute_unprepared("PRAGMA foreign_keys = OFF")
+            .await
+            .unwrap();
+        for table in [
+            schema.create_table_from_entity(oncall_responses::Entity),
+            schema.create_table_from_entity(alert_incident_alerts::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        // Story A on introspect: every page of the alert is its own incident's page.
+        let mut pages = vec![page(SubjectType::Alert, "vpc#7", 600)];
+        let mut firings = Vec::new();
+        for (incident, at) in [("i1", 100), ("i2", 200), ("i3", 300), ("i0", 10)] {
+            pages.push(page(SubjectType::Incident, &format!("{incident}#1"), at));
+            firings.push(firing(incident, "vpc", "internal", at - 5));
+            firings.push(firing(incident, "other", "internal", at + 50));
+        }
+        pages.push(page(SubjectType::Incident, "i4#1", 400));
+        firings.push(firing("i4", "other", "internal", 395));
+        firings.push(firing("i4", "vpc", "internal", 410));
+        pages.push(page(SubjectType::Incident, "i5#1", 500));
+        firings.push(firing("i5", "finding-1", "autoobserve", 495));
+        for p in pages {
+            p.into_active_model().insert(&db).await.unwrap();
+        }
+        for f in firings {
+            f.into_active_model().insert(&db).await.unwrap();
+        }
+        let vpc = pages_with(&db, "o", 50, Some("vpc")).await.unwrap();
+        let seen: Vec<(i64, bool)> = vpc.iter().map(|p| (p.opened_at, p.acked)).collect();
+        assert_eq!(
+            seen,
+            [(600, true), (300, false), (200, false), (100, false)]
+        );
+        let all = pages_with(&db, "o", 50, None).await.unwrap();
+        let seen: Vec<(&str, i64)> = all
+            .iter()
+            .map(|p| (p.alert_id.as_str(), p.opened_at))
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                ("vpc", 600),
+                ("other", 400),
+                ("vpc", 300),
+                ("vpc", 200),
+                ("vpc", 100)
+            ],
+            "an incident's page is its opener's; AutoObserve's own incidents are no alert's"
+        );
     }
 }
