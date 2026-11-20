@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
+import { addLabelToPromQlQuery, escapeRegExp, promqlEscape } from "@/utils/query/promQLUtils";
 import { addLabelsToSQlQuery, getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatDateVariable,
@@ -29,12 +29,56 @@ import { escapeSingleQuotes } from "@/utils/zincutils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { MIN_PERCENTILE_SAMPLES } from "@/utils/metrics/metricDefaults";
 
+interface PromqlStringContext {
+  quote: string | null;
+  inRegexMatcher: boolean;
+}
+
+/** The PromQL string a placeholder sits in, and whether that string is a =~ or !~ matcher's pattern. */
+const promqlStringContextAt = (text: string, offset: number): PromqlStringContext => {
+  let quote: string | null = null;
+  let opening = -1;
+  for (let i = 0; i < offset; i++) {
+    const char = text[i];
+    if (quote === null) {
+      if (char === '"' || char === "'" || char === "`") {
+        [quote, opening] = [char, i];
+      } else if (char === "#") {
+        const lineEnd = text.indexOf("\n", i);
+        i = lineEnd === -1 ? offset : lineEnd;
+      }
+    } else if (char === "\\" && quote !== "`") {
+      i++;
+    } else if (char === quote) {
+      quote = null;
+    }
+  }
+  if (quote === null) return { quote, inRegexMatcher: false };
+  return { quote, inRegexMatcher: /[=!]~\s*$/.test(text.slice(0, opening)) };
+};
+
+/** A null context formats the raw values, as the variable metadata reports them. */
 const formatPanelVariableValue = (
   variable: any,
   format: VariableFormat | undefined,
   queryType: any,
+  context: PromqlStringContext | null,
 ): string => {
-  const escape = (value: any) => escapeSingleQuotes(String(value));
+  const isPromql = queryType === "promql";
+  // values picked from data are literals; custom and textbox values may be regex on purpose
+  const regexLiteral = variable.type === "query_values" && context?.inRegexMatcher === true;
+  const sqlEscape = (value: unknown) => escapeSingleQuotes(String(value));
+  // the author's custom defaults copied into the value may be regex on purpose
+  const keptRegex = new Set<unknown>(variable.customMultiSelectValue ?? []);
+  const promqlValue = (value: unknown) => {
+    // a null list entry joins as "", the way Array.join writes it
+    const text = value === null || value === undefined ? "" : String(value);
+    const literal =
+      regexLiteral && text !== SELECT_ALL_VALUE && !keptRegex.has(text) ? escapeRegExp(text) : text;
+    const quote = context?.quote;
+    return quote === '"' || quote === "'" ? promqlEscape(literal, quote) : literal;
+  };
+  const escape = (value: unknown) => (isPromql ? promqlValue(value) : sqlEscape(value));
 
   if (!Array.isArray(variable.value)) {
     // a date variable prints in its effective format; a null value is the All sentinel
@@ -44,18 +88,25 @@ const formatPanelVariableValue = (
 
   // If no data found (empty array), use SELECT_ALL_VALUE
   const values = variable.value.length === 0 ? [SELECT_ALL_VALUE] : variable.value;
-  const singleQuoted = values.map((value: any) => `'${escape(value)}'`).join(",") || "''";
+  const singleQuoted = values.map((value: unknown) => `'${sqlEscape(value)}'`).join(",") || "''";
   switch (format) {
     case "csv":
       return values.join(",");
     case "pipe":
       return values.join("|");
     case "doublequote":
-      return values.map((value: any) => `"${value}"`).join(",") || '""';
+      return (
+        values
+          .map((value: unknown) =>
+            isPromql && context ? `"${promqlEscape(String(value))}"` : `"${String(value)}"`,
+          )
+          .join(",") || '""'
+      );
     case "singlequote":
       return singleQuoted;
     default:
-      return queryType === "sql" ? singleQuoted : values.join("|");
+      if (queryType === "sql") return singleQuoted;
+      return isPromql ? values.map(promqlValue).join("|") : values.join("|");
   }
 };
 
@@ -493,10 +544,11 @@ export const usePanelVariableSubstitution = ({
       metadata.push({ type, name, value });
     };
 
+    const text = query;
     query = replaceVariablePlaceholders(
-      query,
+      text,
       [...fixedValues.keys(), ...dependentVariables.keys()],
-      ({ name, format }) => {
+      ({ name, format, offset }) => {
         // fixed variables shadow a dashboard variable of the same name
         if (fixedValues.has(name)) {
           if (format) return undefined;
@@ -505,10 +557,16 @@ export const usePanelVariableSubstitution = ({
         }
 
         const variable = dependentVariables.get(name);
-        const value = formatPanelVariableValue(variable, format, queryType);
+        const context = queryType === "promql" ? promqlStringContextAt(text, offset) : null;
         const isScalar = !Array.isArray(variable.value);
-        report("variable", name, isScalar ? (variable.value ?? SELECT_ALL_VALUE) : value);
-        return value;
+        report(
+          "variable",
+          name,
+          isScalar
+            ? (variable.value ?? SELECT_ALL_VALUE)
+            : formatPanelVariableValue(variable, format, queryType, null),
+        );
+        return formatPanelVariableValue(variable, format, queryType, context);
       },
     );
 

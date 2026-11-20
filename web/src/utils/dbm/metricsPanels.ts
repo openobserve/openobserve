@@ -55,6 +55,7 @@ import {
   type MetricStream,
 } from "@/utils/metrics/metricFamily";
 import { buildPromqlSeed } from "@/utils/metrics/metricPanelSeed";
+import { escapeRegExp, promqlEscape } from "@/utils/query/promQLUtils";
 
 /** The scope the panels narrow to — the same three dimensions every DBM tab carries. */
 export interface DbmMetricsScope {
@@ -145,10 +146,6 @@ export function filterDbmMetricStreams(
     return scoped ? owner === scoped : true;
   });
 }
-
-export const promqlEscape = (value: string) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-
-export const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * A port-tolerant identity matcher. The scope's instance is the CLIENT's
