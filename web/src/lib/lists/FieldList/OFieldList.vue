@@ -26,6 +26,10 @@
       </OInput>
     </div>
 
+    <div v-if="$slots['after-search']" class="shrink-0">
+      <slot name="after-search" />
+    </div>
+
     <!-- Scrollable field list body -->
     <div
       ref="scrollContainerRef"
@@ -75,8 +79,7 @@
             :draggable="draggable && isDragEnabled(row, row._index ?? 0) && isDragArmed()"
             @click="(e: MouseEvent) => onRowClick(row, e)"
             @dblclick="(e: MouseEvent) => onRowDblClick(row, e)"
-            @keydown.enter.space="(e: KeyboardEvent) => onRowKey(row, e)"
-            @keydown.up.down="onRowArrow"
+            @keydown="(e: KeyboardEvent) => onRowKeydown(row, e)"
             @dragstart="(e: DragEvent) => onDragStart(row, e)"
             @dragend="(e: DragEvent) => onDragEnd(row, e)"
             @dragover.prevent
@@ -110,7 +113,7 @@
             </div>
             <div
               v-if="$slots['field-actions']"
-              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg invisible absolute top-1/2 right-1 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] group-hover:visible group-hover:opacity-100 max-md:visible max-md:opacity-100"
+              class="o-field-list__actions border-field-list-actions-border rounded-default bg-field-list-actions-bg pointer-events-none absolute top-1/2 right-1 flex shrink-0 -translate-y-1/2 items-stretch overflow-hidden border opacity-0 transition-opacity duration-[120ms] ease-[ease] group-hover:pointer-events-auto group-hover:opacity-100 group-focus-visible:pointer-events-auto group-focus-visible:opacity-100 group-has-[:focus-visible]:pointer-events-auto group-has-[:focus-visible]:opacity-100 max-md:pointer-events-auto max-md:opacity-100"
             >
               <slot name="field-actions" :row="row" :index="row._index" />
             </div>
@@ -119,7 +122,8 @@
           <!-- Expanded content -->
           <div
             v-if="isExpanded(row) && $slots.expansion"
-            class="border-field-list-expansion-border rounded-b-default relative z-1 mb-1.5 box-border w-full border border-t-0 pt-1 pb-1.5"
+            class="o-field-list__expansion bg-field-list-expansion-bg border-field-list-expansion-border relative z-1 mt-1 mb-1.5 box-border w-full border-y pt-0.5 pb-1"
+            :data-test="`o-field-list-expansion-${row.name}`"
           >
             <slot name="expansion" :row="row" />
           </div>
@@ -136,7 +140,7 @@
 
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, useSlots, watch } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "./OFieldRow.vue";
@@ -164,6 +168,8 @@ const props = withDefaults(
     sortFn?: (a: FieldItem, b: FieldItem) => number;
     /** Rows take focus and Enter or Space picks them, for a list that is a picker. */
     keyboard?: boolean;
+    /** With an `expansion` slot, a row click toggles only rows this accepts. */
+    expandableFn?: (row: FieldItem) => boolean;
   }>(),
   {
     search: "",
@@ -182,6 +188,7 @@ const props = withDefaults(
     dragEnabledFn: undefined,
     sortFn: undefined,
     keyboard: false,
+    expandableFn: undefined,
   },
 );
 
@@ -197,6 +204,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const slots = useSlots();
 
 const scrollContainerRef = ref<HTMLElement | null>(null);
 const searchModel = ref(props.search);
@@ -227,6 +235,8 @@ function onSearchChange(value: string | number) {
   internalCurrentPage.value = 1;
   emit("update:currentPage", 1);
   emit("update:search", search);
+  // A kept scroll offset would leave the first matches behind the sticky group header.
+  scrollToTop();
 }
 
 // ── Filtering ───────────────────────────────────────────────────────
@@ -266,23 +276,66 @@ const filteredFields = computed(() => {
 
 // ── Pagination ──────────────────────────────────────────────────────
 
-const totalRows = computed(() => filteredFields.value.length);
+const pageSizeModel = ref(props.pageSize);
+
+watch(
+  () => props.pageSize,
+  (val) => {
+    pageSizeModel.value = val;
+  },
+);
+
+// Header rows ride along with their fields, so only field rows count toward a page.
+const fieldRows = computed(() => filteredFields.value.filter((row) => !row.isGroup));
+
+const totalRows = computed(() => fieldRows.value.length);
 
 const totalPages = computed(() => {
   if (!props.showPagination) return 1;
-  return Math.max(1, Math.ceil(totalRows.value / props.pageSize));
+  return Math.max(1, Math.ceil(totalRows.value / pageSizeModel.value));
+});
+
+// A shrinking list (collapse, search) must move the page itself, or the footer and owner drift apart.
+watch(totalPages, (pages) => {
+  if (internalCurrentPage.value <= pages) return;
+  internalCurrentPage.value = pages;
+  emit("update:currentPage", pages);
 });
 
 const paginatedFields = computed(() => {
   if (!props.showPagination) return filteredFields.value;
-  const start = (internalCurrentPage.value - 1) * props.pageSize;
-  return filteredFields.value.slice(start, start + props.pageSize);
+  const page = Math.min(Math.max(1, internalCurrentPage.value), totalPages.value);
+  const start = (page - 1) * pageSizeModel.value;
+  const end = start + pageSizeModel.value;
+  const lastPageStart = (totalPages.value - 1) * pageSizeModel.value;
+  const result: FieldItem[] = [];
+  let pendingHeaders: FieldItem[] = [];
+  let activeHeader: FieldItem | null = null;
+  let index = 0;
+  for (const row of filteredFields.value) {
+    if (row.isGroup) {
+      pendingHeaders.push(row);
+      activeHeader = row;
+      continue;
+    }
+    if (index >= start && index < end) {
+      // A group continuing from the previous page repeats its header on top.
+      if (!result.length && !pendingHeaders.length && activeHeader) result.push(activeHeader);
+      result.push(...pendingHeaders, row);
+    }
+    pendingHeaders = [];
+    index++;
+  }
+  // A header with no field rows after it (collapsed or empty group) lands on the last page.
+  if (pendingHeaders.length && start === lastPageStart) result.push(...pendingHeaders);
+  return result;
 });
 
 const isFirstPage = computed(() => internalCurrentPage.value <= 1);
 const isLastPage = computed(() => internalCurrentPage.value >= totalPages.value);
 
-function setPageSize() {
+function setPageSize(size: number) {
+  if (size > 0) pageSizeModel.value = size;
   internalCurrentPage.value = 1;
   emit("update:currentPage", 1);
 }
@@ -313,7 +366,7 @@ function lastPage() {
 
 const paginationSlotProps = computed(() => ({
   currentPage: internalCurrentPage.value,
-  pageSize: props.pageSize,
+  pageSize: pageSizeModel.value,
   totalPages: totalPages.value,
   totalRows: totalRows.value,
   isFirstPage: isFirstPage.value,
@@ -336,8 +389,37 @@ watch(
   },
 );
 
+// Keyed like the rows, so two same-named fields in different groups expand on their own.
+const expansionKey = (row: FieldItem): string => String(row[props.rowKey] ?? row.name);
+
 function isExpanded(row: FieldItem): boolean {
-  return localExpandedIds.value.has(row.name);
+  return localExpandedIds.value.has(expansionKey(row));
+}
+
+function isExpandable(row: FieldItem): boolean {
+  if (!slots.expansion || row.isGroup) return false;
+  return props.expandableFn ? props.expandableFn(row) : true;
+}
+
+function toggleExpanded(row: FieldItem, rowEl?: HTMLElement | null) {
+  const next = new Set(localExpandedIds.value);
+  const key = expansionKey(row);
+  const opening = !next.has(key);
+  if (opening) next.add(key);
+  else next.delete(key);
+  localExpandedIds.value = next;
+  emit("update:expandedIds", [...next]);
+  if (opening && rowEl) nextTick(() => revealExpansion(rowEl));
+}
+
+// A row opened near the bottom of a short list would show its values below the fold, so it moves to the top.
+function revealExpansion(rowEl: HTMLElement) {
+  const scroller = scrollContainerRef.value;
+  if (!scroller || !scroller.contains(rowEl)) return;
+  const box = scroller.getBoundingClientRect();
+  const rowTop = rowEl.getBoundingClientRect().top;
+  if (box.bottom - rowTop >= box.height / 2) return;
+  scroller.scrollTop += rowTop - box.top;
 }
 
 // ── Drag-and-drop ───────────────────────────────────────────────────
@@ -366,15 +448,22 @@ function onDragEnd(row: FieldItem, event: DragEvent) {
 
 // ── Row events ──────────────────────────────────────────────────────
 
-function onRowClick(row: FieldItem, event: MouseEvent) {
+function onRowClick(row: FieldItem, event: MouseEvent | KeyboardEvent) {
   if (row.isGroup) return;
   emit("row-click", row, event);
+  if (isExpandable(row)) toggleExpanded(row, event.currentTarget as HTMLElement | null);
 }
 
-function onRowKey(row: FieldItem, event: KeyboardEvent) {
+// Enter and Space both activate a row, as on a native button; arrows move between rows.
+function onRowKeydown(row: FieldItem, event: KeyboardEvent) {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    onRowArrow(event);
+    return;
+  }
+  if (event.key !== "Enter" && event.key !== " ") return;
   if (!props.keyboard || row.isGroup || event.target !== event.currentTarget) return;
   event.preventDefault();
-  emit("row-click", row, event);
+  onRowClick(row, event);
 }
 
 function onRowArrow(event: KeyboardEvent) {

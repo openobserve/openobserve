@@ -29,6 +29,8 @@ export interface OFieldListProps {
   sortFn?: (a: FieldItem, b: FieldItem) => number;
   /** Rows take focus and Enter or Space picks them, for a list that is a picker. */
   keyboard?: boolean;
+  /** With an `expansion` slot, a row click toggles only rows this accepts. */
+  expandableFn?: (row: FieldItem) => boolean;
 }
 
 export interface OFieldListEmits {
@@ -44,6 +46,7 @@ export interface OFieldListEmits {
 
 export interface OFieldListSlots {
   "before-list"?: (props: Record<string, never>) => any;
+  "after-search"?: (props: Record<string, never>) => any;
   "after-list"?: (props: {
     currentPage: number;
     pageSize: number;
@@ -62,6 +65,7 @@ export interface OFieldListSlots {
     index: number;
     draggable: boolean;
     isDragEnabled: boolean;
+    armDrag: () => void;
   }) => any;
   "field-actions"?: (props: { row: FieldItem; index: number }) => any;
   "group-header"?: (props: { row: FieldItem; groupName: string }) => any;

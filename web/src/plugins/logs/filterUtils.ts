@@ -16,15 +16,22 @@
 import { maskedSpanEnd } from "@/utils/query/sqlComments";
 import { removeConditions } from "@/utils/query/sqlFilterBuilder";
 
+// A parenthesised run of one field's conditions, which may hold one such run itself: `((f='a' OR f='b') AND f!='c')`.
+const fieldGroupPattern = (condPat: string): string => {
+  const run = (term: string) => `\\(\\s*${term}(?:\\s+(?:OR|AND)\\s+${term})*\\s*\\)`;
+  return run(`(?:${run(condPat)}|${condPat})`);
+};
+
 /**
  * Extracts the field name from a filter expression.
  * Handles single: `field = 'val'`, multi: `(field = 'x' OR field = 'y')`,
  * and SQL-prefixed: `"stream".field = 'val'`.
  */
 export const getFieldFromExpression = (expression: string): string | null => {
-  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const cleaned = expression.trim().replace(/^(?:\(\s*)+/, "");
   const match =
-    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) || cleaned.match(/^(\w+)\s*(?:=|!=|is)/i);
+    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
+    cleaned.match(/^"?(\w+)"?\s*(?:=|!=|is)/i);
   return match ? match[1] : null;
 };
 
@@ -56,9 +63,9 @@ export const hasFieldCondition = (queryStr: string, fieldName: string): boolean 
   const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
-  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?(?:"${esc}"|${esc})\\s*${opPat}\\s*${valPat}`;
 
-  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
+  const multiRegex = new RegExp(fieldGroupPattern(condPat), "gi");
   if (multiRegex.test(queryStr)) return true;
 
   const singleRegex = new RegExp(condPat, "gi");
@@ -91,10 +98,10 @@ export const replaceExistingFieldCondition = (
   const valPat = `(?:'(?:[^']|'')*'|null|\\d+(?:\\.\\d+)?|true|false)`;
   const opPat = `(?:=|!=|is(?:\\s+not)?)`;
   // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
-  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?(?:"${esc}"|${esc})\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
+  const multiRegex = new RegExp(fieldGroupPattern(condPat), "gi");
   if (multiRegex.test(queryStr)) {
     return queryStr.replace(multiRegex, () => newExpression);
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reactive } from "vue";
-import { usePanelFields } from "./usePanelFields";
+import { axisLimits, isAxisFull, isAxisUnsupported, usePanelFields } from "./usePanelFields";
 
 // Mock Vue to enable computed() in unit test context
 
@@ -781,6 +781,42 @@ describe("usePanelFields", () => {
       }
       const { x, y, breakdown } = panelData.data.queries[0].fields;
       expect([x.length, y.length, breakdown.length]).toEqual([0, 0, 0]);
+    });
+  });
+
+  describe("unsupported and full axes", () => {
+    it("marks x as unsupported, not merely full, on an empty metric panel", () => {
+      panelData.data.type = "metric";
+      expect(fields.isAddXAxisNotAllowed.value).toBe(true);
+      expect(fields.unsupportedAxes.value.x).toBe(true);
+      expect(fields.unsupportedAxes.value.y).toBe(false);
+    });
+
+    it("marks breakdown as unsupported on a funnel", () => {
+      panelData.data.type = "funnel";
+      expect(fields.isAddBreakdownNotAllowed.value).toBe(true);
+      expect(fields.unsupportedAxes.value.breakdown).toBe(true);
+    });
+
+    it("marks x on a bar as full after one field, never as unsupported", () => {
+      panelData.data.type = "bar";
+      expect(fields.isAddXAxisNotAllowed.value).toBe(false);
+      fields.addXAxisItem({ name: "host" });
+      expect(fields.isAddXAxisNotAllowed.value).toBe(true);
+      expect(fields.unsupportedAxes.value.x).toBe(false);
+    });
+
+    it("caps a treemap breakdown by its own count and by the shared level count", () => {
+      const limits = axisLimits("treemap", "breakdown", { x: [1, 2, 3], breakdown: [] });
+      expect(isAxisUnsupported(limits)).toBe(false);
+      expect(isAxisFull(limits)).toBe(false);
+      expect(isAxisFull(axisLimits("treemap", "breakdown", { x: [1], breakdown: [1] }))).toBe(true);
+    });
+
+    it("leaves table x and other charts' z unlimited", () => {
+      expect(isAxisFull(axisLimits("table", "x", { x: new Array(20).fill(0) }))).toBe(false);
+      expect(isAxisFull(axisLimits("bar", "z", { z: [1, 2] }))).toBe(false);
+      expect(isAxisFull(axisLimits("heatmap", "z", { z: [1] }))).toBe(true);
     });
   });
 });

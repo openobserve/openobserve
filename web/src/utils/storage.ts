@@ -115,7 +115,7 @@ export const useLocalTraceFilterField = (val = "", isDelete = false) => {
   return useLocalStorage("traceFilterField", val, isDelete, true);
 };
 
-export const useLocalInterestingFields = (val = "", isDelete = false) => {
+export const useLocalInterestingFields = (val: unknown = "", isDelete = false) => {
   return useLocalStorage("interestingFields", val, isDelete, true);
 };
 

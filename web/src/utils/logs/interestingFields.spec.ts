@@ -19,6 +19,7 @@ import {
   schemaBackedFieldNames,
   selectableInterestingFields,
   pruneInterestingFields,
+  interestingRowsOf,
 } from "./interestingFields";
 
 const SCHEMA_FIELD = { name: "level", isSchemaField: true };
@@ -112,5 +113,28 @@ describe("pruneInterestingFields", () => {
     const interesting = ["level"];
     pruneInterestingFields(interesting, undefined);
     expect(interesting).toEqual([]);
+  });
+});
+
+describe("interestingRowsOf", () => {
+  const header = (group: string) => ({ name: group, label: true, group });
+  const row = (name: string, interesting: boolean) => ({ name, isInterestingField: interesting });
+
+  it("keeps a header only while a field under it is interesting, in the list's order", () => {
+    const rows = [
+      header("a"),
+      row("a1", false),
+      row("a2", true),
+      header("b"),
+      row("b1", false),
+      header("c"),
+      row("c1", true),
+      row("c2", true),
+    ];
+    expect(interestingRowsOf(rows).map((r) => r.name)).toEqual(["a", "a2", "c", "c1", "c2"]);
+  });
+
+  it("returns an empty list when nothing is interesting", () => {
+    expect(interestingRowsOf([header("a"), row("a1", false)])).toEqual([]);
   });
 });

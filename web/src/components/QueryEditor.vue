@@ -612,6 +612,7 @@ defineExpose({
     if (editorRef.value?.replaceValue) editorRef.value.replaceValue(value);
     else if (editorRef.value?.setValue) editorRef.value.setValue(value);
   },
+  insertAtCursor: (text: string): boolean => editorRef.value?.insertAtCursor?.(text) ?? false,
 
   // Cursor and autocomplete (for dashboards)
   getCursorIndex: () => {

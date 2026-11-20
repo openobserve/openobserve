@@ -140,20 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         anchor='[data-drawer-anchor="rum-sessions-toolbar"]'
         data-test="rum-sessions-mobile-fields-drawer"
       >
-        <SearchFieldList
-          :fields="streamFields"
-          :time-stamp="{
-            startTime: dateTime.startTime,
-            endTime: dateTime.endTime,
-          }"
-          :stream-name="rumSessionStreamName"
-          stream-type="logs"
-          :enable-grouping="true"
-          :query="sessionState.data.editorValue"
-          :base-filter="fieldListBaseFilter"
-          :show-count="false"
-          @event-emitted="handleSidebarEvent"
-        />
+        <StreamFieldPanel :capabilities="FIELD_PANEL_CAPABILITIES" :source="fieldSource" />
       </ODrawer>
       <OSplitter
         class="logs-horizontal-splitter min-h-0 flex-1"
@@ -167,20 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isMobile"
             class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1"
           >
-            <SearchFieldList
-              :fields="streamFields"
-              :time-stamp="{
-                startTime: dateTime.startTime,
-                endTime: dateTime.endTime,
-              }"
-              :stream-name="rumSessionStreamName"
-              stream-type="logs"
-              :enable-grouping="true"
-              :query="sessionState.data.editorValue"
-              :base-filter="fieldListBaseFilter"
-              :show-count="false"
-              @event-emitted="handleSidebarEvent"
-            />
+            <StreamFieldPanel :capabilities="FIELD_PANEL_CAPABILITIES" :source="fieldSource" />
           </div>
         </template>
         <template #after>
@@ -510,7 +484,9 @@ import { isSessionLive } from "@/utils/rum/sessionReplayLive";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { durationFormatter, b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
-import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
+import StreamFieldPanel from "@/components/common/fieldPanel/StreamFieldPanel.vue";
+import useLocalFieldSource from "@/components/common/fieldPanel/useLocalFieldSource";
+import type { FieldPanelCapabilities } from "@/components/common/fieldPanel/fieldPanel.types";
 import { useRouter, type LocationQuery } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
@@ -615,6 +591,29 @@ const SESSION_ROWS_FILTER = "session_id IS NOT NULL AND session_id <> ''";
 
 // Mirrors getSessions()'s WHERE clause minus the editor value, so the sidebar's checkbox state reflects the query, not what the user is still typing (health/type/device segments are excluded too — they filter client-side, see tableRows).
 const fieldListBaseFilter = SESSION_ROWS_FILTER;
+
+const FIELD_PANEL_CAPABILITIES: FieldPanelCapabilities = {
+  streamPicker: "none",
+  values: true,
+  drag: false,
+  actions: ["add-filter"],
+  footerToggles: [],
+  highlightColumns: false,
+};
+
+const fieldsLoading = ref(false);
+
+const fieldSource = useLocalFieldSource({
+  fields: streamFields,
+  streamName: computed(() => rumSessionStreamName),
+  streamType: computed(() => "logs"),
+  loading: fieldsLoading,
+  timeRange: () => ({ startTime: dateTime.value.startTime, endTime: dateTime.value.endTime }),
+  query: computed(() => sessionState.data.editorValue),
+  baseFilter: computed(() => fieldListBaseFilter),
+  onAddFilter: (expression) => handleSidebarEvent("add-field", expression),
+  onRemoveFieldFilter: (name) => handleSidebarEvent("remove-field", name),
+});
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -874,6 +873,7 @@ onActivated(() => {
 
 const getStreamFields = () => {
   isLoading.value.push(true);
+  fieldsLoading.value = true;
   return new Promise((resolve) => {
     getStream(rumSessionStreamName, "logs", true)
       .then((stream) => {
@@ -939,6 +939,7 @@ const getStreamFields = () => {
       // An org that has not ingested RUM yet has no session stream; the field list stays empty.
       .catch(() => {})
       .finally(() => {
+        fieldsLoading.value = false;
         isLoading.value.pop();
         resolve(true);
       });

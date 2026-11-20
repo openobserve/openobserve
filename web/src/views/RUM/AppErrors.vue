@@ -127,19 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       anchor='[data-drawer-anchor="rum-errors-toolbar"]'
       data-test="rum-errors-mobile-fields-drawer"
     >
-      <SearchFieldList
-        :fields="streamFields"
-        :time-stamp="{
-          startTime: dateTime.startTime,
-          endTime: dateTime.endTime,
-        }"
-        :stream-name="errorTrackingState.data.stream.errorStream"
-        stream-type="logs"
-        :enable-grouping="true"
-        :query="errorTrackingState.data.editorValue"
-        :base-filter="fieldListBaseFilter"
-        @event-emitted="handleSidebarEvent"
-      />
+      <StreamFieldPanel :capabilities="FIELD_PANEL_CAPABILITIES" :source="fieldSource" />
     </ODrawer>
     <OSplitter
       class="logs-horizontal-splitter min-h-0 flex-1"
@@ -153,19 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!isMobile"
           class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1"
         >
-          <SearchFieldList
-            :fields="streamFields"
-            :time-stamp="{
-              startTime: dateTime.startTime,
-              endTime: dateTime.endTime,
-            }"
-            :stream-name="errorTrackingState.data.stream.errorStream"
-            stream-type="logs"
-            :enable-grouping="true"
-            :query="errorTrackingState.data.editorValue"
-            :base-filter="fieldListBaseFilter"
-            @event-emitted="handleSidebarEvent"
-          />
+          <StreamFieldPanel :capabilities="FIELD_PANEL_CAPABILITIES" :source="fieldSource" />
         </div>
       </template>
       <template #after>
@@ -330,7 +306,9 @@ import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
-import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
+import StreamFieldPanel from "@/components/common/fieldPanel/StreamFieldPanel.vue";
+import useLocalFieldSource from "@/components/common/fieldPanel/useLocalFieldSource";
+import type { FieldPanelCapabilities } from "@/components/common/fieldPanel/fieldPanel.types";
 import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
@@ -556,6 +534,29 @@ const fieldListBaseFilter = computed(() => {
   return clauses.join(" AND ");
 });
 
+const FIELD_PANEL_CAPABILITIES: FieldPanelCapabilities = {
+  streamPicker: "none",
+  values: true,
+  drag: false,
+  actions: ["add-filter"],
+  footerToggles: [],
+  highlightColumns: false,
+};
+
+const fieldsLoading = ref(false);
+
+const fieldSource = useLocalFieldSource({
+  fields: streamFields,
+  streamName: computed(() => errorTrackingState.data.stream.errorStream),
+  streamType: computed(() => "logs"),
+  loading: fieldsLoading,
+  timeRange: () => ({ startTime: dateTime.value.startTime, endTime: dateTime.value.endTime }),
+  query: computed(() => errorTrackingState.data.editorValue),
+  baseFilter: fieldListBaseFilter,
+  onAddFilter: (expression) => handleSidebarEvent("add-field", expression),
+  onRemoveFieldFilter: (name) => handleSidebarEvent("remove-field", name),
+});
+
 // Dynamic editor height based on content lines
 const errorEditorHeight = computed(() => {
   const lines = (errorTrackingState.data.editorValue.match(/\n/g) || []).length + 1;
@@ -733,6 +734,7 @@ const handleSidebarEvent = (event: string, value: any) => {
 
 const getStreamFields = () => {
   isLoading.value.push(true);
+  fieldsLoading.value = true;
   return new Promise((resolve) => {
     getStream(errorTrackingState.data.stream.errorStream, "logs", true)
       .then((stream) => {
@@ -753,6 +755,7 @@ const getStreamFields = () => {
         updateFieldKeywords(stream.schema);
       })
       .finally(() => {
+        fieldsLoading.value = false;
         resolve(true);
         isLoading.value.pop();
       });

@@ -43,3 +43,24 @@ export const pruneInterestingFields = (
   }
   return interestingFields;
 };
+
+type FieldRow = { name: string; label?: boolean; isInterestingField?: boolean };
+
+/** The interesting subset of a grouped field list: a header stays only while a field under it is interesting. */
+export const interestingRowsOf = <T extends FieldRow>(rows: T[]): T[] => {
+  const result: T[] = [];
+  let header: T | null = null;
+  for (const row of rows) {
+    if (row.label) {
+      header = row;
+      continue;
+    }
+    if (!row.isInterestingField) continue;
+    if (header) {
+      result.push(header);
+      header = null;
+    }
+    result.push(row);
+  }
+  return result;
+};

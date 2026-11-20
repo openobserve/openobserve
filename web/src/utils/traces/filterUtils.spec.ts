@@ -989,3 +989,26 @@ describe("removeRequiredCondition — turning errors-only off", () => {
     },
   );
 });
+describe("a field's included and excluded values in one group (U6)", () => {
+  const mixed = "((zebra='a' or zebra='b') and zebra!='c')";
+
+  it("reads the field from the nested group", () => {
+    expect(getFieldFromExpression(mixed)).toBe("zebra");
+  });
+
+  it("replaces the whole group on the next write instead of nesting a second one", () => {
+    const once = applyFilterTerm(mixed, "code=1 and (zebra='a' or zebra='b')");
+    expect(once).toBe(`code=1 and ${mixed}`);
+    expect(applyFilterTerm("zebra='a'", once)).toBe("code=1 and zebra='a'");
+  });
+
+  it("removes the whole group, as the values query does for the field's own condition", () => {
+    expect(removeFieldCondition(`code=1 and ${mixed}`, "zebra")).toBe("code=1");
+  });
+  it("replaces and removes the null-safe form as one group", () => {
+    const safe = "((zebra='a' or zebra is null) and (zebra!='c' or zebra is null))";
+    const withSafe = applyFilterTerm(safe, `code=1 and ${mixed}`);
+    expect(withSafe).toBe(`code=1 and ${safe}`);
+    expect(removeFieldCondition(withSafe, "zebra")).toBe("code=1");
+  });
+});

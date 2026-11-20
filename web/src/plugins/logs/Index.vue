@@ -95,21 +95,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <!-- 10px on top (matching the search bar's 4+6 above it).
-                     No right/bottom gutter here: the field list runs into the
-                     divider so its scrollbar sits on the panel edge, and scrolls
-                     into the panel foot. The form controls (stream selector, field
-                     search) carry their own matching px-1.5 gutter (see IndexList /
-                     OFieldList) so they line up — they're controls, not scrolling
-                     surfaces. -->
+                <!-- No end gutter: the list runs into the divider so its scrollbar sits on the panel edge. -->
                 <div
                   class="relative-position border-border-default bg-surface-panel h-full border-e pt-2.5"
                 >
-                  <IndexList
+                  <StreamFieldPanel
                     v-if="searchObj.meta.showFields && !isMobile"
+                    :capabilities="logsFieldPanelCapabilities"
+                    :source="fieldSource"
+                    test-id-prefix="logs-page"
+                    skeleton-test-id="logs-indexlist-fieldlist-loading-skeleton"
+                    empty-test-id="logs-search-no-field-found-text"
+                    :empty-text="t('search.noFieldFoundInStream')"
                     data-test="logs-search-index-list"
-                    @setInterestingFieldInSQLQuery="setInterestingFieldInSQLQuery"
-                  />
+                    class="h-full"
+                  >
+                    <template v-if="fieldSource.showBackToLogs.value" #picker-before>
+                      <FeatureLockExempt class="shrink-0">
+                        <OButton
+                          data-test="log-search-index-list-back-to-logs-btn"
+                          variant="outline"
+                          size="icon-sm"
+                          class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
+                          @click="fieldSource.backToLogs()"
+                        >
+                          <OIcon name="swap-horiz" size="sm" />
+                          <OTooltip
+                            :content="t('search.switchToLogs')"
+                            side="bottom"
+                            align="center"
+                          />
+                        </OButton>
+                      </FeatureLockExempt>
+                    </template>
+                    <template #no-stream>
+                      <LogsStreamQuickPicks :source="fieldSource" />
+                    </template>
+                  </StreamFieldPanel>
                 </div>
               </template>
               <template #after>
@@ -666,10 +688,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="logs-mobile-fields-drawer"
     >
       <div class="flex h-full flex-col overflow-hidden pt-2.5">
-        <IndexList
+        <StreamFieldPanel
+          :capabilities="logsFieldPanelCapabilities"
+          :source="fieldSource"
+          test-id-prefix="logs-page"
+          skeleton-test-id="logs-indexlist-fieldlist-loading-skeleton"
+          empty-test-id="logs-search-no-field-found-text"
+          :empty-text="t('search.noFieldFoundInStream')"
           data-test="logs-search-index-list-mobile"
-          @setInterestingFieldInSQLQuery="setInterestingFieldInSQLQuery"
-        />
+          class="h-full"
+        >
+          <template v-if="fieldSource.showBackToLogs.value" #picker-before>
+            <FeatureLockExempt class="shrink-0">
+              <OButton
+                data-test="log-search-index-list-back-to-logs-btn"
+                variant="outline"
+                size="icon-sm"
+                class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
+                @click="fieldSource.backToLogs()"
+              >
+                <OIcon name="swap-horiz" size="sm" />
+                <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
+              </OButton>
+            </FeatureLockExempt>
+          </template>
+          <template #no-stream>
+            <LogsStreamQuickPicks :source="fieldSource" />
+          </template>
+        </StreamFieldPanel>
       </div>
     </ODrawer>
     <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="logs-row-nav-live">
@@ -761,7 +807,13 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useStreams from "@/composables/useStreams";
 import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
-import IndexList from "@/plugins/logs/IndexList.vue";
+import StreamFieldPanel from "@/components/common/fieldPanel/StreamFieldPanel.vue";
+import useLogsFieldSource from "@/components/common/fieldPanel/useLogsFieldSource";
+import LogsStreamQuickPicks from "@/plugins/logs/LogsStreamQuickPicks.vue";
+import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -853,7 +905,12 @@ export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
-    IndexList,
+    StreamFieldPanel,
+    LogsStreamQuickPicks,
+    FeatureLockExempt,
+    OButton,
+    OIcon,
+    OTooltip,
     SearchResult: defineAsyncComponent({
       loader: () => import("@/plugins/logs/SearchResult.vue"),
       loadingComponent: SearchResultSkeleton,
@@ -2175,7 +2232,7 @@ export default defineComponent({
     };
 
     const onSelectStream = () => {
-      // The fields panel holding the IndexList selector is hidden in drill down.
+      // The fields panel holding the stream selector is hidden in drill down.
       if (searchObj.meta.logsVisualizeToggle === "drilldown") {
         drillDownStreamSelectRef.value?.open();
         return;
@@ -2440,6 +2497,11 @@ export default defineComponent({
         searchBarRef.value.updateQuery();
       }
     };
+
+    const fieldSource = useLogsFieldSource({
+      onInterestingFieldChange: (field, isFieldExistInSQL) =>
+        setInterestingFieldInSQLQuery(field, isFieldExistInSQL),
+    });
 
     const processInterestingFiledInSQLQuery = (parsedSQL, field, isFieldExistInSQL) => {
       let fieldTable = null;
@@ -4390,6 +4452,8 @@ export default defineComponent({
       getHistogramQueryData,
       generateHistogramSkeleton,
       setInterestingFieldInSQLQuery,
+      fieldSource,
+      logsFieldPanelCapabilities: fieldSource.capabilities,
       handleQuickModeChange,
       handleRunQueryFn,
       visualizeChartData,
@@ -4649,12 +4713,3 @@ export default defineComponent({
   },
 }) as any;
 </script>
-
-<style scoped>
-/* keep(complex-state): the field label is rendered deep inside the IndexList /
-   FieldRow child components, so this reaches it with :deep() rather than a
-   template utility. Mirrors the identical rule in plugins/traces/Index.vue. */
-.logPage :deep(.index-menu .field_list .field_overlay .field_label) {
-  font-size: var(--text-xs) !important;
-}
-</style>

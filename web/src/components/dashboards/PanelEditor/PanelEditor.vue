@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="fieldListContainerStyle"
               >
                 <div class="flex flex-col" :style="fieldListInnerStyle">
-                  <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
+                  <DashboardFieldPanel :edit-mode="editMode" @collapse="collapseFieldList" />
                 </div>
               </div>
             </div>
@@ -581,7 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Field List for custom chart -->
           <!-- Mirror the normal field-list block above: a fixed-height wrapper
-               with NO overflow of its own, so PanelFieldList's inner OFieldList
+               with NO overflow of its own, so DashboardFieldPanel's inner OFieldList
                is the single scroller and its stream selectors (before-list)
                stay sticky above the scrolling field rows. Wrapping it in an
                overflow-y-auto container stacked a second scrollbar and let the
@@ -594,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="fieldListContainerStyle"
               >
                 <div class="flex flex-col" :style="fieldListInnerStyle">
-                  <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
+                  <DashboardFieldPanel :edit-mode="editMode" @collapse="collapseFieldList" />
                 </div>
               </div>
             </div>
@@ -791,7 +791,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="panel-editor-mobile-fields-drawer"
     >
       <div class="flex h-full min-h-0 flex-col">
-        <PanelFieldList :editMode="editMode" frameless @collapse="mobileFieldsOpen = false" />
+        <DashboardFieldPanel :edit-mode="editMode" frameless @collapse="mobileFieldsOpen = false" />
       </div>
     </ODrawer>
 
@@ -847,7 +847,7 @@ import { isCustomSqlPanel } from "@/utils/dashboard/chartTypeGroups";
 // ============================================================================
 
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
-import PanelFieldList from "@/components/dashboards/addPanel/PanelFieldList.vue";
+import DashboardFieldPanel from "@/components/dashboards/addPanel/DashboardFieldPanel.vue";
 import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
 import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
@@ -1332,7 +1332,7 @@ const fieldListContainerStyle = computed(() => {
   return { height: contentHeight.value };
 });
 
-// Field list inner div style - needs height: 100% so PanelFieldList's h-full resolves correctly
+// Field list inner div style - needs height: 100% so DashboardFieldPanel's h-full resolves correctly
 const fieldListInnerStyle = computed(() => {
   return { width: "100%", height: "100%" };
 });

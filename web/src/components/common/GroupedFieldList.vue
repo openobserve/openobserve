@@ -9,12 +9,19 @@
     :search-placeholder="searchPlaceholder ?? t('search.searchField')"
     :current-page="currentPage"
     :page-size="pageSize"
-    :page-size-options="[pageSize]"
     :row-key="rowKey"
     :loading="loading"
     :show-pagination="showPagination"
+    :keyboard="keyboard"
+    :expanded-ids="expandedIds"
+    :expandable-fn="expandableFn"
+    :draggable="draggable"
+    :drag-enabled-fn="dragEnabledFn"
     @update:search="$emit('update:search', $event)"
     @update:current-page="$emit('update:current-page', $event)"
+    @update:expanded-ids="$emit('update:expanded-ids', $event)"
+    @drag-start="(row: FieldItem, event: DragEvent) => $emit('drag-start', row, event)"
+    @drag-end="(row: FieldItem, event: DragEvent) => $emit('drag-end', row, event)"
   >
     <!-- Group header -->
     <template #group-header="{ row, groupName }">
@@ -29,29 +36,43 @@
               :row="row"
               :group-name="groupName"
               :count="groupFieldCount[row.group] ?? 0"
-              >{{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})</slot
+              ><template v-if="searchMatchCount">{{
+                t("search.groupFieldMatches", {
+                  name: groupName,
+                  matched: searchMatchCount[row.group] ?? 0,
+                  total: groupFieldCount[row.group] ?? 0,
+                })
+              }}</template
+              ><template v-else
+                >{{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})</template
+              ></slot
             >
           </div>
           <OButton
             :aria-label="groupName"
-            :aria-expanded="expandGroupRows[row.group] !== false"
+            :aria-expanded="!isCollapsed(row.group)"
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
             size="icon"
             class="size-5! flex-shrink-0"
           >
-            <OIcon
-              :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
-              size="sm"
-            />
+            <OIcon :name="isCollapsed(row.group) ? 'chevron-right' : 'expand-more'" size="sm" />
           </OButton>
         </div>
       </slot>
     </template>
 
     <!-- Field row -->
-    <template #field-row="{ row }">
-      <slot name="field-row" :row="row" />
+    <template #field-row="rowProps">
+      <slot name="field-row" v-bind="rowProps" />
+    </template>
+
+    <template v-if="$slots['field-actions']" #field-actions="actionProps">
+      <slot name="field-actions" v-bind="actionProps" />
+    </template>
+
+    <template v-if="$slots.expansion" #expansion="{ row }">
+      <slot name="expansion" :row="row" />
     </template>
 
     <!-- Empty state -->
@@ -74,19 +95,24 @@
       <slot name="before-list" />
     </template>
 
+    <template v-if="$slots['after-search']" #after-search>
+      <slot name="after-search" />
+    </template>
+
     <!-- After list -->
     <template v-if="$slots['after-list']" #after-list="bottomProps">
-      <slot name="after-list" v-bind="bottomProps" />
+      <slot name="after-list" v-bind="{ ...bottomProps, allRows: allFieldCount }" />
     </template>
   </OFieldList>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
+import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 
 const { t } = useI18nTyped();
 
@@ -96,38 +122,49 @@ interface Props {
   /** Passed to OFieldList so the owning panel can inset the search control. */
   searchClass?: string;
   loading?: boolean;
-  theme?: string;
   currentPage?: number;
   pageSize?: number;
   showPagination?: boolean;
   searchPlaceholder?: I18nText;
   /** Field that keys each row; set it when two rows can share a `name`. */
   rowKey?: string;
+  keyboard?: boolean;
+  expandedIds?: string[];
+  expandableFn?: (row: FieldItem) => boolean;
+  /** Group keys folded shut; when omitted the list keeps the state itself. */
+  collapsedGroups?: Set<string>;
+  draggable?: boolean;
+  dragEnabledFn?: (row: FieldItem, index: number) => boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   search: "",
   searchClass: "",
   loading: false,
-  theme: "light",
   currentPage: 1,
   pageSize: 50,
   showPagination: false,
   rowKey: "name",
+  keyboard: false,
+  expandedIds: () => [],
+  expandableFn: undefined,
+  collapsedGroups: undefined,
+  draggable: false,
+  dragEnabledFn: undefined,
 });
 
-defineEmits<{
+const emit = defineEmits<{
   "update:search": [value: string];
   "update:current-page": [page: number];
+  "update:expanded-ids": [ids: string[]];
+  "update:collapsedGroups": [groups: Set<string>];
+  "drag-start": [row: FieldItem, event: DragEvent];
+  "drag-end": [row: FieldItem, event: DragEvent];
 }>();
 
 const ofieldListRef = ref<InstanceType<typeof OFieldList> | null>(null);
 
-// ---------------------------------------------------------------------------
-// Normalize field objects — applyFieldGrouping() uses `label`/`name` for
-// group headers but OFieldList expects `isGroup`/`groupName`.
-// ---------------------------------------------------------------------------
-
+// applyFieldGrouping() marks headers with `label`/`name`; OFieldList expects `isGroup`/`groupName`.
 const annotatedFields = computed(() =>
   (props.fields as any[]).map((row) => ({
     ...row,
@@ -136,31 +173,22 @@ const annotatedFields = computed(() =>
   })),
 );
 
-// ---------------------------------------------------------------------------
-// Group expand/collapse state
-// ---------------------------------------------------------------------------
+const localCollapsed = ref<Set<string>>(new Set());
 
-const expandGroupRows = ref<Record<string, boolean>>({});
+const collapsed = computed(() => props.collapsedGroups ?? localCollapsed.value);
 
-watch(
-  annotatedFields,
-  (list) => {
-    for (const row of list) {
-      if (row.isGroup && row.group && !(row.group in expandGroupRows.value)) {
-        expandGroupRows.value[row.group] = true;
-      }
-    }
-  },
-  { immediate: true },
-);
-
-function toggleGroup(group: string) {
-  expandGroupRows.value[group] = !expandGroupRows.value[group];
+function isCollapsed(group: string | undefined): boolean {
+  return group !== undefined && collapsed.value.has(group);
 }
 
-// ---------------------------------------------------------------------------
-// Count of non-group fields per group
-// ---------------------------------------------------------------------------
+function toggleGroup(group: string | undefined) {
+  if (group === undefined) return;
+  const next = new Set(collapsed.value);
+  if (next.has(group)) next.delete(group);
+  else next.add(group);
+  if (props.collapsedGroups === undefined) localCollapsed.value = next;
+  emit("update:collapsedGroups", next);
+}
 
 const groupFieldCount = computed(() => {
   const counts: Record<string, number> = {};
@@ -172,17 +200,11 @@ const groupFieldCount = computed(() => {
   return counts;
 });
 
-// ---------------------------------------------------------------------------
-// Groups that still have at least one field matching the active search term.
-// Computed from the full (pre-collapse) field set so a collapsed group whose
-// matching field rows have been filtered out is still recognised as a match.
-// Returns null when there is no active search (every group is a match).
-// ---------------------------------------------------------------------------
-
-const searchMatchedGroups = computed<Set<string> | null>(() => {
+// Matching fields per group, counted before the collapse filter so a collapsed group still counts its matches; null = no search.
+const searchMatchCount = computed<Record<string, number> | null>(() => {
   const term = props.search?.trim().toLowerCase();
   if (!term) return null;
-  const matched = new Set<string>();
+  const counts: Record<string, number> = {};
   for (const row of annotatedFields.value) {
     if (
       !row.isGroup &&
@@ -191,43 +213,41 @@ const searchMatchedGroups = computed<Set<string> | null>(() => {
         .toLowerCase()
         .includes(term)
     ) {
-      matched.add(row.group);
+      counts[row.group] = (counts[row.group] ?? 0) + 1;
     }
   }
-  return matched;
+  return counts;
 });
 
-// ---------------------------------------------------------------------------
-// Visible fields — collapse filter
-//
-// A collapsed group keeps its header but drops its field rows. Because the
-// downstream OFieldList decides whether to keep a group header during a search
-// by looking for matching child rows, we must stamp the header with
-// `matchesSearch` here — otherwise a collapsed group whose only match is hidden
-// would lose its header too, making the field unreachable until page refresh.
-// ---------------------------------------------------------------------------
+// Collapsing hides rows from the page, not from the stream, so the field total counts them anyway.
+const allFieldCount = computed(() => {
+  const term = props.search?.trim().toLowerCase();
+  return annotatedFields.value.filter(
+    (row) =>
+      !row.isGroup &&
+      (!term ||
+        String(row.name ?? "")
+          .toLowerCase()
+          .includes(term)),
+  ).length;
+});
 
+// A collapsed group keeps its header; `matchesSearch` keeps it through a search once its rows are hidden.
 const visibleFields = computed(() =>
   annotatedFields.value
     .filter((row: any) => {
       if (row.isGroup) return true;
-      const group = row.group;
-      if (group && expandGroupRows.value[group] === false) return false;
-      return true;
+      return !isCollapsed(row.group);
     })
     .map((row: any) => {
       if (!row.isGroup) return row;
-      const matched = searchMatchedGroups.value;
+      const matched = searchMatchCount.value;
       return {
         ...row,
-        matchesSearch: matched ? matched.has(row.group) : true,
+        matchesSearch: matched ? (matched[row.group] ?? 0) > 0 : true,
       };
     }),
 );
-
-// ---------------------------------------------------------------------------
-// Expose
-// ---------------------------------------------------------------------------
 
 function scrollToTop() {
   ofieldListRef.value?.scrollToTop?.();

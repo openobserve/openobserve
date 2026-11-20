@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
+import { mount as baseMount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -45,11 +45,36 @@ vi.mock("@/utils/alerts/alertSqlUtils", () => ({
   getParser: vi.fn().mockReturnValue(null),
 }));
 
+vi.mock("@/composables/useFieldGrouping", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({
+      contextLoaded: ref(false),
+      loadGroupingContext: vi.fn().mockResolvedValue(undefined),
+      groupFields: (fields: unknown[]) => fields,
+    }),
+  };
+});
+
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "false", isCloud: "false", isAiEnabled: "false" },
 }));
 
 import QueryEditorDialog from "@/components/alerts/QueryEditorDialog.vue";
+
+// Each test's dialog is unmounted after it, so watchers and timers of earlier mounts do not pile up across the file.
+const mounted: { unmount: () => void }[] = [];
+const mount: typeof baseMount = ((...args: Parameters<typeof baseMount>) => {
+  const wrapper = baseMount(...args);
+  mounted.push(wrapper);
+  return wrapper;
+}) as typeof baseMount;
+
+afterEach(() => {
+  mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+});
+
+const fieldPanelStub = { template: '<div data-test="stream-field-panel-stub" />' };
 
 const childEditorStub = {
   template: '<div class="stub-editor"></div>',
@@ -86,6 +111,7 @@ async function mountComp(props: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
+        StreamFieldPanel: fieldPanelStub,
         CodeQueryEditor: childEditorStub,
         QueryEditor: childEditorStub,
         UnifiedQueryEditor: unifiedEditorStub,
@@ -165,6 +191,86 @@ describe("QueryEditorDialog - initial state", () => {
   it("expandCombinedOutput defaults to true", async () => {
     const w = await mountComp();
     expect((w.vm as any).expandCombinedOutput).toBe(true);
+  });
+});
+
+describe("QueryEditorDialog - field panel", () => {
+  // The real drawer teleports its body; an inline stub keeps the panel queryable.
+  const inlineDrawer = {
+    name: "ODrawer",
+    props: ["open", "size", "showClose", "bleed"],
+    template: '<div><slot name="header-left" /><slot name="header-right" /><slot /></div>',
+  };
+
+  it("renders the field panel on the SQL tab only", async () => {
+    const wrapper = mount(QueryEditorDialog, {
+      props: {
+        modelValue: true,
+        tab: "sql",
+        sqlQuery: "",
+        promqlQuery: "",
+        vrlFunction: "",
+        streamName: "my-stream",
+        streamType: "logs",
+        columns: [{ label: "host", value: "host" }],
+        period: 10,
+        multiTimeRange: [],
+        savedFunctions: [],
+        sqlQueryErrorMsg: "",
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ODrawer: inlineDrawer,
+          CodeQueryEditor: childEditorStub,
+          QueryEditor: childEditorStub,
+          UnifiedQueryEditor: unifiedEditorStub,
+          O2AIChat: { template: "<div />" },
+          StreamFieldPanel: fieldPanelStub,
+        },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="query-editor-dialog-field-panel"]').exists()).toBe(true);
+    const grid = wrapper.find('[data-test="query-editor-dialog-field-panel"]').element
+      .parentElement as HTMLElement;
+    expect([...grid.classList]).toEqual(
+      expect.arrayContaining(["flex-col", "md:grid", "md:grid-cols-[20fr_45fr_35fr]"]),
+    );
+    const toggle = wrapper.find('[data-test="query-editor-dialog-fields-toggle"]');
+    const body = () =>
+      wrapper.find('[data-test="stream-field-panel-stub"]').element.parentElement as HTMLElement;
+    expect(toggle.classes()).toContain("md:hidden");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    expect(body().classList).toContain("max-md:hidden");
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+    expect(body().classList).toContain("max-md:h-[70vh]");
+    await wrapper.setProps({ tab: "promql" });
+    expect(wrapper.find('[data-test="query-editor-dialog-field-panel"]').exists()).toBe(false);
+  });
+
+  it("ignores a field intent while the PromQL tab is active", async () => {
+    const wrapper = await mountComp({ tab: "promql", sqlQuery: 'SELECT * FROM "s"' });
+    (wrapper.vm as any).handleFieldListEvent("add-field", "host='a'");
+    expect(wrapper.emitted("update:sqlQuery")).toBeUndefined();
+  });
+
+  it("writes a sidebar filter into the SQL WHERE clause", async () => {
+    const wrapper = await mountComp({ tab: "sql", sqlQuery: 'SELECT * FROM "s"' });
+    (wrapper.vm as any).fieldSource.addFilter("host='a'");
+    expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([
+      "SELECT * FROM \"s\" WHERE host='a'",
+    ]);
+  });
+
+  it("reads the time range at request time instead of freezing it", async () => {
+    const wrapper = await mountComp({ tab: "sql", period: 10 });
+    const first = (wrapper.vm as any).fieldSource.valuesRequest({ name: "host" });
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    const second = (wrapper.vm as any).fieldSource.valuesRequest({ name: "host" });
+    expect(second.endTime).toBeGreaterThan(first.endTime);
+    expect(second.endTime - second.startTime).toBe(10 * 60 * 1000000);
   });
 });
 
@@ -427,6 +533,7 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
+          StreamFieldPanel: fieldPanelStub,
           ODrawer: ODrawerStub,
           CodeQueryEditor: childEditorStub,
           QueryEditor: childEditorStub,
@@ -597,6 +704,7 @@ describe("QueryEditorDialog - autocomplete wiring reaches the editor", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
+          StreamFieldPanel: fieldPanelStub,
           UnifiedQueryEditor: editorStubDef,
           // ODrawer is the dialog root; without a slot-rendering stub none of
           // its content (including the editor) mounts.

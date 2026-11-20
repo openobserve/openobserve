@@ -102,25 +102,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex h-full w-full flex-col">
           <!-- Main Content Grid: field browser | editors | output -->
           <div
-            class="grid min-h-0 w-full flex-1 grid-cols-[20fr_45fr_35fr] gap-x-2 overflow-hidden px-2 py-2 pe-2"
+            class="flex min-h-0 w-full flex-1 flex-col gap-2 overflow-y-auto px-2 py-2 pe-2 md:grid md:gap-y-0 md:overflow-hidden"
+            :class="
+              localTab === 'sql' ? 'md:grid-cols-[20fr_45fr_35fr]' : 'md:grid-cols-[55fr_45fr]'
+            "
           >
-            <!-- Left Section (25%) — Field Browser -->
+            <!-- PromQL has no WHERE for a field filter to land in, so the field column is SQL-only. -->
             <div
-              class="rounded-default border-border-default bg-surface-base h-full overflow-hidden border p-2.5"
+              v-if="localTab === 'sql'"
+              class="rounded-default border-border-default bg-surface-base flex shrink-0 flex-col overflow-hidden border md:h-full"
+              data-test="query-editor-dialog-field-panel"
             >
-              <SearchFieldList
-                :fields="fieldListItems"
-                :stream-name="streamName"
-                :stream-type="streamType"
-                :query="fieldListWhereClause"
-                :time-stamp="fieldListTimeStamp"
-                :hide-copy-value="true"
-                @event-emitted="handleFieldListEvent"
-              />
+              <OButton
+                variant="ghost"
+                size="sm"
+                class="w-full justify-between md:hidden"
+                :aria-expanded="fieldsOpen"
+                data-test="query-editor-dialog-fields-toggle"
+                @click="fieldsOpen = !fieldsOpen"
+              >
+                {{ t("panel.fields") }}
+                <OIcon :name="fieldsOpen ? 'expand-more' : 'chevron-right'" size="sm" />
+              </OButton>
+              <div
+                class="min-h-0 md:block md:flex-1"
+                :class="fieldsOpen ? 'max-md:h-[70vh]' : 'max-md:hidden'"
+              >
+                <StreamFieldPanel :capabilities="FIELD_PANEL_CAPABILITIES" :source="fieldSource" />
+              </div>
             </div>
 
             <!-- Input Section (40%) -->
-            <div class="flex h-full min-h-0 w-full overflow-y-auto">
+            <div class="flex min-h-0 w-full shrink-0 md:h-full md:overflow-y-auto">
               <div ref="editorsColumnRef" class="flex min-h-full w-full flex-col gap-y-2">
                 <!-- SQL/PromQL Editor Pane + Status Bar wrapper -->
                 <div class="flex min-h-55 w-full flex-[3] flex-col overflow-visible">
@@ -344,7 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Output Section (35%) -->
-            <div class="flex h-full min-h-0 flex-col gap-y-2 overflow-y-auto">
+            <div class="flex min-h-0 shrink-0 flex-col gap-y-2 md:h-full md:overflow-y-auto">
               <!-- Query Result Pane -->
               <div
                 class="rounded-default border-border-default flex min-h-55 flex-1 flex-col overflow-hidden border"
@@ -536,7 +549,9 @@ import searchService from "@/services/search";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
-import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
+import StreamFieldPanel from "@/components/common/fieldPanel/StreamFieldPanel.vue";
+import useLocalFieldSource from "@/components/common/fieldPanel/useLocalFieldSource";
+import type { FieldPanelCapabilities } from "@/components/common/fieldPanel/fieldPanel.types";
 import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";
@@ -688,6 +703,7 @@ const closeDialog = () => {
 // Local state
 // Default to SQL tab if no tab is provided, otherwise use the provided tab
 const localTab = ref<"sql" | "promql">(props.tab || "sql");
+const fieldsOpen = ref(false);
 const localSqlQuery = ref(props.sqlQuery);
 const localPromqlQuery = ref(props.promqlQuery);
 const vrlFunctionContent = ref(props.vrlFunction);
@@ -1140,9 +1156,7 @@ watch(
   { immediate: true, deep: true },
 );
 
-// Transform columns (value/label pairs) → FieldList items ({ name })
-// Extract WHERE clause from SQL so FieldList can use it to filter field values.
-// FieldList.buildSql() expects a raw WHERE clause string (not a full SQL query).
+// The sidebar's WHERE comes from the parser so subqueries, CTEs and quoted keywords do not break it.
 const fieldListWhereClause = computed(() => {
   const sql = localSqlQuery.value?.trim();
   if (!sql) return "";
@@ -1155,14 +1169,32 @@ const fieldListWhereClause = computed(() => {
 const fieldListItems = computed(() =>
   (props.columns as any[]).map((c: any) => ({
     name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
+    type: typeof c === "string" ? undefined : c.type,
     showValues: true,
   })),
 );
 
-const fieldListTimeStamp = computed(() => {
-  const endTime = new Date().getTime() * 1000;
-  const startTime = endTime - props.period * 60 * 1000000;
-  return { startTime, endTime };
+const FIELD_PANEL_CAPABILITIES: FieldPanelCapabilities = {
+  streamPicker: "none",
+  values: true,
+  drag: false,
+  actions: ["add-filter"],
+  footerToggles: [],
+  highlightColumns: false,
+};
+
+const fieldSource = useLocalFieldSource({
+  fields: fieldListItems,
+  streamName: computed(() => props.streamName),
+  streamType: computed(() => props.streamType),
+  // Evaluated per request, so a values query always ends "now".
+  timeRange: () => {
+    const endTime = Date.now() * 1000;
+    return { startTime: endTime - props.period * 60 * 1000000, endTime };
+  },
+  sql: localSqlQuery,
+  onAddFilter: (expression) => handleFieldListEvent("add-field", expression),
+  onRemoveFieldFilter: (name) => handleFieldListEvent("remove-field", name),
 });
 
 const rebuildSqlWithWhere = (newWhere: string): string => {
@@ -1183,6 +1215,7 @@ const rebuildSqlWithWhere = (newWhere: string): string => {
 };
 
 const handleFieldListEvent = (event: string, value: any) => {
+  if (localTab.value !== "sql") return;
   let newSql: string | null = null;
   if (event === "add-field") {
     const newWhere = applyFilterTerm(value, fieldListWhereClause.value);

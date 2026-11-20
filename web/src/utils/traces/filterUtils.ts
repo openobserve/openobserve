@@ -13,12 +13,18 @@ const SIMPLE_CONDITION = new RegExp(
   "i",
 );
 
+// A parenthesised run of one field's conditions, which may hold one such run itself: `((f='a' OR f='b') AND f!='c')`.
+const fieldGroupPattern = (condPat: string): string => {
+  const run = (term: string) => `\\(\\s*${term}(?:\\s+(?:OR|AND)\\s+${term})*\\s*\\)`;
+  return run(`(?:${run(condPat)}|${condPat})`);
+};
+
 /**
  * Extracts the field name from a filter expression such as
  * `field='val'`, `field!='val'`, `(field='x' OR field='y')`, etc.
  */
 export const getFieldFromExpression = (expression: string): string | null => {
-  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const cleaned = expression.trim().replace(/^(?:\(\s*)+/, "");
   const match =
     cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
     cleaned.match(/^(\w+)\s*(?:=|!=|>=|<=|>|<|is)/i);
@@ -42,7 +48,7 @@ export const replaceExistingFieldCondition = (
   const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
+  const multiRegex = new RegExp(fieldGroupPattern(condPat), "gi");
   if (multiRegex.test(queryStr)) {
     return queryStr.replace(multiRegex, () => newExpression);
   }

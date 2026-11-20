@@ -23,6 +23,8 @@ import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 // A plain (non-reactive) object, so tests that change it remount the component.
 const mockStreams = vi.hoisted(() => ({ selected: ["stream1"] }));
@@ -463,6 +465,65 @@ describe("DetailTable Component", () => {
 
     jsonPreview.vm.$emit("copy", { test: "value" });
     expect(mockCopyToClipboard).not.toHaveBeenCalled();
+  });
+
+  it("names the value actions with the field list's words and icons (U7)", async () => {
+    wrapper.unmount();
+    wrapper = mount(DetailTable, {
+      attachTo: "#app",
+      props: defaultProps,
+      global: {
+        ...globalMountOptions,
+        stubs: {
+          ...globalMountOptions.stubs,
+          ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          ODropdownItem: {
+            template:
+              '<div class="menu-item" :data-test="$attrs[\'data-test\']" :data-icon="$attrs[\'icon-left\']"><slot name="icon-left" /><slot /></div>',
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const items = wrapper
+      .findAll(".menu-item")
+      .map((item: any) => ({ text: item.text(), icon: item.attributes("data-icon") }));
+    expect(items.length).toBeGreaterThan(0);
+    expect(items).toEqual(
+      expect.arrayContaining([
+        { text: "Include", icon: undefined },
+        { text: "Exclude", icon: undefined },
+        { text: "Add field to the table", icon: "visibility" },
+      ]),
+    );
+    const include = wrapper.find('[data-test="log-details-include-field-btn"]');
+    const exclude = wrapper.find('[data-test="log-details-exclude-field-btn"]');
+    expect(include.findComponent(EqualIcon).exists()).toBe(true);
+    expect(exclude.findComponent(NotEqualIcon).exists()).toBe(true);
+  });
+
+  it("offers include, exclude and the column eye at the row's end, revealed like the field list's strip (X6)", async () => {
+    await flushPromises();
+    const field = "kubernetes_container_name";
+    const strip = wrapper.find(`[data-test="log-details-row-actions-${field}"]`);
+    expect(strip.classes()).toEqual(
+      expect.arrayContaining([
+        "opacity-0",
+        "pointer-events-none",
+        "group-hover/detail-row:opacity-100",
+        "group-has-[:focus-visible]/detail-row:opacity-100",
+      ]),
+    );
+    expect(strip.classes()).not.toContain("hidden");
+    await wrapper.find(`[data-test="log-details-row-include-${field}"]`).trigger("click");
+    await wrapper.find(`[data-test="log-details-row-exclude-${field}"]`).trigger("click");
+    await wrapper.find(`[data-test="log-details-row-column-${field}"]`).trigger("click");
+    expect(wrapper.emitted()["add:searchterm"]).toEqual([
+      [field, "ziox", "include"],
+      [field, "ziox", "exclude"],
+    ]);
+    expect(wrapper.emitted()["add:table"]).toEqual([[field]]);
+    expect(wrapper.find('[data-test="log-details-row-column-_timestamp"]').exists()).toBe(false);
   });
 
   it("should emit add:table when addFieldToTable called", () => {

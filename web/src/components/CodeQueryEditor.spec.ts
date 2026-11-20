@@ -58,6 +58,14 @@ const mockEditorObj = {
   getRawOptions: vi.fn(() => ({ readOnly: false })),
   deltaDecorations: vi.fn(() => []),
   getPosition: vi.fn(() => ({ lineNumber: 1, column: 1 })),
+  getSelection: vi.fn(() => ({
+    startLineNumber: 1,
+    startColumn: 1,
+    endLineNumber: 1,
+    endColumn: 1,
+  })),
+  executeEdits: vi.fn(),
+  pushUndoStop: vi.fn(),
   trigger: vi.fn(),
   getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
 };
@@ -126,6 +134,11 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     KeyZ: 56,
   },
   Range: class {
+    constructor(...args: number[]) {
+      Object.assign(this, { args });
+    }
+  },
+  Selection: class {
     constructor(...args: number[]) {
       Object.assign(this, { args });
     }
@@ -268,6 +281,29 @@ describe("CodeQueryEditor", () => {
       expect(monacoApi.editor.setModelLanguage.mock.calls[0][1]).toBe("hcl");
       // No second editor: the same instance was retokenized.
       expect(monacoApi.editor.create.mock.calls.length).toBe(createdBefore);
+      wrapper.unmount();
+    });
+  });
+
+  describe("insertAtCursor", () => {
+    it("inserts at the live selection, the start of the line included, and leaves the caret after the text", async () => {
+      attachEditorHost();
+      const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+      const wrapper = createWrapper({ query: "foo{}" });
+      await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalled());
+      mockEditorObj.executeEdits.mockClear();
+
+      expect((wrapper.vm as any).insertAtCursor(" service ")).toBe(true);
+
+      const [, edits, endCursor] = mockEditorObj.executeEdits.mock.calls[0] as any[];
+      expect(edits).toEqual([
+        {
+          range: { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 },
+          text: " service ",
+        },
+      ]);
+      const caret = endCursor([{ range: { endLineNumber: 1, endColumn: 10 } }]);
+      expect(caret[0].args).toEqual([1, 10, 1, 10]);
       wrapper.unmount();
     });
   });

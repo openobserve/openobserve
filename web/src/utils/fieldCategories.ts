@@ -350,47 +350,68 @@ export function applyFieldGrouping(
   return result;
 }
 
-/**
- * Decide whether semantic field grouping should be applied.
- *
- * Grouping is suppressed when multiple streams are selected because the
- * multi-stream layout uses per-stream label rows (group: streamName) and
- * semantic re-grouping would discard those headers.
- */
-export function shouldApplyFieldGrouping(opts: {
-  semanticIndex: SemanticIndex | null;
-  streamCount: number;
-  udsActive: boolean;
-  udsFieldLimit: number;
-  totalSchemaFieldCount: number;
-}): boolean {
-  if (!opts.semanticIndex) return false;
-  if (opts.streamCount !== 1) return false;
-  if (opts.udsActive) return true;
-  return true;
+export interface StreamGroupLabels {
+  common: string;
+  stream: (name: string) => string;
+}
+
+const COMMON_GROUP = "common";
+
+// Without a semantic index a key field is one the org names, or one whose prefix names a key group.
+function isKeyFieldName(name: string, keyFieldSet: Set<string>, keyGroupSet: Set<string>): boolean {
+  const lower = name.toLowerCase();
+  const us = lower.indexOf("_");
+  const rawPrefix = us > 0 ? lower.slice(0, us) : "";
+  return keyFieldSet.has(lower) || (rawPrefix !== "" && keyGroupSet.has(rawPrefix));
+}
+
+function headerRow(group: string, name: string): FieldObj {
+  return {
+    name,
+    label: true,
+    ftsKey: false,
+    isSchemaField: false,
+    showValues: false,
+    group,
+    isExpanded: false,
+    streams: [],
+    isInterestingField: false,
+    dataType: "",
+  } as FieldObj;
 }
 
 /**
- * Filter `fields` according to group-collapse state.
- *
- * Rules:
- * - Label (header) rows are always kept.
- * - When `filterTerm` is non-empty, bypass collapse entirely so the table
- *   filter-method can match fields inside collapsed groups.
- * - When a field's group is not tracked in `expandGroupRows`, it is visible
- *   (flat / ungrouped list behaviour).
- * - Otherwise the field is visible only when its group is expanded.
+ * Multi-stream layout: "Common fields" (in every stream, key fields first), then one group per stream
+ * with the fields no earlier stream listed; a field appears once and an empty group gets no header.
  */
-export function applyCollapseFilter(
+export function applyStreamGrouping(
   fields: FieldObj[],
-  expandGroupRows: Record<string, boolean>,
-  filterTerm: string,
+  streams: string[],
+  keyFieldSet: Set<string>,
+  keyGroupSet: Set<string>,
+  labels: StreamGroupLabels,
 ): FieldObj[] {
-  if (filterTerm) return fields;
-  return fields.filter((row) => {
-    if (row.label === true) return true;
-    const group = row.group;
-    if (group === undefined || !(group in expandGroupRows)) return true;
-    return expandGroupRows[group] !== false;
-  });
+  const rows = fields.filter((f) => !f.label);
+  const inAll = (f: FieldObj) => streams.every((stream) => f.streams.includes(stream));
+  const common = rows.filter(inAll);
+  const keyed = common.filter((f) => isKeyFieldName(f.name, keyFieldSet, keyGroupSet));
+  const rest = common.filter((f) => !isKeyFieldName(f.name, keyFieldSet, keyGroupSet));
+  const result: FieldObj[] = [];
+  if (common.length) {
+    result.push(
+      headerRow(COMMON_GROUP, labels.common),
+      ...[...keyed, ...rest].map((f) => ({ ...f, group: COMMON_GROUP })),
+    );
+  }
+  const placed = new Set(common.map((f) => f.name));
+  for (const stream of streams) {
+    const own = rows.filter((f) => !placed.has(f.name) && f.streams.includes(stream));
+    if (!own.length) continue;
+    own.forEach((f) => placed.add(f.name));
+    result.push(
+      headerRow(stream, labels.stream(stream)),
+      ...own.map((f) => ({ ...f, group: stream })),
+    );
+  }
+  return result;
 }

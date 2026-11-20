@@ -71,6 +71,17 @@ vi.mock("@/composables/rum/useErrorIssuesData", () => ({
   }),
 }));
 
+vi.mock("@/composables/useFieldGrouping", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({
+      contextLoaded: ref(false),
+      loadGroupingContext: vi.fn().mockResolvedValue(undefined),
+      groupFields: (fields: unknown[]) => fields,
+    }),
+  };
+});
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStream: vi.fn().mockResolvedValue({
@@ -338,19 +349,10 @@ const NO_DATA_STUB = {
   template: '<div data-test="no-data-stub">No data</div>',
 };
 
-const SEARCH_FIELD_LIST_STUB = {
-  name: "SearchFieldList",
-  template: '<div data-test="search-field-list-stub" />',
-  props: [
-    "fields",
-    "timeStamp",
-    "streamName",
-    "streamType",
-    "enableGrouping",
-    "query",
-    "baseFilter",
-  ],
-  emits: ["event-emitted"],
+const FIELD_PANEL_STUB = {
+  name: "StreamFieldPanel",
+  template: '<div data-test="stream-field-panel-stub" />',
+  props: ["capabilities", "source"],
 };
 
 import store from "@/test/unit/helpers/store";
@@ -382,7 +384,7 @@ async function mountAppErrors({ routeQuery = {} }: MountOptions = {}) {
         ErrorTrendCell: ERROR_TREND_CELL_STUB,
         DateTime: DATETIME_STUB,
         SyntaxGuide: { template: "<div />" },
-        SearchFieldList: SEARCH_FIELD_LIST_STUB,
+        StreamFieldPanel: FIELD_PANEL_STUB,
         NoData: NO_DATA_STUB,
         // Phase 2/3 page furniture — covered by their own co-located specs.
         ErrorsOverTimeChart: {
@@ -978,8 +980,7 @@ describe("AppErrors", () => {
       const { errorTrackingState } = useErrorTracking();
       errorTrackingState.data.editorValue = "";
 
-      const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
-      await fieldList.vm.$emit("event-emitted", "add-field", 'error_type = "TypeError"');
+      (wrapper.vm as any).fieldSource.addFilter('error_type = "TypeError"');
       await flushPromises();
 
       expect(errorTrackingState.data.editorValue).toContain("TypeError");
@@ -992,8 +993,7 @@ describe("AppErrors", () => {
       const { errorTrackingState } = useErrorTracking();
       errorTrackingState.data.editorValue = 'error_type = "TypeError"';
 
-      const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
-      await fieldList.vm.$emit("event-emitted", "remove-field", "error_type");
+      (wrapper.vm as any).fieldSource.removeFieldFilter("error_type");
       await flushPromises();
 
       // After removal, error_type condition should be gone
@@ -1004,8 +1004,10 @@ describe("AppErrors", () => {
       ({ wrapper, router } = await mountAppErrors());
       await flushPromises();
 
-      const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
-      expect(fieldList.props("baseFilter")).toBe("type='error'");
+      expect((wrapper.vm as any).fieldListBaseFilter).toBe("type='error'");
+      const panel = wrapper.findComponent(FIELD_PANEL_STUB);
+      expect(panel.props("capabilities")).toMatchObject({ streamPicker: "none", values: true });
+      expect(panel.props("source")).toBe((wrapper.vm as any).fieldSource);
     });
 
     it("adds the service chip to the sidebar base filter", async () => {
@@ -1017,8 +1019,7 @@ describe("AppErrors", () => {
         .vm.$emit("update:service", "check'out");
       await flushPromises();
 
-      const fieldList = wrapper.findComponent(SEARCH_FIELD_LIST_STUB);
-      expect(fieldList.props("baseFilter")).toBe("type='error' AND service='check''out'");
+      expect((wrapper.vm as any).fieldListBaseFilter).toBe("type='error' AND service='check''out'");
     });
 
     it("tracks filter chips without sending the service name", async () => {

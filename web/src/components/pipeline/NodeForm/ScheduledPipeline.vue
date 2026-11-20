@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stepper-header mb-2 flex h-full w-full">
       <div
         :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-full'"
-        class="flex"
+        class="flex max-md:w-full! max-md:overflow-y-auto"
         style="height: 100% !important"
       >
         <!-- Collapsed field list bar (shown when hidden) -->
@@ -41,7 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSplitter
           v-model="splitterModel"
           :style="{ width: collapseFields ? 'calc(100% - 3.125rem)' : '100%' }"
-          class="o2-custom-splitter"
+          class="o2-custom-splitter max-md:flex-col! max-md:self-start"
+          before-class="max-md:w-full! max-md:h-auto!"
+          after-class="max-md:w-full! max-md:h-auto! max-md:flex-none"
+          separator-class="max-md:hidden"
         >
           <template #before>
             <div class="flex h-full flex-col">
@@ -53,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="outline"
                   size="icon-xs-sq"
-                  class="rotate-90"
+                  class="rotate-90 max-md:hidden"
                   icon-left="unfold-less"
                   :title="t('search.collapseFields')"
                   data-test="scheduled-pipeline-collapse-btn"
@@ -61,9 +64,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="flex min-h-0 flex-1 flex-col ps-2">
-                <div class="min-h-0 w-full flex-1 overflow-y-auto">
-                  <!-- fieldlist section -->
-                  <div class="flex flex-col overflow-hidden">
+                <div class="flex min-h-0 w-full flex-1 flex-col">
+                  <div
+                    class="flex min-h-0 flex-col"
+                    :class="expandState.buildQuery ? 'flex-1' : 'shrink-0'"
+                  >
                     <span @click.stop="expandState.buildQuery = !expandState.buildQuery">
                       <FullViewContainer
                         name="query"
@@ -71,155 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t('pipeline.buildQuery')"
                       />
                     </span>
-                    <div v-show="expandState.buildQuery" class="flex flex-col pt-2">
-                      <div class="shrink-0">
-                        <OFormSelect
-                          name="stream_type"
-                          :options="streamTypes"
-                          :label="t('alerts.streamType')"
-                          required
-                          class="no-case mb-1 w-full"
-                          data-test="scheduled-pipeline-stream-type-select"
-                        />
-
-                        <OFormSelect
-                          name="stream_name"
-                          :options="filteredStreams"
-                          labelKey="label"
-                          valueKey="value"
-                          :label="t('alerts.stream_name')"
-                          :placeholder="t('pipeline.selectStream')"
-                          :loading="streamsLoading"
-                          class="no-case my-1 w-full"
-                          data-test="scheduled-pipeline-stream-name-select"
-                          @open="getStreamList"
-                        />
-                      </div>
-
-                      <!-- FieldList scrolls within a capped height -->
-                      <div
-                        style="max-height: 40vh"
-                        class="pipeline-field-list-wrapper overflow-y-auto"
-                      >
-                        <GroupedFieldList
-                          :fields="streamFields"
-                          :theme="store.state.theme"
-                          :show-pagination="false"
-                          :page-size="50"
-                          search-class="px-0!"
-                        >
-                          <template #field-row="{ row }">
-                            <FieldRow
-                              :field="row"
-                              :selected-fields="[]"
-                              :timestamp-column="store.state.zoConfig.timestamp_column"
-                              :theme="store.state.theme"
-                              :show-quick-mode="false"
-                              :show-visibility-toggle="false"
-                              :show-fts-field-values="showFtsFieldValues"
-                              @add-to-filter="addFieldSearchTerm(`${row.name}=''`)"
-                            >
-                              <template v-if="isFieldExpandable(row)" #expansion="{ field }">
-                                <FieldExpansion
-                                  :field="field"
-                                  :field-values="fieldValues[field.name]"
-                                  :expanded="expandedRows?.[field.name] ?? false"
-                                  :theme="store.state.theme"
-                                  :show-visibility-toggle="false"
-                                  :show-filter-icon="false"
-                                  :show-quick-mode="false"
-                                  :default-values-count="defaultValuesCount"
-                                  @add-to-filter="(val: string) => addFieldSearchTerm(val)"
-                                  @add-search-term="handleAddSearchTerm"
-                                  @add-multiple-search-terms="handleAddMultipleSearchTerms"
-                                  @remove-field-filter="
-                                    (fn: string) => handleSidebarEvent('remove-field', fn)
-                                  "
-                                  @search-field-values="handleSearchFieldValues"
-                                  @load-more-values="handleLoadMoreValues"
-                                  @before-show="(event: any, f: any) => openFilterCreator(f)"
-                                  @before-hide="(f: any) => closeField(f.name)"
-                                >
-                                  <!-- Duration percentiles for traces -->
-                                  <template
-                                    v-if="
-                                      field.name === 'duration' && selectedStreamType === 'traces'
-                                    "
-                                    #body
-                                  >
-                                    <div
-                                      v-if="durationPercentilesLoading"
-                                      class="flex justify-center py-2"
-                                    >
-                                      <OSpinner size="xs" />
-                                    </div>
-                                    <template v-else-if="hasDurationPercentiles">
-                                      <div
-                                        v-for="p in PERCENTILE_LABELS"
-                                        :key="p.key"
-                                        class="flex items-center justify-between py-[0.15rem] ps-2"
-                                      >
-                                        <span class="text-2xs w-8 shrink-0">{{ p.label }}</span>
-                                        <span class="text-2xs flex-1 pe-1 text-right">
-                                          {{ formatPercentile(durationPercentiles[p.key]) }}
-                                        </span>
-                                        <div class="flex w-[2.7rem]">
-                                          <OButton
-                                            v-if="p.key !== 'max'"
-                                            variant="ghost"
-                                            size="icon-xs-circle"
-                                            :title="
-                                              t('common.durationGte', {
-                                                value: formatPercentile(durationPercentiles[p.key]),
-                                              })
-                                            "
-                                            @click.stop="
-                                              addFieldSearchTerm(
-                                                `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
-                                              )
-                                            "
-                                            class="border-card-glass-border! ms-0.5! border!"
-                                          >
-                                            <OIcon
-                                              name="arrow-forward-ios"
-                                              size="sm"
-                                              class="h-[0.4rem]! w-[0.4rem]!"
-                                            />
-                                          </OButton>
-                                          <OButton
-                                            variant="ghost"
-                                            size="icon-xs-circle"
-                                            :title="
-                                              t('common.durationLte', {
-                                                value: formatPercentile(durationPercentiles[p.key]),
-                                              })
-                                            "
-                                            @click.stop="
-                                              addFieldSearchTerm(
-                                                `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
-                                              )
-                                            "
-                                            class="border-card-glass-border! ms-auto! me-2! border!"
-                                          >
-                                            <OIcon
-                                              name="arrow-back-ios"
-                                              size="sm"
-                                              class="h-[0.4rem]! w-[0.4rem]!"
-                                            />
-                                          </OButton>
-                                        </div>
-                                      </div>
-                                    </template>
-                                    <div v-else class="text-2xs text-text-secondary py-1 ps-2">
-                                      {{ durationPercentileErrMsg || t("common.noValuesFound") }}
-                                    </div>
-                                  </template>
-                                </FieldExpansion>
-                              </template>
-                            </FieldRow>
-                          </template>
-                        </GroupedFieldList>
-                      </div>
+                    <div v-show="expandState.buildQuery" class="flex min-h-0 flex-1 flex-col pt-2">
+                      <StreamFieldPanel
+                        :capabilities="fieldPanelCapabilities"
+                        :source="fieldSource"
+                        test-id-prefix="scheduled-pipeline"
+                        class="min-h-0 flex-1 max-md:h-[70vh] max-md:flex-none"
+                      />
                     </div>
                   </div>
                   <span @click.stop="expandState.setVariables = !expandState.setVariables">
@@ -231,7 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="mt-1"
                     />
                   </span>
-                  <div v-show="expandState.setVariables" class="flex flex-col pt-2">
+                  <div
+                    v-show="expandState.setVariables"
+                    class="flex max-h-1/2 shrink-0 flex-col overflow-y-auto pt-2"
+                  >
                     <div class="flex w-full flex-col gap-4">
                       <div
                         v-if="
@@ -951,13 +817,7 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import {
-  getImageURL,
-  timestampToTimezoneDate,
-  formatTimeWithSuffix,
-  b64EncodeUnicode,
-  queryIndexSplit,
-} from "@/utils/zincutils";
+import { getImageURL, timestampToTimezoneDate, queryIndexSplit } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { toggleFullscreen } from "@/utils/dom";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -977,24 +837,16 @@ import { firstFieldError } from "@/lib/forms/Form/fieldError";
 
 import useLogs from "@/composables/useLogs";
 
-import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
-import FieldRow from "@/components/common/FieldRow.vue";
+import StreamFieldPanel from "@/components/common/fieldPanel/StreamFieldPanel.vue";
+import DurationPercentilesBody from "@/components/common/fieldPanel/DurationPercentilesBody.vue";
+import useLocalFieldSource from "@/components/common/fieldPanel/useLocalFieldSource";
+import type { FieldPanelCapabilities } from "@/components/common/fieldPanel/fieldPanel.types";
 import useStreams from "@/composables/useStreams";
-import useFieldValuesStream from "@/composables/useFieldValuesStream";
-import useDurationPercentiles from "@/composables/useDurationPercentiles";
-import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
-import {
-  useServiceCorrelation,
-  type KeyFieldsConfig,
-  type FieldGroupingConfig,
-} from "@/composables/useServiceCorrelation";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
-
-import config from "../../../aws-exports";
 
 import useAiChat from "@/composables/useAiChat";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
@@ -1003,7 +855,6 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
-import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -1015,7 +866,6 @@ import {
 } from "@/plugins/logs/filterUtils";
 
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
-const FieldExpansion = defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue"));
 
 const props = defineProps([
   "columns",
@@ -1060,7 +910,6 @@ const emits = defineEmits([
   "cancel:form",
   "delete:node",
   "update:fullscreen",
-  "update:stream_type",
   "update:delay",
 ]);
 const { t } = useI18nTyped();
@@ -1073,7 +922,6 @@ const {
   searchObj?: { data?: { stream?: { pipelineQueryStream?: string[] } } };
 } = useLogs(t);
 const { getStream, getStreams } = useStreams(t);
-const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
 
@@ -1169,11 +1017,7 @@ const setAggregation = (value: any) => {
   });
 };
 
-// Stream type / name are form-owned: the two <OFormSelect> controls own
-// `stream_type` / `stream_name`. These are reactive READ views of that single
-// source of truth — every programmatic write goes through form.setFieldValue so
-// all the internal read-sites (query preview, field lists, watches, AI context)
-// keep working off one value, and nothing mirrors it.
+// Stream type / name are form-owned; the field panel's picker writes them through form.setFieldValue.
 const selectedStreamType = form.useStore(
   (s: any) => s.values.stream_type ?? props.streamType ?? "logs",
 );
@@ -1217,7 +1061,6 @@ const {
   externalErrors: sqlErrorRanges,
 });
 const expandedLogs = ref<any[]>([]);
-const cursorPosition = ref(-1);
 const splitterModel = ref(30);
 const step = ref(1);
 const dateTime = ref<{
@@ -1245,23 +1088,64 @@ const aiChatAppendMode = ref(true);
 
 const userDefinedFields = ref<any[]>([]);
 
-// ─── Field value streaming & duration percentiles ────────────────────
+// ─── Field panel ─────────────────────────────────────────────────────
 
-const {
-  fieldValues,
-  fieldValuesFinalizedValues,
-  fieldValuesCurrentSize,
-  fetchFieldValues,
-  cancelFieldStream,
-  resetFieldValues,
-} = useFieldValuesStream(t);
+const filteredStreams = ref<any[]>([]);
+const streams = ref([]);
+const loadedStreamTypes = ref(new Set());
+
+// Falls back to the last 15 min until the parent's DateTime has reported a range.
+const getEffectiveTimeRange = () => {
+  const now = Date.now() * 1000;
+  return {
+    start_time: dateTime.value.startTime ?? now - 900_000_000,
+    end_time: dateTime.value.endTime ?? now,
+  };
+};
+
+// PromQL has no WHERE to carry a value filter, so its values expansion is read-only.
+const fieldPanelCapabilities = computed<FieldPanelCapabilities>(() => ({
+  streamPicker: "single",
+  streamType: "select",
+  values: true,
+  valueFilters: tab.value === "sql",
+  drag: false,
+  actions: ["add-filter"],
+  footerToggles: [],
+  highlightColumns: false,
+}));
+
+const fieldsLoading = ref(false);
+
+const fieldSource = useLocalFieldSource({
+  fields: streamFields,
+  streamName: selectedStreamName,
+  streamType: selectedStreamType,
+  streams: filteredStreams,
+  streamsLoading,
+  loading: fieldsLoading,
+  timeRange: () => {
+    const { start_time, end_time } = getEffectiveTimeRange();
+    return { startTime: start_time, endTime: end_time };
+  },
+  sql: computed(() => (tab.value === "sql" ? (query.value ?? "") : "")),
+  expansionOverride: (field) =>
+    field.name === "duration" && selectedStreamType.value === "traces"
+      ? DurationPercentilesBody
+      : null,
+  onSelectStream: (name) => form.setFieldValue("stream_name", name, { dontUpdateMeta: true }),
+  onChangeStreamType: (type) => form.setFieldValue("stream_type", type, { dontUpdateMeta: true }),
+  onOpenStreams: () => getStreamList(),
+  onAddFilter: (expression) => handleSidebarEvent("add-field", expression),
+  onRemoveFieldFilter: (name) => handleSidebarEvent("remove-field", name),
+});
 
 // ─── Query editor typewriter placeholder ─────────────────────────────
 const isSqlMode = computed(() => tab.value === "sql");
 const noStream = computed(() => !selectedStreamName.value);
 const { placeholder: editorPlaceholder } = useQueryPlaceholder(
   streamFields,
-  fieldValues,
+  fieldSource.fieldValues,
   isSqlMode,
   noStream,
   t,
@@ -1279,41 +1163,6 @@ const {
   resolveFieldValues,
 } = useSqlSuggestions();
 
-const PERCENTILE_LABELS = [
-  { key: "p25", label: raw("P25") },
-  { key: "p50", label: raw("P50") },
-  { key: "p75", label: raw("P75") },
-  { key: "p95", label: raw("P95") },
-  { key: "p99", label: raw("P99") },
-  { key: "max", label: t("pipeline.percentileMax") },
-] as const;
-
-const {
-  percentiles: durationPercentiles,
-  isLoading: durationPercentilesLoading,
-  fetchPercentiles,
-  cancelFetch: cancelPercentileFetch,
-  errMsg: durationPercentileErrMsg,
-} = useDurationPercentiles(t);
-
-const hasDurationPercentiles = computed(() =>
-  PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
-);
-
-// Percentile values are `number | null`; formatTimeWithSuffix already renders
-// null as "0us", so `?? 0` preserves runtime output while satisfying its `number` param.
-const formatPercentile = (value: number | null) => formatTimeWithSuffix(value ?? 0);
-
-const expandedRows: Ref<Record<string, boolean>> = ref({});
-const expandedIds = ref<string[]>([]);
-const currentSizePerField: Ref<Record<string, number>> = ref({});
-const currentKeyword: Ref<Record<string, string>> = ref({});
-const fieldValuesTimeRange: Ref<Record<string, { start_time: number; end_time: number }>> = ref({});
-
-const defaultValuesCount = computed(() => store.state.zoConfig?.query_values_default_num || 10);
-
-const showFtsFieldValues = computed(() => store.state.zoConfig?.showFtsFieldValues ?? false);
-
 const tabOptions = computed(() => [
   {
     label: t("alerts.sql"),
@@ -1328,12 +1177,6 @@ const tabOptions = computed(() => [
     tooltipLabel: selectedStreamType.value !== "metrics" ? t("pipeline.promqlOnlyForMetrics") : "",
   },
 ]);
-
-const filteredStreams = ref<any[]>([]);
-const streams = ref([]);
-
-// Add a loading state and track stream types that have been loaded
-const loadedStreamTypes = ref(new Set());
 
 watch(
   () => collapseFields.value,
@@ -1365,9 +1208,7 @@ watch(
   },
 );
 
-// The stream-name <OFormSelect> owns `stream_name`; react to the form-owned value
-// here to load the selected stream's fields. The SQL-sync path awaits
-// getStreamFields explicitly, so skip it there to avoid a double fetch.
+// The SQL-sync path awaits getStreamFields itself, so it is skipped here to avoid a double fetch.
 watch(
   () => selectedStreamName.value,
   (val) => {
@@ -1678,8 +1519,6 @@ const formIsSubmitting = form.useStore((s: any) => s.isSubmitting);
 
 const filteredNumericColumns = ref(getNumericColumns.value);
 
-const streamTypes = ["logs", "metrics", "traces"];
-
 const rows = ref([]);
 
 // @ts-ignore
@@ -1927,6 +1766,7 @@ const collapseFieldList = () => {
 };
 
 const getStreamFields = () => {
+  fieldsLoading.value = true;
   return new Promise((resolve) => {
     getStream(selectedStreamName.value, selectedStreamType.value, true)
       .then(async (stream: any) => {
@@ -1948,232 +1788,15 @@ const getStreamFields = () => {
             ...field,
           });
         });
-
-        // Apply field grouping (same as logs/traces)
-        try {
-          const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
-          const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
-            isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
-            loadKeyFields(),
-            loadFieldGrouping(),
-          ]);
-          const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
-            ? (fieldGrouping as FieldGroupingConfig)
-            : null;
-          const semanticIndex =
-            semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
-          const keySpec = (keyFieldsConfig as KeyFieldsConfig)[selectedStreamType.value] ?? {
-            fields: [],
-            groups: [],
-          };
-          const keyFieldSet = new Set(keySpec.fields.map((f: string) => f.toLowerCase()));
-          const keyGroupSet = new Set(keySpec.groups.map((g: string) => g.toLowerCase()));
-
-          streamFields.value = applyFieldGrouping(
-            streamFields.value as FieldObj[],
-            semanticIndex,
-            keyFieldSet,
-            keyGroupSet,
-          );
-        } catch (groupErr) {
-          console.warn("Field grouping failed for pipeline, using flat list", groupErr);
-        }
       })
       .finally(() => {
+        fieldsLoading.value = false;
         // Query is cleared when stream changes (see watch on selectedStreamName);
         // initial query generation happens in onMounted.
         expandState.value.query = true;
         expandState.value.output = false;
         resolve(true);
       });
-  });
-};
-
-// ─── Field value helpers (moved from sidebar/FieldList) ──────────────
-
-const buildSql = (streamName: string, whereClause?: string) =>
-  b64EncodeUnicode(`SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`) ||
-  "";
-
-function isFieldExpandable(row: any) {
-  if (row.isGroup || row.label) return false;
-  if (row.ftsKey && !showFtsFieldValues.value) return false;
-  if (!row.showValues) return false;
-  return true;
-}
-
-// Default to last 15 min when dateTime hasn't been set yet (mount-order race
-// with the parent's DateTime component — see Query.vue).
-const getEffectiveTimeRange = () => {
-  const now = Date.now() * 1000;
-  return {
-    start_time: dateTime.value.startTime ?? now - 900_000_000,
-    end_time: dateTime.value.endTime ?? now,
-  };
-};
-
-function openFilterCreator({ name, ftsKey, stream_name }: any) {
-  if (ftsKey && !showFtsFieldValues.value) return;
-
-  expandedRows.value[name] = true;
-  expandedIds.value = [name];
-
-  // Duration field in traces — fetch percentiles instead of regular values
-  if (name === "duration" && selectedStreamType.value === "traces") {
-    cancelPercentileFetch();
-    const { start_time, end_time } = getEffectiveTimeRange();
-    fetchPercentiles({
-      streamName: stream_name || selectedStreamName.value,
-      startTime: start_time,
-      endTime: end_time,
-      whereClause: "",
-    });
-    return;
-  }
-
-  cancelFieldStream(name);
-  currentSizePerField.value[name] = defaultValuesCount.value;
-  currentKeyword.value[name] = "";
-  const { start_time, end_time } = getEffectiveTimeRange();
-  fieldValuesTimeRange.value[name] = { start_time, end_time };
-  resetFieldValues(name, true);
-
-  const resolvedStream = stream_name || selectedStreamName.value;
-  fieldValuesCurrentSize.value[name] = defaultValuesCount.value;
-
-  fetchFieldValues({
-    fields: [name],
-    size: defaultValuesCount.value,
-    no_count: false,
-    start_time,
-    end_time,
-    stream_name: resolvedStream,
-    stream_type: selectedStreamType.value,
-    sql: buildSql(resolvedStream),
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
-}
-
-function closeField(fieldName: string) {
-  if (fieldName === "duration" && selectedStreamType.value === "traces") {
-    cancelPercentileFetch();
-  } else {
-    cancelFieldStream(fieldName);
-    currentSizePerField.value[fieldName] = 0;
-    currentKeyword.value[fieldName] = "";
-    delete fieldValuesTimeRange.value[fieldName];
-    resetFieldValues(fieldName);
-  }
-  expandedRows.value[fieldName] = false;
-  expandedIds.value = expandedIds.value.filter((id) => id !== fieldName);
-}
-
-const handleSearchFieldValues = (fieldName: string, term: string) => {
-  const row: any = (streamFields.value as any[]).find((f: any) => f.name === fieldName);
-  const resolvedStream = row?.stream_name || selectedStreamName.value;
-  currentKeyword.value[fieldName] = term;
-  currentSizePerField.value[fieldName] = defaultValuesCount.value;
-  fieldValuesCurrentSize.value[fieldName] = defaultValuesCount.value;
-  delete fieldValuesFinalizedValues.value[fieldName];
-  cancelFieldStream(fieldName);
-  resetFieldValues(fieldName, true);
-
-  const pinnedTime = fieldValuesTimeRange.value[fieldName];
-  const effective = getEffectiveTimeRange();
-  fetchFieldValues({
-    fields: [fieldName],
-    size: defaultValuesCount.value,
-    no_count: false,
-    start_time: pinnedTime?.start_time ?? effective.start_time,
-    end_time: pinnedTime?.end_time ?? effective.end_time,
-    stream_name: resolvedStream,
-    stream_type: selectedStreamType.value,
-    sql: buildSql(resolvedStream),
-    keyword: term || undefined,
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
-};
-
-const handleLoadMoreValues = (fieldName: string) => {
-  const row: any = (streamFields.value as any[]).find((f: any) => f.name === fieldName);
-  const resolvedStream = row?.stream_name || selectedStreamName.value;
-  const newSize =
-    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) + defaultValuesCount.value;
-  currentSizePerField.value[fieldName] = newSize;
-  fieldValuesCurrentSize.value[fieldName] = newSize;
-  fieldValuesFinalizedValues.value[fieldName] = [...(fieldValues.value[fieldName]?.values || [])];
-
-  const pinnedTime = fieldValuesTimeRange.value[fieldName];
-  const effective2 = getEffectiveTimeRange();
-  fetchFieldValues({
-    fields: [fieldName],
-    size: newSize,
-    no_count: false,
-    start_time: pinnedTime?.start_time ?? effective2.start_time,
-    end_time: pinnedTime?.end_time ?? effective2.end_time,
-    stream_name: resolvedStream,
-    stream_type: selectedStreamType.value,
-    sql: buildSql(resolvedStream),
-    keyword: currentKeyword.value[fieldName] || undefined,
-    timeout: 30000,
-    use_cache: (globalThis as any).use_cache ?? true,
-  });
-};
-
-const isNullValue = (v: string) =>
-  v === null || v === undefined || v === "" || v.toLowerCase() === "null";
-
-const buildExpression = (fieldName: string, v: string, action: string) =>
-  isNullValue(v)
-    ? action === "include"
-      ? `${fieldName} IS NULL`
-      : `${fieldName} IS NOT NULL`
-    : action === "include"
-      ? `${fieldName}='${escapeSingleQuotes(v)}'`
-      : `${fieldName}!='${escapeSingleQuotes(v)}'`;
-
-const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
-  handleSidebarEvent("add-field", buildExpression(fieldName, value, action));
-};
-
-const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
-  const joinOp = action === "include" ? " or " : " and ";
-  const expressions = values.map((v) => buildExpression(fieldName, v, action));
-  handleSidebarEvent(
-    "add-field",
-    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0],
-  );
-};
-
-const addFieldSearchTerm = (term: string) => {
-  handleSidebarEvent("add-field", term);
-};
-
-const filterStreams = (val: string, update: any) => {
-  update(() => {
-    if (!val || val === "") {
-      // If value is empty, show all streams
-      filteredStreams.value = streams.value.map((stream: any) => ({
-        label: raw(stream.name),
-        value: stream.name,
-      }));
-      // Only fetch if we haven't loaded this stream type yet
-      if (!loadedStreamTypes.value.has(selectedStreamType.value) && !streamsLoading.value) {
-        getStreamList();
-      }
-    } else {
-      // Filter existing streams based on the search value
-      filteredStreams.value = streams.value
-        .map((stream: any) => ({
-          label: raw(stream.name),
-          value: stream.name,
-        }))
-        .filter((stream: any) => {
-          return stream.label.toLowerCase().indexOf(val.toLowerCase()) > -1;
-        });
-    }
   });
 };
 
@@ -2299,56 +1922,31 @@ const removeSqlFieldFilter = (sql: string, fieldName: string) => {
   return trailingClause.trim() ? `${nextSql} ${trailingClause.trim()}` : nextSql;
 };
 
+// The editor inserts at its own selection; before Monaco is ready there is no caret, so the text is appended.
+const insertAtEditorCaret = (currentQuery: string, text: string): string => {
+  if (pipelineEditorRef.value.insertAtCursor?.(text))
+    return pipelineEditorRef.value.getValue() ?? "";
+  pipelineEditorRef.value.setValue(currentQuery + text);
+  return currentQuery + text;
+};
+
 const handleSidebarEvent = (event: string, value: any) => {
-  if (pipelineEditorRef.value) {
-    const currentQuery: string = pipelineEditorRef.value.getValue() ?? "";
-
-    if (event === "remove-field") {
-      const newQuery =
-        tab.value === "sql"
-          ? removeSqlFieldFilter(currentQuery, value)
-          : removeFieldCondition(currentQuery, value);
-      pipelineEditorRef.value.setValue(newQuery);
-      updateQueryValue(newQuery);
-      cursorPosition.value = newQuery.length - 1;
-      return;
-    }
-
-    // For include/exclude expressions in SQL mode, append with WHERE / AND so the
-    // resulting query stays syntactically valid.
-    if (tab.value === "sql" && !value.endsWith("=''")) {
-      const newQuery = insertSqlFilter(currentQuery, value);
-      pipelineEditorRef.value.setValue(newQuery);
-      updateQueryValue(newQuery);
-      cursorPosition.value = newQuery.length - 1;
-      return;
-    }
-
-    // For bare field names (add button) or non-SQL modes: insert at cursor.
-    const insertValue = value.endsWith("=''") ? value.split("=")[0].trim() : value;
-    const valueToInsert = ` ${insertValue} `;
-    let cursorIndex = pipelineEditorRef.value?.getCursorIndex();
-    if (cursorIndex != -1) {
-      cursorPosition.value = cursorIndex;
-    } else if (cursorIndex == -1 && cursorPosition.value == -1) {
-      cursorPosition.value = currentQuery.length;
-    }
-
-    // Insert at cursor position
+  if (!pipelineEditorRef.value) return;
+  // PromQL carries no value filters, so there is nothing to remove there.
+  if (event === "remove-field" && tab.value !== "sql") return;
+  const currentQuery: string = pipelineEditorRef.value.getValue() ?? "";
+  if (event === "remove-field" || tab.value === "sql") {
     const newQuery =
-      currentQuery.slice(0, cursorPosition.value + 1) +
-      valueToInsert +
-      currentQuery.slice(cursorPosition.value + 1);
-    if (cursorPosition.value != -1) {
-      cursorPosition.value += valueToInsert.length;
-    }
-
-    // Set the new value
+      event === "remove-field"
+        ? removeSqlFieldFilter(currentQuery, value)
+        : insertSqlFilter(currentQuery, value);
     pipelineEditorRef.value.setValue(newQuery);
     updateQueryValue(newQuery);
-  } else {
-    console.log("Could not find editor instance");
+    return;
   }
+  // The + action drops the field name at the cursor; a PromQL query has no WHERE to put a filter in.
+  const name = tab.value === "promql" && value.endsWith("=''") ? value.split("=")[0].trim() : value;
+  updateQueryValue(insertAtEditorCaret(currentQuery, ` ${name} `));
 };
 const updateDateChange = (date: any) => {
   if (JSON.stringify(date) === JSON.stringify(dateTime.value)) return;
@@ -2572,7 +2170,8 @@ defineExpose({
   filteredStreams,
   streams,
   selectedStreamType,
-  filterStreams,
+  fieldSource,
+  fieldPanelCapabilities,
   handleSidebarEvent,
   dateTime,
   updateDateChange,
@@ -2583,7 +2182,6 @@ defineExpose({
   loading,
   sideBarSplitterModel,
   previewPromqlQueryRef,
-  cursorPosition,
   focusQueryEditor,
   expandedLogs,
   copyLogToClipboard,
@@ -2609,22 +2207,10 @@ defineExpose({
 </script>
 
 <style scoped>
-/* keep(lib-override): all of these reach into DOM owned by child/third-party components —
-   OSplitter panes (.o-splitter__*), the field-list component (.index-menu/.index-table/
-   .traces-field-table) and the Monaco-based query editor (.monaco-editor/
-   .query-editor-container) — so they cannot be expressed as template utilities. */
+/* keep(lib-override): OSplitter panes and the Monaco editor are child DOM, unreachable by utilities. */
 .scheduled-pipeline-container :deep(.o-splitter__before),
 .scheduled-pipeline-container :deep(.o-splitter__after) {
   overflow: hidden;
-}
-
-.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.index-menu),
-.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.index-table) {
-  height: 100%;
-}
-
-.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.traces-field-table) {
-  height: 100% !important;
 }
 
 .scheduled-pipeline-container .scheduled-pipelines :deep(.monaco-editor) {

@@ -621,3 +621,34 @@ describe("appendSqlFilter trailing line break", () => {
     );
   });
 });
+
+describe("a field's included and excluded values in one group (U6)", () => {
+  const mixed = "((level = 'a' OR level = 'b') AND level != 'c')";
+
+  it("reads the field from the nested group", () => {
+    expect(getFieldFromExpression(mixed)).toBe("level");
+  });
+
+  it("finds and replaces the whole group, whichever form held the field before", () => {
+    const base = "code = 1 AND (level = 'a' OR level = 'b') AND host = 'x'";
+    const withMixed = applyFilterToQuery(base, mixed);
+    expect(withMixed).toBe(`code = 1 AND ${mixed} AND host = 'x'`);
+    expect(hasFieldCondition(withMixed, "level")).toBe(true);
+    expect(applyFilterToQuery(withMixed, "level = 'a'")).toBe(
+      "code = 1 AND level = 'a' AND host = 'x'",
+    );
+    expect(applyFilterToQuery(withMixed, "(level != 'c' AND level != 'd')")).toBe(
+      "code = 1 AND (level != 'c' AND level != 'd') AND host = 'x'",
+    );
+  });
+
+  it("removes the whole group and keeps the other conditions", () => {
+    expect(removeFieldCondition(`code = 1 AND ${mixed}`, "level")).toBe("code = 1");
+  });
+  it("replaces and removes the null-safe form as one group", () => {
+    const safe = "((level = 'a' OR level is null) AND (level != 'c' OR level is null))";
+    const withSafe = applyFilterToQuery(`code = 1 AND ${mixed}`, safe);
+    expect(withSafe).toBe(`code = 1 AND ${safe}`);
+    expect(removeFieldCondition(withSafe, "level")).toBe("code = 1");
+  });
+});
