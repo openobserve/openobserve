@@ -537,6 +537,8 @@ describe("AlertConfigSummary — layout", () => {
     const block = field(wrapper, key).findComponent(OCodeBlock);
     expect(block.exists(), `${key} is not a code block`).toBe(true);
     expect(block.props("lang")).toBe(lang);
+    // A long query wraps instead of scrolling under an overlay scrollbar.
+    expect(block.props("wrap")).toBe(true);
     expect(text(wrapper, key).exists()).toBe(false);
     expect(field(wrapper, key).classes()).toContain("col-span-full");
     // After the short fields, so it never splits a row of them.
