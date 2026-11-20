@@ -56,7 +56,7 @@ use openobserve_core::{
 use serde::Serialize;
 use svix_ksuid::Ksuid;
 
-use super::{LiveDigest, alert_allows, may_change_mark, readable_subjects};
+use super::{LiveDigest, alert_allows, changes_every_mark, may_change_mark, readable_subjects};
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     request::{
@@ -110,7 +110,10 @@ impl Access for LiveAccess<'_> {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
             Family::Suggestion | Family::Issue => {
                 !rbac_enforced().await
-                    || org_wide_allows(self.org_id, self.user_id, "alerts", "PUT").await
+                    || changes_every_mark(|resource, method| {
+                        org_wide_allows(self.org_id, self.user_id, resource, method)
+                    })
+                    .await
             }
         }
     }
