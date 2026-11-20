@@ -670,6 +670,7 @@ const selectedSessionInScope = () => {
   ) {
     return selected;
   }
+  return undefined;
 };
 const sessionDetails = computed(() => {
   const identity = sessionMetadata.value.id ? selectedSessionInScope() : undefined;
