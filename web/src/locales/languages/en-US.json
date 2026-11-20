@@ -16301,6 +16301,7 @@
     "noTextAvailable": "No Text Available",
     "lightMode": "Light Mode",
     "darkMode": "Dark Mode",
+    "systemTheme": "System",
     "pickCustomColor": "Pick Custom Color",
     "organizationSettingsUpdated": "Organization settings updated",
     "dangerZone": "Danger zone",

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resolveThemeMode } from "@/utils/themePreference";
 import { applyThemeColors, type SemanticColors } from "@/utils/theme";
 import {
   resolveThemeForMode,
@@ -104,7 +105,13 @@ export const bootstrapTheme = (): void => {
   // resolve below reads the correct `appliedXThemeName` keys.
   migrateLegacyThemeStorage();
 
-  const mode: ThemeMode = localStorage.getItem("theme") === "dark" ? "dark" : "light";
+  const mode: ThemeMode = resolveThemeMode();
+  // "theme" keeps the resolved mode for the many readers that use it directly.
+  try {
+    localStorage.setItem("theme", mode);
+  } catch {
+    // Storage blocked: the mode still applies for this page.
+  }
 
   // No store yet → no live preview at boot.
   applyThemeForMode(mode, { state: { theme: mode, tempThemeColors: {} } });
