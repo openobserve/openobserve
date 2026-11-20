@@ -25,6 +25,7 @@ import {
   thresholdSide,
   valueWithUnit,
 } from "./alertCopy";
+import { countRuleText } from "./countComparison";
 import { describeFilterNode, filterSentenceParts } from "./filterSentence";
 import {
   nameResolvedExpression,
@@ -445,10 +446,12 @@ export function previewVerdictSentence(
   if (verdict.grouped && qc.aggregation?.multi_alert)
     return perGroupVerdict({ ...verdict, count: verdict.count }, alert, t);
   if (verdict.grouped) {
-    if (verdict.wouldTrigger) {
-      return t("alerts.verdict.groupsFire", { count }, verdict.count);
-    }
-    return t("alerts.verdict.groupsQuiet", { count, limit }, verdict.count);
+    const needs = countRuleText(tc.operator, tc.threshold, t);
+    return t(
+      verdict.wouldTrigger ? "alerts.verdict.groupsFire" : "alerts.verdict.groupsQuiet",
+      { count, limit: needs },
+      verdict.count,
+    );
   }
   const window = t("alerts.verdict.window", { n: num(tc.period) }, num(tc.period));
   const having = qc.aggregation?.having;

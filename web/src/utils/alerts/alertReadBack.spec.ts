@@ -332,27 +332,82 @@ describe("previewVerdictSentence", () => {
       {},
       "Quiet now: avg of duration is 182.4 ms in the last 10 minutes (threshold > 500 ms).",
     ],
-    [
-      "groups capped at the row limit",
-      { wouldTrigger: true, reason: "", count: 1000, atLeast: true, grouped: true },
-      alert(),
-      {},
-      "Would alert now: at least 1,000 groups are over the threshold.",
-    ],
-    [
-      "no group over",
-      { wouldTrigger: false, reason: "", count: 0, grouped: true },
-      alert(),
-      {},
-      "Quiet now: no group is over the threshold.",
-    ],
-    [
-      "one group short",
-      { wouldTrigger: false, reason: "", count: 1, grouped: true },
-      alert(),
-      {},
-      "Quiet now: 1 group is over the threshold (needs 3).",
-    ],
+    ...(
+      [
+        [
+          "groups capped at the row limit",
+          1000,
+          true,
+          ">=",
+          3,
+          true,
+          "Would fire one alert now: at least 1,000 groups are over the threshold (needs at least 3).",
+        ],
+        [
+          "the group-count rule met",
+          14,
+          false,
+          ">=",
+          3,
+          true,
+          "Would fire one alert now: 14 groups are over the threshold (needs at least 3).",
+        ],
+        [
+          "the group-count rule short",
+          2,
+          false,
+          ">=",
+          3,
+          false,
+          "Would not fire now: 2 groups are over the threshold (needs at least 3).",
+        ],
+        [
+          "no group over",
+          0,
+          false,
+          ">=",
+          3,
+          false,
+          "Would not fire now: no group is over the threshold (needs at least 3).",
+        ],
+        [
+          "one group short of more than 1",
+          1,
+          false,
+          ">",
+          1,
+          false,
+          "Would not fire now: 1 group is over the threshold (needs more than 1).",
+        ],
+        [
+          "fewer than 2 groups over",
+          0,
+          false,
+          "<",
+          2,
+          true,
+          "Would fire one alert now: no group is over the threshold (needs fewer than 2).",
+        ],
+        [
+          "exactly 2 groups wanted",
+          3,
+          false,
+          "=",
+          2,
+          false,
+          "Would not fire now: 3 groups are over the threshold (needs exactly 2).",
+        ],
+      ] as const
+    ).map(
+      ([name, count, atLeast, operator, threshold, wouldTrigger, sentence]) =>
+        [
+          name,
+          { wouldTrigger, reason: "", count, atLeast, grouped: true },
+          alert({ trigger_condition: { ...alert().trigger_condition, operator, threshold } }),
+          {},
+          sentence,
+        ] as const,
+    ),
     ...(
       [
         [

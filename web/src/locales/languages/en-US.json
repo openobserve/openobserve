@@ -15462,8 +15462,8 @@
     "verdict": {
       "fires": "Would alert now: {count} {label} in the last {window} (threshold {limit}).",
       "quiet": "Quiet now: {count} {label} in the last {window} (threshold {limit}).",
-      "groupsFire": "Would alert now: {count} group is over the threshold. | Would alert now: {count} groups are over the threshold.",
-      "groupsQuiet": "Quiet now: no group is over the threshold. | Quiet now: {count} group is over the threshold (needs {limit}). | Quiet now: {count} groups are over the threshold (needs {limit}).",
+      "groupsFire": "Would fire one alert now: no group is over the threshold (needs {limit}). | Would fire one alert now: {count} group is over the threshold (needs {limit}). | Would fire one alert now: {count} groups are over the threshold (needs {limit}).",
+      "groupsQuiet": "Would not fire now: no group is over the threshold (needs {limit}). | Would not fire now: {count} group is over the threshold (needs {limit}). | Would not fire now: {count} groups are over the threshold (needs {limit}).",
       "firesReason": "Would alert now: {reason}.",
       "quietReason": "Quiet now: {reason}.",
       "events": "event | events",
