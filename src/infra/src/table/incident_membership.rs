@@ -211,6 +211,34 @@ pub async fn openers_with<C: ConnectionTrait>(
         .collect())
 }
 
+/// The org's incidents the alert fired into that were still open at `since`; a resolved one can't
+/// page, and a reopened one has no resolved time.
+pub async fn incidents_open_since_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: &str,
+    since: i64,
+) -> Result<Vec<String>, errors::Error> {
+    use sea_orm::{Condition, JoinType, RelationTrait};
+    let open = Condition::any()
+        .add(alert_incidents::Column::ResolvedAt.is_null())
+        .add(alert_incidents::Column::ResolvedAt.gte(since));
+    Ok(alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .join(
+            JoinType::InnerJoin,
+            alert_incident_alerts::Relation::Incident.def(),
+        )
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .filter(open)
+        .distinct()
+        .into_tuple()
+        .all(conn)
+        .await?)
+}
+
 /// Fire times of the alert's firings in the org's incidents over `[since, until)`, oldest first.
 pub async fn firing_times(
     org_id: &str,
