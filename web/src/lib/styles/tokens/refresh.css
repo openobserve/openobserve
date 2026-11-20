@@ -25,7 +25,7 @@
   --color-grey-950: #09090b;
 
   /* Surface ladder, darker to lighter: shell < card < raised. */
-  --color-surface-shell: #f0f1f4;
+  --color-surface-shell: #e8eaee;
   --color-surface-card: #fbfbfc;
   --color-surface-panel: #f5f6f8;
   --color-surface-band: #eceef2;
@@ -608,19 +608,38 @@
   height: 0.875rem;
 }
 
-/* Toolbar and header secondary buttons: a faint resting fill (half the segmented-track tone) so they sit on the bar, not float; hover and open keep the ghost fills. */
-:root :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active), .results-page-select :is(button, [role="combobox"]), button.results-page-select):not(:disabled):not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not([aria-pressed="true"]) {
+/* Toolbar and header secondary buttons: a raised fill plus a 1px control edge, so they read as outlined buttons, not floating text; hover and open keep the ghost fills. */
+:root :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active)):not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not([aria-pressed="true"]) {
   background-color: var(--toolbar-btn-rest-bg);
 }
-:root :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active), .results-page-select :is(button, [role="combobox"]), button.results-page-select):not(:disabled):not(:focus-visible):not([aria-pressed="true"]) {
+:root :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active)):not(:focus-visible):not([aria-pressed="true"]) {
   box-shadow: inset 0 0 0 1px var(--toolbar-btn-rest-edge);
 }
 :root:not(.dark) {
-  --toolbar-btn-rest-bg: color-mix(in srgb, var(--color-surface-band) 55%, transparent);
+  --toolbar-btn-rest-bg: var(--color-surface-raised);
   --toolbar-btn-rest-edge: var(--color-border-button);
 }
-/* Dark needs more lift: the shell is near-black, so the light-mode mix disappears. */
+/* Raised, never sunken: the fill sits a step above the near-black bar and the edge is near the control border. */
 :root.dark {
-  --toolbar-btn-rest-bg: var(--color-surface-band);
-  --toolbar-btn-rest-edge: color-mix(in srgb, var(--color-border-button) 50%, var(--color-border-control));
+  --toolbar-btn-rest-bg: var(--color-surface-raised);
+  --toolbar-btn-rest-edge: color-mix(in srgb, var(--color-border-button) 75%, var(--color-border-control));
+}
+/* Their icons stay secondary grey (as in the reference apps) but get a thin currentColor stroke, lifting the 300-weight outlines to about the 400 weight (≈1.3px at 16px). */
+:root :is(.toolbar-btn-rest, .header-utility-icons button:not([data-test="menu-link-slack-item"]), #date-time-button) svg path[fill="currentColor"] {
+  stroke: currentColor;
+  stroke-width: 0.75px;
+  stroke-linejoin: round;
+}
+/* The results bar keeps the boxed shape but a step quieter than the query toolbar, so the eye lands on the results: structural edge, no raised fill, secondary text. */
+:root .results-bar-quiet,
+:root [data-test="logs-search-field-list-collapse-btn"] {
+  --toolbar-btn-rest-bg: transparent;
+  --toolbar-btn-rest-edge: var(--color-border-subtle);
+}
+:root :is(.results-bar-quiet .toolbar-btn-rest, [data-test="logs-search-field-list-collapse-btn"]) {
+  color: var(--color-text-secondary) !important;
+}
+/* Light mode: resting toolbar and header icons sit one step below the secondary text, so the heavier strokes do not read as black. */
+:root:not(.dark) :is(.toolbar-btn-rest, .header-utility-icons button:not([data-test="menu-link-slack-item"]), #date-time-button):not(:hover):not([aria-expanded="true"]) :is(span.inline-flex.shrink-0.align-middle, svg.text-text-secondary) {
+  color: color-mix(in srgb, var(--color-text-secondary) 85%, var(--color-surface-raised)) !important;
 }

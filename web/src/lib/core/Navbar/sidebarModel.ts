@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { iconRegistry, type IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { I18nKey } from "@/types/i18n";
 import type { NavItem, RailEntry, SubnavChild } from "./ONavbar.types";
 import { NAV_GROUPS } from "./navGroups";
@@ -114,7 +114,8 @@ const SIDEBAR_ICON_OVERRIDES: Record<string, IconName> = {
 };
 
 export function sidebarIcon(icon: string): IconName {
-  return SIDEBAR_ICON_OVERRIDES[icon] ?? (icon as IconName);
+  const name = SIDEBAR_ICON_OVERRIDES[icon] ?? icon;
+  return (`sb-${name}` in iconRegistry ? `sb-${name}` : name) as IconName;
 }
 
 function sectionOf(name: string): SidebarSectionKey {

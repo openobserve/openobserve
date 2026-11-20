@@ -24,6 +24,35 @@ import SidebarInsights from "~icons/material-symbols-light/query-stats-outline";
 import SidebarIngestion from "~icons/material-symbols-light/database-upload-outline";
 import SidebarIntel from "~icons/material-symbols-light/neurology-outline";
 import SidebarChevronRight from "~icons/material-symbols-light/chevron-right-outline";
+// Sidebar rail: regular weight (400) so 16px menu icons render about 1.3px lines, not a faint 0.75px haze.
+import SbHome from "~icons/mdi/home-outline";
+import SbSearch from "~icons/material-symbols/search-outline";
+import SbBarChart from "~icons/material-symbols/bar-chart-4-bars-outline";
+import SbAccountTree from "~icons/material-symbols/account-tree-outline";
+import SbMemory from "~icons/material-symbols/memory-outline";
+import SbDashboard from "~icons/material-symbols/dashboard-outline";
+import SbDescription from "~icons/material-symbols/description-outline";
+import SbShield from "~icons/material-symbols/shield-outline";
+import SbTarget from "~icons/material-symbols/target-outline";
+import SbNotificationsActive from "~icons/material-symbols/notifications-active-outline";
+import SbDns from "~icons/material-symbols/dns-outline";
+import SbDevices from "~icons/material-symbols/devices-outline";
+import SbRadar from "~icons/material-symbols/radar-outline";
+import SbNavigation from "~icons/material-symbols/navigation-outline";
+import SbDatabase from "~icons/material-symbols/database-outline";
+import SbWindow from "~icons/material-symbols/window-outline";
+import SbLan from "~icons/material-symbols/lan-outline";
+import SbSchema from "~icons/material-symbols/schema-outline";
+import SbSettings from "~icons/material-symbols/settings-outline";
+import SbManageAccounts from "~icons/material-symbols/manage-accounts-outline";
+import SbPayments from "~icons/material-symbols/payments-outline";
+import SbSidebarHome from "~icons/material-symbols/home-outline";
+import SbSidebarAlert from "~icons/material-symbols/gpp-maybe-outline";
+import SbSidebarAi from "~icons/material-symbols/wand-stars-outline";
+import SbSidebarInsights from "~icons/material-symbols/query-stats-outline";
+import SbSidebarIngestion from "~icons/material-symbols/database-upload-outline";
+import SbSidebarIntel from "~icons/material-symbols/neurology-outline";
+import SbSidebarChevronRight from "~icons/material-symbols/chevron-right-outline";
 import Alarm from "~icons/material-symbols-light/alarm-outline";
 // Glyph-only marks (kebab, plus, chevrons) use weight 400: the light 300 stroke antialiases below 3:1.
 import Add from "~icons/material-symbols/add-outline";
@@ -405,6 +434,34 @@ export const iconRegistry = {
   "sidebar-ingestion": SidebarIngestion,
   "sidebar-intel": SidebarIntel,
   "sidebar-chevron-right": SidebarChevronRight,
+  "sb-home": SbHome,
+  "sb-search": SbSearch,
+  "sb-bar-chart": SbBarChart,
+  "sb-account-tree": SbAccountTree,
+  "sb-memory": SbMemory,
+  "sb-dashboard": SbDashboard,
+  "sb-description": SbDescription,
+  "sb-shield": SbShield,
+  "sb-target": SbTarget,
+  "sb-notifications-active": SbNotificationsActive,
+  "sb-dns": SbDns,
+  "sb-devices": SbDevices,
+  "sb-radar": SbRadar,
+  "sb-navigation": SbNavigation,
+  "sb-database": SbDatabase,
+  "sb-window": SbWindow,
+  "sb-lan": SbLan,
+  "sb-schema": SbSchema,
+  "sb-settings": SbSettings,
+  "sb-manage-accounts": SbManageAccounts,
+  "sb-payments": SbPayments,
+  "sb-sidebar-home": SbSidebarHome,
+  "sb-sidebar-alert": SbSidebarAlert,
+  "sb-sidebar-ai": SbSidebarAi,
+  "sb-sidebar-insights": SbSidebarInsights,
+  "sb-sidebar-ingestion": SbSidebarIngestion,
+  "sb-sidebar-intel": SbSidebarIntel,
+  "sb-sidebar-chevron-right": SbSidebarChevronRight,
   alarm: Alarm,
   add: Add,
   mcp: McpLogo,
