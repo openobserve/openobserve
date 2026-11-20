@@ -17,6 +17,7 @@
 
 use std::collections::HashMap;
 
+use config::meta::alerts::incidents::AlertKind;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
     sea_query::OnConflict,
@@ -33,6 +34,8 @@ use crate::{
 
 /// The pair verdict a move out stores: the alert does not rejoin incidents the opener starts.
 pub const SEPARATE: &str = "separate";
+/// Two lists of this many bound values stay far under SQLite's 32,766 per statement.
+const OPENERS_CHUNK: usize = 1_000;
 
 /// The unordered pair key: the lesser id first.
 pub fn pair_key(x: &str, y: &str) -> (String, String) {
@@ -157,6 +160,55 @@ async fn opener_with<C: ConnectionTrait>(
         .into_tuple()
         .one(conn)
         .await?)
+}
+
+/// Each incident's opening alert, the one whose firing paged; AutoObserve's own have none.
+pub async fn openers_of(incident_ids: &[String]) -> Result<HashMap<String, String>, errors::Error> {
+    openers_with(get_orm_client_ro().await, incident_ids).await
+}
+
+pub async fn openers_with<C: ConnectionTrait>(
+    conn: &C,
+    incident_ids: &[String],
+) -> Result<HashMap<String, String>, errors::Error> {
+    use alert_incident_alerts::{Column, Entity};
+    let mut out = HashMap::new();
+    for chunk in incident_ids.chunks(OPENERS_CHUNK) {
+        let firsts: HashMap<String, i64> = Entity::find()
+            .select_only()
+            .column(Column::IncidentId)
+            .column_as(Column::AlertFiredAt.min(), "first_at")
+            .filter(Column::IncidentId.is_in(chunk.iter().map(String::as_str)))
+            .group_by(Column::IncidentId)
+            .into_tuple()
+            .all(conn)
+            .await?
+            .into_iter()
+            .collect();
+        let rows: Vec<(String, String, String, i64)> = Entity::find()
+            .select_only()
+            .column(Column::IncidentId)
+            .column(Column::AlertId)
+            .column(Column::AlertKind)
+            .column(Column::AlertFiredAt)
+            .filter(Column::IncidentId.is_in(chunk.iter().map(String::as_str)))
+            .filter(Column::AlertFiredAt.is_in(firsts.values().copied()))
+            .order_by_asc(Column::AlertId)
+            .into_tuple()
+            .all(conn)
+            .await?;
+        for (incident, alert, kind, fired_at) in rows {
+            if firsts.get(&incident) == Some(&fired_at) {
+                out.entry(incident).or_insert((alert, kind));
+            }
+        }
+    }
+    let autoobserve = AlertKind::AutoObserve.as_str();
+    Ok(out
+        .into_iter()
+        .filter(|(_, (_, kind))| kind != autoobserve)
+        .map(|(incident, (alert, _))| (incident, alert))
+        .collect())
 }
 
 /// Fire times of the alert's firings in the org's incidents over `[since, until)`, oldest first.
