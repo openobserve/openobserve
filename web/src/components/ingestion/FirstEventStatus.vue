@@ -15,7 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  inject,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  toRef,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -44,11 +53,15 @@ import {
 } from "@/composables/firstEvent/useFirstEventWatch";
 import FirstEventStillStuck from "./FirstEventStillStuck.vue";
 import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
-import StarterPackBannerSlot from "@/components/starterPacks/StarterPackBannerSlot.vue";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import HeardFromPrompt from "@/components/login/HeardFromPrompt.vue";
 import { HEARD_FROM_ASKED_BY_HOST } from "@/components/login/heardFrom";
 import { FIRST_EVENT_ASK_AI, REJECTION_REASON_KEYS, askAiQuery } from "./firstEventAskAi";
+
+// Lazy: the slot's matcher imports the store singleton, which a static import would load into every ingestion guide.
+const StarterPackBannerSlot = defineAsyncComponent(
+  () => import("@/components/starterPacks/StarterPackBannerSlot.vue"),
+);
 
 const props = withDefaults(
   defineProps<{

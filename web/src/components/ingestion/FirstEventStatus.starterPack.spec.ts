@@ -35,7 +35,9 @@ vi.mock("@/composables/firstEvent/useFirstEventWatch", () => ({
   }),
 }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+// The marker lets the async loader unwrap the mocked module to its default export.
 vi.mock("@/components/starterPacks/StarterPackBannerSlot.vue", () => ({
+  __esModule: true,
   default: defineComponent({
     name: "StarterPackBannerSlot",
     props: ["org", "clusterName"],
