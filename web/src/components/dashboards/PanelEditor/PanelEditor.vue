@@ -580,12 +580,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         >
           <!-- Field List for custom chart -->
-          <!-- Mirror the normal field-list block above: a fixed-height wrapper
-               with NO overflow of its own, so DashboardFieldPanel's inner OFieldList
-               is the single scroller and its stream selectors (before-list)
-               stay sticky above the scrolling field rows. Wrapping it in an
-               overflow-y-auto container stacked a second scrollbar and let the
-               dropdowns scroll away. -->
           <template #before>
             <div :class="fieldListWrapperClass">
               <div
@@ -1332,7 +1326,6 @@ const fieldListContainerStyle = computed(() => {
   return { height: contentHeight.value };
 });
 
-// Field list inner div style - needs height: 100% so DashboardFieldPanel's h-full resolves correctly
 const fieldListInnerStyle = computed(() => {
   return { width: "100%", height: "100%" };
 });

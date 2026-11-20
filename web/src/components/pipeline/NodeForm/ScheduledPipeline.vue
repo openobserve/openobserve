@@ -1892,7 +1892,8 @@ const normalizeFilterValue = (filter: string) => {
     .replace(/'null'/, "null");
 };
 
-const insertSqlFilter = (sql: string, filterValue: string) => {
+// The + placeholder never replaces: the field's existing condition is the user's filter.
+const insertSqlFilter = (sql: string, filterValue: string, replaceExisting = true) => {
   const filter = normalizeFilterValue(filterValue);
   const query = sql.trimEnd().replace(/;$/, "").trimEnd();
 
@@ -1901,7 +1902,7 @@ const insertSqlFilter = (sql: string, filterValue: string) => {
   if (/\bwhere\b/i.test(query)) {
     const fieldName = getFieldFromExpression(filter);
 
-    if (fieldName && hasFieldCondition(query, fieldName)) {
+    if (replaceExisting && fieldName && hasFieldCondition(query, fieldName)) {
       return replaceExistingFieldCondition(query, fieldName, filter);
     }
 
@@ -1957,22 +1958,23 @@ const insertAtEditorCaret = (currentQuery: string, text: string): string => {
   return currentQuery + text;
 };
 
-const handleSidebarEvent = (event: string, value: any) => {
+const handleSidebarEvent = (event: string, value: string) => {
   if (!pipelineEditorRef.value) return;
   // PromQL carries no value filters, so there is nothing to remove there.
   if (event === "remove-field" && tab.value !== "sql") return;
   const currentQuery: string = pipelineEditorRef.value.getValue() ?? "";
+  const isPlaceholder = value.endsWith("=''");
   if (event === "remove-field" || tab.value === "sql") {
     const newQuery =
       event === "remove-field"
         ? removeSqlFieldFilter(currentQuery, value)
-        : insertSqlFilter(currentQuery, value);
+        : insertSqlFilter(currentQuery, value, !isPlaceholder);
     pipelineEditorRef.value.setValue(newQuery);
     updateQueryValue(newQuery);
     return;
   }
   // The + action drops the field name at the cursor; a PromQL query has no WHERE to put a filter in.
-  const name = tab.value === "promql" && value.endsWith("=''") ? value.split("=")[0].trim() : value;
+  const name = tab.value === "promql" && isPlaceholder ? value.split("=")[0].trim() : value;
   updateQueryValue(insertAtEditorCaret(currentQuery, ` ${name} `));
 };
 const updateDateChange = (date: any) => {

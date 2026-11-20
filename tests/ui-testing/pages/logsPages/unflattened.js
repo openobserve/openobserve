@@ -40,7 +40,7 @@ class UnflattenedPage {
         this.utilitiesMenuButton = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
         this.sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
         this.logsSearchBarQueryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
-        // FieldListPagination receives data-test-prefix="logs-page" from IndexList.vue,
+        // FieldListPagination receives data-test-prefix="logs-page" from StreamFieldPanel.vue,
         // so the rendered data-test is `${prefix}-all-fields-btn`.
         this.allFieldsButton = page.locator('[data-test="logs-page-all-fields-btn"]');
         this.logsSearchBarRefreshButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');

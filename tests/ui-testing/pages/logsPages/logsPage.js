@@ -180,7 +180,7 @@ export class LogsPage {
         // OFieldList search input (visible from Visualize-tab panel layouts).
         this.logSearchIndexListFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.expandCode = 'Expand "code"';
-        // FieldExpansion.vue exposes the row-expand toggle as
+        // FieldPanelRow.vue exposes the row-expand toggle as
         // [data-test="log-search-expand-<field>-field-btn"]. Deterministic data-test for waits.
         this.expandCodeFieldBtn = '[data-test="log-search-expand-code-field-btn"]';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
@@ -308,7 +308,7 @@ export class LogsPage {
         this.addToYAxis = '[data-test="dashboard-add-y-data"]';
         this.addToBreakdown = '[data-test="dashboard-add-b-data"]';
         this.addToFilter = '[data-test="dashboard-add-filter-data"]';
-        // PanelFieldList uses OFieldList which renders an OInput with data-test="o-field-list-search".
+        // DashboardFieldPanel uses OFieldList which renders an OInput with data-test="o-field-list-search".
         // OInput convention: wrapper carries data-test, inner native <input> carries `-field` suffix.
         // Scoped under [data-test="logs-build-query-page"] because the logs sidebar's IndexList
         // also renders an OFieldList with the same data-test, and in build mode that sidebar is
@@ -1027,7 +1027,7 @@ export class LogsPage {
             testLogger.info('selectStream: Skipping page navigation (skipNavigation=true)');
         }
 
-        // Post-OSelect-migration IndexList contract (see web/src/plugins/logs/IndexList.vue):
+        // Post-OSelect-migration IndexList contract (see web/src/components/common/fieldPanel/StreamPicker.vue):
         //  - Wrapper: [data-test="log-search-index-list-select-stream"]   (OSelect outer div)
         //  - Trigger: the inner native <button> that Reka UI's PopoverTrigger renders. A
         //    `[role="button"]` attribute selector does NOT match a native <button> — the
@@ -2542,7 +2542,7 @@ export class LogsPage {
 
     // Kubernetes methods
     async kubernetesContainerName() {
-        // FieldExpansion.vue renders the expand toggle with data-test
+        // FieldPanelRow.vue renders the expand toggle with data-test
         // `log-search-expand-${field.name}-field-btn` — prefer explicit data-test
         // over getByLabel (§2 selector policy bans accessibility queries).
         await this.page.locator('[data-test="log-search-expand-kubernetes_container_name-field-btn"]').first().click();
@@ -2990,7 +2990,7 @@ export class LogsPage {
     }
 
     // Wait for the expand-code field-list row toggle to be visible after filtering.
-    // FieldExpansion.vue renders [data-test="log-search-expand-<field>-field-btn"].
+    // FieldPanelRow.vue renders [data-test="log-search-expand-<field>-field-btn"].
     async waitForExpandCodeButtonVisible(timeout = 10000) {
         await this.page.locator(this.expandCodeFieldBtn).waitFor({ state: 'visible', timeout });
     }
@@ -5342,7 +5342,7 @@ export class LogsPage {
     }
 
     async clickExpandCode() {
-        // FieldExpansion.vue exposes the toggle as
+        // FieldPanelRow.vue exposes the toggle as
         // [data-test="log-search-expand-<field>-field-btn"] — use the data-test selector.
         return await this.page.locator(this.expandCodeFieldBtn).click();
     }
@@ -5849,7 +5849,7 @@ export class LogsPage {
         // quick-mode signal — FieldListPagination renders it whenever the stream
         // exposes a user-defined schema (showUserDefinedSchemaToggle), regardless of
         // searchObj.meta.quickMode. The per-field interesting (star) buttons are gated
-        // purely on quickMode (FieldRow/FieldExpansion `v-if="showQuickMode"`), so we
+        // purely on quickMode (FieldPanelRow shows it only in quick mode), so we
         // must verify the actual Quick Mode switch state via the utilities menu rather
         // than infer "quick mode is on" from the sidebar toggle group. Treating the
         // toggle group as an indicator made all interesting-field tests fail on cloud/
@@ -5914,7 +5914,7 @@ export class LogsPage {
 
     async clickTimestampField() {
         // Post-OFieldList migration the field row is data-test="logs-field-list-item-<field>"
-        // (FieldRow.vue:22). Click the row directly — it dispatches the field-click event.
+        // (FieldPanelRow.vue). Click the row directly — it dispatches the field-click event.
         const field = this.page.locator('[data-test="logs-field-list-item-_timestamp"]').first();
         await field.waitFor({ state: 'visible', timeout: 10000 });
         return await field.click({ force: true });
@@ -10168,7 +10168,7 @@ export class LogsPage {
     }
 
     // ── Build tab: panel field list stream selectors ────────────────────────
-    // PanelFieldList (pageKey "build") owns these. Unlike the Visualize tab's
+    // DashboardFieldPanel (pageKey "build") owns these. Unlike the Visualize tab's
     // copy (pageKey "logs", read-only), both selects here are the user's own.
     // All locator work and every assertion lives here — specs call the semantic
     // methods only, matching the other Logs specs.

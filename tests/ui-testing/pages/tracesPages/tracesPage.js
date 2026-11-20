@@ -1164,7 +1164,7 @@ export class TracesPage {
 
   /**
    * Expand field in field list.
-   * Source: web/src/components/common/FieldExpansion.vue
+   * Source: web/src/components/common/fieldPanel/FieldPanelRow.vue
    *   data-test="log-search-expand-{field.name}-field-btn"
    * @param {string} fieldName - Name of field to expand
    * @returns {boolean} True if expanded successfully
@@ -1184,7 +1184,7 @@ export class TracesPage {
 
   /**
    * Add a field=value filter to the query via the field expansion's
-   * "Add to filter" button. Source: FieldExpansion.vue
+   * "Add to filter" button. Source: FieldPanelRow.vue
    *   data-test="log-search-index-list-add-{field.name}-field-btn"
    * @param {string} fieldName - Name of field
    * @returns {boolean} True if added successfully

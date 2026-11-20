@@ -455,6 +455,38 @@ describe("ScheduledPipeline Component", () => {
       );
     });
 
+    it("adds the + placeholder next to a condition the field already has instead of replacing it", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi.fn().mockReturnValue(`SELECT * FROM "stream1" WHERE service='api'`),
+        setValue: vi.fn(),
+      };
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", "service=''");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        `SELECT * FROM "stream1" WHERE service='api' AND service=''`,
+      );
+    });
+
+    it("replaces the field's condition with a picked value", async () => {
+      const mockEditorRef = {
+        getCursorIndex: vi.fn().mockReturnValue(-1),
+        getValue: vi.fn().mockReturnValue(`SELECT * FROM "stream1" WHERE service='api'`),
+        setValue: vi.fn(),
+      };
+      child.pipelineEditorRef = mockEditorRef;
+      child.tab = "sql";
+
+      await child.handleSidebarEvent("add-field", "service='web'");
+
+      expect(mockEditorRef.setValue).toHaveBeenCalledWith(
+        `SELECT * FROM "stream1" WHERE service='web'`,
+      );
+    });
+
     it.each([
       ["start", 0, " service foo{}"],
       ["middle", 4, "foo{ service }"],
