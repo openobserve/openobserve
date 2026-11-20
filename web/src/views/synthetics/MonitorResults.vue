@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onEnvScopeChange(String($event))"
       />
       <ODateTimeRange
-        ref="dateTimeRef"
+        :key="checkIdentity"
         auto-apply
         menu-align="end"
         :default-type="timeState.valueType"
@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="min-h-0 flex-1 overflow-hidden">
       <MonitorRuns
+        :key="checkIdentity"
         ref="runsRef"
         :monitor-id="monitorId"
         :monitor-name="monitorName"
@@ -141,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBadge>
     </template>
     <RunDetail
+      :key="checkIdentity"
       :drawer-mode="true"
       :override-monitor-id="monitorId"
       :override-monitor-name="monitorName"
@@ -154,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -217,17 +219,26 @@ const envScopeOptions = computed(() => [
 ]);
 
 function onEnvScopeChange(value: string) {
+  const shouldRefresh = checkTypeReady.value;
   envScope.value = value;
   const next = { ...route.query };
   if (value === ENV_SCOPE_ALL) delete next.env;
   else next.env = value;
   router.replace({ query: next }).catch(() => {});
   nextTick(() => {
-    runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+    if (shouldRefresh) runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   });
 }
 // `?folder=` carries the folder ID; the server gates RBAC on it.
 const folderId = computed(() => String(route.query.folder ?? ""));
+const checkIdentity = computed(() =>
+  JSON.stringify([
+    orgIdentifier.value,
+    monitorId.value,
+    folderId.value,
+    store.state.userInfo?.email,
+  ]),
+);
 const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",
 );
@@ -247,7 +258,6 @@ const timeState = ref<{
 });
 
 const timeRange = ref({ startTime: 0, endTime: 0 });
-const dateTimeRef = ref<any>(null);
 const runsRef = ref<any>(null);
 const isRefreshing = ref(false);
 const lastRunAt = useLoadedAt(isRefreshing);
@@ -289,13 +299,17 @@ function onRunStatusUpdate(status: {
   drawerEnvironment.value = status.environment ?? "";
 }
 
+function clearDrawerDetails() {
+  drawerRunStatus.value = null;
+  drawerUrl.value = "";
+  drawerTimestamp.value = "";
+  drawerErrorRecord.value = null;
+  drawerEnvironment.value = "";
+}
+
 function onDrawerClose(open: boolean) {
   if (!open) {
-    drawerRunStatus.value = null;
-    drawerUrl.value = "";
-    drawerTimestamp.value = "";
-    drawerErrorRecord.value = null;
-    drawerEnvironment.value = "";
+    clearDrawerDetails();
     // Clear drawer query params
     const next = { ...route.query };
     delete next.run;
@@ -306,7 +320,7 @@ function onDrawerClose(open: boolean) {
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);
-  if (!range) return;
+  if (!range || !(range.startTime < range.endTime)) return false;
   timeRange.value = { startTime: range.startTime, endTime: range.endTime };
   timeState.value = {
     valueType: "relative",
@@ -314,6 +328,7 @@ function applyRelative(period: string) {
     startTime: range.startTime,
     endTime: range.endTime,
   };
+  return true;
 }
 
 function readFromUrl(): boolean {
@@ -336,12 +351,7 @@ function readFromUrl(): boolean {
     }
   }
 
-  if (typeof periodRaw === "string" && periodRaw) {
-    applyRelative(periodRaw);
-    return true;
-  }
-
-  return false;
+  return typeof periodRaw === "string" && applyRelative(periodRaw);
 }
 
 function writeToUrl() {
@@ -358,8 +368,16 @@ function writeToUrl() {
   router.replace({ query: next }).catch(() => {});
 }
 
-async function onDateChange(value: any) {
-  if (value?.valueType === "relative" && value.relativeTimePeriod) {
+async function onDateChange(value: {
+  valueType?: string;
+  relativeTimePeriod: string | null;
+  startTime: number;
+  endTime: number;
+  userChangedValue?: boolean;
+}) {
+  if (value.userChangedValue === false) return;
+  const shouldRefresh = checkTypeReady.value;
+  if (value.valueType === "relative" && value.relativeTimePeriod) {
     applyRelative(value.relativeTimePeriod);
   } else {
     timeState.value = {
@@ -372,11 +390,11 @@ async function onDateChange(value: any) {
   }
   writeToUrl();
   await nextTick();
-  runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+  if (shouldRefresh) runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
 }
 
 async function refresh() {
-  if (isRefreshing.value) return;
+  if (isRefreshing.value || !checkTypeReady.value) return;
   isRefreshing.value = true;
   try {
     if (timeState.value.valueType === "relative") {
@@ -391,6 +409,7 @@ async function refresh() {
 }
 
 function onJumpToWindow(startTime: number, endTime: number) {
+  const shouldRefresh = checkTypeReady.value;
   timeState.value = {
     valueType: "absolute",
     startTime,
@@ -400,7 +419,7 @@ function onJumpToWindow(startTime: number, endTime: number) {
   timeRange.value = { startTime, endTime };
   writeToUrl();
   nextTick(() => {
-    runsRef.value?.refresh?.(startTime, endTime);
+    if (shouldRefresh) runsRef.value?.refresh?.(startTime, endTime);
   });
 }
 
@@ -464,73 +483,104 @@ function openRunError(info: {
   drawerOpen.value = true;
 }
 
-onMounted(() => {
-  // Always default to last 15 minutes; respect explicit URL params
-  if (!readFromUrl()) {
-    applyRelative(DEFAULT_RELATIVE);
-  }
-  const envQ = route.query.env;
-  if (typeof envQ === "string" && envQ) envScope.value = envQ;
-  writeToUrl();
-  fetchCheck();
-  // Auto-open drawer if query params present
-  const runQ = route.query.run;
-  const execQ = route.query.exec;
-  if (typeof runQ === "string" && typeof execQ === "string" && runQ && execQ) {
-    selectedRunId.value = runQ;
-    selectedExecutionId.value = execQ;
-    drawerOpen.value = true;
-  }
+let checkGeneration = 0;
+const captureCheckRequest = () => ({
+  generation: checkGeneration,
+  org: orgIdentifier.value,
+  id: monitorId.value,
+  folder: folderId.value,
+  subject: store.state.userInfo?.email,
 });
+const isCurrentCheckRequest = (request: ReturnType<typeof captureCheckRequest>) =>
+  request.generation === checkGeneration &&
+  request.org === orgIdentifier.value &&
+  request.id === monitorId.value &&
+  request.folder === folderId.value &&
+  request.subject === store.state.userInfo?.email;
+onBeforeUnmount(() => {
+  checkGeneration++;
+});
+watch(
+  checkIdentity,
+  () => {
+    checkGeneration++;
+    checkName.value = "";
+    checkTypeReady.value = false;
+    lastTriggeredAt.value = 0;
+    retries.value = 0;
+    envNames.value = [];
+    clearDrawerDetails();
+    if (!readFromUrl()) applyRelative(DEFAULT_RELATIVE);
 
-// Fetches the check once on mount — provides type and last_triggered_at to
-// MonitorRuns via props, consolidating what was previously split across
-// MonitorRuns.resolveMonitorType() (always on mount) and the on-demand
-// need-check-data emit (when zero runs). One API call instead of two.
+    const { env, run, exec } = route.query;
+    envScope.value = typeof env === "string" && env ? env : ENV_SCOPE_ALL;
+    if (typeof run === "string" && run && typeof exec === "string" && exec) {
+      selectedRunId.value = run;
+      selectedExecutionId.value = exec;
+      drawerOpen.value = true;
+    } else {
+      selectedRunId.value = "";
+      selectedExecutionId.value = "";
+      drawerOpen.value = false;
+    }
+    writeToUrl();
+    void fetchCheck();
+  },
+  { immediate: true },
+);
+
 async function fetchCheck() {
+  const request = captureCheckRequest();
   try {
     // Folder-scoped RBAC grants resolve through `?folder=`, so it must be sent
     // here too — RunDetail already did, and the two pages disagreed.
-    const res = await syntheticsService.get(orgIdentifier.value, monitorId.value, folderId.value);
+    const res = await syntheticsService.get(request.org, request.id, request.folder);
+    if (!isCurrentCheckRequest(request)) return;
     if (res?.data) {
       lastTriggeredAt.value = Number(res.data.last_triggered_at) || 0;
       checkType.value = res.data.type ?? "browser";
       checkName.value = String(res.data.name ?? "");
       // The flaky tiles are only answerable when the check is allowed to retry.
       retries.value = Number(res.data.retries ?? res.data.settings?.retries ?? 0) || 0;
-      await resolveEnvironmentNames((res.data.environments ?? []) as string[]);
+      await resolveEnvironmentNames((res.data.environments ?? []) as string[], request);
     }
   } catch (err: any) {
+    if (!isCurrentCheckRequest(request)) return;
     if (err?.response?.status === 404) {
       router.push(syntheticsListRoute(navContext.value));
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return;
     }
-  } finally {
-    checkTypeReady.value = true;
   }
+  if (!isCurrentCheckRequest(request)) return;
+  // Every other runs refresh waits for this flag, so a failed check read must still load the runs.
+  checkTypeReady.value = true;
+  await nextTick();
+  if (!isCurrentCheckRequest(request)) return;
+  await runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
 }
 
 /** Check env ids → the names rows are stamped with; deleted ids drop out. */
-async function resolveEnvironmentNames(envIds: string[]) {
+async function resolveEnvironmentNames(
+  envIds: string[],
+  request: ReturnType<typeof captureCheckRequest>,
+) {
   envNames.value = [];
   if (envIds.length) {
     try {
-      const res = await syntheticsService.listEnvironments(orgIdentifier.value);
+      const res = await syntheticsService.listEnvironments(request.org);
+      if (!isCurrentCheckRequest(request)) return;
       const byId = new Map(
         ((res?.data ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name]),
       );
       envNames.value = envIds.map((id) => byId.get(id)).filter((n): n is string => !!n);
     } catch {
+      if (!isCurrentCheckRequest(request)) return;
       // No scope control is a degraded render, not an error state.
       envNames.value = [];
     }
   }
-  if (dropStaleEnvScope()) return;
-  if (envNames.value.length >= 2 && envScope.value === ENV_SCOPE_ALL) {
-    await nextTick();
-    runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
-  }
+  dropStaleEnvScope();
 }
 
 /** A `?env=` the hidden or shorter picker cannot show would empty the page with no way back. */

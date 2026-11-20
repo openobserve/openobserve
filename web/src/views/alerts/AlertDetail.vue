@@ -462,7 +462,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -617,11 +617,14 @@ const isAnomalyAlert = computed(() => alert.value?.alert_type === "anomaly_detec
 const handleReferenceOpen = async (open: boolean) => {
   referenceDrawerOpen.value = open;
   if (!open || !orgId.value || !alertId.value) return;
+  const request = captureDetailRequest();
   try {
-    const response = await alertsService.getCompositeReferences(orgId.value, alertId.value);
+    const response = await alertsService.getCompositeReferences(request.org, request.id);
+    if (!isCurrentDetailRequest(request)) return;
     compositeReferences.value = response.data.references ?? [];
     hiddenReferenceCount.value = response.data.hidden_reference_count ?? 0;
   } catch {
+    if (!isCurrentDetailRequest(request)) return;
     compositeReferences.value = [];
     hiddenReferenceCount.value = 0;
   }
@@ -682,10 +685,13 @@ const sloName = ref("");
 
 const fetchSloName = async () => {
   if (!orgId.value || !sloId.value || anomalyLocked.value) return;
+  const request = captureDetailRequest();
   try {
-    const res = await sloService.get(orgId.value, sloId.value);
+    const res = await sloService.get(request.org, sloId.value);
+    if (!isCurrentDetailRequest(request)) return;
     sloName.value = res.data?.name || "";
   } catch {
+    if (!isCurrentDetailRequest(request)) return;
     // Contained deliberately: this runs inside the mount chain, and letting it
     // reject would abandon everything sequenced after it — the history fetch
     // included — leaving a page that looks empty rather than one missing a name.
@@ -993,10 +999,31 @@ const onAnomalyEndMute = async () => {
   }
 };
 
+let detailGeneration = 0;
+const captureDetailRequest = () => ({
+  generation: detailGeneration,
+  org: orgId.value,
+  id: alertId.value,
+  folder: routeFolderId.value,
+  subject: store.state.userInfo?.email,
+});
+const isCurrentDetailRequest = (request: ReturnType<typeof captureDetailRequest>) =>
+  request.generation === detailGeneration &&
+  request.org === orgId.value &&
+  request.id === alertId.value &&
+  request.folder === routeFolderId.value &&
+  request.subject === store.state.userInfo?.email;
+onBeforeUnmount(() => {
+  detailGeneration++;
+  anomalyMuteActions.resetExtendUntil();
+});
+
 const fetchAlert = async () => {
   if (!orgId.value || !alertId.value) return;
+  const request = captureDetailRequest();
   try {
-    const res = await alertsService.get_by_alert_id(orgId.value, alertId.value);
+    const res = await alertsService.get_by_alert_id(request.org, request.id);
+    if (!isCurrentDetailRequest(request)) return;
     alert.value = res.data;
     loadFailure.value = res.data ? null : "not-found";
     // Same tick as the assignment, not down in onMounted: setting alert.value
@@ -1004,6 +1031,7 @@ const fetchAlert = async () => {
     // tab mount and fire a fetch for a page that is about to switch away.
     if (isAnomalyAlert.value) activeTab.value = "charts";
   } catch (e: unknown) {
+    if (!isCurrentDetailRequest(request)) return;
     alert.value = null;
     const status = (e as { response?: { status?: number } })?.response?.status;
     loadFailure.value = status === 403 ? "forbidden" : status === 404 ? "not-found" : "failed";
@@ -1012,29 +1040,34 @@ const fetchAlert = async () => {
 
 const fetchGroups = async () => {
   if (!orgId.value || !alertId.value) return;
+  const request = captureDetailRequest();
   loadingGroups.value = true;
   try {
-    const res = await alertsService.list_groups(orgId.value, alertId.value);
+    const res = await alertsService.list_groups(request.org, request.id);
+    if (!isCurrentDetailRequest(request)) return;
     groupData.value = res.data;
     groupsLoadError.value = false;
     groupsLoadedAt.value = Date.now();
   } catch {
+    if (!isCurrentDetailRequest(request)) return;
     groupData.value = null;
     groupsLoadError.value = true;
   } finally {
-    loadingGroups.value = false;
+    if (isCurrentDetailRequest(request)) loadingGroups.value = false;
   }
 };
 
 const fetchTransitions = async () => {
   if (!orgId.value || !alertId.value) return;
+  const request = captureDetailRequest();
   loadingTransitions.value = true;
   try {
     const res = await alertsService.list_group_transitions(
-      orgId.value,
-      alertId.value,
+      request.org,
+      request.id,
       historyGroupFilter.value?.group_key,
     );
+    if (!isCurrentDetailRequest(request)) return;
     const list: AlertGroupTransition[] = res.data?.list || [];
     // A simple alert's history is the rollup row, whose group_key is "".
     // The backend cannot be asked for it directly — an empty group_key query
@@ -1044,9 +1077,10 @@ const fetchTransitions = async () => {
     transitions.value = isMultiAlert.value ? list : list.filter((tr) => tr.group_key === "");
     transitionsLoadedAt.value = Date.now();
   } catch {
+    if (!isCurrentDetailRequest(request)) return;
     transitions.value = [];
   } finally {
-    loadingTransitions.value = false;
+    if (isCurrentDetailRequest(request)) loadingTransitions.value = false;
   }
 };
 
@@ -1114,21 +1148,49 @@ const editAlert = () => {
   });
 };
 
-// Mount and Retry share it, so a recovered page loads what the first load skipped.
+// Mount, route changes and Retry share it, so a recovered page loads what the first load skipped.
 const loadPage = async () => {
+  const request = captureDetailRequest();
   await fetchAlert();
-  if (unavailable.value) return;
+  if (!isCurrentDetailRequest(request) || unavailable.value) return;
   await fetchSloName();
-  if (isCompositeAlert.value) return;
+  if (!isCurrentDetailRequest(request) || isCompositeAlert.value) return;
   // Multi-alerts land on Groups, the reason the page exists for them; other alerts have no groups tab.
   if (isMultiAlert.value) {
     activeTab.value = "groups";
     await fetchGroups();
   }
   // Anomaly configs never write to the transitions table.
-  if (isAnomalyAlert.value) return;
+  if (!isCurrentDetailRequest(request) || isAnomalyAlert.value) return;
   await fetchTransitions();
 };
 
-onMounted(loadPage);
+watch(
+  // Separate sources, not one array getter: a token refresh swaps userInfo for an equal copy.
+  [orgId, alertId, routeFolderId, () => store.state.userInfo?.email],
+  () => {
+    detailGeneration++;
+    anomalyMuteActions.resetExtendUntil();
+    alert.value = null;
+    loadFailure.value = null;
+    groupData.value = null;
+    transitions.value = [];
+    historyGroupFilter.value = null;
+    referenceDrawerOpen.value = false;
+    compositeReferences.value = [];
+    hiddenReferenceCount.value = 0;
+    loadingGroups.value = false;
+    loadingTransitions.value = false;
+    groupsLoadedAt.value = null;
+    groupsLoadError.value = false;
+    transitionsLoadedAt.value = null;
+    historyView.value = "evaluations";
+    evidenceFilter.value = null;
+    evidenceParsing.value = false;
+    sloName.value = "";
+    activeTab.value = "history";
+    return loadPage();
+  },
+  { immediate: true },
+);
 </script>

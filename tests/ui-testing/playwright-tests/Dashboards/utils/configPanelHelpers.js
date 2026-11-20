@@ -380,6 +380,27 @@ export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {
   testLogger.info("Sunburst panel with config ready", { dashboardName, panelName, groupFields, subGroupField });
 }
 
+// The editor opens as a bar with histogram(_timestamp) on X, which survives the switch to funnel, so drop it.
+// stageField = null leaves the X well empty for validation tests.
+export async function setupFunnelPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  stageField = "kubernetes_namespace_name",
+} = {}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("funnel");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("e2e_automate");
+  await pm.chartTypeSelector.removeFieldIfPresent("x_axis_1", "x");
+  if (stageField) {
+    await pm.chartTypeSelector.searchAndAddField(stageField, "x");
+  }
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Funnel panel with config ready", { dashboardName, panelName, stageField });
+}
+
 /**
  * GeoMap chart panel — ingests geo data, builds panel with lat/lon fields, opens config sidebar.
  */

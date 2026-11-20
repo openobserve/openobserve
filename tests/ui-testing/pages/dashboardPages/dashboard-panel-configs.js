@@ -197,6 +197,15 @@ export default class DashboardPanelConfigs {
     this.sunburstShowLabels = page.locator('[data-test="dashboard-config-sunburst_show_labels"]');
     this.sunburstShowLabelsBtn = page.locator('[data-test="dashboard-config-sunburst_show_labels-btn"]');
 
+    //Funnel locators: Stage order is an OSelect, Orientation an OToggleGroup, Show percent an OSwitch
+    this.funnelSortId = "dashboard-config-funnel_sort";
+    this.funnelSort = page.locator(`[data-test="${this.funnelSortId}"]`);
+    this.funnelSortTrigger = page.locator(`[data-test="${this.funnelSortId}-trigger"]`);
+    this.funnelOrientId = "dashboard-config-funnel_orient";
+    this.funnelOrient = page.locator(`[data-test="${this.funnelOrientId}"]`);
+    this.funnelOrientOptions = page.locator(`[data-test="${this.funnelOrientId}-option"]`);
+    this.funnelShowPercent = page.locator('[data-test="dashboard-config-funnel_show_percent"]');
+
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
 
@@ -2392,6 +2401,38 @@ export default class DashboardPanelConfigs {
     const current = (await this.sunburstShowLabelsBtn.getAttribute("aria-checked")) === "true";
     if (current !== on) await this.sunburstShowLabelsBtn.click();
     await this.expectSunburstShowLabels(on);
+  }
+
+  // ========== Funnel ==========
+
+  /** Pick a funnel Stage order option by its label, e.g. "Smallest first" or "Default (Largest first)". */
+  async selectFunnelSort(label) {
+    await this.selectConfigOption(this.funnelSortId, label);
+  }
+
+  /** Labels of the funnel Stage order options, the Default entry first. */
+  async getFunnelSortOptionLabels() {
+    return this.getConfigSelectOptionLabels(this.funnelSortId);
+  }
+
+  /** Pick a funnel Orientation item by its label; `value` is what the group then reports ("__auto__" for Default). */
+  async selectFunnelOrient(label, value) {
+    await this.scrollSidebarToElement(this.funnelOrient);
+    await this._clickVirtualOption(this.funnelOrientId, label);
+    await expect(this.funnelOrient).toHaveAttribute("data-test-selected-value", value);
+  }
+
+  /** Assert the funnel Orientation's committed value, retrying while a reopened panel hydrates. */
+  async expectFunnelOrient(value) {
+    await this.scrollSidebarToElement(this.funnelOrient);
+    await expect(this.funnelOrient).toHaveAttribute("data-test-selected-value", value, { timeout: 15000 });
+  }
+
+  /** Labels of the funnel Orientation items, the Default item first. */
+  async getFunnelOrientOptionLabels() {
+    await this.scrollSidebarToElement(this.funnelOrient);
+    await this.funnelOrientOptions.first().waitFor({ state: "visible", timeout: 10000 });
+    return this.funnelOrientOptions.evaluateAll((els) => els.map((el) => el.getAttribute("data-test-label")));
   }
 
   async toggleHeatmapHistogramMode() {

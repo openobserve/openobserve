@@ -212,6 +212,11 @@ export class ShortcutManager {
   // ---------- Event Handler ----------
 
   handleKeyDown(e: KeyboardEvent): void {
+    if (e.defaultPrevented || e.isComposing || e.keyCode === 229) {
+      // A skipped key still breaks a pending sequence, or `g` + consumed key + `d` would fire `g d`.
+      this.sequenceBuffer = [];
+      return;
+    }
     const key = this.parseEvent(e);
 
     if (!key || key === "") return;
