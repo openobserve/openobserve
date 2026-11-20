@@ -133,6 +133,15 @@ const settingsDraftScope = (entityId: string) => ({
   userEmail: "me@x.io",
 });
 
+const serveDashboard = (dashboard: object) => {
+  vi.mocked(dashboardService.save).mockResolvedValue({
+    data: { success: true },
+  } as unknown as AxiosResponse);
+  vi.mocked(dashboardService.get_Dashboard).mockResolvedValue({
+    data: { version: 1, v1: dashboard, hash: 123 },
+  } as unknown as AxiosResponse);
+};
+
 describe("Commons Utility Functions", () => {
   let mockStore: any;
 
@@ -783,6 +792,34 @@ describe("Commons Utility Functions", () => {
   });
 
   describe("addPanel", () => {
+    it("adds a duplicated panel to the panel-scoped variables of its source", async () => {
+      const mockDashboard = {
+        tabs: [
+          { tabId: "tab-1", panels: [{ id: "p1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }] },
+        ],
+        variables: {
+          list: [
+            { name: "svc", type: "custom", scope: "panels", panels: ["p1", "p9"] },
+            { name: "other", type: "custom", scope: "panels", panels: ["p9"] },
+            { name: "env", type: "constant", scope: "global" },
+          ],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-dup"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await addPanel(mockStore, "dash-dup", { id: "p2" }, "f", "tab-1", {
+        variableNames: [],
+        newPanelId: "p2",
+        sourcePanelId: "p1",
+      });
+
+      const [svc, other, env] = mockDashboard.variables.list;
+      expect(svc.panels).toEqual(["p1", "p9", "p2"]);
+      expect(other.panels).toEqual(["p9"]);
+      expect(env).toEqual({ name: "env", type: "constant", scope: "global" });
+    });
+
     it("should add panel with correct layout to empty tab", async () => {
       const dashboardId = "dashboard-1";
       const panelData = { id: "panel-1", title: "Test Panel" };
@@ -1542,6 +1579,93 @@ describe("Commons Utility Functions", () => {
       expect(mockDashboard.tabs[0].panels[1].layout.i).toBe(2);
       expect(mockDashboard.tabs[0].panels[1].layout.y).toBe(20);
     });
+
+    it("moves the deleted tab's variables the moved panels use to the target tab", async () => {
+      const mockDashboard = {
+        tabs: [
+          { tabId: "tab-1", panels: [] },
+          {
+            tabId: "tab-2",
+            panels: [
+              {
+                id: "p1",
+                queries: [{ query: "svc = $svc" }],
+                layout: { x: 0, y: 0, w: 24, h: 9, i: 1 },
+              },
+            ],
+          },
+        ],
+        variables: {
+          list: [
+            { name: "svc", type: "custom", scope: "tabs", tabs: ["tab-2"] },
+            { name: "unused", type: "custom", scope: "tabs", tabs: ["tab-2"] },
+            { name: "pv", type: "custom", scope: "panels", tabs: ["tab-2"], panels: ["p1"] },
+            { name: "env", type: "constant", scope: "global" },
+          ],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-del-var"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await deleteTab(mockStore, "dash-del-var", "f", "tab-2", "tab-1");
+
+      const [svc, unused, pv, env] = mockDashboard.variables.list;
+      expect(svc.tabs).toEqual(["tab-1"]);
+      expect(unused.tabs).toEqual(["tab-2"]);
+      expect(pv.tabs).toEqual(["tab-1"]);
+      expect(env).toEqual({ name: "env", type: "constant", scope: "global" });
+    });
+
+    it("moves the tab-scoped parents of a panel-scoped variable listing a moved panel", async () => {
+      const mockDashboard = {
+        tabs: [
+          { tabId: "tab-1", panels: [] },
+          { tabId: "tab-2", panels: [{ id: "p1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }] },
+        ],
+        variables: {
+          list: [
+            { name: "t", type: "custom", scope: "tabs", tabs: ["tab-2"] },
+            {
+              name: "p",
+              type: "query_values",
+              scope: "panels",
+              tabs: ["tab-2"],
+              panels: ["p1"],
+              query_data: { filter: [{ value: "$t" }] },
+            },
+            { name: "unrelated", type: "custom", scope: "tabs", tabs: ["tab-2"] },
+          ],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-del-pv-parent"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await deleteTab(mockStore, "dash-del-pv-parent", "f", "tab-2", "tab-1");
+
+      expect(mockDashboard.variables.list.map((v) => v.tabs)).toEqual([
+        ["tab-1"],
+        ["tab-1"],
+        ["tab-2"],
+      ]);
+    });
+
+    it("drops the deleted tab from variables when its panels are deleted too", async () => {
+      const mockDashboard = {
+        tabs: [
+          { tabId: "tab-1", panels: [] },
+          { tabId: "tab-2", panels: [] },
+        ],
+        variables: {
+          list: [{ name: "svc", type: "custom", scope: "tabs", tabs: ["tab-1", "tab-2"] }],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-del-drop"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await deleteTab(mockStore, "dash-del-drop", "f", "tab-2");
+
+      expect(mockDashboard.variables.list[0].tabs).toEqual(["tab-1"]);
+    });
   });
 
   describe("editTab", () => {
@@ -1636,6 +1760,187 @@ describe("Commons Utility Functions", () => {
       // maxY = max(all panel y values) = 0, then y = maxY + 20 → 20
       expect(mockDashboard.tabs[1].panels[1].layout.i).toBe(2);
       expect(mockDashboard.tabs[1].panels[1].layout.y).toBe(20);
+    });
+
+    it("widens the source tab's variables the moved panel uses to the target tab", async () => {
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-a",
+            panels: [
+              {
+                id: "p1",
+                queries: [{ query: "SELECT * FROM t WHERE svc = '${svc}' AND env = '$env'" }],
+                layout: { x: 0, y: 0, w: 24, h: 9, i: 1 },
+              },
+            ],
+          },
+          { tabId: "tab-b", panels: [] },
+        ],
+        variables: {
+          list: [
+            { name: "svc", type: "query_values", scope: "tabs", tabs: ["tab-a"] },
+            {
+              name: "pod",
+              type: "query_values",
+              scope: "tabs",
+              tabs: ["tab-a"],
+              query_data: { filter: [{ value: "$svc" }] },
+            },
+            { name: "unused", type: "custom", scope: "tabs", tabs: ["tab-a"] },
+            { name: "env", type: "constant", scope: "global" },
+            { name: "other", type: "custom", scope: "tabs", tabs: ["tab-c"] },
+          ],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-move-var"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await movePanelToAnotherTab(mockStore, "dash-move-var", "p1", "f", "tab-a", "tab-b");
+
+      const [svc, pod, unused, env, other] = mockDashboard.variables.list;
+      expect(svc.tabs).toEqual(["tab-a", "tab-b"]);
+      expect(pod.tabs).toEqual(["tab-a"]);
+      expect(unused.tabs).toEqual(["tab-a"]);
+      expect(env).toEqual({ name: "env", type: "constant", scope: "global" });
+      expect(other.tabs).toEqual(["tab-c"]);
+    });
+
+    it("widens the parent variables a used tab-scoped variable depends on", async () => {
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-a",
+            panels: [
+              {
+                id: "p1",
+                queries: [{ query: "x = $pod" }],
+                layout: { x: 0, y: 0, w: 24, h: 9, i: 1 },
+              },
+            ],
+          },
+          { tabId: "tab-b", panels: [] },
+        ],
+        variables: {
+          list: [
+            { name: "svc", type: "query_values", scope: "tabs", tabs: ["tab-a"] },
+            {
+              name: "pod",
+              type: "query_values",
+              scope: "tabs",
+              tabs: ["tab-a"],
+              query_data: { filter: [{ value: "$svc" }] },
+            },
+          ],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-move-parent"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await movePanelToAnotherTab(mockStore, "dash-move-parent", "p1", "f", "tab-a", "tab-b");
+
+      expect(mockDashboard.variables.list.map((v) => v.tabs)).toEqual([
+        ["tab-a", "tab-b"],
+        ["tab-a", "tab-b"],
+      ]);
+    });
+
+    it.each([
+      ["title", { title: "Latency for $svc" }],
+      ["no data text", { config: { no_data_text: "No traffic for $svc" } }],
+      ["drilldown url", { config: { drilldown: [{ data: { url: "https://x.io/?s=${svc}" } }] } }],
+      [
+        "drilldown logs query",
+        { config: { drilldown: [{ data: { logsQuery: "svc = '{{svc}}'" } }] } },
+      ],
+      [
+        "drilldown variable",
+        { config: { drilldown: [{ data: { variables: [{ name: "s", value: "${svc}" }] } }] } },
+      ],
+      ["markdown", { markdownContent: "Service: {{svc}}" }],
+      ["html", { htmlContent: "<b>${svc}</b>" }],
+    ])("widens the variables a moved panel's %s uses", async (_type, content) => {
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-a",
+            panels: [{ id: "p1", ...content, layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+          },
+          { tabId: "tab-b", panels: [] },
+        ],
+        variables: {
+          list: [
+            { name: "svc", type: "custom", scope: "tabs", tabs: ["tab-a"] },
+            { name: "unused", type: "custom", scope: "tabs", tabs: ["tab-a"] },
+          ],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-move-text"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await movePanelToAnotherTab(mockStore, "dash-move-text", "p1", "f", "tab-a", "tab-b");
+
+      expect(mockDashboard.variables.list.map((v) => v.tabs)).toEqual([
+        ["tab-a", "tab-b"],
+        ["tab-a"],
+      ]);
+    });
+
+    it("widens the tab-scoped parents of a panel-scoped variable the moved panel never references", async () => {
+      const mockDashboard = {
+        tabs: [
+          { tabId: "tab-a", panels: [{ id: "p1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }] },
+          { tabId: "tab-b", panels: [] },
+        ],
+        variables: {
+          list: [
+            { name: "t", type: "custom", scope: "tabs", tabs: ["tab-a"] },
+            {
+              name: "p",
+              type: "query_values",
+              scope: "panels",
+              tabs: ["tab-a"],
+              panels: ["p1"],
+              query_data: { filter: [{ value: "$t" }] },
+            },
+            { name: "unrelated", type: "custom", scope: "tabs", tabs: ["tab-a"] },
+          ],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-move-pv-parent"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await movePanelToAnotherTab(mockStore, "dash-move-pv-parent", "p1", "f", "tab-a", "tab-b");
+
+      expect(mockDashboard.variables.list.map((v) => v.tabs)).toEqual([
+        ["tab-a", "tab-b"],
+        ["tab-a", "tab-b"],
+        ["tab-a"],
+      ]);
+    });
+
+    it("adds the target tab to panel-scoped variables listing the moved panel", async () => {
+      const mockDashboard = {
+        tabs: [
+          { tabId: "tab-a", panels: [{ id: "p1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }] },
+          { tabId: "tab-b", panels: [] },
+        ],
+        variables: {
+          list: [
+            { name: "pv", type: "custom", scope: "panels", tabs: ["tab-a"], panels: ["p1"] },
+            { name: "other", type: "custom", scope: "panels", tabs: ["tab-a"], panels: ["p9"] },
+          ],
+        },
+      };
+      mockStore.state.organizationData.allDashboardData["dash-move-pv"] = mockDashboard;
+      serveDashboard(mockDashboard);
+
+      await movePanelToAnotherTab(mockStore, "dash-move-pv", "p1", "f", "tab-a", "tab-b");
+
+      expect(mockDashboard.variables.list.map((v) => v.tabs)).toEqual([
+        ["tab-a", "tab-b"],
+        ["tab-a"],
+      ]);
     });
   });
 
