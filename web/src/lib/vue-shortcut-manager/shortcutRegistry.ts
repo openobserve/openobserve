@@ -99,6 +99,9 @@ const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtim
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
+// Nodes is self-hosted, not enterprise-only: OSS clusters too (see the `nodes` feature gate).
+const selfHostedMetaAdmin = (c: ShortcutCapabilities) =>
+  (c.isEnterprise || !c.isCloud) && c.isMetaOrg;
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -1048,7 +1051,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.nodes",
     scope: "nodes",
-    visible: metaAdmin,
+    visible: selfHostedMetaAdmin,
     shortcuts: [{ id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" }],
   },
 

@@ -137,10 +137,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('search.showPatternsLabel')"
               value="patterns"
               size="toolbar"
+              :disabled="patternsUnavailableForStreamType"
               :tooltip="
-                patternsAccess.allowed && toolbarToggleIconOnly
-                  ? t('search.showPatternsLabel')
-                  : undefined
+                patternsUnavailableForStreamType
+                  ? t('search.patternsLogsOnly')
+                  : patternsAccess.allowed && toolbarToggleIconOnly
+                    ? t('search.showPatternsLabel')
+                    : undefined
               "
             >
               <template #icon-left>
@@ -1899,7 +1902,6 @@ import {
   b64DecodeUnicode,
   getImageURL,
   useLocalInterestingFields,
-  queryIndexSplit,
   timestampToTimezoneDate,
   b64EncodeUnicode,
   buildDateTimeObject,
@@ -1947,10 +1949,13 @@ import {
   clearPermalink,
   noteUserScopeChange,
 } from "@/composables/useLogs/useLogPermalink";
-import type {
-  PersistAction,
-  PersistSurface,
-  PersistReasonCode,
+import {
+  isAutoRunActive,
+  sameSignature,
+  type LogsSignature,
+  type PersistAction,
+  type PersistSurface,
+  type PersistReasonCode,
 } from "@/composables/useLogs/useAutoRun";
 import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transientSearchKeys";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -1966,9 +1971,11 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import {
+  appendSqlFilter,
   hasFieldCondition,
   qualifyFieldConditions,
   removeFieldCondition,
+  replaceInOuterWhere,
 } from "@/plugins/logs/filterUtils";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFeatureLock, useLicenseLock } from "@/composables/useFeatureLock";
@@ -2211,6 +2218,11 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
+    // The patterns API only reads logs streams, so a traces or metrics stream of the same name must not reach it.
+    const patternsUnavailableForStreamType = computed(
+      () => !!searchObj.data.stream.streamType && searchObj.data.stream.streamType !== "logs",
+    );
+
     // Log-pattern mining ("Patterns" toggle) — shown locked (not hidden) in
     // builds that don't unlock it, with the shared nav/settings tooltip.
     const patternsAccess = computed(() =>
@@ -2826,7 +2838,7 @@ export default defineComponent({
               value: "patterns",
               icon: "layers",
               label: t("search.showPatternsLabel"),
-              disabled: false,
+              disabled: patternsUnavailableForStreamType.value,
             },
           ]
         : []),
@@ -3847,6 +3859,7 @@ export default defineComponent({
       clearPermalink();
       clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
+      let shortenedToHours = 0;
       const viewOrg = store.state.selectedOrganization.identifier;
       const leftViewOrg = () => store.state.selectedOrganization.identifier !== viewOrg;
       savedviewsService
@@ -3987,7 +4000,7 @@ export default defineComponent({
               //here we are getting data so we need to check here
               //before we set the time to the dateTimeRef.value we need to check if the startTime and endTime difference is greater than maxQueryRange in hours
               //solution will be we will do endTime - startTime and convert that difference into hours and check with both global and stream level maxQueryRange and if it is less than or equal to that we will keep that as it is
-              //if that exceeds the maxQueryRange we will convert that to relative type (because we cannot assume the start and end date) or we can do that by converting present time - maxQueryRange
+              //if that exceeds the maxQueryRange we keep the end (the saved end for absolute views, now for relative ones) and move the start to end - maxQueryRange
 
               // Validate and adjust time range based on maxQueryRange
               //before we check all this we need to get the current selected stream max query range and also global max query range
@@ -4043,15 +4056,14 @@ export default defineComponent({
 
                 // Check if time difference exceeds effective max query range
                 if (timeDiffInHours > effectiveMaxQueryRange) {
-                  // Adjust to current time - maxQueryRange
-                  const currentTimeMicros = Date.now() * 1000; // Convert milliseconds to microseconds
                   const maxQueryRangeMicros = effectiveMaxQueryRange * 60 * 60 * 1000000;
-
-                  const adjustedStartTime = currentTimeMicros - maxQueryRangeMicros;
-                  const adjustedEndTime = currentTimeMicros;
-
-                  // Get the current datetime type
                   const currentType = searchObj.data.datetime.type || "relative";
+
+                  // Keep the saved end and move only the start, as the backend clamp does.
+                  const adjustedEndTime =
+                    currentType === "absolute" ? endTimeMicros : Date.now() * 1000;
+                  const adjustedStartTime = adjustedEndTime - maxQueryRangeMicros;
+                  shortenedToHours = effectiveMaxQueryRange;
 
                   // Build the complete datetime object with all required fields
                   const updatedDateTime = buildDateTimeObject(
@@ -4220,10 +4232,20 @@ export default defineComponent({
 
             updateEditorWidth();
 
-            toast({
-              message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
-              variant: "success",
-            });
+            toast(
+              shortenedToHours > 0
+                ? {
+                    message: t("logs.searchBar.viewAppliedRangeShortened", {
+                      name: item.view_name,
+                      hours: shortenedToHours,
+                    }),
+                    variant: "warning",
+                  }
+                : {
+                    message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
+                    variant: "success",
+                  },
+            );
             markSavedViewApplied(item.view_id);
             setTimeout(async () => {
               if (leftViewOrg()) return;
@@ -4890,10 +4912,40 @@ export default defineComponent({
       emit("buildModeToggle", false); // isCustomMode = false
     };
 
+    const GRID_TABS = ["logs", "drilldown"];
+    const AWAY_TABS = ["visualize", "build", "patterns"];
+    let scopeWhenGridLeft: LogsSignature | null = null;
+
+    // Build writes its own SQL and SQL/quick mode into the search, which is not a scope move.
+    const absorbBuildRewrite = (baseline: LogsSignature): LogsSignature => {
+      const { query, sqlMode, quickMode, quickModeFields } = autoRun.readSignature();
+      return { ...baseline, query, sqlMode, quickMode, quickModeFields };
+    };
+
+    const trackScopeAwayFromGrid = (from: string, to: string): boolean => {
+      if (GRID_TABS.includes(from) && AWAY_TABS.includes(to)) {
+        scopeWhenGridLeft = autoRun.readSignature();
+        return false;
+      }
+      if (!scopeWhenGridLeft || !AWAY_TABS.includes(from)) return false;
+      if (from === "build") scopeWhenGridLeft = absorbBuildRewrite(scopeWhenGridLeft);
+      if (!GRID_TABS.includes(to)) return false;
+      const baseline = scopeWhenGridLeft;
+      scopeWhenGridLeft = null;
+      return !sameSignature(autoRun.readSignature(), baseline);
+    };
+
+    watch(patternsUnavailableForStreamType, (unavailable) => {
+      if (unavailable && searchObj.meta.logsVisualizeToggle === "patterns") {
+        onLogsVisualizeToggleUpdate("logs");
+      }
+    });
+
     const onLogsVisualizeToggleUpdate = async (value: any) => {
       // OToggleGroup is controlled (`:model-value`), so refusing to advance
       // here is what keeps the locked Patterns view from becoming active —
       // clicking it opens the upgrade dialog instead of switching.
+      if (value === "patterns" && patternsUnavailableForStreamType.value) return;
       if (value === "patterns" && !patternsAccess.value.allowed) {
         openUpgradeDialog();
         return;
@@ -5024,6 +5076,11 @@ export default defineComponent({
           }
         }
       }
+      if (
+        trackScopeAwayFromGrid(searchObj.meta.logsVisualizeToggle, value) &&
+        isAutoRunActive(store.state.zoConfig ?? {}, searchObj.meta)
+      )
+        tabRunPending = "tab";
       searchObj.meta.logsVisualizeToggle = value;
       patchUrlViewState();
       if (tabRunPending) autoRun.request(tabRunPending);
@@ -5515,6 +5572,7 @@ export default defineComponent({
       loadSavedView,
       config,
       patternsAccess,
+      patternsUnavailableForStreamType,
       scheduledSearchAccess,
       openUpgradeDialog,
       handleRegionsSelection,
@@ -5702,62 +5760,18 @@ export default defineComponent({
               filter = qualifyFieldConditions(filter, streamPrefix);
             }
 
-            // if query contains order by clause or limit clause then add where clause before that
-            // if query contains where clause then add filter after that with and operator and keep order by or limit after that
-            // if query does not contain where clause then add where clause before filter
-            if (query.toLowerCase().includes("where")) {
-              // Replace an existing condition for this field, or append if none.
-              // In append mode (SearchResult include/exclude), skip the
-              // field-level replace so multiple values for the same field
-              // coexist with AND.
-              const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
-              const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
-              if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
-                query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
-              } else {
-                // Find the earliest clause that ends the WHERE conditions.
-                // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
-                // We must insert the new filter before whichever comes first so it
-                // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
-                const terminatingClauses = ["group by", "having", "order by", "limit"];
-                const lowerQuery = query.toLowerCase();
-                let firstClause: string | null = null;
-                let firstIndex = Infinity;
-                for (const clause of terminatingClauses) {
-                  const idx = lowerQuery.indexOf(clause);
-                  if (idx !== -1 && idx < firstIndex) {
-                    firstIndex = idx;
-                    firstClause = clause;
-                  }
-                }
-                if (firstClause) {
-                  const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
-                  query = beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
-                } else {
-                  query = query + " AND " + filter;
-                }
-              }
-            } else {
-              // Find the earliest clause to insert WHERE before.
-              // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
-              const terminatingClauses = ["group by", "having", "order by", "limit"];
-              const lowerQuery = query.toLowerCase();
-              let firstClause: string | null = null;
-              let firstIndex = Infinity;
-              for (const clause of terminatingClauses) {
-                const idx = lowerQuery.indexOf(clause);
-                if (idx !== -1 && idx < firstIndex) {
-                  firstIndex = idx;
-                  firstClause = clause;
-                }
-              }
-              if (firstClause) {
-                const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
-                query = beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
-              } else {
-                query = query + " where " + filter;
-              }
-            }
+            // Replace an existing condition for this field, or append if none.
+            // Append mode (SearchResult include/exclude) skips the replace so values AND together.
+            const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
+            const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
+            const replaced = fieldNameSQL
+              ? replaceInOuterWhere(query, (piece) =>
+                  hasFieldCondition(piece, fieldNameSQL)
+                    ? replaceExistingFieldCondition(piece, fieldNameSQL, filter)
+                    : null,
+                )
+              : null;
+            query = replaced ?? appendSqlFilter(query, filter);
             currentQuery[0] = query;
           } else {
             const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";

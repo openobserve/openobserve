@@ -43,6 +43,7 @@
               :code="field.value"
               :lang="field.code"
               :max-lines="12"
+              wrap
               inset
               role="group"
               :aria-labelledby="labelId(field.key)"

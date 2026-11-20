@@ -77,7 +77,6 @@ const GATED_IN_OSS = [
   "shortcuts.pages.iamInvitations",
   "shortcuts.pages.regexPatterns",
   "shortcuts.pages.cipherKeys",
-  "shortcuts.pages.nodes",
   "shortcuts.pages.modelPricing",
   "shortcuts.pages.llmProviders",
   "shortcuts.pages.aiToolsets",
@@ -126,6 +125,12 @@ describe("shortcut cheatsheet OSS gating", () => {
     expect(titles).not.toContain("shortcuts.modules.runningQueries");
     expect(titles).not.toContain("shortcuts.modules.actions");
     expect(titles).not.toContain("shortcuts.modules.security");
+  });
+
+  // Nodes is meta-org-only, not enterprise-only: OSS clusters too.
+  it("shows Nodes in the meta org of an OSS build only", () => {
+    expect(visiblePages({ ...OSS, isMetaOrg: true }).has("shortcuts.pages.nodes")).toBe(true);
+    expect(visiblePages(OSS).has("shortcuts.pages.nodes")).toBe(false);
   });
 
   it("shows enterprise-only pages on enterprise and hides the cloud-only ones", () => {
