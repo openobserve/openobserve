@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AlertFormSkeleton v-if="isLoadingAlert" :bars="skeletonBars" @cancel="handleCancel" />
     <AddAlert
       v-else-if="!loadFailed"
+      ref="addAlertRef"
+      :key="formKey"
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
@@ -48,6 +50,7 @@ import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
 import { MIN_SKELETON_MS } from "@/lib/styles/motion";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
+import { formPrefillRevision } from "@/composables/alerts/useAlertCreation";
 import { clearAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
 import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { ALERT_LIST_SAVED_NEW } from "@/utils/alerts/alertListLanding";
@@ -233,6 +236,14 @@ export default defineComponent({
 
     const handleCancel = () => openAlertList((route.query.folder as string) || "default");
 
+    // A prefill picked from this form's own starter stays on this route, so the form is remade, after its leave question.
+    const formKey = ref(0);
+    const addAlertRef = ref<{ confirmLeave: () => Promise<boolean> } | null>(null);
+    watch(formPrefillRevision, async () => {
+      if (isUpdated.value || !addAlertRef.value) return;
+      if (await addAlertRef.value.confirmLeave()) formKey.value += 1;
+    });
+
     onBeforeMount(() => {
       // In parallel: the form needs destinations and templates either way, and edit mode
       // needs the alert. Sequencing them would make editing feel slower than
@@ -260,6 +271,8 @@ export default defineComponent({
       refreshTemplates,
       handleUpdateList,
       handleCancel,
+      formKey,
+      addAlertRef,
     };
   },
 });

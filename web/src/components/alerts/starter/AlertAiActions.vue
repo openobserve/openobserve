@@ -90,7 +90,7 @@ import { approveProposedAlertMutation } from "@/services/alerts.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const props = defineProps<{ controller: AlertAiDraft; prompt: string }>();
-const emit = defineEmits<{ created: []; opened: [] }>();
+const emit = defineEmits<{ created: [name: string]; opened: [] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -128,7 +128,7 @@ const create = async () => {
     return;
   }
   toast({ variant: "success", message: t("alertStarter.ai.created", { name: raw(name) }) });
-  emit("created");
+  emit("created", name);
 };
 
 // Declined first, so the agent is not left paused on a proposal the form now owns.

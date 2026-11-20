@@ -133,7 +133,7 @@ describe("useLibraryInstall", () => {
     posted().forEach(check);
   });
 
-  it("retries only the failed alerts, with the same batch settings", async () => {
+  it("retries only the failed alerts, with the same batch settings, and names what it created", async () => {
     mocks.createAlert
       .mockRejectedValueOnce({ response: { data: { message: "boom" } } })
       .mockResolvedValueOnce({ data: {} });
@@ -149,6 +149,10 @@ describe("useLibraryInstall", () => {
     expect(posted().map((p) => p.name)).toEqual(["a"]);
     expect(posted()[0].destinations).toEqual(["oncall"]);
     expect(run?.installedIds).toEqual(["k8s/a"]);
-    expect(api.results.value.map((r) => r.status)).toEqual(["installed", "installed"]);
+    // Each result names the alert it created, so the list can mark both passes' alerts.
+    expect(api.results.value.map((r) => [r.status, r.name])).toEqual([
+      ["installed", "a"],
+      ["installed", "b"],
+    ]);
   });
 });

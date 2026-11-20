@@ -35822,8 +35822,11 @@
       "failedReason": "Couldn't test: {reason}"
     },
     "shell": {
-      "useForm": "Use the form",
-      "starterLabel": "Ways to start a new alert",
+      "dialogTitle": "Start a new alert",
+      "libraryDescription": "Ready-made alerts that match your data",
+      "aiDescription": "Describe it; you review before it's saved",
+      "formName": "The form",
+      "formDescription": "Build it step by step",
       "anotherWay": "Start another way",
       "resume": "Resume",
       "draftWaiting": "You have an unsaved new alert.",
@@ -35916,6 +35919,7 @@
       "guessed": "Guessed · used by {count} alert on this stream | Guessed · used by {count} alerts on this stream",
       "use": "Use",
       "useName": "Use {name}",
+      "inUse": "In use",
       "pick": "Pick…",
       "pickLabel": "Pick who to tell",
       "remove": "Remove {name}",
@@ -35946,7 +35950,6 @@
     "replySend": "Send"
   },
   "createStarter": {
-    "switchHint": "Switch between ways to start",
     "matchCount": "{count} matches your data | {count} match your data",
     "shortcuts": {
       "page": "Ways to start",

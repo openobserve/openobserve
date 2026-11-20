@@ -61,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :has-draft="hasNewDraft"
           :draft-saved-at="newDraftSavedAt"
           @open-form="openNewAlertForm"
-          @created="refreshAlerts"
         />
       </template>
 
@@ -1489,6 +1488,11 @@ import { isAnomalyDataReadinessStatus } from "@/components/anomaly_detection/ste
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import AlertStarter from "@/components/alerts/starter/AlertStarter.vue";
+import {
+  justAddedAlerts,
+  takeJustAdded,
+  type JustAddedAlerts,
+} from "@/utils/alerts/justAddedAlerts";
 import { matchesAnyKey, readFilterKeys, toggleFilterKey } from "@/utils/filterKeys";
 import { ALERT_LIST_ALL_FOLDERS, ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { ALERT_LIST_SAVED_NEW, savedAlertId } from "@/utils/alerts/alertListLanding";
@@ -1514,6 +1518,8 @@ const ALERT_STATE_KEYS = [
   "notify_failed",
 ] as const;
 const ALERT_LEVEL_FILTERS = ["critical", "warning"] as const;
+// Long enough to find a row after the panel closes and the list reloads.
+const JUST_ADDED_MARK_MS = 4000;
 // Tiles counted from run state, which the server omits when `status_unavailable` is set.
 const LIVE_STATE_KEYS: readonly AlertStateKey[] = [
   "firing",
@@ -1978,9 +1984,15 @@ export default defineComponent({
     // Full-row highlight — only the EXCEPTIONS get a wash, so attention goes to
     // what's off, not what's fine: failed=light red, paused=muted grey, active
     // stays clean (its state still reads from the green left rail).
+    // Rows a starter just created; an outline marks them without taking space or a status colour.
+    const justAddedNames = ref<ReadonlySet<string>>(new Set());
     const alertRowClass = (row: any): string => {
       const s = alertOperationalState(row);
-      return s === "failed" ? "!bg-status-error-bg" : s === "paused" ? "!bg-surface-panel" : "";
+      const wash =
+        s === "failed" ? "!bg-status-error-bg" : s === "paused" ? "!bg-surface-panel" : "";
+      return justAddedNames.value.has(row?.name)
+        ? `${wash} outline-accent outline-2 -outline-offset-2 outline-solid`
+        : wash;
     };
 
     // Extreme-left state rail — a full-height colour bar at the very start of the
@@ -4279,6 +4291,48 @@ export default defineComponent({
     // New alert opens the starter; with the button locked away, the form opens as before.
     const startNewAlert = () =>
       alertStarterRef.value ? alertStarterRef.value.openStarter() : showAddUpdateFn({});
+
+    let justAddedTimer: ReturnType<typeof setTimeout> | undefined;
+    // Client paging: the first marked row's page is found in the table's own sort order.
+    const revealJustAdded = async (names: ReadonlySet<string>) => {
+      const rows = oTableRef.value?.table?.getSortedRowModel?.().rows ?? [];
+      const at = rows.findIndex((r: any) => names.has(r.original?.name));
+      if (at < 0) return;
+      const page = Math.floor(at / pageSize.value) + 1;
+      if (page !== currentPage.value) {
+        currentPage.value = page;
+        oTableRef.value?.restorePage?.(page);
+      }
+      await nextTick();
+      document
+        .querySelector(
+          `[data-test="alert-list-table"] [data-test="o2-table-row-${rows[at].index}"]`,
+        )
+        ?.scrollIntoView({ block: "nearest" });
+    };
+    const showJustAdded = async (added: JustAddedAlerts) => {
+      await showSavedAlert(added.folderId);
+      const names: ReadonlySet<string> = new Set(added.names);
+      // A tab that hides every new alert would leave nothing to mark.
+      if (activeTab.value !== "all" && !displayedAlerts.value.some((r: any) => names.has(r.name)))
+        await onAlertTabChange("all");
+      clearTimeout(justAddedTimer);
+      justAddedNames.value = names;
+      await nextTick();
+      await revealJustAdded(names);
+      justAddedTimer = setTimeout(() => (justAddedNames.value = new Set()), JUST_ADDED_MARK_MS);
+    };
+    // The starter's creations wait while the form covers the list, then land in their folder, marked.
+    watch(
+      [justAddedAlerts, showAddAlertDialog],
+      ([added, formShown]) => {
+        if (!added || formShown) return;
+        const taken = takeJustAdded();
+        if (taken) void showJustAdded(taken);
+      },
+      { immediate: true },
+    );
+    onBeforeUnmount(() => clearTimeout(justAddedTimer));
 
     // Raw split (no trim), the same rule AlertSectionTabs hides the Library tab by.
     const showAlertLibrary = computed(

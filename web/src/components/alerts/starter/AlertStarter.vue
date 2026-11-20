@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="starterRef"
     v-model:open="open"
     :panes="panes"
-    :form-label="t('alertStarter.shell.useForm')"
-    :label="t('alertStarter.shell.starterLabel')"
+    :form-label="t('alertStarter.shell.formName')"
+    :form-description="t('alertStarter.shell.formDescription')"
+    :title="t('alertStarter.shell.dialogTitle')"
     @open-form="emit('open-form')"
   >
     <template #default="{ open: isOpen, toggle }">
@@ -73,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="reviewing"
         :entries="reviewEntries"
         :scope="scope"
+        :actions-to="reviewActions"
         @back="reviewing = false"
         @done="onBulkDone"
       />
@@ -82,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:selected="selected"
         v-model:scope="scope"
         :alert-type="alertType"
+        :note-to="reviewing ? null : libraryNote"
         @opened="open = false"
       />
     </template>
@@ -98,16 +101,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @created="onAiCreated"
         @opened="open = false"
       />
-      <OButton
-        v-else-if="selected.length && !reviewing"
-        variant="primary"
-        size="sm"
-        data-test="alert-starter-add-selected"
-        @click="review"
-        >{{
-          t("alertStarter.shell.addSelected", { count: selected.length }, selected.length)
-        }}</OButton
-      >
+      <template v-else>
+        <div ref="libraryNote" class="contents" />
+        <div v-if="reviewing" ref="reviewActions" class="contents" />
+        <OButton
+          v-else-if="selected.length"
+          variant="primary"
+          size="sm"
+          data-test="alert-starter-add-selected"
+          @click="review"
+          >{{
+            t("alertStarter.shell.addSelected", { count: selected.length }, selected.length)
+          }}</OButton
+        >
+      </template>
     </template>
   </CreateStarter>
 </template>
@@ -133,6 +140,7 @@ import { useAlertAiDraft } from "@/components/alerts/starter/useAlertAiDraft";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { menuState } from "@/utils/featureGate";
 import { useFeatureNames } from "@/composables/useFeatureLock";
+import { markJustAdded, type JustAddedAlerts } from "@/utils/alerts/justAddedAlerts";
 import { formatEditorDraftTime } from "@/utils/drafts/editorDraftStore";
 import { useI18nTyped } from "@/types/i18n";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
@@ -159,7 +167,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   /** Open the empty form (or the waiting draft); the host owns the route. */
   "open-form": [];
-  created: [count: number];
+  /** Alerts were created and wait in `justAddedAlerts` for the list to mark them. */
+  created: [];
 }>();
 
 const store = useStore();
@@ -174,6 +183,9 @@ const scope = ref<StarterScope>({ kind: "all" });
 const reviewing = ref(false);
 const reviewEntries = ref<AlertLibraryEntry[]>([]);
 const aiPrompt = ref("");
+// The bulk review's actions render here, in the panel's footer.
+const reviewActions = ref<HTMLElement | null>(null);
+const libraryNote = ref<HTMLElement | null>(null);
 
 const router = useRouter();
 // The alert lands in the folder on screen, as the form's own Save does.
@@ -212,12 +224,14 @@ const panes = computed<StarterPane[]>(() => [
   {
     id: "library",
     label: t("alertStarter.shell.library"),
+    description: t("alertStarter.shell.libraryDescription"),
     count: library.count.value,
     availability: libraryAvailability.value,
   },
   {
     id: "ai",
     label: t("alertStarter.shell.createWithAi"),
+    description: t("alertStarter.shell.aiDescription"),
     count: null,
     availability: aiAvailability.value,
     lockedReason: aiLockedReason.value,
@@ -255,16 +269,18 @@ const review = () => {
   reviewing.value = true;
 };
 
-const onBulkDone = (created: number) => {
-  selected.value = [];
+const onCreated = (added: JustAddedAlerts) => {
+  markJustAdded(added);
   open.value = false;
-  emit("created", created);
+  emit("created");
 };
 
-const onAiCreated = () => {
-  open.value = false;
-  emit("created", 1);
+const onBulkDone = (added: JustAddedAlerts) => {
+  selected.value = [];
+  onCreated(added);
 };
+
+const onAiCreated = (name: string) => onCreated({ folderId: aiDraft.folderId(), names: [name] });
 
 const resume = () => {
   open.value = false;

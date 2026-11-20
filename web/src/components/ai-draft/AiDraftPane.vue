@@ -38,17 +38,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </div>
 
-      <!-- Above the progress, so the words stay put when the read-back replaces the progress. -->
+      <!-- Held at four lines while drafting, so the progress below never moves as the words stream in. -->
       <OTruncatedText
-        v-if="said"
+        v-if="said || phase === 'drafting'"
         as="p"
         :lines="4"
         class="text-text-body m-0 text-sm break-words whitespace-pre-line"
+        :class="{ 'min-h-20': phase === 'drafting' }"
         tooltip-class="whitespace-pre-line"
         data-test="ai-draft-said"
         >{{ said }}</OTruncatedText
       >
-      <AiDraftStatus v-if="phase === 'drafting'" :lines="draft.statusLines.value" />
+      <AiDraftStatus
+        v-if="phase === 'drafting'"
+        class="min-h-30"
+        :lines="draft.statusLines.value"
+      />
 
       <form
         v-if="phase === 'reply'"

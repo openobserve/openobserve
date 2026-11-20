@@ -26,74 +26,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @keydown="markActed"
     @wheel.passive="markActed"
   >
-    <div class="flex shrink-0 items-center gap-2">
-      <OSearchInput
-        v-model="search"
-        size="sm"
-        class="min-w-0 flex-1"
-        :debounce="150"
-        :placeholder="t('alertStarter.library.searchPlaceholder')"
-        data-test="alert-starter-library-search"
-      />
-      <!-- Sized to its value, so the search keeps the rest of the row. -->
-      <div class="flex max-w-1/2 shrink-0">
-        <StarterScopeSelect v-model="scope" />
-      </div>
-    </div>
-
+    <!-- Pinned to the top of the panel's scroll, so search and Select all stay in reach down a long list. -->
     <div
-      v-if="!failed"
-      class="flex min-h-7 shrink-0 flex-wrap items-center gap-1.5"
-      role="group"
-      :aria-label="t('alertStarter.library.packsLabel')"
-      data-test="alert-starter-library-packs"
+      class="bg-dialog-bg -top-dialog-content-py -mt-dialog-content-py pt-dialog-content-py sticky z-1 flex flex-col gap-2 pb-1"
     >
-      <template v-if="busy">
+      <div class="flex shrink-0 items-center gap-2">
+        <OSearchInput
+          v-model="search"
+          size="sm"
+          class="min-w-0 flex-1"
+          :debounce="150"
+          :placeholder="t('alertStarter.library.searchPlaceholder')"
+          data-test="alert-starter-library-search"
+        />
+        <!-- Sized to its value, so the search keeps the rest of the row. -->
+        <div class="flex max-w-1/2 shrink-0">
+          <StarterScopeSelect v-model="scope" />
+        </div>
+      </div>
+
+      <div
+        v-if="!failed"
+        class="flex min-h-7 shrink-0 flex-wrap items-center gap-1.5"
+        role="group"
+        :aria-label="t('alertStarter.library.packsLabel')"
+        data-test="alert-starter-library-packs"
+      >
+        <template v-if="busy">
+          <OSkeleton
+            v-for="n in 4"
+            :key="n"
+            animation="none"
+            class="rounded-default h-6 w-20"
+            :aria-label="t('alertStarter.library.loading')"
+          />
+        </template>
+        <OButton
+          v-for="chip in packChips"
+          v-else
+          :key="chip.id"
+          :variant="pack === chip.id ? 'outline-primary' : 'outline'"
+          size="chip"
+          :aria-pressed="pack === chip.id"
+          :data-test="`alert-starter-library-pack-${chip.id}`"
+          @click="pack = chip.id"
+        >
+          {{ chip.label }}
+          <span
+            class="text-text-secondary inline-block text-end tabular-nums"
+            :class="chip.countWidth"
+            >{{ formatNumber(chip.count) }}</span
+          >
+        </OButton>
+      </div>
+
+      <div v-if="!failed" class="flex min-h-6 shrink-0 items-center justify-between gap-3 text-xs">
         <OSkeleton
-          v-for="n in 4"
-          :key="n"
+          v-if="busy"
           animation="none"
-          class="rounded-default h-6 w-20"
+          class="h-3 w-36"
           :aria-label="t('alertStarter.library.loading')"
         />
-      </template>
-      <OButton
-        v-for="chip in packChips"
-        v-else
-        :key="chip.id"
-        :variant="pack === chip.id ? 'outline-primary' : 'outline'"
-        size="chip"
-        :aria-pressed="pack === chip.id"
-        :data-test="`alert-starter-library-pack-${chip.id}`"
-        @click="pack = chip.id"
-      >
-        {{ chip.label }}
-        <span class="text-text-secondary tabular-nums">{{ formatNumber(chip.count) }}</span>
-      </OButton>
-    </div>
-
-    <div v-if="!failed" class="flex min-h-6 shrink-0 items-center justify-between gap-3 text-xs">
-      <OSkeleton
-        v-if="busy"
-        animation="none"
-        class="h-3 w-36"
-        :aria-label="t('alertStarter.library.loading')"
-      />
-      <span
-        v-else
-        role="status"
-        class="text-text-heading font-medium"
-        data-test="alert-starter-library-total"
-        >{{ totalText }}</span
-      >
-      <OCheckbox
-        v-if="!busy && rows.length > 0"
-        size="sm"
-        :model-value="selectAllState"
-        :label="t('alertStarter.library.selectAll', { count: rows.length }, rows.length)"
-        data-test="alert-starter-library-select-all"
-        @update:model-value="toggleAll"
-      />
+        <span
+          v-else
+          role="status"
+          class="text-text-heading font-medium"
+          data-test="alert-starter-library-total"
+          >{{ totalText }}</span
+        >
+        <OCheckbox
+          v-if="!busy && rows.length > 0"
+          size="sm"
+          :model-value="selectAllState"
+          :label="t('alertStarter.library.selectAll', { count: rows.length }, rows.length)"
+          data-test="alert-starter-library-select-all"
+          @update:model-value="toggleAll"
+        />
+      </div>
     </div>
 
     <OInlineNotice
@@ -108,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-else
-      class="max-h-96 min-h-48 overflow-y-auto"
+      class="min-h-48"
       role="list"
       :aria-label="t('alertStarter.library.listLabel')"
       :aria-busy="busy"
@@ -157,24 +166,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div
-      v-if="!busy && !failed && notReadyCount > 0 && ready.length > 0"
-      class="border-border-subtle text-text-secondary flex shrink-0 items-center justify-between gap-3 border-t pt-2 text-xs"
-      data-test="alert-starter-library-more"
-    >
-      <span>{{
-        t("alertStarter.library.needData", { count: formatNumber(notReadyCount) }, notReadyCount)
-      }}</span>
-      <OButton
-        variant="ghost-primary"
-        size="xs"
-        icon-right="arrow-forward"
-        data-test="alert-starter-library-browse"
-        @click="browseAll"
+    <Teleport :to="noteTo" :disabled="!noteTo">
+      <div
+        v-if="!busy && !failed && notReadyCount > 0 && ready.length > 0"
+        class="text-text-secondary flex shrink-0 items-center gap-3 text-xs"
+        :class="noteTo ? 'me-auto min-w-0' : 'border-border-subtle justify-between border-t pt-2'"
+        data-test="alert-starter-library-more"
       >
-        {{ t("alertStarter.library.browseAll", { count: formatNumber(entries.length) }) }}
-      </OButton>
-    </div>
+        <span>{{
+          t("alertStarter.library.needData", { count: formatNumber(notReadyCount) }, notReadyCount)
+        }}</span>
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          icon-right="arrow-forward"
+          data-test="alert-starter-library-browse"
+          @click="browseAll"
+        >
+          {{ t("alertStarter.library.browseAll", { count: formatNumber(entries.length) }) }}
+        </OButton>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -227,6 +239,8 @@ const props = defineProps<{
   selected: string[];
   /** Optional v-model, so the host can hand the same scope to bulk add. */
   scope?: StarterScope;
+  /** Where the "more need data" line renders, such as the host's footer; inline when unset. */
+  noteTo?: HTMLElement | null;
 }>();
 
 const emit = defineEmits<{
@@ -293,6 +307,11 @@ const filtered = computed(() =>
   pack.value === "all" ? searched.value : searched.value.filter((e) => e.pack === pack.value),
 );
 
+// A count is held at the width of its unsearched size, so a search never resizes its chip.
+const COUNT_WIDTH = ["min-w-[1ch]", "min-w-[2ch]", "min-w-[3ch]", "min-w-[4ch]", "min-w-[5ch]"];
+const countWidthFor = (size: number) =>
+  COUNT_WIDTH[Math.min(COUNT_WIDTH.length, formatNumber(size).length) - 1];
+
 /** Every pack the ready set holds stays listed in one order, so a chip never moves under the pointer. */
 const packChips = computed(() => {
   const sizes = new Map<string, number>();
@@ -301,9 +320,19 @@ const packChips = computed(() => {
   for (const entry of searched.value) counts.set(entry.pack, (counts.get(entry.pack) ?? 0) + 1);
   const packs = [...sizes.entries()]
     .sort((a, b) => b[1] - a[1] || String(packLabel(a[0])).localeCompare(String(packLabel(b[0]))))
-    .map(([id]) => ({ id, label: packLabel(id), count: counts.get(id) ?? 0 }));
+    .map(([id, size]) => ({
+      id,
+      label: packLabel(id),
+      count: counts.get(id) ?? 0,
+      countWidth: countWidthFor(size),
+    }));
   return [
-    { id: "all", label: t("alertStarter.library.packAll"), count: searched.value.length },
+    {
+      id: "all",
+      label: t("alertStarter.library.packAll"),
+      count: searched.value.length,
+      countWidth: countWidthFor(ready.value.length),
+    },
     ...packs,
   ];
 });

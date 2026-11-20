@@ -89,6 +89,7 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
   });
 });
 
+import { justAddedAlerts, markJustAdded } from "@/utils/alerts/justAddedAlerts";
 import AlertList from "@/components/alerts/AlertList.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import config from "@/aws-exports";
@@ -4544,7 +4545,46 @@ describe("AlertList - first run and the alert library", () => {
     await wrapper.find('[data-test="alert-list-empty-new-alert"]').trigger("click");
     await flushPromises();
     expect(push).not.toHaveBeenCalled();
-    expect(document.body.querySelector('[data-test="create-starter"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="create-starter-menu"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it("The form in New alert's menu opens the add-alert form the way New alert did before", async () => {
+    const wrapper = await mountList();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-add-alert-btn"]').trigger("click");
+    await flushPromises();
+    document.body.querySelector<HTMLElement>('[data-test="create-starter-use-form"]')!.click();
+    await flushPromises();
+    expect(push).toHaveBeenCalledWith({
+      name: "alertList",
+      query: {
+        ...wrapper.vm.router.currentRoute.value.query,
+        action: "add",
+        org_identifier: store.state.selectedOrganization.identifier,
+        folder: "default",
+        alert_type: wrapper.vm.activeTab,
+      },
+    });
+    wrapper.unmount();
+  });
+
+  it("lands a starter's new alerts in their folder and marks only their rows", async () => {
+    const wrapper = await mountList();
+    vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    const name = alertsDB[1].name;
+    markJustAdded({ folderId: "default", names: [name] });
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+    const marked = wrapper
+      .findAll('[data-test="alert-list-table"] tbody tr')
+      .filter((tr: any) => tr.classes().includes("outline-accent"));
+    expect([marked.length, marked[0]?.text().includes(name), justAddedAlerts.value]).toEqual([
+      1,
+      true,
+      null,
+    ]);
     wrapper.unmount();
   });
 

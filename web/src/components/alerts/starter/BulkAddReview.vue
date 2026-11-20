@@ -151,60 +151,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </li>
     </ul>
 
-    <footer
-      class="flex min-h-8 items-center justify-end gap-2"
-      data-test="alerts-bulk-add-review-footer"
-    >
-      <template v-if="finishedWithFailures">
-        <p
-          class="text-status-negative me-auto min-w-0 text-sm"
-          role="alert"
-          data-test="alerts-bulk-add-review-summary"
-        >
-          {{ summaryText }}
-        </p>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="refresh"
-          :loading="installer.isInstalling.value"
-          data-test="alerts-bulk-add-review-retry"
-          @click="run(installer.failedIds.value)"
-        >
-          {{ t("alertStarter.bulk.retryFailed") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="installer.isInstalling.value"
-          data-test="alerts-bulk-add-review-done"
-          @click="emit('done', created)"
-        >
-          {{ t("alertStarter.bulk.done") }}
-        </OButton>
-      </template>
-      <template v-else>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          :disabled="locked"
-          data-test="alerts-bulk-add-review-back"
-          @click="emit('back')"
-        >
-          {{ t("alertStarter.bulk.back") }}
-        </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :loading="installer.isInstalling.value"
-          :disabled="rows.length === 0"
-          data-test="alerts-bulk-add-review-add"
-          @click="run(rows.map((row) => row.entry.id))"
-        >
-          {{ t("alertStarter.shell.addSelected", { count: rows.length }, rows.length) }}
-        </OButton>
-      </template>
-    </footer>
+    <Teleport :to="actionsTo" :disabled="!actionsTo">
+      <footer
+        class="flex min-w-0 items-center justify-end gap-2"
+        :class="actionsTo ? 'flex-1' : 'min-h-8'"
+        data-test="alerts-bulk-add-review-footer"
+      >
+        <template v-if="finishedWithFailures">
+          <p
+            class="text-status-negative me-auto min-w-0 text-sm"
+            role="alert"
+            data-test="alerts-bulk-add-review-summary"
+          >
+            {{ summaryText }}
+          </p>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            icon-left="refresh"
+            :loading="installer.isInstalling.value"
+            data-test="alerts-bulk-add-review-retry"
+            @click="run(installer.failedIds.value)"
+          >
+            {{ t("alertStarter.bulk.retryFailed") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :disabled="installer.isInstalling.value"
+            data-test="alerts-bulk-add-review-done"
+            @click="emit('done', added())"
+          >
+            {{ t("alertStarter.bulk.done") }}
+          </OButton>
+        </template>
+        <template v-else>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :disabled="locked"
+            data-test="alerts-bulk-add-review-back"
+            @click="emit('back')"
+          >
+            {{ t("alertStarter.bulk.back") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="installer.isInstalling.value"
+            :disabled="rows.length === 0"
+            data-test="alerts-bulk-add-review-add"
+            @click="run(rows.map((row) => row.entry.id))"
+          >
+            {{ t("alertStarter.shell.addSelected", { count: rows.length }, rows.length) }}
+          </OButton>
+        </template>
+      </footer>
+    </Teleport>
   </section>
 </template>
 
@@ -243,17 +246,20 @@ import {
   type DayVerdict,
   type TestRunTone,
 } from "@/utils/alerts/alertTestRun";
+import type { JustAddedAlerts } from "@/utils/alerts/justAddedAlerts";
 import type { LibrarySuggestQuery } from "@/utils/alerts/librarySuggest.types";
 import { getFoldersListByType } from "@/utils/commons";
 
 const props = defineProps<{
   entries: AlertLibraryEntry[];
   scope: StarterScope;
+  /** Where the actions render, such as a dialog's footer; inline when unset. */
+  actionsTo?: HTMLElement | null;
 }>();
 
 const emit = defineEmits<{
   (e: "back"): void;
-  (e: "done", created: number): void;
+  (e: "done", added: JustAddedAlerts): void;
 }>();
 
 // Evaluate runs are heavy searches; three at once keeps a 30-row batch from flooding the server.
@@ -281,7 +287,6 @@ const destinations = ref<string[]>([]);
 const interval = ref<number>(OWN_INTERVAL);
 const removed = ref<Set<string>>(new Set());
 const tests = ref<Record<string, RowTest>>({});
-const created = ref(0);
 
 const kept = computed(() => {
   const seen = new Set<string>();
@@ -472,15 +477,21 @@ const onFolderSelected = (folder: { value?: string }) => {
   folderId.value = folder?.value ?? "default";
 };
 
+// Every pass's creations, so a retry's success still marks the rows an earlier pass added.
+const added = (): JustAddedAlerts => ({
+  folderId: folderId.value,
+  names: installer.results.value.flatMap((r) =>
+    r.status === "installed" && r.name ? [r.name] : [],
+  ),
+});
+
 const remove = (id: string) => {
   removed.value = new Set([...removed.value, id]);
 };
 
 const run = async (ids: string[]) => {
   const outcome = await installer.install(kept.value, ids, batch.value);
-  if (!outcome) return;
-  created.value += outcome.installedIds.length;
-  if (installer.failedIds.value.length === 0) emit("done", created.value);
+  if (outcome && installer.failedIds.value.length === 0) emit("done", added());
 };
 
 onMounted(() => {

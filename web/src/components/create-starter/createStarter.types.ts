@@ -20,10 +20,12 @@ export type ChoiceAvailability = "on" | "locked" | "hidden";
 export interface StarterPane {
   id: "ai" | "library";
   label: I18nText;
+  /** One line on what this way does, under its name. */
+  description: I18nText;
   /** "44 match your data"; 0 = none match (no count shown); null = loading or failed. */
   count: number | null;
   availability: ChoiceAvailability;
-  /** Why a locked choice cannot be picked; shown on hover and focus. */
+  /** Why a locked choice cannot be picked; shown in its row. */
   lockedReason?: I18nText;
 }
 
@@ -32,3 +34,5 @@ export type StarterScope =
   | { kind: "all" }
   | { kind: "service"; service: string; dimensions: Record<string, string> }
   | { kind: "stream"; streamType: "logs" | "metrics" | "traces"; streamName: string };
+
+export const PANE_ICON = { ai: "auto-awesome", library: "menu-book" } as const;

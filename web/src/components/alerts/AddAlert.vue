@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AlertStarter
               trigger="another-way"
               :alert-type="isAnomalyMode ? 'anomaly_detection' : 'scheduled'"
-              @created="cancelEditor"
+              @created="onStarterCreated"
             />
           </template>
         </OPageHeader>
@@ -1323,6 +1323,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import AlertStarter from "./starter/AlertStarter.vue";
+import { justAddedAlerts, takeJustAdded } from "@/utils/alerts/justAddedAlerts";
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -1666,6 +1667,13 @@ export default defineComponent({
 
     const cancelEditor = async () => {
       if (await alertEditorDraft.draft.confirmLeave()) emit("cancel:hideform");
+    };
+
+    // Alerts made from Start another way land on the list like a save, once this form's edits are settled.
+    const onStarterCreated = async () => {
+      const folderId = justAddedAlerts.value?.folderId;
+      if (await alertEditorDraft.draft.confirmLeave()) emit("update:list", folderId);
+      else takeJustAdded();
     };
 
     // Share server SQL-validation squiggle ranges with the descendant query
@@ -2910,6 +2918,8 @@ export default defineComponent({
       calibrationBanner: calibrationHandoff.banner,
       draftFormKey: alertEditorDraft.formKey,
       cancelEditor,
+      onStarterCreated,
+      confirmLeave: () => alertEditorDraft.draft.confirmLeave(),
       alertAutoName,
       headerModeLabel,
       isAnomalyDetectionEnabled,

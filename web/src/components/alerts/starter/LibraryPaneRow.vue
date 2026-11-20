@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="
       selected
         ? 'border-accent ring-accent/40 ring-2'
-        : 'hover:bg-surface-subtle border-transparent'
+        : 'in-data-pointer-moved:hover:bg-surface-subtle border-transparent'
     "
     :data-entry-id="entry.id"
     :data-test="`alert-starter-library-row-${entry.id}`"

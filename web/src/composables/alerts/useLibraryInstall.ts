@@ -44,6 +44,8 @@ export interface InstallResult {
   status: InstallStatus;
   /** Server text on failure — shown verbatim, so never a catalogue key. */
   message?: I18nText;
+  /** The created alert's name, once installed. */
+  name?: string;
 }
 
 /** What every alert of one batch shares; read once per run. */
@@ -212,11 +214,11 @@ export function useLibraryInstall(
     return { payload: { ...payload, ...shared }, isAnomaly: false };
   };
 
-  const installOne = async (entry: AlertLibraryEntry, batch: InstallBatch): Promise<boolean> => {
+  const installOne = async (entry: AlertLibraryEntry, batch: InstallBatch) => {
     const { payload, isAnomaly } = await prepare(entry, batch);
     const mutation = isAnomaly ? installAnomaly : installAlert;
     await mutation.mutateAsync({ payload, folderId: batch.folderId });
-    return isAnomaly;
+    return { isAnomaly, name: String(payload.name ?? "") };
   };
 
   /** Installs `ids` out of `candidates`; null when nothing ran (busy, or no such entry). */
@@ -255,8 +257,9 @@ export function useLibraryInstall(
       for (const entry of todo) {
         setResult(entry.id, { status: "running", message: undefined });
         try {
-          if (await installOne(entry, frozen)) anomalyCount += 1;
-          setResult(entry.id, { status: "installed" });
+          const { isAnomaly, name } = await installOne(entry, frozen);
+          if (isAnomaly) anomalyCount += 1;
+          setResult(entry.id, { status: "installed", name });
           installedIds.push(entry.id);
         } catch (error) {
           setResult(entry.id, { status: "failed", message: errorText(error) });
