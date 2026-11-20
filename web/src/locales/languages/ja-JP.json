@@ -12932,7 +12932,7 @@
         "severityLoweredWithReason": "重大度を {from} から {to} に引き下げ - {reason}",
         "splitFrom": "{alert} は {incident} と無関係であることが判明",
         "splitFromUntitled": "参加していたインシデント",
-        "inferredByAi": "AI SRE による推定",
+        "inferredByAi": "@:{'brand.autobot'} による推定",
         "inferredFromAlertHistory": "アラート履歴から推定",
         "inferredFromServiceGraph": "サービスグラフから推定",
         "inferredFromWorkload": "ワークロードから推定",
@@ -16022,7 +16022,7 @@
     "orgSubtitle": "{org} のフィールド名、データ保持、自動機能。",
     "passwordPolicySubtitle": "メールアドレスとパスワードによるネイティブアカウントのルール。",
     "cipherKeysDesc": "機密フィールドの暗号化キー",
-    "aiToolsetsDesc": "AI アシスタントが使用できる MCP サーバーと CLI ツール",
+    "aiToolsetsDesc": "@:{'brand.autobot'} が使用できる MCP サーバーと CLI ツール",
     "regexPatternsDesc": "墨消し用の再利用可能なregexパターン",
     "domainManagementDesc": "サインインを許可されたSSOドメインに制限",
     "passwordPolicy": "パスワードポリシー",
@@ -19762,8 +19762,8 @@
         "loopExplain": "高い繰り返し率は、通常エージェントが結果をキャッシュしていないか、再試行していることを意味します。下の最悪のトレースを開いて、繰り返された呼び出しを確認してください。",
         "failExplain": "これらはこの障害クラスを引き起こしている実際のエラーメッセージです — それらを読んで修正を見つけるか、トレースを開いて発生場所を確認してください。",
         "costExplain": "これらのトレースがこのエージェントの支出を牽引しました。最もコストの高いトレースを開いて、何が実行されたかを確認してください。",
-        "explain": "O2 AI で説明",
-        "explainHelp": "O2 AI はエラーメッセージと最も深刻なトレースからこのシグナルを調査し、AI スパンを越えてログ、メトリクス、Kubernetes、デプロイまで参照し、根拠を提示します。"
+        "explain": "@:{'brand.autobot'} で説明",
+        "explainHelp": "@:{'brand.autobot'} はエラーメッセージと最も深刻なトレースからこのシグナルを調査し、AI スパンを越えてログ、メトリクス、Kubernetes、デプロイまで参照し、根拠を提示します。"
       }
     },
     "versionCompare": {
@@ -33190,7 +33190,7 @@
       "openService": "サービスを開く",
       "reviewServices": "サービスを確認",
       "openInCalibration": "アラートキャリブレーションで開く",
-      "askAi": "AI に質問",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "管理者に問い合わせる",
       "dismiss": "非表示…",
       "markIntendedReport": "意図したレポートとしてマーク",

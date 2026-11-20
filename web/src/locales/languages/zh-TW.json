@@ -12927,7 +12927,7 @@
         "severityLoweredWithReason": "嚴重程度已從 {from} 調降至 {to} - {reason}",
         "splitFrom": "發現 {alert} 與 {incident} 無關",
         "splitFromUntitled": "它所加入的事件",
-        "inferredByAi": "由 AI SRE 推斷",
+        "inferredByAi": "由 @:{'brand.autobot'} 推斷",
         "inferredFromAlertHistory": "從警示歷史推斷",
         "inferredFromServiceGraph": "從服務圖表推斷",
         "inferredFromWorkload": "從工作負載推斷",
@@ -16017,7 +16017,7 @@
     "orgSubtitle": "設定 {org} 的欄位名稱、資料保留與自動功能。",
     "passwordPolicySubtitle": "原生電子郵件與密碼帳戶的規則。",
     "cipherKeysDesc": "用於敏感欄位的加密金鑰",
-    "aiToolsetsDesc": "AI 助手可使用的 MCP 伺服器與 CLI 工具",
+    "aiToolsetsDesc": "@:{'brand.autobot'} 可使用的 MCP 伺服器與 CLI 工具",
     "regexPatternsDesc": "用於遮蔽的可重複使用 regex 模式",
     "domainManagementDesc": "限制僅允許的 SSO 網域登入",
     "passwordPolicy": "密碼原則",
@@ -19757,8 +19757,8 @@
         "loopExplain": "高重複率通常表示代理程式未快取結果或正在重試。請開啟下方最差的追蹤以查看重複的呼叫。",
         "failExplain": "這些是此失敗類別背後的實際錯誤訊息 — 請閱讀以尋找解決方案，或開啟追蹤以查看發生位置。",
         "costExplain": "這些追蹤驅動了此代理程式的花費。請開啟最昂貴的追蹤以查看執行了哪些內容。",
-        "explain": "使用 O2 AI 說明",
-        "explainHelp": "O2 AI 會從此訊號的錯誤訊息與最嚴重的追蹤著手調查，跨越 AI Span 深入日誌、指標、Kubernetes 與部署，並引用其證據。"
+        "explain": "使用 @:{'brand.autobot'} 說明",
+        "explainHelp": "@:{'brand.autobot'} 會從此訊號的錯誤訊息與最嚴重的追蹤著手調查，跨越 AI Span 深入日誌、指標、Kubernetes 與部署，並引用其證據。"
       }
     },
     "versionCompare": {
@@ -33185,7 +33185,7 @@
       "openService": "開啟服務",
       "reviewServices": "檢閱服務",
       "openInCalibration": "在警示校準中開啟",
-      "askAi": "詢問 AI",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "詢問管理員",
       "dismiss": "忽略…",
       "markIntendedReport": "標記為預期報表",

@@ -12838,7 +12838,7 @@
         "severityLoweredWithReason": "Gravità ridotta da {from} a {to} - {reason}",
         "splitFrom": "{alert} è risultato non correlato a {incident}",
         "splitFromUntitled": "l'incidente a cui si era unito",
-        "inferredByAi": "Dedotto da AI SRE",
+        "inferredByAi": "Dedotto da @:{'brand.autobot'}",
         "inferredFromAlertHistory": "Dedotto dalla cronologia degli avvisi",
         "inferredFromServiceGraph": "Dedotto dal grafico dei servizi",
         "inferredFromWorkload": "Dedotto dal carico di lavoro",
@@ -15928,7 +15928,7 @@
     "orgSubtitle": "Nomi dei campi, conservazione dei dati e funzionalità automatiche per {org}.",
     "passwordPolicySubtitle": "Regole per gli account nativi con email e password.",
     "cipherKeysDesc": "Chiavi di cifratura per i campi sensibili",
-    "aiToolsetsDesc": "Server MCP e strumenti CLI che l'Assistente AI può usare",
+    "aiToolsetsDesc": "Server MCP e strumenti CLI che @:{'brand.autobot'} può usare",
     "regexPatternsDesc": "Pattern regex riutilizzabili per la redazione",
     "domainManagementDesc": "Analisi delle attestazioni SSO e restrizioni di accesso per dominio",
     "passwordPolicy": "Criteri password",
@@ -19668,8 +19668,8 @@
         "loopExplain": "Un tasso di ripetizione alto di solito indica che l'agente non memorizza i risultati nella cache o sta ritentando. Apri le tracce peggiori qui sotto per vedere le chiamate ripetute.",
         "failExplain": "Questi sono tutti i messaggi di errore di questo agente, di tutte le classi di errore, non solo di questa. Leggili per trovare la soluzione oppure apri una traccia per vedere dove si è verificato.",
         "costExplain": "Queste tracce hanno determinato la spesa dell'agente. Apri quelle più costose per vedere cosa è stato eseguito.",
-        "explain": "Spiega con O2 AI",
-        "explainHelp": "O2 AI analizza questo segnale a partire dai relativi messaggi di errore e dalle tracce peggiori, supera gli span AI per arrivare a log, metriche, Kubernetes e deploy, e cita le proprie evidenze."
+        "explain": "Spiega con @:{'brand.autobot'}",
+        "explainHelp": "@:{'brand.autobot'} analizza questo segnale a partire dai relativi messaggi di errore e dalle tracce peggiori, supera gli span AI per arrivare a log, metriche, Kubernetes e deploy, e cita le proprie evidenze."
       }
     },
     "versionCompare": {
@@ -33359,7 +33359,7 @@
       "openService": "Apri servizio",
       "reviewServices": "Rivedi i servizi",
       "openInCalibration": "Apri in Calibrazione avvisi",
-      "askAi": "Chiedi all'AI",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Chiedi agli amministratori",
       "dismiss": "Ignora…",
       "markIntendedReport": "Contrassegna come report intenzionale",

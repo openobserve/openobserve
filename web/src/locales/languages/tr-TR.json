@@ -12838,7 +12838,7 @@
         "severityLoweredWithReason": "Önem derecesi {from} seviyesinden {to} seviyesine düşürüldü - {reason}",
         "splitFrom": "{alert} öğesinin {incident} ile ilgisiz olduğu tespit edildi",
         "splitFromUntitled": "katıldığı vaka",
-        "inferredByAi": "AI SRE tarafından çıkarıldı",
+        "inferredByAi": "@:{'brand.autobot'} tarafından çıkarıldı",
         "inferredFromAlertHistory": "Uyarı geçmişinden çıkarıldı",
         "inferredFromServiceGraph": "Hizmet grafiğinden çıkarıldı",
         "inferredFromWorkload": "İş yükünden çıkarıldı",
@@ -15928,7 +15928,7 @@
     "orgSubtitle": "{org} için alan adları, veri saklama ve otomatik özellikler.",
     "passwordPolicySubtitle": "Yerleşik e-posta ve parola hesapları için kurallar.",
     "cipherKeysDesc": "Hassas alanlar için şifreleme anahtarları",
-    "aiToolsetsDesc": "Yapay zeka asistanının kullanabileceği MCP sunucuları ve CLI araçları",
+    "aiToolsetsDesc": "@:{'brand.autobot'}'un kullanabileceği MCP sunucuları ve CLI araçları",
     "regexPatternsDesc": "Maskeleme için yeniden kullanılabilir regex desenleri",
     "domainManagementDesc": "SSO talep ayrıştırma ve alan adına göre oturum açma kısıtlamaları",
     "passwordPolicy": "Parola İlkesi",
@@ -19668,8 +19668,8 @@
         "loopExplain": "Yüksek tekrar oranı genellikle ajanın sonuçları önbelleğe almadığı veya yeniden denediği anlamına gelir. Tekrarlanan çağrıları görmek için aşağıdaki en kötü izleri açın.",
         "failExplain": "Bunlar, yalnızca bu sınıfa ait olanlar değil, bu ajanın her hata sınıfından gelen tüm hata mesajlarıdır. Düzeltmeyi bulmak için bunları okuyun ya da nerede gerçekleştiğini görmek için bir iz açın.",
         "costExplain": "Bu izler bu ajanın harcamasını tetikledi. Nelerin çalıştığını görmek için en pahalı olanları açın.",
-        "explain": "O2 AI ile açıkla",
-        "explainHelp": "O2 AI bu sinyali hata mesajlarından ve en kötü izlerinden yola çıkarak inceler; AI span'larının ötesine geçerek günlüklere, metriklere, Kubernetes'e ve dağıtımlara ulaşır ve kanıtlarını sunar."
+        "explain": "@:{'brand.autobot'} ile açıkla",
+        "explainHelp": "@:{'brand.autobot'} bu sinyali hata mesajlarından ve en kötü izlerinden yola çıkarak inceler; AI span'larının ötesine geçerek günlüklere, metriklere, Kubernetes'e ve dağıtımlara ulaşır ve kanıtlarını sunar."
       }
     },
     "versionCompare": {
@@ -33359,7 +33359,7 @@
       "openService": "Hizmeti aç",
       "reviewServices": "Hizmetleri incele",
       "openInCalibration": "Uyarı Kalibrasyonu'nda aç",
-      "askAi": "Yapay Zeka'ya sor",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Yöneticilere sor",
       "dismiss": "Yoksay…",
       "markIntendedReport": "Amaçlanan rapor olarak işaretle",

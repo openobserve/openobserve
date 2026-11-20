@@ -12838,7 +12838,7 @@
         "severityLoweredWithReason": "Severidad reducida de {from} a {to} - {reason}",
         "splitFrom": "Se determinó que {alert} no estaba relacionada con {incident}",
         "splitFromUntitled": "el incidente al que se unió",
-        "inferredByAi": "Inferido por SRE de IA",
+        "inferredByAi": "Inferido por @:{'brand.autobot'}",
         "inferredFromAlertHistory": "Inferido del historial de alertas",
         "inferredFromServiceGraph": "Inferido del mapa de servicios",
         "inferredFromWorkload": "Inferido de la carga de trabajo",
@@ -15928,7 +15928,7 @@
     "orgSubtitle": "Nombres de campos, retención de datos y características automáticas para {org}.",
     "passwordPolicySubtitle": "Reglas para cuentas nativas de correo electrónico y contraseña.",
     "cipherKeysDesc": "Claves de cifrado para campos sensibles",
-    "aiToolsetsDesc": "Servidores MCP y herramientas CLI que puede usar el Asistente de IA",
+    "aiToolsetsDesc": "Servidores MCP y herramientas CLI que puede usar @:{'brand.autobot'}",
     "regexPatternsDesc": "Patrones regex reutilizables para redacción",
     "domainManagementDesc": "Análisis de claims de SSO y restricciones de inicio de sesión por dominio",
     "passwordPolicy": "Política de contraseñas",
@@ -19668,8 +19668,8 @@
         "loopExplain": "Una tasa de repetición alta suele significar que el agente no está guardando resultados en caché o que está reintentando. Abre las peores trazas a continuación para ver las llamadas repetidas.",
         "failExplain": "Estos son todos los mensajes de error de este agente, de todas las clases de fallo, no solo de esta. Léelos para encontrar la solución o abre una traza para ver dónde ocurrió.",
         "costExplain": "Estas trazas impulsaron el gasto de este agente. Abre las más costosas para ver qué se ejecutó.",
-        "explain": "Explicar con O2 AI",
-        "explainHelp": "O2 AI investiga esta señal a partir de sus mensajes de error y sus peores trazas, va más allá de los spans de IA hasta los logs, las métricas, Kubernetes y los despliegues, y cita sus pruebas."
+        "explain": "Explicar con @:{'brand.autobot'}",
+        "explainHelp": "@:{'brand.autobot'} investiga esta señal a partir de sus mensajes de error y sus peores trazas, va más allá de los spans de IA hasta los logs, las métricas, Kubernetes y los despliegues, y cita sus pruebas."
       }
     },
     "versionCompare": {
@@ -33359,7 +33359,7 @@
       "openService": "Abrir servicio",
       "reviewServices": "Revisar servicios",
       "openInCalibration": "Abrir en Calibración de alertas",
-      "askAi": "Preguntar a la IA",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Preguntar a los administradores",
       "dismiss": "Descartar…",
       "markIntendedReport": "Marcar como informe intencionado",

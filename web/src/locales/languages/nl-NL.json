@@ -12932,7 +12932,7 @@
         "severityLoweredWithReason": "Ernst verlaagd van {from} naar {to} - {reason}",
         "splitFrom": "{alert} bleek niet gerelateerd aan {incident}",
         "splitFromUntitled": "het incident waar het bij hoorde",
-        "inferredByAi": "Afgeleid door AI SRE",
+        "inferredByAi": "Afgeleid door @:{'brand.autobot'}",
         "inferredFromAlertHistory": "Afgeleid uit alarmgeschiedenis",
         "inferredFromServiceGraph": "Afgeleid uit servicegrafiek",
         "inferredFromWorkload": "Afgeleid uit workload",
@@ -16022,7 +16022,7 @@
     "orgSubtitle": "Veldnamen, gegevensbewaring en automatische functies voor {org}.",
     "passwordPolicySubtitle": "Regels voor native e-mail- en wachtwoordaccounts.",
     "cipherKeysDesc": "Versleutelingssleutels voor gevoelige velden",
-    "aiToolsetsDesc": "MCP-servers en CLI-tools die de AI-assistent kan gebruiken",
+    "aiToolsetsDesc": "MCP-servers en CLI-tools die @:{'brand.autobot'} kan gebruiken",
     "regexPatternsDesc": "Herbruikbare regex-patronen voor redactie",
     "domainManagementDesc": "Aanmelden beperken tot toegestane SSO-domeinen",
     "passwordPolicy": "Wachtwoordbeleid",
@@ -19762,8 +19762,8 @@
         "loopExplain": "Een hoog herhalingspercentage betekent meestal dat de agent resultaten niet cachet of opnieuw probeert. Open de slechtste traces hieronder om de herhaalde aanroepen te zien.",
         "failExplain": "Dit zijn de daadwerkelijke foutmeldingen achter deze foutklasse — lees ze om de oplossing te vinden, of open een trace om te zien waar het gebeurde.",
         "costExplain": "Deze traces zorgden voor de uitgaven van deze agent. Open de duurste om te zien wat er draaide.",
-        "explain": "Uitleggen met O2 AI",
-        "explainHelp": "O2 AI onderzoekt dit signaal op basis van de foutmeldingen en de slechtste traces, kijkt verder dan de AI-spans naar logs, metrieken, Kubernetes en deployments, en citeert het bewijs."
+        "explain": "Uitleggen met @:{'brand.autobot'}",
+        "explainHelp": "@:{'brand.autobot'} onderzoekt dit signaal op basis van de foutmeldingen en de slechtste traces, kijkt verder dan de AI-spans naar logs, metrieken, Kubernetes en deployments, en citeert het bewijs."
       }
     },
     "versionCompare": {
@@ -33190,7 +33190,7 @@
       "openService": "Service openen",
       "reviewServices": "Services beoordelen",
       "openInCalibration": "Openen in Alarmkalibratie",
-      "askAi": "Vraag AI",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Vraag beheerders",
       "dismiss": "Negeren…",
       "markIntendedReport": "Markeren als bedoeld rapport",

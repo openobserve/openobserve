@@ -12932,7 +12932,7 @@
         "severityLoweredWithReason": "Obniżono ważność z {from} na {to} - {reason}",
         "splitFrom": "Uznano, że {alert} nie ma związku z {incident}",
         "splitFromUntitled": "incydentem, do którego dołączył",
-        "inferredByAi": "Wywnioskowane przez AI SRE",
+        "inferredByAi": "Wywnioskowane przez @:{'brand.autobot'}",
         "inferredFromAlertHistory": "Wywnioskowane z historii alertów",
         "inferredFromServiceGraph": "Wywnioskowane z grafu usług",
         "inferredFromWorkload": "Wywnioskowane z obciążenia",
@@ -16022,7 +16022,7 @@
     "orgSubtitle": "Nazwy pól, przechowywanie danych i funkcje automatyczne dla {org}.",
     "passwordPolicySubtitle": "Zasady dla natywnych kont z adresem e-mail i hasłem.",
     "cipherKeysDesc": "Klucze szyfrowania dla poufnych pól",
-    "aiToolsetsDesc": "Serwery MCP i narzędzia CLI, których może używać Asystent AI",
+    "aiToolsetsDesc": "Serwery MCP i narzędzia CLI, których może używać @:{'brand.autobot'}",
     "regexPatternsDesc": "Wielokrotnego użytku wzorce regex do maskowania",
     "domainManagementDesc": "Ogranicz logowanie do dozwolonych domen SSO",
     "passwordPolicy": "Zasady haseł",
@@ -19762,8 +19762,8 @@
         "loopExplain": "Wysoki wskaźnik powtórzeń zwykle oznacza, że agent nie buforuje wyników lub ponawia próby. Otwórz najgorsze trace'y poniżej, aby zobaczyć powtórzone wywołania.",
         "failExplain": "To są rzeczywiste komunikaty o błędach stojące za tą klasą awarii — przeczytaj je, aby znaleźć poprawkę, lub otwórz trace, aby zobaczyć, gdzie to nastąpiło.",
         "costExplain": "Te trace'y generowały koszty tego agenta. Otwórz najdroższe, aby zobaczyć, co się wykonało.",
-        "explain": "Wyjaśnij za pomocą O2 AI",
-        "explainHelp": "O2 AI analizuje ten sygnał na podstawie jego komunikatów błędów i najgorszych trace, wykracza poza spany AI, sięgając do logów, metryk, Kubernetes i wdrożeń, oraz cytuje dowody."
+        "explain": "Wyjaśnij za pomocą @:{'brand.autobot'}",
+        "explainHelp": "@:{'brand.autobot'} analizuje ten sygnał na podstawie jego komunikatów błędów i najgorszych trace, wykracza poza spany AI, sięgając do logów, metryk, Kubernetes i wdrożeń, oraz cytuje dowody."
       }
     },
     "versionCompare": {
@@ -33190,7 +33190,7 @@
       "openService": "Otwórz usługę",
       "reviewServices": "Przejrzyj usługi",
       "openInCalibration": "Otwórz w Kalibracji alertów",
-      "askAi": "Zapytaj AI",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Zapytaj administratorów",
       "dismiss": "Odrzuć…",
       "markIntendedReport": "Oznacz jako zamierzony raport",

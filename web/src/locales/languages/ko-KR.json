@@ -12932,7 +12932,7 @@
         "severityLoweredWithReason": "심각도가 {from}에서 {to}로 낮아짐 - {reason}",
         "splitFrom": "{alert}이(가) {incident}와 관련 없는 것으로 확인됨",
         "splitFromUntitled": "함께 묶였던 인시던트",
-        "inferredByAi": "AI SRE 추론",
+        "inferredByAi": "@:{'brand.autobot'} 추론",
         "inferredFromAlertHistory": "알림 기록에서 추론",
         "inferredFromServiceGraph": "서비스 그래프에서 추론",
         "inferredFromWorkload": "워크로드에서 추론",
@@ -16022,7 +16022,7 @@
     "orgSubtitle": "{org}의 필드 이름, 데이터 보존 및 자동 기능.",
     "passwordPolicySubtitle": "기본 이메일/비밀번호 계정에 대한 규칙.",
     "cipherKeysDesc": "민감한 필드를 위한 암호화 키",
-    "aiToolsetsDesc": "AI 어시스턴트가 사용할 수 있는 MCP 서버 및 CLI 도구",
+    "aiToolsetsDesc": "@:{'brand.autobot'}가 사용할 수 있는 MCP 서버 및 CLI 도구",
     "regexPatternsDesc": "수정에 재사용 가능한 regex 패턴",
     "domainManagementDesc": "허용된 SSO 도메인으로 로그인 제한",
     "passwordPolicy": "비밀번호 정책",
@@ -19762,8 +19762,8 @@
         "loopExplain": "높은 반복률은 일반적으로 에이전트가 결과를 캐시하지 않거나 재시도 중임을 의미합니다. 아래의 최악의 트레이스를 열어 반복된 호출을 확인하세요.",
         "failExplain": "이들은 이 실패 클래스의 실제 오류 메시지입니다. 이를 읽어 해결책을 찾거나 트레이스를 열어 어디서 발생했는지 확인하세요.",
         "costExplain": "이 트레이스들이 이 에이전트의 비용을 발생시켰습니다. 가장 비용이 높은 트레이스를 열어 무엇이 실행되었는지 확인하세요.",
-        "explain": "O2 AI로 설명",
-        "explainHelp": "O2 AI는 오류 메시지와 가장 나쁜 트레이스에서 이 신호를 조사하고, AI 스팬을 넘어 로그, 메트릭, 쿠버네티스, 배포까지 살펴보며 근거를 인용합니다."
+        "explain": "@:{'brand.autobot'}로 설명",
+        "explainHelp": "@:{'brand.autobot'}는 오류 메시지와 가장 나쁜 트레이스에서 이 신호를 조사하고, AI 스팬을 넘어 로그, 메트릭, 쿠버네티스, 배포까지 살펴보며 근거를 인용합니다."
       }
     },
     "versionCompare": {
@@ -33190,7 +33190,7 @@
       "openService": "서비스 열기",
       "reviewServices": "서비스 검토",
       "openInCalibration": "알림 캘리브레이션에서 열기",
-      "askAi": "AI에게 질문",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "관리자에게 문의",
       "dismiss": "무시…",
       "markIntendedReport": "의도된 보고서로 표시",

@@ -12904,7 +12904,7 @@
         "severityLoweredWithReason": "ลดความรุนแรงจาก {from} เป็น {to} - {reason}",
         "splitFrom": "{alert} พบว่าไม่เกี่ยวข้องกับ {incident}",
         "splitFromUntitled": "เหตุการณ์ขัดข้องที่เคยเข้าร่วม",
-        "inferredByAi": "อนุมานโดย AI SRE",
+        "inferredByAi": "อนุมานโดย @:{'brand.autobot'}",
         "inferredFromAlertHistory": "อนุมานจากประวัติการแจ้งเตือน",
         "inferredFromServiceGraph": "อนุมานจากกราฟบริการ (Service Graph)",
         "inferredFromWorkload": "อนุมานจากเวิร์กโหลด",
@@ -15994,7 +15994,7 @@
     "orgSubtitle": "ชื่อฟิลด์ การเก็บรักษาข้อมูล และคุณสมบัติอัตโนมัติสำหรับ {org}.",
     "passwordPolicySubtitle": "กฎสำหรับบัญชีอีเมลและรหัสผ่านแบบเนทีฟ.",
     "cipherKeysDesc": "Encryption keys for sensitive fields",
-    "aiToolsetsDesc": "เซิร์ฟเวอร์ MCP และเครื่องมือ CLI ที่ผู้ช่วย AI สามารถใช้ได้",
+    "aiToolsetsDesc": "เซิร์ฟเวอร์ MCP และเครื่องมือ CLI ที่@:{'brand.autobot'} สามารถใช้ได้",
     "regexPatternsDesc": "Reusable regex patterns for redaction",
     "domainManagementDesc": "Restrict sign-in to allowed SSO domains",
     "passwordPolicy": "Password Policy",
@@ -19734,8 +19734,8 @@
         "loopExplain": "A high repeat rate usually means the agent isn't caching results or is retrying. Open the worst traces below to see the repeated calls.",
         "failExplain": "These are the actual error messages behind this failure class — read them to find the fix, or open a trace to see where it happened.",
         "costExplain": "These traces drove this agent's spend. Open the most expensive ones to see what ran.",
-        "explain": "อธิบายด้วย O2 AI",
-        "explainHelp": "O2 AI ตรวจสอบสัญญาณนี้จากข้อความข้อผิดพลาดและเทรซที่แย่ที่สุด โดยเจาะลึกเกินกว่าสแปน AI ไปยังล็อก เมทริกซ์ Kubernetes และการดีพลอย พร้อมอ้างอิงหลักฐาน"
+        "explain": "อธิบายด้วย @:{'brand.autobot'}",
+        "explainHelp": "@:{'brand.autobot'} ตรวจสอบสัญญาณนี้จากข้อความข้อผิดพลาดและเทรซที่แย่ที่สุด โดยเจาะลึกเกินกว่าสแปน AI ไปยังล็อก เมทริกซ์ Kubernetes และการดีพลอย พร้อมอ้างอิงหลักฐาน"
       }
     },
     "versionCompare": {
@@ -33159,7 +33159,7 @@
       "openService": "เปิดบริการ",
       "reviewServices": "ตรวจสอบบริการ",
       "openInCalibration": "เปิดในการปรับเทียบการแจ้งเตือน",
-      "askAi": "ถาม AI",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "ถามผู้ดูแลระบบ",
       "dismiss": "ปิด…",
       "markIntendedReport": "ทำเครื่องหมายเป็นรายงานที่ต้องการ",

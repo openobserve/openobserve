@@ -12838,7 +12838,7 @@
         "severityLoweredWithReason": "严重程度从 {from} 降低至 {to} - {reason}",
         "splitFrom": "发现 {alert} 与 {incident} 无关",
         "splitFromUntitled": "其加入的事件",
-        "inferredByAi": "由 AI SRE 推断",
+        "inferredByAi": "由 @:{'brand.autobot'} 推断",
         "inferredFromAlertHistory": "根据告警历史推断",
         "inferredFromServiceGraph": "根据服务图推断",
         "inferredFromWorkload": "根据工作负载推断",
@@ -15928,7 +15928,7 @@
     "orgSubtitle": "{org} 的字段名称、数据保留和自动功能。",
     "passwordPolicySubtitle": "原生邮箱和密码账户的规则。",
     "cipherKeysDesc": "用于敏感字段的加密密钥",
-    "aiToolsetsDesc": "人工智能助手可使用的 MCP 服务器和 CLI 工具",
+    "aiToolsetsDesc": "@:{'brand.autobot'} 可使用的 MCP 服务器和 CLI 工具",
     "regexPatternsDesc": "用于脱敏的可重用 regex 模式",
     "domainManagementDesc": "SSO 声明解析和按域名的登录限制",
     "passwordPolicy": "密码策略",
@@ -19668,8 +19668,8 @@
         "loopExplain": "高重复率通常意味着智能体未缓存结果或正在进行重试。打开下面的最差追踪以查看重复调用。",
         "failExplain": "这些是该智能体的全部错误消息，来自所有失败类别，而不仅是这一类别。阅读它们以找到修复方法，或打开追踪查看发生位置。",
         "costExplain": "这些追踪导致了该智能体的成本。打开最昂贵的追踪以查看运行内容。",
-        "explain": "使用 O2 AI 解释",
-        "explainHelp": "O2 AI 会从错误消息和最差的追踪入手调查此信号，跨越 AI Span 深入到日志、指标、Kubernetes 和部署记录，并引用其证据。"
+        "explain": "使用 @:{'brand.autobot'} 解释",
+        "explainHelp": "@:{'brand.autobot'} 会从错误消息和最差的追踪入手调查此信号，跨越 AI Span 深入到日志、指标、Kubernetes 和部署记录，并引用其证据。"
       }
     },
     "versionCompare": {
@@ -33359,7 +33359,7 @@
       "openService": "打开服务",
       "reviewServices": "审核服务",
       "openInCalibration": "在告警校准中打开",
-      "askAi": "向 AI 提问",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "询问管理员",
       "dismiss": "忽略…",
       "markIntendedReport": "标记为预期报表",

@@ -12932,7 +12932,7 @@
         "severityLoweredWithReason": "Đã giảm mức độ nghiêm trọng từ {from} xuống {to} - {reason}",
         "splitFrom": "{alert} được xác định không liên quan đến {incident}",
         "splitFromUntitled": "sự cố mà nó đã được hợp nhất vào",
-        "inferredByAi": "Được suy luận bởi AI SRE",
+        "inferredByAi": "Được suy luận bởi @:{'brand.autobot'}",
         "inferredFromAlertHistory": "Suy luận từ lịch sử cảnh báo",
         "inferredFromServiceGraph": "Suy luận từ biểu đồ dịch vụ",
         "inferredFromWorkload": "Suy luận từ workload",
@@ -16022,7 +16022,7 @@
     "orgSubtitle": "Tên trường, thời gian lưu giữ dữ liệu và các tính năng tự động cho {org}.",
     "passwordPolicySubtitle": "Quy tắc cho tài khoản email và mật khẩu gốc.",
     "cipherKeysDesc": "Khóa mã hóa cho trường nhạy cảm",
-    "aiToolsetsDesc": "Máy chủ MCP và công cụ CLI mà Trợ lý AI có thể sử dụng",
+    "aiToolsetsDesc": "Máy chủ MCP và công cụ CLI mà @:{'brand.autobot'} có thể sử dụng",
     "regexPatternsDesc": "Mẫu regex tái sử dụng cho việc làm rõ",
     "domainManagementDesc": "Giới hạn đăng nhập vào tên miền SSO được phép",
     "passwordPolicy": "Chính sách mật khẩu",
@@ -19762,8 +19762,8 @@
         "loopExplain": "Tỷ lệ lặp lại cao thường có nghĩa là agent không lưu cache kết quả hoặc đang thử lại. Mở các trace tệ nhất bên dưới để xem các lần gọi lặp lại.",
         "failExplain": "Đây là những thông báo lỗi thực tế đằng sau lớp lỗi này — hãy đọc chúng để tìm cách khắc phục, hoặc mở một trace để xem nó xảy ra ở đâu.",
         "costExplain": "Các trace này đã làm tăng chi phí của agent. Mở những trace đắt nhất để xem thứ gì đã chạy.",
-        "explain": "Giải thích bằng O2 AI",
-        "explainHelp": "O2 AI điều tra tín hiệu này từ các thông báo lỗi và những trace tệ nhất, vượt qua các span AI để đến nhật ký, chỉ số, Kubernetes và các lần triển khai, đồng thời trích dẫn bằng chứng."
+        "explain": "Giải thích bằng @:{'brand.autobot'}",
+        "explainHelp": "@:{'brand.autobot'} điều tra tín hiệu này từ các thông báo lỗi và những trace tệ nhất, vượt qua các span AI để đến nhật ký, chỉ số, Kubernetes và các lần triển khai, đồng thời trích dẫn bằng chứng."
       }
     },
     "versionCompare": {
@@ -33190,7 +33190,7 @@
       "openService": "Mở dịch vụ",
       "reviewServices": "Xem lại dịch vụ",
       "openInCalibration": "Mở trong Hiệu chỉnh cảnh báo",
-      "askAi": "Hỏi AI",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Hỏi quản trị viên",
       "dismiss": "Bỏ qua…",
       "markIntendedReport": "Đánh dấu là báo cáo có chủ đích",
