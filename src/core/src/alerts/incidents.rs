@@ -1109,7 +1109,12 @@ fn retries_incident_notify(
 
 /// The incident drawer; the app routes it at `/web/incidents/:id`.
 #[cfg(feature = "enterprise")]
-fn incident_page_url(web_url: &str, base_uri: &str, org_id: &str, incident_id: &str) -> String {
+pub(crate) fn incident_page_url(
+    web_url: &str,
+    base_uri: &str,
+    org_id: &str,
+    incident_id: &str,
+) -> String {
     format!("{web_url}{base_uri}/web/incidents/{incident_id}?org_identifier={org_id}")
 }
 
@@ -5990,6 +5995,13 @@ pub(crate) async fn start_automatic_rca(
         }
     }
 
+    // Before the meter: a re-check runs no agent, the earlier runs already paid for the cause.
+    if trigger == config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident
+        && let Some(started) = super::rca_recheck::try_recheck(org_id, incident_id).await
+    {
+        return started;
+    }
+
     // A refusal starts nothing and charges nothing; the meter runs after the start.
     #[cfg(feature = "cloud")]
     let usage_feature = if trigger == config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident {
@@ -7992,6 +8004,14 @@ mod tests {
                     _ => format!("{n} streams stopped sending data, including s0 (logs)"),
                 };
                 assert_eq!(title_of(&org, &ids[0]).await, want);
+                let row = infra::table::alert_incidents::get_rw(&org, &ids[0])
+                    .await
+                    .unwrap();
+                let row = row.unwrap();
+                assert!(
+                    row.rca_run_id.is_some() || row.rca_off_reason.is_some(),
+                    "{n} streams, one analysis decided on the one incident"
+                );
                 let (thread, _) = issue_incidents_of(&org).await.remove(&ids[0]).unwrap();
                 match thread.cohort {
                     None => assert_eq!(n, 1, "only a lone member has no cohort"),
