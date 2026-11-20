@@ -414,6 +414,7 @@ async fn fetch_extraction_sample(
     let user_id_owned = user_id.to_string();
     let mut responses: Vec<Response> = Vec::with_capacity(slices);
     let mut last_error: Option<infra::errors::Error> = None;
+    let mut failed_slices = 0usize;
 
     for (chunk_idx, chunk) in ranges.chunks(EXTRACTION_FETCH_CONCURRENCY).enumerate() {
         let mut handles = Vec::with_capacity(chunk.len());
@@ -451,6 +452,7 @@ async fn fetch_extraction_sample(
                     log::warn!(
                         "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice failed, continuing: {e}"
                     );
+                    failed_slices += 1;
                     last_error = Some(e);
                 }
                 // A panicked task is still a failed slice: record it, or a run
@@ -460,6 +462,7 @@ async fn fetch_extraction_sample(
                     log::warn!(
                         "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice task panicked: {e}"
                     );
+                    failed_slices += 1;
                     last_error = Some(infra::errors::Error::Message(format!(
                         "pattern extraction slice task failed: {e}"
                     )));
@@ -485,6 +488,7 @@ async fn fetch_extraction_sample(
     // earliest time slices — and they never reach the clustering. Staying
     // within the cap keeps every slice represented.
     trim_slices_to_budget(&mut responses, req_size as usize);
+    mark_partial_slices(&mut responses, failed_slices, slices);
 
     let fetched: usize = responses.iter().map(|r| r.hits.len()).sum();
     for res in responses {
@@ -528,6 +532,48 @@ fn trim_slices_to_budget(responses: &mut [Response], budget: usize) {
         res.hits.truncate(allowance[i]);
         res.total = res.hits.len();
         res.size = res.total as i64;
+    }
+}
+
+/// Flags the sample partial when some time slices failed, so the caller can warn.
+fn mark_partial_slices(responses: &mut [Response], failed: usize, total: usize) {
+    if failed == 0 {
+        return;
+    }
+    if let Some(first) = responses.first_mut() {
+        first.set_partial(
+            true,
+            format!(
+                "Patterns built from {} of {total} time slices",
+                total - failed
+            ),
+        );
+    }
+}
+
+/// Copies the partial flag and reasons of the sampled slices onto the patterns JSON.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+pub(super) fn tag_partial_extraction(
+    patterns: &mut config::utils::json::Value,
+    results: &[SearchResultType],
+) {
+    let mut reasons: Vec<String> = Vec::new();
+    let mut partial = false;
+    for result in results {
+        let (SearchResultType::Search(r) | SearchResultType::Cached(r)) = result;
+        partial |= r.is_partial;
+        for reason in &r.function_error {
+            if !reasons.contains(reason) {
+                reasons.push(reason.clone());
+            }
+        }
+    }
+    if !partial {
+        return;
+    }
+    if let Some(obj) = patterns.as_object_mut() {
+        obj.insert("is_partial".to_string(), true.into());
+        obj.insert("function_error".to_string(), reasons.into());
     }
 }
 
@@ -967,6 +1013,57 @@ mod tests {
             total: n,
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn test_mark_partial_slices_flags_first_response_when_a_slice_failed() {
+        let mut slices = vec![slice_with(5), slice_with(5)];
+        mark_partial_slices(&mut slices, 1, 12);
+        assert!(slices[0].is_partial);
+        assert_eq!(
+            slices[0].function_error,
+            vec!["Patterns built from 11 of 12 time slices".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_mark_partial_slices_leaves_a_complete_sample_untouched() {
+        let mut slices = vec![slice_with(5), slice_with(5)];
+        mark_partial_slices(&mut slices, 0, 12);
+        assert!(slices.iter().all(|r| !r.is_partial));
+        assert!(slices.iter().all(|r| r.function_error.is_empty()));
+    }
+
+    #[test]
+    fn test_mark_partial_slices_without_responses_is_a_noop() {
+        mark_partial_slices(&mut [], 1, 12);
+    }
+
+    fn tagged(results: Vec<SearchResultType>) -> serde_json::Value {
+        let mut patterns = serde_json::json!({ "patterns": [] });
+        tag_partial_extraction(&mut patterns, &results);
+        patterns
+    }
+
+    #[test]
+    fn test_tag_partial_extraction_copies_flag_and_reasons() {
+        let mut flagged = slice_with(3);
+        flagged.set_partial(true, "Patterns built from 11 of 12 time slices".to_string());
+        let out = tagged(vec![
+            SearchResultType::Search(slice_with(3)),
+            SearchResultType::Search(flagged),
+        ]);
+        assert_eq!(out["is_partial"], true);
+        assert_eq!(
+            out["function_error"],
+            serde_json::json!(["Patterns built from 11 of 12 time slices"])
+        );
+    }
+
+    #[test]
+    fn test_tag_partial_extraction_leaves_a_complete_result_untouched() {
+        let out = tagged(vec![SearchResultType::Search(slice_with(3))]);
+        assert_eq!(out, serde_json::json!({ "patterns": [] }));
     }
 
     #[test]

@@ -1574,6 +1574,7 @@
     "unpinFromToolbar": "Unpin from toolbar",
     "shareLink": "Share Link",
     "downloadTable": "Download current page",
+    "patternsPartialResult": "Patterns were built from part of the selected time range.",
     "customRange": "Download results for custom range",
     "initialNumber": "Initial Number",
     "range": "No of Records",

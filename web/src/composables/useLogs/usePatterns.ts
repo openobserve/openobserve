@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn } from "@/types/i18n";
 import patternsService from "@/services/patterns";
 import type { SearchRequestPayload } from "@/ts/interfaces";
@@ -134,6 +135,14 @@ export default function usePatterns(t: TranslateFn) {
         ...response.data,
         patterns: transformedPatterns,
       };
+
+      const reasons = [response.data.function_error].flat().filter(Boolean).join(" ");
+      if (response.data.is_partial === true || reasons) {
+        toast({
+          message: reasons || t("search.patternsPartialResult"),
+          variant: "warning",
+        });
+      }
 
       // console.log(
       //   "[Patterns] Extraction complete:",
