@@ -192,6 +192,10 @@ export default class DashboardPanelConfigs {
     this.distributionBucketOffsetField = page.locator('[data-test="dashboard-config-distribution_bucket_offset-field"]');
     this.queryLimitField = page.locator('[data-test="dashboard-config-limit-field"]');
 
+    //Sunburst locators (OSwitch wrapper and its -btn role="switch" control)
+    this.sunburstShowLabels = page.locator('[data-test="dashboard-config-sunburst_show_labels"]');
+    this.sunburstShowLabelsBtn = page.locator('[data-test="dashboard-config-sunburst_show_labels-btn"]');
+
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
 
@@ -2365,6 +2369,20 @@ export default class DashboardPanelConfigs {
     await expect(this.distributionBucketCountField).toHaveValue(count);
     await expect(this.distributionBucketSizeField).toHaveValue(size);
     await expect(this.distributionBucketOffsetField).toHaveValue(offset);
+  }
+
+  /** Assert the sunburst "Show labels" switch is on (true) or off (false). */
+  async expectSunburstShowLabels(on) {
+    await this.scrollSidebarToElement(this.sunburstShowLabels);
+    await expect(this.sunburstShowLabelsBtn).toHaveAttribute("aria-checked", on ? "true" : "false");
+  }
+
+  /** Turn the sunburst "Show labels" switch on or off; a no-op when it is already in that state. */
+  async setSunburstShowLabels(on) {
+    await this.scrollSidebarToElement(this.sunburstShowLabels);
+    const current = (await this.sunburstShowLabelsBtn.getAttribute("aria-checked")) === "true";
+    if (current !== on) await this.sunburstShowLabelsBtn.click();
+    await this.expectSunburstShowLabels(on);
   }
 
   async toggleHeatmapHistogramMode() {

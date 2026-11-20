@@ -355,6 +355,31 @@ export async function setupDistributionPanelWithConfig(page, pm, dashboardName, 
   testLogger.info("Distribution panel with config ready", { dashboardName, panelName, yField, breakdownField });
 }
 
+// Sunburst panel with the config sidebar open; Size keeps the seeded count. The editor opens as a bar and
+// seeds histogram(_timestamp) on X, which the switch to sunburst keeps, so it is removed first.
+export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  groupFields = ["kubernetes_namespace_name"],
+  subGroupField = null,
+} = {}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("sunburst");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("e2e_automate");
+  await pm.chartTypeSelector.removeFieldIfPresent("x_axis_1", "x");
+  for (const field of groupFields) {
+    await pm.chartTypeSelector.searchAndAddField(field, "x");
+  }
+  if (subGroupField) {
+    await pm.chartTypeSelector.searchAndAddField(subGroupField, "b");
+  }
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Sunburst panel with config ready", { dashboardName, panelName, groupFields, subGroupField });
+}
+
 /**
  * GeoMap chart panel — ingests geo data, builds panel with lat/lon fields, opens config sidebar.
  */

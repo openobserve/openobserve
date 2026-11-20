@@ -25,6 +25,10 @@ export class PipelinesEP {
         this.importCancelButton = '[data-test="pipeline-import-cancel-btn"]';
         this.pipelineListTitle = '[data-test="pipeline-list-page"]';
         this.importJsonButton = '[data-test="pipeline-import-json-btn"]';
+        this.importErrorItems = '[data-test^="pipeline-import-error-"]';
+        this.importErrorItem = (i) => `[data-test="pipeline-import-error-${i}"]`;
+        // ImportPipeline.vue gives the error list no data-test; this class is its scroll container.
+        this.importErrorReport = '.error-report-container';
         this.pipelineImportUrlInput = '[data-test="pipeline-import-url-input-field"]';
         this.pipelineImportNameInput = '[data-test="pipeline-import-name-input-field"]';
         this.pipelineImportErrorDestinationFunctionNameInput = '[data-test="pipeline-import-error-0-1"] [data-test="pipeline-import-destination-function-name-input"]';
@@ -348,6 +352,43 @@ export class PipelinesEP {
         await this.selectImportOption(this.destinationFunctionNameDataTest, functionName);
         // This data-test is shared by the stream-type, remote-destination and timezone pickers, so pick by label.
         await this.selectImportOption(this.remoteDestinationDataTest, remoteDestination, 0, 'Remote Destination');
+    }
+
+    async waitForImportEditorToContain(text, timeout = 15000) {
+        await expect(this.page.locator(this.monacoViewLines).first()).toContainText(text, { timeout });
+    }
+
+    async expectImportErrorsShown(lastIndex, timeout = 15000) {
+        await expect(this.page.locator(this.importErrorItems).first()).toBeVisible({ timeout });
+        await expect(this.page.locator(this.importErrorItem(lastIndex))).toBeAttached();
+    }
+
+    async getImportErrorReportScroll() {
+        return this.page.locator(this.importErrorReport).first()
+            .evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+    }
+
+    async getPageOverflow() {
+        return this.page.evaluate(() => ({
+            x: document.documentElement.scrollWidth - window.innerWidth,
+            y: document.documentElement.scrollHeight - window.innerHeight,
+        }));
+    }
+
+    async expectImportActionsUsableInViewport() {
+        const viewport = this.page.viewportSize();
+        for (const sel of [this.importJsonButton, this.importCancelButton]) {
+            const btn = this.page.locator(sel);
+            await expect(btn).toBeVisible();
+            await expect(btn).toBeEnabled();
+            const box = await btn.boundingBox();
+            expect(box.y, `${sel} must be in the viewport`).toBeGreaterThanOrEqual(0);
+            expect(box.y + box.height, `${sel} must be in the viewport`).toBeLessThanOrEqual(viewport.height);
+        }
+    }
+
+    async expectImportPipelineButtonVisible(timeout = 15000) {
+        await expect(this.page.locator(this.importPipelineButton)).toBeVisible({ timeout });
     }
 
 }
