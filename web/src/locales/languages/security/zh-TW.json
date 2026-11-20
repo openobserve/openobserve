@@ -236,6 +236,7 @@
       "latestCount": "最新 {n} 筆符合的事件 | 最新 {n} 筆符合的事件",
       "sql": "SQL",
       "invertFilter": "切換包含與排除",
+      "timeColumnAlwaysShown": "一律顯示為時間欄",
       "removeFilter": "移除篩選條件",
       "pivotSqlUnsupported": "此 SQL 查詢不是單純的 SELECT … WHERE，因此無法將篩選條件加入其中。請手動編輯查詢，或切換至 Builder。",
       "topValuesWholeStream": "SQL 模式：值是依整個串流計算，而非依您的查詢。",

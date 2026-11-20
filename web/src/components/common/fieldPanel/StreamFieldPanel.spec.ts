@@ -625,6 +625,109 @@ describe("StreamFieldPanel", () => {
     expect(rows()).toHaveLength(50);
   });
 
+  describe("generic defined-schema tab", () => {
+    const UDS = { user_defined_schemas_enabled: true, all_fields_name: "_all" };
+    const schemaBtn = '[data-test="logs-page-user-defined-fields-btn"]';
+    const allBtn = '[data-test="logs-page-all-fields-btn"]';
+    const range = () => wrapper.find('[data-test="logs-page-fields-list-pagination-range"]');
+
+    const schemaSource = (defined: string[] | null) => {
+      const source = makeSource([
+        header("g"),
+        field("_timestamp"),
+        field("alpha"),
+        field("beta"),
+        field("locked", { columnLocked: true }),
+        header("h"),
+        field("other", { group: "h" }),
+        field("_all", { group: "h" }),
+      ]);
+      source.definedSchemaFields = ref(defined);
+      return source;
+    };
+
+    it("shows the tabs only for a stream with a defined schema and the flag on", () => {
+      wrapper = mountPanel(CAPS, schemaSource(["alpha"]), UDS);
+      expect(wrapper.find(schemaBtn).exists()).toBe(true);
+      expect(wrapper.find(allBtn).exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-page-interesting-fields-btn"]').exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountPanel(CAPS, schemaSource([]), UDS);
+      expect(wrapper.find(schemaBtn).exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountPanel(CAPS, schemaSource(null), UDS);
+      expect(wrapper.find(schemaBtn).exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountPanel(CAPS, schemaSource(["alpha"]), { all_fields_name: "_all" });
+      expect(wrapper.find(schemaBtn).exists()).toBe(false);
+      expect(range().text()).toBe("6 fields");
+    });
+
+    it("lists the defined fields plus timestamp, all-fields and locked ones, with the count following", async () => {
+      wrapper = mountPanel(CAPS, schemaSource(["alpha"]), UDS);
+      expect(wrapper.find(schemaBtn).attributes("data-state")).toBe("on");
+      expect(range().text()).toBe("4 fields");
+      expect(wrapper.text()).not.toContain("beta");
+      expect(wrapper.text()).not.toContain("other");
+      await wrapper.find(allBtn).trigger("click");
+      expect(range().text()).toBe("6 fields");
+      expect(wrapper.text()).toContain("beta");
+      expect(rows()).toHaveLength(6);
+    });
+
+    it("drops a group header once none of its fields is defined", () => {
+      const source = schemaSource(["alpha"]);
+      source.fields.value = source.fields.value.filter((row) => row.name !== "_all");
+      wrapper = mountPanel(CAPS, source, UDS);
+      expect(wrapper.find('[data-test="o-field-list-group-h"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="o-field-list-group-g"]').exists()).toBe(true);
+    });
+
+    it("asks the source per row when it knows each stream's own schema", () => {
+      const source = schemaSource(["alpha"]);
+      source.isDefinedSchemaField = (row) => row.name === "beta";
+      wrapper = mountPanel(CAPS, source, UDS);
+      expect(wrapper.text()).toContain("beta");
+      expect(wrapper.text()).not.toContain("alpha");
+    });
+
+    it("pages the filtered list", async () => {
+      const many = Array.from({ length: 80 }, (_, i) => field(`f${String(i).padStart(3, "0")}`));
+      const source = makeSource([header("g"), ...many]);
+      source.definedSchemaFields = ref(many.slice(0, 60).map((row) => row.name));
+      wrapper = mountPanel(CAPS, source, UDS);
+      expect(range().text()).toBe("1–50 of 60 fields");
+      await wrapper.find(allBtn).trigger("click");
+      expect(range().text()).toBe("1–50 of 80 fields");
+    });
+
+    it("goes back to the defined-schema tab when the stream changes", async () => {
+      const source = schemaSource(["alpha"]);
+      wrapper = mountPanel(CAPS, source, UDS);
+      await wrapper.find(allBtn).trigger("click");
+      expect(range().text()).toBe("6 fields");
+      source.selectedStreams.value = ["s2"];
+      await flushPromises();
+      expect(wrapper.find(schemaBtn).attributes("data-state")).toBe("on");
+      expect(range().text()).toBe("4 fields");
+    });
+
+    it("leaves a page with its own schema tab in charge of it", async () => {
+      const source = schemaSource(["alpha"]);
+      source.footerSchemaTab = ref("all_fields");
+      source.footerToggle = vi.fn();
+      wrapper = mountPanel(CAPS, source, UDS);
+      expect(wrapper.find(schemaBtn).exists()).toBe(false);
+      expect(range().text()).toBe("6 fields");
+      wrapper.unmount();
+      wrapper = mountPanel({ ...CAPS, footerToggles: ["schema"] }, source, UDS);
+      expect(range().text()).toBe("6 fields");
+      await wrapper.find(schemaBtn).trigger("click");
+      expect(source.footerToggle).toHaveBeenCalledWith("schema", "user_defined_schema");
+      expect(range().text()).toBe("6 fields");
+    });
+  });
+
   it("uses the page's skeleton and empty-state ids and text", () => {
     const source = makeSource([]);
     wrapper = mount(StreamFieldPanel, {

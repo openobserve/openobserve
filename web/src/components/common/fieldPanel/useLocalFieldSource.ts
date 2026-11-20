@@ -11,7 +11,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import type { FieldObj } from "@/utils/fieldCategories";
 import { collectActiveValues, type ActiveFilterValues } from "./activeFilterValues";
-import { isNullValue, joinValueConditions } from "./valueFilterExpression";
+import { MISSING_VALUE_KEY, isNullValue, joinValueConditions } from "./valueFilterExpression";
 import type {
   FieldPanelSource,
   PanelField,
@@ -40,6 +40,8 @@ export interface LocalFieldSourceOptions {
   onChangeStreamType?: (type: string) => void;
   onOpenStreams?: () => void;
   expansionOverride?: FieldPanelSource["expansionOverride"];
+  /** The stream's `settings.defined_schema_fields`; null when the page has none. */
+  definedSchemaFields?: Ref<string[] | null>;
   onAddFilter: (expression: string) => void;
   onRemoveFieldFilter: (name: string) => void;
 }
@@ -65,7 +67,9 @@ export const buildValueFilter = (fieldName: string, include: string[], exclude: 
     include.map((value) => buildValueExpression(fieldName, value, "include")),
     exclude.map((value) => buildValueExpression(fieldName, value, "exclude")),
     "lower",
-    include.some(isNullValue) ? buildValueExpression(fieldName, "null", "include") : undefined,
+    include.some(isNullValue)
+      ? buildValueExpression(fieldName, MISSING_VALUE_KEY, "include")
+      : undefined,
   );
 
 export default function useLocalFieldSource(options: LocalFieldSourceOptions): FieldPanelSource {
@@ -79,8 +83,6 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
   const showFtsFieldValues = computed<boolean>(
     () => store.state.zoConfig?.show_fts_field_values ?? false,
   );
-
-  // ─── Fields and grouping ───────────────────────────────────────────
 
   const flatFields = computed<PanelField[]>(() =>
     options.fields.value.map((field) => {
@@ -150,8 +152,6 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     collapsedGroups.value = next;
   };
 
-  // ─── User filter ───────────────────────────────────────────────────
-
   const whereClause = computed<string>(() => {
     if (options.query) return options.query.value?.trim() ?? "";
     const sql = options.sql?.value?.trim();
@@ -193,8 +193,6 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     if (baseFilter.value && user) return `${baseFilter.value} AND (${user})`;
     return baseFilter.value || user;
   };
-
-  // ─── Values ────────────────────────────────────────────────────────
 
   const {
     fieldValues,
@@ -311,7 +309,7 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     );
   };
 
-  // An open list goes stale when the filter or range moves, so it is fetched again in place.
+  // Some pages pass live editor text as the query, so only the base filter and range refetch open lists.
   const refetchOpenFields = () => {
     for (const name of expandedFields.value) {
       pinnedRange.value[name] = options.timeRange();
@@ -327,7 +325,7 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     }
   };
 
-  watch([whereClause, baseFilter, () => options.timeRange()], refetchOpenFields);
+  watch([baseFilter, () => options.timeRange()], refetchOpenFields);
 
   const resetValues = () => {
     cancelAllFieldStreams();
@@ -350,8 +348,6 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
       whereClause: whereFor(field.name),
     };
   };
-
-  // ─── Intents ───────────────────────────────────────────────────────
 
   const addFilter = (expression: string) => options.onAddFilter(expression);
 
@@ -377,6 +373,7 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     activeIncludeValues,
     activeExcludeValues,
     expansionOverride: options.expansionOverride,
+    definedSchemaFields: options.definedSchemaFields,
     valuesRequest,
     selectStreams: (names) => options.onSelectStream?.(names[0] ?? ""),
     changeStreamType: (type) => options.onChangeStreamType?.(type),

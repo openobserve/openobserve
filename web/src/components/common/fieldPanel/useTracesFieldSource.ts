@@ -200,13 +200,24 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
     reset: resetGrouping,
     groupFields,
   } = useFieldGrouping({ fallbackGroups: true });
-  // Grouping is best effort: until the context lands the list stays flat.
-  loadGroupingContext(STREAM_TYPE).catch(() => {});
+  const groupingPending = ref(false);
+  let groupingLoadId = 0;
+  // Grouping is best effort: a failed load leaves the list flat.
+  const loadGrouping = () => {
+    const id = ++groupingLoadId;
+    groupingPending.value = true;
+    loadGroupingContext(STREAM_TYPE)
+      .catch(() => {})
+      .finally(() => {
+        if (id === groupingLoadId) groupingPending.value = false;
+      });
+  };
+  loadGrouping();
   watch(
     () => store.state.selectedOrganization?.identifier,
     () => {
       resetGrouping();
-      loadGroupingContext(STREAM_TYPE).catch(() => {});
+      loadGrouping();
     },
   );
 
@@ -218,19 +229,26 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
       group: "",
       streams: [],
     }));
-    return groupFields(fieldObjs).map(
-      (row) =>
-        ({
-          ...row,
-          isGroup: !!row.label,
-          groupName: row.label ? row.name : undefined,
-        }) as PanelField,
-    );
+    try {
+      return groupFields(fieldObjs).map(
+        (row) =>
+          ({
+            ...row,
+            isGroup: !!row.label,
+            groupName: row.label ? row.name : undefined,
+          }) as PanelField,
+      );
+    } catch {
+      return flatFields.value;
+    }
   });
 
+  // Waits for the grouping config so the list does not render flat and then regroup.
   const loading = computed(
     () =>
-      searchObj.loadingStream || (searchObj.meta.loadingFields && flatFields.value.length === 0),
+      searchObj.loadingStream ||
+      groupingPending.value ||
+      (searchObj.meta.loadingFields && flatFields.value.length === 0),
   );
 
   const search = computed<string>({
@@ -260,6 +278,12 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
 
   const tableColumns = computed<string[]>(() => searchObj.data.stream.selectedFields);
 
+  const definedSchemaFields = computed<string[] | null>(() =>
+    searchObj.data.stream.userDefinedSchema?.length
+      ? searchObj.data.stream.userDefinedSchema
+      : null,
+  );
+
   const persistColumns = () => {
     updatedLocalLogFilterField(searchObj.meta.searchMode === "spans" ? "spans" : "traces");
     options.onColumnsChange();
@@ -274,7 +298,9 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
   };
 
   const resetColumns = () => {
-    searchObj.data.stream.selectedFields = [];
+    searchObj.data.stream.selectedFields = [
+      ...DEFAULT_TRACE_COLUMNS[searchObj.meta.searchMode === "spans" ? "spans" : "traces"],
+    ];
     persistColumns();
   };
 
@@ -316,6 +342,8 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
   const fromPerField = ref<Record<string, number>>({});
   const keywordPerField = ref<Record<string, string>>({});
   const pinnedRange = ref<Record<string, TimeRange>>({});
+  // Pinned like the range, so typing in the editor does not re-query an open override with half-typed SQL.
+  const pinnedWhere = ref<Record<string, string>>({});
 
   const currentRange = (): TimeRange => ({
     startTime: searchObj.data.datetime.startTime,
@@ -370,7 +398,10 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
     if (!expandedFields.value.includes(name))
       expandedFields.value = [...expandedFields.value, name];
     forgetUnfiltered(name);
-    if (hasOverride(name)) return;
+    if (hasOverride(name)) {
+      pinnedWhere.value[name] = whereFor(name);
+      return;
+    }
     startFieldValues(name, "");
   };
 
@@ -380,6 +411,7 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
     delete fromPerField.value[name];
     delete keywordPerField.value[name];
     delete pinnedRange.value[name];
+    delete pinnedWhere.value[name];
     resetFieldValues(name);
     expandedFields.value = expandedFields.value.filter((id) => id !== name);
   };
@@ -421,7 +453,10 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
         continue;
       }
       pinnedRange.value[name] = currentRange();
-      if (hasOverride(name)) continue;
+      if (hasOverride(name)) {
+        pinnedWhere.value[name] = whereFor(name);
+        continue;
+      }
       startFieldValues(name, keywordPerField.value[name] ?? "", true);
     }
   };
@@ -433,7 +468,7 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
       streamType: STREAM_TYPE,
       startTime: range.startTime,
       endTime: range.endTime,
-      whereClause: whereFor(field.name),
+      whereClause: pinnedWhere.value[field.name] ?? whereFor(field.name),
     };
   };
 
@@ -475,6 +510,7 @@ export default function useTracesFieldSource(options: TracesFieldSourceOptions):
     activeIncludeValues,
     activeExcludeValues,
     tableColumns,
+    definedSchemaFields,
     expansionOverride,
     valueMapper,
     valuesCaption,

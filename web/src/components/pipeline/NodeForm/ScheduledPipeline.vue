@@ -855,6 +855,7 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -1117,8 +1118,31 @@ const fieldPanelCapabilities = computed<FieldPanelCapabilities>(() => ({
 
 const fieldsLoading = ref(false);
 
+const { fnParsedSQL } = logsUtils();
+
+const namesOtherTable = (node: unknown, table: string): boolean => {
+  if (!node || typeof node !== "object") return false;
+  if (Array.isArray(node)) return node.some((child) => namesOtherTable(child, table));
+  const record = node as Record<string, unknown>;
+  if (record.type === "column_ref" && record.table && record.table !== table) return true;
+  return Object.values(record).some((child) => namesOtherTable(child, table));
+};
+
+// The values query reads the bare stream, so a WHERE that names an alias or another table would fail there and is left out.
+const fieldPanelSql = computed(() => {
+  if (tab.value !== "sql") return "";
+  const sql = query.value ?? "";
+  const parsed = fnParsedSQL(sql);
+  const from = (parsed?.from ?? []) as { table?: string; as?: string | null }[];
+  if (from.length > 1 || from[0]?.as) return "";
+  return namesOtherTable(parsed?.where, from[0]?.table ?? "") ? "" : sql;
+});
+
+const definedSchemaFields = ref<string[] | null>(null);
+
 const fieldSource = useLocalFieldSource({
   fields: streamFields,
+  definedSchemaFields,
   streamName: selectedStreamName,
   streamType: selectedStreamType,
   streams: filteredStreams,
@@ -1128,7 +1152,7 @@ const fieldSource = useLocalFieldSource({
     const { start_time, end_time } = getEffectiveTimeRange();
     return { startTime: start_time, endTime: end_time };
   },
-  sql: computed(() => (tab.value === "sql" ? (query.value ?? "") : "")),
+  sql: fieldPanelSql,
   expansionOverride: (field) =>
     field.name === "duration" && selectedStreamType.value === "traces"
       ? DurationPercentilesBody
@@ -1772,6 +1796,7 @@ const getStreamFields = () => {
       .then(async (stream: any) => {
         streamFields.value = [];
         userDefinedFields.value = [];
+        definedSchemaFields.value = stream.settings?.defined_schema_fields ?? null;
         const ftsKeys: string[] = stream.settings?.full_text_search_keys || [];
         const timestampColumn: string = store.state.zoConfig.timestamp_column;
         stream.schema?.forEach((field: any) => {

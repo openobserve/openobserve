@@ -1472,7 +1472,7 @@ export default defineComponent({
         editorObj.executeEdits(
           "insert-at-cursor",
           [{ range: selection, text }],
-          (inverse: any[]) => {
+          (inverse: MonacoEditor.editor.IValidEditOperation[]) => {
             const end = inverse[0].range;
             return [
               new monaco.Selection(

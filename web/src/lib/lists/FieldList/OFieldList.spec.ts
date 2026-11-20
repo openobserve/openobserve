@@ -40,6 +40,20 @@ describe("OFieldList keyboard", () => {
     expect(wrapper.emitted("row-click")).toBeUndefined();
   });
 
+  it("tells assistive tech whether an expandable row is open and which region it controls", async () => {
+    wrapper = mount(OFieldList, {
+      props: { fields: FIELDS, keyboard: true, expandedIds: ["/a"] },
+      slots: { expansion: () => h("p", "values") },
+    });
+    const [open, closed] = rows();
+    expect(open.attributes("aria-expanded")).toBe("true");
+    expect(closed.attributes("aria-expanded")).toBe("false");
+    const region = wrapper.find(`#${open.attributes("aria-controls")}`);
+    expect(region.exists()).toBe(true);
+    expect(region.text()).toBe("values");
+    expect(closed.attributes("aria-controls")).toBeUndefined();
+  });
+
   it("picks a focused row with Enter or Space", async () => {
     wrapper = mount(OFieldList, { props: { fields: FIELDS, keyboard: true } });
     expect(rows()[0].attributes("tabindex")).toBe("0");

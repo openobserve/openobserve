@@ -17,6 +17,7 @@ import useLogsFieldSource, {
   type LogsFieldSource,
 } from "./useLogsFieldSource";
 import StreamFieldPanel from "./StreamFieldPanel.vue";
+import { MISSING_VALUE_KEY } from "./valueFilterExpression";
 import type { PanelField } from "./fieldPanel.types";
 
 const sent = vi.hoisted(() => [] as Record<string, unknown>[]);
@@ -308,6 +309,24 @@ describe("useLogsFieldSource", () => {
       expect(optionLabels()).toContain("created_later");
       expect(searchObj.data.stream.selectedStream).toEqual(["default"]);
       expect(onStreamChangeMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the loaded schemas when the refreshed list carries none", async () => {
+      searchObj.data.stream.selectedStream = ["default"];
+      const loaded = searchObj.data.streamResults.list.find(
+        (entry: StreamSeed) => entry.name === "default",
+      );
+      getStreamsMock.mockResolvedValueOnce({
+        list: [stream("default", { schema: [], settings: { fresh: true } })],
+      });
+      source.refreshStreams!();
+      await flushPromises();
+      const refreshed = searchObj.data.streamResults.list.find(
+        (entry: StreamSeed) => entry.name === "default",
+      );
+      expect(refreshed.schema).toEqual(loaded.schema);
+      expect(refreshed.schema.length).toBeGreaterThan(0);
+      expect(refreshed.settings).toEqual(loaded.settings);
     });
 
     it("clears the picker when the refreshed list comes back empty", async () => {
@@ -1135,11 +1154,13 @@ describe("useLogsFieldSource", () => {
       expect(searchObj.data.stream.addToFilter).toBe("code = 500");
       source.addValueFilters("ok", [], ["true"]);
       expect(searchObj.data.stream.addToFilter).toBe("ok is not true");
-      source.addValueFilters("level", ["null"], []);
+      source.addValueFilters("level", [MISSING_VALUE_KEY], []);
       expect(searchObj.data.stream.addToFilter).toBe("(level is null OR level = '')");
-      source.addValueFilters("level", [], ["null"]);
+      source.addValueFilters("level", [], [MISSING_VALUE_KEY]);
       expect(searchObj.data.stream.addToFilter).toBe("(level is not null AND level != '')");
-      source.addValueFilters("code", ["null"], []);
+      source.addValueFilters("level", ["null"], []);
+      expect(searchObj.data.stream.addToFilter).toBe("level = 'null'");
+      source.addValueFilters("code", [MISSING_VALUE_KEY], []);
       expect(searchObj.data.stream.addToFilter).toBe("code is null");
       source.addValueFilters("level", ["a", "b"], []);
       expect(searchObj.data.stream.addToFilter).toBe("(level = 'a' OR level = 'b')");
@@ -1149,11 +1170,11 @@ describe("useLogsFieldSource", () => {
       expect(searchObj.data.stream.addToFilter).toBe(
         "((level = 'a' OR level = 'b') AND level != 'c' AND level != 'd')",
       );
-      source.addValueFilters("level", ["a", "null"], ["c"]);
+      source.addValueFilters("level", ["a", MISSING_VALUE_KEY], ["c"]);
       expect(searchObj.data.stream.addToFilter).toBe(
         "((level = 'a' OR level is null OR level = '') AND (level != 'c' OR level is null))",
       );
-      source.addValueFilters("code", ["null"], ["500"]);
+      source.addValueFilters("code", [MISSING_VALUE_KEY], ["500"]);
       expect(searchObj.data.stream.addToFilter).toBe(
         "(code is null AND (code != 500 OR code is null))",
       );
@@ -1161,6 +1182,41 @@ describe("useLogsFieldSource", () => {
       source.addValueFilters("user", ["x"], []);
       expect(searchObj.data.stream.addToFilter).toBe(`"user" = 'x'`);
     });
+
+    it("matches the null row with a value, and checks only null when another stream types the field as a number", () => {
+      seed([stream("s1", { schema: [{ name: "k", type: "Utf8" }] })]);
+      source.addValueFilters("k", [MISSING_VALUE_KEY, "x"], []);
+      expect(searchObj.data.stream.addToFilter).toBe("(k is null OR k = '' OR k = 'x')");
+      source.addValueFilters("k", [], [MISSING_VALUE_KEY, "x"]);
+      expect(searchObj.data.stream.addToFilter).toBe("(k is not null AND k != '' AND k != 'x')");
+      seed([
+        stream("s1", { schema: [{ name: "k", type: "Utf8" }] }),
+        stream("s2", { schema: [{ name: "k", type: "Int64" }] }),
+      ]);
+      source.addValueFilters("k", [MISSING_VALUE_KEY], []);
+      expect(searchObj.data.stream.addToFilter).toBe("k is null");
+      source.addValueFilters("k", [], [MISSING_VALUE_KEY]);
+      expect(searchObj.data.stream.addToFilter).toBe("k is not null");
+    });
+
+    it.each(["order", "group"])(
+      "reads values next to a field named like the SQL keyword %s",
+      async (keyword) => {
+        seed([
+          stream("s1", {
+            schema: [keyword, "msg"].map((name) => ({ name, type: "Utf8" })),
+          }),
+        ]);
+        searchObj.data.stream.selectedStreamFields = [keyword, "msg"].map((name) => field(name));
+        searchObj.data.query = `(${keyword} = 'x1') AND msg = 'A'`;
+        await nextTick();
+        expect(source.activeIncludeValues.value).toEqual({ [keyword]: ["x1"], msg: ["A"] });
+        searchObj.data.query = `${keyword} = 'g1' AND msg != 'A'`;
+        await nextTick();
+        expect(source.activeIncludeValues.value).toEqual({ [keyword]: ["g1"] });
+        expect(source.activeExcludeValues.value).toEqual({ msg: ["A"] });
+      },
+    );
 
     it("asks the search bar to drop a field's filter when its last value is unticked", () => {
       source.removeFieldFilter("level");
@@ -1177,12 +1233,16 @@ describe("useLogsFieldSource", () => {
       expect(source.activeExcludeValues.value).toEqual({ level: ["it's"] });
       searchObj.data.query = "level='' AND code IS NULL";
       await nextTick();
-      expect(source.activeIncludeValues.value).toEqual({ code: ["null"] });
+      expect(source.activeIncludeValues.value).toEqual({ code: [MISSING_VALUE_KEY] });
       expect(source.activeExcludeValues.value).toEqual({});
       searchObj.data.query = "(level is null AND (level != 'c' OR level is null))";
       await nextTick();
-      expect(source.activeIncludeValues.value).toEqual({ level: ["null"] });
+      expect(source.activeIncludeValues.value).toEqual({ level: [MISSING_VALUE_KEY] });
       expect(source.activeExcludeValues.value).toEqual({ level: ["c"] });
+      searchObj.data.query = "level = 'null' AND ok is not true";
+      await nextTick();
+      expect(source.activeIncludeValues.value).toEqual({ level: ["null"] });
+      expect(source.activeExcludeValues.value).toEqual({ ok: ["true"] });
       searchObj.data.query = "match_all('timeout') and level='error'";
       await nextTick();
       expect(source.activeIncludeValues.value).toEqual({ level: ["error"] });

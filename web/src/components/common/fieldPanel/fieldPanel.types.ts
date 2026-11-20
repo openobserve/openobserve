@@ -130,6 +130,10 @@ export interface FieldPanelSource {
   /** Which footer schema tab is active: `user_defined_schema`, `all_fields` or `interesting_fields`. */
   footerSchemaTab?: Ref<string>;
   footerInterestingOnly?: Ref<boolean>;
+  /** The stream's user-defined schema; null or empty when it has none. Without `footerSchemaTab` the panel owns the tab. */
+  definedSchemaFields?: Ref<string[] | null>;
+  /** Whether a row is in its own stream's defined schema; defaults to its name being in `definedSchemaFields`. */
+  isDefinedSchemaField?: (field: PanelField) => boolean;
   chips?: (field: PanelField) => ChipSpec[];
   expansionOverride?: (field: PanelField) => Component | null;
   valueMapper?: (field: PanelField, values: FieldValueEntry[]) => FieldValueEntry[];

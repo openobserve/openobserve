@@ -236,6 +236,7 @@
       "latestCount": "{n} evento corrispondente più recente | {n} eventi corrispondenti più recenti",
       "sql": "SQL",
       "invertFilter": "Alterna tra inclusione ed esclusione",
+      "timeColumnAlwaysShown": "Sempre mostrato come colonna Ora",
       "removeFilter": "Rimuovi filtro",
       "pivotSqlUnsupported": "Questa query SQL non è un semplice SELECT … WHERE, quindi non è stato possibile aggiungervi il filtro. Modifica la query manualmente oppure passa a Builder.",
       "topValuesWholeStream": "Modalità SQL: i valori vengono conteggiati sull'intero stream, non sulla tua query.",

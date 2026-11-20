@@ -75,6 +75,8 @@
             :tabindex="keyboard ? 0 : undefined"
             :role="keyboard ? 'button' : undefined"
             :aria-disabled="row.disabled ? 'true' : undefined"
+            :aria-expanded="keyboard && isExpandable(row) ? isExpanded(row) : undefined"
+            :aria-controls="keyboard && isExpanded(row) ? expansionId(row) : undefined"
             :data-test="`o-field-list-row-${row.name}`"
             :draggable="draggable && isDragEnabled(row, row._index ?? 0) && isDragArmed()"
             @click="(e: MouseEvent) => onRowClick(row, e)"
@@ -122,6 +124,7 @@
           <!-- Expanded content -->
           <div
             v-if="isExpanded(row) && $slots.expansion"
+            :id="expansionId(row)"
             class="o-field-list__expansion bg-field-list-expansion-bg border-field-list-expansion-border relative z-1 mt-1 mb-1.5 box-border w-full border-y pt-0.5 pb-1"
             :data-test="`o-field-list-expansion-${row.name}`"
           >
@@ -140,7 +143,7 @@
 
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { computed, nextTick, ref, useSlots, watch } from "vue";
+import { computed, nextTick, ref, useId, useSlots, watch } from "vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "./OFieldRow.vue";
@@ -391,6 +394,11 @@ watch(
 
 // Keyed like the rows, so two same-named fields in different groups expand on their own.
 const expansionKey = (row: FieldItem): string => String(row[props.rowKey] ?? row.name);
+
+const listId = useId();
+
+const expansionId = (row: FieldItem): string =>
+  `${listId}-expansion-${expansionKey(row).replace(/[^\w-]/g, "_")}`;
 
 function isExpanded(row: FieldItem): boolean {
   return localExpandedIds.value.has(expansionKey(row));

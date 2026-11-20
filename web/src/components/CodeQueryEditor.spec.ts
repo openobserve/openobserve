@@ -64,7 +64,15 @@ const mockEditorObj = {
     endLineNumber: 1,
     endColumn: 1,
   })),
-  executeEdits: vi.fn(),
+  executeEdits: vi.fn<
+    (
+      source: string,
+      edits: unknown[],
+      endCursor: (inverse: { range: { endLineNumber: number; endColumn: number } }[]) => {
+        args: number[];
+      }[],
+    ) => void
+  >(),
   pushUndoStop: vi.fn(),
   trigger: vi.fn(),
   getAction: vi.fn(() => ({ run: vi.fn(() => Promise.resolve()) })),
@@ -288,14 +296,15 @@ describe("CodeQueryEditor", () => {
   describe("insertAtCursor", () => {
     it("inserts at the live selection, the start of the line included, and leaves the caret after the text", async () => {
       attachEditorHost();
-      const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+      const { editor } = await import("monaco-editor/esm/vs/editor/editor.api");
       const wrapper = createWrapper({ query: "foo{}" });
-      await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalled());
+      await vi.waitFor(() => expect(editor.create).toHaveBeenCalled());
       mockEditorObj.executeEdits.mockClear();
+      const vm = wrapper.vm as unknown as { insertAtCursor: (text: string) => boolean };
 
-      expect((wrapper.vm as any).insertAtCursor(" service ")).toBe(true);
+      expect(vm.insertAtCursor(" service ")).toBe(true);
 
-      const [, edits, endCursor] = mockEditorObj.executeEdits.mock.calls[0] as any[];
+      const [, edits, endCursor] = mockEditorObj.executeEdits.mock.calls[0];
       expect(edits).toEqual([
         {
           range: { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 },

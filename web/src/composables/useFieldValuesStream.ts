@@ -20,6 +20,10 @@ import { generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { captureFromValuesApi } from "@/composables/fieldValueStore";
 import { removeFieldCondition } from "@/utils/traces/filterUtils";
+import {
+  MISSING_VALUE_KEY,
+  valueKeyLabel,
+} from "@/components/common/fieldPanel/valueFilterExpression";
 
 export interface FieldValueEntry {
   key: string;
@@ -358,14 +362,15 @@ const useFieldValuesStream = (t: TranslateFn) => {
         response.content.results.hits.forEach((item: any) => {
           item.values?.forEach((subItem: any) => {
             chunkValues.push({
-              key: subItem.zo_sql_key ? subItem.zo_sql_key : "null",
+              key: subItem.zo_sql_key ? subItem.zo_sql_key : MISSING_VALUE_KEY,
               count: parseInt(subItem.zo_sql_num),
             });
           });
         });
 
         // Background capture — does not block handleResponse return
-        if (chunkValues.length > 0 && columnName) {
+        const capturable = chunkValues.filter(({ key }) => key !== MISSING_VALUE_KEY);
+        if (capturable.length > 0 && columnName) {
           captureFromValuesApi(
             {
               org: store.state.selectedOrganization.identifier,
@@ -373,7 +378,7 @@ const useFieldValuesStream = (t: TranslateFn) => {
               streamName: streamName ?? "",
             },
             columnName,
-            chunkValues,
+            capturable,
           );
         }
 
@@ -390,7 +395,10 @@ const useFieldValuesStream = (t: TranslateFn) => {
         });
 
         const aggregatedArray = Object.entries(aggregated)
-          .map(([key, count]) => ({ key, count }))
+          .map(([key, count]): FieldValueEntry => {
+            const label = valueKeyLabel(key);
+            return label === undefined ? { key, count } : { key, label, count };
+          })
           .sort((a, b) => b.count - a.count);
 
         // Merge with finalized values from previous pages.

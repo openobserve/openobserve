@@ -123,7 +123,7 @@ export function useLogsPickerSource(deps: LogsPickerDeps): LogsPickerSource {
       store.state.selectedOrganization.identifier,
       streamType.value,
     );
-    void deps.getStreamList(false, { isCurrent, force: true });
+    void deps.getStreamList(false, { isCurrent, force: true, keepLoadedSchemas: true });
   };
 
   const selectStreams = (names: string[]) => {

@@ -21,6 +21,11 @@
 
 const mockCancelStreamQuery = vi.fn();
 const mockFetchQueryDataWithHttpStream = vi.fn();
+const mockCaptureFromValuesApi = vi.hoisted(() => vi.fn());
+
+vi.mock("@/composables/fieldValueStore", () => ({
+  captureFromValuesApi: mockCaptureFromValuesApi,
+}));
 
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: vi.fn(() => ({
@@ -54,6 +59,7 @@ import useFieldValuesStream, {
   stripFieldCondition,
 } from "./useFieldValuesStream";
 import { LOGS_FIELD_VALUES_PARITY } from "@/test/unit/mockData/logsFieldValuesParity";
+import { MISSING_VALUE_KEY } from "@/components/common/fieldPanel/valueFilterExpression";
 import { generateTraceContext } from "@/utils/zincutils";
 
 // ---------------------------------------------------------------------------
@@ -312,6 +318,25 @@ describe("logs request parity", () => {
       { key: "error", count: 5 },
       { key: "warn", count: 5 },
       { key: "info", count: 1 },
+    ]);
+  });
+
+  it("keys a missing value apart from the text null, labels it null and keeps it out of autocomplete", () => {
+    const { fetchFieldValues, fieldValues } = useFieldValuesStream(gt);
+    fetchFieldValues({ ...LOGS_FIELD_VALUES_PARITY.keyword[0] });
+    const { payload, handlers } = lastCall();
+    handlers.data(payload, {
+      type: "search_response_hits",
+      content: { results: { hits: [{ values: [hit("", 7), hit("null", 3), hit("a", 1)] }] } },
+    });
+    expect(fieldValues.value.level.values).toEqual([
+      { key: MISSING_VALUE_KEY, label: "null", count: 7 },
+      { key: "null", count: 3 },
+      { key: "a", count: 1 },
+    ]);
+    expect(mockCaptureFromValuesApi).toHaveBeenCalledWith(expect.anything(), expect.any(String), [
+      { key: "null", count: 3 },
+      { key: "a", count: 1 },
     ]);
   });
 

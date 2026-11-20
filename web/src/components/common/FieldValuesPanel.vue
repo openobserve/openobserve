@@ -132,9 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Selected values with no count data available (synthetic fallback) -->
       <div
         v-if="
-          displayValues.length > 0 &&
-          (displayValues[0] as any)?.synthetic &&
-          !fieldValues?.isLoading
+          displayValues.length > 0 && 'synthetic' in displayValues[0] && !fieldValues?.isLoading
         "
         class="text-o2-text-secondary ps-3 pb-1 text-xs italic"
         data-test="field-values-panel-no-count-msg"
@@ -170,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="field-values-panel-value-text"
             />
             <span
-              v-if="value.count != null"
+              v-if="value.count !== null"
               :title="String(value.count)"
               class="w-12 shrink-0 text-right tabular-nums"
               data-test="field-values-panel-value-count"
@@ -250,6 +248,7 @@ import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { valueKeyLabel } from "@/components/common/fieldPanel/valueFilterExpression";
 
 type FilterMode = "include" | "exclude";
 
@@ -352,9 +351,10 @@ const displayValues = computed(() => {
   // they remain visible and removable (count: null signals no data available).
   if (selectedValues.value.length > 0 && !props.fieldValues?.isLoading) {
     return selectedValues.value.map(
-      (v): { key: string; count: number; label?: I18nText; synthetic: boolean } => ({
+      (v): { key: string; count: number | null; label?: I18nText; synthetic: boolean } => ({
         key: v,
-        count: null as unknown as number,
+        count: null,
+        label: valueKeyLabel(v),
         synthetic: true,
       }),
     );

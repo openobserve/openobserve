@@ -1373,6 +1373,7 @@ async function extractFields() {
     if (owner !== fieldsOwner) {
       fieldsOwner = "";
       searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.stream.userDefinedSchema = [];
       selectedStreamStats.value = null;
     }
 
@@ -1421,6 +1422,7 @@ async function extractFields() {
         new Set(stream.settings.full_text_search_keys),
         store.state.zoConfig.timestamp_column,
       );
+      searchObj.data.stream.userDefinedSchema = [...(stream.settings?.defined_schema_fields ?? [])];
       fieldsOwner = owner;
     }
   } catch (e) {
@@ -2527,8 +2529,7 @@ useShortcuts(tracesShortcuts, undefined, { active: pageActive });
 </script>
 
 <style scoped>
-/* keep(scrollbar): native ::-webkit-scrollbar sizing/shadows on the child result-grid
-   scroller — reached through a child component, so not expressible as utilities here. */
+/* keep(scrollbar): a child component's native scrollbar cannot be styled with utilities. */
 .tracePage :deep(#tracesSearchGridComponent:hover::-webkit-scrollbar) {
   height: 0.8125rem;
   width: 0.8125rem;

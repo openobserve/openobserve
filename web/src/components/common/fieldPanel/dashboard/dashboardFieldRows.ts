@@ -53,13 +53,13 @@ const derivedRows = (group: string, fields: DashboardSchemaField[]): DashboardFi
 const streamGroupKey = (group: DashboardStreamGroup) =>
   `stream:${group.stream_alias ?? ""}:${group.name}`;
 
-// A stream with defined fields shows them between the timestamp and the all-fields column, but only with the UDS flag on.
+// A stream with defined fields also lists the timestamp and the all-fields column, but only with the UDS flag on.
 const streamFieldsOf = (group: DashboardStreamGroup, input: DashboardRowsInput) => {
   const defined = group.settings?.defined_schema_fields ?? [];
   if (!defined.length || !input.userDefinedSchemasEnabled) return group.schema;
   return [
     { name: input.timestampColumn, type: "Int64" },
-    ...group.schema.filter((field) => defined.includes(field.name)),
+    ...group.schema,
     { name: input.allFieldsName, type: "Utf8" },
   ];
 };
@@ -83,6 +83,22 @@ const streamRows = (group: DashboardStreamGroup, input: DashboardRowsInput) => {
       group: key,
     };
   });
+};
+
+/** Every stream's defined fields together; null when no stream of the query has any. */
+export const dashboardDefinedSchemaFields = (groups: DashboardStreamGroup[]): string[] | null => {
+  const names = new Set(groups.flatMap((group) => group.settings?.defined_schema_fields ?? []));
+  return names.size ? [...names] : null;
+};
+
+/** A row is in the defined schema of its own stream; query, function and undefined-schema rows always are. */
+export const isInStreamDefinedSchema = (
+  groups: DashboardStreamGroup[],
+  row: PanelField,
+): boolean => {
+  const group = groups.find((candidate) => streamGroupKey(candidate) === row.group);
+  const defined = group?.settings?.defined_schema_fields ?? [];
+  return !defined.length || defined.includes(row.name);
 };
 
 /** Query fields, then function fields, then one group per stream of the query (main stream and joins). */

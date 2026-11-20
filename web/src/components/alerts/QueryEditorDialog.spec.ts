@@ -56,6 +56,14 @@ vi.mock("@/composables/useFieldGrouping", async () => {
   };
 });
 
+const streamsMock = vi.hoisted(() => ({
+  getStream: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: streamsMock.getStream }),
+}));
+
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "false", isCloud: "false", isAiEnabled: "false" },
 }));
@@ -74,7 +82,11 @@ afterEach(() => {
   mounted.splice(0).forEach((wrapper) => wrapper.unmount());
 });
 
-const fieldPanelStub = { template: '<div data-test="stream-field-panel-stub" />' };
+const fieldPanelStub = {
+  name: "StreamFieldPanel",
+  props: ["source", "capabilities"],
+  template: '<div data-test="stream-field-panel-stub" />',
+};
 
 const childEditorStub = {
   template: '<div class="stub-editor"></div>',
@@ -129,6 +141,32 @@ async function mountComp(props: Record<string, any> = {}) {
     },
   });
 }
+
+describe("QueryEditorDialog - defined schema", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const definedSchema = (w: Awaited<ReturnType<typeof mountComp>>) =>
+    w.findComponent({ name: "StreamFieldPanel" }).props("source").definedSchemaFields.value;
+
+  it("hands the field panel the stream's defined schema from the streams cache, without its schema", async () => {
+    streamsMock.getStream.mockResolvedValue({ settings: { defined_schema_fields: ["level"] } });
+    const w = await mountComp();
+    await flushPromises();
+    expect(streamsMock.getStream).toHaveBeenCalledWith("my-stream", "logs", false);
+    expect(definedSchema(w)).toEqual(["level"]);
+  });
+
+  it("has no defined schema when the stream has none or is not cached", async () => {
+    streamsMock.getStream.mockResolvedValue({ settings: {} });
+    const w = await mountComp();
+    await flushPromises();
+    expect(definedSchema(w)).toBeNull();
+    streamsMock.getStream.mockRejectedValue(new Error("not found"));
+    await w.setProps({ streamName: "other" });
+    await flushPromises();
+    expect(definedSchema(w)).toBeNull();
+  });
+});
 
 describe("QueryEditorDialog - rendering", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -262,6 +300,15 @@ describe("QueryEditorDialog - field panel", () => {
     expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([
       "SELECT * FROM \"s\" WHERE host='a'",
     ]);
+  });
+
+  it("reads the WHERE the field panel parses, not a text match cut short by a keyword in a literal", async () => {
+    const wrapper = await mountComp({
+      tab: "sql",
+      sqlQuery: `SELECT * FROM "s" WHERE msg = 'no limit' AND host = 'a'`,
+    });
+    const vm = wrapper.vm as unknown as { fieldListWhereClause: string };
+    expect(vm.fieldListWhereClause).toBe(`msg = 'no limit' AND host = 'a'`);
   });
 
   it("reads the time range at request time instead of freezing it", async () => {

@@ -1,6 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { unescapeSqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { MISSING_VALUE_KEY } from "./valueFilterExpression";
 
 export interface ActiveFilterValues {
   include: Record<string, string[]>;
@@ -10,7 +11,7 @@ export interface ActiveFilterValues {
 interface WhereNode {
   operator?: string;
   left?: WhereNode & { type?: string; column?: unknown };
-  right?: WhereNode & { value?: unknown };
+  right?: WhereNode & { type?: string; value?: unknown };
 }
 
 const columnName = (col: unknown): string | null => {
@@ -24,7 +25,14 @@ const push = (target: Record<string, string[]>, field: string, value: string) =>
   if (!target[field].includes(value)) target[field].push(value);
 };
 
-/** Walks a parsed WHERE tree and lists the values each field is filtered to (`=`, `IS NULL`) or away from (`!=`, `<>`, `IS NOT NULL`). */
+// `f IS NULL` is the missing-value row and `f IS TRUE` (how a boolean value is filtered) its value; anything else is no row.
+const isTestKey = (right: WhereNode["right"]): string | null => {
+  if (right?.type === "null") return MISSING_VALUE_KEY;
+  if (right?.type === "bool" && typeof right.value === "boolean") return String(right.value);
+  return null;
+};
+
+/** Walks a parsed WHERE tree and lists the values each field is filtered to (`=`, `IS NULL`, `IS TRUE`) or away from (`!=`, `<>`, `IS NOT NULL`, `IS NOT TRUE`). */
 export const collectActiveValues = (where: unknown): ActiveFilterValues => {
   const include: Record<string, string[]> = {};
   const exclude: Record<string, string[]> = {};
@@ -47,10 +55,9 @@ export const collectActiveValues = (where: unknown): ActiveFilterValues => {
       push(include, col, unescapeSqlLiteral(literal));
     } else if ((op === "!=" || op === "<>") && hasLiteral) {
       push(exclude, col, unescapeSqlLiteral(literal));
-    } else if (op === "IS") {
-      push(include, col, "null");
-    } else if (op === "IS NOT") {
-      push(exclude, col, "null");
+    } else if (op === "IS" || op === "IS NOT") {
+      const key = isTestKey(node.right);
+      if (key !== null) push(op === "IS" ? include : exclude, col, key);
     }
   };
   walk(where as WhereNode);

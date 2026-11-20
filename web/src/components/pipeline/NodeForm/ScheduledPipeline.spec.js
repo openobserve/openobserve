@@ -530,6 +530,19 @@ describe("ScheduledPipeline Component", () => {
       expect(child.fieldPanelCapabilities.values).toBe(true);
     });
 
+    it("scopes field values by the WHERE only when the bare stream can resolve it", async () => {
+      child.tab = "sql";
+      child.query = `SELECT * FROM "a" WHERE level='x'`;
+      await nextTick();
+      expect(child.fieldPanelSql).toBe(`SELECT * FROM "a" WHERE level='x'`);
+      child.query = `SELECT * FROM "a" AS t WHERE t.level='x'`;
+      await nextTick();
+      expect(child.fieldPanelSql).toBe("");
+      child.query = `SELECT * FROM "a" WHERE b.level='x'`;
+      await nextTick();
+      expect(child.fieldPanelSql).toBe("");
+    });
+
     it("inserts SQL filters before GROUP BY", async () => {
       const mockEditorRef = {
         getCursorIndex: vi.fn().mockReturnValue(-1),

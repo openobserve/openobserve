@@ -125,6 +125,7 @@ import useTracesFieldSource, {
 import DurationPercentilesBody from "./DurationPercentilesBody.vue";
 import StreamFieldPanel from "./StreamFieldPanel.vue";
 import { applyFilterTerm } from "@/utils/traces/filterUtils";
+import { MISSING_VALUE_KEY } from "./valueFilterExpression";
 import type { FieldPanelCapabilities, PanelField } from "./fieldPanel.types";
 
 const SCHEMA = [
@@ -168,6 +169,7 @@ interface SearchObj {
       filterField: string;
       addToFilter: string;
       removeFilterField: string;
+      userDefinedSchema: string[];
     };
   };
 }
@@ -198,6 +200,7 @@ const makeSearchObj = (): SearchObj =>
         filterField: "",
         addToFilter: "",
         removeFilterField: "",
+        userDefinedSchema: [],
       },
     },
   });
@@ -352,6 +355,13 @@ describe("useTracesFieldSource", () => {
       expect(fieldByName(harness.source, "zebra").columnLocked).toBe(false);
     });
 
+    it("hands the panel the stream's defined schema, and none while it has none", () => {
+      harness = mountSource();
+      expect(harness.source.definedSchemaFields?.value).toBeNull();
+      harness.searchObj.data.stream.userDefinedSchema = ["k8s_pod"];
+      expect(harness.source.definedSchemaFields?.value).toEqual(["k8s_pod"]);
+    });
+
     it("binds the search text and the table columns to the page store", () => {
       harness = mountSource();
       harness.source.setSearch("svc");
@@ -362,8 +372,9 @@ describe("useTracesFieldSource", () => {
       );
     });
 
-    it("reports loading while the stream or its fields load", () => {
+    it("reports loading while the stream or its fields load", async () => {
       harness = mountSource();
+      await flush();
       expect(harness.source.loading.value).toBe(false);
       harness.searchObj.loadingStream = true;
       expect(harness.source.loading.value).toBe(true);
@@ -372,6 +383,29 @@ describe("useTracesFieldSource", () => {
       expect(harness.source.loading.value).toBe(false);
       harness.searchObj.data.stream.selectedStreamFields = [];
       expect(harness.source.loading.value).toBe(true);
+    });
+
+    it("reports loading until the grouping config lands, then shows the grouped list", async () => {
+      let resolveKeys!: (value: Record<string, unknown>) => void;
+      correlation.keyFieldsByOrg.org = new Promise((resolve) => {
+        resolveKeys = resolve;
+      });
+      harness = mountSource();
+      await flush();
+      expect(harness.source.loading.value).toBe(true);
+      resolveKeys({ traces: { fields: ["service_name"], groups: [] } });
+      await flush();
+      expect(harness.source.loading.value).toBe(false);
+      expect(harness.source.fields.value.some((row) => row.isGroup)).toBe(true);
+    });
+
+    it("stops loading and keeps the flat list when the grouping config fails", async () => {
+      correlation.keyFieldsByOrg.org = Promise.reject(new Error("down"));
+      harness = mountSource();
+      await flush();
+      expect(harness.source.loading.value).toBe(false);
+      expect(harness.source.fields.value.some((row) => row.isGroup)).toBe(false);
+      expect(fieldByName(harness.source, "zebra")).toBeDefined();
     });
 
     it("keeps the collapse state per stream", () => {
@@ -425,11 +459,32 @@ describe("useTracesFieldSource", () => {
       expect(traces.updatedLocalLogFilterField).toHaveBeenCalledWith("spans");
     });
 
-    it("clears every column from the footer reset", () => {
+    it("puts back the view's default columns from the footer reset", () => {
       harness = mountSource();
+      harness.searchObj.data.stream.selectedFields = ["zebra"];
       harness.source.resetColumns?.();
-      expect(harness.searchObj.data.stream.selectedFields).toEqual([]);
+      expect(harness.searchObj.data.stream.selectedFields).toEqual([
+        "service_name",
+        "operation_name",
+        "duration",
+        "spans",
+        "status",
+        "service_latency",
+      ]);
       expect(harness.onColumnsChange).toHaveBeenCalledTimes(1);
+    });
+
+    it("resets to the spans defaults in the spans view", () => {
+      harness = mountSource();
+      harness.searchObj.meta.searchMode = "spans";
+      harness.source.resetColumns?.();
+      expect(harness.searchObj.data.stream.selectedFields).toEqual([
+        "service_name",
+        "operation_name",
+        "duration",
+        "span_status",
+      ]);
+      expect(traces.updatedLocalLogFilterField).toHaveBeenCalledWith("spans");
     });
   });
 
@@ -571,6 +626,19 @@ describe("useTracesFieldSource", () => {
       });
     });
 
+    it("keeps the percentile query pinned while the editor text changes", () => {
+      harness = mountSource();
+      harness.searchObj.data.editorValue = "service_name = 'api'";
+      const duration = fieldByName(harness.source, "duration");
+      harness.source.openField(duration);
+      harness.searchObj.data.editorValue = "service_name = 'api' AND span_st";
+      expect(harness.source.valuesRequest(duration).whereClause).toBe("service_name = 'api'");
+      harness.searchObj.data.editorValue = "span_status = 'ERROR'";
+      harness.source.closeField("duration");
+      harness.source.openField(duration);
+      expect(harness.source.valuesRequest(duration).whereClause).toBe("span_status = 'ERROR'");
+    });
+
     it("accepts a unit string and a raw microsecond value in the filter", () => {
       harness = mountSource();
       harness.searchObj.data.editorValue = "duration >= '1.5ms' AND duration <= 9000";
@@ -584,7 +652,7 @@ describe("useTracesFieldSource", () => {
     it("ignores the + placeholder f='' and keeps a real null (M3)", () => {
       harness = mountSource();
       harness.searchObj.data.editorValue = "zebra='' and k8s_ns IS NULL";
-      expect(harness.source.activeIncludeValues.value).toEqual({ k8s_ns: ["null"] });
+      expect(harness.source.activeIncludeValues.value).toEqual({ k8s_ns: [MISSING_VALUE_KEY] });
       expect(harness.source.activeExcludeValues.value).toEqual({});
       expect(applyFilterTerm(buildTracesValueFilter("zebra", ["a"], []), "zebra=''")).toBe(
         "zebra='a'",
@@ -595,7 +663,7 @@ describe("useTracesFieldSource", () => {
       harness = mountSource();
       harness.searchObj.data.editorValue =
         "((zebra='a' or zebra is null) and (zebra!='c' or zebra is null))";
-      expect(harness.source.activeIncludeValues.value).toEqual({ zebra: ["a", "null"] });
+      expect(harness.source.activeIncludeValues.value).toEqual({ zebra: ["a", MISSING_VALUE_KEY] });
       expect(harness.source.activeExcludeValues.value).toEqual({ zebra: ["c"] });
     });
 
@@ -605,12 +673,12 @@ describe("useTracesFieldSource", () => {
         "(service_name = 'a' OR service_name = 'b') AND zebra != 'z' AND k8s_pod <> 'p' AND k8s_ns IS NULL AND body IS NOT NULL";
       expect(harness.source.activeIncludeValues.value).toEqual({
         service_name: ["a", "b"],
-        k8s_ns: ["null"],
+        k8s_ns: [MISSING_VALUE_KEY],
       });
       expect(harness.source.activeExcludeValues.value).toEqual({
         zebra: ["z"],
         k8s_pod: ["p"],
-        body: ["null"],
+        body: [MISSING_VALUE_KEY],
       });
     });
 
@@ -668,12 +736,14 @@ describe("useTracesFieldSource", () => {
       harness.source.openField(duration);
       vi.clearAllMocks();
       harness.searchObj.data.datetime = { startTime: 300, endTime: 400 };
+      harness.searchObj.data.editorValue = "service_name = 'api'";
       switchStream(harness);
       expect(valuesMock.fetchFieldValues).not.toHaveBeenCalled();
       expect(harness.source.valuesRequest(duration)).toMatchObject({
         streamName: "other",
         startTime: 300,
         endTime: 400,
+        whereClause: "service_name = 'api'",
       });
     });
 
@@ -758,7 +828,7 @@ describe("buildTracesValueFilter", () => {
   });
 
   it("excludes the null row with is not null and keeps an empty value a literal", () => {
-    expect(buildTracesValueFilter("f", [], ["null"])).toBe("f is not null");
+    expect(buildTracesValueFilter("f", [], [MISSING_VALUE_KEY])).toBe("f is not null");
     expect(buildTracesValueFilter("f", [], [""])).toBe("f!=''");
   });
 
@@ -767,14 +837,18 @@ describe("buildTracesValueFilter", () => {
   });
 
   it("lets null rows through each exclusion only when null is included (Additions 2)", () => {
-    expect(buildTracesValueFilter("f", ["a", "null"], ["c"])).toBe(
+    expect(buildTracesValueFilter("f", ["a", MISSING_VALUE_KEY], ["c"])).toBe(
       "((f='a' or f is null) and (f!='c' or f is null))",
     );
-    expect(buildTracesValueFilter("f", ["null"], ["c"])).toBe(
+    expect(buildTracesValueFilter("f", [MISSING_VALUE_KEY], ["c"])).toBe(
       "(f is null and (f!='c' or f is null))",
     );
-    expect(buildTracesValueFilter("f", ["null"], [])).toBe("f is null");
+    expect(buildTracesValueFilter("f", [MISSING_VALUE_KEY], [])).toBe("f is null");
     expect(buildTracesValueFilter("f", [], ["c"])).toBe("f!='c'");
+  });
+  it("filters the text null as an ordinary value, not as a missing one", () => {
+    expect(applyFilterTerm(buildTracesValueFilter("f", ["null"], []), "")).toBe("f='null'");
+    expect(applyFilterTerm(buildTracesValueFilter("f", [], ["null"]), "")).toBe("f!='null'");
   });
 });
 

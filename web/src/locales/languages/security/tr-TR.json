@@ -236,6 +236,7 @@
       "latestCount": "En son eşleşen {n} olay | En son eşleşen {n} olay",
       "sql": "SQL",
       "invertFilter": "Dahil etme ve hariç tutma arasında geçiş yap",
+      "timeColumnAlwaysShown": "Her zaman Zaman sütunu olarak gösterilir",
       "removeFilter": "Filtreyi kaldır",
       "pivotSqlUnsupported": "Bu SQL sorgusu basit bir SELECT … WHERE değildir; bu nedenle filtre sorguya eklenemedi. Sorguyu elle düzenleyin veya Oluşturucu'ya geçin.",
       "topValuesWholeStream": "SQL modu: değerler sorgunuzda değil, tüm akışta sayılır.",

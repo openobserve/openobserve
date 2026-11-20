@@ -58,6 +58,7 @@ interface Harness {
   onToggleColumn: ReturnType<typeof vi.fn>;
   onFiltersChange: ReturnType<typeof vi.fn>;
   panelShown: Ref<boolean>;
+  definedSchemaFields: Ref<string[] | null>;
 }
 
 function mountSource({ withPanel = false } = {}): Harness {
@@ -71,11 +72,13 @@ function mountSource({ withPanel = false } = {}): Harness {
   const onToggleColumn = vi.fn();
   const onFiltersChange = vi.fn();
   const panelShown = ref(true);
+  const definedSchemaFields = ref<string[] | null>(null);
   let source!: SecurityFieldSource;
   const Host = defineComponent({
     setup() {
       source = useSecurityFieldSource({
         schemaFields: ref(SCHEMA),
+        definedSchemaFields,
         stream,
         loading: ref(false),
         timeRange: () => ({ start: 100, end: 200 }),
@@ -109,6 +112,7 @@ function mountSource({ withPanel = false } = {}): Harness {
     onToggleColumn,
     onFiltersChange,
     panelShown,
+    definedSchemaFields,
   };
 }
 
@@ -162,6 +166,31 @@ describe("useSecurityFieldSource", () => {
       );
     });
 
+    it("hands the panel the picked stream's defined schema, and none while hunting", () => {
+      harness = mountSource();
+      expect(harness.source.definedSchemaFields?.value).toBeNull();
+      harness.definedSchemaFields.value = ["actor_user_name"];
+      expect(harness.source.definedSchemaFields?.value).toEqual(["actor_user_name"]);
+      harness.stream.value = ALL_SOURCES;
+      expect(harness.source.definedSchemaFields?.value).toBeNull();
+    });
+
+    it("lists only the defined fields and the timestamp on the panel's defined-schema tab", async () => {
+      store.state.zoConfig.user_defined_schemas_enabled = true;
+      harness = mountSource({ withPanel: true });
+      harness.definedSchemaFields.value = ["actor_user_name"];
+      await nextTick();
+      const range = () =>
+        harness.wrapper.find('[data-test="logs-page-fields-list-pagination-range"]').text();
+      expect(range()).toBe("2 fields");
+      const headers = () => harness.wrapper.findAll('[data-test^="o-field-list-group-"]');
+      expect(headers()).toHaveLength(2);
+      await harness.wrapper.find('[data-test="logs-page-all-fields-btn"]').trigger("click");
+      expect(range()).toBe("5 fields");
+      expect(headers()).toHaveLength(4);
+      store.state.zoConfig.user_defined_schemas_enabled = false;
+    });
+
     it("asks for a stream when none is picked, and names a search that matches nothing", () => {
       harness = mountSource();
       harness.stream.value = null;
@@ -187,6 +216,17 @@ describe("useSecurityFieldSource", () => {
       expect(sql).toBe(
         `SELECT "actor_user_name" AS zo_value, COUNT(*) AS zo_n FROM "s1" WHERE (${SEVERITY_SQL}) = 4 AND ("src_endpoint_ip" != '10.0.0.1' OR "src_endpoint_ip" IS NULL) GROUP BY zo_value ORDER BY zo_n DESC LIMIT 11`,
       );
+    });
+
+    it("keeps a typed contains filter on the opened field in its values query", () => {
+      harness = mountSource();
+      harness.fieldFilters.value = [
+        { field: "actor_user_name", op: "=", value: "root" },
+        { field: "actor_user_name", op: "contains", value: "ad" },
+      ];
+      harness.source.openField(fieldRow(harness, "actor_user_name"));
+      expect(lastSql()).toContain(`WHERE CAST("actor_user_name" AS VARCHAR) LIKE '%ad%'`);
+      expect(lastSql()).not.toContain("'root'");
     });
 
     it("searches values case-insensitively and asks for one page more on load more", async () => {

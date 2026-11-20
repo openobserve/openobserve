@@ -2,6 +2,7 @@
 
 import { addToSqlWhere, whereParts, type FieldFilter } from "@/utils/security/eventQuery";
 import type { ActiveFilterValues } from "../activeFilterValues";
+import { MISSING_VALUE_KEY } from "../valueFilterExpression";
 import type { FieldValueEntry } from "@/composables/useFieldValuesStream";
 import type { ValueFilterMode } from "../fieldPanel.types";
 import { raw } from "@/types/i18n";
@@ -9,7 +10,7 @@ import { raw } from "@/types/i18n";
 const ESCAPE = "\u0000";
 
 /** Key of the missing value in the values list; `keyOfValue` escapes every stored string, so none can equal it. */
-export const NULL_VALUE_KEY = `${ESCAPE}null`;
+export const NULL_VALUE_KEY = MISSING_VALUE_KEY;
 
 /** Text a filter chip shows for the missing value. */
 const NULL_CHIP_TEXT = "null";
@@ -20,6 +21,9 @@ const VALUE_OPS: Record<string, ValueFilterMode> = {
   "!=": "exclude",
   is_not_null: "exclude",
 };
+
+/** Whether the values list writes and reads this filter, as opposed to a typed one such as contains. */
+export const isValueFilter = (filter: FieldFilter): boolean => Object.hasOwn(VALUE_OPS, filter.op);
 
 export interface SqlValueFilters {
   /** The query before the panel first wrote into it. */

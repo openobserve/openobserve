@@ -66,6 +66,16 @@ describe("DurationPercentilesBody", () => {
     );
   });
 
+  it("does not refetch when the parent passes an equal request as a new object", async () => {
+    wrapper = mount(DurationPercentilesBody, { props: { request: request() } });
+    percentilesMock.fetchPercentiles.mockClear();
+    percentilesMock.cancelFetch.mockClear();
+    await wrapper.setProps({ request: request() });
+    await nextTick();
+    expect(percentilesMock.cancelFetch).not.toHaveBeenCalled();
+    expect(percentilesMock.fetchPercentiles).not.toHaveBeenCalled();
+  });
+
   it("writes the microsecond value, not a unit string, into the filter", async () => {
     wrapper = mount(DurationPercentilesBody, { props: { request: request() } });
     await wrapper.find('[data-test="field-panel-duration-gte-p95"]').trigger("click");

@@ -236,6 +236,7 @@
       "latestCount": "Nieuwste {n} overeenkomende gebeurtenis | Nieuwste {n} overeenkomende gebeurtenissen",
       "sql": "SQL",
       "invertFilter": "Schakel tussen opnemen en uitsluiten",
+      "timeColumnAlwaysShown": "Altijd getoond als de tijdkolom",
       "removeFilter": "Filter verwijderen",
       "pivotSqlUnsupported": "Deze SQL-query is geen eenvoudige SELECT … WHERE, dus het filter kon er niet aan worden toegevoegd. Bewerk de query handmatig of schakel over naar Builder.",
       "topValuesWholeStream": "SQL-modus: waarden worden over de hele stream geteld, niet over je query.",

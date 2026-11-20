@@ -236,6 +236,7 @@
       "latestCount": "{n} neuestes passendes Ereignis | {n} neueste passende Ereignisse",
       "sql": "SQL",
       "invertFilter": "Zwischen Ein- und Ausschluss wechseln",
+      "timeColumnAlwaysShown": "Wird immer als Zeitspalte angezeigt",
       "removeFilter": "Filter entfernen",
       "pivotSqlUnsupported": "Diese SQL-Abfrage ist kein einfaches SELECT … WHERE, daher konnte der Filter nicht hinzugefügt werden. Bearbeiten Sie die Abfrage manuell oder wechseln Sie zu Builder.",
       "topValuesWholeStream": "SQL-Modus: Werte werden über den gesamten Stream gezählt, nicht über Ihre Abfrage.",

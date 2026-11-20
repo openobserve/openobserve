@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { computed, defineComponent, h, nextTick, reactive } from "vue";
+import { computed, defineComponent, h, reactive } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { b64DecodeUnicode } from "@/utils/zincutils";
@@ -166,11 +166,14 @@ import useDashboardFieldSource, { type DashboardFieldSource } from "./useDashboa
 import { buildDashboardChips } from "./dashboard/dashboardFieldChips";
 import {
   buildDashboardFieldRows,
+  dashboardDefinedSchemaFields,
   FUNCTION_FIELDS_GROUP,
+  isInStreamDefinedSchema,
   QUERY_FIELDS_GROUP,
 } from "./dashboard/dashboardFieldRows";
 import DashboardFieldPanel from "@/components/dashboards/addPanel/DashboardFieldPanel.vue";
 import { buildCondition } from "@/utils/dashboard/dashboardAutoQueryBuilder";
+import { MISSING_VALUE_KEY } from "./valueFilterExpression";
 
 const panel = () => mockReturn.dashboardPanelData;
 const query = () => panel().data.queries[0];
@@ -656,7 +659,7 @@ describe("groups", () => {
     expect(row.stream).toBeUndefined();
   });
 
-  it("lists timestamp, defined fields and the all-fields column with the UDS flag on", () => {
+  it("lists the whole schema with the timestamp and the all-fields column for a defined schema", () => {
     const rows = buildDashboardFieldRows({
       ...input,
       streamGroups: [
@@ -673,8 +676,42 @@ describe("groups", () => {
     expect(rows.filter((row) => !row.isGroup).map((row) => [row.name, row.showValues])).toEqual([
       ["_timestamp", false],
       ["a", true],
+      ["b", true],
       ["_all", false],
     ]);
+  });
+
+  it("unions the defined fields of every stream, and has none when no stream defines any", () => {
+    const schema = [{ name: "a", type: "Utf8" }];
+    expect(
+      dashboardDefinedSchemaFields([
+        { name: "s1", schema, settings: { defined_schema_fields: ["a", "b"] } },
+        { name: "s2", schema, settings: { defined_schema_fields: ["b", "c"] } },
+        { name: "s3", schema },
+      ]),
+    ).toEqual(["a", "b", "c"]);
+    expect(dashboardDefinedSchemaFields([{ name: "s1", schema, settings: {} }])).toBeNull();
+    expect(dashboardDefinedSchemaFields([])).toBeNull();
+  });
+
+  it("judges a row by its own stream's defined schema", () => {
+    const groups = [
+      { name: "s1", schema: [], settings: { defined_schema_fields: ["a"] } },
+      { name: "s2", schema: [] },
+    ];
+    const row = (name: string, group: string) =>
+      ({
+        name,
+        group,
+        dataType: "",
+        ftsKey: false,
+        isSchemaField: true,
+        showValues: true,
+      }) as const;
+    expect(isInStreamDefinedSchema(groups, row("a", "stream::s1"))).toBe(true);
+    expect(isInStreamDefinedSchema(groups, row("b", "stream::s1"))).toBe(false);
+    expect(isInStreamDefinedSchema(groups, row("b", "stream::s2"))).toBe(true);
+    expect(isInStreamDefinedSchema(groups, row("cnt", QUERY_FIELDS_GROUP))).toBe(true);
   });
 
   it("lists the whole schema with the UDS flag off (B21b)", () => {
@@ -736,6 +773,28 @@ describe("groups", () => {
     source.setSearch("sta");
     expect(panel().meta.stream.filterField).toBe("sta");
     expect(source.search.value).toBe("sta");
+  });
+});
+
+describe("defined schema", () => {
+  it("hands the panel every stream's defined fields and a per-stream row check", () => {
+    withGroups(
+      appGroup({ settings: { defined_schema_fields: ["level"] } }),
+      appGroup({ stream_alias: "b" }),
+    );
+    const source = mountSource()();
+    expect(source.definedSchemaFields?.value).toEqual(["level"]);
+    expect(source.isDefinedSchemaField?.(rowNamed(source, "status", "stream::app_logs"))).toBe(
+      false,
+    );
+    expect(source.isDefinedSchemaField?.(rowNamed(source, "status", "stream:b:app_logs"))).toBe(
+      true,
+    );
+  });
+
+  it("has no defined schema when no stream of the query defines one", () => {
+    withGroups(appGroup());
+    expect(mountSource()().definedSchemaFields?.value).toBeNull();
   });
 });
 
@@ -996,6 +1055,18 @@ describe("values", () => {
 
   const sentSql = () => b64DecodeUnicode(valuesMock.fetchFieldValues.mock.calls.at(-1)![0].sql);
 
+  // flushPromises runs on setImmediate, so only the settle timer is faked.
+  const fakeSettleTimer = () => vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  const settle = async () => {
+    await flushPromises();
+    vi.advanceTimersByTime(500);
+    await flushPromises();
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("asks for the same page again after a failed load more, through the real values stream (F2)", () => {
     realStream.on = true;
     realStream.sent.length = 0;
@@ -1022,6 +1093,7 @@ describe("values", () => {
     realStream.sent.length = 0;
     realStream.inFlight.length = 0;
     try {
+      fakeSettleTimer();
       const { source, row } = openLevel();
       settleStream(3);
       expect(source.fieldValues.value[row._uid].values).toHaveLength(3);
@@ -1040,8 +1112,7 @@ describe("values", () => {
           },
         ],
       };
-      await nextTick();
-      await nextTick();
+      await settle();
       expect(realStream.inFlight).toHaveLength(1);
       expect(source.fieldValues.value[row._uid]).toMatchObject({ isLoading: true });
       expect(source.fieldValues.value[row._uid].values).toHaveLength(3);
@@ -1216,12 +1287,12 @@ describe("values", () => {
 
   it("writes a picked null as Is Null, alone or ORed with other values in a group, and reads it back as checked", () => {
     const { source, row } = openLevel();
-    source.addValueFilters(row._uid, ["null"], []);
+    source.addValueFilters(row._uid, [MISSING_VALUE_KEY], []);
     expect(fields().filter!.conditions).toEqual([
       expect.objectContaining({ type: "condition", operator: "Is Null", logicalOperator: "AND" }),
     ]);
-    expect(source.activeIncludeValues.value[row._uid]).toEqual(["null"]);
-    source.addValueFilters(row._uid, ["null", "error"], []);
+    expect(source.activeIncludeValues.value[row._uid]).toEqual([MISSING_VALUE_KEY]);
+    source.addValueFilters(row._uid, [MISSING_VALUE_KEY, "error"], []);
     expect(fields().filter!.conditions).toEqual([
       {
         filterType: "group",
@@ -1232,7 +1303,7 @@ describe("values", () => {
         ],
       },
     ]);
-    expect(source.activeIncludeValues.value[row._uid]).toEqual(["error", "null"]);
+    expect(source.activeIncludeValues.value[row._uid]).toEqual(["error", MISSING_VALUE_KEY]);
     expect(buildCondition(fields().filter, panel())).toBe(
       "((level IN ('error') OR level IS NULL))",
     );
@@ -1245,7 +1316,7 @@ describe("values", () => {
   it("clears a mixed null pick as one group, leaving no empty group (F8)", () => {
     const { source, row } = openLevel();
     fields().filter!.conditions.push(STATUS_200);
-    source.addValueFilters(row._uid, ["error", "null"], ["debug"]);
+    source.addValueFilters(row._uid, ["error", MISSING_VALUE_KEY], ["debug"]);
     expect(fields().filter!.conditions).toHaveLength(3);
     source.removeFieldFilter(row._uid);
     expect(fields().filter!.conditions).toEqual([STATUS_200]);
@@ -1279,7 +1350,7 @@ describe("values", () => {
       { filterType: "group", logicalOperator: "OR", conditions: [STATUS_200, mixed()] },
     );
     const { source, row } = openLevel();
-    expect(source.activeIncludeValues.value[row._uid]).toEqual(["error", "null", "error", "null"]);
+    expect(source.activeIncludeValues.value[row._uid]).toEqual(["error", MISSING_VALUE_KEY]);
     source.removeFieldFilter(row._uid);
     expect(fields().filter!.conditions).toEqual([
       { filterType: "group", logicalOperator: "OR", conditions: [STATUS_200] },
@@ -1288,7 +1359,7 @@ describe("values", () => {
 
   it("replaces a mixed null group in place and drops its duplicate elsewhere without leaving an empty group (F8)", () => {
     const { source, row } = openLevel();
-    source.addValueFilters(row._uid, ["error", "null"], []);
+    source.addValueFilters(row._uid, ["error", MISSING_VALUE_KEY], []);
     fields().filter!.conditions.push({
       filterType: "group",
       logicalOperator: "AND",
@@ -1303,13 +1374,13 @@ describe("values", () => {
   it("writes an excluded null as Is Not Null next to the NOT IN, and clears both", () => {
     const { source, row } = openLevel();
     fields().filter!.conditions.push(STATUS_200);
-    source.addValueFilters(row._uid, [], ["debug", "null"]);
+    source.addValueFilters(row._uid, [], ["debug", MISSING_VALUE_KEY]);
     expect(fields().filter!.conditions).toEqual([
       STATUS_200,
       expect.objectContaining({ operator: "NOT IN", value: "debug" }),
       expect.objectContaining({ operator: "Is Not Null", logicalOperator: "AND" }),
     ]);
-    expect(source.activeExcludeValues.value[row._uid]).toEqual(["debug", "null"]);
+    expect(source.activeExcludeValues.value[row._uid]).toEqual(["debug", MISSING_VALUE_KEY]);
     source.removeFieldFilter(row._uid);
     expect(fields().filter!.conditions).toEqual([STATUS_200]);
   });
@@ -1397,16 +1468,18 @@ describe("values", () => {
     fields().filter!.conditions.push(STATUS_200);
     openLevel();
     expect(sentSql()).toBe('SELECT * FROM "app_logs" WHERE (status = 200)');
+    fakeSettleTimer();
     query().joins = [{ stream: "error_logs", streamAlias: "b" }];
-    await flushPromises();
+    await settle();
     expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(2);
     expect(sentSql()).toBe('SELECT * FROM "app_logs"');
   });
 
   it("fetches an open field again when the builder filter or stream type changes (F2)", async () => {
+    fakeSettleTimer();
     openLevel();
     fields().filter!.conditions.push(STATUS_200);
-    await flushPromises();
+    await settle();
     expect(sentSql()).toBe('SELECT * FROM "app_logs" WHERE (status = 200)');
     fields().stream_type = "traces";
     await flushPromises();
@@ -1432,6 +1505,65 @@ describe("values", () => {
     });
   });
 
+  it("refetches an open list once the builder filter stops changing, not per keystroke", async () => {
+    fakeSettleTimer();
+    openLevel();
+    const status = { ...STATUS_200, value: "2" };
+    fields().filter!.conditions.push(status);
+    await flushPromises();
+    vi.advanceTimersByTime(300);
+    status.value = "20";
+    fields().filter!.conditions.splice(0, 1, { ...status });
+    await flushPromises();
+    vi.advanceTimersByTime(300);
+    expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
+    await settle();
+    expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(2);
+    expect(sentSql()).toBe('SELECT * FROM "app_logs" WHERE (status = 20)');
+  });
+
+  it("leaves a condition on a dashboard variable alone: never checked, replaced or cleared", () => {
+    const variable = {
+      type: "condition",
+      operator: "IN",
+      value: "$level",
+      values: [],
+      column: { field: "level" },
+      filterType: "condition",
+      logicalOperator: "AND",
+    };
+    fields().filter!.conditions.push(variable);
+    const { source, row } = openLevel();
+    expect(source.activeIncludeValues.value[row._uid]).toBeUndefined();
+    source.addValueFilters(row._uid, ["error"], []);
+    expect(fields().filter!.conditions).toEqual([
+      variable,
+      expect.objectContaining({ type: "list", values: ["error"] }),
+    ]);
+    expect(source.activeIncludeValues.value[row._uid]).toEqual(["error"]);
+    source.removeFieldFilter(row._uid);
+    expect(fields().filter!.conditions).toEqual([variable]);
+  });
+
+  it("keeps null rows through an exclusion while null is included", () => {
+    const { source, row } = openLevel();
+    source.addValueFilters(row._uid, [MISSING_VALUE_KEY], ["debug"]);
+    expect(buildCondition(fields().filter, panel())).toBe(
+      "(level IS NULL AND (level NOT IN ('debug') OR level IS NULL))",
+    );
+    expect(source.activeIncludeValues.value[row._uid]).toEqual([MISSING_VALUE_KEY]);
+    expect(source.activeExcludeValues.value[row._uid]).toEqual(["debug"]);
+    source.addValueFilters(row._uid, [], ["debug"]);
+    expect(buildCondition(fields().filter, panel())).toBe("(level NOT IN ('debug'))");
+  });
+
+  it("quotes an excluded literal holding a dollar sign, so the panel SQL never reads it as a variable", () => {
+    const { source, row } = openLevel();
+    source.addValueFilters(row._uid, [], ["a$b", "it's"]);
+    expect(buildCondition(fields().filter, panel())).toBe("(level NOT IN ('a$b','it''s'))");
+    expect(source.activeExcludeValues.value[row._uid]).toEqual(["a$b", "it's"]);
+  });
+
   it("closes an open field whose row left the list", async () => {
     const { source, row } = openLevel();
     withGroups();
@@ -1455,6 +1587,35 @@ describe("panel host", () => {
     const wrapper = mountPanel("dashboard", { frameless: true });
     await flushPromises();
     expect(wrapper.find('[data-test="panel-field-list-collapse-btn"]').exists()).toBe(false);
+  });
+
+  it("opens on the defined-schema tab for a stream with a defined schema, and lists all fields on the other tab", async () => {
+    store.state.zoConfig.all_fields_name = "_all";
+    withGroups(appGroup({ settings: { defined_schema_fields: ["level"] } }));
+    const wrapper = mountPanel();
+    await flushPromises();
+    const names = () =>
+      wrapper
+        .findAll('[data-test^="o-field-list-row-"]')
+        .map((row) => row.attributes("data-test")?.replace("o-field-list-row-", ""));
+    const schemaBtn = wrapper.find('[data-test="dashboard-panel-user-defined-fields-btn"]');
+    expect(schemaBtn.attributes("data-state")).toBe("on");
+    expect(names()).not.toContain("status");
+    expect(names()).toContain("level");
+    await wrapper.find('[data-test="dashboard-panel-all-fields-btn"]').trigger("click");
+    expect(names()).toContain("status");
+  });
+
+  it("offers no schema tab for a stream without a defined schema", async () => {
+    withGroups(appGroup());
+    const wrapper = mountPanel();
+    await flushPromises();
+    expect(wrapper.find('[data-test="dashboard-panel-user-defined-fields-btn"]').exists()).toBe(
+      false,
+    );
+    expect(
+      wrapper.find('[data-test="dashboard-panel-fields-list-pagination-range"]').exists(),
+    ).toBe(true);
   });
 
   it("pages at 50 rows", async () => {

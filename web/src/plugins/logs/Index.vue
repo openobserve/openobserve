@@ -95,7 +95,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onSplitterUpdate"
             >
               <template #before>
-                <!-- No end gutter: the list runs into the divider so its scrollbar sits on the panel edge. -->
                 <div
                   class="relative-position border-border-default bg-surface-panel h-full border-e pt-2.5"
                 >

@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, ref, watch, type ComputedRef } from "vue";
+import { computed, onScopeDispose, ref, watch, type ComputedRef } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
@@ -19,6 +19,9 @@ interface TimeRange {
   start_time: number;
   end_time: number;
 }
+
+// Builder filters change per keystroke; open lists follow them once typing pauses.
+const FILTER_SETTLE_MS = 500;
 
 export interface DashboardValuesOptions {
   panel: DashboardPanelState;
@@ -56,7 +59,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
   const keywordPerField = ref<Record<string, string>>({});
   const pinnedRange = ref<Record<string, TimeRange>>({});
   // What each open field's values were fetched for, so a change to any of it fetches them again.
-  const fetchedContext: Record<string, string> = {};
+  const fetchedContext: Record<string, { base: string; where: string }> = {};
 
   // The builder filter speaks in join aliases once the query joins, which a single-stream values query cannot resolve.
   const whereFor = (row: DashboardFieldRow): string => {
@@ -77,7 +80,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
       resetFieldValues(row._uid);
       return;
     }
-    const where = whereFor(row);
+    const where = fetchedContext[row._uid]?.where ?? whereFor(row);
     fetch(
       {
         fields: [row.name],
@@ -96,15 +99,15 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
     );
   };
 
-  const contextOf = (row: DashboardFieldRow) => {
+  const baseContextOf = (row: DashboardFieldRow) => {
     const range = options.timeRange();
     const streamType = currentQuery()?.fields?.stream_type ?? "";
-    return [row.stream, streamType, whereFor(row), range?.start_time, range?.end_time].join("|");
+    return [row.stream, streamType, range?.start_time, range?.end_time].join("|");
   };
 
   const startFieldValues = (row: DashboardFieldRow, keyword: string, keepValues = false) => {
     const key = row._uid;
-    fetchedContext[key] = contextOf(row);
+    fetchedContext[key] = { base: baseContextOf(row), where: whereFor(row) };
     keywordPerField.value[key] = keyword;
     sizePerField.value[key] = pageSize();
     delete fieldValuesFinalizedValues.value[key];
@@ -172,7 +175,8 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
         closeField(key);
         continue;
       }
-      if (contextOf(row) === fetchedContext[key]) continue;
+      const fetched = fetchedContext[key];
+      if (fetched?.base === baseContextOf(row) && fetched.where === whereFor(row)) continue;
       const range = options.timeRange();
       if (range) pinnedRange.value[key] = range;
       else delete pinnedRange.value[key];
@@ -180,15 +184,29 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
     }
   };
 
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+  onScopeDispose(() => clearTimeout(settleTimer));
+
+  // A moved stream, type or range, or a row that left, refreshes at once; a filter-only change waits for typing to pause.
+  const onContextChange = () => {
+    clearTimeout(settleTimer);
+    const baseMoved = expandedFields.value.some((key) => {
+      const row = rowByKey(key);
+      return !row || baseContextOf(row) !== fetchedContext[key]?.base;
+    });
+    if (baseMoved) refreshOpenFields();
+    else settleTimer = setTimeout(refreshOpenFields, FILTER_SETTLE_MS);
+  };
+
   watch(
     () =>
       expandedFields.value
         .map((key) => {
           const row = rowByKey(key);
-          return row ? `${key}=${contextOf(row)}` : key;
+          return row ? `${key}=${baseContextOf(row)}|${whereFor(row)}` : key;
         })
         .join("\n"),
-    refreshOpenFields,
+    onContextChange,
   );
 
   const valuesRequest = (field: PanelField): ValuesRequest => {

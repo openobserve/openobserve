@@ -10,7 +10,12 @@ import type {
   PanelField,
   StreamTypeMode,
 } from "./fieldPanel.types";
-import { buildDashboardFieldRows, type DashboardFieldRow } from "./dashboard/dashboardFieldRows";
+import {
+  buildDashboardFieldRows,
+  dashboardDefinedSchemaFields,
+  isInStreamDefinedSchema,
+  type DashboardFieldRow,
+} from "./dashboard/dashboardFieldRows";
 import {
   buildDashboardChips,
   chipsAvailable,
@@ -94,6 +99,11 @@ export default function useDashboardFieldSource(
   );
 
   const loading = computed(() => picker.streamsLoading.value || groupedFieldsInFlight.value > 0);
+
+  const streamGroups = () => panel.meta.streamFields.groupedFields ?? [];
+  const definedSchemaFields = computed(() => dashboardDefinedSchemaFields(streamGroups()));
+  const isDefinedSchemaField = (field: PanelField) =>
+    isInStreamDefinedSchema(streamGroups(), field);
 
   const search = computed<string>(() => panel.meta.stream.filterField ?? "");
   const setSearch = (value: string) => {
@@ -192,6 +202,8 @@ export default function useDashboardFieldSource(
       optionTooltip: true,
     },
     fields: rows,
+    definedSchemaFields,
+    isDefinedSchemaField,
     loading,
     groupingMode: "per-source",
     rowKey: "_uid",

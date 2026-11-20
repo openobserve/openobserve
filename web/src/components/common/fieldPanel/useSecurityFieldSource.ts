@@ -19,6 +19,7 @@ import {
   activeValueFilters,
   applyValueFilters,
   EMPTY_SQL_VALUE_FILTERS,
+  isValueFilter,
   valueEntry,
   writeSqlValueFilters,
   type SqlValueFilters,
@@ -54,6 +55,8 @@ export interface SecuritySchemaField {
 
 export interface SecurityFieldSourceOptions {
   schemaFields: Ref<SecuritySchemaField[]>;
+  /** The picked stream's `settings.defined_schema_fields`; null when it has none. */
+  definedSchemaFields?: Ref<string[] | null>;
   /** The picked stream; `ALL_SOURCES` while hunting across every source. */
   stream: Ref<string | null>;
   loading: Ref<boolean>;
@@ -107,6 +110,10 @@ export default function useSecurityFieldSource(
       columnLockedReason: options.columnLockedReason?.(field.name),
     }));
   });
+
+  const definedSchemaFields = computed<string[] | null>(() =>
+    streamName.value ? (options.definedSchemaFields?.value ?? null) : null,
+  );
 
   const groupFn = (rows: PanelField[]): FieldGroup[] =>
     groupFields(rows).map(({ group, fields: grouped }) => ({
@@ -195,7 +202,9 @@ export default function useSecurityFieldSource(
     return whereParts({
       severitySql: options.severitySql.value,
       severity: options.severity.value,
-      filters: options.fieldFilters.value.filter((filter) => filter.field !== name),
+      filters: options.fieldFilters.value.filter(
+        (filter) => filter.field !== name || !isValueFilter(filter),
+      ),
     });
   };
 
@@ -297,6 +306,7 @@ export default function useSecurityFieldSource(
     activeIncludeValues,
     activeExcludeValues,
     tableColumns: options.tableColumns,
+    definedSchemaFields,
     emptyState,
     valuesCaption,
     valuesRequest,

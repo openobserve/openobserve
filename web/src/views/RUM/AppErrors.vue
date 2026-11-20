@@ -545,8 +545,11 @@ const FIELD_PANEL_CAPABILITIES: FieldPanelCapabilities = {
 
 const fieldsLoading = ref(false);
 
+const definedSchemaFields = ref<string[] | null>(null);
+
 const fieldSource = useLocalFieldSource({
   fields: streamFields,
+  definedSchemaFields,
   streamName: computed(() => errorTrackingState.data.stream.errorStream),
   streamType: computed(() => "logs"),
   loading: fieldsLoading,
@@ -739,6 +742,7 @@ const getStreamFields = () => {
     getStream(errorTrackingState.data.stream.errorStream, "logs", true)
       .then((stream) => {
         streamFields.value = [];
+        definedSchemaFields.value = stream.settings?.defined_schema_fields ?? null;
         stream.schema.forEach((field: any) => {
           // TODO OK: Convert this to set
           schemaMapping.value[field.name] = true;

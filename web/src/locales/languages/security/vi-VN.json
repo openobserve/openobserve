@@ -236,6 +236,7 @@
       "latestCount": "{n} sự kiện khớp mới nhất | {n} sự kiện khớp mới nhất",
       "sql": "SQL",
       "invertFilter": "Chuyển đổi giữa bao gồm và loại trừ",
+      "timeColumnAlwaysShown": "Luôn hiển thị dưới dạng cột Thời gian",
       "removeFilter": "Xóa bộ lọc",
       "pivotSqlUnsupported": "Truy vấn SQL này không phải là một SELECT … WHERE đơn giản, nên không thể thêm bộ lọc vào đó. Hãy chỉnh sửa truy vấn thủ công, hoặc chuyển sang Builder.",
       "topValuesWholeStream": "Chế độ SQL: các giá trị được đếm trên toàn bộ stream, không phải trên truy vấn của bạn.",

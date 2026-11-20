@@ -236,6 +236,7 @@
       "latestCount": "最新 {n} 条匹配事件 | 最新 {n} 条匹配事件",
       "sql": "SQL",
       "invertFilter": "在包含与排除之间切换",
+      "timeColumnAlwaysShown": "始终显示为时间列",
       "removeFilter": "移除过滤器",
       "pivotSqlUnsupported": "此 SQL 查询不是简单的 SELECT … WHERE，因此无法为其添加过滤器。请手动编辑查询，或切换到构建器。",
       "topValuesWholeStream": "SQL 模式：值按整个数据流统计，而非按您的查询统计。",

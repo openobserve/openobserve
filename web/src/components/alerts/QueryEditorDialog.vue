@@ -554,6 +554,8 @@ import useLocalFieldSource from "@/components/common/fieldPanel/useLocalFieldSou
 import type { FieldPanelCapabilities } from "@/components/common/fieldPanel/fieldPanel.types";
 import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
+import useStreams from "@/composables/useStreams";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -1156,14 +1158,30 @@ watch(
   { immediate: true, deep: true },
 );
 
-// The sidebar's WHERE comes from the parser so subqueries, CTEs and quoted keywords do not break it.
-const fieldListWhereClause = computed(() => {
-  const sql = localSqlQuery.value?.trim();
-  if (!sql) return "";
+const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
+
+const regexWhereClause = (sql: string): string => {
   const match = sql.match(
     /\bWHERE\b([\s\S]+?)(?:\bGROUP\s+BY\b|\bHAVING\b|\bORDER\s+BY\b|\bLIMIT\b|$)/i,
   );
   return match ? match[1].trim() : "";
+};
+
+// Read through the same parser the field panel reads its checked values with, so a pick edits the WHERE the panel shows; an unparsable query keeps its text WHERE.
+const fieldListWhereClause = computed(() => {
+  const sql = localSqlQuery.value?.trim();
+  if (!sql) return "";
+  const parsed = fnParsedSQL(sql);
+  if (!parsed?.from?.length) return regexWhereClause(sql);
+  if (!parsed.where) return "";
+  const rendered = fnUnparsedSQL({
+    type: "select",
+    columns: [{ expr: { type: "column_ref", table: null, column: "*" }, as: null }],
+    from: [{ db: null, table: "x", as: null }],
+    where: parsed.where,
+  });
+  const match = rendered.match(/\bWHERE\b\s+([\s\S]+)$/i);
+  return match ? match[1].replace(/`/g, '"').trim() : regexWhereClause(sql);
 });
 
 const fieldListItems = computed(() =>
@@ -1183,8 +1201,26 @@ const FIELD_PANEL_CAPABILITIES: FieldPanelCapabilities = {
   highlightColumns: false,
 };
 
+const { getStream } = useStreams(t);
+
+const definedSchemaFields = ref<string[] | null>(null);
+
+// The parent loaded this stream's schema, so its settings come from the streams cache.
+watch(
+  () => [props.streamName, props.streamType],
+  async ([name, type]) => {
+    definedSchemaFields.value = null;
+    if (!name || !type) return;
+    const stream = await getStream(name, type, false).catch(() => null);
+    if (props.streamName === name && props.streamType === type)
+      definedSchemaFields.value = stream?.settings?.defined_schema_fields ?? null;
+  },
+  { immediate: true },
+);
+
 const fieldSource = useLocalFieldSource({
   fields: fieldListItems,
+  definedSchemaFields,
   streamName: computed(() => props.streamName),
   streamType: computed(() => props.streamType),
   // Evaluated per request, so a values query always ends "now".

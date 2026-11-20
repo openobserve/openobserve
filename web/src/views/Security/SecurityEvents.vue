@@ -215,6 +215,7 @@ interface StreamField {
   ftype: string;
 }
 const schemaFields = ref<StreamField[]>([]);
+const definedSchemaFields = ref<string[] | null>(null);
 const schemaLoading = ref(false);
 const fieldNames = computed(() => schemaFields.value.map((f) => f.name));
 
@@ -679,6 +680,7 @@ function onChartZoom({ start, end }: { start: number; end: number }) {
 
 const fieldSource = useSecurityFieldSource({
   schemaFields,
+  definedSchemaFields,
   stream: selectedStream,
   // Before the streams land no stream is picked yet, which is not "pick one".
   loading: computed(() => schemaLoading.value || (streamsLoading.value && !selectedStream.value)),
@@ -903,6 +905,7 @@ function newestSource(): string | null {
 
 async function loadSchema(streamName: string) {
   schemaFields.value = [];
+  definedSchemaFields.value = null;
   schemaLoading.value = true;
   try {
     const res = await securitySources.schema(orgId.value, streamName);
@@ -912,6 +915,7 @@ async function loadSchema(streamName: string) {
       name: f.name,
       ftype: f.type ?? f.field_type ?? "",
     }));
+    definedSchemaFields.value = res.data?.settings?.defined_schema_fields ?? null;
     schemaLoading.value = false;
     initColumns(schemaFields.value);
     // Identified from the schema first so severity is known before the first search.
@@ -1188,6 +1192,7 @@ watch(selectedStream, async (v) => {
   if (v === ALL_SOURCES) {
     cancelSearch({ quiet: true });
     schemaFields.value = [];
+    definedSchemaFields.value = null;
     schemaLoading.value = false;
     detected.value = null;
     severityExpr.value = null;

@@ -2139,6 +2139,13 @@ describe("TraceDetailsSidebar", async () => {
       expect(result).toBe(displayValue);
     });
 
+    it("should return a real null for a null attribute the table shows as the text null", async () => {
+      await wrapper.setProps({ span: { ...mockSpan, db_name: null, db_label: "null" } });
+      await flushPromises();
+      expect(wrapper.vm.getFilterValue("db_name", "null")).toBeNull();
+      expect(wrapper.vm.getFilterValue("db_label", "null")).toBe("null");
+    });
+
     it("should return raw start_time value when _start_time_ns is absent", () => {
       // mockSpan has start_time but not _start_time_ns, so the ?? chain
       // returns span.start_time (the raw nanosecond value)

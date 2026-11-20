@@ -93,7 +93,7 @@ function load() {
   });
 }
 
-// Raw microseconds: a bound rounded to the label (or to a whole number) drops the slowest span.
+// Raw microseconds: a bound cut to the label or a whole number drops the slowest span.
 function emitFilter(op: ">=" | "<=", value: number | null) {
   if (value === null) return;
   emit("add-filter", `duration${op}${value}`);
@@ -101,12 +101,13 @@ function emitFilter(op: ">=" | "<=", value: number | null) {
 
 onMounted(load);
 
+// Separate sources compare by value; the parent builds a fresh request object on every render.
 watch(
-  () => [
-    props.request.streamName,
-    props.request.whereClause,
-    props.request.startTime,
-    props.request.endTime,
+  [
+    () => props.request.streamName,
+    () => props.request.whereClause,
+    () => props.request.startTime,
+    () => props.request.endTime,
   ],
   load,
 );

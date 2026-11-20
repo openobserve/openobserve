@@ -196,7 +196,7 @@ export class TracesPage {
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
     this.fieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
-    this.fieldsTable = '[data-test="log-search-index-list-fields-table"]';
+    this.fieldsTable = '[data-test="traces-search-index-list"]';
 
     // Span Components
     this.spanBlock = '[data-test="span-block"]';
@@ -2920,11 +2920,10 @@ export class TracesPage {
 
   /**
    * Get field expansion headers in the traces field list
-   * (.field-expansion-item is a framework component class, not a data-test hook)
    * @returns {Locator}
    */
   getFieldExpansionHeaders() {
-    return this.page.locator('.field-expansion-item .field-expansion-header');
+    return this.page.locator(`${this.fieldsTable} [data-test^="log-search-expand-"][data-test$="-field-btn"]`);
   }
 
   /**

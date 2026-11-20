@@ -3,7 +3,10 @@
 import { cloneDeep } from "lodash-es";
 import { raw, type TranslateFn } from "@/types/i18n";
 import type { SearchObject } from "@/composables/useLogs/searchState";
-import { removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
+import {
+  removeFieldFromWhereAST,
+  type ExtendedParsedSQLResult,
+} from "@/composables/useLogs/logsUtils";
 import {
   freeTextWhereByStream,
   isFilterHeld,
@@ -29,7 +32,7 @@ export interface ValuesPlanDeps {
   searchObj: SearchObject;
   zoConfig: () => FreeTextZoConfig & { query_values_default_num?: number };
   t: TranslateFn;
-  fnParsedSQL: (sql: string) => any;
+  fnParsedSQL: (sql: string) => ExtendedParsedSQLResult;
   fnUnparsedSQL: (ast: unknown) => string;
   extractValueQuery: () => Record<string, string>;
   validateFilterForMultiStream: () => boolean;

@@ -380,10 +380,7 @@ function headerRow(group: string, name: string): FieldObj {
   } as FieldObj;
 }
 
-/**
- * Multi-stream layout: "Common fields" (in every stream, key fields first), then one group per stream
- * with the fields no earlier stream listed; a field appears once and an empty group gets no header.
- */
+/** Multi-stream layout: "Common fields" first, then one group per stream with the fields no earlier stream listed. */
 export function applyStreamGrouping(
   fields: FieldObj[],
   streams: string[],

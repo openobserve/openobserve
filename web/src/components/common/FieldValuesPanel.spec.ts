@@ -273,6 +273,21 @@ describe("FieldValuesPanel.vue", () => {
       await nextTick();
       expect(wrapper.emitted("set-value-filters")?.[0]).toEqual(["body_kind", ["\u0000null"], []]);
     });
+
+    it("labels a selected missing value as null when the API returns no values", () => {
+      wrapper = createWrapper({
+        fieldName: "body_kind",
+        fieldValues: { isLoading: false, values: [] },
+        activeIncludeValues: ["\u0000null", "null"],
+      });
+      const texts = wrapper
+        .findAll('[data-test="field-values-panel-value-text"]')
+        .map((el) => el.text());
+      expect(texts).toEqual(["null", "null"]);
+      expect(texts.some((text) => text.includes("\u0000"))).toBe(false);
+      expect(wrapper.find('[data-test="field-values-panel-no-count-msg"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="field-values-panel-value-count"]').exists()).toBe(false);
+    });
   });
 
   // ─── Multi-select controls ───────────────────────────────────────────────────

@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="border-card-glass-border bg-card-glass-bg w-full justify-between border-t px-1 py-px"
-    :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
+    class="border-card-glass-border bg-card-glass-bg flex w-full justify-between border-t px-1 py-px"
   >
     <!-- Schema Toggle Buttons -->
     <div v-if="showSchemaToggle">
@@ -120,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Pagination and Reset Controls -->
-    <div class="flex items-center justify-end gap-1">
+    <div class="ms-auto flex items-center justify-end gap-1">
       <span
         v-if="pagesNumber <= 1 && totalFieldsCount > 0"
         class="text-2xs text-text-secondary flex h-7 items-center pe-1 whitespace-nowrap tabular-nums"

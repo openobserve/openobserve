@@ -234,7 +234,7 @@ export default function useLogsFieldSource(options: LogsFieldSourceOptions): Log
         searchObj.data.streamResults?.list ?? [],
         searchObj.data.stream.selectedStream,
       );
-    // The values stream keys "" and missing alike as "null", so that row matches both.
+    // The values stream keys "" and missing alike as the missing-value key, so that row matches both.
     const conditionsFor = (value: string, mode: ValueFilterMode): string[] =>
       isNullValue(value)
         ? emptyValueConditions(name, mode, quote, fieldType())

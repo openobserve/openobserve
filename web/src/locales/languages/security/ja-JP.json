@@ -236,6 +236,7 @@
       "latestCount": "最新の一致イベント {n} 件 | 最新の一致イベント {n} 件",
       "sql": "SQL",
       "invertFilter": "含める/除外を切り替え",
+      "timeColumnAlwaysShown": "常に時刻列として表示されます",
       "removeFilter": "フィルターを削除",
       "pivotSqlUnsupported": "この SQL クエリは単純な SELECT … WHERE ではないため、フィルターを追加できませんでした。クエリを手動で編集するか、ビルダーに切り替えてください。",
       "topValuesWholeStream": "SQL モード: 値はクエリではなくストリーム全体で集計されます。",

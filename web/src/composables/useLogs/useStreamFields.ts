@@ -84,6 +84,15 @@ export interface StreamListOptions {
   isCurrent?: () => boolean;
   /** Reads the list from the server even while the cached copy is fresh. */
   force?: boolean;
+  /** Carries schemas already loaded for the current type onto the refreshed list, so a later schema reuse does not read the list's empty one. */
+  keepLoadedSchemas?: boolean;
+}
+
+interface ListedStream {
+  name?: string;
+  schema?: unknown;
+  settings?: unknown;
+  removedSchemaFields?: unknown;
 }
 
 export interface ExtractFieldsOptions {
@@ -603,6 +612,14 @@ export const useStreamFields = () => {
       if (options.isCurrent && !options.isCurrent()) return;
       searchObj.data.streamResults = {
         ...streamData,
+        ...(options.keepLoadedSchemas
+          ? {
+              list: withLoadedSchemas(
+                streamData?.list ?? [],
+                searchObj.data.streamResults.list ?? [],
+              ),
+            }
+          : {}),
       };
       await nextTick();
       if (options.isCurrent && !options.isCurrent()) return;
@@ -612,6 +629,24 @@ export const useStreamFields = () => {
       if (e instanceof CancelledError) return;
       console.error("Error while getting stream list", e);
     }
+  };
+
+  const withLoadedSchemas = <T extends ListedStream>(fresh: T[], loaded: ListedStream[]): T[] => {
+    const byName = new Map(
+      loaded
+        .filter((entry) => Array.isArray(entry?.schema) && entry.schema.length > 0)
+        .map((entry) => [entry.name, entry]),
+    );
+    return fresh.map((entry) => {
+      const previous = byName.get(entry?.name);
+      if (!previous || (Array.isArray(entry.schema) && entry.schema.length > 0)) return entry;
+      return {
+        ...entry,
+        schema: previous.schema,
+        settings: previous.settings,
+        removedSchemaFields: previous.removedSchemaFields,
+      };
+    });
   };
 
   // The list is cached for minutes, so a URL stream created since then would read as missing.

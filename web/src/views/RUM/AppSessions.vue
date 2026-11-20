@@ -603,8 +603,11 @@ const FIELD_PANEL_CAPABILITIES: FieldPanelCapabilities = {
 
 const fieldsLoading = ref(false);
 
+const definedSchemaFields = ref<string[] | null>(null);
+
 const fieldSource = useLocalFieldSource({
   fields: streamFields,
+  definedSchemaFields,
   streamName: computed(() => rumSessionStreamName),
   streamType: computed(() => "logs"),
   loading: fieldsLoading,
@@ -904,6 +907,7 @@ const getStreamFields = () => {
         const priorityFieldsMap = new Map(priorityFields.map((field, index) => [field, index]));
 
         streamFields.value = [];
+        definedSchemaFields.value = stream.settings?.defined_schema_fields ?? null;
 
         stream.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name)) schemaMapping.value[field.name] = field;

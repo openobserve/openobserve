@@ -98,6 +98,7 @@ import useLocalFieldSource, {
   type LocalFieldSourceOptions,
 } from "./useLocalFieldSource";
 import StreamFieldPanel from "./StreamFieldPanel.vue";
+import { MISSING_VALUE_KEY } from "./valueFilterExpression";
 import { applyFilterTerm } from "@/utils/traces/filterUtils";
 import type { FieldPanelCapabilities, FieldPanelSource } from "./fieldPanel.types";
 
@@ -253,8 +254,10 @@ describe("useLocalFieldSource", () => {
       await nextTick();
       harness.source.openField(harness.source.fields.value.find((row) => row.name === "service")!);
       expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE env='prod' AND level='error'`);
+      harness.source.closeField("service");
       harness.query.value = "service='api' AND level='error'";
       await flush();
+      harness.source.openField(harness.source.fields.value.find((row) => row.name === "service")!);
       expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error'`);
     });
 
@@ -309,7 +312,7 @@ describe("useLocalFieldSource", () => {
       expect(harness.source.expandedFields.value).toEqual([]);
     });
 
-    it("refetches every open field when the query or the time range changes", async () => {
+    it("refetches every open field when the base filter or the time range changes", async () => {
       harness = mountSource();
       harness.source.openField({
         name: "msg",
@@ -319,7 +322,7 @@ describe("useLocalFieldSource", () => {
         showValues: true,
       });
       expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
-      harness.query.value = "level='error'";
+      harness.baseFilter.value = "level='error'";
       await flush();
       expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(2);
       expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error'`);
@@ -327,6 +330,27 @@ describe("useLocalFieldSource", () => {
       await flush();
       expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(3);
       expect(lastRequest()).toMatchObject({ start_time: 300, end_time: 400 });
+    });
+
+    it("does not refetch open fields while the query text changes, but a newly opened field uses it", async () => {
+      harness = mountSource();
+      const field = (name: string) => ({
+        name,
+        dataType: "",
+        ftsKey: false,
+        isSchemaField: true,
+        showValues: true,
+      });
+      harness.source.openField(field("msg"));
+      expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
+      harness.query.value = "level='e";
+      await flush();
+      harness.query.value = "level='error'";
+      await flush();
+      expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
+      harness.source.openField(field("service"));
+      expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(2);
+      expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error'`);
     });
 
     it("pins the time range of an open field for search and load more", async () => {
@@ -408,16 +432,19 @@ describe("useLocalFieldSource", () => {
       ["a='x'", { include: { a: ["x"] }, exclude: {} }],
       ["b!='y'", { include: {}, exclude: { b: ["y"] } }],
       ["c<>'z'", { include: {}, exclude: { c: ["z"] } }],
-      ["d IS NULL", { include: { d: ["null"] }, exclude: {} }],
-      ["e IS NOT NULL", { include: {}, exclude: { e: ["null"] } }],
+      ["d IS NULL", { include: { d: [MISSING_VALUE_KEY] }, exclude: {} }],
+      ["e IS NOT NULL", { include: {}, exclude: { e: [MISSING_VALUE_KEY] } }],
+      ["d = 'null'", { include: { d: ["null"] }, exclude: {} }],
+      ["flag IS TRUE", { include: { flag: ["true"] }, exclude: {} }],
+      ["flag IS NOT FALSE", { include: {}, exclude: { flag: ["false"] } }],
       ["(f='1' or f='2')", { include: { f: ["1", "2"] }, exclude: {} }],
       ["(g!='1' and g!='2') AND h='3'", { include: { h: ["3"] }, exclude: { g: ["1", "2"] } }],
       ["brand = 'it''s'", { include: { brand: ["it's"] }, exclude: {} }],
       ["f=''", { include: {}, exclude: {} }],
-      ["f='' and g IS NULL", { include: { g: ["null"] }, exclude: {} }],
+      ["f='' and g IS NULL", { include: { g: [MISSING_VALUE_KEY] }, exclude: {} }],
       [
         "(f IS NULL and (f!='c' or f IS NULL))",
-        { include: { f: ["null"] }, exclude: { f: ["c"] } },
+        { include: { f: [MISSING_VALUE_KEY] }, exclude: { f: ["c"] } },
       ],
     ])("parses %s", async (query, expected) => {
       harness = mountSource();
@@ -457,8 +484,10 @@ describe("useLocalFieldSource", () => {
       expect(harness.onAddFilter).toHaveBeenLastCalledWith("(f='a' or f='b')");
       harness.source.addValueFilters("f", [], ["a", "b"]);
       expect(harness.onAddFilter).toHaveBeenLastCalledWith("(f!='a' and f!='b')");
-      harness.source.addValueFilters("f", ["null"], []);
+      harness.source.addValueFilters("f", [MISSING_VALUE_KEY], []);
       expect(harness.onAddFilter).toHaveBeenLastCalledWith("f IS NULL");
+      harness.source.addValueFilters("f", ["null"], []);
+      expect(harness.onAddFilter).toHaveBeenLastCalledWith("f='null'");
       harness.source.addValueFilters("f", ["a"], ["b"]);
       expect(harness.onAddFilter).toHaveBeenLastCalledWith("(f='a' and f!='b')");
     });
@@ -522,6 +551,28 @@ describe("useLocalFieldSource", () => {
       expect(harness.onAddFilter).toHaveBeenLastCalledWith("msg='boom'");
       panel.unmount();
     });
+
+    it("passes the page's defined schema through, and the panel lists only it on the defined-schema tab", async () => {
+      const definedSchemaFields = ref<string[] | null>(["msg", "count"]);
+      harness = mountSource({ definedSchemaFields });
+      await flush();
+      expect(harness.source.definedSchemaFields?.value).toEqual(["msg", "count"]);
+      store.state.zoConfig.user_defined_schemas_enabled = true;
+      const panel = mount(StreamFieldPanel, {
+        props: { capabilities: CAPABILITIES, source: harness.source },
+        global: { plugins: [store] },
+      });
+      await flush();
+      const range = () => panel.find('[data-test="logs-page-fields-list-pagination-range"]').text();
+      expect(range()).toBe("3 fields");
+      await panel.find('[data-test="logs-page-all-fields-btn"]').trigger("click");
+      expect(range()).toBe("7 fields");
+      definedSchemaFields.value = null;
+      await flush();
+      expect(panel.find('[data-test="logs-page-all-fields-btn"]').exists()).toBe(false);
+      store.state.zoConfig.user_defined_schemas_enabled = false;
+      panel.unmount();
+    });
   });
 });
 
@@ -532,8 +583,9 @@ describe("buildValueExpression", () => {
   });
 
   it("maps the null row to IS NULL and IS NOT NULL, and keeps an empty value a literal", () => {
-    expect(buildValueExpression("brand", "null", "include")).toBe("brand IS NULL");
-    expect(buildValueExpression("brand", "null", "exclude")).toBe("brand IS NOT NULL");
+    expect(buildValueExpression("brand", MISSING_VALUE_KEY, "include")).toBe("brand IS NULL");
+    expect(buildValueExpression("brand", MISSING_VALUE_KEY, "exclude")).toBe("brand IS NOT NULL");
+    expect(buildValueExpression("brand", "null", "include")).toBe("brand='null'");
     expect(buildValueExpression("brand", "", "exclude")).toBe("brand!=''");
   });
 
@@ -550,8 +602,10 @@ describe("buildValueExpression", () => {
   });
 
   it("lets null rows through each exclusion only when null is included (Additions 2)", () => {
-    expect(buildValueFilter("f", ["null"], ["c"])).toBe("(f IS NULL and (f!='c' or f IS NULL))");
-    expect(buildValueFilter("f", ["a", "null"], ["c", "d"])).toBe(
+    expect(buildValueFilter("f", [MISSING_VALUE_KEY], ["c"])).toBe(
+      "(f IS NULL and (f!='c' or f IS NULL))",
+    );
+    expect(buildValueFilter("f", ["a", MISSING_VALUE_KEY], ["c", "d"])).toBe(
       "((f='a' or f IS NULL) and (f!='c' or f IS NULL) and (f!='d' or f IS NULL))",
     );
     expect(buildValueFilter("f", ["a"], ["c"])).toBe("(f='a' and f!='c')");

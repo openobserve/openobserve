@@ -167,10 +167,10 @@
         <FieldListPagination
           v-if="showFooter(pager.allRows ?? pager.totalRows)"
           :data-test-prefix="testIdPrefix"
-          :show-schema-toggle="capabilities.footerToggles.includes('schema')"
-          :show-quick-mode="capabilities.footerToggles.includes('interesting')"
+          :show-schema-toggle="footerToggles.includes('schema')"
+          :show-quick-mode="footerToggles.includes('interesting')"
           :show-reset="showReset"
-          :use-user-defined-schemas="source.footerSchemaTab?.value ?? ''"
+          :use-user-defined-schemas="schemaTab"
           :show-only-interesting-fields="source.footerInterestingOnly?.value ?? false"
           :schema-toggle-options="schemaToggleOptions"
           :interesting-fields-toggle-options="INTERESTING_TOGGLE_OPTIONS"
@@ -184,7 +184,7 @@
           @first-page="pager.firstPage()"
           @last-page="pager.lastPage()"
           @set-page="currentPage = $event"
-          @toggle-schema="(value: string) => source.footerToggle?.('schema', value)"
+          @toggle-schema="onSchemaToggle"
           @toggle-interesting-fields="
             (value: boolean) => source.footerToggle?.('interesting', value)
           "
@@ -211,6 +211,7 @@ import type {
   FieldPanelCapabilities,
   FieldPanelEmptyTexts,
   FieldPanelSource,
+  FooterToggle,
   PanelField,
   StreamOption,
 } from "./fieldPanel.types";
@@ -253,14 +254,53 @@ const INTERESTING_TOGGLE_OPTIONS = [
   { label: "", value: true, slot: "interesting_fields_slot" },
 ];
 
+const SCHEMA_TAB = "user_defined_schema";
+
 const currentPage = ref(1);
 
 const streams = computed(() => props.source.streams.value);
 const streamsLoading = computed(() => props.source.streamsLoading?.value ?? false);
 const selectedStreams = computed(() => props.source.selectedStreams.value);
 const streamType = computed(() => props.source.streamType.value);
+const timestampColumn = computed<string>(() => store.state.zoConfig?.timestamp_column ?? "");
+
+// Logs drives its own schema tab; any other page with a defined schema gets the same tab, owned here.
+const ownSchemaTab = computed<boolean>(
+  () =>
+    !props.source.footerSchemaTab &&
+    store.state.zoConfig?.user_defined_schemas_enabled === true &&
+    (props.source.definedSchemaFields?.value?.length ?? 0) > 0,
+);
+const localSchemaTab = ref(SCHEMA_TAB);
+const schemaTab = computed<string>(() =>
+  ownSchemaTab.value ? localSchemaTab.value : (props.source.footerSchemaTab?.value ?? ""),
+);
+
+const footerToggles = computed<FooterToggle[]>(() => {
+  const own = props.capabilities.footerToggles;
+  return ownSchemaTab.value && !own.includes("schema") ? ["schema", ...own] : own;
+});
+
+function inDefinedSchema(row: PanelField, defined: Set<string>): boolean {
+  if (row.columnLocked) return true;
+  if (row.name === timestampColumn.value) return true;
+  if (row.name === store.state.zoConfig?.all_fields_name) return true;
+  return props.source.isDefinedSchemaField?.(row) ?? defined.has(row.name);
+}
+
+// Group headers are kept only while a field of their group is left.
+function onlyDefinedSchema(rows: PanelField[]): PanelField[] {
+  const defined = new Set(props.source.definedSchemaFields?.value ?? []);
+  const kept = rows.filter((row) => row.isGroup || inDefinedSchema(row, defined));
+  const groups = new Set(kept.filter((row) => !row.isGroup).map((row) => row.group));
+  return kept.filter((row) => !row.isGroup || groups.has(row.group));
+}
+
 const fields = computed<PanelField[]>(() => {
-  const rows = props.source.fields.value;
+  const rows =
+    ownSchemaTab.value && localSchemaTab.value === SCHEMA_TAB
+      ? onlyDefinedSchema(props.source.fields.value)
+      : props.source.fields.value;
   const groupFn = props.source.groupFn;
   if (props.source.groupingMode !== "custom" || !groupFn) return rows;
   return groupFn(rows).flatMap((group) =>
@@ -291,7 +331,6 @@ const activeExcludeValues = computed(() => props.source.activeExcludeValues.valu
 const tableColumns = computed(() => props.source.tableColumns?.value ?? []);
 const rowKey = computed(() => props.source.rowKey ?? "name");
 
-const timestampColumn = computed<string>(() => store.state.zoConfig?.timestamp_column ?? "");
 const showFtsFieldValues = computed<boolean>(
   () => store.state.zoConfig?.show_fts_field_values ?? false,
 );
@@ -377,7 +416,12 @@ const showReset = computed(
 
 // The footer always carries the field count, so it shows whenever there are fields or footer controls.
 function showFooter(fieldCount: number): boolean {
-  return fieldCount > 0 || props.capabilities.footerToggles.length > 0 || showReset.value;
+  return fieldCount > 0 || footerToggles.value.length > 0 || showReset.value;
+}
+
+function onSchemaToggle(value: string) {
+  if (ownSchemaTab.value) localSchemaTab.value = value;
+  else props.source.footerToggle?.("schema", value);
 }
 
 function onPickerOpen() {
@@ -410,15 +454,13 @@ function onExpandedIdsChange(ids: string[]) {
   }
 }
 
+// A new stream starts on the defined-schema tab again.
+watch([streamType, () => selectedStreams.value.join(",")], () => {
+  localSchemaTab.value = SCHEMA_TAB;
+});
+
 // A new stream set or footer tab is a new list, so paging starts over.
-watch(
-  [
-    selectedStreams,
-    () => props.source.footerSchemaTab?.value,
-    () => props.source.footerInterestingOnly?.value,
-  ],
-  () => {
-    currentPage.value = 1;
-  },
-);
+watch([selectedStreams, schemaTab, () => props.source.footerInterestingOnly?.value], () => {
+  currentPage.value = 1;
+});
 </script>
