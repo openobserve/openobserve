@@ -87,6 +87,11 @@ export async function readPickerText(
 
 /** "1 hr 30 min": the two largest whole units of the span, in the app locale. */
 export function formatSpan(spanUs: number, intlLocale: string): string {
+  // Two log stamps can be under a second apart, so a short span keeps its fraction.
+  if (spanUs > 0 && spanUs < US_PER_S)
+    return unitText(spanUs / US_PER_MS, "millisecond", intlLocale);
+  if (spanUs > 0 && spanUs < 60 * US_PER_S && spanUs % US_PER_S !== 0)
+    return unitText(spanUs / US_PER_S, "second", intlLocale);
   const seconds = Math.max(0, Math.round(spanUs / US_PER_S));
   const parts: [number, string][] = [
     [Math.floor(seconds / 86_400), "day"],
@@ -135,18 +140,20 @@ export function formatInstant(
   intlLocale: string,
   nowUs: number,
   withDay = dayKey(us, zone) !== dayKey(nowUs, zone),
+  withMillis = us % US_PER_S !== 0,
 ): string {
   const at = new Date(Math.floor(us / US_PER_MS));
   const yearFormat = dateFormat("en-CA", { timeZone: zone, year: "numeric" });
   const sameYear =
     yearFormat.format(at) === yearFormat.format(new Date(Math.floor(nowUs / US_PER_MS)));
-  const withSeconds = Math.floor(us / US_PER_S) % 60 !== 0;
+  const withSeconds = withMillis || Math.floor(us / US_PER_S) % 60 !== 0;
   return dateFormat(intlLocale, {
     timeZone: zone,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
     ...(withSeconds ? { second: "2-digit" } : {}),
+    ...(withMillis ? { fractionalSecondDigits: 3 as const } : {}),
     ...(withDay
       ? {
           weekday: "short",
@@ -166,13 +173,23 @@ export function formatRangeText(
   intlLocale: string,
   nowUs: number,
 ): string {
-  const start = formatInstant(startUs, zone, intlLocale, nowUs);
+  // Milliseconds matter only between close stamps; elsewhere they are the clock's, as for a range to now.
+  const short = endUs - startUs < 60 * US_PER_S;
+  const start = formatInstant(
+    startUs,
+    zone,
+    intlLocale,
+    nowUs,
+    undefined,
+    short && startUs % US_PER_S !== 0,
+  );
   const end = formatInstant(
     endUs,
     zone,
     intlLocale,
     nowUs,
     dayKey(endUs, zone) !== dayKey(startUs, zone),
+    short && endUs % US_PER_S !== 0,
   );
   return `${start} → ${end}`;
 }

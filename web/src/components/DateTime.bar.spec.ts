@@ -430,12 +430,16 @@ describe("DateTime typed range bar review fixes", () => {
     expect(wrapper!.vm.selectedTime.startTime).toBe("00:00:00");
   });
 
-  it("caps a typed rolling range at the ten-year limit", async () => {
+  it("applies a typed rolling range over the ten-year limit only as the capped row", async () => {
     create({ autoApply: true });
     await openMenu(wrapper!);
     await typeInBar("last 11 years");
+    const before = (wrapper!.emitted("on:date-change") ?? []).length;
     await press(barInput(), "Enter");
+    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(before);
 
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
     expect(lastChange(wrapper!).relativeTimePeriod).toBe("120M");
   });
 

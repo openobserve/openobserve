@@ -176,7 +176,7 @@ describe("DateTimeRangeInput", () => {
 
     expect(state()).toBe("blocked");
     expect(el("date-time-range-message")!.textContent).toBe(
-      "Longer than this stream's 3 days query limit.",
+      "Longer than this stream's query limit of 3 days.",
     );
     expect(el("date-time-range-reading-0")!.textContent).toContain("Longest allowed");
     await press(barInput(), "Enter");
@@ -376,5 +376,115 @@ describe("DateTimeRangeInput review fixes", () => {
     const event = pasteIntoBar("2h");
 
     expect(event.defaultPrevented).toBe(false);
+  });
+});
+
+describe("DateTimeRangeInput polish fixes", () => {
+  let wrapper: Bar | null = null;
+
+  const capRolling = (reading: TimeRangeReading): TimeRangeReading | null =>
+    reading.rolling && reading.rolling.unit === "M" && reading.rolling.value > 120
+      ? {
+          ...reading,
+          rolling: { unit: "M", value: 120 },
+          startUs: Date.UTC(2016, 9, 8, 3) * 1000,
+          name: undefined,
+          notes: [],
+        }
+      : null;
+
+  const create = (props: Record<string, unknown> = {}) => {
+    wrapper = mount(DateTimeRangeInput, {
+      props: {
+        zone: "UTC",
+        locale: "en-us",
+        intlLocale: "en-US",
+        applied: null,
+        limits: { allowFuture: false },
+        kinds: { relative: true, calendar: true, absolute: true },
+        units: ["s", "m", "h", "d", "w", "M"],
+        canCopy: true,
+        spanLimit: "",
+        capRolling,
+        ...props,
+      },
+      attachTo: document.body,
+      global: { plugins: [i18n] },
+    });
+    return wrapper;
+  };
+
+  const applied = () =>
+    (wrapper!.emitted("apply") ?? []).map((args) => args[0] as TimeRangeReading);
+  const state = () => el("date-time-range-status")!.getAttribute("data-state");
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+    vi.useRealTimers();
+  });
+
+  it("blocks a rolling range over the picker's cap and offers the capped one", async () => {
+    create();
+    await typeInBar("last 200 months");
+
+    expect(state()).toBe("blocked");
+    expect(el("date-time-range-message")!.textContent).toBe(
+      "Longer than the picker's 10-year limit.",
+    );
+    const row = el("date-time-range-reading-0")!.textContent;
+    expect(row).toContain("Past 120 Months");
+    expect(row).toContain("Longest allowed");
+    await press(barInput(), "Enter");
+    expect(applied()).toHaveLength(0);
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
+    expect(applied()[0].rolling).toEqual({ unit: "M", value: 120 });
+  });
+
+  it("names each zone-abbreviation row by its offset without counting the readings", async () => {
+    create();
+    await typeInBar("2026-10-07 10:00 IST");
+
+    expect(state()).toBe("ambiguous");
+    expect(el("date-time-range-message")!.textContent).toBe(
+      "This zone abbreviation names more than one zone. Pick one",
+    );
+    expect(el("date-time-range-reading-0")!.textContent).toContain("UTC+05:30");
+    expect(el("date-time-range-reading-1")!.textContent).toContain("UTC+02:00");
+  });
+
+  it("does not call a range cut at now the longest allowed", async () => {
+    create();
+    await typeInBar("2026-10-08 02:00 to 2026-10-08 05:00");
+
+    expect(state()).toBe("blocked");
+    expect(el("date-time-range-reading-0")!.textContent).not.toContain("Longest allowed");
+  });
+
+  it("describes a stamp's window as it is when now cuts it short", async () => {
+    create();
+    await typeInBar("2026-10-08 02:59");
+    expect(el("date-time-range-note")!.textContent).toBe("5 min before and 1 min after");
+
+    await typeInBar("2026-10-08 03:00:00");
+    expect(el("date-time-range-note")!.textContent).toBe("5 min before Thu, Oct 8, 03:00");
+
+    await typeInBar("2026-10-08 01:00");
+    expect(el("date-time-range-note")!.textContent).toBe("5 min either side of Thu, Oct 8, 01:00");
+  });
+
+  it("shows no duration for an empty applied range", async () => {
+    create({ applied: { startUs: NOW_US, endUs: NOW_US } });
+    await flushPromises();
+
+    expect(el("date-time-range-resolved")).not.toBeNull();
+    expect(el("date-time-range-duration")).toBeNull();
   });
 });

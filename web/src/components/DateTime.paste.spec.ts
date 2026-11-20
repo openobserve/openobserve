@@ -378,6 +378,19 @@ describe("DateTime paste review fixes", () => {
     expect(lastEmit().relativeTimePeriod).toBe("30m");
   });
 
+  it("sends a pasted rolling range over the cap to the bar instead of clamping it", async () => {
+    createWrapper({ autoApply: true });
+    await openMenu();
+    const before = (wrapper!.emitted("on:date-change") ?? []).length;
+    await wrapper!.vm.onPickerPaste(pasteEvent("now-200M"));
+    await flushPromises();
+
+    expect(barInput()!.value).toBe("now-200M");
+    expect(el("date-time-range-status")!.getAttribute("data-state")).toBe("blocked");
+    expect(el("date-time-range-reading-0")!.textContent).toContain("Past 120 Months");
+    expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(before);
+  });
+
   it("drops a paste that resolves after a newer pick", async () => {
     createWrapper({ autoApply: true });
     await openMenu();
