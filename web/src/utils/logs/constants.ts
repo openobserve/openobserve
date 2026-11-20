@@ -98,7 +98,7 @@ export const DEFAULT_LOGS_CONFIG = {
   shouldIgnoreWatcher: false,
   communicationMethod: "streaming" as const,
   config: {
-    splitterModel: 20,
+    splitterModel: 17,
     lastSplitterPosition: 0,
     splitterLimit: [0, 40] as const,
     fnSplitterModel: 60,

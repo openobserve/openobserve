@@ -1084,7 +1084,7 @@ export default defineComponent({
         if (mobile) {
           searchObj.config.splitterModel = 0;
         } else if (wasMobile && searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
-          searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+          searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 17;
         }
       },
       { immediate: true },
