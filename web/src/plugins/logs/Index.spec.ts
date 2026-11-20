@@ -302,7 +302,9 @@ vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
       streamFields: null,
       logSamples: null,
       analysisType: null,
+      initialDimensions: null,
     },
+    emits: ["update:dimensions"],
     template: '<div data-test="drill-down-dashboard-stub"><slot name="header-start" /></div>',
   },
 }));
@@ -1793,6 +1795,23 @@ describe("Logs Index", async () => {
       await enterDrillDown();
 
       expect(wrapper.find("#thirdLevel").attributes("style")).toContain("display: none");
+    });
+
+    it("hands the picked dimensions back to the dashboard each time it remounts", async () => {
+      await enterDrillDown();
+      const { searchObj } = wrapper.vm;
+      expect(dashboard().props("initialDimensions")).toBeNull();
+
+      dashboard().vm.$emit("update:dimensions", ["service_name", "level"]);
+      await flushPromises();
+      expect(searchObj.meta.drillDownDimensions).toEqual(["service_name", "level"]);
+
+      searchObj.loading = true;
+      await flushPromises();
+      expect(dashboard().exists()).toBe(false);
+      searchObj.loading = false;
+      await flushPromises();
+      expect(dashboard().props("initialDimensions")).toEqual(["service_name", "level"]);
     });
 
     it("unmounts the dashboard while a search runs so it rebuilds from the new results", async () => {

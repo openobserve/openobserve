@@ -417,6 +417,29 @@ describe("Use Logs Composable", () => {
       expect(wrapper.vm.searchObj.meta.freeTextScan).toEqual({});
     });
 
+    it("restores the picked Drill down dimensions and clears them when the link has none", async () => {
+      const { restoreUrlQueryParams } = wrapper.vm;
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+        drilldown_dims: "level,k8s_namespace_name",
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toEqual([
+        "level",
+        "k8s_namespace_name",
+      ]);
+
+      wrapper.vm.router.currentRoute.value.query = {
+        stream: "stream1",
+        period: "15m",
+        query: btoa("timeout"),
+      };
+      await restoreUrlQueryParams();
+      expect(wrapper.vm.searchObj.meta.drillDownDimensions).toBeNull();
+    });
+
     it("should restore stream and datetime parameters", async () => {
       wrapper.vm.router.currentRoute.value.query = {
         stream: "stream1,stream2",

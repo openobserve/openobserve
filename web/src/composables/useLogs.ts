@@ -556,6 +556,10 @@ const useLogs = (t: TranslateFn) => {
       );
     }
 
+    searchObj.meta.drillDownDimensions = queryParams.drilldown_dims
+      ? String(queryParams.drilldown_dims).split(",").filter(Boolean)
+      : null;
+
     //here we restore the fn editor state from the url query params
     if (queryParams.fn_editor) {
       searchObj.meta.showTransformEditor = queryParams.fn_editor == "true" ? true : false;

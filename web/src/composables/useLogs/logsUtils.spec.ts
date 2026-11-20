@@ -826,6 +826,20 @@ describe("logsUtils", () => {
       expect(query.logs_visualize_toggle).toBe("visualize");
     });
 
+    it("writes the picked Drill down dimensions only in the drilldown view", () => {
+      mockSearchObj.meta.drillDownDimensions = ["level", "k8s_namespace_name"];
+      mockSearchObj.meta.logsVisualizeToggle = "drilldown";
+      expect(utils.generateURLQuery().drilldown_dims).toBe("level,k8s_namespace_name");
+
+      mockSearchObj.meta.logsVisualizeToggle = "logs";
+      expect(utils.generateURLQuery().drilldown_dims).toBeUndefined();
+
+      mockSearchObj.meta.logsVisualizeToggle = "drilldown";
+      mockSearchObj.meta.drillDownDimensions = null;
+      expect(utils.generateURLQuery().drilldown_dims).toBeUndefined();
+      delete mockSearchObj.meta.drillDownDimensions;
+    });
+
     it("should handle stream as object with value property", () => {
       mockSearchObj.data.stream.selectedStream = { value: "my-stream" } as any;
       const query = utils.generateURLQuery();

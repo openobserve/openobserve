@@ -46,6 +46,7 @@ export const VIEW_STATE_PARAMS = new Set([
   "visualization_data",
   "build_data",
   "logs_visualize_toggle",
+  "drilldown_dims",
   "cmp_pin",
   ...LINE_LINK_PARAMS,
 ]);

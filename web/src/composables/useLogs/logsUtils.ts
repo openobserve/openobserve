@@ -602,6 +602,13 @@ export const logsUtils = () => {
       query["logs_visualize_toggle"] = searchObj.meta.logsVisualizeToggle;
     }
 
+    if (
+      searchObj.meta.logsVisualizeToggle === "drilldown" &&
+      searchObj.meta.drillDownDimensions?.length
+    ) {
+      query["drilldown_dims"] = searchObj.meta.drillDownDimensions.join(",");
+    }
+
     // Preserve visualization data in URL
     // - If in visualize mode and panel data is provided, encode the dashboardPanelData
     if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
