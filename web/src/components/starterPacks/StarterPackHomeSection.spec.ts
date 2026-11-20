@@ -72,12 +72,19 @@ const matcherDouble = (state = "matched", streams = ["k8s_events"]) => {
     state: ref(state),
     clusters: ref<string[]>([]),
     streams: ref(streams),
+    streamTypes: ref<Record<string, string>>({}),
     waitedLong: ref(false),
     check,
     checkShared: check,
     retry: vi.fn(async () => undefined),
   };
 };
+
+const previewOf = (kinds: string[]) => ({
+  items: kinds.map((kind, n) => ({ kind, itemId: `${kind}-${n}`, status: "new" })),
+  panels: { kept: 0 },
+  severities: {},
+});
 
 const render = async (packs = [KUBERNETES_PACK]) => {
   for (const pack of packs) fake.flows[pack.id].loaded.value = false;
@@ -153,13 +160,22 @@ describe("StarterPackHomeSection", () => {
   });
 
   it("shows the hero, then the pack in the same rail and tiles as the header popup", async () => {
+    fake.flows.kubernetes.preview.value = previewOf(["dashboard", "alert", "alert"]);
+    fake.flows.hosts.preview.value = previewOf(["dashboard", "savedView"]);
     const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
     const hero = wrapper.get('[data-test="home-pack-hero"]').text();
     expect(hero).toContain("Starter packs");
-    expect(hero).toContain("Your data is arriving. Turn it into monitoring.");
     expect(hero).toContain(
-      "Pick a starter pack below. It creates dashboards, alerts and saved views that fit your streams.",
+      "Data is live. Set up ready-made dashboards and alerts in about a minute",
     );
+    expect(hero).toContain("from 2 packs that fit your data");
+    const count = (kind: string) =>
+      wrapper.get(`[data-test="home-pack-hero-count-${kind}"]`).text();
+    expect([count("dashboard"), count("alert"), count("savedView")]).toEqual([
+      "2 dashboards",
+      "2 alerts",
+      "1 saved view",
+    ]);
     expect(has(wrapper, "home-pack-hero-icon")).toBe(true);
     expect(wrapper.get('[data-test="home-pack-list-hero"]').text()).toContain("Kubernetes");
     expect(has(wrapper, "home-pack-list-tile-dashboard")).toBe(true);
@@ -251,14 +267,84 @@ describe("StarterPackHomeSection", () => {
     expect(interrupted).toEqual({ packId: "hosts", label: "Hosts", done: 1, total: 3 });
   });
 
-  it("names the cluster and folds every stream after the first into +N streams", async () => {
-    fake.matchers.kubernetes.streams.value = ["a", "b", "c", "d"];
+  it("lists connected sources: two cluster names then +N clusters", async () => {
+    fake.matchers.kubernetes.streams.value = ["a"];
+    fake.matchers.kubernetes.clusters.value = ["prod", "stage", "dev", "qa"];
+    const wrapper = await render();
+    const row = wrapper.get('[data-test="home-pack-connected-kubernetes"]').text();
+    expect(row).toContain("prod, stage");
+    expect(row).toContain("+2 clusters");
+  });
+
+  it("shows a chip per cluster and the first 4 streams, then +N more", async () => {
+    fake.matchers.kubernetes.streams.value = ["a", "b", "c", "d", "e"];
     fake.matchers.kubernetes.clusters.value = ["staging-eu-1"];
     const wrapper = await render();
-    expect(wrapper.get('[data-test="home-pack-list-from"]').text()).toBe("from staging-eu-1");
+    const chips = wrapper.findAll('[data-test="home-pack-list-source-chip"]');
+    expect(chips.map((chip) => chip.findAll("span").map((part) => part.text()))).toEqual([
+      ["staging-eu-1", "cluster"],
+    ]);
     const streams = wrapper.get('[data-test="home-pack-list-streams"]').text();
-    expect(streams).toContain("a+3 streams");
-    expect(streams).toContain("bcd");
+    expect(streams).toContain("Streams this pack uses · 5");
+    expect(wrapper.findAll('[data-test="home-pack-list-stream-chip"]')).toHaveLength(4);
+    expect(streams).toContain("+1 more");
+  });
+
+  it("counts nothing to add until every startable pack's preview has loaded", async () => {
+    fake.flows.kubernetes.previewState.value = "loading";
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    expect(has(wrapper, "home-pack-hero-counts")).toBe(false);
+    fake.flows.kubernetes.previewState.value = "ready";
+    fake.flows.kubernetes.preview.value = previewOf(["dashboard"]);
+    fake.flows.hosts.preview.value = previewOf(["alert"]);
+    await nextTick();
+    expect(wrapper.get('[data-test="home-pack-hero-counts"]').text()).toContain(
+      "from 2 packs that fit your data",
+    );
+  });
+
+  it("leaves a pack the user may not set up out of the Ready to add counts", async () => {
+    fake.flows.kubernetes.forbidden.value = true;
+    fake.flows.kubernetes.preview.value = previewOf(["dashboard", "alert"]);
+    fake.flows.hosts.preview.value = previewOf(["alert"]);
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    const counts = wrapper.get('[data-test="home-pack-hero-counts"]').text();
+    expect(counts).toContain("1 alert");
+    expect(counts).toContain("from 1 pack that fits your data");
+    expect(has(wrapper, "home-pack-hero-count-dashboard")).toBe(false);
+  });
+
+  it("counts only packs that add something, and skips a pack whose preview failed", async () => {
+    fake.flows.kubernetes.preview.value = previewOf(["alert"]);
+    fake.flows.hosts.previewState.value = "error";
+    const wrapper = await render([KUBERNETES_PACK, HOSTS_PACK]);
+    const counts = wrapper.get('[data-test="home-pack-hero-counts"]').text();
+    expect(counts).toContain("1 alert");
+    expect(counts).toContain("from 1 pack that fits your data");
+  });
+
+  it("hides Ready to add when every item of the pack already exists", async () => {
+    fake.flows.kubernetes.preview.value = {
+      ...previewOf(["dashboard"]),
+      items: [{ kind: "dashboard", itemId: "d", status: "existing" }],
+    };
+    const wrapper = await render();
+    expect(has(wrapper, "home-pack-hero-counts")).toBe(false);
+  });
+
+  it("names each stream's type and counts clusters and streams on the rail", async () => {
+    fake.matchers.kubernetes.streams.value = ["k8s_events", "kube_pod_info"];
+    fake.matchers.kubernetes.streamTypes.value = { k8s_events: "logs", kube_pod_info: "metrics" };
+    fake.matchers.kubernetes.clusters.value = ["prod", "stage"];
+    const wrapper = await render();
+    const chips = wrapper.findAll('[data-test="home-pack-list-stream-chip"]');
+    expect(chips.map((chip) => chip.findAll("span").map((part) => part.text()))).toEqual([
+      ["k8s_events", "logs"],
+      ["kube_pod_info", "metrics"],
+    ]);
+    expect(wrapper.get('[data-test="home-pack-list-row-kubernetes"]').text()).toContain(
+      "2 clusters · 2 streams",
+    );
   });
 
   it("shows an empty alerts tile with no summary for a pack with no alerts", async () => {
