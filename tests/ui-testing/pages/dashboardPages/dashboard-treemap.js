@@ -1,7 +1,29 @@
 // Treemap panel reads: tiles are canvas-painted, so the live ECharts instance is the only source of what is drawn.
+const {
+  getOrgIdentifier,
+} = require("../../playwright-tests/utils/cloud-auth.js");
+
 export default class DashboardTreemap {
   constructor(page) {
     this.page = page;
+  }
+
+  org() {
+    return getOrgIdentifier() || process.env.ORGNAME || "default";
+  }
+
+  async openDashboard(dashboardId, period = "1h") {
+    await this.page.goto(
+      `/web/dashboards/view?org_identifier=${this.org()}&dashboard=${dashboardId}&folder=default&period=${period}`,
+    );
+  }
+
+  /** Opens the panel editor on `panelId`, or on a new panel when `panelId` is omitted. */
+  async openPanelEditor(dashboardId, panelId) {
+    const panel = panelId ? `&panelId=${panelId}` : "";
+    await this.page.goto(
+      `/web/dashboards/add_panel?org_identifier=${this.org()}&dashboard=${dashboardId}${panel}&folder=default&tab=default`,
+    );
   }
 
   panel(panelId) {

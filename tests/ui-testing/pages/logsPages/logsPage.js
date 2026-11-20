@@ -10,6 +10,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 
+// The app's url-safe base64 (b64EncodeUnicode in web/src/utils/formatters.ts): '+/=' become '-_.'.
+export const encodeUrlSafeBase64 = (text) =>
+    Buffer.from(text, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '.');
+export const decodeUrlSafeBase64 = (text) =>
+    Buffer.from(text.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf8');
+
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment, authedRequest } = require('../../playwright-tests/utils/cloud-auth.js');
@@ -10237,16 +10243,16 @@ export class LogsPage {
     }
 
     /** Assert the Build tab's stream type. Retries — the model settles a tick late. */
-    async expectBuildStreamType(type) {
+    async expectBuildStreamType(type, timeout = 20000) {
         await expect(this.page.locator(this.buildStreamTypeTrigger))
-            .toHaveAttribute('data-test-selected-value', type, { timeout: 20000 });
+            .toHaveAttribute('data-test-selected-value', type, { timeout });
         testLogger.info(`Verified Build tab stream type: ${type}`);
     }
 
     /** Assert which stream the Build tab's field list has selected. */
-    async expectBuildStreamSelected(name) {
+    async expectBuildStreamSelected(name, timeout = 20000) {
         await expect(this.page.locator(this.buildStreamTrigger))
-            .toHaveAttribute('data-test-selected-value', name, { timeout: 20000 });
+            .toHaveAttribute('data-test-selected-value', name, { timeout });
         testLogger.info(`Verified Build tab selected stream: ${name}`);
     }
 
@@ -13364,8 +13370,132 @@ export class LogsPage {
         }, { message: `${field} never offered ${value}`, timeout }).toContain(value);
     }
 
-    async expectPatternsToggleOff() {
-        await expect(this.page.locator('[data-test="logs-patterns-toggle"]')).not.toHaveAttribute('data-state', 'on');
+    async expectPatternsToggleOff(timeout = 15000) {
+        const toggle = this.page.locator('[data-test="logs-patterns-toggle"]');
+        await expect(toggle).toBeVisible({ timeout });
+        await expect(toggle).toHaveAttribute('data-state', 'off');
+    }
+
+    /** Live list of `/patterns/extract` request URLs sent from now on. */
+    trackPatternsExtractRequests() {
+        const sent = [];
+        this.page.on('request', (req) => {
+            if (/\/patterns\/extract/.test(req.url())) sent.push(req.url());
+        });
+        return sent;
+    }
+
+    // An extract call follows the toggle within a second when it is made, so `timeout` without one means none.
+    /** Resolves to the next `/patterns/extract` URL, or null if none is sent within `timeout`. */
+    waitForPatternsExtract(timeout = 10000) {
+        return this.page
+            .waitForRequest((req) => /\/patterns\/extract/.test(req.url()), { timeout })
+            .then((req) => req.url())
+            .catch(() => null);
+    }
+
+    /** Clicks Patterns even when it is disabled, so a toggle that should refuse is still tried. */
+    async tryPatternsToggle() {
+        await selectLogsViewMode(this.page, 'patterns', 20000, { force: true });
+    }
+
+    /** `/web/logs` link for `stream` with `params` appended; `query` text is url-safe base64 encoded as the app does. */
+    logsLink(stream, { streamType = 'logs', query, ...params } = {}) {
+        const search = new URLSearchParams({
+            org_identifier: getOrgIdentifier() || 'default',
+            stream,
+            stream_type: streamType,
+            ...params,
+        });
+        if (query !== undefined) search.set('query', encodeUrlSafeBase64(query));
+        return `/web/logs?${search.toString()}`;
+    }
+
+    /** Opens Logs on `stream` with `queryText` in the editor, sent as plain base64 the way the share link writes it. */
+    async openLogsWithQueryText(stream, queryText, period = '1h') {
+        await this.openLogsWithParams(stream, {
+            period,
+            sql_mode: 'false',
+            quick_mode: 'false',
+            query: Buffer.from(queryText, 'utf8').toString('base64'),
+        });
+    }
+
+    async getQueryEditorTextCollapsed() {
+        return ((await this.getQueryEditorText()) || '').replace(/\s+/g, ' ').trim();
+    }
+
+    /**
+     * Live list of every POST `_search`/`_search_stream` sent from now on, optionally only those whose SQL names `stream`.
+     * Each entry: `{ type, searchType, histogram, size, sql, done }`, with the SQL decoded and whitespace-collapsed.
+     */
+    trackSearchRequests({ stream } = {}) {
+        const sent = [];
+        const settle = (req) => {
+            const entry = sent.find((r) => r.req === req);
+            if (entry) entry.done = true;
+        };
+        this.page.on('requestfinished', settle);
+        this.page.on('requestfailed', settle);
+        this.page.on('request', (req) => {
+            const url = new URL(req.url());
+            if (req.method() !== 'POST' || !/\/_search(_stream)?$/.test(url.pathname)) return;
+            let sql = '';
+            let size;
+            try {
+                const body = JSON.parse(req.postData() || '{}');
+                const q = body.query && typeof body.query === 'object' ? body.query : body;
+                size = q.size;
+                sql = body.encoding === 'base64' ? decodeUrlSafeBase64(String(q.sql ?? '')) : String(q.sql ?? '');
+            } catch {
+                /* non-JSON body */
+            }
+            sql = sql.replace(/\s+/g, ' ').trim();
+            if (stream && !sql.includes(stream)) return;
+            sent.push({
+                req,
+                done: false,
+                type: url.searchParams.get('type'),
+                searchType: url.searchParams.get('search_type'),
+                histogram: url.searchParams.get('is_ui_histogram') === 'true',
+                size,
+                sql,
+            });
+        });
+        return sent;
+    }
+
+    // The histogram and the size-0 count searches carry the same SQL as the hits search, so they are left out.
+    /** SQL of the UI hits searches among trackSearchRequests() entries. */
+    hitSearchSql(sent) {
+        return sent.filter((r) => r.searchType === 'ui' && !r.histogram && r.size !== 0).map((r) => r.sql);
+    }
+
+    async expectTrackedSearchesSettled(sent, timeout = 60000) {
+        await expect
+            .poll(() => sent.filter((r) => !r.done).length, { timeout, message: 'every tracked search must finish' })
+            .toBe(0);
+    }
+
+    /** Polls until the grid shows exactly `count` rows and every one contains `text`. */
+    async expectResultRowsAllContain(text, count, timeout = 60000) {
+        await expect
+            .poll(
+                async () => {
+                    const rows = await this.getResultRowTexts();
+                    return { count: rows.length, allMatch: rows.every((r) => r.includes(text)) };
+                },
+                { timeout, message: `the grid must show ${count} rows containing ${text}` },
+            )
+            .toEqual({ count, allMatch: true });
+    }
+
+    /** Resolves once a successful POST `/query_history` (a run saved as a recent search) has been answered. */
+    waitForQueryHistoryRecorded(timeout = 60000) {
+        return this.page.waitForResponse(
+            (r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/query_history') && r.ok(),
+            { timeout },
+        );
     }
 
     async closeLogDetailIfOpen() {
@@ -13401,14 +13531,6 @@ export class LogsPage {
 
     searchStreamNotFoundMessage() {
         return this.page.getByText('Search stream not found');
-    }
-
-    async expectBuildStreamType(pattern, timeout = 15000) {
-        await expect(this.page.locator(this.buildStreamTypeDropdown).first()).toContainText(pattern, { timeout });
-    }
-
-    async expectBuildStream(streamName, timeout = 15000) {
-        await expect(this.page.locator(this.buildStreamDropdown).first()).toContainText(streamName, { timeout });
     }
 
     /** The no-events copy for a filtered query, an unfiltered one, or a window with no stream data. */

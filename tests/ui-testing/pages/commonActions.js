@@ -188,6 +188,28 @@ export class CommonActions {
         this.homeMenuItem = '[data-test="menu-link-\\/-item"]';
     }
 
+    // The same router.push an in-app link makes: a kept-alive page is re-activated, not reloaded.
+    async routerPush(path) {
+        await this.page.evaluate(
+            (to) => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push(to),
+            path.replace(/^\/web/, ''),
+        );
+    }
+
+    /** Tags the current document so expectSameDocument() can tell a later reload apart. */
+    async markDocument() {
+        await this.page.evaluate(() => {
+            window.__e2eSameDocument = 'same-document';
+        });
+    }
+
+    async expectSameDocument() {
+        expect(
+            await this.page.evaluate(() => window.__e2eSameDocument),
+            'navigation must not reload the page',
+        ).toBe('same-document');
+    }
+
     async navigateToAlerts() {
         await this.page.locator(this.alertsMenuItem).click();
         await this.page.waitForTimeout(2000);

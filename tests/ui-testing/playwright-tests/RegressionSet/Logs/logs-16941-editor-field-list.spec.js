@@ -21,9 +21,6 @@ const SERVICES = ["alpha", "beta", "gamma"];
 const ORDERS = ["o1", "o2"];
 const ROWS_PER_PAIR = 2;
 
-const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
-const flat = (s) => (s || "").replace(/\s+/g, " ").trim();
-
 test.describe("Logs editor and field list keep the user's query (#16941)", () => {
   test.describe.configure({ mode: "serial" });
   let pm;
@@ -73,7 +70,7 @@ test.describe("Logs editor and field list keep the user's query (#16941)", () =>
       const unfiltered = `SELECT * FROM "${STREAM}"`;
       await pm.logsPage.setQueryEditorContent(unfiltered);
       await expect
-        .poll(async () => flat(await pm.logsPage.getQueryEditorText()))
+        .poll(async () => pm.logsPage.getQueryEditorTextCollapsed())
         .toBe(unfiltered);
       // An armed Run button means the debounced edit has reached the search state the copy used to read.
       await pm.logsPage.expectRunPending();
@@ -87,12 +84,7 @@ test.describe("Logs editor and field list keep the user's query (#16941)", () =>
     "ticking a second field-list value next to an order filter ORs it with the first",
     { tag: ["@bug-16941", "@P2", "@regression", "@logsRegression"] },
     async ({ page }) => {
-      await pm.logsPage.openLogsWithParams(STREAM, {
-        period: "1h",
-        sql_mode: "false",
-        quick_mode: "false",
-        query: b64("order = 'o1'"),
-      });
+      await pm.logsPage.openLogsWithQueryText(STREAM, "order = 'o1'");
       await pm.logsPage.ensureQueryEditorMode();
       await pm.logsPage.runQueryAndWaitForResults();
       expect(await pm.logsPage.getResultHitsCount()).toBe(
@@ -100,14 +92,13 @@ test.describe("Logs editor and field list keep the user's query (#16941)", () =>
       );
 
       await pm.logsPage.clickFieldExpandButton("svc_name");
-      const box = (v) => pm.logsPage.fieldValueCheckbox("svc_name", v);
-      await box("alpha").click();
+      await pm.logsPage.fieldValueCheckbox("svc_name", "alpha").click();
       await expect
-        .poll(async () => flat(await pm.logsPage.getQueryEditorText()))
+        .poll(async () => pm.logsPage.getQueryEditorTextCollapsed())
         .toMatch(/svc_name = 'alpha'/);
-      await box("beta").click();
+      await pm.logsPage.fieldValueCheckbox("svc_name", "beta").click();
       await expect
-        .poll(async () => flat(await pm.logsPage.getQueryEditorText()), {
+        .poll(async () => pm.logsPage.getQueryEditorTextCollapsed(), {
           timeout: 15000,
         })
         .toMatch(
@@ -133,13 +124,7 @@ test.describe("Logs editor and field list keep the user's query (#16941)", () =>
       await pm.logsPage.waitForSearchResultRows(60000);
       await pm.logsPage.expectNoQueryInFlight(60000);
       await pm.logsPage.fillQueryEditor(recent);
-      const recorded = page.waitForResponse(
-        (r) =>
-          r.request().method() === "POST" &&
-          new URL(r.url()).pathname.endsWith("/query_history") &&
-          r.ok(),
-        { timeout: 60000 },
-      );
+      const recorded = pm.logsPage.waitForQueryHistoryRecorded();
       await pm.logsPage.runPendingQuery();
       await recorded;
       await pm.logsPage.expectNoQueryInFlight(60000);
@@ -161,7 +146,7 @@ test.describe("Logs editor and field list keep the user's query (#16941)", () =>
 
       await page.keyboard.press("Tab");
       await expect
-        .poll(async () => flat(await pm.logsPage.getQueryEditorText()))
+        .poll(async () => pm.logsPage.getQueryEditorTextCollapsed())
         .toBe(CODE_FIELD);
     },
   );

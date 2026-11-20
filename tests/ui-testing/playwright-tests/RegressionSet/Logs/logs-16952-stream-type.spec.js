@@ -13,8 +13,10 @@ const {
   ingestOtlpTraces,
   waitForStreamRows,
   deleteStream,
-  stringAttr,
 } = require("../../utils/traces-api.js");
+const {
+  simpleTracesPayload,
+} = require("../../../pages/tracesPages/tracesFixtures.js");
 const { getOrgIdentifier } = require("../../utils/cloud-auth.js");
 const { selectLogsViewMode } = require("../../../pages/commonActions.js");
 
@@ -26,85 +28,13 @@ const LOG_MARKER = `logs-16952-${RID}`;
 const LOG_ROWS = 3;
 const SPANS = 4;
 
-const logsUrl = (type) =>
-  `/web/logs?org_identifier=${ORG}&stream=${STREAM}&stream_type=${type}&period=15m` +
-  "&refresh=0&sql_mode=false&quick_mode=false&show_histogram=false";
-
-function tracesPayload() {
-  const nowNs = BigInt(Date.now()) * 1_000_000n;
-  const traceId = `${RID}`
-    .padEnd(32, "0")
-    .replace(/[^0-9a-f]/g, "a")
-    .slice(0, 32);
-  const spans = Array.from({ length: SPANS }, (_, i) => ({
-    traceId,
-    spanId: `${i + 1}`.padStart(16, "0"),
-    name: `op-${i}`,
-    kind: 2,
-    startTimeUnixNano: String(nowNs - BigInt((i + 2) * 1_000_000_000)),
-    endTimeUnixNano: String(nowNs - BigInt((i + 1) * 1_000_000_000)),
-    attributes: [],
-    status: {},
-  }));
-  return {
-    resourceSpans: [
-      {
-        resource: {
-          attributes: [stringAttr("service.name", `svc-16952-${RID}`)],
-        },
-        scopeSpans: [{ scope: { name: "e2e" }, spans }],
-      },
-    ],
-  };
-}
-
-function searchRequests(page) {
-  const sent = [];
-  const settle = (req) => {
-    const entry = sent.find((r) => r.req === req);
-    if (entry) entry.done = true;
-  };
-  page.on("requestfinished", settle);
-  page.on("requestfailed", settle);
-  page.on("request", (req) => {
-    const url = new URL(req.url());
-    if (req.method() !== "POST" || !/\/_search(_stream)?$/.test(url.pathname))
-      return;
-    let sql = "";
-    try {
-      const body = JSON.parse(req.postData() || "{}");
-      const raw = String((body.query && body.query.sql) ?? body.sql ?? "");
-      sql =
-        body.encoding === "base64"
-          ? Buffer.from(
-              raw.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="),
-              "base64",
-            ).toString("utf8")
-          : raw;
-    } catch {
-      /* non-JSON body */
-    }
-    sent.push({
-      req,
-      done: false,
-      type: url.searchParams.get("type"),
-      searchType: url.searchParams.get("search_type"),
-      sql,
-    });
-  });
-  return sent;
-}
-
-// Kept-alive in-app navigation: the same router.push a link inside the app makes, with no page load.
-async function routerPush(page, path) {
-  await page.evaluate(
-    (to) =>
-      document
-        .querySelector("#app")
-        .__vue_app__.config.globalProperties.$router.push(to),
-    path.replace(/^\/web/, ""),
-  );
-}
+const LINK_PARAMS = {
+  period: "15m",
+  refresh: "0",
+  sql_mode: "false",
+  quick_mode: "false",
+  show_histogram: "false",
+};
 
 test.describe("Logs uses the stream type of the stream it shows (#16952)", () => {
   test.describe.configure({ mode: "serial" });
@@ -121,7 +51,11 @@ test.describe("Logs uses the stream type of the stream it shows (#16952)", () =>
         message: `${LOG_MARKER} ${i}`,
       })),
     );
-    await ingestOtlpTraces(request, STREAM, tracesPayload());
+    await ingestOtlpTraces(
+      request,
+      STREAM,
+      simpleTracesPayload(RID, `svc-16952-${RID}`, SPANS),
+    );
     await waitForSearchable(request, ORG, STREAM, LOG_ROWS);
     await waitForStreamRows(request, STREAM, SPANS);
   });
@@ -143,11 +77,13 @@ test.describe("Logs uses the stream type of the stream it shows (#16952)", () =>
       tag: ["@bug-16952", "@P1", "@regression", "@logsRegression"],
     },
     async ({ page }) => {
-      await page.goto(logsUrl("traces"));
+      await page.goto(
+        pm.logsPage.logsLink(STREAM, { streamType: "traces", ...LINK_PARAMS }),
+      );
       await pm.logsPage.waitForSearchResultRows(60000);
       await pm.logsPage.expectNoQueryInFlight(60000);
 
-      const sent = searchRequests(page);
+      const sent = pm.logsPage.trackSearchRequests();
       await selectLogsViewMode(page, "drilldown");
       await expect
         .poll(() => sent.filter((r) => r.searchType === "insights").length, {
@@ -178,14 +114,16 @@ test.describe("Logs uses the stream type of the stream it shows (#16952)", () =>
       tag: ["@bug-16952", "@P1", "@regression", "@logsRegression"],
     },
     async ({ page }) => {
-      await page.goto(logsUrl("traces"));
+      await page.goto(
+        pm.logsPage.logsLink(STREAM, { streamType: "traces", ...LINK_PARAMS }),
+      );
       await pm.logsPage.waitForSearchResultRows(60000);
       await pm.logsPage.expectNoQueryInFlight(60000);
 
       await selectLogsViewMode(page, "build");
       await pm.logsPage.expectBuildTabSelected(30000);
-      await pm.logsPage.expectBuildStreamType(/traces/i, 30000);
-      await pm.logsPage.expectBuildStream(STREAM);
+      await pm.logsPage.expectBuildStreamType("traces", 30000);
+      await pm.logsPage.expectBuildStreamSelected(STREAM);
     },
   );
 
@@ -195,7 +133,9 @@ test.describe("Logs uses the stream type of the stream it shows (#16952)", () =>
       tag: ["@bug-16952", "@P1", "@regression", "@logsRegression"],
     },
     async ({ page }) => {
-      await page.goto(logsUrl("traces"));
+      await page.goto(
+        pm.logsPage.logsLink(STREAM, { streamType: "traces", ...LINK_PARAMS }),
+      );
       await pm.logsPage.waitForSearchResultRows(60000);
       await pm.logsPage.expectNoQueryInFlight(60000);
 
@@ -203,8 +143,10 @@ test.describe("Logs uses the stream type of the stream it shows (#16952)", () =>
       await page.waitForURL((u) => !u.pathname.includes("/logs"), {
         timeout: 15000,
       });
-      const sent = searchRequests(page);
-      await routerPush(page, logsUrl("logs"));
+      const sent = pm.logsPage.trackSearchRequests();
+      await pm.commonActions.routerPush(
+        pm.logsPage.logsLink(STREAM, LINK_PARAMS),
+      );
 
       await pm.logsPage.expectResultRowWithText(LOG_MARKER);
       const hits = sent.filter(

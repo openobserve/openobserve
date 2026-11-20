@@ -8,42 +8,15 @@ const {
   TracesRegressionPage,
 } = require("../../../pages/tracesPages/tracesRegressionPage.js");
 const {
-  hexId,
-  otlpAttr,
-  otlpSpan,
   uniqueTraceStream,
   ingestSpansAndWait,
   deleteTraceStream,
+  sidebarFilterSpans,
+  SIDEBAR_SPAN_COUNT: SPAN_COUNT,
 } = require("../../../pages/tracesPages/tracesFixtures.js");
 
+// Spans 0,4,8,12 have no http_status_code, 3,6,9,15 are 500 and the rest 200; 0,5,10,15 are ERROR; services a (0-5), b (6-10), c (11-15).
 // The slowest span (15) lasts 1.234567 s, so a Max bound rounded to the label's 1.23s would drop it.
-const SPAN_COUNT = 16;
-const NULL_STATUS = [0, 4, 8, 12];
-const STATUS_500 = [3, 6, 9, 15];
-const ERRORS = [0, 5, 10, 15];
-const service = (i) => (i < 6 ? "a" : i < 11 ? "b" : "c");
-
-function seedSpans() {
-  const nowNs = BigInt(Date.now()) * 1000000n;
-  const byService = {};
-  for (let i = 0; i < SPAN_COUNT; i++) {
-    const attributes = NULL_STATUS.includes(i)
-      ? []
-      : [otlpAttr("http_status_code", STATUS_500.includes(i) ? "500" : "200")];
-    const span = otlpSpan({
-      traceId: hexId(16),
-      name: `fb-op-${String(i).padStart(2, "0")}`,
-      nowNs,
-      agoMs: 600000 + i * 1000,
-      durationNs: i === 15 ? 1234567000 : 100000000 + i * 50000000,
-      statusCode: ERRORS.includes(i) ? 2 : 0,
-      attributes,
-    });
-    (byService[service(i)] ||= []).push(span);
-  }
-  return byService;
-}
-
 test.describe("Traces sidebar filters (#16941)", () => {
   test.describe.configure({ mode: "serial" });
   const stream = uniqueTraceStream("16941");
@@ -51,7 +24,7 @@ test.describe("Traces sidebar filters (#16941)", () => {
 
   test.beforeAll(async ({ playwright }) => {
     const request = await playwright.request.newContext();
-    await ingestSpansAndWait(request, stream, seedSpans());
+    await ingestSpansAndWait(request, stream, sidebarFilterSpans());
     await request.dispose();
   });
 
@@ -166,15 +139,7 @@ test.describe("Traces sidebar filters (#16941)", () => {
         stream,
         "(service_name='a' AND span_status='ERROR') OR duration > 1000",
       );
-      const valuesStatus = page
-        .waitForResponse(
-          (r) =>
-            /_values|_search/.test(r.url()) &&
-            /service_name/.test(r.request().postData() || r.url()),
-          { timeout: 20000 },
-        )
-        .then((r) => r.status())
-        .catch(() => null);
+      const valuesStatus = tr.waitForFieldValuesStatus("service_name");
       await tr.expandField("service_name");
       expect(
         await valuesStatus,

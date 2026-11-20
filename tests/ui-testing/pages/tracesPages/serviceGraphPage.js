@@ -531,6 +531,13 @@ export class ServiceGraphPage {
     await this.page.waitForURL(/\/traces\?/, { timeout: 15000 });
   }
 
+  /** Opens `nodeName`'s side panel and hands its first operation (expected to count `count`) off to Traces. */
+  async viewTracesFromFirstOperation(nodeName, count) {
+    await this.clickNodeByName(nodeName);
+    await this.expectSidePanelServiceName(nodeName);
+    await this.openFirstOperationTraces(nodeName, count);
+  }
+
   async closeSidePanel() {
     await this.page.locator(this.sidePanelCloseBtn).click();
     await this.page.locator(this.sidePanel)

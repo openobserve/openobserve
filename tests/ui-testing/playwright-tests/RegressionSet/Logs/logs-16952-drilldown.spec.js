@@ -7,59 +7,18 @@ const testLogger = require("../../utils/test-logger.js");
 const PageManager = require("../../../pages/page-manager.js");
 const {
   TracesRegressionPage,
+  slantedLabelLegendOverlaps,
 } = require("../../../pages/tracesPages/tracesRegressionPage.js");
-const { decodedSqlOf } = require("../../../pages/tracesPages/tracesPage.js");
 const {
   uniqueTraceStream,
   ingestLogsAndWait,
   deleteTraceStream,
+  drillDownLogRows,
 } = require("../../../pages/tracesPages/tracesFixtures.js");
 
 // Drill down is the Logs page's view of plugins/traces/metrics/TracesAnalysisDashboard.vue.
 const ROWS = 40;
 const FIELDS = ["level", "svc_name", "reason", "msg", "code"];
-// Long enough to be cut and slanted under the comparison bars.
-const REASONS = [
-  "notify_failed_downstream",
-  "checkout_pending_review",
-  "payment_gateway_timeout",
-  "inventory_sync_failed",
-];
-
-// Separating-axis test for two convex polygons given as [[x, y], ...].
-function polygonsIntersect(a, b) {
-  for (const poly of [a, b]) {
-    for (let i = 0; i < poly.length; i++) {
-      const [x1, y1] = poly[i];
-      const [x2, y2] = poly[(i + 1) % poly.length];
-      const nx = y2 - y1;
-      const ny = x1 - x2;
-      const project = (p) => p.map(([x, y]) => x * nx + y * ny);
-      const pa = project(a);
-      const pb = project(b);
-      if (
-        Math.max(...pa) <= Math.min(...pb) ||
-        Math.max(...pb) <= Math.min(...pa)
-      )
-        return false;
-    }
-  }
-  return true;
-}
-
-function seedRows() {
-  const now = Date.now();
-  return Array.from({ length: ROWS }, (_, i) => ({
-    // Spread over five hours so a brush across the histogram's middle selects a subset.
-    _timestamp: (now - (ROWS - i) * 450000) * 1000,
-    level: ["info", "error", "warn"][i % 3],
-    svc_name: ["alpha", "beta", "gamma"][i % 3 === 0 ? 0 : i % 2 ? 1 : 2],
-    reason: REASONS[i % 4],
-    msg: `message number ${i % 10}`,
-    code: 200 + (i % 5),
-  }));
-}
-
 test.describe("Drill down dimensions and empty states (#16952)", () => {
   test.describe.configure({ mode: "serial" });
   const stream = uniqueTraceStream("16952");
@@ -68,7 +27,7 @@ test.describe("Drill down dimensions and empty states (#16952)", () => {
 
   test.beforeAll(async ({ playwright }) => {
     const request = await playwright.request.newContext();
-    await ingestLogsAndWait(request, stream, seedRows());
+    await ingestLogsAndWait(request, stream, drillDownLogRows(ROWS));
     await request.dispose();
   });
 
@@ -103,12 +62,7 @@ test.describe("Drill down dimensions and empty states (#16952)", () => {
         `Precondition: one seeded field must start unselected (selected: ${selected})`,
       ).toBeTruthy();
 
-      const charted = page
-        .waitForRequest((r) => (decodedSqlOf(r)?.sql || "").includes(field), {
-          timeout: 30000,
-        })
-        .then(() => true)
-        .catch(() => false);
+      const charted = tr.waitForSearchMentioning(field);
       await tr.clickDimensionName(field);
       await expect
         .poll(() => tr.isDimensionSelected(field), {
@@ -217,18 +171,7 @@ test.describe("Drill down dimensions and empty states (#16952)", () => {
         )
         .toBeGreaterThan(0);
 
-      const overlaps = charts.flatMap((texts) => {
-        const legend = texts.filter(
-          (t) => t.text === "Baseline" || t.text === "Selected",
-        );
-        return texts
-          .filter((t) => t.rotated)
-          .flatMap((label) =>
-            legend
-              .filter((l) => polygonsIntersect(label.corners, l.corners))
-              .map((l) => `${label.text} over ${l.text}`),
-          );
-      });
+      const overlaps = slantedLabelLegendOverlaps(charts);
       expect(
         overlaps,
         "no slanted category label may be drawn over the legend",

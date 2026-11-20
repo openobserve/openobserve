@@ -4,19 +4,15 @@ const {
   navigateToBase,
 } = require("../../utils/enhanced-baseFixtures.js");
 const {
-  getAuthHeaders,
-  getOrgIdentifier,
-} = require("../../utils/cloud-auth.js");
-const { ingestBase } = require("../../utils/ingest-url.js");
+  ingestLogRowsAndWaitForCount,
+  treemapPanelQuery,
+  createTreemapDashboard,
+  deleteDashboardQuietly,
+  deleteStreamQuietly,
+} = require("../../utils/regression-seed-api.js");
 const testLogger = require("../../utils/test-logger.js");
 const PageManager = require("../../../pages/page-manager.js");
 
-const BASE = (
-  process.env.INGESTION_URL ||
-  process.env.ZO_BASE_URL ||
-  ""
-).replace(/\/$/, "");
-const ORG = () => getOrgIdentifier() || process.env.ORGNAME || "default";
 const RUN = `${Date.now().toString(36)}_${process.pid.toString(36)}`;
 const STREAM = `e2e_treemap_${RUN}`;
 
@@ -58,95 +54,6 @@ const ONE_QUERY_ERROR =
 
 const created = { dashboards: [], streams: [] };
 
-async function api(method, path, body) {
-  const res = await fetch(`${BASE}/api/${ORG()}${path}`, {
-    method,
-    headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}: ${text}`);
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text;
-  }
-}
-
-const field = (alias, column, functionName = null) => ({
-  label: column,
-  alias,
-  column,
-  color: null,
-  functionName,
-  args: [{ type: "field", value: { field: column, streamAlias: null } }],
-  isDerived: false,
-  sortBy: null,
-});
-
-function query(levels, value) {
-  const x = levels.map((column, i) => field(`x_axis_${i + 1}`, column));
-  const y =
-    value === "count"
-      ? field("y_axis_1", "_timestamp", "count")
-      : field("y_axis_1", "bytes", "sum");
-  const select = [
-    ...x.map((f) => `${f.column} as "${f.alias}"`),
-    value === "count"
-      ? `count(_timestamp) as "y_axis_1"`
-      : `sum(bytes) as "y_axis_1"`,
-  ].join(", ");
-  return {
-    query: `SELECT ${select} FROM "${STREAM}" GROUP BY ${x.map((f) => f.alias).join(", ")}`,
-    customQuery: false,
-    fields: {
-      stream: STREAM,
-      stream_type: "logs",
-      x,
-      y: [y],
-      z: [],
-      breakdown: [],
-      filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
-    },
-    config: {
-      promql_legend: "",
-      layer_type: "scatter",
-      weight_fixed: 1,
-      limit: 0,
-      min: 0,
-      max: 100,
-    },
-  };
-}
-
-async function createTreemapDashboard(name, queries) {
-  const panel = {
-    id: "p_treemap",
-    type: "treemap",
-    title: name,
-    description: "",
-    queryType: "sql",
-    config: { show_legends: true, unit: "default", decimals: 0 },
-    queries,
-    layout: { x: 0, y: 0, w: 96, h: 20, i: 1 },
-  };
-  const result = await api("POST", "/dashboards?folder=default", {
-    version: 8,
-    title: `${name}_${RUN}`,
-    description: "treemap e2e",
-    tabs: [{ tabId: "default", name: "Default", panels: [panel] }],
-  });
-  const inner = result[`v${result.version}`] || result;
-  const id = inner.dashboardId || inner.dashboard_id;
-  created.dashboards.push(id);
-  return id;
-}
-
-const openDashboard = (page, id) =>
-  page.goto(
-    `/web/dashboards/view?org_identifier=${ORG()}&dashboard=${id}&folder=default&period=1h`,
-  );
-
 test.describe(
   "Treemap totals, defaults and query count (#16935)",
   {
@@ -171,50 +78,14 @@ test.describe(
         host,
         bytes,
       }));
-      const res = await fetch(
-        `${ingestBase(BASE)}/api/${ORG()}/${STREAM}/_json`,
-        {
-          method: "POST",
-          headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-          body: JSON.stringify(records),
-        },
-      );
-      expect(res.ok, `Precondition: ingest ${STREAM} -> ${res.status}`).toBe(
-        true,
-      );
+      await ingestLogRowsAndWaitForCount(STREAM, records);
       created.streams.push(STREAM);
-      // Rows are searchable only after the WAL flush, so wait until the stream reports them all.
-      await expect
-        .poll(
-          async () => {
-            const body = await api("POST", "/_search?type=logs", {
-              query: {
-                sql: `SELECT count(*) as c FROM "${STREAM}"`,
-                start_time: now - 3_600_000_000,
-                end_time: now + 60_000_000,
-                from: 0,
-                size: 1,
-              },
-            }).catch(() => null);
-            return body?.hits?.[0]?.c ?? 0;
-          },
-          { timeout: 60000 },
-        )
-        .toBe(ROWS.length);
     });
 
     test.afterAll(async () => {
-      for (const id of created.dashboards) {
-        await api("DELETE", `/dashboards/${id}?folder=default`).catch((e) =>
-          testLogger.warn(`dashboard cleanup: ${e.message}`),
-        );
-      }
-      for (const stream of created.streams) {
-        await api(
-          "DELETE",
-          `/streams/${stream}?type=logs&delete_all=true`,
-        ).catch((e) => testLogger.warn(`stream cleanup: ${e.message}`));
-      }
+      for (const id of created.dashboards) await deleteDashboardQuietly(id);
+      for (const stream of created.streams)
+        await deleteStreamQuietly(stream, "logs");
     });
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -226,10 +97,11 @@ test.describe(
     test("tiles total only the positive rows and the panel says how many rows it left out", async ({
       page,
     }) => {
-      const id = await createTreemapDashboard("tm_sum", [
-        query(["region", "service"], "sum"),
+      const id = await createTreemapDashboard(`tm_sum_${RUN}`, "tm_sum", [
+        treemapPanelQuery(STREAM, ["region", "service"], "sum"),
       ]);
-      await openDashboard(page, id);
+      created.dashboards.push(id);
+      await pm.dashboardTreemap.openDashboard(id);
       await pm.dashboardTreemap.waitForTiles(expect, "p_treemap");
       const { nodes } = await pm.dashboardTreemap.snapshot("p_treemap");
       expect(nodes.map(({ name, value }) => ({ name, value }))).toEqual(
@@ -244,20 +116,23 @@ test.describe(
     test("a treemap with two queries draws only the first query's measure and the editor refuses the second", async ({
       page,
     }) => {
-      const id = await createTreemapDashboard("tm_two_queries", [
-        query(["region"], "count"),
-        query(["region"], "sum"),
-      ]);
-      await openDashboard(page, id);
+      const id = await createTreemapDashboard(
+        `tm_two_queries_${RUN}`,
+        "tm_two_queries",
+        [
+          treemapPanelQuery(STREAM, ["region"], "count"),
+          treemapPanelQuery(STREAM, ["region"], "sum"),
+        ],
+      );
+      created.dashboards.push(id);
+      await pm.dashboardTreemap.openDashboard(id);
       await pm.dashboardTreemap.waitForTiles(expect, "p_treemap");
       const { nodes } = await pm.dashboardTreemap.snapshot("p_treemap");
       expect(nodes.map(({ name, value }) => ({ name, value }))).toEqual(
         COUNT_BY_REGION,
       );
 
-      await page.goto(
-        `/web/dashboards/add_panel?org_identifier=${ORG()}&dashboard=${id}&panelId=p_treemap&folder=default&tab=default`,
-      );
+      await pm.dashboardTreemap.openPanelEditor(id, "p_treemap");
       await pm.dashboardPanelActions.applyDashboardBtn();
       await expect(
         pm.dashboardTreemap.editorError(ONE_QUERY_ERROR),
@@ -267,12 +142,11 @@ test.describe(
     test("a new treemap does not start grouped by the time bucket", async ({
       page,
     }) => {
-      const id = await createTreemapDashboard("tm_new", [
-        query(["region"], "sum"),
+      const id = await createTreemapDashboard(`tm_new_${RUN}`, "tm_new", [
+        treemapPanelQuery(STREAM, ["region"], "sum"),
       ]);
-      await page.goto(
-        `/web/dashboards/add_panel?org_identifier=${ORG()}&dashboard=${id}&folder=default&tab=default`,
-      );
+      created.dashboards.push(id);
+      await pm.dashboardTreemap.openPanelEditor(id);
       await pm.chartTypeSelector.selectChartType("treemap");
       await pm.chartTypeSelector.selectStream(STREAM);
       await expect(pm.dashboardTreemap.firstSizeField()).toBeVisible({

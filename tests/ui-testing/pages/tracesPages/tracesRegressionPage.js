@@ -1,8 +1,46 @@
 // Traces sidebar, trace-details and drill-down actions used by the merged-fix regression specs.
 
 import { expect } from "@playwright/test";
+import { decodedSqlOf } from "./tracesPage.js";
 
 const b64 = (s) => Buffer.from(s).toString("base64");
+
+// Separating-axis test for two convex polygons given as [[x, y], ...].
+function polygonsIntersect(a, b) {
+  for (const poly of [a, b]) {
+    for (let i = 0; i < poly.length; i++) {
+      const [x1, y1] = poly[i];
+      const [x2, y2] = poly[(i + 1) % poly.length];
+      const nx = y2 - y1;
+      const ny = x1 - x2;
+      const project = (p) => p.map(([x, y]) => x * nx + y * ny);
+      const pa = project(a);
+      const pb = project(b);
+      if (
+        Math.max(...pa) <= Math.min(...pb) ||
+        Math.max(...pb) <= Math.min(...pa)
+      )
+        return false;
+    }
+  }
+  return true;
+}
+
+/** For canvasTextBoxes() charts, every "<label> over <legend entry>" where a slanted label overlaps the Baseline/Selected legend. */
+export function slantedLabelLegendOverlaps(charts) {
+  return charts.flatMap((texts) => {
+    const legend = texts.filter(
+      (t) => t.text === "Baseline" || t.text === "Selected",
+    );
+    return texts
+      .filter((t) => t.rotated)
+      .flatMap((label) =>
+        legend
+          .filter((l) => polygonsIntersect(label.corners, l.corners))
+          .map((l) => `${label.text} over ${l.text}`),
+      );
+  });
+}
 
 export class TracesRegressionPage {
   constructor(page) {
@@ -439,5 +477,28 @@ export class TracesRegressionPage {
       await expect(pinBackdrop).toBeHidden();
     }
     throw new Error("the Logs histogram never accepted a brush");
+  }
+
+  /** Resolves true once a search whose decoded SQL mentions `text` is sent, false if none within `timeout`. */
+  waitForSearchMentioning(text, timeout = 30000) {
+    return this.page
+      .waitForRequest((r) => (decodedSqlOf(r)?.sql || "").includes(text), {
+        timeout,
+      })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  /** Resolves to the status of the next values/search response that asks about `field`, or null if none within `timeout`. */
+  waitForFieldValuesStatus(field, timeout = 20000) {
+    return this.page
+      .waitForResponse(
+        (r) =>
+          /_values|_search/.test(r.url()) &&
+          new RegExp(field).test(r.request().postData() || r.url()),
+        { timeout },
+      )
+      .then((r) => r.status())
+      .catch(() => null);
   }
 }
