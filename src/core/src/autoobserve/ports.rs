@@ -113,22 +113,20 @@ impl SearchPort for SearchAdapter {
         size: i64,
         timeout: Duration,
     ) -> anyhow::Result<SearchPage> {
-        let trace_id = ider::generate_trace_id();
-        let mut guard = CancelOnDrop {
-            org: org.to_string(),
-            trace_id: trace_id.clone(),
-            armed: true,
-        };
-        let read = search_streamed(&trace_id, org, sql, range, size, timeout);
-        let read = tokio::time::timeout(timeout, read).await;
-        guard.armed = read.is_err();
-        match read {
-            Err(_) => anyhow::bail!("streamed search timed out after {timeout:?}"),
-            Ok(Err(InfraError::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)))) => {
-                Ok(SearchPage::default())
-            }
-            Ok(other) => other.map_err(rejected_or_failed),
-        }
+        streamed_within(org, StreamType::Logs, sql, range, size, timeout).await
+    }
+
+    async fn sql_streamed_on(
+        &self,
+        org: &str,
+        stream_type: &str,
+        sql: &str,
+        range: (i64, i64),
+        size: i64,
+        timeout: Duration,
+    ) -> anyhow::Result<SearchPage> {
+        let stream_type = stream_type_of(stream_type)?;
+        streamed_within(org, stream_type, sql, range, size, timeout).await
     }
 
     async fn sql_on(
@@ -577,10 +575,37 @@ async fn search(
     })
 }
 
+async fn streamed_within(
+    org: &str,
+    stream_type: StreamType,
+    sql: &str,
+    range: (i64, i64),
+    size: i64,
+    timeout: Duration,
+) -> anyhow::Result<SearchPage> {
+    let trace_id = ider::generate_trace_id();
+    let mut guard = CancelOnDrop {
+        org: org.to_string(),
+        trace_id: trace_id.clone(),
+        armed: true,
+    };
+    let read = search_streamed(&trace_id, org, stream_type, sql, range, size, timeout);
+    let read = tokio::time::timeout(timeout, read).await;
+    guard.armed = read.is_err();
+    match read {
+        Err(_) => anyhow::bail!("streamed search timed out after {timeout:?}"),
+        Ok(Err(InfraError::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)))) => {
+            Ok(SearchPage::default())
+        }
+        Ok(other) => other.map_err(rejected_or_failed),
+    }
+}
+
 /// The partitioned streaming search folded into one answer; a clamped range or cut answer fails.
 async fn search_streamed(
     trace_id: &str,
     org: &str,
+    stream_type: StreamType,
     sql: &str,
     range: (i64, i64),
     size: i64,
@@ -595,7 +620,7 @@ async fn search_streamed(
         org,
         "",
         &mut req,
-        StreamType::Logs,
+        stream_type,
         streams,
         None,
         String::new(),
