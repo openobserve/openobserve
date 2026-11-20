@@ -41,7 +41,7 @@ use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table::anomaly_detection::config as anomaly_config_table,
 };
-use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+use sea_orm::{IntoActiveModel, Set};
 use search_service as search;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
@@ -1236,7 +1236,9 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    let mut updated = active_model.update(db).await?;
+    let mut updated = anomaly_config_table::save_changes(db, active_model)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if let Some((from, to)) = moved_folders {
         repoint_folder(anomaly_id, &from, &to).await;
     }
@@ -1614,7 +1616,9 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     active.training_started_at = Set(None);
     active.last_error = Set(Some("Training cancelled by user.".to_string()));
     active.updated_at = Set(Utc::now().timestamp_micros());
-    active.update(db).await?;
+    anomaly_config_table::save_changes(db, active)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     log::info!("[anomaly_detection {anomaly_id}] training cancelled by user");
     Ok(())
@@ -10502,7 +10506,7 @@ mod tests {
 
     mod p1_model_shape {
         use infra::table::entity::anomaly_detection_config::{Column, Entity, Model};
-        use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
+        use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 
         use super::{update_interval_validation::stored_config, *};
 
