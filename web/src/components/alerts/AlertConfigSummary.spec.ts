@@ -550,7 +550,7 @@ describe("AlertConfigSummary — layout", () => {
     expect(text(wrapper, key).exists(), `${key} is not a plain-text value`).toBe(true);
     expect(field(wrapper, key).findComponent(OCodeBlock).exists()).toBe(false);
     expect(field(wrapper, key).classes()).not.toContain("col-span-full");
-    expect(field(wrapper, key).classes()).not.toContain("sm:col-span-2");
+    expect(field(wrapper, key).classes()).not.toContain("@sm:col-span-2");
   };
 
   it("shows each short value as plain text under its own label", () => {
@@ -583,7 +583,7 @@ describe("AlertConfigSummary — layout", () => {
     const long = mountSummary(
       generic({ type: "sql", sql: SQL }, { stream_name: "k8s_cluster_production_audit_events" }),
     );
-    expect(field(long, "stream").classes()).toContain("sm:col-span-2");
+    expect(field(long, "stream").classes()).toContain("@sm:col-span-2");
 
     const short = mountSummary(generic({ type: "sql", sql: SQL }));
     expectShortText(short, "stream");
