@@ -85,6 +85,34 @@ describe("useTimeRangeInput helpers", () => {
     );
   });
 
+  it("tells apart same-millisecond ends when only the start names its day", () => {
+    const at = Date.parse("2026-11-17T09:20:05.250Z") * 1000;
+    expect(formatRangeText(at + 1, at + 999, "UTC", "en-US", NOW_US)).toBe(
+      "Tue, Nov 17, 09:20:05.250001 → 09:20:05.250999",
+    );
+  });
+
+  it("tells apart same-millisecond ends when only one has a fraction", () => {
+    const at = Date.parse("2026-11-18T09:20:05Z") * 1000;
+    expect(formatRangeText(at, at + 1, "UTC", "en-US", NOW_US)).toBe(
+      "09:20:05.000000 → 09:20:05.000001",
+    );
+  });
+
+  it("tells apart the two passes of a repeated hour by their offsets", () => {
+    const start = Date.parse("2026-11-01T05:30:00Z") * 1000;
+    expect(formatRangeText(start, start + 60 * MIN_US, "America/New_York", "en-US", NOW_US)).toBe(
+      "Sun, Nov 1, 01:30 -04:00 → 01:30 -05:00",
+    );
+  });
+
+  it("writes the microsecond digits in the locale's own numerals", () => {
+    const at = Date.parse("2026-11-18T09:20:05.250Z") * 1000;
+    const text = formatRangeText(at + 1, at + 999, "UTC", "ar-SA", NOW_US);
+    expect(text).not.toMatch(/[0-9]/);
+    expect(text).toContain("٠٠١");
+  });
+
   it("formats the day of an instant without its time", () => {
     const at = Date.parse("2026-11-01T05:30:00.020Z") * 1000;
     expect(formatDay(at, "America/New_York", "en-US", NOW_US)).toBe("Sun, Nov 1");

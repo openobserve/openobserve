@@ -503,6 +503,7 @@ import {
 } from "@/utils/timeRangeRail";
 import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
 import { localeFileMap } from "@/locales";
+import { focusControlAfter } from "@/utils/focusNextControl";
 import { checkTimeRange } from "@/utils/timeRangeInput/check";
 import { addDays, addMonths } from "@/utils/timeRangeInput/civil";
 import { offsetAtInstant, offsetLabel, resolveCivil, wallAt } from "@/utils/timeRangeInput/zone";
@@ -2716,7 +2717,10 @@ export default defineComponent({
         box.right <= 0 ||
         box.top >= window.innerHeight ||
         box.left >= window.innerWidth;
-      if (outside || (box.width === 0 && box.height === 0)) closeMenu();
+      const hidden = box.width === 0 && box.height === 0;
+      // A hidden trigger cannot take back the panel's focus, which would otherwise fall to body.
+      if (hidden && trigger instanceof HTMLElement) focusControlAfter(trigger);
+      if (outside || hidden) closeMenu();
     };
     watch(menuOpen, (open) => {
       if (open) window.addEventListener("resize", closeIfTriggerHidden);

@@ -151,9 +151,10 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
     testLogger.info('Shifting an absolute window up to now and checking Next is then disabled');
 
     // A future end is refused at paste, so the guard is reached by a clamped shift that ends at now.
+    // An hour-long window ending 30 s ago still reaches now however slowly Next is clicked.
     const { startMicros, endMicros } = await page.evaluate(() => {
       const now = Date.now() * 1_000;
-      return { startMicros: now - 90_000_000, endMicros: now - 30_000_000 };
+      return { startMicros: now - 3_630_000_000, endMicros: now - 30_000_000 };
     });
 
     await pm.dateTimePickerPage.pasteAndReadBackRange(`${startMicros} - ${endMicros}`);

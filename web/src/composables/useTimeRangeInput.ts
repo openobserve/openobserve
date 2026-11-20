@@ -38,6 +38,7 @@ import {
   type TimeRangePack,
   type TimeRangeParseResult,
 } from "@/utils/timeRangeInput";
+import { offsetAtInstant, offsetLabel } from "@/utils/timeRangeInput/zone";
 
 const US_PER_MS = 1000;
 const US_PER_S = 1_000_000;
@@ -148,6 +149,15 @@ function dayOptions(us: number, zone: string, nowUs: number): Intl.DateTimeForma
   };
 }
 
+// An unknown zone has no offset, and the zone module throws on it.
+function offsetOf(us: number, zone: string): string {
+  try {
+    return offsetLabel(offsetAtInstant(zone, us));
+  } catch {
+    return "";
+  }
+}
+
 /** One instant in the picker zone: the day only when it is not today, the year only when it is not this year. */
 export function formatInstant(
   us: number,
@@ -171,8 +181,17 @@ export function formatInstant(
     ...(withDay ? dayOptions(us, zone, nowUs) : {}),
   });
   if (!withMicros) return format.format(at);
-  // Intl stops at milliseconds, so the microsecond digits extend its fraction.
-  const micros = String(((us % US_PER_MS) + US_PER_MS) % US_PER_MS).padStart(3, "0");
+  // Intl stops at milliseconds, so the microsecond digits extend its fraction in the same numerals.
+  const micros = cachedFormat(
+    numberFormats,
+    `${intlLocale}|micros|${format.resolvedOptions().numberingSystem}`,
+    () =>
+      new Intl.NumberFormat(intlLocale, {
+        numberingSystem: format.resolvedOptions().numberingSystem,
+        minimumIntegerDigits: 3,
+        useGrouping: false,
+      }),
+  ).format(((us % US_PER_MS) + US_PER_MS) % US_PER_MS);
   return format
     .formatToParts(at)
     .map((p) => (p.type === "fractionalSecond" ? p.value + micros : p.value))
@@ -213,9 +232,17 @@ export function formatRangeText(
     endDay,
     short && endUs % US_PER_S !== 0,
   );
-  if (start !== end || startUs === endUs) return `${start} → ${end}`;
-  const startMicros = formatInstant(startUs, zone, intlLocale, nowUs, undefined, true, true);
-  return `${startMicros} → ${formatInstant(endUs, zone, intlLocale, nowUs, endDay, true, true)}`;
+  // Ends on one day that read the same to the millisecond need more to tell them apart.
+  const sameMs = (micros: boolean) =>
+    formatInstant(startUs, zone, intlLocale, nowUs, false, true, micros) ===
+    formatInstant(endUs, zone, intlLocale, nowUs, false, true, micros);
+  if (endDay || startUs === endUs || !sameMs(false)) return `${start} → ${end}`;
+  if (!sameMs(true)) {
+    const startMicros = formatInstant(startUs, zone, intlLocale, nowUs, undefined, true, true);
+    return `${startMicros} → ${formatInstant(endUs, zone, intlLocale, nowUs, endDay, true, true)}`;
+  }
+  // Whole hours apart yet rendered alike is a repeated hour, which only the offset tells apart.
+  return `${start} ${offsetOf(startUs, zone)} → ${end} ${offsetOf(endUs, zone)}`;
 }
 
 /** Text, parse result and locale pack of the typed bar; the parse runs on every change. */
