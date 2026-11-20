@@ -50,6 +50,10 @@ pub struct PagingBody {
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<String>)]
     pub team_id: Option<Option<String>>,
+    /// Unacknowledged pages of one alert in a day before a snooze is proposed; left out, kept.
+    #[serde(default)]
+    #[schema(minimum = 2)]
+    pub snooze_after_pages: Option<u32>,
 }
 
 /// The setting as stored, with the paging team's name while that team exists.
@@ -60,6 +64,9 @@ struct PagingAnswer {
     #[serde(skip_serializing_if = "Option::is_none")]
     team_name: Option<String>,
 }
+
+/// Fewer than 2 would offer a snooze on an alert's first repeat, before anyone could answer it.
+const MIN_SNOOZE_AFTER_PAGES: u32 = 2;
 
 #[utoipa::path(
     get,
@@ -101,7 +108,7 @@ pub async fn get_paging_settings(Path(org_id): Path<String>) -> Response {
     tag = "AutoObserve",
     operation_id = "AutoObservePutPagingSettings",
     summary = "Turn AutoObserve paging on or off for this organization",
-    description = "With `page_on_stop` true, a stream that stops sending data opens an incident and pages on-call: the team in `team_id` when one is set, otherwise an ownership rule on the stream's service, otherwise the organization's default team, otherwise it waits on the unrouted queue. Streams that stop together share one incident and one page. `pages_per_day`, optional and at least 1, caps how many AutoObserve pages reach a team in any `O2_AUTOOBSERVE_PAGE_BUDGET_WINDOW_HOURS` window; left out, the stored value is kept. A stop past it still opens an incident and gets its analysis, but pages nobody. `team_id` sends AutoObserve pages, and no other alert's, to that on-call team; left out, the saved team is kept, and `null` or an empty string clears it. A `team_id` that is not an on-call team of this organization is refused. Needs the permission that changes on-call routing.",
+    description = "With `page_on_stop` true, a stream that stops sending data opens an incident and pages on-call: the team in `team_id` when one is set, otherwise an ownership rule on the stream's service, otherwise the organization's default team, otherwise it waits on the unrouted queue. Streams that stop together share one incident and one page. `pages_per_day`, optional and at least 1, caps how many AutoObserve pages reach a team in any `O2_AUTOOBSERVE_PAGE_BUDGET_WINDOW_HOURS` window; left out, the stored value is kept. A stop past it still opens an incident and gets its analysis, but pages nobody. `snooze_after_pages`, optional and at least 2, is how many unacknowledged pages of one alert in a day make AutoObserve propose snoozing it; left out, the stored value is kept. `team_id` sends AutoObserve pages, and no other alert's, to that on-call team; left out, the saved team is kept, and `null` or an empty string clears it. A `team_id` that is not an on-call team of this organization is refused. Needs the permission that changes on-call routing.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(PagingBody), content_type = "application/json"),
@@ -134,6 +141,14 @@ pub async fn put_paging_settings(
         Ok(body) => body,
         Err(e) => return MetaHttpResponse::bad_request(format!("invalid paging body: {e}")),
     };
+    if body
+        .snooze_after_pages
+        .is_some_and(|n| n < MIN_SNOOZE_AFTER_PAGES)
+    {
+        return MetaHttpResponse::bad_request(format!(
+            "invalid paging body: snooze_after_pages must be at least {MIN_SNOOZE_AFTER_PAGES}"
+        ));
+    }
     let team = body
         .team_id
         .as_ref()
@@ -158,7 +173,7 @@ pub async fn put_paging_settings(
             &deps,
             &org_id,
             body.page_on_stop,
-            body.pages_per_day,
+            (body.pages_per_day, body.snooze_after_pages),
             team,
             true,
         )
@@ -237,6 +252,8 @@ mod tests {
             r#"{"page_on_stop":true,"pages_per_day":-1}"#,
             r#"{"page_on_stop":true,"pages_per_day":"1"}"#,
             r#"{"page_on_stop":true,"team_id":5}"#,
+            r#"{"page_on_stop":true,"snooze_after_pages":1}"#,
+            r#"{"page_on_stop":true,"snooze_after_pages":-3}"#,
         ] {
             let (status, text) = send("PUT", uri, body).await;
             assert_eq!(status, StatusCode::BAD_REQUEST, "{body}: {text}");
