@@ -31,7 +31,6 @@ use infra::errors::Error;
 use self::{
     index::apply_index_rules,
     plan::{apply_pushdown_rules, decode_plan, replace_table_scan},
-    redaction::ScanRedaction,
     scan::{StreamSearchSettings, collect_table_providers, split_scan_files},
 };
 use crate::{
@@ -46,15 +45,7 @@ pub async fn search(
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {
     log::info!("[trace_id {trace_id}] flight->search: start");
     let (ctx, physical_plan, source) = decode_plan(trace_id, req).await?;
-    let redaction = ScanRedaction::load(
-        &req.query_identifier.org_id,
-        source.stream_type,
-        &source.stream.stream_name(),
-        &source.schema,
-    )
-    .await?;
-    let mut settings = StreamSearchSettings::load(req, &source).await;
-    settings.exclude_redacted(redaction.redacted_columns().into_iter().collect());
+    let settings = StreamSearchSettings::load(req, &source).await?;
 
     let time_range = (req.search_info.start_time, req.search_info.end_time);
     let (physical_plan, index) = apply_index_rules(
@@ -100,10 +91,17 @@ pub async fn search(
     .await?;
 
     let start = std::time::Instant::now();
+    let redaction = &settings.redaction;
     let physical_plan =
-        replace_table_scan(&query, req, &ctx, physical_plan, tables, &redaction).await?;
-    let physical_plan =
-        apply_pushdown_rules(trace_id, &ctx, physical_plan, aggregates, &mut scan_stats)?;
+        replace_table_scan(&query, req, &ctx, physical_plan, tables, redaction).await?;
+    let physical_plan = apply_pushdown_rules(
+        trace_id,
+        &ctx,
+        physical_plan,
+        redaction,
+        aggregates,
+        &mut scan_stats,
+    )?;
     log::info!(
         "{}",
         search_inspector_fields(

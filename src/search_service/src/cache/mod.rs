@@ -52,6 +52,8 @@ use tracing::Instrument;
 use transform::{get_all_transform_keys, init_vrl_runtime};
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
 
+#[cfg(feature = "vectorscan")]
+use crate::datafusion::physical_optimizer::sdr_redact::redaction_digest;
 use crate::{
     self as SearchService,
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
@@ -582,11 +584,7 @@ pub async fn prepare_cache_response(
         hash_body.extend(req.clusters.clone());
     }
     #[cfg(feature = "vectorscan")]
-    if let Some(digest) = crate::datafusion::physical_optimizer::sdr_redact::redaction_digest(
-        org_id,
-        stream_type,
-        &sql.stream_names,
-    ) {
+    if let Some(digest) = redaction_digest(org_id, stream_type, &sql.stream_names) {
         hash_body.push(digest);
     }
     let mut h = config::utils::hash::gxhash::new();

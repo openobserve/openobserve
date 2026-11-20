@@ -324,20 +324,6 @@ fn stream_index_fields(sql: &Sql) -> HashMap<TableReference, HashSet<String>> {
             .into_iter()
             .filter(|index_field| schema.contains_field(index_field))
             .collect::<HashSet<_>>();
-        // An index shortcut on a redacted field would return its raw terms.
-        #[cfg(feature = "vectorscan")]
-        let idx_fields = {
-            use config::meta::sql::TableReferenceExt;
-            let protected = crate::datafusion::physical_optimizer::sdr_redact::protected_columns(
-                &sql.org_id,
-                stream_name.get_stream_type(sql.stream_type),
-                &stream_name.stream_name(),
-            );
-            idx_fields
-                .into_iter()
-                .filter(|field| !protected.contains(field))
-                .collect::<HashSet<_>>()
-        };
         index_fields.insert(stream_name.clone(), idx_fields);
     }
     index_fields
