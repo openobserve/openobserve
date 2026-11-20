@@ -21781,6 +21781,8 @@
       "initialNumberPositive": "Initial number must be positive number.",
       "runQueryBeforeDownload": "Please run a query first before downloading.",
       "noDataToDownload": "No data found to download.",
+      "downloadMayBeIncomplete": "The downloaded file may be incomplete.",
+      "downloadMayBeIncompleteReason": "The downloaded file may be incomplete: {reason}",
       "transformTypeFunction": "Function",
       "jobContextRemoved": "Job Context have been removed",
       "histogramNotAvailableScheduled": "Histogram is not available for scheduled search",

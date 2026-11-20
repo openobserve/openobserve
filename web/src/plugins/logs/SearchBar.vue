@@ -1923,7 +1923,12 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isExplainQuery, isSqlQuery } from "@/utils/query/sqlUtils";
-import { applyDownloadRange, downloadRangeWindow, sqlLimitOf } from "@/utils/logs/downloadRange";
+import {
+  applyDownloadRange,
+  downloadRangeWindow,
+  partialDownloadReason,
+  sqlLimitOf,
+} from "@/utils/logs/downloadRange";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
@@ -2184,6 +2189,17 @@ export default defineComponent({
           );
           if (hits.length > 0) {
             this.downloadLogs(hits, this.downloadCustomFileType);
+            const partialReason = partialDownloadReason(res.data);
+            if (partialReason !== null) {
+              toast({
+                message: partialReason
+                  ? this.t("logs.searchBar.downloadMayBeIncompleteReason", {
+                      reason: partialReason,
+                    })
+                  : this.t("logs.searchBar.downloadMayBeIncomplete"),
+                variant: "warning",
+              });
+            }
           } else {
             toast({
               message: this.t("logs.searchBar.noDataToDownload"),
