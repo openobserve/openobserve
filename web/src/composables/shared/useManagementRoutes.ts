@@ -7,6 +7,12 @@ import { slackRouteGuard } from "./slackRouteGuard";
 
 const Settings = () => import("@/components/settings/index.vue");
 
+// The OSS config reports `ai_observability` locked, yet OSS prices traces without a license.
+const modelPricingRoute = <T extends object>(route: T): T =>
+  config.isEnterprise == "true" || config.isCloud == "true"
+    ? withLicenseFeature("ai_observability", route)
+    : route;
+
 const useManagementRoutes = () => {
   const routes: any = [
     {
@@ -116,13 +122,10 @@ const useManagementRoutes = () => {
     },
   });
 
-  // LLM Model Pricing, LLM Providers, GenAI Agent Mapping (used by the AI
-  // Observability / Online Evals flows), and the enterprise-only operations/
-  // security pages below are all always registered; a direct URL redirects
-  // to the shared locked page (see `withFeatureGate`) when the edition
-  // doesn't unlock them, instead of landing on the real page or a 404.
+  // LLM Providers, GenAI Agent Mapping and the enterprise-only operations/security pages below
+  // redirect to the shared locked page (`withFeatureGate`) in an edition that locks them.
   routes[0].children.push(
-    withLicenseFeature("ai_observability", {
+    modelPricingRoute({
       path: "model_pricing",
       name: "modelPricing",
       meta: {
@@ -130,11 +133,11 @@ const useManagementRoutes = () => {
         titleKey: "settings.llmModelPricing",
       },
       component: () => import("@/components/settings/ModelPricingList.vue"),
-      beforeEnter: withFeatureGate("modelPricing", routeGuard),
+      beforeEnter: routeGuard,
     }),
   );
   routes[0].children.push(
-    withLicenseFeature("ai_observability", {
+    modelPricingRoute({
       path: "model_pricing/gaps",
       name: "modelPricingGaps",
       meta: {
@@ -142,11 +145,11 @@ const useManagementRoutes = () => {
         titleKey: "modelPricing.unpriced.title",
       },
       component: () => import("@/components/settings/ModelPricingGaps.vue"),
-      beforeEnter: withFeatureGate("modelPricing", routeGuard),
+      beforeEnter: routeGuard,
     }),
   );
   routes[0].children.push(
-    withLicenseFeature("ai_observability", {
+    modelPricingRoute({
       path: "model_pricing/edit",
       name: "modelPricingEditor",
       meta: {
@@ -154,7 +157,7 @@ const useManagementRoutes = () => {
         accessScopeQuery: ["id"],
       },
       component: () => import("@/components/settings/ModelPricingEditor.vue"),
-      beforeEnter: withFeatureGate("modelPricing", routeGuard),
+      beforeEnter: routeGuard,
     }),
   );
   routes[0].children.push(
