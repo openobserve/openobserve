@@ -63,7 +63,7 @@ describe("parse and compile budgets", () => {
   it("compiles each locale pack in under 5 ms (10 ms on CI)", () => {
     // Best of 10 after a warm-up drops scheduler noise; CI runners are ~2.5x slower than a laptop
     // even at their best, so CI gets 10 ms, still far below a pack that regressed.
-    const budget = process.env.CI ? 10 : 5;
+    const budget = process.env.CI === "true" ? 10 : 5;
     for (const { pack, tables } of Object.values(hands)) {
       compilePack(pack, tables, en);
       let ms = Infinity;
