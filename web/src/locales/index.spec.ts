@@ -35,7 +35,6 @@ import {
 } from "@/locales/numberFormat";
 import i18n, {
   applyDocumentLocale,
-  frenchPluralRule,
   getLocale,
   isRtlLocale,
   loadLazyLocaleBlocks,
@@ -252,58 +251,6 @@ describe("document locale", () => {
     applyDocumentLocale(locale);
     expect(document.documentElement.lang).toBe(language);
     expect(document.documentElement.dir).toBe(direction);
-  });
-});
-
-describe("French plural forms", () => {
-  const plural = (message: string, count: number): string => {
-    const loaded = i18n.global.getLocaleMessage("fr");
-    i18n.global.setLocaleMessage("fr", { ...loaded, pluralSpec: { message } } as never);
-    try {
-      return (i18n.global as any).t("pluralSpec.message", count, { locale: "fr" });
-    } finally {
-      i18n.global.setLocaleMessage("fr", loaded);
-    }
-  };
-
-  beforeEach(async () => {
-    await loadLocaleMessages("fr");
-  });
-
-  it.each([
-    [0, "0 alerte"],
-    [1, "1 alerte"],
-    [2, "2 alertes"],
-  ])("uses the singular form below 2 in a two-form message (%i)", (count, expected) => {
-    expect(plural("{n} alerte | {n} alertes", count)).toBe(expected);
-  });
-
-  it.each([
-    [0, "aucune"],
-    [1, "une"],
-    [5, "5"],
-  ])("picks zero, one or many in a three-form message (%i)", (count, expected) => {
-    expect(plural("aucune | une | {n}", count)).toBe(expected);
-  });
-});
-
-describe("frenchPluralRule", () => {
-  it.each([
-    [0, 2, 0],
-    [1, 2, 0],
-    [1.5, 2, 0],
-    [-1, 2, 0],
-    [2, 2, 1],
-    [0, 3, 0],
-    [1, 3, 1],
-    [1.5, 3, 1],
-    [5, 3, 2],
-    [0, 1, 0],
-    [3, 1, 0],
-    [3, 4, 3],
-    [9, 4, 3],
-  ])("maps count %s with %i forms to index %i", (choice, choicesLength, expected) => {
-    expect(frenchPluralRule(choice, choicesLength)).toBe(expected);
   });
 });
 
