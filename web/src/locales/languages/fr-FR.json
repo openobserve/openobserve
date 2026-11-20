@@ -777,7 +777,7 @@
       "create": "Vous ne pouvez pas créer {resource}",
       "edit": "Vous ne pouvez pas modifier {resource}",
       "delete": "Vous ne pouvez pas supprimer {resource}",
-      "missing": "Votre rôle ne dispose pas de l'autorisation {permission} sur {resource}.",
+      "missing": "Votre rôle ne dispose pas de l'autorisation « {permission} » sur {resource}.",
       "parts": "Vous ne pouvez pas afficher {count} partie de cette page | Vous ne pouvez pas afficher {count} parties de cette page",
       "missingIntro": "Votre rôle ne dispose pas des autorisations suivantes :",
       "more": "{count} autres",
