@@ -461,3 +461,60 @@ describe("IngestionTokens — column budget", () => {
     wrapper.unmount();
   });
 });
+
+describe("IngestionTokens — description column (#12950)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    queryClient.clear();
+  });
+
+  it("shows a Description column with each token's description", async () => {
+    const wrapper = mountRows(
+      [
+        {
+          name: "ci-collector",
+          token: "o2oi_ci",
+          description: "Token for the CI collector",
+          enabled: true,
+          created_by: "admin@demo-org",
+        },
+      ],
+      false,
+    );
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="o2-table-th-description"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="o2-table-th-description"]').text()).toContain("Description");
+    expect(wrapper.find('[data-test="ingestion-token-ci-collector-description"]').text()).toBe(
+      "Token for the CI collector",
+    );
+    wrapper.unmount();
+  });
+
+  it("shows a dash when a token has no description", async () => {
+    const wrapper = mountRows(
+      [
+        {
+          name: "no-desc",
+          token: "o2oi_nd",
+          description: "",
+          enabled: true,
+          created_by: "admin@demo-org",
+        },
+      ],
+      false,
+    );
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="ingestion-token-no-desc-description"]').text()).toBe("—");
+    wrapper.unmount();
+  });
+
+  it("places Description right after Name", async () => {
+    const wrapper = mountRows([], false);
+    await flushPromises();
+    const ids = ((wrapper.vm as any).columns as { id: string }[]).map((c) => c.id);
+    expect(ids.indexOf("description")).toBe(ids.indexOf("name") + 1);
+    wrapper.unmount();
+  });
+});
