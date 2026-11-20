@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { reactive } from "vue";
 
 // ── Mocks (hoisted by Vitest) ──────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ const mockRouterPush = vi.fn();
 const mockRouterReplace = vi.fn();
 
 // Route query state — reset per test via beforeEach
+const routeParams = reactive({ id: "mon-1" });
 let routeQuery: Record<string, any> = {
   name: "Test Monitor",
   status: "healthy",
@@ -33,7 +35,7 @@ let routeQuery: Record<string, any> = {
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({
-    params: { id: "mon-1" },
+    params: routeParams,
     query: routeQuery,
   }),
   useRouter: () => ({
@@ -79,9 +81,22 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
 
-vi.mock("@/composables/useSyntheticResults", () => ({
-  default: () => ({}),
-}));
+const mockFetchAll = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("@/composables/useSyntheticResults", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({
+      kpiLoading: ref(false),
+      histogramLoading: ref(false),
+      runsLoading: ref(false),
+      kpiHasLoadedOnce: ref(false),
+      histogramHasLoadedOnce: ref(false),
+      runsHasLoadedOnce: ref(false),
+      fetchAll: mockFetchAll,
+      cancelAll: vi.fn(),
+    }),
+  };
+});
 
 // Mock syntheticsService.get — called via bootstrap() when MonitorRuns emits
 // need-check-data (only when there are zero runs and no lastTriggeredAt).
@@ -104,7 +119,7 @@ import MonitorResults from "./MonitorResults.vue";
 
 // ── Mount factory ──────────────────────────────────────────────────────────
 
-function makeWrapper() {
+function makeWrapper(stubOverrides: Record<string, unknown> = {}) {
   return mount(MonitorResults, {
     global: {
       stubs: {
@@ -185,6 +200,7 @@ function makeWrapper() {
             "overrideError",
           ],
         },
+        ...stubOverrides,
       },
     },
   });
@@ -202,6 +218,7 @@ describe("MonitorResults", () => {
     mockRouterPush.mockReset();
     mockRouterPush.mockImplementation(() => Promise.resolve());
 
+    routeParams.id = "mon-1";
     // Default route state
     routeQuery = {
       name: "Test Monitor",
@@ -211,6 +228,49 @@ describe("MonitorResults", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  it("reloads another monitor in place and ignores an earlier late response", async () => {
+    wrapper = makeWrapper();
+    await flushPromises();
+    let finishOld!: (value: unknown) => void;
+    mockSyntheticsServiceGet.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishOld = resolve;
+      }),
+    );
+    routeParams.id = "slow-monitor";
+    await flushPromises();
+    expect(mockSyntheticsServiceGet).toHaveBeenLastCalledWith("org-1", "slow-monitor", "");
+    mockSyntheticsServiceGet.mockResolvedValueOnce({
+      data: { name: "New monitor", last_triggered_at: 42 },
+    });
+    routeParams.id = "new-monitor";
+    await flushPromises();
+    expect(wrapper.find('[data-test="app-page-header-title"]').text()).toBe("New monitor");
+    finishOld({ data: { name: "Stale monitor", last_triggered_at: 1 } });
+    await flushPromises();
+    expect(wrapper.find('[data-test="app-page-header-title"]').text()).toBe("New monitor");
+  });
+
+  it("reloads the real runs child for a different monitor with no environment scope", async () => {
+    wrapper = makeWrapper({ MonitorRuns: false, ChartRenderer: true, MonitorStatusTimeline: true });
+    await flushPromises();
+    const firstChild = wrapper.findComponent({ name: "SyntheticMonitorRuns" }).vm;
+    mockSyntheticsServiceGet.mockResolvedValueOnce({
+      data: { name: "Second", environments: [], last_triggered_at: 0 },
+    });
+    routeParams.id = "second-monitor";
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledWith(
+      "second-monitor",
+      expect.any(Number),
+      expect.any(Number),
+      undefined,
+      false,
+    );
+    expect(mockFetchAll.mock.calls.filter(([id]) => id === "second-monitor")).toHaveLength(1);
+    expect(wrapper.findComponent({ name: "SyntheticMonitorRuns" }).vm).not.toBe(firstChild);
   });
 
   describe("page shell rendering", () => {

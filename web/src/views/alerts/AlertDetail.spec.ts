@@ -15,6 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { reactive } from "vue";
 
 vi.mock("@/services/alerts", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -40,7 +41,11 @@ vi.mock("@/services/anomaly_detection", async (importOriginal) => {
 const mockRouterPush = vi.fn();
 // Mutable so a test can arrive from a non-default folder, the way the list
 // navigates here.
-const mockRouteQuery: Record<string, string> = {};
+const mockRouteQuery: Record<string, string> = reactive({});
+const mockRouteParams = reactive({ alert_id: "alert-1" });
+beforeEach(() => {
+  mockRouteParams.alert_id = "alert-1";
+});
 vi.mock("vue-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vue-router")>();
   return {
@@ -48,7 +53,7 @@ vi.mock("vue-router", async (importOriginal) => {
     useRoute: () => ({
       name: "alertDetail",
       path: "/alerts/detail/alert-1",
-      params: { alert_id: "alert-1" },
+      params: mockRouteParams,
       query: mockRouteQuery,
       meta: {},
     }),
@@ -258,6 +263,33 @@ async function mountView({
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("AlertDetail — route reuse", () => {
+  let wrapper: VueWrapper | undefined;
+  afterEach(() => wrapper?.unmount());
+  it("reloads another alert in place and ignores the previous target's late reply", async () => {
+    wrapper = await mountView({ alert: makeSimpleAlert() });
+    let finishOld!: (value: unknown) => void;
+    vi.mocked(alertsService.get_by_alert_id).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishOld = resolve;
+      }) as never,
+    );
+    mockRouteParams.alert_id = "slow-alert";
+    await flushPromises();
+    expect(alertsService.get_by_alert_id).toHaveBeenLastCalledWith(expect.anything(), "slow-alert");
+    vi.mocked(alertsService.get_by_alert_id).mockResolvedValueOnce({
+      data: { ...makeSimpleAlert(), id: "new-alert", name: "New alert" },
+    } as never);
+    mockRouteParams.alert_id = "new-alert";
+    await flushPromises();
+    expect(wrapper.text()).toContain("New alert");
+    finishOld({ data: { ...makeSimpleAlert(), id: "slow-alert", name: "Stale alert" } });
+    await flushPromises();
+    expect(wrapper.text()).toContain("New alert");
+    expect(wrapper.text()).not.toContain("Stale alert");
+  });
+});
 
 describe("AlertDetail — History tab", () => {
   let wrapper: VueWrapper;
