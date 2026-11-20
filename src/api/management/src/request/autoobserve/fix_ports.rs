@@ -98,8 +98,9 @@ impl FixPort for LiveFixPort {
             Ok(target) => target,
             Err(e) => return ack_answer(e),
         };
+        // No end on the first clear: a flapping alert would page again (ENT ends it when quiet).
         let req = AlertMuteRequest {
-            until_clear: true,
+            ends_at: Some(now_micros() + mute::UNTIL_CLEAR_MICROS),
             all_groups: true,
             ..Default::default()
         };
