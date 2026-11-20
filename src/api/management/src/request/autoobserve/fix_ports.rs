@@ -220,7 +220,7 @@ impl FixPort for LiveFixPort {
                     destination_type, ..
                 } => Some(DestinationRow {
                     name: d.name,
-                    kind: kind_of(&destination_type).to_string(),
+                    kind: kind_of(&destination_type),
                 }),
                 Module::Pipeline { .. } => None,
             })
@@ -394,12 +394,17 @@ fn mute_source(via: Source) -> MuteSource {
     }
 }
 
-fn kind_of(t: &DestinationType) -> &'static str {
+/// The kind a replacement must share: a webhook's prebuilt type (slack, msteams, ...) counts.
+fn kind_of(t: &DestinationType) -> String {
     match t {
-        DestinationType::Http(_) => "http",
-        DestinationType::Email(_) => "email",
-        DestinationType::Sns(_) => "sns",
-        DestinationType::SlackApp(_) => "slack_app",
+        DestinationType::Http(endpoint) => {
+            let typed = endpoint.destination_type.as_deref().map(str::trim);
+            let name = typed.filter(|t| !t.is_empty()).unwrap_or("custom");
+            format!("http:{}", name.to_lowercase())
+        }
+        DestinationType::Email(_) => "email".into(),
+        DestinationType::Sns(_) => "sns".into(),
+        DestinationType::SlackApp(_) => "slack_app".into(),
     }
 }
 
@@ -513,5 +518,25 @@ mod tests {
             ],
             "an incident's page is its opener's; AutoObserve's own incidents are no alert's"
         );
+    }
+
+    #[test]
+    fn a_destination_kind_is_its_type_never_just_http() {
+        let http = |typed: serde_json::Value| {
+            let mut body = serde_json::json!({"url": "https://hooks.test/x"});
+            if !typed.is_null() {
+                body["destination_type"] = typed;
+            }
+            DestinationType::Http(serde_json::from_value(body).unwrap())
+        };
+        let kinds = [
+            (serde_json::json!("slack"), "http:slack"),
+            (serde_json::json!(" MSTeams "), "http:msteams"),
+            (serde_json::json!(""), "http:custom"),
+            (serde_json::Value::Null, "http:custom"),
+        ];
+        for (typed, want) in kinds {
+            assert_eq!(kind_of(&http(typed.clone())), want, "{typed}");
+        }
     }
 }
