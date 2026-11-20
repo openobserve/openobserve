@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   appendSqlFilter,
+  outerWhereSpan,
   replaceInOuterWhere,
   getFieldFromExpression,
   hasFieldCondition,
@@ -650,5 +651,20 @@ describe("a field's included and excluded values in one group (U6)", () => {
     const withSafe = applyFilterToQuery(`code = 1 AND ${mixed}`, safe);
     expect(withSafe).toBe(`code = 1 AND ${safe}`);
     expect(removeFieldCondition(withSafe, "level")).toBe("code = 1");
+  });
+});
+
+describe("outerWhereSpan", () => {
+  it("spans the outer conditions, skipping a keyword in a literal and a sub-select", () => {
+    const sql = `SELECT * FROM t WHERE m = 'no limit' AND id IN (SELECT id FROM u WHERE a = 1) ORDER BY b`;
+    const span = outerWhereSpan(sql)!;
+    expect(sql.slice(span.keyword, span.start)).toBe("WHERE");
+    expect(sql.slice(span.start, span.end).trim()).toBe(
+      "m = 'no limit' AND id IN (SELECT id FROM u WHERE a = 1)",
+    );
+  });
+
+  it("is null without a WHERE", () => {
+    expect(outerWhereSpan("SELECT * FROM t ORDER BY a")).toBeNull();
   });
 });

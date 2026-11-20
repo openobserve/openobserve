@@ -302,13 +302,44 @@ describe("QueryEditorDialog - field panel", () => {
     ]);
   });
 
-  it("reads the WHERE the field panel parses, not a text match cut short by a keyword in a literal", async () => {
+  it("reads the whole WHERE, not a text match cut short by a keyword in a literal", async () => {
     const wrapper = await mountComp({
       tab: "sql",
       sqlQuery: `SELECT * FROM "s" WHERE msg = 'no limit' AND host = 'a'`,
     });
     const vm = wrapper.vm as unknown as { fieldListWhereClause: string };
     expect(vm.fieldListWhereClause).toBe(`msg = 'no limit' AND host = 'a'`);
+  });
+
+  it.each([
+    [
+      "adds a pick next to a keyword inside a literal and keeps the trailing clauses",
+      `SELECT * FROM "s" WHERE msg = 'no limit' AND host = 'a' ORDER BY _timestamp LIMIT 10`,
+      "add-field",
+      "level='error'",
+      `SELECT * FROM "s" WHERE msg = 'no limit' AND host = 'a' and level='error' ORDER BY _timestamp LIMIT 10`,
+    ],
+    [
+      "removes the last condition together with its WHERE",
+      `SELECT * FROM "s" WHERE host = 'a' ORDER BY _timestamp`,
+      "remove-field",
+      "host",
+      `SELECT * FROM "s" ORDER BY _timestamp`,
+    ],
+    [
+      "adds a WHERE before the trailing clauses when there is none",
+      `SELECT * FROM "s" ORDER BY _timestamp`,
+      "add-field",
+      "host='a'",
+      `SELECT * FROM "s" WHERE host='a' ORDER BY _timestamp`,
+    ],
+  ])("%s", async (_name, sqlQuery, event, value, expected) => {
+    const wrapper = await mountComp({ tab: "sql", sqlQuery });
+    const vm = wrapper.vm as unknown as {
+      handleFieldListEvent: (event: string, value: string) => void;
+    };
+    vm.handleFieldListEvent(event, value);
+    expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([expected]);
   });
 
   it("reads the time range at request time instead of freezing it", async () => {

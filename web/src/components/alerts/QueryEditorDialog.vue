@@ -555,7 +555,6 @@ import type { FieldPanelCapabilities } from "@/components/common/fieldPanel/fiel
 import config from "@/aws-exports";
 import useQuery from "@/composables/useQuery";
 import useStreams from "@/composables/useStreams";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getParser as getParserUtil, type SqlUtilsContext } from "@/utils/alerts/alertSqlUtils";
 import useParser from "@/composables/useParser";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -563,6 +562,7 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
+import { appendSqlFilter, outerWhereSpan } from "@/plugins/logs/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -1158,30 +1158,11 @@ watch(
   { immediate: true, deep: true },
 );
 
-const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
-
-const regexWhereClause = (sql: string): string => {
-  const match = sql.match(
-    /\bWHERE\b([\s\S]+?)(?:\bGROUP\s+BY\b|\bHAVING\b|\bORDER\s+BY\b|\bLIMIT\b|$)/i,
-  );
-  return match ? match[1].trim() : "";
-};
-
-// Read through the same parser the field panel reads its checked values with, so a pick edits the WHERE the panel shows; an unparsable query keeps its text WHERE.
+// One literal-aware span is both read and rewritten, so a keyword inside a string never splits the WHERE.
 const fieldListWhereClause = computed(() => {
-  const sql = localSqlQuery.value?.trim();
-  if (!sql) return "";
-  const parsed = fnParsedSQL(sql);
-  if (!parsed?.from?.length) return regexWhereClause(sql);
-  if (!parsed.where) return "";
-  const rendered = fnUnparsedSQL({
-    type: "select",
-    columns: [{ expr: { type: "column_ref", table: null, column: "*" }, as: null }],
-    from: [{ db: null, table: "x", as: null }],
-    where: parsed.where,
-  });
-  const match = rendered.match(/\bWHERE\b\s+([\s\S]+)$/i);
-  return match ? match[1].replace(/`/g, '"').trim() : regexWhereClause(sql);
+  const sql = localSqlQuery.value?.trim() ?? "";
+  const span = outerWhereSpan(sql);
+  return span ? sql.slice(span.start, span.end).trim() : "";
 });
 
 const fieldListItems = computed(() =>
@@ -1236,18 +1217,10 @@ const fieldSource = useLocalFieldSource({
 const rebuildSqlWithWhere = (newWhere: string): string => {
   const sql = localSqlQuery.value?.trim() || "";
   if (!sql) return newWhere ? `SELECT * FROM "${props.streamName}" WHERE ${newWhere}` : "";
-
-  // Split off any trailing GROUP BY / HAVING / ORDER BY / LIMIT
-  const trailingMatch = sql.match(/(\s+(?:GROUP\s+BY|HAVING|ORDER\s+BY|LIMIT)\b[\s\S]*)$/i);
-  const trailing = trailingMatch ? trailingMatch[1] : "";
-  const sqlBeforeTrailing = trailing ? sql.slice(0, sql.length - trailing.length) : sql;
-
-  // Now strip any existing WHERE clause from sqlBeforeTrailing
-  const whereIdx = sqlBeforeTrailing.search(/\bWHERE\b/i);
-  const beforeWhere =
-    whereIdx >= 0 ? sqlBeforeTrailing.slice(0, whereIdx).trimEnd() : sqlBeforeTrailing;
-
-  return newWhere ? `${beforeWhere} WHERE ${newWhere}${trailing}` : `${beforeWhere}${trailing}`;
+  const span = outerWhereSpan(sql);
+  if (!span) return newWhere ? appendSqlFilter(sql, newWhere, "WHERE") : sql;
+  if (!newWhere) return `${sql.slice(0, span.keyword).trimEnd()}${sql.slice(span.end)}`;
+  return `${sql.slice(0, span.start)} ${newWhere}${sql.slice(span.end)}`;
 };
 
 const handleFieldListEvent = (event: string, value: any) => {

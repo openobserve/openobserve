@@ -142,7 +142,7 @@ const topLevelKeywords = (sql: string): { kw: string; index: number }[] => {
  * Appends `filter` to the query's top-level WHERE (adding one if absent), bracketing
  * existing conditions that hold a top-level OR so the new AND binds to all of them.
  */
-export const appendSqlFilter = (query: string, filter: string): string => {
+export const appendSqlFilter = (query: string, filter: string, whereKeyword = "where"): string => {
   const keywords = topLevelKeywords(query);
   const where = keywords.find((k) => k.kw === "where");
   const end = keywords.find(
@@ -156,7 +156,7 @@ export const appendSqlFilter = (query: string, filter: string): string => {
     ? trailing.slice(trailing.trimEnd().length)
     : "";
   const tail = (rest ? " " + rest : "") + lineBreak;
-  if (!where) return `${query.slice(0, codeEnd)} where ${filter}${tail}`;
+  if (!where) return `${query.slice(0, codeEnd)} ${whereKeyword} ${filter}${tail}`;
   const condStart = where.index + "where".length;
   const hasOr = keywords.some(
     (k) => k.kw === "or" && k.index > where.index && (!end || k.index < end.index),
@@ -164,6 +164,21 @@ export const appendSqlFilter = (query: string, filter: string): string => {
   const conditions = query.slice(condStart, codeEnd).trim();
   const wrapped = hasOr ? `(${conditions})` : conditions;
   return `${query.slice(0, condStart)} ${wrapped} AND ${filter}${tail}`;
+};
+
+/** Where the top-level WHERE keyword and its conditions sit, skipping literals, comments and sub-selects. */
+export const outerWhereSpan = (
+  query: string,
+): { keyword: number; start: number; end: number } | null => {
+  const keywords = topLevelKeywords(query);
+  const where = keywords.find((k) => k.kw === "where");
+  if (!where) return null;
+  const end = keywords.find((k) => k.kw !== "or" && k.kw !== "where" && k.index > where.index);
+  return {
+    keyword: where.index,
+    start: where.index + "where".length,
+    end: lastCodeEnd(query, end ? end.index : query.length),
+  };
 };
 
 // Trailing comments stay after the appended filter so a line comment cannot swallow it.
