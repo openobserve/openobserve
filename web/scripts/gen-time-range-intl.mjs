@@ -97,7 +97,9 @@ function relative(tag) {
     const rtf = new Intl.RelativeTimeFormat(tag, { numeric: "auto" });
     for (const offset of offsets) {
       const word = clean(rtf.format(offset, unit));
-      if (!/\d/.test(word)) auto.push([key, offset, word]);
+      // Sentence case: the word doubles as the reading's name, as the rail labels it.
+      if (!/\d/.test(word))
+        auto.push([key, offset, word.replace(/^\p{Ll}/u, (c) => c.toLocaleUpperCase(tag))]);
     }
   }
   return { ago, fixed: uniq(fixed.map((f) => JSON.stringify(f))).map((f) => JSON.parse(f)), auto };

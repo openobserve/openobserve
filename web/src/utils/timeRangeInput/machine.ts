@@ -46,20 +46,7 @@ export interface MathPoint {
   offsets: { sign: number; n: number; unit: UnitKey }[];
 }
 
-const EN_MONTHS = [
-  "jan",
-  "feb",
-  "mar",
-  "apr",
-  "may",
-  "jun",
-  "jul",
-  "aug",
-  "sep",
-  "oct",
-  "nov",
-  "dec",
-];
+const EN_MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split(" ");
 // Letter abbreviations: a list of offsets (minutes) asks, an IANA name follows that zone's DST.
 const ZONE_ABBREVIATIONS: Record<string, number[] | string> = {
   IST: [330, 120, 60],
@@ -477,7 +464,7 @@ export function firstInstant(c: Civil, zone: string): number {
   return r.kind === "fold" ? r.earlier : r.us;
 }
 
-function floorInstant(us: number, unit: UnitKey, zone: string, firstDay: number): number {
+function floorInstant(us: number, unit: UnitKey, zone: string): number {
   const c = wallAt(zone, us);
   if (unit === "s" || unit === "m") {
     const size = UNIT_US[unit] ?? US_PER_S;
@@ -491,7 +478,8 @@ function floorInstant(us: number, unit: UnitKey, zone: string, firstDay: number)
   }
   const day = dayStart(c.y, c.mo, c.d);
   if (unit === "d") return firstInstant(day, zone);
-  if (unit === "w") return firstInstant(weekStartOf(day, firstDay), zone);
+  // `/w` snaps to the rail's `calendar:week`, which starts on Monday in every locale.
+  if (unit === "w") return firstInstant(weekStartOf(day, 1), zone);
   if (unit === "M") return firstInstant(dayStart(c.y, c.mo, 1), zone);
   return firstInstant(dayStart(c.y, 1, 1), zone);
 }
@@ -502,7 +490,6 @@ export function scanDateMath(
   pos: number,
   nowUs: number,
   zone: string,
-  firstDay: number,
 ): MathPoint | null | undefined {
   if (text.slice(pos, pos + 3).toLowerCase() !== "now" || isAlpha(text, pos + 3)) return undefined;
   let i = pos + 3;
@@ -533,8 +520,8 @@ export function scanDateMath(
       const unit = readMathUnit(text[j + 1]);
       if (!unit || isAlpha(text, j + 2)) return null;
       const [a, b] = chains;
-      const first = floorInstant(a, unit, zone, firstDay);
-      chains = [first, a === b ? first : floorInstant(b, unit, zone, firstDay)];
+      const first = floorInstant(a, unit, zone);
+      chains = [first, a === b ? first : floorInstant(b, unit, zone)];
       snapped = true;
       i = j + 2;
     } else break;

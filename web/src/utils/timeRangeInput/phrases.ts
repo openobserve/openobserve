@@ -601,7 +601,7 @@ export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
     const out: Hit<Alt<Point>[]>[] = [];
     for (const s of scanStamp(sc.text, pos, env.nowUs, env.zone)) out.push([s.end, s.alts]);
     for (const s of scanEpoch(sc.text, pos)) out.push([s.end, s.alts]);
-    const math = scanDateMath(sc.text, pos, env.nowUs, env.zone, env.pack.firstDay);
+    const math = scanDateMath(sc.text, pos, env.nowUs, env.zone);
     if (math && math.offsets.length + (math.snapped ? 1 : 0) > 0) {
       out.push([math.end, math.alts]);
     }
