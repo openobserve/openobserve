@@ -277,16 +277,16 @@
   --color-datepicker-relative-btn-selected-bg: var(--color-selected-bg);
   --color-datepicker-relative-btn-selected-text: var(--color-selected-fg);
 
-  /* Fields: raised fill and the 3:1 control edge; focus is the accent ring alone. */
+  /* Fields: raised fill and the quiet hairline edge; focus is the accent ring alone. */
   --color-input-bg: var(--color-surface-raised);
-  --color-input-border: var(--color-border-control);
-  --color-input-border-hover: var(--color-border-strong);
+  --color-input-border: var(--color-border-button);
+  --color-input-border-hover: var(--color-border-control);
   --color-input-border-focus: var(--color-border-control);
   --color-input-focus-glow: var(--color-focus-ring-accent);
   --color-input-placeholder: var(--color-text-placeholder);
   --color-select-bg: var(--color-surface-raised);
-  --color-select-border: var(--color-border-control);
-  --color-select-border-hover: var(--color-border-strong);
+  --color-select-border: var(--color-border-button);
+  --color-select-border-hover: var(--color-border-control);
   --color-select-border-focus: var(--color-border-control);
   --color-select-icon: var(--color-text-secondary);
   --color-datepicker-focus-border: var(--color-border-control);
@@ -419,7 +419,7 @@
   font-weight: var(--font-medium);
   background-color: var(--color-button-outline-bg);
   /* A select, so it takes the 3:1 input edge, not the button edge. */
-  border-color: var(--color-select-border);
+  border-color: var(--color-border-button);
   border-radius: var(--radius-default);
   box-shadow: none;
 }
@@ -606,4 +606,21 @@
 :root [data-o2-btn]:is(.h-6, .size-6) span.inline-flex.shrink-0.align-middle.size-4 {
   width: 0.875rem;
   height: 0.875rem;
+}
+
+/* Toolbar and header secondary buttons: a faint resting fill (half the segmented-track tone) so they sit on the bar, not float; hover and open keep the ghost fills. */
+:root :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active), .results-page-select :is(button, [role="combobox"]), button.results-page-select):not(:disabled):not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not([aria-pressed="true"]) {
+  background-color: var(--toolbar-btn-rest-bg);
+}
+:root :is(.toolbar-btn-rest, .header-utility-icons button:not(.ai-btn-active), .results-page-select :is(button, [role="combobox"]), button.results-page-select):not(:disabled):not(:focus-visible):not([aria-pressed="true"]) {
+  box-shadow: inset 0 0 0 1px var(--toolbar-btn-rest-edge);
+}
+:root:not(.dark) {
+  --toolbar-btn-rest-bg: color-mix(in srgb, var(--color-surface-band) 55%, transparent);
+  --toolbar-btn-rest-edge: var(--color-border-button);
+}
+/* Dark needs more lift: the shell is near-black, so the light-mode mix disappears. */
+:root.dark {
+  --toolbar-btn-rest-bg: var(--color-surface-band);
+  --toolbar-btn-rest-edge: color-mix(in srgb, var(--color-border-button) 50%, var(--color-border-control));
 }

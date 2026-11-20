@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
       <OButton
         data-test="date-time-prev-btn"
+        class="toolbar-btn-rest"
         variant="ghost"
         size="icon-xs-sq"
         icon-left="chevron-left"
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
             'w-fit': disableRelative,
-            'border-select-border! enabled:hover:border-select-border-hover!':
+            'border-border-button! enabled:hover:border-border-control!':
               fieldAppearance || variant === 'outline',
             'w-full': fieldAppearance,
           }"
@@ -379,6 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip v-if="!hideRangeShift" :content="t('common.next')">
       <OButton
         data-test="date-time-next-btn"
+        class="toolbar-btn-rest"
         variant="ghost"
         size="icon-xs-sq"
         icon-left="chevron-right"

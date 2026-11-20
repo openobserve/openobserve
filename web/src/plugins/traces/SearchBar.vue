@@ -81,6 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showDrillDown"
             data-test="insights-button"
+            class="toolbar-btn-rest"
             variant="ghost"
             size="sm-toolbar"
             :disabled="searchObj.loading"
@@ -118,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="!toolbarMoveResetToMenu"
               data-test="traces-search-bar-reset-filters-btn"
+              class="toolbar-btn-rest"
               variant="ghost"
               size="sm-toolbar"
               @click="resetFilters"
@@ -132,6 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showPinnedMetrics"
             data-test="traces-search-bar-metrics-pinned-btn"
+            class="toolbar-btn-rest"
             size="sm-toolbar"
             variant="ghost"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
@@ -157,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="traces-search-bar-saved-views-btn"
                   variant="ghost"
                   size="xs-grouped"
-                  class="h-full!"
+                  class="toolbar-btn-rest h-full!"
                 >
                   <OIcon name="saved-search" size="sm" />
                   <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
@@ -182,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-search-bar-saved-views-create-btn"
               variant="ghost"
               size="icon-panel"
-              class="h-full!"
+              class="toolbar-btn-rest h-full!"
               @click="openSaveViewDialog"
             >
               <OIcon name="save" size="sm" />
@@ -202,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-search-bar-more-menu-btn"
               variant="ghost"
               size="sm-toolbar"
-              class="shrink-0 max-lg:ms-auto"
+              class="toolbar-btn-rest shrink-0 max-lg:ms-auto"
             >
               {{ t("search.menuMore") }}
               <template #icon-right>
@@ -336,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <RecentSearchesButton
             data-test="traces-search-bar-recent-searches-btn"
+            class="toolbar-btn-rest"
             @view-all="openRecentSearches"
           />
           <div>
@@ -445,6 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
+            class="toolbar-btn-rest"
             :url="tracesShareURL"
             variant="ghost"
             size="icon-toolbar"
@@ -456,6 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 data-test="traces-search-bar-more-actions-btn"
+                class="toolbar-btn-rest"
                 :aria-label="toolbarActionsLabel"
                 variant="ghost"
                 size="icon-toolbar"
@@ -552,6 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               data-test="service-graph-refresh-btn"
+              class="toolbar-btn-rest"
               variant="ghost"
               size="icon-toolbar"
               @click="$emit('service-graph-refresh')"

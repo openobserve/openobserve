@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="icon-toolbar"
-          class="ms-1.5 shrink-0"
+          class="toolbar-btn-rest ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
         >
@@ -226,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ORefreshButton
               layout="inline"
               variant="ghost"
-              class="gap-1.5! ps-1! pe-2! text-xs!"
+              class="toolbar-btn-rest gap-1.5! ps-1! pe-2! text-xs!"
               :last-run-at="searchObj.meta.lastRunAt"
               :loading="searchObj.loading || histogramSettling"
               :disabled="searchObj.loading || histogramSettling"
@@ -239,6 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 :size="showActionLabels ? 'sm-toolbar' : 'icon-toolbar'"
                 :disabled="!showInspectBtn"
+                class="toolbar-btn-rest"
                 :aria-label="t('volumeInsights.searchInspectionsLabel')"
                 @click="openSearchJobInspector"
                 data-test="logs-inspect-button"
@@ -253,6 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="showWrapBtn"
                 variant="ghost"
                 :size="showActionLabels ? 'sm-toolbar' : 'icon-toolbar'"
+                class="toolbar-btn-rest"
                 :class="searchObj.meta.toggleSourceWrap ? '' : 'border! border-transparent!'"
                 :active="searchObj.meta.toggleSourceWrap"
                 :aria-pressed="searchObj.meta.toggleSourceWrap ? 'true' : 'false'"
