@@ -1518,6 +1518,8 @@ mod tests {
     #[tokio::test]
     async fn without_the_engine_a_valid_request_is_a_503_and_a_bad_one_a_400() {
         ENGINE_ON.with(|on| on.set(Some(true)));
+        // RBAC is on for the whole process once any test installs the fake checker.
+        MAY_CHANGE.with(|may| may.set(Some(true)));
         let mark = "/v2/o/autoobserve/marks/protected/alert/a1";
         for (method, uri, body) in [
             ("GET", "/v2/o/autoobserve/coverage", ""),
