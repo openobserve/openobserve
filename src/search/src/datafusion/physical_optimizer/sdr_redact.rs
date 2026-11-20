@@ -79,6 +79,27 @@ impl PhysicalOptimizerRule for LiftRedaction {
     }
 }
 
+/// Columns of a stream whose index terms or values hold raw protected data; empty when the
+/// stream is unprotected or the pattern manager is not ready, which the scanning node rechecks.
+#[cfg(feature = "vectorscan")]
+pub fn protected_columns(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> HashSet<String> {
+    let Some(manager) = PATTERN_MANAGER.get() else {
+        return HashSet::new();
+    };
+    match manager.search_protection(org_id, stream_type, stream_name) {
+        Ok(Some(protection)) => protection
+            .fields
+            .into_iter()
+            .chain(RAW_COPY_COLUMNS.iter().map(|c| c.to_string()))
+            .collect(),
+        _ => HashSet::new(),
+    }
+}
+
 /// Part of a cache key: results are stored redacted, so a pattern change must miss them.
 /// `None` when no stream read is protected, which keeps the keys of other queries unchanged.
 #[cfg(feature = "vectorscan")]
