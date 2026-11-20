@@ -27,6 +27,7 @@ import {
 } from "@/components/alerts/alertFormSections";
 import { operatorsToWords } from "@/components/alerts/composite/expression";
 import { alertConditionText } from "@/utils/alerts/alertCondition";
+import { countComparisonWords } from "@/utils/alerts/countComparison";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import {
   compactDuration,
@@ -793,9 +794,17 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     if (qc.type !== "promql" || qc.promql_rule_mode) return null;
     if (forecastOf(fd)) return forecastReady(fd) ? "forecast" : "forecastUnset";
     if (!hasValue(qc.promql_condition?.value)) return null;
-    if (qc.promql_multi_alert) return "promqlEach";
-    const op = fd.trigger_condition?.operator;
-    return !op || op === ">=" ? "promqlAny" : null;
+    return qc.promql_multi_alert ? "promqlEach" : "promqlAny";
+  };
+
+  // "at least 3", "fewer than 2": how many groups or series must cross, in the count picker's words.
+  const groupCount = (fd: AlertSectionsFormData) => {
+    const count = Number(fd.trigger_condition?.threshold ?? 1);
+    const op = countComparisonWords(fd.trigger_condition?.operator, t);
+    return {
+      count,
+      text: strong(t("alerts.sections.review.comparison", { op, value: formatNumber(count) })),
+    };
   };
 
   const conditionLine = (fd: AlertSectionsFormData): ReviewSentence => {
@@ -838,10 +847,10 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
           : { keypath: FIRES_KEYS.promqlEach, parts: { comparison } };
       }
       if (!rule) return null;
-      const count = Number(fd.trigger_condition?.threshold ?? 1);
+      const { count, text } = groupCount(fd);
       return {
         keypath: FIRES_KEYS.promqlAny,
-        parts: { count: strong(formatNumber(count)), comparison, window },
+        parts: { count: text, comparison, window },
         plural: count,
       };
     }
@@ -878,8 +887,8 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
             parts: { groups: groups(labels), measure, comparison, window },
           };
     }
-    const count = Number(fd.trigger_condition?.threshold ?? 1);
-    const shared = { count: strong(formatNumber(count)), groups: groups(labels), window };
+    const { count, text } = groupCount(fd);
+    const shared = { count: text, groups: groups(labels), window };
     return counts
       ? {
           keypath: "alerts.sections.review.firesSomeGroupsCount",
@@ -1030,10 +1039,10 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
       comparisonWords(pc.operator, pc.value, t, promqlValueText(fd, pc.value)),
     );
     if (kind === "promqlEach") return { keypath: FIRES_KEYS.promqlEach, parts: { comparison } };
-    const count = Number(fd.trigger_condition?.threshold ?? 1);
+    const { count, text } = groupCount(fd);
     return {
       keypath: FIRES_KEYS.promqlAny,
-      parts: { count: strong(formatNumber(count)), comparison, window },
+      parts: { count: text, comparison, window },
       plural: count,
     };
   };

@@ -473,7 +473,16 @@ describe("useAlertFormSections", () => {
       "PromQL with one alert",
       { query_condition: { type: "promql", promql_condition: { operator: ">=", value: 1 } } },
       "1+ series ≥ 1",
-      "Fires when 1 or more series are at least 1 at any point in the last 5 minutes.",
+      "Fires when at least 1 series is at least 1 at any point in the last 5 minutes.",
+    ],
+    [
+      "PromQL with one alert once fewer than 2 series cross",
+      {
+        query_condition: { type: "promql", promql_condition: { operator: ">=", value: 1 } },
+        trigger_condition: { ...base.trigger_condition, operator: "<", threshold: 2 },
+      },
+      "< 2 series ≥ 1",
+      "Fires when fewer than 2 series are at least 1 at any point in the last 5 minutes.",
     ],
     [
       "PromQL with one alert per series",
